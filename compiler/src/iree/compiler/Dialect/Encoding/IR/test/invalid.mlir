@@ -183,11 +183,3 @@ func.func @illegal_layout_encoding_without_any_layout(%arg0: tensor<?x?xf32, #en
 func.func @illegal_layout_encoding_with_invalid_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
-
-// -----
-
-// expected-error @+1 {{invalid kind of attribute specified}}
-#encoding = #iree_encoding.layout<123>
-func.func @illegal_layout_encoding_with_invalid_attr(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
-  return %arg0 : tensor<?x?xf32, #encoding>
-}

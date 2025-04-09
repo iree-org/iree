@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -546,38 +547,30 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
     encoding = encodingAttr;
   } else if (auto layoutAttr =
                  dyn_cast<IREE::Encoding::LayoutAttr>(tensorEncoding)) {
-    if (!llvm::all_of(layoutAttr.getLayouts().getValue(),
-                      llvm::IsaPred<IREE::CPU::VMVXEncodingLayoutAttr>)) {
+    if (layoutAttr.getLayouts().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "only single layout is handled");
+    }
+    auto encodingLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingLayoutAttr>(
+        layoutAttr.getLayouts().getValue()[0]);
+    if (!encodingLayoutAttr || !encodingLayoutAttr.getConfiguration()) {
       return rewriter.notifyMatchFailure(
-          op, "only VMVX encoding resolver is handled");
+          op, "only VMVX encoding resolver with a configuration is handled");
     }
-    for (auto attr : layoutAttr.getLayouts()
-                         .getAsRange<IREE::CPU::VMVXEncodingLayoutAttr>()) {
-      DictionaryAttr dictAttr = attr.getConfiguration();
-      if (!dictAttr) {
-        continue;
-      }
-      std::optional<NamedAttribute> maybeExtractedEncodingAttr =
-          dictAttr.getNamed("encoding_attr");
-      if (!maybeExtractedEncodingAttr) {
-        continue;
-      }
-      auto extractedEncodingAttr = dyn_cast<IREE::Encoding::EncodingAttr>(
-          maybeExtractedEncodingAttr->getValue());
-      if (!extractedEncodingAttr) {
-        return rewriter.notifyMatchFailure(op,
-                                           "invalid EncodingAttr is encoded");
-      }
-      if (encoding && encoding != extractedEncodingAttr) {
-        return rewriter.notifyMatchFailure(
-            op, "inconsistent EncodingAttr is encoded");
-      }
-      encoding = extractedEncodingAttr;
+
+    DictionaryAttr dictAttr = encodingLayoutAttr.getConfiguration();
+    std::optional<NamedAttribute> maybeEncodingAttr =
+        dictAttr.getNamed("encoding_attr");
+    if (!maybeEncodingAttr ||
+        !isa<IREE::Encoding::EncodingAttr>(maybeEncodingAttr->getValue())) {
+      return rewriter.notifyMatchFailure(op, "EncodingAttr is not found");
     }
+    encoding =
+        cast<IREE::Encoding::EncodingAttr>(maybeEncodingAttr->getValue());
   }
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }
+
   SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
   SmallVector<Value> inputValues;
   Location loc = op.getLoc();

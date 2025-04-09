@@ -66,28 +66,6 @@ LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
   return success();
 }
 
-Attribute LayoutAttr::parse(AsmParser &p, Type type) {
-  SMLoc loc = p.getCurrentLocation();
-  if (failed(p.parseLess())) {
-    return {};
-  }
-  ArrayAttr layouts;
-  if (failed(p.parseAttribute(layouts))) {
-    return {};
-  }
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return p.getChecked<LayoutAttr>(loc, p.getContext(), layouts);
-}
-
-void LayoutAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(getLayouts());
-  os << ">";
-}
-
 bool LayoutAttr::isSerialized() const { return true; }
 
 bool LayoutAttr::isIdentityLayout() const {

@@ -54,10 +54,12 @@ def LayoutAttr :
       ]>
     ]> {
   let mnemonic = "layout";
+  let assemblyFormat = "`<` $layouts `>`";
+
   let summary = [{Indicates potential serialized layouts}];
   let description = [{
     This attribute describes the potential layouts of the encoding. It is an
-    array because a device could have multiple target device.
+    array because a device could have multiple target layouts.
 
     It has a verifier that will ensure that all the attributes in layouts
     implement SerializableEncodingAttrInterface.
@@ -74,7 +76,6 @@ def LayoutAttr :
     AttrBuilder<(ins "ArrayAttr":$layouts)>,
   ];
 
-  let hasCustomAssemblyFormat = 1;
   let genVerifyDecl = 1;
 }
 
