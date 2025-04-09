@@ -12,6 +12,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-constexpr"
@@ -66,6 +67,107 @@ void ConstExprAnalysis::tryExpandToUseOrUseParent(Operation *definingOp,
     return;
   }
   expandToOp(useOp);
+}
+
+static SmallVector<Operation *>
+getLeavesOfForwardSlice(const llvm::SetVector<Operation *> &slice) {
+  SmallVector<Operation *> leaves;
+  for (auto op : slice) {
+    if (llvm::all_of(op->getUsers(),
+                     [&](Operation *user) { return !slice.contains(user); })) {
+      leaves.push_back(op);
+    }
+  }
+  return leaves;
+}
+
+static SmallVector<Operation *>
+getLeavesWithLayoutConflict(ArrayRef<Operation *> leaves) {
+  llvm::MapVector<IREE::Util::LayoutInfo, SmallVector<Operation *>>
+      layoutInfoMap;
+  for (auto leaf : leaves) {
+    auto hoistableOp = dyn_cast<HoistableOpInterface>(leaf);
+    if (!hoistableOp || hoistableOp->getNumResults() != 1) {
+      continue;
+    }
+    std::optional<IREE::Util::LayoutInfo> leafLayout =
+        hoistableOp.getResultLayout(0);
+    if (!leafLayout) {
+      continue;
+    }
+    layoutInfoMap[leafLayout.value()].push_back(hoistableOp);
+  }
+  // If there is a single layout or if map is empty, no conflicts.
+  if (layoutInfoMap.size() <= 1) {
+    return {};
+  }
+  // It is possible to smarter about what leaves to drop, for now
+  // just drop all the leaves.
+  return llvm::to_vector(leaves);
+}
+
+void ConstExprAnalysis::dropLeavesWithLayoutConflicts(
+    ArrayRef<IREE::Util::GlobalLoadOpInterface> roots) {
+
+  // Compute the forward slice from all the global loads of this global.
+  ForwardSliceOptions sliceOptions;
+  // Filter for forward slice. Note that not including an op in a slice
+  // implies that the layout of the leafs that are reachable from this
+  // op is not considered for potential conflicts. So its the aggressive
+  // option (not conservative option).
+  sliceOptions.filter = [&](Operation *op) -> bool {
+    // If op has multiple results, terminate the slice.
+    if (op->getNumResults() != 1) {
+      return false;
+    }
+
+    OpResult val = op->getResult(0);
+    // If the op has no constant info, terminate the slice.
+    ConstValueInfo *opConstInfo = constInfoMap.lookup(val);
+    if (!opConstInfo || !opConstInfo->isConstExpr()) {
+      return false;
+    }
+
+    auto hoistableOp = dyn_cast<IREE::Util::HoistableOpInterface>(op);
+    if (!hoistableOp) {
+      return false;
+    }
+    std::optional<IREE::Util::LayoutInfo> layoutInfo =
+        hoistableOp.getResultLayout(val.getResultNumber());
+    if (!layoutInfo) {
+      return false;
+    }
+
+    // Lastly if this op is reachable from multiple roots, do not include in the
+    // slice.
+    if (opConstInfo->roots.size() != 1) {
+      return false;
+    }
+    return true;
+  };
+
+  // Compute the forward slice
+  llvm::SetVector<Operation *> forwardSlice;
+  for (auto root : roots) {
+    mlir::getForwardSlice(root, &forwardSlice, sliceOptions);
+  }
+  SmallVector<Operation *> leaves = getLeavesOfForwardSlice(forwardSlice);
+
+  SmallVector<Operation *> droppedLeaves = getLeavesWithLayoutConflict(leaves);
+  if (droppedLeaves.empty()) {
+    return;
+  }
+
+  SmallVector<Value> droppedLeafVals =
+      llvm::map_to_vector(droppedLeaves, [&](Operation *droppedLeaf) -> Value {
+        assert(droppedLeaf->getNumResults() == 1 &&
+               "expected op with single result");
+        return droppedLeaf->getResult(0);
+      });
+  // Instead of dropping the leaf, mark it as a non-constant.
+  for (auto droppedLeadVal : droppedLeafVals) {
+    constInfoMap[droppedLeadVal]->state = ConstValueInfo::NON_CONSTANT;
+  }
 }
 
 ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
@@ -187,6 +289,12 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
       }
     }
   }
+
+  // Drop leaves that result in duplication of globals due to layout changes.
+  explorer.forEachGlobal([&](const Explorer::GlobalInfo *info) {
+    auto loads = llvm::to_vector(info->getLoads());
+    dropLeavesWithLayoutConflicts(loads);
+  });
 
   // Go through and populate all consumer sets now that producers are known.
   for (auto it : constInfoMap) {
