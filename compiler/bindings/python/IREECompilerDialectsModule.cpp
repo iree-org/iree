@@ -50,6 +50,16 @@ ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   return mmaList;
 }
 
+static std::vector<MlirOperation>
+ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
+  size_t numOps = 0;
+  ireeCodegenGetTunerRootOps(module, &numOps, nullptr);
+  std::vector<MlirOperation> ops(numOps);
+  ireeCodegenGetTunerRootOps(module, &numOps, ops.data());
+
+  return ops;
+}
+
 NB_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
@@ -432,4 +442,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
       "Queries the MMA intrinsics from an executable variant op.",
       py::arg("op"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetTunerRootOps
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def("get_tuner_root_ops",
+                          &ireeCodegenGetTunerRootOpsBinding,
+                          "Get the operations marked with the tuner root op "
+                          "attribute from a module.",
+                          py::arg("module"));
 }

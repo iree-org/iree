@@ -1049,4 +1049,16 @@ queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
   return mmaIntrinsics;
 }
 
+SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
+  SmallVector<Operation *> rootOps;
+
+  moduleOp.walk([&](Operation *op) {
+    if (hasRootOpInfo(op)) {
+      rootOps.push_back(op);
+    }
+  });
+
+  return rootOps;
+}
+
 } // namespace mlir::iree_compiler

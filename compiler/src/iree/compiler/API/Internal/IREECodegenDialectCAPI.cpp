@@ -198,3 +198,25 @@ void ireeCodegenQueryMMAIntrinsics(MlirOperation op, size_t *numIntrinsics,
     mmaIntrinsics[i] = static_cast<uint32_t>(intrinsics[i]);
   }
 }
+
+void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
+                                MlirOperation *rootOps) {
+  assert(!mlirModuleIsNull(module) && "module cannot be nullptr");
+  assert(numOps && "numOps cannot be nullptr");
+
+  mlir::ModuleOp moduleOp = unwrap(module);
+  llvm::SmallVector<mlir::Operation *> tunerRootOps =
+      mlir::iree_compiler::getTunerRootOps(moduleOp);
+
+  if (!rootOps) {
+    *numOps = tunerRootOps.size();
+    return;
+  }
+
+  assert(*numOps == tunerRootOps.size() &&
+         "*numOps must match the number of elements in the rootOps");
+
+  for (size_t i = 0, e = tunerRootOps.size(); i < e; ++i) {
+    rootOps[i] = wrap(tunerRootOps[i]);
+  }
+}

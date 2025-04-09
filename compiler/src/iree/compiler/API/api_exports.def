@@ -15,6 +15,7 @@ EXPORTS
   ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue
   ireeCodegenGetExecutableVariantOps
+  ireeCodegenGetTunerRootOps
   ireeCodegenQueryMMAIntrinsics
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
