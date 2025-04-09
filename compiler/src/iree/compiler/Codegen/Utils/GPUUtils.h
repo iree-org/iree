@@ -214,6 +214,10 @@ getExecutableVariantOps(mlir::ModuleOp moduleOp);
 SmallVector<IREE::GPU::MMAIntrinsic>
 queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
 
+// Returns all operations within the given module that are marked with the
+// tuner root op attribute (i.e., have the `root_op` UnitAttr).
+SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
