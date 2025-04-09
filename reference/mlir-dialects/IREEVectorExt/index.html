@@ -4004,19 +4004,19 @@ distributed vectors.</p>
 abstraction for gathers, by preserving the iteration space mapping between
 the result vector and the memory dimensions being indexed.</p>
 <p>The operation is a generalization of <code>vector.transfer_read</code> op, where the
-slice from which the read is performed is not guranteed to be contigious,
+slice from which the read is performed is not guranteed to be contiguous,
 and instead how the slice is gathered is defined explicitly in the
 operation.</p>
 <p>The operation can be thought of as:
-  1. A contigious slice gathered from the source as described by the operation
-  2. A <code>vector.transfer_read</code> on the contigious slice</p>
+  1. A contiguous slice gathered from the source as described by the operation
+  2. A <code>vector.transfer_read</code> on the contiguous slice</p>
 <p>The operation defines <code>permutation_map</code>, <code>padding</code>, <code>mask</code>, <code>in_bounds</code> in
 the same way as <code>vector.transfer_read</code> defines, but on the inferred
-contigious slice.</p>
-<p>The other parameters of the operation define how the contigious slice is
+contiguous slice.</p>
+<p>The other parameters of the operation define how the contiguous slice is
 gathered from the source. <code>indices</code> define a base to offset the source by.
 <code>indexed</code> defines for each dimension if the dimension is gathered or
-contigious.</p>
+contiguous.</p>
 <p>The <code>indices</code> contains a base to offset the source by. The <code>indexed</code> array
 defines if a dimension is gathered or not. For example, for the following
 gather:</p>
@@ -4043,7 +4043,7 @@ index_maps = [
 ]
 </code></pre></div>
 <p>With these additional parameters, the operation can define a supervector
-read from a non-contigious slice. For example:</p>
+read from a non-contiguous slice. For example:</p>
 <div class="highlight"><pre><span></span><code>source: memref&lt;8192x8x16xf32&gt;
 indices0 : vector&lt;2xindex&gt;
 indices1 : vector&lt;4x8xindex&gt;
@@ -4065,7 +4065,7 @@ vector = read(slice) : memref&lt;8192x8x16xf32&gt; -&gt; vector&lt;16x8x2xf32&gt
 <p>The crucial structure of the operation relies on the index_vec and
 the result vector's indexing being defined based on the dimensions of the
 memory. This mapping can be exploited to simplify gathered dimensions
-to contigious dimensions.</p>
+to contiguous dimensions.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface</code>, <code>VectorTransferOpInterface</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
