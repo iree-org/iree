@@ -21,64 +21,37 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Pattern to combine instructions across ForOp boundary. It is common when
-/// doing incremental lowering to generate transient ops that cancel each others
-/// out. Canonicalization usually clean up those operations. When the value is
-/// loop carried, MLIR canonicalization currently doesn't remove the redundant
-/// operations.
-///
-/// This pass allow to workaround MLIR limitation and does ad hoc clean up of
-/// instructions found in IREE. Once we have a more general mechanism in MLIR
-/// this pass can be completely removed.
-/// This pass does this kind of transformation:
-/// ```
-/// %21 = vector.shape_cast %20 : vector<4xf32> to vector<1x4xf32>
-/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %21)
-///    -> vector<1x4xf32> {
-///    [...]
-///    %100 = vector.shape_cast %arg4 : vector<1x4xf32> to vector<4xf32>
-///    [...]
-///    %109 = vector.shape_cast %108 : vector<4xf32> to vector<1x4xf32>
-///    scf.yield %109 : vector<1x4xf32>
-///  }
-///  %24 = vector.shape_cast %22 : vector<1x4xf32> to vector<4xf32>
-/// ```
-/// ->
-/// ```
-/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %20)
-///    -> vector<4xf32> {
-///    [...]
-///    scf.yield %108 : vector<4xf32>
-///  }
-/// ```
 struct CanonicalizeForOpInductionVarShape final
     : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
-  Value FoldCarryDep(scf::ForOp forOp, Operation *ivUser,
-                     Operation *ivDef) const {
-    if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(ivUser)) {
-      if (auto souceOp = dyn_cast<vector::ShapeCastOp>(ivDef)) {
-        if (shapeCast.getType() == souceOp.getSource().getType()) {
-          return souceOp.getSource();
-        }
-      }
-    } else if (auto extractOp = dyn_cast<vector::ExtractOp>(ivUser)) {
-      if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(ivDef)) {
-        if (extractOp.getType() == broadcastOp.getSourceType()) {
-          return broadcastOp.getSource();
-        }
-      }
-    } else if (auto targetOp = dyn_cast<UnrealizedConversionCastOp>(ivUser)) {
-      if (auto sourceOp = dyn_cast<UnrealizedConversionCastOp>(ivDef)) {
-        if (sourceOp->getNumOperands() == 1 && targetOp->getNumResults() == 1 &&
-            sourceOp->getOperandTypes().front() ==
-                targetOp.getResultTypes().front()) {
-          return sourceOp.getInputs().front();
-        }
-      }
+  // Return true if it might be possible to yield the operand of `op` instead of
+  // its result.
+  bool canFoldEnd(Operation *op) const {
+    if (!isa<vector::ShapeCastOp, vector::BroadcastOp,
+             UnrealizedConversionCastOp>(op)) {
+      return false;
     }
-    return Value();
+    if (op->getNumOperands() != 1) {
+      return false;
+    }
+    return true;
+  }
+
+  // Return true if `op` (user of induction variable) can be folded if the
+  // induction variable is changed to have type `type`.
+  bool canFoldStart(Operation *op, Type type) const {
+    if (op->getNumResults() != 1) {
+      return false;
+    }
+    if (!isa<vector::ShapeCastOp, vector::ExtractOp,
+             UnrealizedConversionCastOp>(op)) {
+      return false;
+    }
+    if (op->getResult(0).getType() != type) {
+      return false;
+    }
+    return true;
   }
 
   // Transfer the body of `source` into `dest` and update the terminator of
@@ -117,40 +90,81 @@ struct CanonicalizeForOpInductionVarShape final
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
+
     SmallVector<unsigned, 8> iteratorFolded;
     SmallVector<Operation *, 8> resultOps;
     auto terminator = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
     auto returnValues = llvm::to_vector<8>(terminator.getOperands());
     auto initArgs = llvm::to_vector<8>(forOp.getInitArgs());
-    for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (!iterArg.hasOneUse())
-        continue;
-      Operation *op = iterArg.use_begin()->getOwner();
-      if (!isa<vector::ShapeCastOp, vector::ExtractOp,
-               UnrealizedConversionCastOp>(op)) {
-        continue;
-      }
+    for (unsigned index = 0, s = forOp.getNumRegionIterArgs(); index < s;
+         ++index) {
+
       Operation *returnValDef = returnValues[index].getDefiningOp();
+
       // Currently we don't track usage through block arguments.
       if (!returnValDef) {
         continue;
       }
-      Value newReturn = FoldCarryDep(forOp, op, returnValDef);
-      if (!newReturn)
+
+      if (!canFoldEnd(returnValDef)) {
         continue;
+      }
+      Value newReturn = returnValDef->getOperand(0);
+
+      BlockArgument iterArg = forOp.getRegionIterArg(index);
+
+      // Check that all of the users of the induction variable can be folded,
+      // and if so return the final user of the induction variable.
+      Operation *finalIvUser = [&]() -> Operation * {
+        Operation *op = nullptr;
+        for (OpOperand &use : iterArg.getUses()) {
+          op = use.getOwner();
+          if (!canFoldStart(op, newReturn.getType())) {
+            return nullptr;
+          }
+        }
+        return op;
+      }();
+
+      if (!finalIvUser) {
+        continue;
+      }
+
       iteratorFolded.push_back(index);
       resultOps.push_back(returnValDef);
       returnValues[index] = newReturn;
 
+      // Create a clone of the user of the induction variable. Clone will be
+      // used as induction variable in new scf.for.
+      //
+      // An example, where %new_clone is clone of %to_clone:
+      // ```
+      // %0 = scf.for %arg0 = %c1 to %c3 step %c1 iter_args(%arg1 = %cst) ->
+      // (vector<4xf32>) {
+      //   %to_clone = vector.extract %arg1[%arg0] : f32 from vector<4xf32>
+      //   ...
+      // }
+      // %new_clone = vector.extact %cst[%c1] : f32 from vector<4xf32>
+      // ```
       IRMapping mapping;
       mapping.map(iterArg, initArgs[index]);
-      initArgs[index] = rewriter.clone(*op, mapping)->getResult(0);
+
+      std::optional<SmallVector<Value>> loopIndVars =
+          forOp.getLoopInductionVars();
+      assert(loopIndVars.has_value() && loopIndVars.value().size() == 1 &&
+             "scf.for must have 1 loop induction variable");
+      Value loopIndVar = loopIndVars.value()[0];
+      Value start = forOp.getLowerBound();
+      mapping.map(loopIndVar, start);
+      initArgs[index] = rewriter.clone(*finalIvUser, mapping)->getResult(0);
     }
     if (iteratorFolded.empty())
       return failure();
+
     auto newLoop = rewriter.create<scf::ForOp>(
         forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
         forOp.getStep(), initArgs);
+
     SmallVector<Value> newReturnVals = transferBody(
         forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
 
@@ -160,15 +174,18 @@ struct CanonicalizeForOpInductionVarShape final
     for (auto [index, iter] : llvm::enumerate(iteratorFolded)) {
       IRMapping mapping;
       mapping.map(newReturnVals[iter], newLoop.getResult(iter));
-      repResults[index] =
+      repResults[iter] =
           rewriter.clone(*resultOps[index], mapping)->getResult(0);
-      Operation *oldOp =
-          newLoop.getRegionIterArgs()[index].use_begin()->getOwner();
-      assert(oldOp->getNumResults() == 1 && "expected single result");
-      rewriter.replaceAllUsesWith(oldOp->getResult(0),
-                                  newLoop.getRegionIterArgs()[index]);
+
+      for (OpOperand &use : newLoop.getRegionIterArgs()[iter].getUses()) {
+        Operation *oldOp = use.getOwner();
+        assert(oldOp->getNumResults() == 1 && "expected single result");
+        rewriter.replaceAllUsesWith(oldOp->getResult(0),
+                                    newLoop.getRegionIterArgs()[iter]);
+      }
     }
     rewriter.replaceOp(forOp, repResults);
+
     return success();
   }
 };
@@ -301,12 +318,12 @@ struct ForOpCanonicalizationPass final
     // canonicalization pattern will be blocked by the packing pattern
     // so we apply that first.
     RewritePatternSet canonPatterns(&getContext());
-    canonPatterns.insert<CanonicalizeForOpInductionVarShape>(fn.getContext());
+    canonPatterns.add<CanonicalizeForOpInductionVarShape>(fn.getContext());
     if (failed(applyPatternsGreedily(fn, std::move(canonPatterns)))) {
       return signalPassFailure();
     }
     RewritePatternSet packPatterns(&getContext());
-    packPatterns.insert<PackForOpInductionVarVector>(fn.getContext());
+    packPatterns.add<PackForOpInductionVarVector>(fn.getContext());
     if (failed(applyPatternsGreedily(fn, std::move(packPatterns)))) {
       return signalPassFailure();
     }
@@ -314,4 +331,10 @@ struct ForOpCanonicalizationPass final
 };
 
 } // namespace
+
+void populateForOpInductionVarShapePatterns(RewritePatternSet &patterns,
+                                            PatternBenefit benefit) {
+  patterns.add<CanonicalizeForOpInductionVarShape>(patterns.getContext(),
+                                                   benefit);
+}
 } // namespace mlir::iree_compiler
