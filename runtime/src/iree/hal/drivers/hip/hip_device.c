@@ -1552,6 +1552,14 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     }
 
     if (iree_status_is_ok(status)) {
+      if (iree_status_is_ok(status)) {    
+        for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+          iree_hal_hip_semaphore_wait_until_timepoints_exported(
+            signal_semaphore_list.semaphores[i],
+            signal_semaphore_list.payload_values[i]);
+        }
+      }
+    
       *out_buffer = buffer;
     } else {
       if (buffer) {
@@ -1639,6 +1647,14 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
       }
     } else {
       iree_hal_hip_device_destroy_buffer_callback_data(callback_data);
+    }
+
+    if (iree_status_is_ok(status)) {    
+      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+        iree_hal_hip_semaphore_wait_until_timepoints_exported(
+          signal_semaphore_list.semaphores[i],
+          signal_semaphore_list.payload_values[i]);
+      }
     }
 
     IREE_TRACE_ZONE_END(z0);
@@ -2083,6 +2099,14 @@ static iree_status_t iree_hal_hip_device_queue_read(
   } else {
     iree_hal_hip_device_destroy_queue_read_callback_data(callback_data);
   }
+  if (iree_status_is_ok(status)) {    
+    for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      iree_hal_hip_semaphore_wait_until_timepoints_exported(
+        signal_semaphore_list.semaphores[i],
+        signal_semaphore_list.payload_values[i]);
+    }
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -2109,6 +2133,12 @@ static iree_status_t iree_hal_hip_device_queue_write(
               signal_semaphore_list, source_buffer, source_offset, target_file,
               target_offset, length, flags, options));
 
+  for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+    iree_hal_hip_semaphore_wait_until_timepoints_exported(
+      signal_semaphore_list.semaphores[i],
+      signal_semaphore_list.payload_values[i]);
+  }
+          
   IREE_TRACE_ZONE_END(z0);
   return loop_status;
 }
@@ -2426,6 +2456,14 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     }
   } else {
     iree_hal_hip_device_destroy_callback_data(callback_data);
+  }
+
+  if (iree_status_is_ok(status)) {    
+    for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      iree_hal_hip_semaphore_wait_until_timepoints_exported(
+        signal_semaphore_list.semaphores[i],
+        signal_semaphore_list.payload_values[i]);
+    }
   }
 
   IREE_TRACE_ZONE_END(z0);
