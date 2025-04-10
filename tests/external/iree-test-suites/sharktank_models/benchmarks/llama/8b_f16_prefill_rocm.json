@@ -7,6 +7,7 @@
     ],
     "function_run": "prefill_bs4",
     "benchmark_flags": [
+        "--hip_use_streams=true",
         "--benchmark_repetitions=10",
         "--benchmark_min_warmup_time=3.0"
     ],
