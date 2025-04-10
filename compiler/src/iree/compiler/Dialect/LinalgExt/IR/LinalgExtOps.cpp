@@ -143,6 +143,8 @@ static LogicalResult
 verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
                     ShapedType updateType, StringRef originalName,
                     StringRef updateName) {
+  static_assert(llvm::is_one_of<OpTy, GatherOp, ScatterOp>::value,
+                "applies to only gather or scatter operations");
   if (op.getInputs().size() != 2) {
     return op.emitOpError("expected two input operands");
   }
@@ -300,7 +302,7 @@ SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
 }
 
 //===----------------------------------------------------------------------===//
-// Gather Op
+// GatherOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult GatherOp::verify() {
