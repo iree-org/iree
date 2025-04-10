@@ -14,7 +14,7 @@
         }
     ],
     "device": "hip",
-    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/8b_f16_random.irpa",
+    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/real_weights.irpa",
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/8b_f16_random.mlir",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
