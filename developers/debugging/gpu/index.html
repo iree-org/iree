@@ -3868,8 +3868,12 @@ you hours of debugging sometimes:</p>
 <li>Are others able to reproduce the issue?</li>
 <li>If not what SDK / driver versions they are using?</li>
 <li>Is your machine drawing enough power when benchmarking?</li>
-<li>Is your machine connected with a mointor (e.g., for Vulkan)?</li>
+<li>Is your machine connected with a monitor (e.g., for Vulkan)?</li>
 <li>How long since you last rebooted your machine? 👻</li>
+<li>(Windows only) Did you change the <code>TdrDelay</code> value to something more lenient (e.g., 600 seconds)?
+  <code>TdrDelay</code> (<code>HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\GraphicsDrivers</code>) is
+  the timeout for a response to a preempt request from the GPU scheduler.
+  A large enough computation can outlive the default value of 2 seconds, leading to a GPU reset.</li>
 </ul>
 </div>
 <div class="admonition tip">
