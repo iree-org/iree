@@ -180,7 +180,12 @@ def EncodingAttr :
 // iree_encoding.matmul_k
 //===---------------------------------------------------------------------===//
 
-def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
+def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "cloneWithLayouts",
+      ]>
+    ]> {
   let mnemonic = "matmul_k";
   let summary = [{An attribute that tracks reduction dimensions for matmul}];
   let description = [{
@@ -223,6 +228,10 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK"> {
   let parameters = (ins
     "DenseI32ArrayAttr":$k_dims
   );
+
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<int32_t>":$k_dims)>
+  ];
 }
 
 //===---------------------------------------------------------------------===//
