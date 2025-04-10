@@ -127,3 +127,57 @@ util.func public @scatter(%arg0 : tensor<4xi64>, %arg1 : tensor<4x1xi32>, %arg2 
 //  CHECK-SAME:     ins(%[[ARG0]], %[[COLLAPSED]]
 //  CHECK-SAME:     outs(%[[ARG2]]
 //       CHECK:   util.return %[[SCATTER]]
+
+// -----
+
+util.func public @no_barrier(%arg0 : tensor<4096x2048xf32>) -> !hal.buffer_view {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [4096, 1, 1, 2048] : tensor<4096x2048xf32> into tensor<4096x1x1x2048xf32>
+  %8 = hal.tensor.export on(#hal.device.promise<@dev_a>) %expanded "output" : tensor<4096x1x1x2048xf32> -> !hal.buffer_view
+  util.return %8 : !hal.buffer_view
+}
+// CHECK-LABEL: func public @no_barrier
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-NOT:    tensor.expand_shape
+//      CHECK:    %[[EXPORT:.+]] =  hal.tensor.export on(#hal.device.promise<@dev_a>) %[[ARG0]] "output"
+// CHECK-SAME:      : tensor<4096x1x1x2048xf32> as tensor<4096x2048xf32> -> !hal.buffer_view
+//      CHECK:    util.return %[[EXPORT]]
+
+// -----
+
+util.func public @multiresult_barrier(%arg0 : tensor<4096x2048xf32>, %arg1 : tensor<4096x2048xbf16>, %arg2: !hal.fence) -> !hal.buffer_view, !hal.buffer  {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [4096, 1, 1, 2048] : tensor<4096x2048xf32> into tensor<4096x1x1x2048xf32>
+  %expanded_0 = tensor.expand_shape %arg1 [[0, 1, 2], [3]] output_shape [512, 2, 4, 2048] : tensor<4096x2048xbf16> into tensor<512x2x4x2048xbf16>
+  %7:2 = hal.tensor.barrier join(%expanded_0, %expanded : tensor<512x2x4x2048xbf16>, tensor<4096x1x1x2048xf32>) => %arg2 : !hal.fence
+  %8 = hal.tensor.export %7#1 : tensor<4096x1x1x2048xf32> -> !hal.buffer_view
+  %9 = hal.tensor.export %7#0 : tensor<512x2x4x2048xbf16> -> !hal.buffer
+  util.return %8, %9 : !hal.buffer_view, !hal.buffer
+}
+
+// CHECK-LABEL: func public @multiresult_barrier
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<4096x2048xf32>
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<4096x2048xbf16>
+//  CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: !hal.fence
+//   CHECK-NOT:    tensor.expand_shape
+//       CHECK:    %[[BAR0:.+]]:2 = hal.tensor.barrier join(%[[ARG1]], %[[ARG0]] : tensor<4096x2048xbf16>, tensor<4096x2048xf32>) => %[[ARG2]] : !hal.fence
+//       CHECK:    %[[EXPORT0:.+]] = hal.tensor.export %[[BAR0]]#1 : tensor<4096x1x1x2048xf32> as tensor<4096x2048xf32> -> !hal.buffer_view
+//       CHECK:    %[[EXPORT1:.+]] = hal.tensor.export %[[BAR0]]#0 : tensor<512x2x4x2048xbf16> as tensor<4096x2048xbf16> -> !hal.buffer
+//       CHECK:    util.return %[[EXPORT0]], %[[EXPORT1]] : !hal.buffer_view, !hal.buffer
+
+// -----
+
+util.func public @mutipleusers_barrier_unsupported(%arg0 : tensor<4096x2048xf32>, %arg1: !hal.fence) -> !hal.buffer_view, !hal.buffer_view {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [4096, 1, 1, 2048] : tensor<4096x2048xf32> into tensor<4096x1x1x2048xf32>
+  %7 = hal.tensor.barrier join(%expanded : tensor<4096x1x1x2048xf32>) => %arg1 : !hal.fence
+  %8 = hal.tensor.export %7 :  tensor<4096x1x1x2048xf32> -> !hal.buffer_view
+  %9 = hal.tensor.export %7 :  tensor<4096x1x1x2048xf32> -> !hal.buffer_view
+  util.return %8, %9 : !hal.buffer_view, !hal.buffer_view
+}
+
+// CHECK-LABEL: func public @mutipleusers_barrier_unsupported
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<4096x2048xf32>
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
+//       CHECK:    %[[EXPANDED:.+]] = tensor.expand_shape
+//       CHECK:    %[[BARRIER:.+]] = hal.tensor.barrier join(%[[EXPANDED]] : tensor<4096x1x1x2048xf32>) => %[[ARG1]] : !hal.fence
+//       CHECK:    %[[EXPORT0:.+]] = hal.tensor.export %[[BARRIER]]
+//       CHECK:    %[[EXPORT1:.+]] = hal.tensor.export %[[BARRIER]]
+//       CHECK:    util.return %[[EXPORT0]], %[[EXPORT1]] : !hal.buffer_view, !hal.buffer_view
