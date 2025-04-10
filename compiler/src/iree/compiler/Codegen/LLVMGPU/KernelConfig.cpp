@@ -270,42 +270,6 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
 // Vector Distribution Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-/// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
-/// or one of M, N dim isn't present.
-static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
-  SmallVector<unsigned> parallelDims;
-  linalgOp.getParallelDims(parallelDims);
-
-  // Validate that there's exactly one parallel dimension with size != 1.
-  unsigned nonUnitParallelDimsCount = llvm::count_if(
-      parallelDims, [&bounds](unsigned idx) { return bounds[idx] != 1; });
-
-  // No. of parallel dims size shouldn't exceed 2.
-  // There should be exactly one reduction loop.
-  if (parallelDims.size() > 2 || nonUnitParallelDimsCount != 1 ||
-      linalgOp.getNumReductionLoops() != 1) {
-    return false;
-  }
-
-  // TODO: Allow for matvec with fused dequantization.
-  FailureOr<linalg::ContractionDimensions> dims =
-      linalg::inferContractionDims(linalgOp);
-  if (failed(dims))
-    return false;
-
-  // TODO: Support batch matvec.
-  if (!dims->batch.empty())
-    return false;
-
-  if (dims->m.size() >= 2 || dims->n.size() >= 2 ||
-      !llvm::hasSingleElement(dims->k)) {
-    return false;
-  }
-
-  return true;
-}
-
 /// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
 /// reduction iterator.
 static bool hasReductionIterator(linalg::LinalgOp &op) {
@@ -475,10 +439,15 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
     workgroupTileSizes[dim] = 1;
   }
 
+  auto isMatmulLike = [](linalg::LinalgOp &linalgOp) -> bool {
+    return linalg::isaContractionOpInterface(linalgOp) &&
+           linalgOp.getNumParallelLoops() >= 2;
+  };
+
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
   if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
-      isMatvecLike(op)) {
+      isMatmulLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
     int64_t parallelBound = bounds[parallelIdx];
@@ -2406,6 +2375,43 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                passPipeline, workgroupSize,
                                                preferredSubgroupSize);
+}
+
+/// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
+/// or one of M, N dim isn't present.
+static bool isMatvecLike(linalg::LinalgOp linalgOp) {
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<unsigned> parallelDims;
+  linalgOp.getParallelDims(parallelDims);
+
+  // Validate that there's exactly one parallel dimension with size != 1.
+  unsigned nonUnitParallelDimsCount = llvm::count_if(
+      parallelDims, [&bounds](unsigned idx) { return bounds[idx] != 1; });
+
+  // No. of parallel dims size shouldn't exceed 2.
+  // There should be exactly one reduction loop.
+  if (parallelDims.size() > 2 || nonUnitParallelDimsCount != 1 ||
+      linalgOp.getNumReductionLoops() != 1) {
+    return false;
+  }
+
+  // TODO: Allow for matvec with fused dequantization.
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // TODO: Support batch matvec.
+  if (!dims->batch.empty())
+    return false;
+
+  if (dims->m.size() >= 2 || dims->n.size() >= 2 ||
+      !llvm::hasSingleElement(dims->k)) {
+    return false;
+  }
+
+  return true;
 }
 
 //====---------------------------------------------------------------------===//
