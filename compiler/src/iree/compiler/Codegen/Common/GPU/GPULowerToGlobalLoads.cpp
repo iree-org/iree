@@ -13,6 +13,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -87,7 +88,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   // Construct a ForallOp:
   SmallVector<OpFoldResult> lowerBounds(rank, rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> upperBounds =
-      memref::getMixedSizes(rewriter, loc, copy->getOperand(0));
+      tensor::getMixedSizes(rewriter, loc, copy->getOperand(0));
 
   SmallVector<Attribute> mapping;
   int idx = 0;
@@ -107,7 +108,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto inductionVars = newForallOp.getInductionVars();
 
   // TODO: properly handle workgroup sizes and subgroup sizes.
-  auto numParts = workgroupSize[0] * subgroupSize[0];
+  auto numParts = workgroupSize[0] / subgroupSize[0];
 
   auto globalSlice = sliceTensor(rewriter, copy.getOperand(0), numParts, inductionVars);
   auto localSlice = sliceTensor(rewriter, copy.getResult(0), numParts, inductionVars);
