@@ -184,7 +184,6 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
-      IREEEncoding_SerializableEncodingAttrInterface,
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
         "cloneWithLayouts",
