@@ -32,7 +32,7 @@ iree_status_t VulkanClientInstance::CreateDriver(
 }
 
 bool VulkanClientInstance::SetDefaultCompilerFlags(CompilerJob* compiler_job) {
-  return compiler_job->SetFlag("--iree-hal-target-backends=vulkan");
+  return compiler_job->SetFlag("--iree-hal-target-device=vulkan");
 }
 
 }  // namespace iree::pjrt::vulkan

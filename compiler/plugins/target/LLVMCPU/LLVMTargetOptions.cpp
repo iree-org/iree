@@ -139,6 +139,7 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   if (vectorWidthInBytes != DEFAULT_VECTOR_WIDTH_IN_BYTES) {
     addInt64("native_vector_size", vectorWidthInBytes);
   }
+  addInt64("max_stack_allocation_size", maxStackAllocSizeInBytes);
   if (linkEmbedded != DEFAULT_LINK_EMBEDDED) {
     addBool("link_embedded", linkEmbedded);
   }
@@ -343,7 +344,12 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
     if (!cachedTargetMachine) {
       cachedTargetMachine = createTargetMachine(*this);
       // TODO(#13988): proper error propagation. This is a common user scenario.
-      assert(cachedTargetMachine && "createTargetMachine failed");
+      if (!cachedTargetMachine) {
+        llvm::errs() << "createTargetMachine(" << getTriple()
+                     << ") failed; machine may not be "
+                        "enabled in LLVM\n";
+        assert(cachedTargetMachine && "createTargetMachine failed");
+      }
     }
     return cachedTargetMachine.get();
   };
@@ -398,8 +404,9 @@ createTargetMachine(const LLVMTarget &target) {
       llvm::TargetRegistry::lookupTarget(target.getTriple(), errorMessage);
   if (!llvmTarget)
     return nullptr;
+  llvm::Triple triple(target.getTriple());
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
-      target.getTriple(), target.getCpu() /* cpu e.g k8 */,
+      triple, target.getCpu() /* cpu e.g k8 */,
       target.getCpuFeatures() /* cpu features e.g avx512f */,
       target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
       target.codeGenOptLevel,
@@ -581,6 +588,11 @@ void LLVMCPUTargetCLOptions::bindOptions(OptionsBinder &binder) {
                        targetVectorWidthInBytes, llvm::cl::cat(category),
                        llvm::cl::desc("Overrides the native vector register "
                                       "width (in bytes) of the target."));
+  binder.opt<llvm::cl::PowerOf2ByteSize>(
+      "iree-llvmcpu-stack-allocation-limit", targetMaxStackAllocSizeInBytes,
+      llvm::cl::cat(category),
+      llvm::cl::desc(
+          "Maximum allowed stack allocation size for LLVM CPU in bytes"));
   binder.opt<std::string>(
       "iree-llvmcpu-enable-ukernels", enableUkernels, llvm::cl::cat(category),
       llvm::cl::desc("Enables ukernels in the llvmcpu backend. May be "
@@ -607,12 +619,15 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   ResolveCPUAndCPUFeaturesStatus status;
   std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
       targetTriple, targetCPU, targetCPUFeatures, linkEmbedded, status);
-  (void)status; // Ignore status here, since this code runs at target backend
-                // registration time and we don't know if this backend will
-                // actually be used, and these error statuses are non-fatal,
-                // mostly warning about fallbacks. If the target backend is
-                // actually used, any error here will also trigger in
-                // loadFromConfigAttr, where we will generate an IR error.
+  // Only report serious errors here, not potentially verbose warnings such as
+  // ImplicitGenericFallback, which has false positives at this point as it
+  // triggers on default-constructed targets that we might not actually use.
+  // If the targets are used, they will trigger the warning again in
+  // LLVMTarget::loadFromConfigAttr.
+  if (status != ResolveCPUAndCPUFeaturesStatus::OK &&
+      status != ResolveCPUAndCPUFeaturesStatus::ImplicitGenericFallback) {
+    llvm::errs() << getMessage(status, targetTriple);
+  }
   if (maybeTarget) {
     targetOptions.target = *maybeTarget;
   } else {
@@ -631,6 +646,7 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.llvmTargetOptions.FloatABIType = targetFloatABI;
   target.dataLayout = targetDataLayout;
   target.vectorWidthInBytes = targetVectorWidthInBytes;
+  target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;
   target.ukernels = enableUkernels;
   target.linkUkernelBitcode = linkUKernelBitcode;
 

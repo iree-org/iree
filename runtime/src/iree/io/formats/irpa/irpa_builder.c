@@ -189,10 +189,10 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_archive_builder_write(
         break;
       }
       default: {
-        IREE_RETURN_AND_END_ZONE_IF_ERROR(
-            z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                 "unhandled entry type %d",
-                                 (int)source_entry->type));
+        IREE_TRACE_ZONE_END(z0);
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "unhandled entry type %d",
+                                (int)source_entry->type);
       }
     }
 

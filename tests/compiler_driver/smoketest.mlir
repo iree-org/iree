@@ -1,5 +1,6 @@
 // RUN: iree-compile --split-input-file \
-// RUN:   --iree-hal-target-backends=vmvx \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=vmvx \
 // RUN:   --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
 
 // CHECK-LABEL: "name": "simple_module"

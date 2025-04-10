@@ -17,7 +17,10 @@ guides, and instructions on building from source.
 
 ## Project news
 
-* 2024-05-23: [IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
+* 2025-04-02:
+[AMD submitted an IREE-based SDXL implementation to the MLPerf benchmark suite](https://rocm.blogs.amd.com/artificial-intelligence/mi325x-accelerates-mlperf-inference/README.html#stable-diffusion-xl-sdxl-text-to-image-mlperf-inference-benchmark)
+* 2024-05-23:
+[IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
 
 ## Project status
 
@@ -26,13 +29,15 @@ guides, and instructions on building from source.
 Releases notes are
 [published on GitHub releases](https://github.com/iree-org/iree/releases?q=prerelease%3Afalse).
 
-
 | Package | Release status |
 | -- | -- |
 GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree)](https://github.com/iree-org/iree/releases/latest)
 GitHub release (nightly) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree?include_prereleases)](https://github.com/iree-org/iree/releases)
-Python iree-base-compiler | [![PyPI version](https://badge.fury.io/py/iree-base-compiler.svg)](https://badge.fury.io/py/iree-base-compiler)
-Python iree-base-runtime | [![PyPI version](https://badge.fury.io/py/iree-base-runtime.svg)](https://badge.fury.io/py/iree-base-runtime)
+`iree-base-compiler` | [![PyPI version](https://badge.fury.io/py/iree-base-compiler.svg)](https://pypi.org/project/iree-base-compiler)
+`iree-base-runtime` | [![PyPI version](https://badge.fury.io/py/iree-base-runtime.svg)](https://pypi.org/project/iree-base-runtime)
+
+For more details on the release process, see
+https://iree.dev/developers/general/release-management/.
 
 ### Build status
 
@@ -45,6 +50,7 @@ Python iree-base-runtime | [![PyPI version](https://badge.fury.io/py/iree-base-r
 | -- | --: |
 Linux | [![CI - Linux arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule)
 macOS | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule)
+macOS | [![CI - macOS arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_arm64_clang.yml?query=branch%3Amain+event%3Aschedule)
 Windows | [![CI - Windows x64 MSVC](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule)
 
 For the full list of workflows see
@@ -84,6 +90,8 @@ Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@ir
 
 Date | Title | Recording | Slides
 ---- | ----- | --------- | ------
+2025-02-12 | The Long Tail of AI: SPIR-V in IREE and MLIR (Vulkanised) | [recording](https://youtu.be/0zwfc6UkxeE) | [slides](https://www.vulkan.org/user/pages/09.events/vulkanised-2025/T12-Jakub-Kuderski-AMD-IREE-MLIR.pdf)
+2024-10-01 | Unveiling the Inner Workings of IREE: An MLIR-Based Compiler for Diverse H/W | [recording](https://www.youtube.com/watch?v=a3T74I9gGH8) |
 2021-06-09 | IREE Runtime Design Tech Talk | [recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) | [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing)
 2020-08-20 | IREE CodeGen (MLIR Open Design Meeting) | [recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing) | [slides](https://docs.google.com/presentation/d/1NetHjKAOYg49KixY5tELqFp6Zr2v8_ujGzWZ_3xvqC8/edit)
 2020-03-18 | Interactive HAL IR Walkthrough | [recording](https://drive.google.com/file/d/1_sWDgAPDfrGQZdxAapSA90AD1jVfhp-f/view?usp=sharing) |

@@ -463,13 +463,13 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
 }
 
 /// Replaces a tensor.empty op with bufferization.alloc_tensor op which is
-/// created by tiling tensor.unpack op. It is intended because tiling unpack ops
+/// created by tiling linalg.unpack op. It is intended because tiling unpack ops
 /// with non-perfect sizes needs extra elements. See the tiling implementation
-/// of tensor.unpack op for more details.
+/// of linalg.unpack op for more details.
 static LogicalResult
 replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
                                   mlir::FunctionOpInterface funcOp) {
-  funcOp.walk([&](tensor::UnPackOp unpackOp) {
+  funcOp.walk([&](linalg::UnPackOp unpackOp) {
     if (!unpackOp->hasOneUse() ||
         !isa<tensor::ExtractSliceOp>(*(unpackOp->user_begin()))) {
       return;

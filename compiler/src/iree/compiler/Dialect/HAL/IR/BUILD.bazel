@@ -100,8 +100,11 @@ iree_compiler_cc_library(
     hdrs = ["HALDialect.h"],
     deps = [
         ":IR",
+        "//compiler/src/iree/compiler/Dialect/Encoding/IR",
         "//compiler/src/iree/compiler/Dialect/HAL:hal_imports",
+        "//compiler/src/iree/compiler/Dialect/HAL/Analysis",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:Support",

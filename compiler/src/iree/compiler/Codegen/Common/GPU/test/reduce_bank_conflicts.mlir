@@ -129,3 +129,30 @@ func.func @pad_alloc_rank_zero() {
   vector.transfer_write %cst, %0[] : vector<f32>, memref<f32, #gpu.address_space<workgroup>>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @no_padding_when_close_to_limit
+// CHECK: memref.alloc() : memref<4x32x127xf32, #gpu.address_space<workgroup>>
+func.func @no_padding_when_close_to_limit(%a: memref<1024x1024xf32>) {
+  %0 = memref.alloc() : memref<4x32x127xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @no_padding_if_at_limit
+// CHECK: memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
+func.func @no_padding_if_at_limit(%a: memref<1024x1024xf32>) {
+  %0 = memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @pad_if_below_limit
+// CHECK: memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
+func.func @pad_if_below_limit(%a: memref<1024x1024xf32>) {
+  %0 = memref.alloc() : memref<4x32x126xf32, #gpu.address_space<workgroup>>
+  return
+}

@@ -1,5 +1,6 @@
 // RUN: iree-compile %s \
-// RUN:   --iree-hal-target-backends=vmvx \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=vmvx \
 // RUN:   --iree-opt-export-parameters=scope=%t.irpa \
 // RUN:   --iree-opt-export-parameter-minimum-size=0 | \
 // RUN: iree-run-module \

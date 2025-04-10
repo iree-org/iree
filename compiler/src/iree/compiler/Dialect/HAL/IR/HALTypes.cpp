@@ -55,6 +55,9 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
     }
   } else if (auto castOp = dyn_cast<arith::IndexCastUIOp>(op)) {
     return lookupOffsetOrAlignment(castOp.getOperand());
+  } else if (auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(op)) {
+    return assumeOp.getUnionedUnsignedDivisor(
+        cast<OpResult>(value).getResultNumber());
   }
 
   // TODO(benvanik): more searching using util.align and other ops.

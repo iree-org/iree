@@ -7,13 +7,12 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 using namespace mlir::linalg;
 
 namespace mlir::iree_compiler {
 
-/// Returns true if `map` is a tranpose. A transpose map is a projected
+/// Returns true if `map` is a transpose. A transpose map is a projected
 /// permutation with or without zeros in results where there exist at least two
 /// dimensions di and dj such that di < dj and result_pos(di) > result_pos(dj).
 /// Examples:

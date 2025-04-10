@@ -6,15 +6,20 @@
 
 #include "./hal.h"
 
+#include <nanobind/intrusive/ref.h>
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/function.h>
 #include <nanobind/stl/vector.h>
 
+#include <algorithm>
+#include <iterator>
 #include <optional>
 
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
 #include "./vm.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
@@ -441,7 +446,7 @@ HalBuffer HalDevice::QueueAlloca(uint64_t allocation_size,
   CheckApiStatus(iree_hal_device_queue_alloca(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
                      signal_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-                     allocation_size, &out_buffer),
+                     allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &out_buffer),
                  "allocating memory on queue");
   return HalBuffer::StealFromRawPtr(out_buffer);
 }
@@ -495,7 +500,8 @@ void HalDevice::QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
 
   CheckApiStatus(
       iree_hal_device_queue_dealloca(raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY,
-                                     wait_list, signal_list, buffer.raw_ptr()),
+                                     wait_list, signal_list, buffer.raw_ptr(),
+                                     IREE_HAL_DEALLOCA_FLAG_NONE),
       "deallocating memory on queue");
 }
 
@@ -553,10 +559,11 @@ void HalDevice::QueueExecute(py::handle command_buffer,
           ? py::cast<HalCommandBuffer*>(command_buffer)->raw_ptr()
           : NULL;
 
-  CheckApiStatus(iree_hal_device_queue_execute(
-                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, cb, iree_hal_buffer_binding_table_empty()),
-                 "executing command buffers");
+  CheckApiStatus(
+      iree_hal_device_queue_execute(
+          raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list, cb,
+          iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE),
+      "executing command buffers");
 }
 
 void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
@@ -851,7 +858,7 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   iree_hal_buffer_params_t params;
   memset(&params, 0, sizeof(params));
   params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
-  params.access = IREE_HAL_MEMORY_ACCESS_ANY;
+  params.access = IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE;
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   iree_hal_external_buffer_t external_buffer;
   memset(&external_buffer, 0, sizeof(external_buffer));
@@ -1069,8 +1076,10 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 // HAL module
 //------------------------------------------------------------------------------
 
-VmModule CreateHalModule(VmInstance* instance, std::optional<HalDevice*> device,
-                         std::optional<py::list> devices) {
+VmModule CreateHalModule(
+    VmInstance* instance, std::optional<HalDevice*> device,
+    std::optional<py::list> devices,
+    std::optional<py::ref<HalModuleDebugSink>> debug_sink) {
   if (device && devices) {
     PyErr_SetString(
         PyExc_ValueError,
@@ -1095,13 +1104,114 @@ VmModule CreateHalModule(VmInstance* instance, std::optional<HalDevice*> device,
     devices_ptr = devices_vector.data();
     device_count = devices_vector.size();
   }
-  CheckApiStatus(
-      iree_hal_module_create(instance->raw_ptr(), device_count, devices_ptr,
-                             IREE_HAL_MODULE_FLAG_NONE,
-                             iree_hal_module_debug_sink_stdio(stderr),
-                             iree_allocator_system(), &module),
-      "Error creating hal module");
-  return VmModule::StealFromRawPtr(module);
+
+  iree_hal_module_debug_sink_t iree_hal_module_debug_sink =
+      iree_hal_module_debug_sink_stdio(stderr);
+  if (debug_sink) {
+    iree_hal_module_debug_sink = (*debug_sink)->AsIreeHalModuleDebugSink();
+  }
+
+  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
+                                        devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
+                                        iree_hal_module_debug_sink,
+                                        iree_allocator_system(), &module),
+                 "Error creating hal module");
+  VmModule vm_module = VmModule::StealFromRawPtr(module);
+  if (debug_sink) {
+    // Retain a reference. We want the callback to be valid after
+    // the user has dropped its reference to the HAL module Python object and
+    // not burden the user with lifetime management.
+    // The counter will be decremented once the IREE runtime does not use the
+    // debug sink anymore.
+    (*debug_sink)->inc_ref();
+  }
+  return vm_module;
+}
+
+HalModuleDebugSink::HalModuleDebugSink(
+    HalModuleBufferViewTraceCallback buffer_view_trace_callback)
+    : buffer_view_trace_callback_(buffer_view_trace_callback) {}
+
+iree_hal_module_debug_sink_t HalModuleDebugSink::AsIreeHalModuleDebugSink()
+    const {
+  iree_hal_module_debug_sink_t res;
+  memset(&res, 0, sizeof(res));
+  res.buffer_view_trace.fn = HalModuleDebugSink::IreeHalModuleBufferViewTrace;
+  res.buffer_view_trace.user_data = const_cast<HalModuleDebugSink*>(this);
+  res.destroy.fn = HalModuleDebugSink::DestroyCallback;
+  res.destroy.user_data = const_cast<HalModuleDebugSink*>(this);
+  return res;
+}
+
+HalModuleBufferViewTraceCallback&
+HalModuleDebugSink::GetHalModuleBufferViewTraceCallback() {
+  return this->buffer_view_trace_callback_;
+}
+
+static std::vector<HalBufferView> CreateHalBufferViewVector(
+    iree_host_size_t buffer_view_count, iree_hal_buffer_view_t** buffer_views) {
+  std::vector<HalBufferView> res;
+  res.reserve(buffer_view_count);
+  std::transform(buffer_views, buffer_views + buffer_view_count,
+                 std::back_inserter(res),
+                 [](iree_hal_buffer_view_t* buffer_view) {
+                   return HalBufferView::BorrowFromRawPtr(buffer_view);
+                 });
+  return res;
+}
+
+iree_status_t HalModuleDebugSink::DestroyCallback(void* user_data) {
+  HalModuleDebugSink* debug_sink =
+      reinterpret_cast<HalModuleDebugSink*>(user_data);
+  debug_sink->dec_ref();
+  return iree_ok_status();
+}
+
+iree_status_t HalModuleDebugSink::IreeHalModuleBufferViewTrace(
+    void* user_data, iree_string_view_t key, iree_host_size_t buffer_view_count,
+    iree_hal_buffer_view_t** buffer_views, iree_allocator_t host_allocator) {
+  auto debug_sink = reinterpret_cast<HalModuleDebugSink*>(user_data);
+  std::vector<HalBufferView> buffer_views_vec =
+      CreateHalBufferViewVector(buffer_view_count, buffer_views);
+  try {
+    debug_sink->buffer_view_trace_callback_(std::string(key.data, key.size),
+                                            buffer_views_vec);
+  } catch (const py::python_error& e) {
+    return iree_make_status(IREE_STATUS_UNKNOWN, "%s", e.what());
+  }
+
+  return iree_ok_status();
+}
+
+static int HalModuleDebugSinkTpTraverse(PyObject* self, visitproc visit,
+                                        void* arg) {
+  // Inform Python's garbage collector about the references we hold.
+
+  // Retrieve a pointer to the C++ instance associated with 'self'
+  // (never fails)
+  HalModuleDebugSink* debug_sink = py::inst_ptr<HalModuleDebugSink>(self);
+
+  // Although we are not tracking cycles involving the HAL module or VM context
+  // we still want to properly destroy the callback and let the GC know what
+  // references we hold. If debug_sink->GetHalModuleBufferViewTraceCallback()
+  // has an associated CPython object, return it. If not, value.ptr() will equal
+  // NULL, which is also fine.
+  py::handle buffer_view_trace_callback =
+      py::find(debug_sink->GetHalModuleBufferViewTraceCallback());
+
+  // Inform the Python GC about the instance.
+  Py_VISIT(buffer_view_trace_callback.ptr());
+
+  return 0;
+}
+
+int HalModuleDebugSinkTpClear(PyObject* self) {
+  // Retrieve a pointer to the C++ instance associated with 'self'
+  // (never fails)
+  HalModuleDebugSink* debug_sink = py::inst_ptr<HalModuleDebugSink>(self);
+  debug_sink->GetHalModuleBufferViewTraceCallback() = nullptr;
+
+  return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -1113,7 +1223,8 @@ void SetupHalBindings(nanobind::module_ m) {
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule, py::arg("instance"),
-        py::arg("device") = py::none(), py::arg("devices") = py::none());
+        py::arg("device") = py::none(), py::arg("devices") = py::none(),
+        py::arg("debug_sink") = py::none());
 
   // Enums.
   py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
@@ -1247,6 +1358,10 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("BFLOAT_16", IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
+      .value("FLOAT_8_E4M3_FN", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN)
+      .value("FLOAT_8_E4M3_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ)
+      .value("FLOAT_8_E5M2", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
+      .value("FLOAT_8_E5M2_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
       .export_values()
       .def("__int__",
            [](enum iree_hal_element_types_t self) { return (uint64_t)self; });
@@ -1669,7 +1784,12 @@ void SetupHalBindings(nanobind::module_ m) {
         new (self) HalShape(indices);
       });
 
-  py::class_<HalCommandBuffer>(m, "HalCommandBuffer")
+  auto hal_command_buffer = py::class_<HalCommandBuffer>(m, "HalCommandBuffer");
+  VmRef::BindRefProtocol(hal_command_buffer, iree_hal_command_buffer_type,
+                         iree_hal_command_buffer_retain_ref,
+                         iree_hal_command_buffer_deref,
+                         iree_hal_command_buffer_isa);
+  hal_command_buffer
       .def(
           "__init__",
           [](HalCommandBuffer* new_self, HalDevice& device,
@@ -1777,6 +1897,27 @@ void SetupHalBindings(nanobind::module_ m) {
           py::arg("target_buffer"), py::arg("pattern"),
           py::arg("target_offset") = 0, py::arg("length") = py::none(),
           py::arg("end") = false);
+
+  PyType_Slot debug_sink_slots[] = {
+      {Py_tp_traverse, (void*)HalModuleDebugSinkTpTraverse},
+      {Py_tp_clear, (void*)HalModuleDebugSinkTpClear},
+      {0, nullptr}};
+  py::class_<HalModuleDebugSink>(
+      m, "HalModuleDebugSink", py::type_slots(debug_sink_slots),
+      py::intrusive_ptr<HalModuleDebugSink>(
+          [](HalModuleDebugSink* debug_sink, PyObject* po) noexcept {
+            debug_sink->set_self_py(po);
+          }))
+      .def(
+          "__init__",
+          [](HalModuleDebugSink* self,
+             HalModuleBufferViewTraceCallback buffer_view_trace_callback) {
+            new (self) HalModuleDebugSink(buffer_view_trace_callback);
+          },
+          py::arg("buffer_view_trace_callback"))
+      .def_prop_ro("buffer_view_trace_callback", [](HalModuleDebugSink& self) {
+        return self.GetHalModuleBufferViewTraceCallback();
+      });
 }
 
 }  // namespace python

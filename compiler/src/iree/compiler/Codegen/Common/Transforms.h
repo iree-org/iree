@@ -73,7 +73,7 @@ struct IREETilingResult {
   SmallVector<OpFoldResult> tileSizes;
 };
 FailureOr<IREETilingResult>
-tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
+tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
 /// Populate patterns related to clean up the IR after tile and distribute
@@ -84,12 +84,14 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
 /// Populate IREE patterns related to resolving
 /// `memref.extract_strided_metadata`.
 void populateIREEResolveExtractStridedMetadataPatterns(
-    MLIRContext *context, RewritePatternSet &patterns);
+    RewritePatternSet &patterns);
 
 /// Populate patterns that replaces maximumf/minimumf with minumf/maxnumf ops.
 /// This is supposed to be used for targets which have faulty codegen
 /// for maximumf/minimumf ops, e.g. LLVM NVIDIA-PTX.
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
+
+void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

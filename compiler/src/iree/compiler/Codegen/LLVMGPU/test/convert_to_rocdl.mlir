@@ -30,7 +30,8 @@ builtin.module {
 // INDEX32-LABEL: llvm.func @abs_ex_dispatch_0
 //    CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
-//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone})
 //         CHECK:    rocdl.workgroup.dim.x
 //         CHECK:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //       INDEX32:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
@@ -230,3 +231,77 @@ module {
 }
 // CHECK-LABEL: llvm.func @emulation_lowering(
 //   CHECK-NOT:   builtin.unrealized_conversion_cast
+
+// -----
+// Test that an unused binding still appears in the kernargs
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+builtin.module {
+  func.func @missing_ptr_dispatch_copy_idx_0() {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+    %1 = arith.index_castui %0 : i32 to index
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%1) flags(ReadOnly) : memref<16xf32, strided<[1], offset : ?>, #gpu.address_space<global>>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32, #gpu.address_space<global>>
+    %4 = memref.load %2[%c0] : memref<16xf32, strided<[1], offset : ?>, #gpu.address_space<global>>
+    memref.store %4, %3[%c0] : memref<16xf32, #gpu.address_space<global>>
+    return
+  }
+}
+//   CHECK-LABEL: llvm.func @missing_ptr_dispatch_copy_idx_0
+//    CHECK-SAME: (%[[arg0:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
+//    CHECK-SAME:  %[[arg1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone},
+//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %[[arg3:.+]]: i32 {llvm.noundef})
+//         CHECK:   llvm.zext %[[arg3]] : i32 to i64
+//         CHECK:   llvm.insertvalue %[[arg0]]
+//         CHECK:   llvm.insertvalue %[[arg2]]
+
+// -----
+// Test lowering of iree_codegen.null_pointer.
+module {
+  func.func private @foo(!iree_codegen.null_pointer)
+  func.func @null_pointer() {
+    %0 = iree_codegen.null_pointer
+    call @foo(%0) : (!iree_codegen.null_pointer) -> ()
+    return
+  }
+}
+//   CHECK-LABEL: llvm.func @null_pointer
+//   CHECK:       llvm.mlir.zero : !llvm.ptr
+
+// -----
+
+module {
+  func.func private @foo(vector<4xf32>)
+  func.func @swap_mfma() {
+    %in = arith.constant 1.0 : f32
+    %out = arith.constant dense<0.0> : vector<4xf32>
+    rocdl.s.setprio 1 { iree_gpu.swap_mfma = -10 }
+    rocdl.s.setprio 2 { iree_gpu.swap_mfma = 1 }
+    rocdl.s.setprio 3 { iree_gpu.swap_mfma = 2 }
+    rocdl.s.setprio 4 { iree_gpu.swap_mfma = 5 }
+    %0 = amdgpu.mfma %in * %in + %out {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    %1 = amdgpu.mfma %in * %in + %0 {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    %2 = amdgpu.mfma %in * %in + %1 {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    call @foo(%2) : (vector<4xf32>) -> ()
+    return
+  }
+}
+//   CHECK-LABEL: llvm.func @swap_mfma
+//   CHECK:         rocdl.s.setprio 1
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 2
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 3
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 4

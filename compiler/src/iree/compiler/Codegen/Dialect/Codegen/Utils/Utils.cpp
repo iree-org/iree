@@ -9,7 +9,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -78,6 +77,21 @@ bool operator==(const MaterializeEncodingInfo &lhs,
 bool operator!=(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs) {
   return !(lhs == rhs);
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const MaterializeEncodingInfo &encodingInfo) {
+  os << "{innerDimsPos = [";
+  llvm::interleaveComma(encodingInfo.innerDimsPos, os);
+  os << "], innerTileSizes = [";
+  llvm::interleaveComma(encodingInfo.innerTileSizes, os);
+  os << "], outerDimsPerm = [";
+  llvm::interleaveComma(encodingInfo.outerDimsPerm, os);
+  if (encodingInfo.swizzle) {
+    os << "], swizzle = " << encodingInfo.swizzle.value();
+  }
+  os << "]}";
+  return os;
 }
 
 //===----------------------------------------------------------------------===//
@@ -266,10 +280,14 @@ getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   return result;
 }
 
-MaterializeEncodingInfo
+FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
   MaterializeEncodingInfo encodingInfo;
-  auto cDims = getEncodingContractionDims(encoding);
+  FailureOr<linalg::ContractionDimensions> cDims =
+      getEncodingContractionDims(encoding);
+  if (failed(cDims)) {
+    return failure();
+  }
   // The following expects M, N, K, and Batch sizes of at most 1 for now
   assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
          cDims->batch.size() <= 1 &&

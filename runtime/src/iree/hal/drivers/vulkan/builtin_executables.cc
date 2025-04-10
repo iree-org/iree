@@ -169,7 +169,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   binding.reserved = 0;
   binding.buffer = target_buffer;
   binding.offset = 0;
-  binding.length = IREE_WHOLE_BUFFER;
+  binding.length = IREE_HAL_WHOLE_BUFFER;
   IREE_RETURN_IF_ERROR(descriptor_set_arena->BindDescriptorSet(
       command_buffer, pipeline_layout_, IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET,
       /*binding_count=*/1, &binding));

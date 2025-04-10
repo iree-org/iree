@@ -781,7 +781,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   // Construct the MemRefDescriptor type based on the information we have.
   // NOTE: we could use the binding length to clamp this/check that the
   // requested range is valid.
-  auto [strides, offset] = getStridesAndOffset(memRefType);
+  auto [strides, offset] = memRefType.getStridesAndOffset();
   if (memRefType.hasStaticShape() &&
       !llvm::any_of(strides, ShapedType::isDynamic) &&
       !ShapedType::isDynamic(offset)) {
@@ -792,8 +792,8 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
     int64_t rank = memRefType.getRank();
 
     // Build MemRef descriptor for this interface binding.
-    auto desc = MemRefDescriptor::undef(builder, loc,
-                                        typeConverter->convertType(memRefType));
+    auto desc = MemRefDescriptor::poison(
+        builder, loc, typeConverter->convertType(memRefType));
     desc.setAllocatedPtr(builder, loc, basePtrValue);
     desc.setAlignedPtr(builder, loc, basePtrValue);
     auto llvmIndexType = typeConverter->convertType(builder.getIndexType());
@@ -843,12 +843,12 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
             currentStrideVal = builder.create<LLVM::ConstantOp>(
                 loc, llvmIndexType, currentStrideInt.value());
           } else {
-            currentStrideVal = currentStride.get<Value>();
+            currentStrideVal = cast<Value>(currentStride);
           }
           currentStride =
               builder.create<LLVM::MulOp>(loc, currentStrideVal, dim)
                   .getResult();
-          desc.setStride(builder, loc, i - 1, currentStride.get<Value>());
+          desc.setStride(builder, loc, i - 1, cast<Value>(currentStride));
         } else {
           currentStride = builder.getIndexAttr(strides[i - 1]);
           desc.setConstantStride(builder, loc, i - 1, strides[i - 1]);

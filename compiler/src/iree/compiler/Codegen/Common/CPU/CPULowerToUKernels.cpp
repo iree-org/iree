@@ -263,7 +263,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
+matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "pack";
@@ -386,7 +386,7 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
+matchDAGForUKernel(RewriterBase &rewriter, linalg::UnPackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "unpack";
@@ -479,7 +479,7 @@ getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
   auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
-  if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
+  if (succeeded(cDims) && (!cDims->batch.empty() || operandTypes.size() != 3)) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 
@@ -616,8 +616,8 @@ void CPULowerToUKernelsPass::runOnOperation() {
   // these ops.
   auto allTargets = [](auto target) { return true; };
   patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
-                  LowerToUKernelPattern<tensor::PackOp>,
-                  LowerToUKernelPattern<tensor::UnPackOp>>(
+                  LowerToUKernelPattern<linalg::PackOp>,
+                  LowerToUKernelPattern<linalg::UnPackOp>>(
       context, allTargets, skipIntermediateRoundings);
   // These patterns are inherently specific to the VMVX backend.
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(

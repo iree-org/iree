@@ -1,5 +1,6 @@
 // RUN: iree-compile %s -o ignored.mlir \
-// RUN:     --iree-hal-target-backends=vmvx \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=vmvx \
 // RUN:     --iree-hal-dump-executable-benchmarks-to=- | \
 // RUN: iree-compile - | \
 // RUN: iree-benchmark-module --module=- | \
@@ -16,7 +17,8 @@
 // Example of dumping per-dispatch executable benchmarks, compiling each, and
 // then benchmarking each:
 //  iree-compile some_input.mlir -o ignored.mlir \
-//      --iree-hal-target-backends=vmvx \
+//      --iree-hal-target-device=local \
+//      --iree-hal-local-target-device-backends=vmvx \
 //      --iree-hal-dump-executable-benchmarks-to=benchmarks/ | \
 //  ls -1 benchmarks/ | xargs -i sh -c "iree-compile benchmarks/{} | iree-benchmark-module --module=-"
 //

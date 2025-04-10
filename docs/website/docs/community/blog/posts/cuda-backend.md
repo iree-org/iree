@@ -118,7 +118,7 @@ func.func @add(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
 ```shell
 # First compile into a VM bytecode module.
 $ ../iree-build/tools/iree-compile \
-  --iree-hal-target-backends=cuda \
+  --iree-hal-target-device=cuda \
   /tmp/add.mlir \
   -o /tmp/add.vmfb
 

@@ -27,11 +27,11 @@ typedef struct iree_hal_null_device_options_t {
   int reserved;
 } iree_hal_null_device_options_t;
 
-// Initializes |out_params| to default values.
+// Initializes |out_options| to default values.
 IREE_API_EXPORT void iree_hal_null_device_options_initialize(
-    iree_hal_null_device_options_t* out_params);
+    iree_hal_null_device_options_t* out_options);
 
-// Creates a {Null} HAL device with the given |params|.
+// Creates a {Null} HAL device with the given |options|.
 //
 // The provided |identifier| will be used by programs to distinguish the device
 // type from other HAL implementations. If compiling programs with the IREE

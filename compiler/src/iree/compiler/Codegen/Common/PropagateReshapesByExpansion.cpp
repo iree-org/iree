@@ -88,14 +88,15 @@ static LogicalResult verifyAndCollectExpandableUsers(
       return failure();
     if (extractSliceOp.getMixedOffsets() != parallelInsertOp.getMixedOffsets())
       return failure();
-    auto expandShapeOp =
-        dyn_cast<tensor::ExpandShapeOp>(*extractSliceOp->getUsers().begin());
-    if (!expandShapeOp)
-      return failure();
-    SmallVector<ReassociationIndices> expandReIndices =
-        expandShapeOp.getReassociationIndices();
-    if (reIndices != expandReIndices)
-      return failure();
+    for (Operation *user : extractSliceOp->getUsers()) {
+      auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(user);
+      if (!expandShapeOp)
+        return failure();
+      SmallVector<ReassociationIndices> expandReIndices =
+          expandShapeOp.getReassociationIndices();
+      if (reIndices != expandReIndices)
+        return failure();
+    }
     expandableUsers.push_back(extractSliceOp);
   }
   return success();
@@ -155,9 +156,14 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
       expandedOffsets, expandedSizes, expandedStrides);
   for (tensor::ExtractSliceOp extractSliceOp : expandableUsers) {
     rewriter.setInsertionPoint(extractSliceOp);
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        extractSliceOp, resultType, extractSliceOp.getSource(), expandedOffsets,
-        expandedSizes, expandedStrides);
+    auto newExtractSliceOp =
+        rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+            extractSliceOp, resultType, extractSliceOp.getSource(),
+            expandedOffsets, expandedSizes, expandedStrides);
+    for (Operation *user : newExtractSliceOp->getUsers()) {
+      auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(user);
+      expandShapeOp->replaceAllUsesWith(newExtractSliceOp);
+    }
   }
   return;
 }

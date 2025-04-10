@@ -93,7 +93,7 @@ static iree_status_t iree_hal_inline_storage_buffer_create(
   // requires mapping.
   iree_status_t status = iree_hal_buffer_map_range(
       hal_buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_ANY, 0,
-      IREE_WHOLE_BUFFER, &storage->mapping);
+      IREE_HAL_WHOLE_BUFFER, &storage->mapping);
 
   // Initializes the VM buffer to reference the mapped memory.
   // Since the VM buffer is what we pass back to the VM and gets reference

@@ -1,1 +1,2 @@
 # RUN: %PYTHON -m iree_tfl_tests.person_detect_test --artifacts_dir=%t
+# XFAIL: *

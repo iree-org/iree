@@ -11,6 +11,13 @@
 
 namespace mlir::iree_compiler {
 
+struct GlobalPipelineOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
+};
+
 struct BindingOptions {
   // Whether to include runtime support functions for the IREE native ABI.
   bool native = true;
@@ -72,6 +79,7 @@ struct InputDialectOptions {
 //   2. Through a Transform dialect spec file.
 //   3. Through a PDL spec file.
 struct PreprocessingOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
   std::string preprocessingPassPipeline;
   std::string preprocessingTransformSpecFilename;
   std::string preprocessingPDLSpecFilename;
@@ -82,6 +90,7 @@ struct PreprocessingOptions {
 
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
   // Maximum byte size increase allowed for constant expr hoisting policy to
   // allow hoisting. The threshold is 1MB by default.
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
@@ -128,6 +137,9 @@ struct GlobalOptimizationOptions {
   // Strips debug assertions after any useful information has been extracted.
   bool stripAssertions = false;
 
+  // Converts linalg named matmul ops to linalg generic ops.
+  bool generalizeMatmul = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };
@@ -156,6 +168,27 @@ struct SchedulingOptions {
   // Program execution model specifying scheduling behavior.
   ExecutionModel executionModel = ExecutionModel::AsyncInternal;
 
+  // Defines the behavior of initialization.
+  enum class InitializationMode {
+    // Synchronously initialize all parameters and globals prior to returning
+    // from the module initializer.
+    Synchronous = 0,
+    // Asynchronously initialize all parameters and globals and return
+    // immediately from the module initializer without waiting for them to
+    // complete. Subsequent invocations will queue waiting for any dependencies
+    // they have on the initialized values.
+    Asynchronous = 1,
+  };
+  // Initialization mode for parameters and globals.
+  InitializationMode initializationMode = InitializationMode::Synchronous;
+
+  // TODO(benvanik): favor size/speed/etc for partitioning.
+  // TODO(benvanik): execution model to optimize for (unified/discrete memory,
+  //                 single/multiple processors, etc).
+
+  // Enables fusing bindings with the same underlying storage.
+  bool optimizeBindings = true;
+
   // TODO(benvanik): find a way to share this with
   // Stream/Transforms/Passes.h w/o circular deps.
   // Defines the output format of a dump pass.
@@ -176,15 +209,18 @@ struct SchedulingOptions {
   DumpOutputFormat dumpStatisticsFormat = DumpOutputFormat::None;
   // File path to write statistics to; or `` for stderr or `-` for stdout.
   std::string dumpStatisticsFile = "";
-  // Enables fusing bindings with the same underlying storage.
-  bool optimizeBindings = true;
-
-  // TODO(benvanik): favor size/speed/etc for partitioning.
-  // TODO(benvanik): execution model to optimize for (unified/discrete memory,
-  //                 single/multiple processors, etc).
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<SchedulingOptions>;
+};
+
+struct DispatchCreationOptions {
+  llvm::OptimizationLevel optLevel;
+
+  bool enableAggressiveFusion = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
 };
 
 } // namespace mlir::iree_compiler

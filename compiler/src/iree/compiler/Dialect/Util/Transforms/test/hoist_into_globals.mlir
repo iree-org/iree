@@ -99,6 +99,24 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 
 // -----
 
+// Checks that the name of global op is readable when encoding is present.
+
+// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @hoist_encoded_const_expr_with_simpler_name
+module @hoist_encoded_const_expr_with_simpler_name {
+  // CHECK: util.global private @__hoisted_tensor_64xi8__encoded : tensor<64xi8, #[[$ENCODING]]>
+  util.func public @main() -> (tensor<64xi8, #encoding>) {
+    %0 = arith.constant dense<0> : tensor<32xi8>
+    %1 = arith.constant dense<0> : tensor<32xi8>
+    %2 = "iree_unregistered.const_expr"(%0, %1)
+        : (tensor<32xi8>, tensor<32xi8>) -> tensor<64xi8, #encoding>
+    util.return %2 : tensor<64xi8, #encoding>
+  }
+}
+
+// -----
+
 // We presently expand i1 -> i8 for legacy reasons. As such, we support
 // it, even though we don't generally support sub-byte constexprs.
 
@@ -249,6 +267,61 @@ module @hoist_implicit_capture {
 
 // -----
 
+// CHECK-LABEL: @hoist_multi_nested_regions
+module @hoist_multi_nested_regions {
+  // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
+  // CHECK: util.initializer {
+  // CHECK:       %[[C0:.*]] = arith.constant 0 : i32
+  // CHECK:       %[[CE0:.+]] = "iree_unregistered.const_expr"(%[[C0]])
+  // CHECK:         "iree_unregistered.const_expr"
+  // CHECK:           ^bb0
+  // CHECK:           math.absi
+  // CHECK:       util.global.store %[[CE0]], @[[HOISTED_SYM]] : i32
+  // CHECK:       util.return
+  // CHECK: }
+  // CHECK: util.func public @main
+  util.func public @main() -> (i32) {
+    %0 = arith.constant 0 : i32
+    // CHECK-NOT: arith.constant
+    // CHECK-NOT: iree_unregistered.const_expr
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
+    // CHECK: util.return %[[VAL]]
+    %2 = "iree_unregistered.const_expr"(%0) ({
+    ^bb0(%inner0 : i32):
+      %3 = "iree_unregistered.const_expr"(%inner0) ({
+      ^bb0(%inner1 : i32):
+        %4 = math.absi %inner0 : i32
+        "iree_unregistered.yield"(%4) : (i32) -> i32
+      }) : (i32) -> i32
+      "iree_unregistered.yield"(%3) : (i32) -> i32
+    }) : (i32) -> i32
+    util.return %2 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @hoist_multi_nested_regions
+// CHECK-NOT:     util.global
+// CHECK-NOT:     util.initializer
+module @hoist_multi_nested_regions {
+  util.func public @main() -> (i32) {
+    %0 = arith.constant 0 : i32
+    %2 = "iree_unregistered"(%0) ({
+    ^bb0(%inner0 : i32):
+      %3 = "iree_unregistered.const_expr"(%inner0) ({
+      ^bb0(%inner1 : i32):
+        %4 = math.absi %inner0 : i32
+        "iree_unregistered.yield"(%4) : (i32) -> i32
+      }) : (i32) -> i32
+      "iree_unregistered.yield"(%3) : (i32) -> i32
+    }) : (i32) -> i32
+    util.return %2 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @do_not_hoist_non_value_type_results
 module @do_not_hoist_non_value_type_results {
   // CHECK-NOT: util.global
@@ -263,15 +336,18 @@ module @do_not_hoist_non_value_type_results {
 
 // -----
 
-// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
-module @do_not_hoist_uses_within_dispatches {
+// CHECK-LABEL: @hoist_root_consumer_dispatch
+module @hoist_root_consumer_dispatch {
+  // CHECK: util.global private @[[HOISTED_SYM:.+]] : tensor<i32>
+  // CHECK: util.initializer {
+  // CHECK:       flow.dispatch.region -> (tensor<i32>)
+  // CHECK:       util.return
+  // CHECK: }
+  // CHECK: util.func public @main
   util.func public @main() -> (tensor<i32>) {
-    // CHECK:   %[[CST:.+]] = arith.constant
-    // CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-    // CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[CST]]
-    // CHECK:     flow.return %[[SLICE]]
-    // CHECK:   util.return %[[RESULT]]
     %cst = arith.constant dense<[2, 3]>: tensor<2xi32>
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : tensor<i32>
+    // CHECK: util.return %[[VAL]]
     %result = flow.dispatch.region -> (tensor<i32>) {
       %slice = tensor.extract_slice %cst[0] [1] [1] : tensor<2xi32> to tensor<i32>
       flow.return %slice : tensor<i32>
@@ -282,17 +358,25 @@ module @do_not_hoist_uses_within_dispatches {
 
 // -----
 
-// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
-module @do_not_hoist_uses_within_dispatches {
-  // CHECK-NOT: util.global
-  // CHECK-NOT: util.initializer
+// CHECK-LABEL: @hoist_dispatch_regions
+module @hoist_dispatch_regions {
+  // CHECK: util.global private @[[HOISTED_SYM:.+]] : tensor<2x2xi32>
+  // CHECK: util.initializer {
+  // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x2xi32>) {
+  // CHECK:         linalg.generic
+  // CHECK:         flow.return
+  // CHECK:       }
+  // CHECK:       util.global.store %[[DISPATCH]], @[[HOISTED_SYM]] : tensor<2x2xi32>
+  // CHECK:       util.return
+  // CHECK: }
   // CHECK: util.func public @main
   util.func public @main() -> tensor<2x2xi32> {
     %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
     %1 = arith.constant dense<[[6, 7], [8,9]]> : tensor<2x2xi32>
     %expanded = tensor.expand_shape %0[[0, 1]] output_shape [2, 2] : tensor<4xi32> into tensor<2x2xi32>
     %2 = tensor.empty() : tensor<2x2xi32>
-    // CHECK: flow.dispatch.region
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : tensor<2x2xi32>
+    // CHECK: util.return %[[VAL]]
     %3 = flow.dispatch.region -> (tensor<2x2xi32>) {
       %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%expanded, %1 : tensor<2x2xi32>, tensor<2x2xi32>) outs(%2 : tensor<2x2xi32>) {
       ^bb0(%in: i32, %in_0: i32, %out: i32):
@@ -362,5 +446,20 @@ module @nested_program_const_expr {
       %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
       util.return %2 : i32
     }
+  }
+}
+
+// -----
+
+// We may attach ConstValueInfo to some op results, but not others, in some
+// special cases. Ensure we do not crash on such cases.
+
+// CHECK-LABEL: @partially_analyzed_op
+module @partially_analyzed_op {
+  util.func public @main(%arg0: i32, %arg1: i32) -> (i32, i32) {
+    %cst = arith.constant 1 : i32
+    %barrier0:2 = util.optimization_barrier %arg0, %arg1 : i32, i32
+    %barrier1:2 = util.optimization_barrier %cst, %barrier0#0 : i32, i32
+    util.return %barrier1#0, %barrier1#1 : i32, i32
   }
 }

@@ -13,6 +13,17 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+def DecomposeHorizontallyFusedGemmsPass :
+    InterfacePass<"iree-codegen-gpu-decompose-horizontally-fused-gemms",
+                  "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes a horizontally fused GEMM back into its constituent GEMMs";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::linalg::LinalgDialect",
+  ];
+}
+
 def GPUCheckResourceUsagePass :
     InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";
@@ -29,6 +40,14 @@ def GPUCreateFastSlowPathPass :
     InterfacePass<"iree-codegen-gpu-create-fast-slow-path", "mlir::FunctionOpInterface"> {
   let summary = "Create separate fast and slow paths to handle padding";
   let dependentDialects = ["::mlir::scf::SCFDialect"];
+}
+
+def GPUDistributeCopyUsingForallPass :
+    InterfacePass<"iree-codegen-gpu-distribute-copy-using-forall", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to distribute copies to threads.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
+  ];
 }
 
 def GPUDistributeForallPass :
@@ -112,6 +131,8 @@ def GPULowerToUKernelsPass :
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
     "::mlir::arith::ArithDialect",
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::gpu::GPUDialect",
     "::mlir::tensor::TensorDialect",
   ];
 }
@@ -180,11 +201,6 @@ def GPUPromoteMatmulOperandsPass :
   ];
 }
 
-def GPUPropagateDispatchSizeBoundsPass :
-    InterfacePass<"iree-codegen-gpu-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
-}
-
 def GPUReduceBankConflictsPass :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
@@ -238,13 +254,15 @@ def GPUApplyTilingLevelPass :
            [{llvm::cl::values(
               clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
                          "Tile and fuse all annotated ops to serial loops"),
+              clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
+                         "Tile and fuse all annotated ops to partial reduuction loops"),
               clEnumValN(IREE::GPU::TilingLevel::Thread, "thread",
                          "Tile and fuse all annotated ops to threads"),
               clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
                          "Tile and fuse all annotated ops to threads")
            )}]>,
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
-           /*default=*/"false",
+           /*default=*/"true",
            "Allow pad fusion to generate zero size slices">
   ];
 }

@@ -346,12 +346,12 @@ def Util_AlignOp : Util_PureOp<"align", [
   }];
 
   let arguments = (ins
-    SignlessIntegerLike:$value,
-    SignlessIntegerLike:$alignment
+    SignlessIntegerOrIndexLike:$value,
+    SignlessIntegerOrIndexLike:$alignment
   );
 
   let results = (outs
-    SignlessIntegerLike:$result
+    SignlessIntegerOrIndexLike:$result
   );
 
   let assemblyFormat = [{
@@ -463,7 +463,8 @@ let opDocGroup = OpGroupCompilerHintOps in {
 
 def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>,
-    DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>
+    DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>,
+    AllTypesMatch<["operands", "results"]>
 ]> {
   let summary = "memorializes assumptions about index/integer values.";
   let description = [{
@@ -497,7 +498,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     OpBuilder<(ins
       "ArrayRef<Value>":$operands,
       "ArrayRef<ArrayAttr>":$assumptions
-    )>
+    )>,
   ];
 
   let extraClassDeclaration = [{
@@ -777,7 +778,9 @@ def Util_CallOp : Util_Op<"call", [
   let arguments = (ins
     FlatSymbolRefAttr:$callee,
     Variadic<AnyType>:$operands,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -791,7 +794,7 @@ def Util_CallOp : Util_Op<"call", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ), [{
       build($_builder, $_state, callee.getResultTypes(), callee.getName(),
-            operands, tied_operands);
+            operands, tied_operands, /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
       $_state.addAttributes(attrs);
     }]>,
   ];
@@ -819,7 +822,7 @@ def Util_CallOp : Util_Op<"call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     // Clones the call and potentially expands each operand and result.

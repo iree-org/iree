@@ -1159,6 +1159,13 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.barrier
+//===----------------------------------------------------------------------===//
+
+void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.transfer
 //===----------------------------------------------------------------------===//
 

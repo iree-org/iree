@@ -30,8 +30,8 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-        "ConvertConv2DToIm2ColOp.cpp",
         "ConvertConv2DToWinograd.cpp",
+        "ConvertConvToIm2ColOp.cpp",
         "ConvertToLoops.cpp",
         "DecomposeAttention.cpp",
         "DecomposeIm2col.cpp",
@@ -53,7 +53,7 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
-        "//llvm-external-projects/iree-dialects:IREEInputDialect",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",

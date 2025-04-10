@@ -103,9 +103,11 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             .Case<vector::ExtractOp, vector::ExtractElementOp,
                   vector::ExtractStridedSliceOp>(
                 [](auto extract) { return extract.getVector(); })
-            .Case<vector::InsertOp, vector::InsertElementOp,
-                  vector::InsertStridedSliceOp>(
-                [](auto insert) { return insert.getSource(); })
+            .Case<vector::InsertElementOp>([](vector::InsertElementOp insert) {
+              return insert.getSource();
+            })
+            .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
+                [](auto insert) { return insert.getValueToStore(); })
             .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
               return transpose.getVector();
             })
@@ -265,7 +267,7 @@ bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   // First check if the function op itself has a target env attribute. This may
   // be preferred in tests.
   auto targetEnvAttr =
-      fn->getAttrOfType<IREE::GPU::TargetAttr>("iree.gpu.target");
+      fn->getAttrOfType<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
   if (!targetEnvAttr)
     targetEnvAttr = getGPUTargetAttr(fn);
   if (!targetEnvAttr)
@@ -423,7 +425,8 @@ public:
       auto options =
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::ParallelArith);
-      vector::populateVectorContractLoweringPatterns(patterns, options);
+      vector::populateVectorContractLoweringPatterns(
+          patterns, options.vectorContractLowering);
       // The pattern can generate transpose ops. Try to fold it if possible to
       // avoid lowering them into extract/insert later.
       vector::TransposeOp::getCanonicalizationPatterns(patterns, context);
@@ -446,7 +449,8 @@ public:
       auto options =
           vector::VectorTransformsOptions().setVectorTransposeLowering(
               vector::VectorTransposeLowering::EltWise);
-      vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorTransposeLoweringPatterns(
+          patterns, options.vectorTransposeLowering);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();

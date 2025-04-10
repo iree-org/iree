@@ -81,6 +81,16 @@ _Float16 __ockl_wfred_max_f16(_Float16);
 int64_t __ockl_wfred_min_i64(int64_t);
 int32_t __ockl_wfred_min_i32(int32_t);
 
+static inline void __threadfence_block() {
+  __builtin_amdgcn_fence(__ATOMIC_SEQ_CST, "workgroup");
+}
+
+[[clang::convergent]] static inline void __syncthreads() {
+  __builtin_amdgcn_fence(__ATOMIC_RELEASE, "workgroup");
+  __builtin_amdgcn_s_barrier();
+  __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup");
+}
+
 //===----------------------------------------------------------------------===//
 // Local replacements for HIP headers
 //===----------------------------------------------------------------------===//

@@ -18,18 +18,14 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-LLVM_SRCS = enforce_glob(
-    # keep sorted
-    [
-        "subbyte_types.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_subbyte_emulation",
-    srcs = LLVM_SRCS,
+    srcs = enforce_glob(
+        [
+            "subbyte_types.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     compiler_flags = [
         "--iree-llvmcpu-target-cpu=generic",
         "--iree-experimental-packed-i1-storage",

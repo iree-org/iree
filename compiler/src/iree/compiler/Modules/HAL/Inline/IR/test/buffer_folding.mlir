@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize -cse %s | FileCheck %s
 
 // CHECK-LABEL: @FoldBufferLengthOp
 // CHECK-SAME: (%[[LENGTH:.+]]: index)

@@ -28,6 +28,7 @@ enum BindingBits:uint64 (bit_flags) {
 // Information about an exported function on the executable.
 table ExportDef {
   // String name of the exported function symbol in the module.
+  // Includes a `.kd` suffix as that's what HSA expects.
   symbol_name:string;
 
   // Workgroup size for the export.

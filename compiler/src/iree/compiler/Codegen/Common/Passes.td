@@ -23,6 +23,7 @@ def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "
                 "statically known values.";
+  let dependentDialects = ["iree_compiler::IREE::Util::UtilDialect"];
 }
 
 def BubbleUpOrdinalOpsPass : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
@@ -66,6 +67,11 @@ def ConcretizePadResultShapePass :
       "implements OffsetSizeAndStrideOpInterface.";
 }
 
+def ConvertAccGEMMToGEMMPass :
+    Pass<"iree-convert-accgemm-to-gemm", ""> {
+  let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
+}
+
 def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
@@ -73,6 +79,14 @@ def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
 def ConvertBf16ToUInt16BuffersPass :
     Pass<"iree-codegen-convert-bf16-to-uint16-buffers", ""> {
   let summary = "Convert BF16 buffer ops and conversions to simulated behavior with uint16.";
+}
+
+def ConvertUnsupportedFloatArithPass
+    : InterfacePass<"iree-convert-unsupported-float-arith",
+                    "mlir::FunctionOpInterface"> {
+  let summary = "Convert arith operations on unsupported(source types) float "
+                "types to the target type. Populates the source and target "
+                "based on the target architecture.";
 }
 
 def ConvertToDestinationPassingStylePass :
@@ -151,6 +165,11 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
 def DecomposeConvolutionToLowerDimOpsPass :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
+}
+
+def DecomposeMemrefsPass :
+    Pass<"iree-codegen-decompose-memrefs", ""> {
+  let summary = "Decomposes memrefs";
 }
 
 def DecomposeLinalgGenericPass :
@@ -257,6 +276,7 @@ def EraseHALDescriptorTypeFromMemRefPass
 def ConvertHALDescriptorTypeToGPUAddressSpacePass
     : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
   let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let dependentDialects = ["::mlir::gpu::GPUDialect"];
 }
 
 def ExtractAddressComputationPass : Pass<"iree-codegen-extract-address-computation"> {
@@ -379,6 +399,11 @@ def HoistStaticallyBoundAllocationsPass :
   ];
 }
 
+def IREEBufferizeConstantsPass :
+    Pass<"iree-codegen-iree-bufferize-constants", ""> {
+  let summary = "Convert from arith.constant on tensors to buffers";
+}
+
 def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -451,6 +476,17 @@ def MaterializeEncodingIntoNopPass :
   let summary = "Drop the encodings from tensor types with encodings.";
 }
 
+def MaterializeEncodingIntoPaddingPass :
+    InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
+  let description = [{
+    Handles padding introduced by `pad_encoding_layout` encoding layouts, which
+    requires `flow.dispatch.tensor.load`/`.store` to be adjusted to account for
+    padding regions.
+    Materializes any other encoding layouts into nop.
+  }];
+}
+
 def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {
   let summary =
       "Load tuning spec transform dialect libraries and encode them in the module";
@@ -521,9 +557,15 @@ def PadDynamicAllocPass :
   let summary = "Pass to pad dynamic alloc into static one.";
 }
 
-def PolynomialApproximationPass :
-    Pass<"iree-codegen-polynomial-approximation", ""> {
-  let summary = "Convert math operations to their polynomial approximation";
+def MathTransformPass :
+    Pass<"iree-codegen-math-transform", ""> {
+  let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
+}
+
+def PropagateDispatchSizeBoundsPass :
+    InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
+  let dependentDialects = ["::mlir::arith::ArithDialect"];
 }
 
 def PropagateReshapesByExpansionPass :
@@ -632,6 +674,11 @@ def TileAndDistributeToWorkgroupsUsingForallOpPass :
     "scf::SCFDialect",
     "tensor::TensorDialect",
   ];
+  let options = [
+    Option<"transposeWorkgroup", "transpose-workgroup", "bool", /*default=*/"false",
+           "Swaps the workgroup mapping attribute x and y."
+            "Only swaps when the loop bounds are static.">,
+  ];
 }
 
 def TileLargeTensorsPass :
@@ -680,6 +727,16 @@ def UnrollAnnotatedLoopsPass :
 def VectorizeMemrefCopyPass :
     Pass<"iree-codegen-vectorize-memref-copy", ""> {
   let summary = "Vectorizes memref copy operations.";
+}
+
+def VectorTransferLoweringPass :
+    InterfacePass<"iree-codegen-vector-transfer-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to lower transfer ops to simpler ops like `vector.load`, `vector.store`, `vector.broadcast`, and a set of scf ops.";
+  let options = [
+    Option<"enableScalableLowerings", "enable-scalable-lowerings", "bool",
+      /*default=*/"false",
+      "Enables scalable vector specific transfer lowerings">,
+  ];
 }
 
 def VerifyWorkgroupDistributionPass :

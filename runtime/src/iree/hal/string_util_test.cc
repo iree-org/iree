@@ -610,8 +610,8 @@ TEST(ElementTypeStringUtilTest, ParseElementType) {
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_BFLOAT_16)));
   EXPECT_THAT(ParseElementType("f8E5M2"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)));
-  EXPECT_THAT(ParseElementType("f8E4M3"),
-              IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3)));
+  EXPECT_THAT(ParseElementType("f8E4M3FN"),
+              IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN)));
   EXPECT_THAT(ParseElementType("f8E5M2FNUZ"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)));
   EXPECT_THAT(ParseElementType("f8E4M3FNUZ"),
@@ -649,8 +649,8 @@ TEST(ElementTypeStringUtilTest, FormatElementType) {
               IsOkAndHolds(Eq("bf16")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2),
               IsOkAndHolds(Eq("f8E5M2")));
-  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3),
-              IsOkAndHolds(Eq("f8E4M3")));
+  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN),
+              IsOkAndHolds(Eq("f8E4M3FN")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ),
               IsOkAndHolds(Eq("f8E5M2FNUZ")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ),

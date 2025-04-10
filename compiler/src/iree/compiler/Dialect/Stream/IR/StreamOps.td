@@ -159,10 +159,16 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
 
     The resource returned is not valid for use until the timepoint is reached;
     execution using this resource must await on the timepoint.
+
+    If the lifetime of the allocation is unknowable (analysis fails, etc) the
+    `indeterminate_lifetime` will be set indicating that the resource should not
+    be deallocated asynchronously and only after all references have been
+    released.
   }];
 
   let arguments = (ins
     Stream_Size:$storage_size,
+    UnitAttr:$indeterminate_lifetime,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -173,6 +179,7 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
 
   let assemblyFormat = [{
     `uninitialized`
+    (`indeterminate` $indeterminate_lifetime^)?
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
     attr-dict
@@ -216,11 +223,17 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
     The resource is considered live and valid until the provided timepoint is
     reached and the memory is only made available for future requests after
     the result timepoint is reached.
+
+    If `prefer_origin` is set then the deallocation will be scheduled against
+    the original placement affinity of the allocation at runtime. In cases where
+    the original placement is unavailable the affinity of the deallocation op
+    will be used to perform a barrier operation.
   }];
 
   let arguments = (ins
     Stream_AnyResource:$operand,
     Stream_Size:$operand_size,
+    UnitAttr:$prefer_origin,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -229,6 +242,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   );
 
   let assemblyFormat = [{
+    (`origin` $prefer_origin^)?
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     $operand `:` type($operand) `{` $operand_size `}`
@@ -245,6 +259,103 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   }];
 
   let hasCanonicalizer = 1;
+}
+
+def Stream_ResourceRetainOp : Stream_Op<"resource.retain", [
+  Stream_CmdPhaseOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{retains ownership of the resource}];
+  let description = [{
+    Retains ownership of the resource for the parent code until a corresponding
+    `stream.resource.release` is used to release the ownership claim. A
+    particular resource may have multiple owners at any given time indicating
+    that multiple parts of the program are sharing responsibility for
+    deallocating the resource.
+
+    This is primarily only relevant for resources allocated asynchronously and
+    that need `stream.resource.dealloca` operations scheduled on timelines.
+    Synchronously allocated resources have their lifetimes tied directly to
+    their reference-type and do not need additional ownership management.
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `{` $operand_size `}`
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Stream_ResourceReleaseOp : Stream_Op<"resource.release", [
+  Stream_CmdPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{releases an ownership claim on the resource}];
+  let description = [{
+    A resource is allowed to be deallocated or reused once the last owner
+    releases their ownership. Returns a boolean indicating whether the owner
+    releasing their claim was the last owner (equivalent to having used
+    `stream.resource.is_terminal`).
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `{` $operand_size `}`
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Stream_ResourceIsTerminalOp : Stream_Op<"resource.is_terminal", [
+  Stream_CmdPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns true if the resource has no other claims to ownership}];
+  let description = [{
+    Resources may have multiple conceptual owners and are generally only safe to
+    deallocate if the code performing the deallocation is the last owner. This
+    op can be used to see if the current owner is the last one claiming
+    ownership and can deallocate or reuse the resource for other purposes.
+  }];
+
+  let arguments = (ins
+    Stream_AnyResource:$operand,
+    Stream_Size:$operand_size
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `{` $operand_size `}`
+  }];
+
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
 }
 
 def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
@@ -577,7 +688,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{slices out a cloned subview of a value}];
+  let summary = [{slices out a subview of a value}];
   let description = [{
     Aliases a byte subrange of a resource.
   }];
@@ -1083,7 +1194,9 @@ def OpGroupPseudoOps : OpDocGroup {
 let opDocGroup = OpGroupPseudoOps in {
 
 def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
-  Stream_AffinityOp,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "pinsValueAffinity",
+  ]>,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1098,6 +1211,11 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     is resolved during lowering into the stream dialect. This can be used to
     interoperate between levels of the stack that require specifying stream
     types and those that prior to lowering do not handle them.
+
+    `consume` can be used to indicate a transfer of ownership. Though the
+    imported value may still have external references when consumed a resource
+    will be conceptually released from its existing owner and retained by the
+    importer atomically.
   }];
 
   let arguments = (ins
@@ -1105,6 +1223,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     Stream_Size:$result_size,
+    UnitAttr:$consume,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1113,6 +1232,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`consume` $consume^)?
     $source `:`
     type($source)
     `->`
@@ -1136,7 +1256,9 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
 }
 
 def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
-  Stream_AffinityOp,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "pinsValueAffinity",
+  ]>,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1375,7 +1497,9 @@ def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
 def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -1423,6 +1547,60 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
+  AttrSizedOperandSegments,
+  Stream_AffinityOp,
+  Stream_StreamableOp,
+  Stream_TensorPhaseOp,
+  Util_ShapeAwareOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{Encodes the contents of a value}];
+  let description = [{
+    Elones the contents of a value at a snapshot in time. Future changes to the
+    identity encoding will not effect the result. Acts as a copy-on-write
+    operation. Otherwise, an executable for encoding the value is generated
+    during lowering.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    TypeAttr:$source_encoding,
+    Stream_ShapeDynamicDims:$source_encoding_dims,
+    Stream_Size:$source_size,
+    TypeAttr:$result_encoding,
+    Stream_ShapeDynamicDims:$result_encoding_dims,
+    Stream_Size:$result_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `:`
+    $source_encoding (`` `{` $source_encoding_dims^ `}`)?
+    `in`
+    type($source) `` `{` $source_size `}`
+    `->`
+    $result_encoding (`` `{` $result_encoding_dims^ `}`)?
+    `in`
+    type($result) `` `{` $result_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
+  }];
+
+  let hasVerifier = 1;
   let hasFolder = 1;
 }
 
@@ -1737,6 +1915,80 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
   }];
 
   let hasVerifier = 1;
+}
+
+def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  Stream_AffinityOp,
+  Stream_TensorPhaseOp,
+  Stream_StreamableOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{dispatches a parallelized grid of work}];
+  let description = [{
+    Calls the specified entry point function once for each element in the
+    specified workgroup count. Each workgroup has access to the same operands
+    and results and is able to load/store at will.
+  }];
+
+  let arguments = (ins
+    Variadic<Index>:$workload,
+    SymbolRefArrayAttr:$entry_points,
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_PrimitiveType,
+    ]>>:$mixed_operands,
+    Variadic<Stream_Size>:$operand_sizes,
+    TypeArrayAttr:$operand_encodings,
+    Stream_ShapeDynamicDims:$operand_encoding_dims,
+    Variadic<Stream_Size>:$result_sizes,
+    TypeArrayAttr:$result_encodings,
+    Stream_ShapeDynamicDims:$result_encoding_dims,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<Stream_AnyStreamResource>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    custom<DispatchEntryPoints>($entry_points)
+    (`[` $workload^ `]`)? ``
+    `(` $mixed_operands `)`
+    attr-dict `:`
+    custom<EncodedShapedFunctionType>(
+        ref($mixed_operands),
+        type($mixed_operands), $operand_sizes,
+        $operand_encodings, $operand_encoding_dims,
+        type($results), $result_sizes,
+        $result_encodings, $result_encoding_dims,
+        $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
+    Value getOperandSize(unsigned idx) {
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getOperandSizes());
+    }
+    Value getResultSize(unsigned idx) {
+      return IREE::Util::findValueSizeInList(idx, getResults(), getResultSizes());
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
 }
 
 } // OpGroupTensorOps
@@ -2216,6 +2468,59 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
+  AllTypesMatch<["source", "result"]>,
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "isMetadata",
+  ]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{indicates a value that must have a specific affinity}];
+  let description = [{
+    Prevents fusion and scheduling of a value across an affinity boundary.
+    May introduce copy-on-write behavior if the operand value is used as well as
+    the result and users should try to keep the operand to a single use by this
+    op.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>:$source,
+    Stream_Size:$size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `:` type($source)
+    `` `{` $size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSize(); }
+    Value getResultSize(unsigned idx) { return getSize(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+}
+
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinityAttr",
@@ -2360,7 +2665,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
@@ -2408,6 +2715,18 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
                                type($results), $result_sizes,
                                $tied_operands)
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$operands,
+      "ValueRange":$operandSizes, "ValueRange":$operandOffests,
+      "ValueRange":$operandEnds, "ValueRange":$operandLengths,
+      "ValueRange":$resultSizes,
+      CArg<"ArrayRef<int64_t>", "{}">:$tiedOperands,
+      CArg<"AffinityAttr", "{}">:$affinityAttr
+    )>
+  ];
 
   let extraClassDeclaration = [{
     auto getEntryPointRefs() {
@@ -2557,6 +2876,8 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -2597,7 +2918,7 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     Value getOperandSize(unsigned idx) {
@@ -3241,6 +3562,8 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
     Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
     Stream_ResourceAccessArrayAttr:$resource_operand_accesses
   );
   let results = (outs
@@ -3277,7 +3600,7 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
     }
 
     Value getOperandSize(unsigned idx) {
@@ -3748,7 +4071,8 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
-    Stream_Timepoint:$await_timepoint
+    Stream_Timepoint:$await_timepoint,
+    UnitAttr:$sync
   );
   let results = (outs
     Variadic<AnyTypeOf<[
@@ -3758,6 +4082,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   );
 
   let assemblyFormat = [{
+    (`sync` $sync^)?
     $await_timepoint `=` `` `>`
     $resource_operands `:`
     custom<ShapedTypeList>(type($resource_operands),
@@ -4220,6 +4545,9 @@ def Stream_YieldOp : Stream_Op<"yield", [
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>,
   Terminator,
   SameVariadicOperandSize,
+  DeclareOpInterfaceMethods<Util_ClosureYieldOpInterface, [
+    "getClosureResultsMutable",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{yields stream values from an execution region}];

@@ -11,15 +11,17 @@
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
-#include "mlir/Bindings/Python/PybindAdaptors.h"
+#include "mlir/Bindings/Python/Nanobind.h"
+#include "mlir/Bindings/Python/NanobindAdaptors.h"
 
 static const char *kCodegenModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
 static const char *kGpuModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
 
-namespace py = pybind11;
-using namespace mlir::python::adaptors;
+namespace py = nanobind;
+using namespace nanobind::literals;
+using namespace mlir::python::nanobind_adaptors;
 
 static std::vector<MlirOperation>
 ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
@@ -39,7 +41,7 @@ ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
 
   py::object mmaIntrinsicEnum =
-      py::module_::import(kGpuModuleImportPath).attr("MMAIntrinsic");
+      py::module_::import_(kGpuModuleImportPath).attr("MMAIntrinsic");
   std::vector<py::object> mmaList(numMMAs);
   for (size_t i = 0; i < numMMAs; ++i) {
     mmaList[i] = mmaIntrinsicEnum(mmaIntrinsics[i]);
@@ -48,7 +50,17 @@ ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   return mmaList;
 }
 
-PYBIND11_MODULE(_ireeCompilerDialects, m) {
+static std::vector<MlirOperation>
+ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
+  size_t numOps = 0;
+  ireeCodegenGetTunerRootOps(module, &numOps, nullptr);
+  std::vector<MlirOperation> ops(numOps);
+  ireeCodegenGetTunerRootOps(module, &numOps, ops.data());
+
+  return ops;
+}
+
+NB_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
   auto iree_codegen_module =
@@ -75,7 +87,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
       .def_property_readonly("value", [](MlirAttribute self) -> py::object {
         uint32_t rawValue =
             ireeCodegenDispatchLoweringPassPipelineAttrGetValue(self);
-        return py::module_::import(kCodegenModuleImportPath)
+        return py::module_::import_(kCodegenModuleImportPath)
             .attr("DispatchLoweringPassPipeline")(rawValue);
       });
 
@@ -204,7 +216,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
                              ireeGPUReorderWorkgroupsStrategyAttrGetValue)
       .def_property_readonly("value", [](MlirAttribute self) -> py::object {
         uint32_t rawValue = ireeGPUReorderWorkgroupsStrategyAttrGetValue(self);
-        return py::module_::import(kGpuModuleImportPath)
+        return py::module_::import_(kGpuModuleImportPath)
             .attr("ReorderWorkgroupsStrategy")(rawValue);
       });
 
@@ -296,7 +308,7 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
                              [](MlirAttribute self) -> py::object {
                                uint32_t rawValue =
                                    ireeGPUMMAIntrinsicAttrGetValue(self);
-                               return py::module_::import(kGpuModuleImportPath)
+                               return py::module_::import_(kGpuModuleImportPath)
                                    .attr("MMAIntrinsic")(rawValue);
                              })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
@@ -430,4 +442,14 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
       "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
       "Queries the MMA intrinsics from an executable variant op.",
       py::arg("op"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetTunerRootOps
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def("get_tuner_root_ops",
+                          &ireeCodegenGetTunerRootOpsBinding,
+                          "Get the operations marked with the tuner root op "
+                          "attribute from a module.",
+                          py::arg("module"));
 }

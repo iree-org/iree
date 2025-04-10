@@ -583,9 +583,11 @@ struct OutlineMemoizeRegionsPass
     // Gather all memoize ops in the module. We are changing the module during
     // processing and need to complete the walk before modification.
     SmallVector<IREE::HAL::DeviceMemoizeOp> memoizeOps;
-    moduleOp.walk([&](IREE::HAL::DeviceMemoizeOp memoizeOp) {
-      memoizeOps.push_back(memoizeOp);
-    });
+    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+      funcOp.walk([&](IREE::HAL::DeviceMemoizeOp memoizeOp) {
+        memoizeOps.push_back(memoizeOp);
+      });
+    }
 
     // Try to outline all memoize ops. Some may fail analysis and be inlined.
     auto &moduleSymbolTable =

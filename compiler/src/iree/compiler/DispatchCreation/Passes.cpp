@@ -70,12 +70,6 @@ static llvm::cl::opt<bool>
                          llvm::cl::desc("Fuse multi-use ops."),
                          llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableAggressiveFusion(
-    "iree-dispatch-creation-enable-aggressive-fusion",
-    llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
-                   "since all backends dont support it yet"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-dispatch-creation-experimental-data-tiling",
     llvm::cl::desc("Enable data-tiling at flow level, i.e., it sets encodings "
@@ -137,6 +131,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
+      .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
       .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
       .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
@@ -194,40 +189,65 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
       .addPass(DispatchCreation::createTransposeGenericOpsPass);
+
+  // Run constant expression hoisting just before dispatch creation in case
+  // there are any new hoisting opportunities (e.g. transpose generics or
+  // horizontal fusion).
+  IREE::Util::ExprHoistingOptions options;
+  options.maxSizeIncreaseThreshold = 0;
+  options.registerDependentDialectsFn = [](DialectRegistry &registry) {
+    registry.insert<IREE::Flow::FlowDialect>();
+  };
+  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  FunctionLikeNest(passManager)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 }
 
 // Pipeline to first create `flow.dispatch.region` ops and then lower to
 // `flow.dispatch.workgroup` ops.
-static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
+// Note that we should not hoist out small constants before the dispatch regions
+// are converted to workgroups. E.g., the `cseConstant` option needs to be false
+// in greedy pattern rewriting drivers.
+static void
+addDispatchRegionCreationPasses(OpPassManager &passManager,
+                                const DispatchCreationOptions &options) {
   FunctionLikeNest(passManager)
       // Create dispatches for scalar operations as roots.
       .addPass(DispatchCreation::createFormScalarDispatchesPass)
       // Create `flow.dispatch.region` centered around a root and fuse with
       // producers and consumers.
-      .addPass([&]() {
+      .addPass([&] {
         return DispatchCreation::createFormDispatchRegionsPass(
             FormDispatchRegionsPassOptions{
-                clEnableAggressiveFusion,
+                options.enableAggressiveFusion,
                 clEnableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
-      // Clone all producers into the dispatch region to perpare for being
+      // Clone all producers into the dispatch region to prepare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
-      .addPass(DispatchCreation::createCloneProducersIntoDispatchRegionsPass);
+      .addPass([&] {
+        return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
+            CloneProducersIntoDispatchRegionsPassOptions{
+                options.enableAggressiveFusion});
+      })
+      // Collapse dimensions of linalg Ops.
+      .addPass(DispatchCreation::createCollapseDimensionsPass);
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be
   // separated from compiler fusion decisions.
   if (clEnableDataTiling) {
-    SetEncodingPassOptions options{clPadFactor};
     FunctionLikeNest(passManager)
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
-        .addPass([&]() { return createSetEncodingPass(options); })
+        .addPass([] {
+          return createSetEncodingPass(SetEncodingPassOptions{clPadFactor});
+        })
         // SetEncodingOps should not be in the same dispatch as the data-tiled
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
@@ -239,8 +259,14 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
   FunctionLikeNest(passManager)
-      // Collapse dimensions of linalg Ops.
-      .addPass(DispatchCreation::createCollapseDimensionsPass);
+      .addPass(DispatchCreation::createConvertEncodingToFlowPass);
+  // Hoist encoding operations into initializers when possible.
+  IREE::Util::ExprHoistingOptions hoistingOptions;
+  hoistingOptions.maxSizeIncreaseThreshold = 0;
+  hoistingOptions.registerDependentDialectsFn = [](DialectRegistry &registry) {
+    registry.insert<IREE::Flow::FlowDialect>();
+  };
+  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
 }
 
 // Apply preprocessing and form dispatch regions
@@ -285,7 +311,7 @@ void buildDispatchCreationPassPipeline(
       .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
-  addDispatchRegionCreationPasses(passManager);
+  addDispatchRegionCreationPasses(passManager, transformOptions.options);
 
   FunctionLikeNest(passManager)
       .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)

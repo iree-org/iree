@@ -32,28 +32,31 @@
 // and is contributed back to the final address with just one instruction.
 
 // Match the interesting constants.
-// CHECK-DAG: %[[C2:.*]] = llvm.mlir.constant(2 : index) : i64
-// CHECK-DAG: %[[C6:.*]] = llvm.mlir.constant(6 : index) : i64
-// CHECK-DAG: %[[C16:.*]] = llvm.mlir.constant(16 : index) : i64
-// CHECK-DAG: %[[C64:.*]] = llvm.mlir.constant(64 : index) : i64
+// CHECK-DAG: %[[C2:.*]] = llvm.mlir.constant(2 : i32) : i32
+// CHECK-DAG: %[[C6:.*]] = llvm.mlir.constant(6 : i32) : i32
+// CHECK-DAG: %[[C16:.*]] = llvm.mlir.constant(16 : i32) : i32
+// CHECK-DAG: %[[C64:.*]] = llvm.mlir.constant(64 : i32) : i32
 // CHECK-DAG: %[[C4096:.*]] = llvm.mlir.constant(4096 : index) : i64
 // CHECK-DAG: %[[C8192:.*]] = llvm.mlir.constant(8192 : index) : i64
 //
 // Match the interesting special registers.
 // CHECK-DAG: %[[TID_Y:.*]] = nvvm.read.ptx.sreg.tid.y range <i32, 0, 2> : i32
 // CHECK-DAG: %[[TID_Y_EXT:.*]] = llvm.sext %[[TID_Y]] : i32 to i64
+// CHECK-DAG: %[[TID_Y_TRUNC:.*]] = llvm.trunc %[[TID_Y_EXT]] : i64 to i32
 // CHECK-DAG: %[[LANEID:.*]] = nvvm.read.ptx.sreg.laneid range <i32, 0, 32> : i32
 // CHECK-DAG: %[[LANEID_EXT:.*]] = llvm.sext %[[LANEID]] : i32 to i64
-// CHECK-DAG: %[[TID_Y_IDX:.*]] = llvm.mul %[[TID_Y_EXT]], %[[C64]]  : i64
+// CHECK-DAG: %[[LANEID_TRUNC:.*]] = llvm.trunc %[[LANEID_EXT]] : i64 to i32
+// CHECK-DAG: %[[TID_Y_IDX:.*]] = llvm.mul %[[TID_Y_TRUNC]], %[[C64]] overflow<nsw> : i32
 //
 // Match the loop invariant math on the special registers.
-// CHECK: %[[GRP_IDX:.*]] = llvm.add %[[TID_Y_IDX]], %[[LANEID_EXT]]  : i64
-// CHECK: %[[GRP_IDX1:.*]] = llvm.add %[[GRP_IDX]], %{{.*}}  : i64
-// CHECK: %[[GRP_IDX2:.*]] = llvm.and %[[GRP_IDX1]], %[[C6]]  : i64
-// CHECK: %[[GRP_IDX3:.*]] = llvm.shl %[[GRP_IDX2]], %[[C2]]  : i64
-// CHECK: %{{.*}} = llvm.xor %[[SRC:.*]], %[[GRP_IDX3]]  : i64
-// CHECK: %[[ADJ_SRC:.*]] = llvm.add %[[SRC]], %[[C16]]  : i64
-// CHECK: %[[INV:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i64
+// CHECK: %[[GRP_IDX:.*]] = llvm.add %[[TID_Y_IDX]], %[[LANEID_TRUNC]]  : i32
+// CHECK: %[[GRP_IDX1:.*]] = llvm.add %[[GRP_IDX]], %{{.*}}  : i32
+// CHECK: %[[GRP_IDX2:.*]] = llvm.and %[[GRP_IDX1]], %[[C6]]  : i32
+// CHECK: %[[GRP_IDX3:.*]] = llvm.shl %[[GRP_IDX2]], %[[C2]]  : i32
+// CHECK: %{{.*}} = llvm.xor %[[SRC:.*]], %[[GRP_IDX3]]  : i32
+// CHECK: %[[ADJ_SRC:.*]] = llvm.add %[[SRC]], %[[C16]]  : i32
+// CHECK: %[[INV:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i32
+// CHECK: %[[INV_EXT:.*]] = llvm.zext %[[INV]] : i32 to i64
 //
 // Find the basic block boundary.
 // CHECK: llvm.br ^[[LOOP_BODY:bb[0-9]+]](
@@ -65,7 +68,7 @@
 // CHECK: %[[VAR:.*]] = llvm.mul %[[IV]], %[[C4096]]
 //
 // Add the loop invariant part.
-// CHECK: %[[OFF:.*]] = llvm.add %{{.*}}, %[[INV]]
+// CHECK: %[[OFF:.*]] = llvm.add %{{.*}}, %[[INV_EXT]]
 //
 // Store the resulting offset in the memref descriptor.
 // llvm.insert %[[OFF]], %{{.*}}[2]

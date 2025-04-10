@@ -38,8 +38,6 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         unsigned pipelineDepth);
 
-void addGPUPackUnPackPasses(OpPassManager &funcPassManager);
-
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a
 /// module-level pass manager.
@@ -90,6 +88,10 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// the module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
                                      bool useROCM);
+LogicalResult
+verifyGPUMatmulPipeline(Operation *op,
+                        IREE::GPU::LoweringConfigAttr loweringConfig,
+                        IREE::Codegen::TranslationInfoAttr translationInfo);
 
 /// Lowering calling vectorization patterns.
 LogicalResult

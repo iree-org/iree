@@ -66,11 +66,11 @@ func.func @block_attention_dims() {
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //   CHECK-DAG:   %[[M:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 0 : index
 //   CHECK-DAG:   %[[K2:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 1 : index
-//   CHECK-DAG:   %[[M_DYNAMIC:.+]] = arith.divui %[[M]], %[[C16]]
+//   CHECK-DAG:   %[[M_DYNAMIC:.+]] = arith.divsi %[[M]], %[[C16]]
 //       CHECK:   %[[Q_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(0)
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
-//       CHECK:   %[[K2_DYNAMIC:.+]] = arith.divui %[[K2]], %[[C32]]
+//       CHECK:   %[[K2_DYNAMIC:.+]] = arith.divsi %[[K2]], %[[C32]]
 //       CHECK:   %[[K_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(1)
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
@@ -252,4 +252,59 @@ func.func @multiple_dynamic_dims(%arg0 : index, %arg1 : index) -> tensor<?x?x409
 //  CHECK-SAME:       ins(%[[LHS]], %[[RHS]]
 //  CHECK-SAME:       outs(%[[INIT]] :
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[MATMUL]]
+//       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+func.func @block_elementwise(%arg0 : tensor<?xf16>, %dim : index)
+    -> tensor<?xf16> {
+  %0 = util.assume.int %dim<udiv = 1024> : index
+  %cst = arith.constant 0.2 : f16
+  %init = tensor.empty(%0) : tensor<?xf16>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<?xf16>) outs(%init : tensor<?xf16>) {
+    ^bb0(%in : f16, %out : f16):
+      %3 = arith.addf %in, %cst : f16
+      linalg.yield %3 : f16
+  } -> tensor<?xf16>
+  return %2 : tensor<?xf16>
+}
+// CHECK-LABEL: func @block_elementwise(
+//       CHECK:   %[[ELEM:.+]] = linalg.generic
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ELEM]]
+//  CHECK-SAME:     tensor<?x1024xf16> into tensor<?xf16>
+//       CHECK:   return %[[COLLAPSE]] : tensor<?xf16>
+
+// -----
+
+// Check that there are no SSA violations during blocking
+func.func @check_ssa_violation(%dim : index,
+    %lhs : tensor<?xf32>, %rhs : tensor<?xf32>) -> tensor<?xf32> {
+  %c4 = arith.constant 4 : index
+  %0 = arith.muli %dim, %c4 overflow<nsw> : index
+  %1 = tensor.empty(%0) : tensor<?xf32>
+  %2 = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%lhs, %rhs : tensor<?xf32>, tensor<?xf32>)
+        outs(%1 : tensor<?xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %33 = arith.addf %in, %in_0 : f32
+    linalg.yield %33 : f32
+  } -> tensor<?xf32>
+  return %2 : tensor<?xf32>
+}
+// CHECK-LABEL: func @check_ssa_violation
+//  CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<?xf32>
+//  CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<?xf32>
+//   CHECK-DAG:   %[[EXPANDED0:.+]] = tensor.expand_shape %[[LHS]]
+//   CHECK-DAG:   %[[EXPANDED1:.+]] = tensor.expand_shape %[[RHS]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[EXPANDED0]], %[[EXPANDED1]] :
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   return %[[COLLAPSE]]

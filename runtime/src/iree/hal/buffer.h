@@ -26,7 +26,7 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 //===----------------------------------------------------------------------===//
 
 // Whole length of the underlying buffer.
-#define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
+#define IREE_HAL_WHOLE_BUFFER ((iree_device_size_t)(-1))
 
 // A bitfield specifying properties for a memory type.
 enum iree_hal_memory_type_bits_t {
@@ -472,6 +472,12 @@ enum iree_hal_buffer_placement_flag_bits_t {
   // iree_hal_device_queue_alloca and/or can be deallocated with an asynchronous
   // deallocation API such as iree_hal_device_queue_dealloca.
   IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS = 1u << 0,
+  // Buffer lifetime is indeterminate indicating that the compiler or
+  // application allocating the buffer is unable to determine when it is safe to
+  // deallocate the buffer. Explicit deallocation requests are ignored and the
+  // buffer deallocation will happen synchronously when the last remaining
+  // reference to the buffer is released.
+  IREE_HAL_BUFFER_PLACEMENT_FLAG_INDETERMINATE_LIFETIME = 1u << 1,
   // TODO(benvanik): flags for discrete/external to allow for quick export
   // checks.
 };
@@ -740,16 +746,16 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_calculate_range(
     iree_device_size_t* out_adjusted_length);
 
 // Tests whether the given buffers overlap, including support for subspans.
-// IREE_WHOLE_BUFFER may be used for |lhs_length| and/or |rhs_length| to use the
-// lengths of those buffers, respectively.
+// IREE_HAL_WHOLE_BUFFER may be used for |lhs_length| and/or |rhs_length| to use
+// the lengths of those buffers, respectively.
 IREE_API_EXPORT iree_hal_buffer_overlap_t iree_hal_buffer_test_overlap(
     iree_hal_buffer_t* lhs_buffer, iree_device_size_t lhs_offset,
     iree_device_size_t lhs_length, iree_hal_buffer_t* rhs_buffer,
     iree_device_size_t rhs_offset, iree_device_size_t rhs_length);
 
 // Returns a reference to a subspan of the |buffer|.
-// If |byte_length| is IREE_WHOLE_BUFFER the remaining bytes in the buffer after
-// |byte_offset| (possibly 0) will be selected.
+// If |byte_length| is IREE_HAL_WHOLE_BUFFER the remaining bytes in the buffer
+// after |byte_offset| (possibly 0) will be selected.
 //
 // The parent buffer will remain alive for the lifetime of the subspan
 // returned. If the subspan is a small portion this may cause additional
@@ -794,6 +800,90 @@ iree_hal_buffer_allocation_size(const iree_hal_buffer_t* buffer);
 // explicitly.
 IREE_API_EXPORT iree_hal_buffer_placement_t
 iree_hal_buffer_allocation_placement(const iree_hal_buffer_t* buffer);
+
+// Preserves the underlying buffer allocation for the caller.
+// Preservation is a way to track lifetime of an asynchronously-allocated buffer
+// on multiple device timelines. Incrementing the preserve count indicates that
+// there is a new co-owner of the buffer lifetime and that owner must make a
+// corresponding iree_hal_buffer_allocation_discard call to release their
+// ownership and possibly deallocate the buffer.
+//
+// Though intended for asynchronously-allocated buffers it is fine to preserve
+// synchronously-allocated ones. Any code that _may_ receive asynchronously
+// allocated buffers must properly balance their preserves and discards. Code
+// that will never receive asynchronously allocated buffers - such as those
+// using the inline HAL - can ignore tracking.
+//
+// This preservation roughly translates to retaining logical ownership of the
+// allocation and may differ from the buffer object reference count. As an
+// example if the Python GC hasn't run there may still be several references to
+// the buffer object even after the application has stopped using the buffer.
+// Tracking the preserve count independently allows the application to eagerly
+// deallocate the buffer without relying on the lifetime of the object to do so.
+//
+// A preserved buffer will still be deallocated if there are no longer any
+// references to the buffer object. Preserving the buffer only prevents any
+// other owner from deallocating it while there are references outstanding.
+// See iree_hal_buffer_allocation_discard for more information about releasing
+// ownership.
+IREE_API_EXPORT void iree_hal_buffer_allocation_preserve(
+    iree_hal_buffer_t* buffer);
+
+// Discards a previously preserved buffer allocation for the caller.
+// Decrementing the preserve count indicates that the owner is releasing its
+// ownership. When the last owner discards their ownership it is safe to
+// deallocate the buffer allocation even if there are still references remaining
+// to the buffer object.
+//
+// Any code that _may_ receive asynchronously allocated buffers must properly
+// balance their preserves and discards. Code that will never receive
+// asynchronously allocated buffers - such as those using the inline HAL - can
+// ignore tracking as there's no asynchronous deallocation and allocation
+// lifetime is tied to buffer object lifetime. Note that unbalanced discards
+// will result in either correctness issues (buffer is deallocated too early) or
+// extended lifetime (buffer cannot be deallocated until all buffer object
+// references have been released).
+//
+// Returns true if the caller was the last owner of the allocation and it can
+// now be deallocated.
+//
+// Example (note that expensive queue operations are guarded):
+//   if (iree_hal_buffer_allocation_discard(buffer)) {
+//     placement = iree_hal_buffer_allocation_placement(buffer);
+//     if (iree_all_bits_set(placement.flags,
+//                           IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS)) {
+//       <timeline logic>
+//       iree_hal_device_queue_dealloca(
+//           placement.device, placement.queue_affinity,
+//           wait_semaphore_list, signal_semaphore_list,
+//           IREE_HAL_DEALLOCA_FLAG_NONE,
+//           iree_hal_buffer_allocated_buffer(buffer));
+//     }
+//   }
+IREE_API_EXPORT IREE_MUST_USE_RESULT bool iree_hal_buffer_allocation_discard(
+    iree_hal_buffer_t* buffer);
+
+// Returns true if the caller is the last owner preserving an allocation.
+// This can be used to reuse a buffer that has no other owners.
+//
+// Note that an allocated buffer may have multiple suballocations referencing it
+// and this query is only for the entire allocation. When reusing a buffer one
+// should ensure the allocation size matches (or is within threshold) so that a
+// reuse of 16MB doesn't keep an underlying allocation of 16GB wired.
+//
+// Since device allocators are expected to reuse memory if in doubt prefer to
+// dealloca and alloca. This method should only be used in situations where the
+// buffer types are known to the application (such as fixed input and output
+// buffers).
+//
+// Example:
+//   if (iree_hal_buffer_allocation_is_terminal(buffer)) {
+//     new_buffer = buffer;  // safe to reuse
+//   } else {
+//     iree_hal_device_queue_alloca(..., &new_buffer);  // need a new buffer
+//   }
+IREE_API_EXPORT bool iree_hal_buffer_allocation_is_terminal(
+    const iree_hal_buffer_t* buffer);
 
 // Returns the offset in bytes of the buffer within its allocated_buffer.
 IREE_API_EXPORT iree_device_size_t
@@ -975,7 +1065,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_flush_range(
 
 // Calculates and returns a byte subspan range within a buffer mapping.
 // The byte range provided is local to the mapping. May return a 0-length span.
-// IREE_WHOLE_BUFFER can be used for |byte_length|.
+// IREE_HAL_WHOLE_BUFFER can be used for |byte_length|.
 //
 // Note that the access requirements of the mapping still hold: if the memory is
 // not host coherent and writeable then the caller must use the
@@ -1088,6 +1178,15 @@ struct iree_hal_buffer_t {
   // TODO(#19159): remove iree_hal_allocator_deallocate_buffer when pooling no
   // longer requires the pooling_allocator on iree_hal_buffer_t.
   iree_hal_allocator_t* pooling_allocator;
+
+  // A counter indicating the number of active preservation requests.
+  // This roughly translates to the number of logical "owners" of the allocation
+  // and may differ from the buffer object reference count. Note that this
+  // should only be used to schedule deallocations: the buffer will remain live
+  // and all fields valid until its reference count drops to 0 and its host-side
+  // data structures are freed.
+  // See iree_hal_buffer_allocation_preserve for more information.
+  iree_atomic_uint32_t preserve_count;
 
   // TODO(benvanik): bit pack these; could be ~4 bytes vs 12.
   iree_hal_memory_type_t memory_type;

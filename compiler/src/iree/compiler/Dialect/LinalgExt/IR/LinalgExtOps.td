@@ -107,40 +107,42 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getTiledImplementationFromOperandTile"]>]> {
   let summary = "Scatter operator";
   let description = [{
-    Based on XLA operation semantics, takes two `inputs` (`update` and
-    `indices`) and `outputs` value (`original`). The operation updates
-    the value at the slices specified by `indices` by combining the
-    current value with the value in `updates` using the computation
+    Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
+    The operation updates the value at the slices specified by `indices` by
+    combining the current value with the value in `updates` using the computation
     specified in `region`. The `region` specifies a binary operation
-    of signature (T, T) -> T, where `T` is the element-type of
-    `updates` (and `original`). The first argument correspond the
-    value to be updated (i.e. from `updates`), and the second the
-    current value (i.e. value from `original`).
+    of signature `(T, T) -> T`, where `T` is the element-type of
+    `updates` (and `original`). The first argument is from `updates`,
+    and the second is from `original`.
 
-    The `indices` is a 2D tensor/memref type. The first dim is the number of
-    updates, and the second dim is index depth. The index depth should always be
-    static.
+    The size of the `dimension_map` attribute is used to determine how many
+    indices are used to index into `original`, i.e. `index_depth`. The
+    `dimension_map` attribute describes which index value maps to which dimension
+    in the destination.
 
-    The first dim of `updates` and `indices` is identical, since they represent
-    the number of updates.
+    The operand `indices` is a N-D tensor/memref type that is composed
+    of two logical parts. The first `N-1` dimensions represent the batch of
+    updates. The last dim (at index `N-1`) is the `index_depth`, which can be
+    omitted if `index_depth` is 1.
 
-    The rank of the `original`/`result` is at least
-    `index_depth + rank(%updates) - 1`. The first `index_depth` indices are
-    derived from `indices` and the shape of update value has the last
-    rank(%original) - index_depth values match %(originals) last dimensions,
-    with the previous dims extending from the index offsets.
+    The operand `update` is a M-D tensor/memref type and similarly
+    consists of two parts. The first `N-1` dimensions represent the batch of
+    updates. This must exactly match to the first `N-1` dimensions in `indices`.
+    Dimensions `N..M-1` represent the slice scattered into `original`,
+    `update_slice`, and must match the last dimensions in original. This
+    represents a contiguous slice to be inserted into `original`.
 
-    The dimension_map attributes describes which index value maps to which
-    dimension in the destionation. It cannot contain duplicate values, must
-    have as many entries as index depth, and values must be within the rank of
-    the destination.
+    The operand `original` is a DPS init representing the destination that
+    `update` gets scattered to.
+    Where `rank(original) = rank(update_slice) + index_depth`
 
-    The unique_indices attribute carries the information whether all the indices
-    are unique. If there are repeated indices, the first iteration loop will be
-    marked as reduction.
+    The unique_indices attribute carries the information whether all the
+    indices are unique. If `unique_indices` is `true` and two or more updates
+    scatter to the same location in `original` the final value in `original` is
+    not guaranteed. If `unique_indices` is set to false, the first
+    `batch_rank` iteration loops will be marked as reduction.
 
-    The shapes definition follows tensorflow operations execept that it force
-    batch dims to be 1D. See more information in
+    The shapes definition follows tensorflow operations. See more information in
       https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
@@ -159,11 +161,12 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    static constexpr unsigned kUpdatesOpNum = 0;
+    static constexpr unsigned kIndicesOpNum = 1;
+    static constexpr unsigned kOriginalOpNum = 2;
 
     int64_t getIndexDepth() {
-      return cast<ShapedType>(getDpsInputOperand(1)->get().getType())
-          .getShape()
-          .back();
+      return getDimensionMap().size();
     }
 
     Value getUpdates() {
@@ -190,8 +193,22 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       return cast<ShapedType>(getOriginal().getType());
     }
 
+    /// Utility to get the rank of the portion of `indices` that
+    /// represents the batch dimensions
+    int64_t getBatchRank() {
+      return getUpdateType().getRank() - getUpdateSliceRank();
+    }
+
+    /// Utility to get the shape of the portion of `indices` that
+    /// represents the batch dimensions.
+    ArrayRef<int64_t> getBatchShape() {
+      return getIndicesType().getShape().slice(0, getBatchRank());
+    }
+
+    /// Utility to get the rank of the portion of `updates` that
+    /// is scattered into `original`.
     int64_t getUpdateSliceRank() {
-      return cast<ShapedType>(getUpdates().getType()).getRank() - 1;
+      return getOriginalType().getRank() - getIndexDepth();
     }
 
     bool isScalarUpdate() {
@@ -585,7 +602,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation"]>]> {
+       "getTiledImplementation"]>,
+     DeclareOpInterfaceMethods<PartialReductionOpInterface,
+      ["generateInitialTensorForPartialReduction",
+       "tileToPartialReduction",
+       "mergeReductions",
+       "getPartialResultTilePosition"]>]> {
   let summary = "Online Attention operator";
   let description = [{
     Traditional scaled dot product attention computes:
@@ -1191,7 +1213,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
   let description = [{
     This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
-    this operator computes matmul(tranpose(B), matmul(I, B)).
+    this operator computes matmul(transpose(B), matmul(I, B)).
     The input tile is assumed to be square with each side of size m + r - 1,
     where the convolutional kernel is m x m and the output tile size is r x r.
     B is a constant 2-d square matrix of the same shape as the input tile I.

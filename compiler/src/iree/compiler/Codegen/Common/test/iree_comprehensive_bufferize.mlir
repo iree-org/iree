@@ -76,7 +76,7 @@ func.func @matmul() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -84,15 +84,17 @@ func.func @matmul() {
 func.func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
-  %c1024 = arith.constant 1024 : index
   %m = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %n = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %k = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %base_offset_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) alignment(8) : i32
   %base_offset = arith.index_castui %base_offset_i32 : i32 to index
+  %res_offset_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
+  %res_offset_index = arith.index_castui %res_offset_i32 : i32 to index
+  %res_offset = util.assume.int %res_offset_index[<umin = 0, umax = 0>, <umin = 128, umax = 128, udiv = 128>, <umin = 1024, umax = 1024, udiv = 1024>] : index
   %lhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k}
   %rhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%base_offset) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n}
-  %result = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c1024) : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%m, %n}
+  %result = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%res_offset) : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%m, %n}
   %wg_id_y = hal.interface.workgroup.id[1] : index
   %wg_count_y = hal.interface.workgroup.count[1] : index
   %wg_size_y = hal.interface.workgroup.size[1] : index
@@ -127,11 +129,14 @@ func.func @matmul_fill() {
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
 //  CHECK-DAG:   %[[BASE_OFFSET_I32:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(3)
 //  CHECK-DAG:   %[[BASE_OFFSET:.+]] = arith.index_castui %[[BASE_OFFSET_I32]]
+//  CHECK-DAG:   %[[RES_OFFSET_I32:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(4)
+//  CHECK-DAG:   %[[RES_OFFSET_INDEX:.+]] = arith.index_castui %[[RES_OFFSET_I32]]
+//  CHECK-DAG:   %[[RES_OFFSET:.+]] = util.assume.int %[[RES_OFFSET_INDEX]]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(32)
 //  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[BASE_OFFSET]])
 //  CHECK-DAG:   memref.assume_alignment %[[RHS]], 8
-//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c1024)
+//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[RES_OFFSET]])
 //  CHECK-DAG:   memref.assume_alignment %[[RESULT]], 64
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
@@ -207,8 +212,8 @@ func.func @elementwise() {
 //      CHECK: func.func @elementwise()
 //  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant dense_resource<__elided__> : tensor<1x10xf32>
 //  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_memref %[[CST_TENSOR]]
-//  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(0) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: 128>, #hal.descriptor_type<storage_buffer>>
-//  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(1) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: 16>, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(0) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(1) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //      CHECK:   scf.for
 //  CHECK-DAG:     %[[SUB_IN1:.+]] = memref.subview %[[IN_BUF]]
 //  CHECK-DAG:     %[[SUB_OUT1:.+]] = memref.subview %[[OUT_BUF]]
@@ -2492,7 +2497,7 @@ func.func @tensor_pack() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x2x3x3xi32>>
   %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [2, 2, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x2x3x3xi32>> -> tensor<2x2x3x3xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x4xi32>> -> tensor<4x4xi32>
-  %4 = tensor.pack %3 padding_value(%c0_i32 : i32) inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %2 : tensor<4x4xi32> -> tensor<2x2x3x3xi32>
+  %4 = linalg.pack %3 padding_value(%c0_i32 : i32) inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %2 : tensor<4x4xi32> -> tensor<2x2x3x3xi32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [2, 2, 3, 3], strides = [1, 1, 1, 1] : tensor<2x2x3x3xi32> -> !flow.dispatch.tensor<writeonly:tensor<2x2x3x3xi32>>
   return
 }
@@ -2516,7 +2521,7 @@ func.func @tensor_unpack() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
   %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<4x4xi32>> -> tensor<4x4xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 2, 2, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x2x2x2xi32>> -> tensor<2x2x2x2xi32>
-  %4 = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %2 : tensor<2x2x2x2xi32> -> tensor<4x4xi32>
+  %4 = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %2 : tensor<2x2x2x2xi32> -> tensor<4x4xi32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : tensor<4x4xi32> -> !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
   return
 }
@@ -2539,7 +2544,7 @@ func.func @tensor_unpack_fully_dynamic() {
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
   %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<4x4xi32>> -> tensor<4x4xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 2, %inner_d0, %inner_d0], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x2x2x2xi32>> -> tensor<2x2x?x?xi32>
-  %4 = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [%inner_d0, %inner_d0] into %2 : tensor<2x2x?x?xi32> -> tensor<4x4xi32>
+  %4 = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [%inner_d0, %inner_d0] into %2 : tensor<2x2x?x?xi32> -> tensor<4x4xi32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : tensor<4x4xi32> -> !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
   return
 }
@@ -2584,8 +2589,8 @@ func.func @reduction_ew() {
 }
 
 // CHECK: func.func @reduction_ew
-// CHECK: hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c5120) : memref<1001xf32, strided<[1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
-// CHECK: hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c5120) : memref<1x1001xf32, strided<[1001, 1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
+// CHECK: hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c5120) : memref<1001xf32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+// CHECK: hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c5120) : memref<1x1001xf32, strided<[1001, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 // CHECK: hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%c0) : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -2684,6 +2689,31 @@ func.func @micro_kernel_op() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer>,
+    #hal.pipeline.binding<storage_buffer>
+]>
+func.func @rocdl_buffer_memory_space_elementwise_copy() {
+  %off.i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %off = arith.index_castui %off.i32 : i32 to index
+  %wgid = hal.interface.workgroup.id[0] : index
+  %tid = gpu.thread_id x
+  %arg0_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+  %arg1_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%off) {iree_gpu.use_rocdl_buffer_instructions} : !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+  %v = flow.dispatch.tensor.load %arg0_binding, offsets = [%wgid, %tid], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf32>> -> tensor<1x1xf32>
+  flow.dispatch.tensor.store %v, %arg1_binding, offsets = [%wgid, %tid], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+  return
+}
+// CHECK-LABEL: func @rocdl_buffer_memory_space_elementwise_copy()
+//   CHECK-DAG:   %[[arg0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+//   CHECK-DAG:   %[[arg1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) offset(%{{.+}}) : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+//   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg0]] resetOffset : memref<256x256xf32, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
+//   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg1]] resetOffset : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+//   CHECK-NOT:   hal.interface.binding.subspan
+//       CHECK:    return
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -2709,7 +2739,7 @@ func.func @sub_byte_bufferize_with_offset() {
 // CHECK-LABEL: func.func @sub_byte_bufferize_with_offset()
 //       CHECK:   %[[C64:.+]] = arith.constant 64 : index
 //       CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-SAME:       memref<64xi4, strided<[1], offset: 128>
+//  CHECK-SAME:       memref<64xi4, strided<[1], offset: ?>
 
 // -----
 
@@ -2866,3 +2896,55 @@ func.func @barrier_region_in_place() -> vector<2x3xf32> {
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[READ:.+]] = vector.transfer_read %[[EXPAND]]
 //       CHECK:   return %[[READ]]
+
+// -----
+
+// Check that there is no allocation in this case, fixed by removing read semantics of `tensor.parallel_insert_slice`.
+// See issue #20400
+func.func @check_no_alloc() {
+  %c32_i64 = arith.constant 32 : i64
+  %c0 = arith.constant 0 : index
+  %c256 = arith.constant 256 : index
+  %0 = hal.interface.constant.load layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<8x16xf16>>
+  %2 = hal.interface.binding.subspan layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      binding(0) alignment(64) offset(%c256) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<8xi32>>
+  %3 = hal.interface.binding.subspan layout(<constants = 1,
+      bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+                  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+      binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<?x16xf16>>{%0}
+  %16 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x16xf16>> -> tensor<8x16xf16>
+  %17 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<8xi32>> -> tensor<8xi32>
+  %18 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%0, 16], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x16xf16>>{%0} -> tensor<?x16xf16>
+  %19 = scf.forall (%arg0) in (2) shared_outs(%arg1 = %18) -> (tensor<?x16xf16>) {
+    %20 = affine.apply affine_map<(d0) -> (d0 * 8)>(%arg0)
+    %extracted_slice = tensor.extract_slice %arg1[0, %20] [%0, 8] [1, 1] : tensor<?x16xf16> to tensor<?x8xf16>
+    %21 = scf.forall (%arg2, %arg3) in (8, 1) shared_outs(%arg4 = %extracted_slice) -> (tensor<?x8xf16>) {
+      %extracted_slice_0 = tensor.extract_slice %16[%arg2, %20] [1, 8] [1, 1] : tensor<8x16xf16> to tensor<1x8xf16>
+      %extracted_slice_1 = tensor.extract_slice %17[%arg2] [1] [1] : tensor<8xi32> to tensor<1xi32>
+      %22 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+          ins(%extracted_slice_0, %extracted_slice_1 : tensor<1x8xf16>, tensor<1xi32>) outs(%arg4 : tensor<?x8xf16>) {
+      ^bb0(%arg5: f16, %arg6: f16):
+        iree_linalg_ext.yield %arg5 : f16
+      } -> tensor<?x8xf16>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %22 into %arg4[0, 0] [%0, 8] [1, 1] : tensor<?x8xf16> into tensor<?x8xf16>
+      }
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %21 into %arg1[0, %20] [%0, 8] [1, 1] : tensor<?x8xf16> into tensor<?x16xf16>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  flow.dispatch.tensor.store %19, %3, offsets = [0, 0], sizes = [%0, 16], strides = [1, 1] : tensor<?x16xf16> -> !flow.dispatch.tensor<readwrite:tensor<?x16xf16>>{%0}
+  return
+}
+// CHECK-LABEL: func @check_no_alloc
+//   CHECK-NOT:   memref.alloc

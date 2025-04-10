@@ -1,5 +1,6 @@
 // RUN: iree-compile %s -o ignored.mlir \
-// RUN:     --iree-hal-target-backends=vmvx \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=vmvx \
 // RUN:     --iree-hal-dump-executable-benchmarks-to=- | \
 // RUN: iree-compile - --output-format=vm-asm | \
 // RUN: FileCheck %s

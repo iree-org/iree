@@ -15,14 +15,6 @@ declare_mlir_python_sources(IREEDialectsPythonSources.Dialects
   ADD_TO_PARENT IREEDialectsPythonSources
 )
 
-declare_mlir_dialect_python_bindings(
-  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
-  TD_FILE dialects/IreeInputBinding.td
-  SOURCES dialects/iree_input.py
-  DIALECT_NAME iree_input
-)
-
 declare_mlir_dialect_extension_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
@@ -40,6 +32,7 @@ declare_mlir_dialect_extension_python_bindings(
 declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
   MODULE_NAME _ireeDialects
   ADD_TO_PARENT IREEDialectsPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREEDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS

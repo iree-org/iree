@@ -7,6 +7,9 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
 #define IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
 
+#include <nanobind/intrusive/counter.h>
+
+#include <functional>
 #include <vector>
 
 #include "./binding.h"
@@ -14,6 +17,7 @@
 #include "./vm.h"
 #include "iree/base/string_view.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/debugging.h"
 
 namespace iree {
 namespace python {
@@ -288,6 +292,33 @@ class HalMappedMemory {
 
 class HalCommandBuffer
     : public ApiRefCounted<HalCommandBuffer, iree_hal_command_buffer_t> {};
+
+using HalModuleBufferViewTraceCallback =
+    std::function<void(const std::string&, const std::vector<HalBufferView>&)>;
+
+// HAL debug sinks need ot live as long as the HAL module. This means the
+// underlying native object, not just the HAL module Python object.
+// This is necessary since here we hold a reference to a callback to a Python
+// function. This function needs to live after the destruction of the HAL module
+// Python object if it is registered into the VM context.
+// The HAL module and VM context Python objects are owners of the debug sink.
+class HalModuleDebugSink : public py::intrusive_base {
+ public:
+  HalModuleDebugSink(
+      HalModuleBufferViewTraceCallback buffer_view_trace_callback);
+  iree_hal_module_debug_sink_t AsIreeHalModuleDebugSink() const;
+  HalModuleBufferViewTraceCallback& GetHalModuleBufferViewTraceCallback();
+
+ private:
+  HalModuleBufferViewTraceCallback buffer_view_trace_callback_;
+
+  static iree_status_t DestroyCallback(void* user_data);
+
+  static iree_status_t IreeHalModuleBufferViewTrace(
+      void* user_data, iree_string_view_t key,
+      iree_host_size_t buffer_view_count, iree_hal_buffer_view_t** buffer_views,
+      iree_allocator_t host_allocator);
+};
 
 void SetupHalBindings(nanobind::module_ m);
 

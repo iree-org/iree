@@ -13,6 +13,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
@@ -39,7 +40,13 @@ static std::string getHoistedName(Type type) {
   std::string str;
   llvm::raw_string_ostream os(str);
   os << "__hoisted_";
-  type.print(os);
+  auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+  if (rankedTensorType && rankedTensorType.getEncoding()) {
+    rankedTensorType.dropEncoding().print(os);
+    os << "_encoded";
+  } else {
+    type.print(os);
+  }
   str = sanitizeSymbolName(str);
   if (str.substr(str.size() - 1) == "_")
     str = str.substr(0, str.size() - 1); // strip trailing _

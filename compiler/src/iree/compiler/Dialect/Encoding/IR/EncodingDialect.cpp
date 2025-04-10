@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypeInterfaces.cpp.inc"
 #undef GET_ATTRDEF_CLASSES
 
 namespace mlir::iree_compiler::IREE::Encoding {
@@ -29,13 +30,14 @@ namespace {
 // Used for custom printing support.
 struct EncodingOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
-  /// Hooks for getting an alias identifier alias for a given symbol, that is
-  /// not necessarily a part of this dialect. The identifier is used in place
-  /// of the symbol when printing textual IR. These aliases must not contain
-  /// `.` or end with a numeric digit([0-9]+). Returns success if an alias was
-  /// provided, failure otherwise.
+  // Hooks for getting an alias identifier alias for a given symbol, that is
+  // not necessarily a part of this dialect. The identifier is used in place
+  // of the symbol when printing textual IR. These aliases must not contain
+  // `.` or end with a numeric digit([0-9]+). Returns success if an alias was
+  // provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (llvm::isa<EncodingAttr>(attr)) {
+    if (llvm::isa<EncodingAttr, MatmulKAttr, TestingEncodingAttr,
+                  UnknownEncodingAttr>(attr)) {
       os << "encoding";
       return AliasResult::OverridableAlias;
     }

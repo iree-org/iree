@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/Conversion/HALToStream/Patterns.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -66,9 +67,9 @@ struct ConvertTensorImportOp
         TypeAttr::get(op.getTarget().getType()),
         flattenValues(adaptor.getTargetDims()), executionAffinityAttr);
     Value resource = rewriter.create<IREE::Stream::TensorImportOp>(
-        op.getLoc(), resultType, adaptor.getSource().front(),
-        TypeAttr::get(targetType), flattenValues(adaptor.getTargetDims()),
-        resultSize, executionAffinityAttr);
+        op.getLoc(), resultType, adaptor.getSource().front(), targetType,
+        flattenValues(adaptor.getTargetDims()), resultSize, op.getConsume(),
+        executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the resource is assumed to
     // be immediately available.
@@ -100,6 +101,13 @@ struct ConvertTensorImportOp
                                                RankedTensorType tensorType,
                                                ValueRange dynamicDims,
                                                OpBuilder &builder) {
+    // If the encoding attr is about packed storage then we don't need
+    // assertion, because packed storage attribute is about memory layout and it
+    // doesn't affect the tensor shape.
+    if (IREE::Encoding::hasPackedStorageAttr(tensorType)) {
+      return success();
+    }
+
     auto expectedElementType = builder.create<IREE::HAL::ElementTypeOp>(
         loc, tensorType.getElementType());
     auto expectedEncodingType = builder.create<IREE::HAL::EncodingTypeOp>(
@@ -210,7 +218,7 @@ struct ConvertTensorAliasOp
     auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
         op.getLoc(), externalType, adaptor.getStorage().front(),
         TypeAttr::get(sourceType), convertedSourceDims, storageSize,
-        executionAffinityAttr);
+        /*consume=*/UnitAttr{}, executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the storage is assumed to
     // be immediately available.

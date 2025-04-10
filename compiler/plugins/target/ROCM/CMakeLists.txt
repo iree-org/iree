@@ -59,6 +59,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils::ExecutableDebugInfoUtils
@@ -152,8 +153,7 @@ endforeach()
 add_custom_command(
   OUTPUT ${_all_device_bc_files}
   DEPENDS ${_all_device_bc_deps}
-  POST_BUILD
-    ${_all_device_bc_copy_commands}
+  COMMAND ${_all_device_bc_copy_commands}
 )
 add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
   DEPENDS

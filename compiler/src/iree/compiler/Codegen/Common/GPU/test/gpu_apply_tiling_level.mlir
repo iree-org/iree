@@ -1,7 +1,8 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{allow-zero-slices=true}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NOZERO
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{allow-zero-slices=false}, canonicalize, cse))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s --check-prefix=NOZERO
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=partial_reduction}, canonicalize, cse))" %s | FileCheck %s --check-prefix=PARTRED
 
 #config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -202,211 +203,6 @@ func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tens
 //   THREAD-DAG:       %[[LHS:.+]] = tensor.extract_slice %[[A]]
 //   THREAD-DAG:       %[[RHS:.+]] = tensor.extract_slice %[[B]]
 //       THREAD:       %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_add_tensor(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: tensor<64x256xf32>) -> tensor<64x256xf32>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
-      } {
-    %6 = linalg.generic {
-      indexing_maps = [#map, #map, #map],
-      iterator_types = ["parallel", "parallel"]
-      } ins(%3, %4 : tensor<64x256xf32>, tensor<64x256xf32>) outs(%5 : tensor<64x256xf32>) attrs =  {lowering_config = #config} {
-    ^bb0(%in: f32, %in_0: f32, %out: f32):
-      %7 = arith.addf %in, %in_0 : f32
-      linalg.yield %7 : f32
-    } -> tensor<64x256xf32>
-    return %6 : tensor<64x256xf32>
-  }
-}
-
-// Verify that no loops are generated without a reduction configuration.
-// CHECK-LABEL: func.func @inferred_add_tensor
-//   CHECK-NOT:   scf.for
-
-// THREAD-LABEL: func.func @inferred_add_tensor
-//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (1, 4)
-//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<1x4xf32>, tensor<1x4xf32>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_dynamic(%3: tensor<?x?xf32>, %4: tensor<?x?xf32>, %5: tensor<?x?xf32>) -> tensor<?x?xf32>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
-      } {
-    %6 = linalg.generic {
-      indexing_maps = [#map, #map, #map],
-      iterator_types = ["parallel", "parallel"]
-      } ins(%3, %4 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%5 : tensor<?x?xf32>) attrs =  {lowering_config = #config} {
-    ^bb0(%in: f32, %in_0: f32, %out: f32):
-      %7 = arith.addf %in, %in_0 : f32
-      linalg.yield %7 : f32
-    } -> tensor<?x?xf32>
-    return %6 : tensor<?x?xf32>
-  }
-}
-
-// THREAD-LABEL: func.func @inferred_dynamic
-//  THREAD-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<?x?xf32>
-//   THREAD-DAG:   %[[DIM0:.+]] = tensor.dim %[[A]], %c0 : tensor<?x?xf32>
-//   THREAD-DAG:   %[[DIM1:.+]] = tensor.dim %[[A]], %c1 : tensor<?x?xf32>
-//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (%[[DIM0]], %[[DIM1]]) step (1, 4)
-//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<1x?xf32>, tensor<1x?xf32>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_small_inner_dim(%3: tensor<8x2xf32>, %4: tensor<8x2xf32>, %5: tensor<8x2xf32>) -> tensor<8x2xf32>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
-      } {
-    %6 = linalg.generic {
-      indexing_maps = [#map, #map, #map],
-      iterator_types = ["parallel", "parallel"]
-      } ins(%3, %4 : tensor<8x2xf32>, tensor<8x2xf32>) outs(%5 : tensor<8x2xf32>) attrs =  {lowering_config = #config} {
-    ^bb0(%in: f32, %in_0: f32, %out: f32):
-      %7 = arith.addf %in, %in_0 : f32
-      linalg.yield %7 : f32
-    } -> tensor<8x2xf32>
-    return %6 : tensor<8x2xf32>
-  }
-}
-
-// THREAD-LABEL: func.func @inferred_small_inner_dim
-//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (8, 2) step (1, 2)
-//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<1x2xf32>, tensor<1x2xf32>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_small_inner_dim_fill_vector_sizes(%0: tensor<4x16x8x4x16x2x4xf16>, %1: tensor<4x16x8x4x16x2x4xf16>) -> tensor<4x16x8x4x16x2x4xf16>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
-      } {
-    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-        ins(%0 : tensor<4x16x8x4x16x2x4xf16>)
-        outs(%1 : tensor<4x16x8x4x16x2x4xf16>) -> tensor<4x16x8x4x16x2x4xf16>
-    return %2 : tensor<4x16x8x4x16x2x4xf16>
-  }
-}
-
-// THREAD-LABEL: func.func @inferred_small_inner_dim_fill_vector_sizes
-//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0, 0, 0, 0) to (4, 16, 8, 4, 16, 2, 4) step (1, 1, 1, 1, 1, 2, 4)
-//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<1x1x1x1x1x2x4xf16>) outs({{.*}} : tensor<1x1x1x1x1x2x4xf16>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_6>, {{.*}}, #gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_small_inner_dim_dont_fill_non_contiguous(
-    %0: tensor<4x16x4x4xf16>, %1: tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
-      } {
-    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-        ins(%0 : tensor<4x16x4x4xf16>)
-        outs(%1 : tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
-    return %2 : tensor<4x16x4x4xf16>
-  }
-}
-
-// THREAD-LABEL: func.func @inferred_small_inner_dim_dont_fill_non_contiguous
-//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (4, 16, 4, 4) step (1, 1, 1, 4)
-//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<1x1x1x4xf16>) outs({{.*}} : tensor<1x1x1x4xf16>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_3>, {{.*}}, #gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_unaligned(%0: tensor<70xf16>, %1: tensor<70xf16>) -> tensor<70xf16>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
-      } {
-    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-        ins(%0 : tensor<70xf16>)
-        outs(%1 : tensor<70xf16>) -> tensor<70xf16>
-    return %2 : tensor<70xf16>
-  }
-}
-
-// THREAD-LABEL: func.func @inferred_unaligned
-//       THREAD:   scf.forall ({{.*}}) = (0) to (70) step (8)
-//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<?xf16>) outs({{.*}} : tensor<?xf16>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-#map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @inferred_smaller_load(%0: tensor<128xf16>, %1: tensor<128xf16>) -> tensor<128xf16>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
-      } {
-    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-        ins(%0 : tensor<128xf16>)
-        outs(%1 : tensor<128xf16>) -> tensor<128xf16>
-    return %2 : tensor<128xf16>
-  }
-}
-
-// THREAD-LABEL: func.func @inferred_smaller_load
-//       THREAD:   scf.forall ({{.*}}) = (0) to (128) step (2)
-//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<2xf16>) outs({{.*}} : tensor<2xf16>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
-
-// -----
-
-#config = #iree_gpu.derived_thread_config
-module {
-  func.func @inferred_im2col(%2: tensor<2x34x34x128xf16>, %3: tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
-      attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64, {}>
-      } {
-    %4 = iree_linalg_ext.im2col {lowering_config = #config}
-      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      m_offset = [0] * [1] k_offset = [0] * [1]
-      batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-      ins(%2 : tensor<2x34x34x128xf16>)
-      outs(%3 : tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
-    return %4 : tensor<2x128x8xf16>
-  }
-}
-
-// Verify that no loops are generated without a reduction configuration.
-// CHECK-LABEL: func.func @inferred_im2col
-//   CHECK-NOT:   scf.for
-
-// THREAD-LABEL: func.func @inferred_im2col
-//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0) to (2, 128, 8) step (1, 1, 4)
-//       THREAD:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<1x34x34x128xf16>) outs({{.*}}: tensor<1x1x4xf16>)
-//       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
 // -----
 
@@ -637,8 +433,8 @@ module {
 
 // THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice
 //       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]], %[[Z:[A-Za-z0-9]+]])
-//       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1, d2) -> (d0 + d1 * 30 + d2 * 10)>(%[[Z]], %[[X]], %[[Y]])
-//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [5] [1] : tensor<60xf32> to tensor<5xf32>
+//       THREAD:     %[[LINEAR_IDX:.+]] = affine.linearize_index disjoint [%[[X]], %[[Y]], %[[Z]]] by (2, 3, 10)
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX]]] [5] [1] : tensor<60xf32> to tensor<5xf32>
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 1, 5]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
 
@@ -655,9 +451,10 @@ module {
 }
 
 // THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_full_inner_dim
+//       THREAD:   %[[C0:.+]] = arith.constant 0 : index
 //       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]])
-//       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[X]], %[[Y]])
-//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
+//       THREAD:     %[[LINEAR_IDX:.+]] = affine.linearize_index disjoint [%[[X]], %[[Y]], %[[C0]]] by (3, 4, 10)
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 2, 10]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
 
@@ -692,9 +489,50 @@ module {
 }
 
 // THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_multiple_expanded_dims
+//       THREAD:   %[[C0:.+]] = arith.constant 0 : index
 //       THREAD:   scf.forall (%[[ID0:[A-Za-z0-9]+]], %[[ID1:[A-Za-z0-9]+]], %[[ID2:[A-Za-z0-9]+]], %[[ID3:[A-Za-z0-9]+]])
-//       THREAD:     %[[APPLY0:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[ID0]], %[[ID1]])
-//       THREAD:     %[[APPLY1:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 8 + d1)>(%[[ID2]], %[[ID3]])
-//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY0]], %[[APPLY1]]] [20, 4] [1, 1]
+//       THREAD:     %[[LINEAR_IDX0:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[ID1]], %[[C0]]] by (3, 4, 10)
+//       THREAD:     %[[LINEAR_IDX1:.+]] = affine.linearize_index disjoint [%[[ID2]], %[[ID3]]] by (7, 8)
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX0]], %[[LINEAR_IDX1]]] [20, 4] [1, 1]
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2], [3, 4]] output_shape [1, 2, 10, 1, 4]
 //       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+
+// -----
+
+// Partial reduction tiling tests
+#config = #iree_gpu.lowering_config<{partial_reduction = [0, 8]}>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
+func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0  = arith.constant 0 : index
+  %par_dim = tensor.dim %3, %c0 : tensor<?x?xf32>
+  %empty = tensor.empty(%par_dim) : tensor<?xf32>
+  %4 = linalg.fill ins(%cst : f32) outs(%empty : tensor<?xf32>) -> tensor<?xf32>
+  %5 = linalg.generic {
+    indexing_maps = [#map1, #map2],
+    iterator_types = ["parallel", "reduction"]
+    } ins(%3 : tensor<?x?xf32>) outs(%4 : tensor<?xf32>) attrs =  {lowering_config = #config} {
+  ^bb0(%in: f32, %out: f32):
+    %7 = arith.addf %in, %out : f32
+    linalg.yield %7 : f32
+  } -> tensor<?xf32>
+  return %5 : tensor<?xf32>
+}
+
+// We only check if the correct tiling implementation was used. We do not
+// check if the tiling implementation itself is correct (it should be tested
+// in the partial tiling unit tests).
+// PARTRED-LABEL: func.func @partial_reduction
+//   PARTRED-DAG:  %[[DIM0:.+]]  = tensor.dim %{{.*}}, %c0
+//   PARTRED-DAG:  %[[DIM1:.+]]  = tensor.dim %{{.*}}, %c1
+//   PARTRED-DAG:   %[[FULL:.+]] = linalg.fill {{.*}} tensor<?xf32>
+//   PARTRED-DAG:   %[[PART:.+]] = linalg.fill {{.*}} tensor<?x8xf32>
+//       PARTRED:   %[[OUT:.+]] = scf.for %{{.*}} = %c0 to %[[DIM1]] step %c8 iter_args(%{{.*}} = %[[PART]])
+//       PARTRED:     linalg.generic
+//  PARTRED-SAME:       iterator_types = ["parallel", "parallel"]
+//  PARTRED-SAME:       ins(%{{.*}}  : tensor<?x?xf32>) outs(%{{.*}} : tensor<?x?xf32>)
+//  PARTRED-SAME:       attrs = {lowering_config =
+//       PARTRED:   scf.yield
+//       PARTRED:   linalg.reduce ins(%[[OUT]] : tensor<?x8xf32>)
+//  PARTRED-SAME:                 outs(%[[FULL]] : tensor<?xf32>)

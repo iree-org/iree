@@ -10,14 +10,20 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -101,6 +107,31 @@ struct ArithDivUIInferIntDivisibilityOpInterface
     uint64_t divSDiv = lhsDivisibility.sdiv() / std::abs(intVal.getSExtValue());
 
     setResultDivs(divOp, IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv));
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// ValueBoundsOpInterface
+//===----------------------------------------------------------------------===//
+
+/// For some reason, this interface has to be done as an external model.
+struct UtilAssumeIntValueBoundsOpInterface
+    : public ValueBoundsOpInterface::ExternalModel<
+          UtilAssumeIntValueBoundsOpInterface, IREE::Util::AssumeIntOp> {
+  void populateBoundsForIndexValue(Operation *op, Value value,
+                                   ValueBoundsConstraintSet &cstr) const {
+    auto assumeOp = cast<IREE::Util::AssumeIntOp>(op);
+    auto result = cast<OpResult>(value);
+    assert(result.getOwner() == op && "value is a result of this index op");
+    auto [min, max] =
+        assumeOp.getUnionedUnsignedRange(result.getResultNumber());
+
+    if (min) {
+      cstr.bound(result) >= *min;
+    }
+    if (max) {
+      cstr.bound(result) <= *max;
+    }
   }
 };
 
@@ -306,26 +337,40 @@ struct HoistableLinalgOpInterface
           HoistableLinalgOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return true; }
 
-  /// FillOp and broadcasting ops are not hoistableLeaf ops, since it is
-  /// typically better to fuse them with their consumers.
+  // Determines if a linalg op is a hoistable leaf, based on heuristics.
   bool isHoistableLeafOp(Operation *op) const {
-    auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
-    if (!genericOp)
-      return !isa<linalg::FillOp>(op);
-    // Generally, we prefer to not hoist broadcasts.
-    // Detect op that only broadcast input as fusing them makes the new
-    // op cheaper.
-    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
-        isa<linalg::YieldOp>(genericOp.getBody()->front())) {
-      for (OpOperand *opOperand : genericOp.getDpsInputOperands()) {
-        AffineMap indexingMap = genericOp.getMatchingIndexingMap(opOperand);
-        if (indexingMap.isProjectedPermutation() &&
-            indexingMap.getNumDims() != indexingMap.getNumResults()) {
-          return false;
-        }
-      }
+    // Don't hoist bit extend ops because fusing them with their
+    // consumers prevents materializing the high bit-width tensor and they
+    // preform very little real computation.
+    if (IREE::LinalgExt::isBitExtendOp(op)) {
+      return false;
     }
-    return !linalg::isaFillOpInterface(genericOp).has_value();
+
+    // Hoist all non-generic linalg ops except for fill ops which should be
+    // fused with their consumers.
+    auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
+    if (!genericOp) {
+      return !isa<linalg::FillOp>(op);
+    }
+
+    // Don't hoist ops with no inputs, their result is defined by `linalg.index`
+    // ops and should be fused with their consumers.
+    if (genericOp.getNumDpsInputs() == 0) {
+      return false;
+    }
+
+    if (linalg::isaFillOpInterface(genericOp).has_value()) {
+      return false;
+    }
+
+    // Don't hoist broadcast-like ops because fusing them makes the new
+    // op cheaper.
+    if (linalg::isaBroadcastOpInterface(genericOp).has_value()) {
+      return false;
+    }
+
+    // Hoist all other ops.
+    return true;
   }
   bool isAtomicallyHoistableOp(Operation *) const { return true; }
   bool isOperandHoistable(Operation *, OpOperand *) const { return true; }
@@ -447,13 +492,24 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 
   // Hoistable Op Interface registration.
 
-  // Register hoistable type interfaces for LinalgExt ops.
+  // Register hoistable op interfaces for Encoding ops.
   registry.addExtension(
       +[](MLIRContext *context, IREE::Encoding::IREEEncodingDialect *dialect) {
         UnhoistableOpInterfaceHelper<
             IREE::Encoding::SetEncodingOp>::registerOpInterface(context);
       });
-  // Register hoistable type interfaces for linalg ops.
+
+  // Register hoistable op interfaces for Flow ops.
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Flow::FlowDialect *dialect) {
+        UnhoistableOpInterfaceHelper<
+            IREE::Flow::DispatchWorkgroupCountOp>::registerOpInterface(context);
+
+        AlwaysHoistableOpInterfaceHelper<
+            IREE::Flow::TensorEncodeOp>::registerOpInterface(context);
+      });
+
+  // Register hoistable op interfaces for linalg ops.
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.
   registry.addExtension(
@@ -474,8 +530,11 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 #define GET_OP_LIST
 #include "mlir/Dialect/Linalg/IR/LinalgOps.cpp.inc"
             >::registerOpInterface(context);
+
+        AlwaysHoistableOpInterfaceHelper<
+            linalg::PackOp, linalg::UnPackOp>::registerOpInterface(context);
       });
-  // Register hoistable type interfaces for tensor ops.
+  // Register hoistable op interfaces for tensor ops.
   registry.addExtension(
       +[](MLIRContext *context, tensor::TensorDialect *dialect) {
         // Never hoist empty and other pure metadata ops as a leaf. It's fine to
@@ -485,9 +544,13 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             tensor::ExtractSliceOp>::registerOpInterface(context);
         // Cases of trivial pack/unpack should be handled as canonicalizations
         // before we get here, thus we're safe to always hoist.
-        AlwaysHoistableOpInterfaceHelper<
-            tensor::PadOp, tensor::PackOp,
-            tensor::UnPackOp>::registerOpInterface(context);
+        AlwaysHoistableOpInterfaceHelper<tensor::PadOp>::registerOpInterface(
+            context);
+      });
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Util::UtilDialect *dialect) {
+        IREE::Util::AssumeIntOp::attachInterface<
+            UtilAssumeIntValueBoundsOpInterface>(*context);
       });
 }
 

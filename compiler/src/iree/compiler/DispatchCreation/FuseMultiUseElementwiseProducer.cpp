@@ -22,7 +22,6 @@
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -54,7 +53,9 @@ static std::optional<OpOperand *> getFusableUse(Operation *op,
     bool dominatesAllUsers = true;
     for (OpOperand &target : uses) {
       Operation *targetOp = target.getOwner();
-      if (!dominanceInfo.dominates(sourceOp, targetOp)) {
+      if (sourceOp != targetOp &&
+          !dominanceInfo.properlyDominates(sourceOp, targetOp,
+                                           /*enclosingOpOk=*/false)) {
         dominatesAllUsers = false;
         break;
       }

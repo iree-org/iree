@@ -30,6 +30,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
@@ -73,6 +74,11 @@ static llvm::cl::opt<bool> clLLVMGPUEnableSharedMemoryReuse(
     llvm::cl::desc(
         "Enable shared memory reuse in the vector distribute pipeline"),
     llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDistributeToWorkgroupsUsingForall(
+    "iree-llvmgpu-test-distribute-to-workgroups-using-forall",
+    llvm::cl::desc("Use scf.forall for distribution to workgroups"),
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
@@ -176,6 +182,7 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 //===----------------------------------------------------------------------===//
 
 static void addBufferizePasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
@@ -186,10 +193,15 @@ static void addBufferizePasses(OpPassManager &funcPassManager) {
 static void tileAndDistributeToWorkgroup(
     OpPassManager &funcPassManager, bool useForall,
     std::optional<ConvertToDestinationPassingStylePassOptions>
-        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{}) {
+        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{},
+    ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None) {
   if (useForall) {
-    funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
+    assert((strategy == ReorderWorkgroupsStrategy::None ||
+            strategy == ReorderWorkgroupsStrategy::Transpose) &&
+           "Only None and Transpose reorder strategies are supported with "
+           "forall distribution.");
+    funcPassManager.addPass(createTileAndDistributeToWorkgroupsWithReordering(
+        strategy == ReorderWorkgroupsStrategy::Transpose));
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
         kNumMaxParallelDims,
@@ -220,6 +232,8 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool vectorizeCopies = true) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
   // Vectorize.
@@ -243,7 +257,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
 //===---------------------------------------------------------------------===//
 
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
 
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
@@ -262,6 +276,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUDistributePass());
 
   // Post bufferization optimizations.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -282,7 +297,9 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
   Attribute memorySpace = memRefType.getMemorySpace();
   // Bail out if the memref type specifies a nonnull memory space that is not
   // #gpu.address_space.
-  if (memorySpace && !llvm::isa<gpu::AddressSpaceAttr>(memorySpace)) {
+  if (memorySpace &&
+      !llvm::isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(
+          memorySpace)) {
     return failure();
   }
 
@@ -308,6 +325,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
+  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
@@ -327,12 +345,12 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 /// op is a PackOp with a DispatchTensorLoadOp producer, or an UnPackOp with
 /// only DispatchTensorStoreOp consumers.
 LogicalResult isAtBoundary(Operation *op) {
-  if (isa<tensor::PackOp>(op)) {
+  if (isa<linalg::PackOp>(op)) {
     if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
             op->getOperand(0).getDefiningOp())) {
       return success();
     }
-  } else if (isa<tensor::UnPackOp>(op)) {
+  } else if (isa<linalg::UnPackOp>(op)) {
     if (llvm::all_of(op->getUsers(), [](Operation *user) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(user);
         })) {
@@ -347,7 +365,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   if (pipelineOptions.useIgemmConvolution) {
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
-
+  // TODO (nirvedhmeshram) : Can remove this pass after
+  // https://github.com/iree-org/iree/issues/19546 is fixed.
+  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/std::nullopt);
 
@@ -437,6 +457,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createTileLargeTensorsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(IREE::GPU::createCombineBarrierRegionsPass());
 
@@ -450,6 +471,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   addGPUBufferizePasses(funcPassManager);
 
   // Step 8. Resolve remaining parallel loops.
+  funcPassManager.addPass(createGPUDistributeCopyUsingForallPass());
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
       NormalizeLoopBoundsPassOptions{/*normalizeFor=*/false,
                                      /*normalizeForall=*/true}));
@@ -465,6 +487,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
@@ -521,6 +544,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUDistributeScfForPass(options));
 
   // Post bufferization optimizations.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
@@ -541,6 +565,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   // Distribute linalg onto warps within the workgroup.
   funcPassManager.addPass(
       createLLVMGPUTileAndDistributePass(/*distributeToWarp=*/true));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1) {
     funcPassManager.addPass(createGPUMultiBufferingPass(
@@ -586,6 +611,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Hoist loop invariant code to avoid pipelining it.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   GPUPipeliningPassOptions pipelieningOptions = {};
@@ -610,6 +636,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   // Distribute linalg onto warps within the workgroup.
   funcPassManager.addPass(
       createLLVMGPUTileAndDistributePass(/*distributeToWarp=*/true));
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1) {
     funcPassManager.addPass(createGPUMultiBufferingPass(
@@ -652,6 +679,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   funcPassManager.addPass(createCSEPass());
 
   // Hoist loop invariant code to avoid pipelining it.
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   GPUPipeliningPassOptions pipelieningOptions = {};
@@ -765,6 +793,7 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
 }
 
 static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
@@ -775,12 +804,13 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
-  funcPassManager.addPass(
-      createReorderWorkgroups(reorderStrategy, canReorderWorkgroups));
+
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
+                               /*convertToDpsOptions=*/std::nullopt,
+                               /*reorderStrategy=*/reorderStrategy);
 
   if (usePadToModelSharedMemcpy) {
     funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
@@ -804,12 +834,24 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
+  // Tile to reduction loops.
+  {
+    GPUApplyTilingLevelPassOptions options;
+    options.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
+    options.allowZeroSlices = true;
+    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+    funcPassManager.addPass(affine::createLoopCoalescingPass());
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+  }
+
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // Set anchors at tensor level for vector distribution later and hoist out
   // loop invariant anchors.
+  funcPassManager.addPass(createDecomposeHorizontallyFusedGemmsPass());
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
 
@@ -873,12 +915,14 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 }
 
 void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false);
+  tileAndDistributeToWorkgroup(
+      funcPassManager, /*useForall=*/clDistributeToWorkgroupsUsingForall);
   funcPassManager.addPass(createRematerializeParallelOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createGPUTileReductionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
 
   // Linalg -> vector
   {
@@ -914,38 +958,20 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
       /*expandSubgroupReduction=*/true));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-}
-
-void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createGPUTensorTilePass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createDecomposePackUnPackOpsPass(
-      DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/true,
-                                        /*useOnlyReshapes=*/false}));
+  funcPassManager.addPass(affine::createLoopCoalescingPass());
   funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  addGPUVectorizationPasses(funcPassManager);
-
-  addBufferizePasses(funcPassManager);
-
-  funcPassManager.addPass(createGPUDistributePass());
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
   tileAndBufferize(funcPassManager);
 
   // Distribute linalg onto threads within the workgroup.
-  funcPassManager.addPass(
-      createLLVMGPUTileAndDistributePass(/*distributeToWarp=*/false));
+  funcPassManager.addPass(createLLVMGPUTileAndDistributePass(
+      /*distributeToWarp=*/clDistributeToWorkgroupsUsingForall));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 }
 
@@ -953,7 +979,7 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const GPUPipelineOptions &options) {
   ConvertToDestinationPassingStylePassOptions dpsOptions;
   dpsOptions.useWARForCooperativeMatrixCodegen = true;
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/false,
+  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/dpsOptions);
   if (options.enableUkernels) {
     funcPassManager.addPass(createGPULowerToUKernelsPass());
@@ -962,6 +988,7 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   addBufferizePasses(funcPassManager);
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 }
 
@@ -978,6 +1005,7 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(IREE::LinalgExt::createLinalgExtToLoopsPass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
   funcPassManager.addPass(createConvertLinalgToLoopsPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -994,8 +1022,13 @@ static void
 addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
   funcPassManager.addPass(createExtractAddressComputationGPUPass)
       .addPass(memref::createExpandOpsPass)
+      // Lower any remaining vector.transfer_read and vector.transfer_write ops,
+      // since some of the following patterns have trouble dealing with their
+      // full complexity.
+      .addPass(createVectorTransferLoweringPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(memref::createExpandStridedMetadataPass)
+      .addPass(createIREEExpandStridedMetadataPass)
+      .addPass(createPropagateDispatchSizeBoundsPass)
       // Hoist loop invariant variables to give affine decomposition pass the
       // right loop dependencies.
       .addPass(createIREELoopInvariantCodeMotionPass)
@@ -1007,7 +1040,10 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createIREELoopInvariantCodeMotionPass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass)
-      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+      .addPass([]() {
+        return IREE::Util::createOptimizeIntArithmeticPass(
+            IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
+      })
       // Do another round of LICM now that we've lowered and optimized
       // arithmetic
       .addPass(createCSEPass)
@@ -1044,14 +1080,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // Handled tensor constants.
-  addConstantBufferizePasses(modulePassManager);
+  modulePassManager.addPass(createIREEBufferizeConstantsPass());
 
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass(createExpandGPUOpsPass)
-      // Expose workitem and workgroup counts to range inference later.
-      .addPass(createGPUPropagateDispatchSizeBoundsPass);
+      .addPass(createExpandGPUOpsPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1063,7 +1097,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
       // SCF -> CF
-      .addPass(createConvertSCFToCFPass)
+      .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       // Handle complex operation conversion.
@@ -1071,11 +1105,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Convert BF16 operations to occur as F32.
       .addPass(createConvertBf16ArithToF32Pass)
       .addPass(createConvertBf16ToUInt16BuffersPass)
-      // Convert math dialect elementry functions to polynomial form.
-      .addPass(createPolynomialApproximationPass)
+      // Math dialect ops rewrites, approximations, casts.
+      .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(memref::createExpandStridedMetadataPass)
+      .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);
@@ -1088,6 +1122,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     // convert to ROCDL.
+    funcPassManager.addPass(createConvertUnsupportedFloatArithPass);
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());
@@ -1117,9 +1152,15 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createMaterializeDeviceEncodingPass);
+    // TODO(#20160): Combine the EncodingToPaddingPasses with the
+    // MaterializeDeviceEncodingPass.
+    addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
-    addEncodingToNopPasses(funcPassManager);
+    // This materializes into 'nop' in the absence of pad encoding layout
+    // attributes.
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
@@ -1194,6 +1235,7 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
@@ -1217,6 +1259,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),

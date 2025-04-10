@@ -19,6 +19,7 @@ repos:
 
       - id: end-of-file-fixer
         exclude_types: ["image", "jupyter"]
+        exclude: ".*\\.excalidraw"
 
       - id: trailing-whitespace
         exclude_types: ["image", "jupyter"]

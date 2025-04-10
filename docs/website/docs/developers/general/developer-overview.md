@@ -100,7 +100,8 @@ model file:
 ```shell
 $ ../iree-build/tools/iree-opt \
   --iree-transformation-pipeline \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   $PWD/tests/e2e/stablehlo_models/fullyconnected.mlir
 ```
 
@@ -113,7 +114,8 @@ For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
 $ ../iree-build/tools/iree-compile \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
@@ -197,7 +199,8 @@ runner for the IREE [check framework](./testing-guide.md#iree-core-end-to-end-e2
 ```shell
 $ ../iree-build/tools/iree-compile \
   --iree-input-type=stablehlo \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   $PWD/tests/e2e/stablehlo_ops/abs.mlir \
   -o /tmp/abs.vmfb
 ```
@@ -223,7 +226,8 @@ For example, to execute the contents of
 ```shell
 # iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
 $ ../iree-build/tools/iree-run-mlir \
-  --iree-hal-target-backends=vmvx \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
   --input=f32=-2
 ```

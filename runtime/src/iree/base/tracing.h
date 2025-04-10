@@ -165,14 +165,14 @@ typedef uint32_t iree_zone_id_t;
 //===----------------------------------------------------------------------===//
 
 // Matches Tracy's PlotFormatType enum.
-enum {
+typedef enum {
   // Values will be displayed as plain numbers.
   IREE_TRACING_PLOT_TYPE_NUMBER = 0,
   // Treats the values as memory sizes. Will display kilobytes, megabytes, etc.
   IREE_TRACING_PLOT_TYPE_MEMORY = 1,
   // Values will be displayed as percentage with value 100 being equal to 100%.
   IREE_TRACING_PLOT_TYPE_PERCENTAGE = 2,
-};
+} iree_tracing_plot_type_t;
 
 // Colors used for messages based on the level provided to the macro.
 enum {

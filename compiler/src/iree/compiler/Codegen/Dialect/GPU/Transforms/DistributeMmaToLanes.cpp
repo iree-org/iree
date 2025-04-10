@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -83,7 +82,12 @@ void DistributeMmaToLanesPass::runOnOperation() {
 
   // Distribute multi_mma ops to lanes and greedily fuse producers.
   SmallVector<IREE::GPU::MultiMmaOp> mmaOps;
-  funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) { mmaOps.push_back(mmaOp); });
+  funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) {
+    if (!mmaOp.hasTensorSemantics()) {
+      return;
+    }
+    mmaOps.push_back(mmaOp);
+  });
   if (mmaOps.empty()) {
     return;
   }

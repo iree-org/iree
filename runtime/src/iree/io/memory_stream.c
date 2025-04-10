@@ -199,15 +199,14 @@ static iree_status_t iree_io_memory_stream_read(
       z0, iree_io_stream_validate_fixed_range(stream->offset, stream->length,
                                               buffer_capacity, &read_length));
   if (!out_buffer_length && read_length != buffer_capacity) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                         "read of range [%" PRIu64 ", %" PRIu64 ") (%" PRIu64
-                         " bytes) out of range; stream offset %" PRIu64
-                         " and length %" PRIu64 " insufficient",
-                         stream->offset, stream->offset + buffer_capacity,
-                         (iree_io_stream_pos_t)buffer_capacity, stream->offset,
-                         stream->length));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "read of range [%" PRIu64 ", %" PRIu64 ") (%" PRIu64
+                            " bytes) out of range; stream offset %" PRIu64
+                            " and length %" PRIu64 " insufficient",
+                            stream->offset, stream->offset + buffer_capacity,
+                            (iree_io_stream_pos_t)buffer_capacity,
+                            stream->offset, stream->length);
   }
 
   memcpy(buffer, stream->contents + stream->offset,

@@ -42,6 +42,11 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                            mlir::FunctionOpInterface entryPoint,
                                            Operation *op);
 
+// Helper for setting tile sizes for scatter.
+LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
+                                       mlir::FunctionOpInterface entryPoint,
+                                       Operation *op);
+
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options
 //===----------------------------------------------------------------------===//

@@ -142,8 +142,8 @@ func.func @warp_reduction_dispatch() attributes {hal.executable.target = #execut
 
 //     CHECK-DAG:    %[[F0:.+]] = arith.constant 0.000000e+00 : f16
 
-//     CHECK-DAG:    %[[WGIDX:.+]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:    %[[WGIDY:.+]] = hal.interface.workgroup.id[1] : index
+//     CHECK-DAG:    %[[WGIDX:.+]] = hal.interface.workgroup.id[0] upper_bound 65535 : index
+//     CHECK-DAG:    %[[WGIDY:.+]] = hal.interface.workgroup.id[1] upper_bound 65535 : index
 //     CHECK-DAG:    %[[TIDX:.+]] = gpu.thread_id  x
 
 //     CHECK-DAG:    %[[SPAN0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
@@ -228,7 +228,6 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
 //         CHECK:    arith.maxnumf
 //         CHECK:    vector.splat %{{.*}} : vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {

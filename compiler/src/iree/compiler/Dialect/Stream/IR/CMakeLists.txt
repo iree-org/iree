@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "StreamDialect.h"
     "StreamEnums.h.inc"
+    "StreamInterfaces.h"
     "StreamOpInterfaces.h.inc"
     "StreamOps.h"
     "StreamOps.h.inc"
@@ -53,6 +54,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRViewLikeInterface
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC

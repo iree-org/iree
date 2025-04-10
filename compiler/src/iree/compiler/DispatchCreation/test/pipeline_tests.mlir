@@ -149,3 +149,151 @@ util.func public @verify_operand_cse(%arg0: !hal.buffer_view, %arg1: !hal.buffer
 //       CHECK:   flow.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [%[[DIM3]], 64, %[[DIM4]]]
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x64x?xf32>>{%[[DIM3]], %[[DIM4]]}
+
+// -----
+
+util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
+    %arg2: tensor<4x8x4x?x128xf16>, %arg3: tensor<4x8x4x128x?xf16>, %arg4: f16,
+    %arg5: tensor<4x8x4x?x?xf16>, %arg6: tensor<4x?x32x128xf16>)
+    -> tensor<4x8x4x?x128xf16> {
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty(%arg0) : tensor<4x32x?x128xf16>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<?x128xf32>) outs(%0 : tensor<4x32x?x128xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %6 = linalg.index 0 : index
+    %7 = linalg.index 1 : index
+    %8 = linalg.index 2 : index
+    %9 = linalg.index 3 : index
+    %10 = arith.divui %9, %c2 : index
+    %11 = arith.remui %9, %c2 : index
+    %12 = math.cos %in : f32
+    %13 = math.sin %in : f32
+    %14 = arith.muli %10, %c2 : index
+    %15 = arith.addi %14, %c1 : index
+    %extracted = tensor.extract %arg6[%6, %7, %8, %14] : tensor<4x?x32x128xf16>
+    %16 = arith.extf %extracted : f16 to f32
+    %extracted_0 = tensor.extract %arg6[%6, %7, %8, %15] : tensor<4x?x32x128xf16>
+    %17 = arith.extf %extracted_0 : f16 to f32
+    %18 = arith.cmpi eq, %11, %c0 : index
+    %19 = arith.mulf %16, %12 : f32
+    %20 = arith.mulf %17, %13 : f32
+    %21 = arith.subf %19, %20 : f32
+    %22 = arith.mulf %17, %12 : f32
+    %23 = arith.mulf %16, %13 : f32
+    %24 = arith.addf %22, %23 : f32
+    %25 = arith.select %18, %21, %24 : f32
+    %26 = arith.truncf %25 : f32 to f16
+    linalg.yield %26 : f16
+  } -> tensor<4x32x?x128xf16>
+  %expanded = tensor.expand_shape %1 [[0], [1, 2], [3], [4]]
+    output_shape [4, 8, 4, %arg0, 128]
+        : tensor<4x32x?x128xf16> into tensor<4x8x4x?x128xf16>
+  %2 = tensor.empty(%arg0) : tensor<4x?x8x4x128xf16>
+  %3 = tensor.empty(%arg0) : tensor<4x8x4x?x128xf16>
+  %4 = iree_linalg_ext.attention {
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d5)>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6, d5)>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d6)>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d6)>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>]}
+      ins(%expanded, %arg2, %arg3, %arg4, %arg5
+        : tensor<4x8x4x?x128xf16>, tensor<4x8x4x?x128xf16>,
+          tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x?xf16>)
+      outs(%3 : tensor<4x8x4x?x128xf16>) {
+    ^bb0(%arg7: f32):
+      iree_linalg_ext.yield %arg7 : f32
+  } -> tensor<4x8x4x?x128xf16>
+  util.return %4 : tensor<4x8x4x?x128xf16>
+}
+// CHECK-LABEL: util.func public @attention_rope_fusion
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
+//       CHECK:     %[[GATHER:.+]] = linalg.generic
+//       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:         ins(%[[GATHER]],
+//       CHECK:      flow.dispatch.tensor.store %[[ATTENTION]]
+//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
+//       CHECK:   util.return %[[RESHAPE]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+util.func public @verify_bubbling(%arg0: !hal.buffer_view, %arg2: !hal.fence) -> !hal.buffer_view {
+  %c12 = arith.constant 12 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %2 = hal.tensor.import wait(%arg2) => %arg0 : !hal.buffer_view -> tensor<10x10xf32>
+  %empty = tensor.empty() : tensor<10x10xf32>
+  %elementwise = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<10x10xf32>) outs(%empty : tensor<10x10xf32>) {
+    ^bb0(%in : f32, %out : f32):
+      %22 = arith.mulf %cst, %in : f32
+      linalg.yield %22 : f32
+  } -> tensor<10x10xf32>
+  %extract = tensor.extract_slice %elementwise[0, 0][4, 10][1, 1] : tensor<10x10xf32> to tensor<4x10xf32>
+  %expanded = tensor.expand_shape %extract [[0, 1], [2, 3]] output_shape[2, 2, 2, 5] : tensor<4x10xf32> into tensor<2x2x2x5xf32>
+  %extract2 = tensor.extract_slice %expanded[0, 0, 0, 0][1, 1, 2, 5][1, 1, 1, 1] : tensor<2x2x2x5xf32> to tensor<2x5xf32>
+  %empty2 = tensor.empty() : tensor<2x5xf32>
+  %elementwise2 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%extract2 : tensor<2x5xf32>) outs(%empty2 : tensor<2x5xf32>) {
+    ^bb0(%in : f32, %out : f32):
+      %22 = arith.mulf %cst, %in : f32
+      linalg.yield %22 : f32
+  } -> tensor<2x5xf32>
+  %12 = hal.tensor.barrier join(%elementwise2 : tensor<2x5xf32>) => %arg2 : !hal.fence
+  %13 = hal.tensor.export %12 : tensor<2x5xf32> -> !hal.buffer_view
+  util.return %13 : !hal.buffer_view
+}
+
+// Check that all `tensor.expand_shape` and `tensor.extract_slice` ops get bubbled
+// and allow for fusion of the 2 elementwise ops. This should result in a single
+// dispatch.
+
+// CHECK-LABEL: util.func public @verify_bubbling
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
+//       CHECK:     %[[GEN:.+]] = linalg.generic
+//       CHECK:      flow.dispatch.tensor.store %[[GEN]]
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
+    -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0
+      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  util.return %0 : tensor<?x?xf32, #encoding>
+}
+// CHECK-LABEL: util.func public @set_encoding_op
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[D0:.+]] = tensor.dim %[[SRC]], %[[C0]]
+// CHECK-DAG:     %[[D1:.+]] = tensor.dim %[[SRC]], %[[C1]]
+// CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32>{%[[D0]], %[[D1]]} -> tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]}
+// CHECK:         util.return %[[RES]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0: index, %d1: index)
+    -> tensor<?x?xf32> {
+  %0 = iree_encoding.unset_encoding %arg0
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  util.return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: util.func public @unset_encoding_op
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D1:[a-zA-Z0-9]+]]
+// CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
+// CHECK:         util.return %[[RES]]

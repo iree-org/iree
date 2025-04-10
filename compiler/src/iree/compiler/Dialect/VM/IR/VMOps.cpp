@@ -120,10 +120,10 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_interface_impl::addArgAndResultAttrs(
-      builder, result, argAttrs,
-      /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
-      getResAttrsAttrName(result.name));
+  call_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                            /*resultAttrs=*/std::nullopt,
+                                            getArgAttrsAttrName(result.name),
+                                            getResAttrsAttrName(result.name));
 }
 
 Block *FuncOp::addEntryBlock() {
@@ -153,15 +153,15 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
     llvm::append_range(attrs, existingAttr);
   }
   bool didFind = false;
-  for (size_t i = 0; i < attrs.size(); ++i) {
-    if (attrs[i].getName() == name) {
-      attrs[i].setValue(value);
+  for (NamedAttribute &attr : attrs) {
+    if (attr.getName() == name) {
+      attr.setValue(value);
       didFind = true;
       break;
     }
   }
   if (!didFind) {
-    attrs.push_back(NamedAttribute(StringAttr::get(getContext(), name), value));
+    attrs.emplace_back(name, value);
     DictionaryAttr::sortInPlace(attrs);
   }
   getOperation()->setAttr("iree.reflection",
@@ -289,10 +289,10 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  function_interface_impl::addArgAndResultAttrs(
-      builder, result, argAttrs,
-      /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
-      getResAttrsAttrName(result.name));
+  call_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                            /*resultAttrs=*/std::nullopt,
+                                            getArgAttrsAttrName(result.name),
+                                            getResAttrsAttrName(result.name));
   if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
@@ -358,10 +358,10 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   if (!argAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size() &&
            "expected as many argument attribute lists as arguments");
-    function_interface_impl::addArgAndResultAttrs(
-        builder, result, argAttrs,
-        /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
-        getResAttrsAttrName(result.name));
+    call_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                              /*resultAttrs=*/std::nullopt,
+                                              getArgAttrsAttrName(result.name),
+                                              getResAttrsAttrName(result.name));
   }
 
   result.addRegion();
@@ -611,11 +611,11 @@ static TypedAttr convertConstIntegerValue(TypedAttr value) {
 static FloatType getFloatType(int bitwidth, MLIRContext *context) {
   switch (bitwidth) {
   case 16:
-    return FloatType::getF16(context);
+    return Float16Type::get(context);
   case 32:
-    return FloatType::getF32(context);
+    return Float32Type::get(context);
   case 64:
-    return FloatType::getF64(context);
+    return Float64Type::get(context);
   default:
     assert(false && "unhandled floating point type");
     return {};

@@ -77,9 +77,9 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 // CHECK-NOT: tensor.pad
 // SKIP: tensor.pad
 
-// ----
+// -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
     %arg0: !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>,
     %arg1: index, %arg2: index, %arg3: index, %arg4: index,
@@ -99,9 +99,30 @@ util.func public @dispatch_dispatch_0_generic_512x1024_f32(
   flow.dispatch.tensor.store %11, %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
   util.return
 }
-// CHECK:  #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32]>
+// CHECK:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK:  util.func public @dispatch_dispatch_0_generic_512x1024_f32
 // CHECK:    %[[LOAD:.+]] = flow.dispatch.tensor.load
 // CHECK:    %[[PAD:.+]] = tensor.pad %[[LOAD]] low
 // CHECK:    %[[ENCODE:.+]] = iree_encoding.set_encoding %[[PAD]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
 // CHECK:    flow.dispatch.tensor.store %[[ENCODE]],
+
+// -----
+
+// Do not break up pad within dispatches.
+
+util.func @pad_within_dispatch(%arg0 : tensor<500x1000xf32>) -> tensor<512x1024xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = flow.dispatch.region -> (tensor<512x1024xf32>) {
+    %1 = tensor.pad %arg0 low [0, 0] high[12, 24] {
+    ^bb0(%arg1 : index, %arg2 : index):
+      tensor.yield %cst : f32
+    } : tensor<500x1000xf32> to tensor<512x1024xf32>
+    flow.return %1 : tensor<512x1024xf32>
+  }
+  util.return %0 : tensor<512x1024xf32>
+}
+// CHECK-LABEL: func public @pad_within_dispatch
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[PAD:.+]] = tensor.pad
+//       CHECK:     flow.return %[[PAD]]
+//       CHECK:   return %[[DISPATCH]]

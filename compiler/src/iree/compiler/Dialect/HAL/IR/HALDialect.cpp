@@ -6,13 +6,17 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -115,6 +119,66 @@ public:
   }
 };
 
+class HALAffinityAnalysisDialectInterface
+    : public IREE::Stream::AffinityAnalysisDialectInterface {
+public:
+  using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
+
+  // Returns a function that gathers the corresponding
+  // EncodingLayoutResolverAttrInterface attributes for each
+  // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
+  // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
+  // `encoding` is not present, IdentityEncodingAttr is returned.
+  IREE::Stream::ResolveLayoutAttrFn
+  makeLayoutAttrResolver(ModuleOp moduleOp) const {
+    return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
+               llvm::DenseMap<IREE::Stream::AffinityAndOpPair,
+                              SetVector<Attribute>> &layoutAttrs)
+               -> LogicalResult {
+      // This needs to be in the lambda because the moduleOp could be modified.
+      IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+      if (failed(deviceAnalysis.run())) {
+        return moduleOp->emitError("failed to run DeviceAnalysis");
+      }
+
+      MLIRContext *ctx = getContext();
+      std::optional<IREE::Encoding::IdentityEncodingAttr> defaultAttr;
+      auto getDefaultAttr = [&]() {
+        if (defaultAttr) {
+          return defaultAttr.value();
+        }
+        defaultAttr = IREE::Encoding::IdentityEncodingAttr::get(ctx);
+        return defaultAttr.value();
+      };
+      for (IREE::Stream::AffinityAndOpPair key : batchQueries) {
+        auto [affinityAttr, op] = key;
+        SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
+        deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
+                                                       resultSet);
+        for (auto targetAttr : resultSet) {
+          if (!targetAttr.hasConfigurationAttr(
+                  IREE::Encoding::kEncodingResolverAttrName)) {
+            layoutAttrs[key].insert(getDefaultAttr());
+            continue;
+          }
+          auto encodingLayoutAttr =
+              targetAttr.getConfiguration()
+                  .getAs<IREE::Encoding::EncodingLayoutResolverAttrInterface>(
+                      IREE::Encoding::kEncodingResolverAttrName);
+          if (!encodingLayoutAttr) {
+            layoutAttrs[key].insert(getDefaultAttr());
+            continue;
+          }
+          layoutAttrs[key].insert(encodingLayoutAttr.cloneWithSimplifiedConfig(
+              targetAttr.getConfiguration()));
+        }
+      }
+
+      return success();
+    };
+  };
+};
+
 } // namespace
 
 HALDialect::HALDialect(MLIRContext *context)
@@ -131,6 +195,7 @@ HALDialect::HALDialect(MLIRContext *context)
 #include "iree/compiler/Dialect/HAL/IR/HALOps.cpp.inc"
       >();
   addInterfaces<HALInlinerInterface, HALOpAsmInterface,
+                HALAffinityAnalysisDialectInterface,
                 HALToVMConversionInterface>();
 }
 

@@ -34,6 +34,10 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
     llvm::cl::desc(
         "Enables propagation of transpose ops to improve fusion chances."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableAttentionVTranspose(
+    "iree-global-opt-enable-attention-v-transpose",
+    llvm::cl::desc("Enables transposition of v operand of attention ops,"),
+    llvm::cl::init(true));
 
 // TODO(hanchung): Remove the flag. We don't want to do early materialization by
 // default. Because it won't work for heterogeneous computing. This is not the
@@ -63,6 +67,10 @@ static llvm::cl::opt<int> clPadFactor(
                    "encodings."),
     llvm::cl::init(32));
 
+static llvm::cl::opt<bool> clWarnOnUninitializedValues(
+    "iree-global-opt-enable-warn-on-uninitialized-values",
+    llvm::cl::desc("Warn on some classes of uses of uninitialized values."),
+    llvm::cl::init(true));
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -90,6 +98,11 @@ void buildGlobalOptimizationPassPipeline(
         transformOptions.options.parameterImportMaximumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
         importParametersOptions));
+  }
+
+  if (clWarnOnUninitializedValues) {
+    FunctionLikeNest(mainPassManager)
+        .addPass(createWarnOnUninitializedValuesPass);
   }
 
   // Preprocessing passes to get the program into a canonical state.
@@ -130,7 +143,11 @@ void buildGlobalOptimizationPassPipeline(
       // dims as the unit dim folding pass updates indexing maps and is better
       // at working with generics. By this point we have already done any
       // specialized raising and the op names are no longer useful.
-      .addPass(createGeneralizeLinalgNamedOpsPass);
+      .addPass([&]() {
+        GeneralizeLinalgNamedOpsPassOptions opt;
+        opt.enableGeneralizeMatmul = transformOptions.options.generalizeMatmul;
+        return createGeneralizeLinalgNamedOpsPass(opt);
+      });
 
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
@@ -153,8 +170,11 @@ void buildGlobalOptimizationPassPipeline(
       .addPredicatedPass(
           clEnableTransposePropagation,
           [&]() {
-            return createPropagateLinalgTransposePass(
-                transformOptions.options.aggressiveTransposePropagation);
+            PropagateLinalgTransposePassOptions options;
+            options.enableAggressivePropagation =
+                transformOptions.options.aggressiveTransposePropagation;
+            options.enableAttentionVTranspose = clEnableAttentionVTranspose;
+            return createPropagateLinalgTransposePass(options);
           })
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);

@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -112,6 +113,41 @@ SmallVector<int64_t> NestedLayoutAttr::getUndistributedPackedShape() const {
   return shape;
 }
 
+SmallVector<int64_t> NestedLayoutAttr::getUndistributedShape() const {
+  int64_t rank = getRank();
+  SmallVector<int64_t> shape;
+  shape.reserve(rank);
+  for (int64_t i : llvm::seq<int64_t>(rank)) {
+    int64_t expectedDimLen = getSubgroupTile()[i] * getBatchTile()[i] *
+                             getOuterTile()[i] * getThreadTile()[i] *
+                             getElementTile()[i];
+    shape.push_back(expectedDimLen);
+  }
+  return shape;
+}
+
+SmallVector<int64_t>
+NestedLayoutAttr::getPackedShapeForUndistributedDim(int64_t dim) const {
+  SmallVector<int64_t> shape;
+  shape.reserve(5);
+  shape.push_back(getSubgroupTile()[dim]);
+  shape.push_back(getBatchTile()[dim]);
+  shape.push_back(getOuterTile()[dim]);
+  shape.push_back(getThreadTile()[dim]);
+  shape.push_back(getElementTile()[dim]);
+  return shape;
+}
+
+SmallVector<int64_t> NestedLayoutAttr::getDistributedUnpackedShape() const {
+  SmallVector<int64_t> shape;
+  shape.reserve(getRank());
+  for (auto [batch, outer, element] :
+       llvm::zip(getBatchTile(), getOuterTile(), getElementTile())) {
+    shape.push_back(batch * outer * element);
+  }
+  return shape;
+}
+
 // Gets the rank of the undistributed vector for this layout.
 int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
@@ -134,7 +170,7 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
                             getOuterTile()[i] * getThreadTile()[i] *
                             getElementTile()[i];
-    if (expectedShape != shape[i]) {
+    if (!ShapedType::isDynamic(shape[i]) && expectedShape != shape[i]) {
       std::string shapeStr;
       llvm::raw_string_ostream shapeOs(shapeStr);
       llvm::interleaveComma(shape, shapeOs);
@@ -198,6 +234,136 @@ NestedLayoutAttr NestedLayoutAttr::get(
                    normalizedThreadStrides);
 }
 
+static SmallVector<int64_t> appendDims(ArrayRef<int64_t> tileLens,
+                                       ArrayRef<int64_t> appendLens) {
+  SmallVector<int64_t> tileLensResult = llvm::to_vector(tileLens);
+  tileLensResult.insert(tileLensResult.end(), appendLens.begin(),
+                        appendLens.end());
+  return tileLensResult;
+}
+
+NestedLayoutAttr NestedLayoutAttr::get(MLIRContext *context,
+                                       NestedLayoutAttr source,
+                                       ArrayRef<int64_t> appendSubGroupLens,
+                                       ArrayRef<int64_t> appendBatchLens,
+                                       ArrayRef<int64_t> appendOuterLens,
+                                       ArrayRef<int64_t> appendThreadLens,
+                                       ArrayRef<int64_t> appendElementLens,
+                                       ArrayRef<int64_t> appendSubgroupStrides,
+                                       ArrayRef<int64_t> appendThreadStrides) {
+  SmallVector<int64_t> subgroupTile =
+      appendDims(source.getSubgroupTile(), appendSubGroupLens);
+  SmallVector<int64_t> batchTile =
+      appendDims(source.getBatchTile(), appendBatchLens);
+  SmallVector<int64_t> outerTile =
+      appendDims(source.getOuterTile(), appendOuterLens);
+  SmallVector<int64_t> threadTile =
+      appendDims(source.getThreadTile(), appendThreadLens);
+  SmallVector<int64_t> elementTile =
+      appendDims(source.getElementTile(), appendElementLens);
+  SmallVector<int64_t> subgroupStrides =
+      appendDims(source.getSubgroupStrides(), appendSubgroupStrides);
+  SmallVector<int64_t> threadStrides =
+      appendDims(source.getThreadStrides(), appendThreadStrides);
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
+VectorLayoutInterface
+NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
+                                      ArrayRef<AffineMap> maps,
+                                      AffineMap resultMap) {
+  constexpr int64_t kInvalid = -1;
+  if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
+        return !mlir::isa<NestedLayoutAttr>(layout);
+      })) {
+    return NestedLayoutAttr();
+  }
+  MLIRContext *context = resultMap.getContext();
+
+  SmallVector<NestedLayoutAttr> nestedLayouts;
+  llvm::transform(layouts, std::back_inserter(nestedLayouts),
+                  [&](VectorLayoutInterface layout) {
+                    return mlir::cast<NestedLayoutAttr>(layout);
+                  });
+
+  int64_t resRank = resultMap.getNumResults();
+  SmallVector<int64_t> subgroupTile(resRank, kInvalid);
+  SmallVector<int64_t> batchTile(resRank, kInvalid);
+  SmallVector<int64_t> outerTile(resRank, kInvalid);
+  SmallVector<int64_t> threadTile(resRank, kInvalid);
+  SmallVector<int64_t> elementTile(resRank, kInvalid);
+  SmallVector<int64_t> subgroupStrides(resRank, kInvalid);
+  SmallVector<int64_t> threadStrides(resRank, kInvalid);
+
+  // a helper to perform a valid update when recombining
+  // layouts. If there is a conflict, this will return
+  // false.
+  auto checkedUpdate = [&](int64_t &data, int64_t v) -> bool {
+    if (data != kInvalid && data != v) {
+      return false;
+    }
+    data = v;
+    return true;
+  };
+
+  for (auto [layout, indexingMap] : llvm::zip(nestedLayouts, maps)) {
+    for (int64_t resultIdx : llvm::seq<int64_t>(indexingMap.getNumResults())) {
+      int64_t iterSpacePos = indexingMap.getDimPosition(resultIdx);
+      std::optional<unsigned int> mayBeResultPos =
+          resultMap.getResultPosition(getAffineDimExpr(iterSpacePos, context));
+      if (!mayBeResultPos.has_value()) {
+        continue;
+      }
+      int64_t resultPos = mayBeResultPos.value();
+      if (!checkedUpdate(subgroupTile[resultPos],
+                         layout.getSubgroupTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(batchTile[resultPos],
+                         layout.getBatchTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(outerTile[resultPos],
+                         layout.getOuterTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(threadTile[resultPos],
+                         layout.getThreadTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(elementTile[resultPos],
+                         layout.getElementTile()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+
+      if (!checkedUpdate(subgroupStrides[resultPos],
+                         layout.getSubgroupStrides()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+      if (!checkedUpdate(threadStrides[resultPos],
+                         layout.getThreadStrides()[resultIdx])) {
+        return NestedLayoutAttr();
+      }
+    }
+  }
+
+  // All the tiles should have valid data
+  // after a successful recombination.
+  for (const llvm::SmallVector<int64_t> &tile :
+       {subgroupTile, batchTile, outerTile, threadTile, subgroupStrides,
+        threadStrides}) {
+    if (llvm::any_of(tile, [&](int64_t v) { return v == kInvalid; })) {
+      return NestedLayoutAttr();
+    }
+  }
+
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,
@@ -237,51 +403,28 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
 
   Location loc = threadId.getLoc();
 
-  AffineExpr tidExpr, size, stride;
-  bindDims(rewriter.getContext(), tidExpr);
-  bindSymbols(rewriter.getContext(), size, stride);
+  SmallVector<int64_t> subgroupBasis, threadBasis;
+  SmallVector<size_t> subgroupDimToResult, threadDimToResult;
 
-  // (tid floordiv stride) mod size
-  AffineMap threadTidMap =
-      AffineMap::get(/*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride) % size);
+  if (failed(basisFromSizesStrides(getSubgroupTile(), getSubgroupStrides(),
+                                   subgroupBasis, subgroupDimToResult)))
+    return {};
+  if (failed(basisFromSizesStrides(getThreadTile(), getThreadStrides(),
+                                   threadBasis, threadDimToResult)))
+    return {};
 
-  // (tid floordiv (stride * subgroup_size)) mod size
-  AffineMap subgroupTidMap = AffineMap::get(
-      /*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride * subgroupSize) % size);
+  // Add the subgroup_size to the end of the subgroup delinearization basis.
+  subgroupBasis.push_back(subgroupSize);
 
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getSubgroupTile(), getSubgroupStrides())) {
-    // Dimension is not distributed.
-    if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
-      continue;
-    }
+  auto subgroupSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
+  auto threadSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, threadId, threadBasis, /*hasOuterBound=*/false);
 
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, subgroupTidMap, ValueRange{threadId, sizeVal, strideVal}));
-  }
-
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getThreadTile(), getThreadStrides())) {
-    // Dimension is not distributed.
-    if (dimStride == 0) {
-      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIndexAttr(dimStride)));
-      continue;
-    }
-
-    auto sizeVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
-    auto strideVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIndexAttr(dimStride));
-    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
-        loc, threadTidMap, ValueRange{threadId, sizeVal, strideVal}));
-  }
+  llvm::transform(subgroupDimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return subgroupSplit.getResult(idx); });
+  llvm::transform(threadDimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return threadSplit.getResult(idx); });
 
   return virtualTids;
 }

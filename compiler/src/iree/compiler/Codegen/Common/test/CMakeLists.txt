@@ -21,15 +21,19 @@ iree_lit_test_suite(
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
+    "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
+    "convert_hal_descriptor_type_to_gpu_address_space.mlir"
     "convert_to_destination_passing_style.mlir"
+    "convert_unsupported_float_arith.mlir"
     "convolution_to_igemm.mlir"
     "convolutions.mlir"
     "decompose_affine_ops.mlir"
     "decompose_boundary_pack_unpack_ops.mlir"
     "decompose_conv2d.mlir"
     "decompose_linalg_generic.mlir"
+    "decompose_memref.mlir"
     "decompose_pack_unpack_ops.mlir"
     "decompose_softmax.mlir"
     "eliminate_empty_tensors.mlir"
@@ -56,15 +60,17 @@ iree_lit_test_suite(
     "llvmcpu_materialize_encoding.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
+    "materialize_encoding_into_padding.mlir"
     "materialize_tuning_specs.mlir"
     "materialize_tuning_specs_default_missing.mlir"
     "materialize_tuning_specs_invalid_spec.mlir"
     "materialize_user_config_from_tuning_spec.mlir"
     "materialize_user_configs.mlir"
+    "math_transform.mlir"
     "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
-    "polynomial_approximation.mlir"
+    "propagate_dispatch_size_bounds.mlir"
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
     "reductions.mlir"
@@ -104,6 +110,7 @@ iree_lit_test_suite(
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir
+    tuning_spec_default.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

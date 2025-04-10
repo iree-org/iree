@@ -111,6 +111,18 @@ getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
   return *maybeTransformLibrary;
 }
 
+static std::optional<StringRef> fetchDefaultTuningSpec(StringRef identifier) {
+  std::string tuningSpecName =
+      llvm::formatv("iree_default_tuning_spec_{}.mlir", identifier);
+  std::optional<StringRef> tuningSpecSource;
+
+  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+    tuningSpecSource = dir.getFile(tuningSpecName);
+  });
+
+  return tuningSpecSource;
+}
+
 static FailureOr<ModuleOp>
 getDefaultTuningSpec(ModuleOp module,
                      IREE::Codegen::IREECodegenDialect &dialect) {
@@ -123,14 +135,29 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-  // Try to look up the default tuning spec for this architecture, if any.
-  StringRef arch = gpuTarget.getArch();
-  std::string defaultTuningSpecName =
-      llvm::formatv("iree_default_tuning_spec_{}.mlir", arch);
+  std::optional<StringRef> sku;
+  if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
+    if (StringAttr chipSku = chip.getSku()) {
+      sku = chipSku.getValue();
+    }
+  }
+
+  std::string defaultTuningSpecName;
   std::optional<StringRef> defaultTuningSpecSource;
-  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-    defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
-  });
+  if (sku) {
+    // GPUs with the same ISA may have different hardware characteristics such
+    // as the number of workgroup processors and power limits, Look up
+    // SKU-specific tuning spec for optimal performance.
+    defaultTuningSpecSource = fetchDefaultTuningSpec(*sku);
+  }
+
+  if (!defaultTuningSpecSource) {
+    // If SKU-specific spec is not found, fall back to the default
+    // architecture-based tuning spec to ensure broader compatibility.
+    StringRef arch = gpuTarget.getArch();
+    defaultTuningSpecSource = fetchDefaultTuningSpec(arch);
+  }
+
   if (!defaultTuningSpecSource) {
     // Not all architectures are expected to provide default tuning specs, so
     // this shouldn't be considered a hard error (but that's up to the caller).
@@ -197,28 +224,36 @@ struct MaterializeTuningSpecsPass final
       return;
     }
 
-    // If only the default tuning spec is available, use it directly and skip
-    // the linking stage.
-    if (!hasUserTuningSpec) {
-      if (failed(dumpFinalTuningSpecToDir(*defaultTuningSpec))) {
+    // When the user tuning spec and default spec are available, link all
+    // available libraries into a single module. We insert the default tuning
+    // spec last, so that any user-specified tuning configurations take
+    // precedence.
+    SmallVector<ModuleOp, 2> allSpecs;
+    if (hasUserTuningSpec) {
+      allSpecs.push_back(*userTuningSpec);
+    }
+    if (hasDefaultTuningSpec) {
+      allSpecs.push_back(*defaultTuningSpec);
+    }
+
+    // Determine if the linking pass should be skipped.
+    // Skip if there is only one tuning spec (either user-provided or default)
+    // with the default attribute.
+    if (allSpecs.size() == 1 &&
+        allSpecs[0]->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
+      // Use the appropriate tuning spec (user or default).
+      ModuleOp tuningSpecWithDefaultAttr = allSpecs[0];
+      if (failed(dumpFinalTuningSpecToDir(tuningSpecWithDefaultAttr))) {
         return signalPassFailure();
       }
       FailureOr<DenseElementsAttr> serializedSpec =
-          serializeTuningSpecToAttr(*defaultTuningSpec);
+          serializeTuningSpecToAttr(tuningSpecWithDefaultAttr);
       if (failed(serializedSpec)) {
         module->emitError("Failed to serialize default tuning specs");
         return signalPassFailure();
       }
       module->setAttr(kSerializedTuningSpecAttrName, *serializedSpec);
       return;
-    }
-
-    // When the user tuning spec is available, link all available libraries into
-    // a single module. We insert the default tuning spec last, so that any
-    // user-specified tuning configurations take precedence.
-    SmallVector<ModuleOp, 2> allSpecs = {*userTuningSpec};
-    if (hasDefaultTuningSpec) {
-      allSpecs.push_back(*defaultTuningSpec);
     }
 
     Location loc =
@@ -234,11 +269,6 @@ struct MaterializeTuningSpecsPass final
         UnitAttr::get(ctx));
     for (auto [idx, spec] : llvm::enumerate(allSpecs)) {
       ModuleOp clonedSpec = spec.clone();
-      // Drop the module-level attribute due to renamed entrypoints during
-      // linking.
-      if (clonedSpec->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
-        clonedSpec->removeAttr(kTuningSpecDefaultEntrypointAttrName);
-      }
       // Make sure there are no symbol name collisions.
       clonedSpec.setSymName(
           llvm::formatv("{}_{}", clonedSpec.getSymName().value(), idx).str());

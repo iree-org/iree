@@ -1,6 +1,7 @@
 // Tests that execution providing no outputs is ok.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --module=- --function=no_output) | \
 // RUN: FileCheck --check-prefix=NO-OUTPUT %s
 // NO-OUTPUT-LABEL: EXEC @no_output
@@ -12,7 +13,8 @@ func.func @no_output() {
 
 // Tests the default output printing to stdout.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --module=- --function=default) | \
 // RUN: FileCheck --check-prefix=OUTPUT-DEFAULT %s
 // OUTPUT-DEFAULT-LABEL: EXEC @default
@@ -34,7 +36,8 @@ func.func @default() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // printing the results in python. This also verifies our npy files can be
 // parsed by numpy.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --module=- --function=numpy \
 // RUN:                  --output= \
 // RUN:                  --output=@%t.npy \
@@ -58,7 +61,8 @@ func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // another invocation reading from the binary files. Each output is written to
 // its own file (optimal for alignment/easier to inspect).
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb && \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s -o=%t.vmfb && \
 // RUN:  iree-run-module --device=local-sync \
 // RUN:                  --module=%t.vmfb \
 // RUN:                  --function=write_binary \
@@ -75,7 +79,9 @@ func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // another invocation reading from the binary files. The values are appended to
 // a single file and read from the single file.
 
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb && \
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx \
+// RUN:               -o=%t.vmfb %s && \
 // RUN:  iree-run-module --device=local-sync \
 // RUN:                  --module=%t.vmfb \
 // RUN:                  --function=write_binary \

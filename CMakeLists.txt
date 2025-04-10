@@ -17,21 +17,19 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(IREE ASM C CXX)
+# If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
+# and we can just inform the user and then reset it.
+if(DEFINED CACHE{CMAKE_CXX_STANDARD})
+  message(WARNING "Unsetting cache value for CMAKE_CXX_STANDARD")
+  unset(CMAKE_CXX_STANDARD CACHE)
+endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-# LLVM defines this as a CACHE property and uses a policy that causes the
-# cache value to take precedence. This is causing us to mix 17/14 across
-# the boundary.
-# TODO: Remove this once the LLVM mechanism is updated. See:
-#   https://discourse.llvm.org/t/important-new-toolchain-requirements-to-build-llvm-will-most-likely-be-landing-within-a-week-prepare-your-buildbots/61447/9
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to" FORCE)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if(MSVC)
   enable_language(ASM_MASM)
-else()
-  enable_language(ASM)
 endif()
 
 # Set the default CMake build type so some of the build type dependent setting
@@ -568,6 +566,7 @@ include(iree_cc_binary_benchmark)
 include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
 include(iree_plugin_register)
+include(iree_genrule)
 
 # Default any sub-tree which doesn't provide its own package namespacing
 # to derive it relative to this directory and prefixed with iree/.
@@ -646,7 +645,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
-  # can be troublesome. Note that pybind11 and nanobind require FindPython.
+  # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
   find_package(Python 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
@@ -775,7 +774,7 @@ endif()
 
 # Both the IREE and MLIR Python bindings require nanobind. We initialize it here
 # at the top level so that everything uses ours consistently.
-if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
+if(IREE_BUILD_PYTHON_BINDINGS)
   include(FetchContent)
   FetchContent_Declare(
     nanobind
@@ -783,30 +782,6 @@ if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
     GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
   )
   FetchContent_MakeAvailable(nanobind)
-endif()
-
-# Both the IREE and MLIR Python bindings require pybind11. We initialize it here
-# at the top level so that everything uses ours consistently.
-if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
-  set(pybind11_VERSION 2.13.6)
-  include(FetchContent)
-  FetchContent_Declare(
-      pybind11
-      GIT_REPOSITORY https://github.com/pybind/pybind11
-      GIT_TAG        v${pybind11_VERSION}
-  )
-  set(PYBIND11_FINDPYTHON ON)
-  FetchContent_MakeAvailable(pybind11)
-  # pybind11 source fetches do not include find_package integration, which is
-  # a shame since sub-projects can require that to work. If we were using
-  # CMake 3.24, we could just add OVERRIDE_FIND_PACKAGE to the
-  # FetchContent_Declare call above and it would take care of doing the
-  # following to let subsequent sub-project find_package calls to resolve
-  # successfully.
-  set(pybind11_DIR "${pybind11_BINARY_DIR}")
-  file(WRITE "${pybind11_BINARY_DIR}/pybind11Config.cmake" "")
-  file(WRITE "${pybind11_BINARY_DIR}/pybind11ConfigVersion.cmake"
-       "set(PACKAGE_VERSION ${pybind11_VERSION})\nset(PACKAGE_VERSION_COMPATIBLE TRUE)")
 endif()
 
 if(NOT IREE_BUILD_COMPILER)
@@ -906,8 +881,10 @@ if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
   )
 endif()
 
-iree_set_googletest_cmake_options()
-add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+if(IREE_BUILD_TESTS)
+  iree_set_googletest_cmake_options()
+  add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+endif()
 
 if(IREE_ENABLE_THREADING)
   # Benchmark.

@@ -120,7 +120,8 @@ All steps here assume starting from the IREE root directory.
 
     ```bash
     iree-compile \
-      --iree-hal-target-backends=llvm-cpu \
+      --iree-hal-target-device=local \
+      --iree-hal-local-target-device-backends=llvm-cpu \
       --iree-input-type=stablehlo \
       iree_input.mlir
     ```

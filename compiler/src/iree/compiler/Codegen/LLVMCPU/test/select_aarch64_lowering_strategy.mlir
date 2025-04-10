@@ -255,7 +255,7 @@ func.func @pack() attributes {hal.executable.target = #executable_target_system_
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
   %3 = tensor.empty() : tensor<4x48x8x1xf32>
-  %pack = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x40xf32> -> tensor<4x48x8x1xf32>
+  %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x40xf32> -> tensor<4x48x8x1xf32>
   flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 48, 8, 1], strides = [1, 1, 1, 1] : tensor<4x48x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
   return
 }
@@ -263,7 +263,7 @@ func.func @pack() attributes {hal.executable.target = #executable_target_system_
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling, {enable_decomposition}>
 //       CHECK: func.func @pack()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK:   tensor.pack
+//       CHECK:   linalg.pack
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -288,7 +288,7 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
   %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
   %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
   %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-  %unpack = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
+  %unpack = linalg.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
   flow.dispatch.tensor.store %unpack, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
   return
 }
@@ -296,7 +296,7 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling, {enable_decomposition}>
 //       CHECK: func.func @unpack_outer_dynamic()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK:   tensor.unpack
+//       CHECK:   linalg.unpack
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -322,7 +322,7 @@ func.func @unpack_fully_dynamic() attributes {hal.executable.target = #executabl
   %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%8, %9}
   %14 = flow.dispatch.tensor.load %12, offsets = [0, 0, 0, 0], sizes = [%6, %7, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%6, %7, %10, %11} -> tensor<?x?x?x?xi32>
   %15 = tensor.empty(%8, %9) : tensor<?x?xi32>
-  %unpack = tensor.unpack %14 inner_dims_pos = [0, 1] inner_tiles = [%10, %11] into %15 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
+  %unpack = linalg.unpack %14 inner_dims_pos = [0, 1] inner_tiles = [%10, %11] into %15 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
   flow.dispatch.tensor.store %unpack, %13, offsets = [0, 0], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%8, %9}
   return
 }
@@ -330,7 +330,7 @@ func.func @unpack_fully_dynamic() attributes {hal.executable.target = #executabl
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling>
 //       CHECK: func.func @unpack_fully_dynamic()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK:   tensor.unpack
+//       CHECK:   linalg.unpack
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----

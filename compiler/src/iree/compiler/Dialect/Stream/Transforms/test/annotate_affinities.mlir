@@ -71,7 +71,7 @@ util.func private @constant_op() -> (tensor<1xi32>, tensor<1xi32>) {
 
 // Tests that splats (not constant-like but no consumed values) are placed with
 // their consumer(s). These are always best to rematerialize where they are
-// consumed to avoid allocating/transfering a bunch of repeated values.
+// consumed to avoid allocating/transferring a bunch of repeated values.
 
 // CHECK-LABEL: @splat_op
 util.func private @splat_op() -> tensor<1xi32> {
@@ -91,13 +91,38 @@ util.func private @splat_op() -> tensor<1xi32> {
 
 // -----
 
+// Tests that splats which cannot be resolved to a single consumer get tagged
+// with both.
+
+// CHECK-LABEL: @splat_op_ambiguous
+util.func private @splat_op_ambiguous() -> (tensor<1xi32>, tensor<1xi32>) {
+  %splat_value = arith.constant 123 : i32
+  // CHECK: flow.tensor.splat
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %splat = flow.tensor.splat %splat_value : tensor<1xi32>
+  // CHECK: flow.tensor.transfer
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  %splat_a = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_a>
+  // CHECK: flow.tensor.transfer
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  %splat_b = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_b>
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_b>]]
+  util.return %splat_a, %splat_b : tensor<1xi32>, tensor<1xi32>
+}
+
+// -----
+
 // Tests that imported tensor placement is inherited.
 // Frontends can use this to declare where they expect their arguments to
 // be living at the time the functions are invoked. Imports do not perform
 // transfers so we must use whatever is declared.
 
-// CHECK-LABEL: @imported_tensor
-util.func public @imported_tensor(%buffer_view: !hal.buffer_view, %fence: !hal.fence) -> tensor<1xi32> {
+// CHECK-LABEL: @imported_hal_tensor
+util.func public @imported_hal_tensor(%buffer_view: !hal.buffer_view, %fence: !hal.fence) -> tensor<1xi32> {
   // CHECK: hal.tensor.import
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
   %tensor = hal.tensor.import on(#hal.device.promise<@dev_a>) wait(%fence) => %buffer_view "input" : !hal.buffer_view -> tensor<1xi32>
@@ -108,13 +133,26 @@ util.func public @imported_tensor(%buffer_view: !hal.buffer_view, %fence: !hal.f
 
 // -----
 
+// CHECK-LABEL: @imported_stream_tensor
+util.func public @imported_stream_tensor(%buffer_view: !hal.buffer_view) -> !stream.resource<external> {
+  %size = stream.tensor.sizeof on(#hal.device.promise<@dev_a>) tensor<1xi32> : index
+  // CHECK: stream.tensor.import
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  %resource = stream.tensor.import on(#hal.device.promise<@dev_a>) %buffer_view : !hal.buffer_view -> tensor<1xi32> in !stream.resource<external>{%size}
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  util.return %resource : !stream.resource<external>
+}
+
+// -----
+
 // Tests that consumer-placed ops exported to buffers are properly placed.
 // Frontends can use this to explicitly define where exported tensors must live.
 // With consumer-placed ops like constants or splats we place them directly on
 // the export target.
 
-// CHECK-LABEL: @exported_constant
-util.func public @exported_constant(%fence: !hal.fence) -> !hal.buffer_view {
+// CHECK-LABEL: @exported_hal_constant
+util.func public @exported_hal_constant(%fence: !hal.fence) -> !hal.buffer_view {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
@@ -126,6 +164,21 @@ util.func public @exported_constant(%fence: !hal.fence) -> !hal.buffer_view {
   // CHECK: hal.tensor.export
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   %buffer_view = hal.tensor.export on(#hal.device.promise<@dev_a>) %cst_ready "output" : tensor<1xi32> -> !hal.buffer_view
+  util.return %buffer_view : !hal.buffer_view
+}
+
+// -----
+
+// CHECK-LABEL: @exported_stream_constant
+util.func public @exported_stream_constant() -> !hal.buffer_view {
+  %size = stream.tensor.sizeof on(#hal.device.promise<@dev_a>) tensor<1x5x64xi32> : index
+  // CHECK: stream.tensor.constant
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  %cst = stream.tensor.constant : tensor<1x5x64xi32> in !stream.resource<external> = dense<0> : tensor<1x5x64xi32>
+  // CHECK: stream.tensor.export
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  %buffer_view = stream.tensor.export on(#hal.device.promise<@dev_a>) %cst : tensor<1x5x64xi32> in !stream.resource<external>{%size} -> !hal.buffer_view
   util.return %buffer_view : !hal.buffer_view
 }
 

@@ -89,6 +89,20 @@ static inline iree_string_pair_t iree_make_cstring_pair(const char* first,
   return v;
 }
 
+// A list of string key-value pairs.
+typedef struct iree_string_pair_list_t {
+  // Total number of pairs in the list.
+  iree_host_size_t count;
+  // Value list or NULL if no values.
+  const iree_string_pair_t* pairs;
+} iree_string_pair_list_t;
+
+// Returns an empty string pair list.
+static inline iree_string_pair_list_t iree_string_pair_list_empty(void) {
+  iree_string_pair_list_t v = {0, NULL};
+  return v;
+}
+
 #define iree_string_view_literal(str) \
   { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
 
@@ -105,6 +119,12 @@ typedef struct iree_string_view_list_t {
   // Value list or NULL if no values.
   const iree_string_view_t* values;
 } iree_string_view_list_t;
+
+// Returns an empty string list.
+static inline iree_string_view_list_t iree_string_view_list_empty(void) {
+  iree_string_view_list_t v = {0, NULL};
+  return v;
+}
 
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,

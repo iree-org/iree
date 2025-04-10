@@ -77,6 +77,10 @@ void iree_arena_block_pool_initialize(iree_host_size_t total_block_size,
 // back to it.
 void iree_arena_block_pool_deinitialize(iree_arena_block_pool_t* block_pool);
 
+// Preallocates |count| blocks and adds them to the pool free list.
+iree_status_t iree_arena_block_pool_preallocate(
+    iree_arena_block_pool_t* block_pool, iree_host_size_t count);
+
 // Trims the pool by freeing unused blocks back to the allocator.
 // Acquired blocks are not freed and remain valid.
 void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool);

@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Download packages
         id: download_packages
-        uses: dawidd6/action-download-artifact@5e780fc7bbd0cac69fc73271ed86edf5dcb72d67 # v2.26.0
+        uses: dawidd6/action-download-artifact@07ab29fd4a977ae4d2b275087cf67563dfdf0295 # v9
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
@@ -35,7 +35,7 @@ jobs:
           ls -R
       - name: Set up python
         id: set_up_python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
         with:
           python-version: "3.9"
       - name: Install python packages
@@ -115,7 +115,7 @@ jobs:
     steps:
       - name: Publish Release
         id: publish_release
-        uses: eregon/publish-release@46913fa2b3f7edc7345ae3c17f6d1b093a54916d # v1.0.5
+        uses: eregon/publish-release@01df127f5e9a3c26935118e22e738d95b59d10ce # v1.0.6
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
@@ -130,7 +130,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
         with:
           python-version: "3.9"
 

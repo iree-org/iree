@@ -37,7 +37,7 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
       return val;
     matchPattern(val, m_Constant(&attr));
   } else {
-    attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
+    attr = llvm::cast<IntegerAttr>(cast<Attribute>(attrOrValue));
   }
   return builder.createOrFold<arith::ConstantIndexOp>(
       loc, attr.getValue().getSExtValue());

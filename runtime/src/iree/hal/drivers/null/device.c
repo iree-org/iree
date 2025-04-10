@@ -18,6 +18,26 @@
 #include "iree/hal/utils/file_transfer.h"
 
 //===----------------------------------------------------------------------===//
+// iree_hal_null_device_options_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT void iree_hal_null_device_options_initialize(
+    iree_hal_null_device_options_t* out_options) {
+  memset(out_options, 0, sizeof(*out_options));
+  // TODO(null): set defaults based on compiler configuration. Flags should not
+  // be used as multiple devices may be configured within the process or the
+  // hosting application may be authored in python/etc that does not use a flags
+  // mechanism accessible here.
+}
+
+static iree_status_t iree_hal_null_device_options_verify(
+    const iree_hal_null_device_options_t* options) {
+  // TODO(null): verify that the parameters are within expected ranges and any
+  // requested features are supported.
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_null_device_t
 //===----------------------------------------------------------------------===//
 
@@ -40,22 +60,6 @@ static iree_hal_null_device_t* iree_hal_null_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_null_device_vtable);
   return (iree_hal_null_device_t*)base_value;
-}
-
-void iree_hal_null_device_options_initialize(
-    iree_hal_null_device_options_t* out_options) {
-  memset(out_options, 0, sizeof(*out_options));
-  // TODO(null): set defaults based on compiler configuration. Flags should not
-  // be used as multiple devices may be configured within the process or the
-  // hosting application may be authored in python/etc that does not use a flags
-  // mechanism accessible here.
-}
-
-static iree_status_t iree_hal_null_device_options_verify(
-    const iree_hal_null_device_options_t* options) {
-  // TODO(null): verify that the parameters are within expected ranges and any
-  // requested features are supported.
-  return iree_ok_status();
 }
 
 iree_status_t iree_hal_null_device_create(
@@ -314,7 +318,7 @@ static iree_status_t iree_hal_null_device_queue_alloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
@@ -334,7 +338,7 @@ static iree_status_t iree_hal_null_device_queue_dealloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* buffer) {
+    iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
   // TODO(null): perform a deallocation of the transient buffer in queue order.
@@ -459,7 +463,8 @@ static iree_status_t iree_hal_null_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table) {
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t flags) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
   // TODO(null): implement a wait, execute, and signal queue operation. The

@@ -173,6 +173,14 @@ static inline iree_time_t iree_timeout_as_deadline_ns(iree_timeout_t timeout) {
              : iree_relative_timeout_to_deadline_ns(timeout.nanos);
 }
 
+// Returns a relative timeout duration in nanoseconds from the given timeout.
+static inline iree_duration_t iree_timeout_as_duration_ns(
+    iree_timeout_t timeout) {
+  return timeout.type == IREE_TIMEOUT_ABSOLUTE
+             ? iree_absolute_deadline_to_timeout_ns(timeout.nanos)
+             : timeout.nanos;
+}
+
 // Returns the earliest timeout between |lhs| and |rhs|.
 static inline iree_timeout_t iree_timeout_min(iree_timeout_t lhs,
                                               iree_timeout_t rhs) {

@@ -321,3 +321,21 @@ func.func @fold_identity_extract_slice(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 // CHECK-LABEL: @fold_identity_extract_slice
 //       CHECK:   %[[ARG0:.+]]: tensor<?xf32>
 //       CHECK:   return %[[ARG0]]
+
+// -----
+
+func.func @push_up_extract_slice(%arg0: index, %arg1: vector<64x64xf32>, %arg2: tensor<2x4096x10x64xf16>) -> tensor<1x64x1x64xf16> {
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<64x64xf16>
+  %c2 = arith.constant 2 : index
+  %1 = arith.addi %arg0, %c2 : index
+  %2 = arith.truncf %arg1 : vector<64x64xf32> to vector<64x64xf16>
+  %3 = vector.transfer_write %2, %0[%c0, %c0] {in_bounds = [true, true]} : vector<64x64xf16>, tensor<64x64xf16>
+  %extracted_slice = tensor.extract_slice %arg2[%arg0, %c2, %1, %arg0] [1, 64, 1, 64] [1, 1, 1, 1] : tensor<2x4096x10x64xf16> to tensor<1x64x1x64xf16>
+  %inserted_slice = tensor.insert_slice %3 into %extracted_slice[0, 0, 0, 0] [1, 64, 1, 64] [1, 1, 1, 1] : tensor<64x64xf16> into tensor<1x64x1x64xf16>
+  return %inserted_slice : tensor<1x64x1x64xf16>
+}
+
+// CHECK-LABEL: @push_up_extract_slice
+//       CHECK:   tensor.extract_slice
+//       CHECK:   vector.transfer_write

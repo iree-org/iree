@@ -150,8 +150,15 @@ struct ExecutePartitionBuilder {
     // If the op has the same affinity as the partition region we can strip it.
     // Note that some ops may have affinities that are more specific and we
     // want to preserve those as long as possible.
-    if (auto affinityOp =
-            dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
+    if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(clonedOp)) {
+      if (transferOp.getSourceAffinityAttr() == partition->affinity) {
+        transferOp.setSourceAffinityAttr(nullptr);
+      }
+      if (transferOp.getResultAffinityAttr() == partition->affinity) {
+        transferOp.setResultAffinityAttr(nullptr);
+      }
+    } else if (auto affinityOp =
+                   dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
       if (affinityOp.getAffinityAttr() == partition->affinity) {
         affinityOp.setAffinityAttr(nullptr);
       }
@@ -282,14 +289,14 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         toBeDeleted.replaceAllUsesWith(awaitOp.getResults().front());
         deadOps.insert(oldResult.getDefiningOp());
       }
-
-      // Sort the ops in the execution region. This is safe because we are
-      // still unaliased and SSA values imply ordering.
-      mlir::sortTopologically(block);
     }
     for (auto *deadOp : llvm::reverse(deadOps)) {
       deadOp->erase();
     }
+
+    // Sort the ops in the execution region. This is safe because we are
+    // still unaliased and SSA values imply ordering.
+    mlir::sortTopologically(block);
 
     LLVM_DEBUG({
       llvm::dbgs() << "\nPartitions constructed:\n";
@@ -314,6 +321,15 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
 //===----------------------------------------------------------------------===//
 // --iree-stream-schedule-execution
 //===----------------------------------------------------------------------===//
+
+struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncBarrierOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, op.getOperand(0));
+    return success();
+  }
+};
 
 struct ScheduleExecutionPass
     : public IREE::Stream::impl::ScheduleExecutionPassBase<
@@ -347,6 +363,11 @@ struct ScheduleExecutionPass
     for (auto op : context->getRegisteredOperations()) {
       op.getCanonicalizationPatterns(patterns, context);
     }
+
+    // Barriers are used only for analysis and can be removed as part of
+    // cleanup.
+    patterns.insert<RemoveBarriers>(context);
+
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();

@@ -165,6 +165,37 @@ def MaterializeCopyOnWritePass :
   ];
 }
 
+def MaterializeEncodingsPass :
+    Pass<"iree-stream-materialize-encodings", "mlir::ModuleOp"> {
+  let summary = "Materialize stream.tensor.encode ops to dispatches and executables.";
+  let description = [{
+    Materializes uniqued executables for `stream.tensor.encode` ops and replaces
+    them with dispatches to those executables.
+  }];
+  let dependentDialects = [
+    "mlir::func::FuncDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+    // TODO(#20249): Drop the Flow dependency once the needed operations and
+    // types are moved to other dialects like TensorExt.
+    "IREE::Flow::FlowDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
+def CloneToConsumersPass :
+    Pass<"iree-stream-clone-to-consumers", "mlir::ModuleOp"> {
+  let summary = "Clones operations that opt-in to consumer affinities.";
+  let description = [{
+    Performs whole-program analysis to identify operations that are used on
+    multiple affinities that can be cloned per-affinity. The `StreamableOp`
+    interface's `preferCloneToConsumers` query is used and any ops implementing
+    the interface may opt-in to the cloning.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def ElideAsyncCopiesPass :
     Pass<"iree-stream-elide-async-copies", "mlir::ModuleOp"> {
   let summary = "Elides copies when they are not performing meaningful work.";
@@ -174,6 +205,18 @@ def ElideAsyncCopiesPass :
     of a value. This eliminates copies both from input programs and those
     materialized by the `iree-stream-materialize-copy-on-write` pass.
   }];
+}
+
+def ElideAsyncTransfersPass :
+    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
+  let summary = "Elides transfers when they are not performing meaningful work.";
+  let description = [{
+    Performs whole-program analysis to identify transfers that are not required
+    for program correctness (transfers to/from the same device, etc).
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
 }
 
 def EmplaceAllocationsPass :
@@ -244,6 +287,27 @@ def ScheduleConcurrencyPass :
   }];
   let dependentDialects = [
     "IREE::Stream::StreamDialect",
+  ];
+}
+
+def SyncInitializersPass :
+    Pass<"iree-stream-sync-initializers", "mlir::ModuleOp"> {
+  let summary = "Makes all initializer-produced timepoints synchronously wait before proceeding.";
+  let description = [{
+    Gathers all global timepoint stores within each initializer and converts
+    them to a single synchronous host wait.
+
+    NOTE: this does not currently find timepoints in called functions. To handle
+    that we would need to analyze the call graph to find functions called only
+    from initializers and duplicate any function that is called from both
+    initializers and non-initializer roots. At the point in the pipeline where
+    this pass runs most internal function calls return timepoints and the
+    initializer is the place where they are stored into globals so it happens to
+    work out.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
   ];
 }
 
@@ -411,6 +475,45 @@ def SpecializeDispatchesPass :
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "mlir::tensor::TensorDialect",
+  ];
+}
+
+def SpecializeEncodingsPass :
+    Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
+  let summary = "Specializes serializable encodings based on layout analysis.";
+  let description = [{
+    Attaches layouts to encodings and duplicates executables based on the
+    encoding layout analysis.
+
+    Some executables can be launched by different devices. It can produce
+    wrong codegen artifacts when bindings types are encoded (i.e., the
+    tensor type has an encoding attribute). Because they can result in
+    different layouts, especially when multi-device is involved. E.g., say
+    that device_a and device_b interpret a tensor type with encodings in
+    different layouts, and there is an executable that can be launched with
+    resources from either device_a or device_b. It is confusing what the
+    input layouts for the executable because there are two possibilities. In
+    this case, we have to duplicate the executable with updated encoding,
+    and modify the dispatch to launch proper executable based on device
+    analysis.
+
+    The pass resolves the layouts based on Stream affinity analysis. It updates
+    the encodings of all the Stream tensor ops with resolved layouts, duplicates
+    executables based on the set of incoming layouts and result layouts, and
+    updates bindings with resolved layouts.
+
+    Requirements:
+    - At least one of the dialect implements AffinityAnalysisDialectInterface
+      dialect interface, because Stream does not need to know any dialect other
+      than itself.
+    - The binding types have to implement IREE::Encoding::EncodingTypeInterface,
+      so it can updates the types without accessing any other dialects.
+    - All the encodings attached on the types have to implement
+      SerializableEncodingAttrInterface. Because the pass updates the encodings
+      using interfaces.
+  }];
+  let dependentDialects = [
+    "IREE::Encoding::IREEEncodingDialect"
   ];
 }
 

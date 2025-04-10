@@ -6,6 +6,10 @@
 
 #include "iree/io/stream.h"
 
+#include "iree/io/file_handle.h"
+#include "iree/io/memory_stream.h"
+#include "iree/io/stdio_stream.h"
+
 // This is arbitrary - we should allow dynamic block sizes and such but keeping
 // this small only requires a reasonable fixed size stack alloc.
 #define IREE_IO_STREAM_COPY_BLOCK_SIZE (32 * 1024)
@@ -294,6 +298,110 @@ IREE_API_EXPORT iree_status_t iree_io_stream_copy(
     if (!iree_status_is_ok(status)) break;
     remaining_length -= read_length;
   }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_io_stream_t utilities
+//===----------------------------------------------------------------------===//
+
+static void iree_io_memory_stream_file_release(void* user_data,
+                                               iree_io_stream_t* stream) {
+  iree_io_file_handle_t* file_handle = (iree_io_file_handle_t*)user_data;
+  iree_io_file_handle_release(file_handle);
+}
+
+IREE_API_EXPORT iree_status_t iree_io_stream_open(
+    iree_io_stream_mode_t mode, iree_io_file_handle_t* file_handle,
+    uint64_t file_offset, iree_allocator_t host_allocator,
+    iree_io_stream_t** out_stream) {
+  IREE_ASSERT_ARGUMENT(file_handle);
+  IREE_ASSERT_ARGUMENT(out_stream);
+  *out_stream = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status = iree_ok_status();
+  iree_io_stream_t* stream = NULL;
+  iree_io_file_handle_primitive_t file_primitive =
+      iree_io_file_handle_primitive(file_handle);
+  switch (file_primitive.type) {
+    case IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION: {
+      if (file_offset > file_primitive.value.host_allocation.data_length) {
+        status = iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "file offset %" PRIu64
+            " out of range of host allocation with %" PRIhsz " bytes available",
+            file_offset, file_primitive.value.host_allocation.data_length);
+        break;
+      }
+      iree_io_stream_release_callback_t release_callback = {
+          .fn = iree_io_memory_stream_file_release,
+          .user_data = file_handle,
+      };
+      iree_io_file_handle_retain(file_handle);
+      status = iree_io_memory_stream_wrap(
+          mode,
+          iree_make_byte_span(
+              file_primitive.value.host_allocation.data + file_offset,
+              file_primitive.value.host_allocation.data_length - file_offset),
+          release_callback, host_allocator, &stream);
+      if (!iree_status_is_ok(status)) iree_io_file_handle_release(file_handle);
+      break;
+    }
+    case IREE_IO_FILE_HANDLE_TYPE_FD: {
+      iree_io_stdio_stream_mode_t stdio_mode = 0;
+      if (iree_all_bits_set(mode, IREE_IO_STREAM_MODE_READABLE)) {
+        stdio_mode |= IREE_IO_STDIO_STREAM_MODE_READ;
+      }
+      if (iree_all_bits_set(mode, IREE_IO_STREAM_MODE_WRITABLE)) {
+        stdio_mode |= IREE_IO_STDIO_STREAM_MODE_WRITE;
+      }
+      status = iree_io_stdio_stream_open_fd(stdio_mode, file_primitive.value.fd,
+                                            host_allocator, &stream);
+      if (iree_status_is_ok(status)) {
+        status =
+            iree_io_stream_seek(stream, IREE_IO_STREAM_SEEK_SET, file_offset);
+      }
+      break;
+    }
+    default: {
+      status =
+          iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                           "stream open not yet supported on handle type %d",
+                           (int)file_primitive.type);
+      break;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_stream = stream;
+  } else {
+    iree_io_stream_release(stream);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_io_stream_write_file(
+    iree_io_stream_t* stream, iree_io_file_handle_t* source_file_handle,
+    uint64_t source_file_offset, iree_io_stream_pos_t length,
+    iree_allocator_t host_allocator) {
+  IREE_ASSERT_ARGUMENT(stream);
+  IREE_ASSERT_ARGUMENT(source_file_handle);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+
+  iree_io_stream_t* source_stream = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_io_stream_open(IREE_IO_STREAM_MODE_READABLE, source_file_handle,
+                          source_file_offset, host_allocator, &source_stream));
+
+  iree_status_t status = iree_io_stream_copy(source_stream, stream, length);
+
+  iree_io_stream_release(source_stream);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

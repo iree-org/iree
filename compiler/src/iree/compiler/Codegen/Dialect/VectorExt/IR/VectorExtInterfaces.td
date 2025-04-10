@@ -36,6 +36,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*args=*/(ins "::llvm::ArrayRef<bool>":$droppedDims)
     >,
     InterfaceMethod<
+      /*description=*/"Get the expected undistributed shape for the given vector type.",
+      /*retTy=*/"SmallVector<int64_t>",
+      /*methodName=*/"getUndistributedShape",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
       /*description=*/"Get the distributed shape for the given vector type.",
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getDistributedShape",
@@ -46,6 +52,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*retTy=*/"int64_t",
       /*methodName=*/"getRank",
       /*args=*/(ins)
+    >,
+    StaticInterfaceMethod<
+      /*description=*/"Given operand layouts and indexing maps, create a recombined layout for result indexing map",
+      /*retTy=*/"VectorLayoutInterface",
+      /*methodName=*/"getRecombinedLayout",
+      /*args=*/(ins "::llvm::ArrayRef<VectorLayoutInterface>":$layouts, "::llvm::ArrayRef<AffineMap>":$maps, "AffineMap":$resultMap)
     >
   ];
 }

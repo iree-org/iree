@@ -4,15 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -22,7 +21,6 @@
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-fuse-and-hoist-parallel-loops"
@@ -256,6 +254,11 @@ struct FuseTilableSliceProducers final
       return failure();
     }
 
+    auto producerParent = tilableProducer->getParentOfType<scf::ForallOp>();
+    if (producerParent && producerParent == parentForall) {
+      return failure();
+    }
+
     SmallVector<LoopLikeOpInterface> loops = {parentForall};
     std::optional<scf::SCFFuseProducerOfSliceResult> fusionResult =
         mlir::scf::tileAndFuseProducerOfSlice(rewriter, sliceOp, loops);
@@ -279,7 +282,7 @@ struct FuseTilableForallConsumers final
     }
 
     tensor::ParallelInsertSliceOp producerSlice;
-    scf::ForallOp sliceOwner;
+    LoopLikeOpInterface sliceOwner;
     Value fusionOperand;
     for (auto operand : dpsOp.getDpsInputs()) {
       auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
@@ -317,8 +320,47 @@ struct FuseTilableForallConsumers final
     }
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice);
+        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice, {sliceOwner});
     if (failed(fuseConsumerResults)) {
+      return failure();
+    }
+    return success();
+  }
+};
+
+struct FuseCollapseShapeConsumers final
+    : OpRewritePattern<tensor::CollapseShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
+                                PatternRewriter &rewriter) const override {
+    auto forallOp = collapseOp.getSrc().getDefiningOp<scf::ForallOp>();
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(collapseOp, "No forall op producer");
+    }
+
+    if (failed(fuseCollapseShapeIntoProducerForall(rewriter, forallOp,
+                                                   collapseOp))) {
+      return failure();
+    }
+    return success();
+  }
+};
+
+struct FuseExtractSliceConsumers final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    // Find the scf::ForallOp producer, and get the corresponding
+    // tensor::ParallelInsertSliceOp.
+    auto forallOp = extractSliceOp.getSource().getDefiningOp<scf::ForallOp>();
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(extractSliceOp,
+                                         "No forall op producer");
+    }
+
+    if (failed(fuseExtractSliceIntoProducerForall(rewriter, forallOp,
+                                                  extractSliceOp))) {
       return failure();
     }
     return success();
@@ -369,6 +411,9 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableDestinationProducers>(context);
     patterns.add<FuseUnitLoopDestination>(context);
     patterns.add<FuseTilableForallConsumers>(context);
+    patterns.add<FuseCollapseShapeConsumers>(context);
+    patterns.add<FuseExtractSliceConsumers>(context);
+    populateSwapExtractWithExpandPattern(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

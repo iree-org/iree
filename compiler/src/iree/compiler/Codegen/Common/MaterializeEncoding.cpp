@@ -5,30 +5,29 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen--materialize-encoding"
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
@@ -68,32 +67,60 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
-    IREE::Codegen::LayoutAttrInterface layoutAttr;
-    if (isVMVXBackend(targetAttr)) {
-      LDBG("Select VMVXEncodingLayoutAttr attribute as the layout attribute.");
-      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::CPU::VMVXEncodingLayoutAttr::get(
-              ctx, targetAttr.getConfiguration()));
-    } else if (isLLVMCPUBackend(targetAttr)) {
-      LDBG("Select CPUEncodingLayoutAttr attribute as the layout attribute.");
-      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::CPU::CPUEncodingLayoutAttr::get(ctx,
-                                                targetAttr.getConfiguration()));
-    } else if (isROCMBackend(targetAttr)) {
-      LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute.");
-      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::GPU::GPUEncodingLayoutAttr::get(ctx,
-                                                getGPUTargetAttr(targetAttr)));
-    } else if (testCLGPUTarget) {
-      LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
-           "(testCLGPUTarget)");
-      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
-          IREE::GPU::GPUEncodingLayoutAttr::get(ctx, getCLGPUTarget(ctx)));
-    } else {
-      LDBG("Select EncodingNopLayoutAttr attribute as the layout attribute.");
-      layoutAttr = IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
+    DictionaryAttr targetConfig =
+        targetAttr ? targetAttr.getConfiguration() : nullptr;
+    // Check if the encoding resolver is a GPUPadLayoutAttr. For padding
+    // encoding materialization, we use a separate pass, so skip materialization
+    // here.
+    // TODO(#20160): Support GPUPadLayoutAttr materialization through this
+    // pass, and remove the ad-hoc materialization pass for padding.
+    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPadLayoutAttr>(
+                            IREE::Encoding::kEncodingResolverAttrName)) {
+      LDBG("Found GPUPadLayoutAttr encoding resolver. Materialization will "
+           "be handled later.");
+      return success();
     }
-    MaterializeEncodingTypeConverter typeConverter(layoutAttr);
+
+    auto getTestTargetOrNopLayout =
+        [&]() -> IREE::Codegen::LayoutAttrInterface {
+      if (testCLGPUTarget) {
+        LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
+             "(testCLGPUTarget)");
+        return cast<IREE::Codegen::LayoutAttrInterface>(
+            IREE::GPU::GPUEncodingLayoutAttr::get(
+                ctx,
+                DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
+                                                        getCLGPUTarget(ctx)))));
+      }
+      LDBG("Select EncodingNopLayoutAttr attribute as the layout "
+           "attribute (Encoding resolver unknown or unsupported).");
+      return IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
+    };
+
+    // The layoutAttr should come in without any target info attached to it,
+    // so we need to clone the layout attrs with the targetAttr configuration
+    // so it can access the target info during materialization.
+    //
+    // If the layoutAttr was not found, or if it does not implement the layout
+    // resolver interface, fall back to the resolver for getCLGPUTarget. If
+    // there is also no test target set, fall back to the nop layout.
+    IREE::Codegen::LayoutAttrInterface layoutAttr =
+        targetConfig ? targetConfig.getAs<IREE::Codegen::LayoutAttrInterface>(
+                           IREE::Encoding::kEncodingResolverAttrName)
+                     : nullptr;
+    auto resolverAttr = llvm::dyn_cast_or_null<
+        IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
+
+    IREE::Codegen::LayoutAttrInterface layoutAttrWithTargetInfo =
+        layoutAttr && resolverAttr
+            ? cast<IREE::Codegen::LayoutAttrInterface>(
+                  resolverAttr.cloneWithSimplifiedConfig(targetConfig))
+            : getTestTargetOrNopLayout();
+
+    LDBG("Selected LayoutAttrInterface with target configuration: "
+         << layoutAttrWithTargetInfo);
+
+    MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);
     auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter,
@@ -109,8 +136,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // resolve dims ops.
   {
     RewritePatternSet patterns(ctx);
+    populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
-    tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
+    tensor::populateFoldTensorEmptyPatterns(patterns);
+    linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
@@ -150,9 +180,8 @@ getFuncExecutableTargetAttrs(FunctionOpInterface funcOp,
   return executableTargetAttrs;
 }
 
-struct MaterializeHostEncodingPass
-    : public impl::MaterializeHostEncodingPassBase<
-          MaterializeHostEncodingPass> {
+struct MaterializeHostEncodingPass final
+    : impl::MaterializeHostEncodingPassBase<MaterializeHostEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
                     IREE::Codegen::IREECodegenDialect,
@@ -160,7 +189,7 @@ struct MaterializeHostEncodingPass
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    ModuleOp moduleOp = getOperation();
 
     // Run required analysis passes.
     IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
@@ -211,11 +240,9 @@ struct MaterializeHostEncodingPass
 // that. It should _not_ be running on both - target-specific codegen passes
 // are not allowed on host programs and it's a big violation of layering that
 // this exists.
-struct MaterializeDeviceEncodingPass
-    : public impl::MaterializeDeviceEncodingPassBase<
-          MaterializeDeviceEncodingPass> {
-  using impl::MaterializeDeviceEncodingPassBase<
-      MaterializeDeviceEncodingPass>::MaterializeDeviceEncodingPassBase;
+struct MaterializeDeviceEncodingPass final
+    : impl::MaterializeDeviceEncodingPassBase<MaterializeDeviceEncodingPass> {
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
@@ -224,7 +251,7 @@ struct MaterializeDeviceEncodingPass
   }
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr,
                                           testCLGPUTarget))) {

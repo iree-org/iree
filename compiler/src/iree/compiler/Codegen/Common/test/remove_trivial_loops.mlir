@@ -19,8 +19,8 @@ hal.executable private @dispatch_0  {
         %c256 = arith.constant 256 : index
         //     CHECK: %[[C250:.+]] = arith.constant 250 : index
         %c250 = arith.constant 250 : index
-        %tidx = gpu.thread_id x
-        %tidy = gpu.thread_id y
+        %tidx = gpu.thread_id x upper_bound 64
+        %tidy = gpu.thread_id y upper_bound 1
         // CHECK-NOT: scf.for
         //     CHECK: gpu.barrier
         scf.for %arg3 = %tidy to %c2 step %c2 {
@@ -64,8 +64,8 @@ hal.executable private @workgroup_tile_loop  {
     builtin.module {
       func.func @workgroup_tile_loop()  attributes {translation_info = #translation}  {
         %c2048 = arith.constant 2048 : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] upper_bound 64 : index
+        %workgroup_count_x = arith.constant 64 : index
         %idx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
         %countx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
         // CHECK-NOT: scf.for
@@ -99,8 +99,8 @@ hal.executable private @workgroup_tile_loop_negative  {
     builtin.module {
       func.func @workgroup_tile_loop_negative() attributes {translation_info = #translation} {
         %c2048 = arith.constant 2048 : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] upper_bound 2147483647 : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] upper_bound 2147483647 : index
         %idx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
         %countx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
         //     CHECK: scf.for
@@ -139,12 +139,15 @@ hal.executable private @both_workgroup_and_workitem  {
         %c8 = arith.constant 8 : index
         %c32 = arith.constant 32 : index
         %c112 = arith.constant 112 : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %workgroup_id_z = hal.interface.workgroup.id[2] : index
-        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] upper_bound 1 : index
+        // Any hal.interface.workgroup.count op in a function liket his should have
+        // have been -iree-codegen-propagate-dispatch-size-bounds 'd away before
+        // this pass is called.
+        %workgroup_count_x = arith.constant 1 : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] upper_bound 14 : index
+        %workgroup_count_y = arith.constant 14 : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] upper_bound 112 : index
+        %workgroup_count_z = arith.constant 112 : index
         scf.for %arg0 = %workgroup_id_z to %c112 step %workgroup_count_z {
           %4 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_y]
           %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_y]
@@ -154,13 +157,13 @@ hal.executable private @both_workgroup_and_workitem  {
             scf.for %arg2 = %6 to %c32 step %7 {
 
               // Additional loops distributed to workitems.
-              %18 = gpu.thread_id y
-              %19 = gpu.block_dim y
+              %18 = gpu.thread_id y upper_bound 2
+              %19 = arith.constant 2 : index
               %20 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%18]
               %21 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%19]
               scf.for %arg3 = %20 to %c8 step %21 {
-                %22 = gpu.thread_id x
-                %23 = gpu.block_dim x
+                %22 = gpu.thread_id x upper_bound 8
+                %23 = arith.constant 8 : index
                 %24 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%22]
                 %25 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%23]
                 scf.for %arg4 = %24 to %c32 step %25 {
@@ -240,3 +243,125 @@ hal.executable private @simple_mul {
 // CHECK-LABEL: func.func @simple_mul
 // CHECK:         scf.for
 // CHECK:         scf.for
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [128, 1, 1]>
+// CHECK-LABEL: func.func @delinearize_linearize()
+hal.executable private @delinearize_linearize {
+  hal.executable.variant @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @delinearize_linearize layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @delinearize_linearize() attributes {translation_info = #translation_info} {
+        %c0 = arith.constant 0 : index
+        %c2 = arith.constant 2 : index
+        // CHECK: %[[C3:.+]] = arith.constant 3 : index
+        %c3 = arith.constant 3 : index
+        %c4 = arith.constant 4 : index
+        %c8 = arith.constant 8 : index
+        %c64 = arith.constant 64 : index
+        %tidx = gpu.thread_id x upper_bound 128
+        %ids:2 = affine.delinearize_index %tidx into (4, 32) : index, index
+        // CHECK-NOT: scf.for
+        //     CHECK: gpu.barrier
+        scf.for %arg3 = %ids#0 to %c4 step %c4 {
+          %0 = affine.linearize_index [%ids#1, %c0] by (32, 2) : index
+          scf.for %arg4 = %0 to %c64 step %c64 {
+             gpu.barrier
+          }
+        }
+        // The loop loop doesn't always execute once so it cannot be removed.
+        //     CHECK: scf.for %{{.*}} = %{{.*}} to %[[C3]] step %{{.*}}
+        //     CHECK:   gpu.barrier
+        scf.for %arg3 = %ids#0 to %c3 step %c4 {
+          gpu.barrier
+        }
+        // ValueBoundsOpInterface will also work on an arith.muli
+        // CHECK-NOT: scf.for
+        //     CHECK: gpu.barrier
+        scf.for %arg3 = %ids#0 to %c4 step %c4 {
+          %0 = arith.muli %ids#1, %c2 : index
+          scf.for %arg4 = %0 to %c64 step %c64 {
+             gpu.barrier
+          }
+        }
+
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+// Test used as a proxy for a ValueBoundsOpInterface implementation
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [128, 1, 1]>
+// CHECK-LABEL: func.func @workgroup_id
+hal.executable private @workgroup_id {
+  hal.executable.variant @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @workgroup_id layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c8 = arith.constant 8 : index
+      hal.return %c8, %c8, %c8 : index, index, index
+    }
+    builtin.module {
+      func.func @workgroup_id() attributes {translation_info = #translation_info} {
+        %c0 = arith.constant 0 : index
+        %c8 = arith.constant 8 : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] upper_bound 8 : index
+        // CHECK-NOT: scf.for
+        //     CHECK: gpu.barrier
+        scf.for %arg3 = %workgroup_id_x to %c8 step %c8 {
+             gpu.barrier
+        }
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [128, 1, 1]>
+// CHECK-LABEL: func.func @argument_with_assume
+hal.executable private @argument_with_assume {
+  hal.executable.variant @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @workgroup_id layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @argument_with_assume() attributes {translation_info = #translation_info} {
+        %c0 = arith.constant 0 : index
+        %c8 = arith.constant 8 : index
+        %arg_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+        %arg_index = arith.index_cast %arg_i32 : i32 to index
+        %arg = util.assume.int %arg_index[<umin=0, umax=4>, <umin=4, umax=7>] : index
+        // CHECK-NOT: scf.for
+        //     CHECK: gpu.barrier
+        scf.for %arg3 = %arg to %c8 step %c8 {
+             gpu.barrier
+        }
+        return
+      }
+    }
+  }
+}

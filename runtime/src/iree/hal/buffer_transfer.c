@@ -78,7 +78,8 @@ static iree_status_t iree_hal_device_transfer_and_wait(
     };
     status = iree_hal_device_queue_execute(
         device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores, signal_semaphores,
-        command_buffer, iree_hal_buffer_binding_table_empty());
+        command_buffer, iree_hal_buffer_binding_table_empty(),
+        IREE_HAL_EXECUTE_FLAG_NONE);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(fence_semaphore, signal_value, timeout);
@@ -140,7 +141,7 @@ static iree_status_t iree_hal_device_transfer_mappable_range(
   iree_device_size_t adjusted_data_length = 0;
   if (iree_status_is_ok(status)) {
     // Adjust the data length based on the min we have.
-    if (data_length == IREE_WHOLE_BUFFER) {
+    if (data_length == IREE_HAL_WHOLE_BUFFER) {
       // Whole buffer copy requested - that could mean either, so take the min.
       adjusted_data_length = iree_min(source_mapping.contents.data_length,
                                       target_mapping.contents.data_length);

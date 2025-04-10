@@ -249,8 +249,8 @@ TEST_F(CommandBufferCopyBufferTest, CopySubBufferIndirect) {
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   const iree_hal_buffer_binding_t bindings[] = {
-      /*kHostBufferSlot=*/{host_buffer, 0, IREE_WHOLE_BUFFER},
-      /*kDeviceBufferSlot=*/{device_buffer, 0, IREE_WHOLE_BUFFER},
+      /*kHostBufferSlot=*/{host_buffer, 0, IREE_HAL_WHOLE_BUFFER},
+      /*kDeviceBufferSlot=*/{device_buffer, 0, IREE_HAL_WHOLE_BUFFER},
   };
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer,
                                             iree_hal_buffer_binding_table_t{

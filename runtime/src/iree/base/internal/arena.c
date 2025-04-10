@@ -41,6 +41,27 @@ void iree_arena_block_pool_deinitialize(iree_arena_block_pool_t* block_pool) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+iree_status_t iree_arena_block_pool_preallocate(
+    iree_arena_block_pool_t* block_pool, iree_host_size_t count) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
+
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    uint8_t* block_base = NULL;
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc_uninitialized(block_pool->block_allocator,
+                                                block_pool->total_block_size,
+                                                (void**)&block_base));
+    iree_arena_block_t* block =
+        iree_arena_block_trailer(block_pool, block_base);
+    iree_atomic_arena_block_slist_concat(&block_pool->available_slist, block,
+                                         block);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -125,6 +146,7 @@ void iree_arena_reset(iree_arena_allocator_t* arena) {
     } while (head);
     arena->allocation_head = NULL;
   }
+
   if (arena->block_head != NULL) {
 #if defined(IREE_SANITIZER_ADDRESS)
     iree_arena_block_t* block = arena->block_head;
@@ -140,6 +162,10 @@ void iree_arena_reset(iree_arena_allocator_t* arena) {
     arena->block_head = NULL;
     arena->block_tail = NULL;
   }
+
+  arena->total_allocation_size = 0;
+  arena->used_allocation_size = 0;
+  arena->block_bytes_remaining = 0;
 
   IREE_TRACE_ZONE_END(z0);
 }

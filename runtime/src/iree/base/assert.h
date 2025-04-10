@@ -57,7 +57,7 @@ IREE_ATTRIBUTE_NORETURN static inline void iree_abort(void) { abort(); }
 
 // Assertions enabled:
 
-#define IREE_ASSERT(condition, ...) assert(condition)
+#define IREE_ASSERT(condition, ...) assert(IREE_UNLIKELY(condition))
 
 // TODO(#2843): better logging of status assertions.
 // #define IREE_ASSERT_OK(status) IREE_ASSERT(iree_status_is_ok(status))

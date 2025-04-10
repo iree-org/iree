@@ -84,6 +84,7 @@ Workflow file | Build status | Event triggers
  | |
 [`ci_linux_arm64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_arm64_clang.yml) | [![CI - Linux arm64 clang](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_arm64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
 [`ci_macos_x64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_x64_clang.yml) | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_x64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_macos_arm64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_macos_arm64_clang.yml) | [![CI - macOS x64 clang](https://github.com/iree-org/iree/actions/workflows/ci_macos_arm64_clang.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_macos_arm64_clang.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
 [`ci_windows_x64_msvc.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_windows_x64_msvc.yml) | [![CI - Windows x64 MSVC](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_windows_x64_msvc.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
  | |
 [`ci_linux_x64_clang_byollvm.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_byollvm.yml) | [![CI - Linux x64 clang_byollvm](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
@@ -118,6 +119,13 @@ graph LR
 * Test workflows can install other packages (e.g. `tensorflow`, `torch`) and
   fetch from model repositories like
   [Hugging Face](https://huggingface.co/models) as needed to run test suites.
+
+!!! Tip
+
+    PkgCI workflows can be triggered directly to skip the 5-10 minute build
+    "build packages" job when testing workflows. See the
+    [faster iteration on PkgCI workflows](#faster-iteration-on-pkgci-workflows)
+    section below for details.
 
 Workflow file | Build status | Event triggers
 -- | --: | --
@@ -306,6 +314,26 @@ We group runners into categories:
     in touch with us on one of our
     [communication channels](../../index.md#communication-channels) and we'd be
     happy to discuss the options available.
+
+### Faster iteration on PkgCI workflows
+
+Each pkgci workflow can be triggered directly with `workflow_dispatch` to
+run tests using a previous run of the build_packages job.
+
+1. Find the `artifact_run_id` from a prior run to use packages from. You can
+   go through the history at
+   <https://github.com/iree-org/iree/actions/workflows/pkgci.yml> for this. For
+   example, <https://github.com/iree-org/iree/actions/runs/13723791082> has
+   run id `13723791082`.
+2. Choose which workflow you want to run and navigate to its control page on
+   <https://github.com/iree-org/iree/actions>, like
+   <https://github.com/iree-org/iree/actions/workflows/pkgci_unit_test.yml>
+   for
+   [`pkgci_unit_test.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/pkgci_unit_test.yml).
+3. Run the workflow using the `workflow_dispatch` trigger, selecting the branch
+   you want to test and providing the `artifact_run_id` from step 1:
+
+    ![ci-extra](./pkgci-workflow-dispatch.png)
 
 ## :material-book-open-outline: Maintenance tips
 

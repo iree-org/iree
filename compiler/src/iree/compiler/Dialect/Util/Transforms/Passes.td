@@ -66,6 +66,12 @@ def OptimizeIntArithmeticPass : Pass<"iree-util-optimize-int-arithmetic", ""> {
     "::mlir::arith::ArithDialect",
     "::mlir::iree_compiler::IREE::Util::UtilDialect"
   ];
+  let options = [
+    Option<"narrowToI32", "narrow-to-i32", "bool",
+      /*default=*/"false",
+      "Flag indicating if computations that can be performed with 32 bits should be."
+      " Mainly used for GPU code generation to not waste registers.">
+  ];
 }
 
 def PropagateSubrangesPass : Pass<"iree-util-propagate-subranges", "mlir::ModuleOp"> {
@@ -176,7 +182,10 @@ def TestConversionPass : Pass<"iree-util-test-conversion", "mlir::ModuleOp"> {
   let options = [
     Option<"widenIntegers", "widen-integers",
       "bool", /*default=*/"false",
-      "Tests type conversion by widening integers to i32">
+      "Tests type conversion by widening integers to i32.">,
+    Option<"structuralConversion", "structural-conversion",
+      "bool", /*default=*/"true",
+      "Tests generic structural conversion ops.">
   ];
 }
 

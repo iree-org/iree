@@ -130,9 +130,7 @@ iree_cc_library(
     ::numpy_io
     iree::base
     iree::hal
-    iree::io::stdio_stream
     iree::io::stream
-    iree::io::vec_stream
     iree::modules::hal
     iree::vm
   PUBLIC
@@ -147,7 +145,7 @@ iree_cc_test(
     ::function_io
     iree::base
     iree::hal
-    iree::io::vec_stream
+    iree::io::stream
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
@@ -208,8 +206,7 @@ iree_cc_test(
   DEPS
     ::device_util
     ::numpy_io
-    iree::io::memory_stream
-    iree::io::vec_stream
+    iree::io::stream
     iree::testing::gtest
     iree::testing::gtest_main
     iree::tooling::testdata::npy
@@ -256,7 +253,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::flags
     iree::hal
-    iree::io::stdio_stream
+    iree::io::stream
     iree::modules::hal::types
     iree::vm
     iree::vm::bytecode::module

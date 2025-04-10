@@ -17,12 +17,20 @@
 
 #define IREE_SET_BINARY_MODE(handle) _setmode(_fileno(handle), O_BINARY)
 
+#define iree_dup _dup
+#define iree_close _close
+
 #define iree_fseek _fseeki64
 #define iree_ftell _ftelli64
 
 #else
 
+#include <unistd.h>
+
 #define IREE_SET_BINARY_MODE(handle) ((void)0)
+
+#define iree_dup dup
+#define iree_close close
 
 #if _FILE_OFFSET_BITS == 64 || _POSIX_C_SOURCE >= 200112L
 #define iree_fseek fseeko
@@ -91,6 +99,52 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_wrap(
 }
 
 #if IREE_FILE_IO_ENABLE
+
+// Populates the |out_fopen_mode| string for use with fopen-like calls based on
+// the iree_io_stdio_stream_mode_t bitmap.
+//
+// NOTE: not all implementations support all mode flags and this may have
+// different behavior. We should paper over it here but don't today given the
+// limited usage of this and our intent to rewrite it all using
+// platform-optimal APIs instead of stdio.
+static void iree_io_map_stdio_fopen_mode(iree_io_stdio_stream_mode_t stdio_mode,
+                                         char out_fopen_mode[16]) {
+  memset(out_fopen_mode, 0, 16);
+
+  if (iree_all_bits_set(stdio_mode, IREE_IO_STDIO_STREAM_MODE_READ |
+                                        IREE_IO_STDIO_STREAM_MODE_WRITE |
+                                        IREE_IO_STDIO_STREAM_MODE_APPEND)) {
+    strcat(out_fopen_mode, "a+");
+  } else if (iree_all_bits_set(stdio_mode,
+                               IREE_IO_STDIO_STREAM_MODE_READ |
+                                   IREE_IO_STDIO_STREAM_MODE_WRITE |
+                                   IREE_IO_STDIO_STREAM_MODE_DISCARD)) {
+    strcat(out_fopen_mode, "w+");
+  } else if (iree_all_bits_set(stdio_mode,
+                               IREE_IO_STDIO_STREAM_MODE_READ |
+                                   IREE_IO_STDIO_STREAM_MODE_WRITE)) {
+    strcat(out_fopen_mode, "r+");
+  } else if (iree_all_bits_set(stdio_mode,
+                               IREE_IO_STDIO_STREAM_MODE_WRITE |
+                                   IREE_IO_STDIO_STREAM_MODE_APPEND)) {
+    strcat(out_fopen_mode, "a");
+  } else if (iree_all_bits_set(stdio_mode, IREE_IO_STDIO_STREAM_MODE_WRITE)) {
+    strcat(out_fopen_mode, "w");
+  } else if (iree_all_bits_set(stdio_mode, IREE_IO_STDIO_STREAM_MODE_READ)) {
+    strcat(out_fopen_mode, "r");
+  }
+  if (iree_all_bits_set(stdio_mode, IREE_IO_STDIO_STREAM_MODE_WRITE) &&
+      !iree_all_bits_set(stdio_mode, IREE_IO_STDIO_STREAM_MODE_DISCARD)) {
+    // If writable and not discard then the file must not exist.
+    // TODO(benvanik): actually observe this; the C11 spec says `x` is supported
+    // but at least on MSVC's CRT it isn't. We can emulate this with stat and
+    // such but today we don't have any uses that require it.
+    // strcat(out_fopen_mode, "x");
+  }
+  // Force binary mode (avoid Windows CRLF expansion).
+  strcat(out_fopen_mode, "b");
+}
+
 IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
     iree_io_stdio_stream_mode_t mode, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_io_stream_t** out_stream) {
@@ -107,40 +161,8 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
     stream_mode |= IREE_IO_STREAM_MODE_WRITABLE;
   }
 
-  // NOTE: not all implementations support all mode flags and this may have
-  // different behavior. We should paper over it here but don't today given the
-  // limited usage of this and our intent to rewrite it all using
-  // platform-optimal APIs instead of stdio.
   char fopen_mode[16] = {0};
-  if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_READ |
-                                  IREE_IO_STDIO_STREAM_MODE_WRITE |
-                                  IREE_IO_STDIO_STREAM_MODE_APPEND)) {
-    strcat(fopen_mode, "a+");
-  } else if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_READ |
-                                         IREE_IO_STDIO_STREAM_MODE_WRITE |
-                                         IREE_IO_STDIO_STREAM_MODE_DISCARD)) {
-    strcat(fopen_mode, "w+");
-  } else if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_READ |
-                                         IREE_IO_STDIO_STREAM_MODE_WRITE)) {
-    strcat(fopen_mode, "r+");
-  } else if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_WRITE |
-                                         IREE_IO_STDIO_STREAM_MODE_APPEND)) {
-    strcat(fopen_mode, "a");
-  } else if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_WRITE)) {
-    strcat(fopen_mode, "w");
-  } else if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_READ)) {
-    strcat(fopen_mode, "r");
-  }
-  if (iree_all_bits_set(stream_mode, IREE_IO_STREAM_MODE_WRITABLE) &&
-      !iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_DISCARD)) {
-    // If writable and not discard then the file must not exist.
-    // TODO(benvanik): actually observe this; the C11 spec says `x` is supported
-    // but at least on MSVC's CRT it isn't. We can emulate this with stat and
-    // such but today we don't have any uses that require it.
-    // strcat(fopen_mode, "x");
-  }
-  // Force binary mode (avoid Windows CRLF expansion).
-  strcat(fopen_mode, "b");
+  iree_io_map_stdio_fopen_mode(mode, fopen_mode);
 
   // Since we stack alloc the path we want to keep it reasonable.
   // We could heap allocate instead but a few thousand chars is quite long and
@@ -188,7 +210,70 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open_fd(
+    iree_io_stdio_stream_mode_t mode, int fd, iree_allocator_t host_allocator,
+    iree_io_stream_t** out_stream) {
+  IREE_ASSERT_ARGUMENT(out_stream);
+  *out_stream = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Duplicate the file descriptor so that we have our own copy of the seek
+  // position. The initial position will be preserved.
+  int dup_fd = iree_dup(fd);
+  if (dup_fd == -1) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_stdio_status(
+        "unable to duplicate file descriptor; possibly out of file descriptors "
+        "(see ulimit)");
+  }
+
+  iree_io_stream_mode_t stream_mode = IREE_IO_STREAM_MODE_SEEKABLE;
+  if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_READ)) {
+    stream_mode |= IREE_IO_STREAM_MODE_READABLE;
+  }
+  if (iree_all_bits_set(mode, IREE_IO_STDIO_STREAM_MODE_WRITE)) {
+    stream_mode |= IREE_IO_STREAM_MODE_WRITABLE;
+  }
+
+  char fopen_mode[16] = {0};
+  iree_io_map_stdio_fopen_mode(mode, fopen_mode);
+
+  // NOTE: after this point the file handle is associated with dup_fd and
+  // anything we do to it (like closing) will apply to the dup_fd.
+  iree_status_t status = iree_ok_status();
+  FILE* handle = fdopen(dup_fd, fopen_mode);
+  if (handle == NULL) {
+    status = iree_make_stdio_statusf(
+        "unable to open file descriptor with mode %d", mode);
+  }
+
+  // Ownership of the handle (and the dup_fd backing it) is transferred.
+  iree_io_stream_t* stream = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_io_stdio_stream_wrap(
+        stream_mode, handle, /*owns_handle=*/true, host_allocator, &stream);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_stream = stream;
+  } else {
+    if (stream) {
+      // NOTE: closes the file handle/dup_fd.
+      iree_io_stream_release(stream);
+    } else if (handle) {
+      // NOTE: closes the dup_fd.
+      fclose(handle);
+    } else if (dup_fd > 0) {
+      iree_close(dup_fd);
+    }
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 #else
+
 IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
     iree_io_stdio_stream_mode_t mode, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_io_stream_t** out_stream) {
@@ -196,6 +281,15 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
                           "file support has been compiled out of this binary; "
                           "set IREE_FILE_IO_ENABLE=1 to include it");
 }
+
+IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open_fd(
+    iree_io_stdio_stream_mode_t mode, int fd, iree_allocator_t host_allocator,
+    iree_io_stream_t** out_stream) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file support has been compiled out of this binary; "
+                          "set IREE_FILE_IO_ENABLE=1 to include it");
+}
+
 #endif  // IREE_FILE_IO_ENABLE
 
 static void iree_io_stdio_stream_destroy(
@@ -297,16 +391,16 @@ static iree_status_t iree_io_stdio_stream_read(
   // reads in one go anyway.
   iree_host_size_t bytes_read = 0;
   while (bytes_read < buffer_capacity) {
-    iree_host_size_t chunk_size =
+    const iree_host_size_t chunk_size =
         iree_min(buffer_capacity - bytes_read, INT_MAX);
-    iree_host_size_t read_size =
+    const iree_host_size_t read_size =
         fread((uint8_t*)buffer + bytes_read, 1, chunk_size, stream->handle);
     if (read_size != chunk_size) {
       // Failed to read chunk - may have reached EOF.
       if (feof(stream->handle)) {
         if (out_buffer_length) {
           // Ok to hit EOF; just return what's valid.
-          *out_buffer_length = bytes_read + read_size;
+          bytes_read += read_size;
         } else {
           status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                                     "end-of-file encountered during read");
@@ -319,6 +413,9 @@ static iree_status_t iree_io_stdio_stream_read(
     bytes_read += read_size;
   }
 
+  if (out_buffer_length) {
+    *out_buffer_length = bytes_read;
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

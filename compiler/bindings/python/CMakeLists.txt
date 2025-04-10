@@ -176,6 +176,7 @@ declare_mlir_python_sources(IREECompilerPythonExtensions)
 declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
   MODULE_NAME _site_initialize_0
   ADD_TO_PARENT IREECompilerPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREECompilerRegistration.cpp
   EMBED_CAPI_LINK_LIBS
@@ -187,6 +188,7 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
 declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects
   MODULE_NAME _ireeCompilerDialects
   ADD_TO_PARENT IREECompilerPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREECompilerDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
@@ -208,6 +210,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Core
 
   # Core dialects.
+  MLIRPythonSources.Dialects.affine
   MLIRPythonSources.Dialects.amdgpu
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
@@ -230,6 +233,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.extras
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
+  MLIRPythonSources.Dialects.vector_transform
 
   # iree-dialects project.
   IREEDialectsPythonSources
@@ -376,8 +380,7 @@ endforeach()
 add_custom_command(
   OUTPUT ${_dylib_target_files}
   DEPENDS ${_dylib_src_files}
-  POST_BUILD
-    ${_dylib_copy_commands}
+  COMMAND ${_dylib_copy_commands}
 )
 
 add_custom_target(IREECompilerPythonDylibFiles

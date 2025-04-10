@@ -26,6 +26,10 @@ include "mlir/Pass/PassBase.td"
 def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
+  let options = [
+    Option<"enableBubbleUpExpandShapesAcrossReductionOps", "enable-bubble-up-expand-shapes-across-reduction-ops", "bool",
+           /*default=*/"false", "Enables propagation of 'expand_shape's through 'linalg.generic's with reductions">
+  ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
   ];
@@ -65,9 +69,47 @@ def FoldUnitExtentDimsPass :
   ];
 }
 
+def FoldUnitExtentDimsForFuncPass :
+    Pass<"iree-dispatch-creation-fold-unit-extent-dims-for-func", ""> {
+  let summary = "Fold unit extent dimension of operations on a function.";
+  let description = [{
+    Imports upstream patterns to fold unit extent dims but with IREE control.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def FuseHorizontalContractionsPass:
     InterfacePass<"iree-dispatch-creation-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
-  let summary = "Fuses horizontal contraction ops without fusions";
+  let summary = "Fuses horizontal contraction ops";
+  let description = [{
+    For cases where multiple contractions
+    - that dont have a direct dependence
+    - that have the same LHS operand
+    - all the N dimensions of the RHS operands used are the same
+    Such contractions can be executed as a single contraction, i.e.
+
+    A = matmul(lhs, rhs0);
+    B = matmul(lhs, rhs1);
+    C = matmul(lhs, rhs2);
+
+    can be combined into
+    result = matmul(lhs, concat_along_N(rhs0, rhs1, rhs2));
+    A = slice0(result)
+    B = slice1(result)
+    C = slice2(result)
+
+    Instead of doing an actual concat of the RHS operands,
+    and extracting slices of the result, the pass generates a single
+    operation with
+    - the lhs operands
+    - all the rhs operands
+    - multiple results representing the individual matmuls
+  }];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "mlir::tensor::TensorDialect",
@@ -169,6 +211,11 @@ def CloneProducersIntoDispatchRegionsPass :
     regions but defined in the above. This prepares the dispatch regions for
     converting to dispatch workgroups with explicit captures.
   }];
+  let options = [
+    Option<"aggressive", "aggressive", "bool",
+    /*default=*/"false",
+    "Include operations that are cloned only under aggressive fusion mode">,
+  ];
 }
 
 def CollapseDimensionsPass :
@@ -258,6 +305,19 @@ def SetEncodingPass :
   let options = [
     Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
            "provides padding size hints that will be attached to encodings.">,
+  ];
+}
+
+def ConvertEncodingToFlowPass :
+    InterfacePass<"iree-dispatch-creation-convert-encoding-to-flow", "mlir::FunctionOpInterface"> {
+  let summary = "Convert top-level Encoding ops to Flow ops.";
+  let description = [{
+    Pass to convert top-level Encoding ops to Flow ops, which only converts the
+    Encoding ops outside flow.dispatch.region to Flow.
+  }];
+  let dependentDialects = [
+    "IREE::Encoding::IREEEncodingDialect",
+    "IREE::Flow::FlowDialect",
   ];
 }
 

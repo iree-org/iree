@@ -21,6 +21,7 @@ iree_cc_library(
     "EncodingInterfaces.h.inc"
     "EncodingOps.h"
     "EncodingOps.h.inc"
+    "EncodingTypeInterfaces.h.inc"
     "EncodingTypes.h"
     "EncodingTypes.h.inc"
   SRCS
@@ -32,6 +33,8 @@ iree_cc_library(
     "EncodingInterfaces.cpp.inc"
     "EncodingOps.cpp"
     "EncodingOps.cpp.inc"
+    "EncodingTypeInterfaces.cpp.inc"
+    "EncodingTypes.cpp"
     "EncodingTypes.cpp.inc"
   DEPS
     ::EncodingEnumsGen
@@ -39,28 +42,14 @@ iree_cc_library(
     ::EncodingOpsIncGen
     ::EncodingTypesGen
     LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineUtils
     MLIRArithDialect
-    MLIRArithUtils
-    MLIRControlFlowInterfaces
-    MLIRDestinationStyleOpInterface
-    MLIRFuncDialect
-    MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
     MLIRLinalgUtils
-    MLIRMathDialect
-    MLIRMemRefDialect
-    MLIRPass
-    MLIRSCFDialect
-    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
-    MLIRTilingInterface
-    MLIRViewLikeInterface
   PUBLIC
 )
 
@@ -94,6 +83,8 @@ iree_tablegen_library(
   OUTS
     --gen-attr-interface-decls EncodingInterfaces.h.inc
     --gen-attr-interface-defs EncodingInterfaces.cpp.inc
+    --gen-type-interface-decls EncodingTypeInterfaces.h.inc
+    --gen-type-interface-defs EncodingTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

@@ -38,6 +38,8 @@ bool operator==(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs);
 bool operator!=(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const MaterializeEncodingInfo &encodingInfo);
 
 //===----------------------------------------------------------------------===//
 // Layout Utilities.
@@ -72,7 +74,7 @@ struct TileMxNxK {
   int64_t K = 1;
 };
 
-MaterializeEncodingInfo
+FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
 
 } // namespace mlir::iree_compiler::IREE::Codegen

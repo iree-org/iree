@@ -1,14 +1,14 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
 // RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse.mlir \
-// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
 // RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse.mlir \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
-// RUN:   --iree-codegen-notify-transform-strategy-application \
+// RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
 // Make sure we can apply the lowering strategy from the specified tuning spec.

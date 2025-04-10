@@ -281,8 +281,8 @@ void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
 template <typename OpTy>
 class MemRefConversionPattern : public OpConversionPattern<OpTy> {
 public:
-  MemRefConversionPattern<OpTy>(MLIRContext *context,
-                                const MemRefUsageAnalysis &memrefUsageAnalysis)
+  MemRefConversionPattern(MLIRContext *context,
+                          const MemRefUsageAnalysis &memrefUsageAnalysis)
       : OpConversionPattern<OpTy>::OpConversionPattern(context),
         memrefUsageAnalysis(memrefUsageAnalysis) {}
 
@@ -475,8 +475,8 @@ public:
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
     if (*vectorMemrefElemSize == *writeVecSize) {
-      Value data = rewriter.create<vector::BitCastOp>(loc, memrefVectorType,
-                                                      adaptor.getVector());
+      Value data = rewriter.create<vector::BitCastOp>(
+          loc, memrefVectorType, adaptor.getValueToStore());
       rewriter.replaceOpWithNewOp<memref::StoreOp>(
           write, data, adaptor.getSource(), indices.value());
       return success();
@@ -506,7 +506,7 @@ public:
     for (int i = 0; i < vectorCount; ++i) {
       offsets.back() = i * memrefVectorType.getNumElements();
       auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
-          loc, adaptor.getVector(), offsets, sizes, strides);
+          loc, adaptor.getValueToStore(), offsets, sizes, strides);
       auto component =
           rewriter.create<vector::BitCastOp>(loc, memrefVectorType, slice);
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
@@ -767,7 +767,7 @@ static Value predicateMaybeMaskedScalarTransfer(
 }
 
 /// Scalarizes remaining vector transfer that couldn't be converted to
-/// vevtor load operations.
+/// vector load operations.
 
 /// This is very specific to SPIR-V as pointer cannot be casted to vector type
 /// if any of the memory access is not vector.
@@ -1000,11 +1000,11 @@ struct ReifyExtractOfCreateMask final
     for (auto [idx, size] :
          llvm::zip_equal(extractOp.getMixedPosition(), maskOp.getOperands())) {
       Value idxVal;
-      if (idx.is<Attribute>()) {
+      if (auto attr = dyn_cast<Attribute>(idx)) {
         idxVal = rewriter.create<arith::ConstantIndexOp>(
-            loc, cast<IntegerAttr>(idx.get<Attribute>()).getInt());
+            loc, dyn_cast<IntegerAttr>(attr).getInt());
       } else {
-        idxVal = idx.get<Value>();
+        idxVal = dyn_cast<Value>(idx);
       }
       Value cmpIdx = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::slt, idxVal, size);

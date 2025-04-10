@@ -16,10 +16,12 @@
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
@@ -143,7 +145,7 @@ public:
   explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
       : defaultOptions_(std::move(options)) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "llvm-cpu"; }
+  std::string getLegacyDefaultDeviceID() const override { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
@@ -170,6 +172,9 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     target.storeToConfigAttrs(context, configItems);
+    configItems.emplace_back(
+        b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
+        IREE::CPU::CPUEncodingLayoutAttr::get(context, {}));
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;
@@ -489,7 +494,7 @@ public:
 
     // Specialize the module to our target machine.
     llvmModule->setDataLayout(targetMachine->createDataLayout());
-    llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
+    llvmModule->setTargetTriple(targetMachine->getTargetTriple());
 
     // Dump just the codegen bitcode before linking and optimization.
     if (!options.dumpIntermediatesPath.empty()) {
@@ -839,19 +844,6 @@ private:
 struct LLVMCPUSession
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    // TODO(multi-device): move local device registration out.
-    // This exists here for backwards compat with the old
-    // iree-hal-target-backends flag that needs to look up the device by backend
-    // name.
-    // #hal.device.target<"llvm-cpu", ...
-    targets.add("llvm-cpu", [=]() {
-      LocalDevice::Options localDeviceOptions;
-      localDeviceOptions.defaultTargetBackends.push_back("llvm-cpu");
-      localDeviceOptions.defaultHostBackends.push_back("llvm-cpu");
-      return std::make_shared<LocalDevice>(localDeviceOptions);
-    });
-  }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"llvm-cpu", ...
     targets.add("llvm-cpu", [=]() {

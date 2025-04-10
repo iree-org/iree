@@ -96,10 +96,8 @@ using GetMinMaxExprFn =
         SmallVectorImpl<Value> &symbols)>;
 
 /// Insert pattern to remove single iteration loop. The pattern will detect
-/// single iteration loops based on the range returned by the lambda
-/// |getMinMaxFn| for some know values.
-void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
-                                              GetMinMaxExprFn getMinMaxFn);
+/// single iteration loops based on the range returned ValueBoundsOpInterface.
+void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns);
 
 /// Populate patterns that fold tensor.expand/collapse_shape into the source
 /// hal.interface.binding.subspan.

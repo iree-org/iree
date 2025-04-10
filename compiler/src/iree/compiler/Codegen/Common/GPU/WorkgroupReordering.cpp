@@ -44,7 +44,8 @@ static std::pair<Value, Value> makeTransposedIds(Location loc, OpBuilder b,
 /// Returns the workgroup counts along the X and Y dimensions. These will be
 /// constants when static in the corresponding `hal.executable.export` op.
 static std::pair<Value, Value>
-getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
+getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp,
+                     std::optional<APInt> xBound, std::optional<APInt> yBound) {
   Location loc = funcOp.getLoc();
   SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
   bool isStaticWgCount = llvm::none_of(workgroupCounts, ShapedType::isDynamic);
@@ -62,9 +63,9 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
 
   LLVM_DEBUG(llvm::dbgs() << "Using dynamic workgroup counts\n");
   Value dynamicCountX =
-      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 0);
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 0, xBound);
   Value dynamicCountY =
-      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 1);
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 1, yBound);
   return {dynamicCountX, dynamicCountY};
 }
 
@@ -100,11 +101,12 @@ reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   // that to RAUW the old ones. This way we don't have to worry about the
   // picking the exact insertion points that do not violate dominance between
   // their defs and users.
-  Value workgroupIdX =
-      builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 0);
-  Value workgroupIdY =
-      builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
-  auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
+  Value workgroupIdX = builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(
+      funcOp.getLoc(), 0, oldXId.getUpperBound());
+  Value workgroupIdY = builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(
+      funcOp.getLoc(), 1, oldYId.getUpperBound());
+  auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(
+      builder, funcOp, oldXId.getUpperBound(), oldYId.getUpperBound());
   Value newWorkgroupIdX;
   Value newWorkgroupIdY;
   assert(strategy == ReorderWorkgroupsStrategy::Transpose &&

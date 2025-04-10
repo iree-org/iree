@@ -48,14 +48,14 @@ static Status SyncSimulatedHostOpI32(iree_hal_buffer_t* source_buffer,
   if (status.ok()) {
     status = iree_hal_buffer_map_range(
         source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-        IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &source_mapping);
+        IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_HAL_WHOLE_BUFFER, &source_mapping);
   }
   iree_hal_buffer_mapping_t target_mapping = {{0}};
   if (status.ok()) {
     status =
         iree_hal_buffer_map_range(target_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
                                   IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0,
-                                  IREE_WHOLE_BUFFER, &target_mapping);
+                                  IREE_HAL_WHOLE_BUFFER, &target_mapping);
   }
 
   // Sad slow host work. Whenever possible it's worth it to move these into the
@@ -232,7 +232,8 @@ class CustomModuleState final {
         iree_hal_fence_semaphore_list(wait_fence.get()),
         iree_hal_fence_semaphore_list(alloca_fence.get()),
         IREE_HAL_ALLOCATOR_POOL_DEFAULT, buffer_params,
-        iree_hal_buffer_view_byte_length(arg_view.get()), &result_buffer));
+        iree_hal_buffer_view_byte_length(arg_view.get()),
+        IREE_HAL_ALLOCA_FLAG_NONE, &result_buffer));
 
     // Wrap the buffer in a buffer view that provides the metadata for
     // runtime verification.

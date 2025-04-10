@@ -30,6 +30,8 @@ IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 # needed, but some of the deps are too large to enable by default for all
 # developers.
 IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-ON}"
+# Enable building the `iree-test-deps` target.
+IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -73,9 +75,11 @@ echo "Building 'install'"
 echo "------------------"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
 
-echo "Building test deps"
-echo "------------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+if (( IREE_BUILD_TEST_DEPS == 1 )); then
+  echo "Building test deps"
+  echo "------------------"
+  "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+fi
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats

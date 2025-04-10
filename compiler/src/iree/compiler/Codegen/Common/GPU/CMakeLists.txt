@@ -48,12 +48,14 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AMDGPUDistributeContract.cpp"
+    "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCombineValueBarriers.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
+    "GPUDistributeCopyUsingForall.cpp"
     "GPUDistributeForall.cpp"
     "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
@@ -70,7 +72,6 @@ iree_cc_library(
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
-    "GPUPropagateDispatchSizeBounds.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUReuseSharedMemoryAllocs.cpp"
     "GPUTensorAlloc.cpp"
@@ -141,6 +142,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Utils
   PUBLIC
 )

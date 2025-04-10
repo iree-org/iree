@@ -64,6 +64,7 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
@@ -210,6 +211,11 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               OpFoldResult byteOffset,
                                               Type elementType);
 
+/// Clone an operation and drop all encodings.
+Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                  ValueRange convertedInputOperands,
+                                  ValueRange convertedOutputOperands);
+
 /// Check if a linalg.generic is representing an argmax operation.
 LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
 
@@ -251,6 +257,37 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
                  IREE::Flow::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
+
+//===----------------------------------------------------------------------===//
+// Utility functions for vector size inference for dynamic shapes
+//===----------------------------------------------------------------------===//
+
+struct VectorizationTileSizes {
+  SmallVector<int64_t> destShape;
+  SmallVector<int64_t> vectorSizes;
+  SmallVector<bool> vectorScalableFlags;
+};
+
+/// Returns a VectorizationTileSizes which contains the inferred bounded result
+/// shape and vector input sizes. This is useful to infer the sizes from a
+/// chain.
+std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
+
+/// Returns the result sizes and vector input sizes of the linalg.unpack op. The
+/// inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op);
+
+/// Returns the result sizes and vector input sizes of the linalg.pack op. The
+/// inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
+
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis. If
+/// `opResult` is provided, it stores the bounded result shapes to destShape.
+/// Returns std::nullopt if vector sizes can't be inferred.
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
 
 } // namespace mlir::iree_compiler
 

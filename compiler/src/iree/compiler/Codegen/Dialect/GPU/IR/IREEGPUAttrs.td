@@ -115,11 +115,16 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
 }
 
 //===----------------------------------------------------------------------===//
-// Base MMA vector layout
+// MMA intrinsic
 //===----------------------------------------------------------------------===//
 
-class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
-    AttrDef<IREEGPU_Dialect, attrname, [
+class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
+  : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
+
+def IREEGPU_MMAIntrinsicAttr
+  : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;
+
+def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
     "getABCVectorTypes",
@@ -130,9 +135,10 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "populateOperandOffsetsSizesStrides",
   ]>
 ]> {
+  let mnemonic = "mma_layout";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
-  string baseDescription = [{
+  let description = [{
     Attribute describing a particular shape of matrix-multiply and accumulate
     instruction. Abstractly, all attributes of this type represent the following
     unit of arithmetic for matrices A, B, and C.
@@ -141,55 +147,25 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
       C += A x B
     ```
 
-    Where the shape of matrix `A` is `[m, k]`, `B` is `[k, n]`, and
-    `C` is `[m, n]`. This intentionally leaves the layout information abstract
-    and uses interface methods to materialize layout information only when
-    needed. The shape of the mma intrinsic is stored explicitly here as that
-    information is queried frequently.
+    The |intrinsic| field specifies which particular MMA intrinsic this refers
+    to, with each intrinsic implicating a specific MNK shape and operand types.
+    See IREEGPUEnums.td for the definition of the intrinsics.
 
-    The element types for this particular mma intrinsic are |aType|, |bType|,
-    and |cType| for matrices `A`, `B`, and `C` respectively.
+    If set to true, |col_major| indicates that the result should be produced
+    column major. This is equivalent to instead computing:
 
-    ######
-
+    ```
+      C^T += B^T x A^T
+    ```
   }];
 
-
   let parameters = (ins
-    mmaintrinsic:$intrinsic,
-    "int64_t":$mSize,
-    "int64_t":$nSize,
-    "int64_t":$kSize,
-    "::mlir::Type":$aType,
-    "::mlir::Type":$bType,
-    "::mlir::Type":$cType
+    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"bool", "false">:$col_major
   );
-}
 
-//===----------------------------------------------------------------------===//
-// MMA intrinsic
-//===----------------------------------------------------------------------===//
+  let assemblyFormat = "`<` $intrinsic (`,` `col_major` `=` $col_major^)? `>`";
 
-class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
-  : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
-
-def IREEGPU_MMAIntrinsicAttr
-  : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;
-
-def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
-  let mnemonic = "mma_layout";
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  let description = !strconcat(baseDescription, [{
-    This mma variant describes configurations for MMA ops. The |intrinsic|
-    field specifies which particular MMA intrinsic this refers to, with each
-    intrinsic implicating a specific MNK shape and operand types.
-    See IREEGPUEnums.td for the definition of the intrinsics.
-  }]);
-
-  let hasCustomAssemblyFormat = 1;
-
-  let skipDefaultBuilders = 1;
   let builders = [
     AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
   ];
@@ -231,12 +207,12 @@ def IREEGPU_DataTiledMMAAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, on the same thread.">:$unroll_m,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, distributed across this many more threads.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, on the same thread.">:$unroll_n,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, distributed across this many more threads.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Unrolling along the K dimension, on the same thread, with interleaved layout.">:$unroll_k
+    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
   );
 }
 
@@ -260,7 +236,7 @@ def IREEGPU_VirtualMMAAttr :
 
   let description = [{
     This mma variant represents "virtual" MMA ops that has modification to
-    its native layouts by unrollK and/or interleave reads. The |intrinsic|
+    its native layouts by intrinsicsK and/or interleave reads. The |intrinsic|
     field represents different kinds of "Virtual" MMA Ops we found helpful.
 
     These interleaving and/or unrolling changes in the layout is especially
@@ -269,12 +245,9 @@ def IREEGPU_VirtualMMAAttr :
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
-  let builders = [
-    AttrBuilder<(ins "VirtualMMAIntrinsic":$intrinsic)>
-  ];
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr":$intrinsic
+    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic
   );
 
   let extraClassDeclaration = [{
@@ -282,8 +255,8 @@ def IREEGPU_VirtualMMAAttr :
 
     // Factor to unroll K from native MMA/intrinsic size to virtual size.
     // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
-    // in this example, unrollK = 32/16 = 2.
-    int64_t getUnrollK() const;
+    // in this example, intrinsicsK = 32/16 = 2.
+    int64_t getIntrinsicsK() const;
   }];
 }
 
@@ -334,9 +307,35 @@ def IREEGPU_GPUEncodingLayoutAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    OptionalParameter<"::mlir::iree_compiler::IREE::GPU::TargetAttr",
-     "IREE GPU target attribute. It is expected to be used in a pass scope, "
-     "but not the final IR output.">:$targetAttr
+    OptionalParameter<"DictionaryAttr", "Executable target configuration. It is "
+     "expected to be used in a pass scope, but not the final IR output.">:$configuration
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// iree_gpu.gpu_pad_layout
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
+  let mnemonic = "gpu_pad_layout";
+  let summary = "The padded encoding layout attribute for GPU targets.";
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let description = [{
+    Describes padding preferences for a given GPU target.
+    This attribute can implement any encoding interface for data-tiling,
+    e.g., Encoding::EncodingLayoutResolverAttrInterface, etc. They should be
+    implemented through external model mechanism because we do not want to
+    relocate domain-specific logic to the dialect implementation, and we can
+    have better code structure. See the implementation in
+    compiler/Codegen/ExternalInterfaces/*.
+  }];
+
+  let parameters = (ins
+    // Relevant target properties that will later allow us to decide the
+    // serialized pad layout.
+    OptionalParameter<"std::optional<uint32_t>">:$cache_line_bytes,
+    OptionalParameter<"std::optional<uint32_t>">:$cache_sets
   );
 }
 
@@ -416,6 +415,8 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
   let parameters = (ins
     "uint32_t":$wgp_count,
 
+    // An optional SKU identifier to distinguish different models.
+    OptionalParameter<"StringAttr">:$sku,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.
@@ -530,12 +531,13 @@ def IREEGPU_UKernelConfigAttr  :
   let summary = "An attribute specifying a ukernel that an op can lower to.";
   let description = [{
     An attribute that can be applied to any operation to specify that it has
-    been match with a ukernel that is a legal lowering for it.
+    been matched with a ukernel that is a legal lowering for it.
   }];
   let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
        "StringAttr":$name,
-       "DictionaryAttr":$def_attrs
+       "DictionaryAttr":$def_attrs,
+       DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_bytes
   );
 }
 

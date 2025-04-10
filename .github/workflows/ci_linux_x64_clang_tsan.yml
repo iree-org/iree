@@ -60,7 +60,7 @@ jobs:
           sccache --show-stats
 
       - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
+        uses: sarisia/actions-status-discord@5ddd3b114a98457dd80a39b2f00b6a998cd69008 # v1.15.3
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
