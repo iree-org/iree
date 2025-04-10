@@ -14,6 +14,7 @@ iree_lit_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "torch_to_iree.mlir"
+    "unstructured_linalg_ext.mlir"
   DATA
     "torch.pdl.mlir"
   TOOLS

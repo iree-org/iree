@@ -36,6 +36,7 @@ iree_cc_library(
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"
+    "RewriteFft.cpp"
     "SplitReduction.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
