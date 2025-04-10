@@ -105,6 +105,8 @@ typedef struct iree_hal_hip_semaphore_t {
   // has changed state.
   iree_notification_t state_notification;
 
+  iree_notification_t external_event_notification;
+
   iree_hal_hip_device_topology_t devices;
 
   iree_slim_mutex_t mutex;
@@ -155,6 +157,7 @@ iree_status_t iree_hal_hip_event_semaphore_create(
       sizeof(semaphore->event_queue.inline_storage),
       &semaphore->event_queue.tree);
   iree_notification_initialize(&semaphore->state_notification);
+  iree_notification_initialize(&semaphore->external_event_notification);
 
   iree_slim_mutex_initialize(&semaphore->mutex);
   semaphore->current_visible_value = initial_value;
@@ -177,6 +180,7 @@ static void iree_hal_hip_semaphore_destroy(
   iree_status_ignore(semaphore->failure_status);
   iree_slim_mutex_deinitialize(&semaphore->mutex);
 
+  iree_notification_deinitialize(&semaphore->external_event_notification);
   iree_notification_deinitialize(&semaphore->state_notification);
   for (iree_hal_hip_util_tree_node_t* i =
            iree_hal_hip_util_tree_first(&semaphore->event_queue.tree);
@@ -419,8 +423,12 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
   } while (true);
 
   iree_slim_mutex_lock(&semaphore->mutex);
-  semaphore->max_value_to_be_signaled = iree_max(
-      semaphore->max_value_to_be_signaled, semaphore->current_visible_value);
+  if (semaphore->max_value_to_be_signaled < semaphore->current_visible_value) {
+    semaphore->max_value_to_be_signaled = iree_max(
+        semaphore->max_value_to_be_signaled, semaphore->current_visible_value);
+    iree_notification_post(&semaphore->external_event_notification, IREE_ALL_WAITERS);
+  }
+
   iree_status_t status = iree_status_clone(semaphore->failure_status);
 
   iree_slim_mutex_unlock(&semaphore->mutex);
@@ -523,8 +531,8 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
         break;
     }
 
-    value = iree_max(semaphore->max_value_to_be_signaled,
-      iree_hal_hip_util_tree_node_get_key(node));
+    value = iree_max(value, iree_max(semaphore->max_value_to_be_signaled,
+      iree_hal_hip_util_tree_node_get_key(node)));
 
     iree_hal_hip_semaphore_work_item_t* next_work_item =
         queue_item->work_item;
@@ -546,8 +554,11 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
     }
   }
 
-  semaphore->max_value_to_be_signaled =
-      iree_max(semaphore->max_value_to_be_signaled, value);
+  if (value > semaphore->max_value_to_be_signaled) {
+    semaphore->max_value_to_be_signaled =
+        iree_max(semaphore->max_value_to_be_signaled, value);
+    iree_notification_post(&semaphore->external_event_notification, IREE_ALL_WAITERS);
+  }
   iree_slim_mutex_unlock(&semaphore->mutex);
 
   // Now that we have accumulated all of the work items, and we have
@@ -1111,6 +1122,17 @@ static iree_status_t iree_hal_hip_semaphore_export_timepoint(
   return status;
 }
 
+typedef struct iree_hal_hip_semaphore_external_timepoint_wait_data_t {
+  iree_hal_hip_semaphore_t* semaphore;
+  uint64_t value;
+} iree_hal_hip_semaphore_external_timepoint_wait_data_t;
+
+bool iree_hal_hip_semaphore_timepoint_already_exported(iree_hal_hip_semaphore_external_timepoint_wait_data_t* data) {
+  iree_slim_mutex_lock(&data->semaphore->mutex);
+  bool ret = data->semaphore->max_value_to_be_signaled >= data->value;
+  iree_slim_mutex_unlock(&data->semaphore->mutex);
+  return ret;
+}
 
 iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
   iree_hal_semaphore_t* base_semaphore, uint64_t value) {
@@ -1132,6 +1154,7 @@ iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
     }
     value_to_wait_for = iree_hal_hip_util_tree_node_get_key(i);
   }
+  bool do_wait = value_to_wait_for > semaphore->max_value_to_be_signaled;
   iree_slim_mutex_unlock(&semaphore->mutex);
   // TEMP: busy loop.
   // Basically if we have any exported timepoints, we want to block this
@@ -1139,7 +1162,19 @@ iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
   // once we return it is legal for any other operation to then submit
   // the exported event, which because of  hip ordering must occur
   // after the record.
-  while(value_to_wait_for > semaphore->max_value_to_be_signaled);
+  if (do_wait) {
+    IREE_TRACE_ZONE_BEGIN(z0);
+    iree_hal_hip_semaphore_external_timepoint_wait_data_t dat = {
+      .semaphore = semaphore,
+      .value = value_to_wait_for
+    };
+    iree_notification_await(
+      &semaphore->external_event_notification,
+      (iree_condition_fn_t)
+      iree_hal_hip_semaphore_timepoint_already_exported,
+        &dat, iree_infinite_timeout());
+    IREE_TRACE_ZONE_END(z0);
+  }
   return iree_ok_status();
 }
 
