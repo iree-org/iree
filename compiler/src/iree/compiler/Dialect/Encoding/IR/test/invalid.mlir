@@ -167,3 +167,19 @@ func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32,
   %0 = iree_encoding.unset_encoding %arg0: tensor<20x30xf32, #encoding> -> tensor<10x20xf32>
   return %0 : tensor<10x20xf32>
 }
+
+// -----
+
+// expected-error @+1 {{expected non-empty layouts}}
+#encoding = #iree_encoding.layout<[]>
+func.func @illegal_layout_encoding_without_any_layout(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+// expected-error @+1 {{expected all the layout attributes to implement SerializableEncodingAttrInterface}}
+#encoding = #iree_encoding.layout<[#iree_encoding.unknown_encoding]>
+func.func @illegal_layout_encoding_with_invalid_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}

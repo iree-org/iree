@@ -55,9 +55,16 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
                                       ValueRange dynamicDims);
 
 /// Returns a dictionary attribute that contains the materialized encoding info,
-/// i.e., serialized MaterializeEncodingInfo struct.
+/// i.e., serialized MaterializeEncodingInfo struct. The EncodingAttr attribute
+/// is attached to the dictionary, if it is present in `type` and
+/// `addEncodingAttr` is true.
+/// TODO(hanchung): only attach needed information to the configuration. The
+/// `addEncodingAttr` is mainly for VMVX ukernel path because the ukernel ops
+/// lowering requires all the information. There are no direct mappings from
+/// layouts to ukernels.
 /// Requirement: `attr` must implement IREE::Codegen::LayoutAttrInterface.
-DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type);
+DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type,
+                             bool addEncodingAttr = false);
 
 /// Appends the NamedAttribute into `config` if there is a `name` NamedAttribute
 /// in the `dictAttr`.

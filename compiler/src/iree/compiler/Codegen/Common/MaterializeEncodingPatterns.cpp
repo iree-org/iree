@@ -119,11 +119,6 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
     return source;
   }
 
-  auto encoding = IREE::Encoding::getEncodingAttr(resultType);
-  if (!encoding) {
-    return failure();
-  }
-
   // Create `tensor.empty` operation for the result of the pack operation.
   Location loc = encodingOp.getLoc();
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(

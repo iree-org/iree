@@ -758,7 +758,8 @@ struct VMVXHostEncodingLayoutResolverAttrInterface final
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return VMVXEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+    return VMVXEncodingLayoutAttr::get(
+        ctx, getLayoutImpl(attr, type, /*addEncodingAttr=*/true));
   }
 };
 

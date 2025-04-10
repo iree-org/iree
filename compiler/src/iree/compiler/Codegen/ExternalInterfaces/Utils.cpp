@@ -92,14 +92,20 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
   return result;
 }
 
-DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type) {
+DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type,
+                             bool addEncodingAttr) {
   MLIRContext *ctx = attr.getContext();
   auto deviceLayoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(attr);
   const MaterializeEncodingInfo info = deviceLayoutAttr.getEncodingInfo(type);
   Attribute encodingInfoAttr =
       IREE::Codegen::serializeEncodingInfo(attr.getContext(), info);
-  return DictionaryAttr::get(
-      ctx, NamedAttribute(kEncodingInfoAttrName, encodingInfoAttr));
+  SmallVector<NamedAttribute> items;
+  items.push_back(NamedAttribute(kEncodingInfoAttrName, encodingInfoAttr));
+  auto encodingAttr = IREE::Encoding::getEncodingAttr(type);
+  if (addEncodingAttr && encodingAttr) {
+    items.push_back(NamedAttribute("encoding_attr", encodingAttr));
+  }
+  return DictionaryAttr::get(ctx, items);
 }
 
 void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
