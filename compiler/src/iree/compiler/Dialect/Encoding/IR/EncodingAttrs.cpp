@@ -473,6 +473,29 @@ Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
+std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
+  FailureOr<linalg::ContractionDimensions> contractionDims =
+      getEncodingContractionDims(*this);
+  if (failed(contractionDims)) {
+    return std::nullopt;
+  }
+  SmallVector<int32_t> result;
+  for (unsigned k : contractionDims->k) {
+    if (std::optional<unsigned> dimIdx = mapDimToOperandIndex(k)) {
+      result.push_back(dimIdx.value());
+    }
+  }
+  return result;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.matmul_k
+//===---------------------------------------------------------------------===//
+
+std::optional<SmallVector<int32_t>> MatmulKAttr::getReductionDims() const {
+  return llvm::to_vector(getKDims().asArrayRef());
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.matmul_k
 //===---------------------------------------------------------------------===//

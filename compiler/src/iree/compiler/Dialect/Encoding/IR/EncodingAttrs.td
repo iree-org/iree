@@ -102,6 +102,9 @@ def EncodingAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
         "cloneWithLayouts",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
+        "getReductionDims",
       ]>
     ]> {
   let mnemonic = "encoding";
@@ -184,7 +187,10 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
         "cloneWithLayouts",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
+        "getReductionDims",
+      ]>,
     ]> {
   let mnemonic = "matmul_k";
   let summary = [{An attribute that tracks reduction dimensions for matmul}];
