@@ -122,6 +122,7 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createConvertToDestinationPassingStylePass());
     funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
   }
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAggregateOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
