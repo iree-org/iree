@@ -79,8 +79,8 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
       if (!tensorType || !tensorType.getEncoding()) {
         return false;
       }
-      return isa<IREE::Encoding::EncodingAttr, IREE::Encoding::LayoutAttr>(
-          tensorType.getEncoding());
+      return isa<IREE::Encoding::ContractionEncodingAttrInterface,
+                 IREE::Encoding::LayoutAttr>(tensorType.getEncoding());
     };
     auto valueHasDataTilingEncoding = [=](Value v) -> bool {
       return typeHasDataTilingEncoding(v.getType());

@@ -424,61 +424,53 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
     auto padLayoutAttr = cast<GPUPadLayoutAttr>(attr);
-    auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
+    auto contractionEncodingAttr =
+        dyn_cast_or_null<Encoding::ContractionEncodingAttrInterface>(
+            type.getEncoding());
 
     const int64_t rank = type.getRank();
     auto noPaddingAttr =
         Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
-    if (encodingAttr.getOpType().getValue() !=
-        IREE::Encoding::EncodingOpType::matmul) {
-      // We only support simple matmuls for now.
-      return noPaddingAttr;
-    }
-
     if (!padLayoutAttr.getCacheLineBytes() || !padLayoutAttr.getCacheSets()) {
       return noPaddingAttr;
     }
 
-    const int64_t operandIndex = encodingAttr.getOperandIndex().getInt();
-    if (!llvm::is_contained({0, 1}, operandIndex)) {
-      // We only have to pad matmul operands.
+    if (!contractionEncodingAttr) {
       return noPaddingAttr;
     }
 
     // We only support simple matmuls for now. Filter out everything that
     // does not have a simple row-major access pattern with a single static
     // reduction dimension.
-    FailureOr<linalg::ContractionDimensions> contractionDims =
-        Encoding::getEncodingContractionDims(encodingAttr);
-    if (failed(contractionDims) || contractionDims->k.size() != 1) {
+    std::optional<SmallVector<int32_t>> reductionDims =
+        contractionEncodingAttr.getReductionDims();
+    if (!reductionDims || reductionDims->size() != 1) {
       return noPaddingAttr;
     }
 
-    std::optional<unsigned> padDimensionIndex =
-        encodingAttr.mapDimToOperandIndex(contractionDims->k[0]);
-    if (!padDimensionIndex || padDimensionIndex != rank - 1) {
+    int32_t padDimensionIndex = reductionDims.value()[0];
+    if (padDimensionIndex != rank - 1) {
       return noPaddingAttr;
     }
     ArrayRef<int64_t> shape = type.getShape();
-    if (ShapedType::isDynamic(shape[*padDimensionIndex])) {
+    if (ShapedType::isDynamic(shape[padDimensionIndex])) {
       return noPaddingAttr;
     }
 
     // Bail out on matvec / vecmat and skinny matmul problems.
     {
       int64_t parallelDimSize = 1;
-      ArrayRef<unsigned> parallelDims =
-          (operandIndex == 0) ? contractionDims->m : contractionDims->n;
-      for (unsigned parallelDim : parallelDims) {
-        if (std::optional<unsigned> dimIdx =
-                encodingAttr.mapDimToOperandIndex(parallelDim)) {
-          int64_t dimSize = shape[*dimIdx];
-          if (ShapedType::isDynamic(dimSize)) {
-            parallelDimSize = ShapedType::kDynamic;
-            break;
-          }
-          parallelDimSize *= dimSize;
+      llvm::SmallSetVector<int32_t, 4> reductionDimsSet(reductionDims->begin(),
+                                                        reductionDims->end());
+      for (auto [idx, dimSize] : llvm::enumerate(shape)) {
+        if (reductionDimsSet.contains(idx)) {
+          continue;
         }
+        if (ShapedType::isDynamic(dimSize)) {
+          parallelDimSize = ShapedType::kDynamic;
+          break;
+        }
+        parallelDimSize *= dimSize;
       }
 
       // TODO(#19897): Use `getMatmulNarrowDim`.
@@ -504,7 +496,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     const int64_t cacheSetSpanBytes =
         *padLayoutAttr.getCacheSets() * cacheLineBytes;
     const int64_t dimSizeInBytes =
-        type.getDimSize(*padDimensionIndex) * (elementBits / 8);
+        type.getDimSize(padDimensionIndex) * (elementBits / 8);
     if (dimSizeInBytes < cacheSetSpanBytes) {
       // Very small dimension, leave as-is.
       return noPaddingAttr;
@@ -527,7 +519,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     assert(padBytes < cacheSetSpanBytes && "Incorrect pad amount");
     const int64_t numPadElements = (padBytes * 8) / elementBits;
     SmallVector<int32_t> padValues(rank, 0);
-    padValues[*padDimensionIndex] = numPadElements;
+    padValues[padDimensionIndex] = numPadElements;
     auto padLayout = Encoding::PadEncodingLayoutAttr::get(ctx, padValues);
     return padLayout;
   }

@@ -207,6 +207,30 @@ def IREEEncoding_SerializableEncodingAttrInterface :
   }];
 }
 
+def IREEEncoding_ContractionEncodingAttrInterface :
+  AttrInterface<"ContractionEncodingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query contraction information.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the reduction dimensions. Returns std::nullopt on failure.
+      }],
+      /*retTy=*/"std::optional<llvm::SmallVector<int32_t>>",
+      /*methodName=*/"getReductionDims",
+      /*args=*/(ins
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
+    >
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Type Interfaces
 //===----------------------------------------------------------------------===//
