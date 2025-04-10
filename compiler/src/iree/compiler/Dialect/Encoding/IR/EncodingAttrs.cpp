@@ -480,12 +480,10 @@ std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
     return std::nullopt;
   }
   SmallVector<int32_t> result;
-  for (auto k : contractionDims->k) {
-    std::optional<unsigned> dimIdx = mapDimToOperandIndex(k);
-    if (!dimIdx) {
-      continue;
+  for (unsigned k : contractionDims->k) {
+    if (std::optional<unsigned> dimIdx = mapDimToOperandIndex(k)) {
+      result.push_back(dimIdx.value());
     }
-    result.push_back(dimIdx.value());
   }
   return result;
 }
