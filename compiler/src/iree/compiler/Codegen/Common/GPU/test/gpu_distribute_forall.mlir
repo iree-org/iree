@@ -60,7 +60,7 @@ func.func @distribute_lane_forall(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_lane_forall
-//       CHECK:   %[[LANEID:.+]] = gpu.lane_id
+//       CHECK:   %[[LANEID:.+]] = gpu.lane_id upper_bound 32
 //       CHECK:   memref.store {{.*}}[%[[LANEID]]]
 
 // -----
