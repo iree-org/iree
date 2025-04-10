@@ -80,7 +80,7 @@ option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and 
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
 
-if (IREE_USE_SYSTEM_DEPS)
+if(IREE_USE_SYSTEM_DEPS)
   message(WARNING "IREE_USE_SYSTEM_DEPS is on. This option is untested and may find incompatible dependencies.")
 endif()
 
