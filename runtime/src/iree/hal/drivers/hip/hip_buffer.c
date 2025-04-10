@@ -23,6 +23,9 @@ typedef struct iree_hal_hip_buffer_t {
   iree_hal_buffer_release_callback_t release_callback;
   iree_slim_mutex_t device_ptr_lock;
   iree_notification_t device_ptr_notification;
+  iree_hal_buffer_t* wrapped_buffer;
+  iree_slim_mutex_t wrapped_buffer_lock;
+  iree_notification_t wrapped_buffer_notification;
   bool empty;
 } iree_hal_hip_buffer_t;
 
@@ -75,6 +78,9 @@ iree_status_t iree_hal_hip_buffer_wrap(
     buffer->empty = false;
     iree_slim_mutex_initialize(&buffer->device_ptr_lock);
     iree_notification_initialize(&buffer->device_ptr_notification);
+    buffer->wrapped_buffer = NULL;
+    iree_slim_mutex_initialize(&buffer->wrapped_buffer_lock);
+    iree_notification_initialize(&buffer->wrapped_buffer_notification);
     *out_buffer = &buffer->base;
   }
 
@@ -87,6 +93,8 @@ void iree_hal_hip_buffer_set_device_pointer(iree_hal_buffer_t* base_buffer,
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
   IREE_ASSERT(buffer->device_ptr == NULL,
               "Cannot set a device_ptr to a buffer that already has one");
+  IREE_ASSERT(buffer->type != IREE_HAL_HIP_BUFFER_TYPE_WRAPPER,
+              "Cannot set a device_ptr to a buffer that is a wrapper buffer");
   iree_slim_mutex_lock(&buffer->device_ptr_lock);
   buffer->device_ptr = pointer;
   iree_slim_mutex_unlock(&buffer->device_ptr_lock);
@@ -112,6 +120,12 @@ static void iree_hal_hip_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   }
   iree_slim_mutex_deinitialize(&buffer->device_ptr_lock);
   iree_notification_deinitialize(&buffer->device_ptr_notification);
+  if (buffer->wrapped_buffer != NULL) {
+    iree_hal_buffer_release(buffer->wrapped_buffer);
+    buffer->wrapped_buffer = NULL;
+  }
+  iree_slim_mutex_deinitialize(&buffer->wrapped_buffer_lock);
+  iree_notification_deinitialize(&buffer->wrapped_buffer_notification);
   iree_allocator_free(host_allocator, buffer);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -122,6 +136,12 @@ static iree_status_t iree_hal_hip_buffer_map_range(
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+
+  if (buffer->wrapped_buffer != NULL) {
+    return iree_hal_hip_buffer_map_range(buffer->wrapped_buffer, mapping_mode,
+                                         memory_access, local_byte_offset,
+                                         local_byte_length, mapping);
+  }
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(base_buffer),
@@ -183,9 +203,25 @@ static bool iree_hal_hip_buffer_has_device_ptr(void* arg) {
   return has_ptr_or_error;
 }
 
+static bool iree_hal_hip_buffer_has_wrapped_buffer(void* arg) {
+  iree_hal_hip_buffer_t* buffer = (iree_hal_hip_buffer_t*)arg;
+  iree_slim_mutex_lock(&buffer->wrapped_buffer_lock);
+  bool has_buffer_or_error = buffer->wrapped_buffer || buffer->empty;
+  iree_slim_mutex_unlock(&buffer->wrapped_buffer_lock);
+  return has_buffer_or_error;
+}
+
 hipDeviceptr_t iree_hal_hip_buffer_device_pointer(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  if (buffer->type == IREE_HAL_HIP_BUFFER_TYPE_WRAPPER) {
+    iree_notification_await(&buffer->wrapped_buffer_notification,
+                            iree_hal_hip_buffer_has_wrapped_buffer, buffer,
+                            iree_infinite_timeout());
+    return buffer->wrapped_buffer
+               ? iree_hal_hip_buffer_cast(buffer->wrapped_buffer)->device_ptr
+               : NULL;
+  }
   iree_notification_await(&buffer->device_ptr_notification,
                           iree_hal_hip_buffer_has_device_ptr, buffer,
                           iree_infinite_timeout());
@@ -201,6 +237,26 @@ void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
 void iree_hal_hip_buffer_drop_release_callback(iree_hal_buffer_t* base_buffer) {
   iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
   buffer->release_callback = iree_hal_buffer_release_callback_null();
+}
+
+void iree_hal_hip_buffer_set_wrapped_buffer(iree_hal_buffer_t* base_buffer,
+                                            iree_hal_buffer_t* wrapped_buffer) {
+  iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  IREE_ASSERT(buffer->type == IREE_HAL_HIP_BUFFER_TYPE_WRAPPER,
+              "Cannot set a wrapped_buffer to a hip buffer that is not a "
+              "wrapper buffer");
+  iree_slim_mutex_lock(&buffer->wrapped_buffer_lock);
+  if (buffer->wrapped_buffer != NULL) {
+    // Currently if a pooling_allocator is attached, then releasing the
+    // wrapped_buffer will trigger a call into pooling_allocator. If the
+    // pooling_allocator is not set, then releasing the wrapped_buffer would
+    // cause a deallocation via release callback.
+    iree_hal_buffer_release(buffer->wrapped_buffer);
+  }
+  buffer->wrapped_buffer = wrapped_buffer;
+  iree_slim_mutex_unlock(&buffer->wrapped_buffer_lock);
+  iree_notification_post(&buffer->wrapped_buffer_notification,
+                         IREE_ALL_WAITERS);
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_hip_buffer_vtable = {
