@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass))" --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding
 util.func public @parallel_fusion(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<2x11008x128xf32>
@@ -20,7 +20,7 @@ util.func public @parallel_fusion(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11
   %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
   util.return %2 : tensor<2x11008x128xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding
 // CHECK-LABEL: @parallel_fusion
 // CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #[[$ENCODING]]>)
 // CHECK:         %[[ADD:.+]] = linalg.generic
@@ -33,7 +33,7 @@ util.func public @parallel_fusion(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding
 util.func public @reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<2x11008x128xf32, #encoding> {
   %0 = tensor.empty() : tensor<2x11008x128xf32>
   %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
@@ -51,7 +51,7 @@ util.func public @reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<
   %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
   util.return %2 : tensor<2x11008x128xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding
 // CHECK-LABEL: @reduction_fusion
 // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32>)
 // CHECK:         %[[REDUCTION:.+]] = linalg.generic
@@ -64,7 +64,7 @@ util.func public @reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding
 util.func public @transpose_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x11008x128xf32, #encoding> {
   %0 = tensor.empty() : tensor<2x11008x128xf32>
   %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
@@ -81,7 +81,7 @@ util.func public @transpose_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x1
   %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
   util.return %2 : tensor<2x11008x128xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding
 // CHECK-LABEL: @transpose_fusion
 // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #[[$ENCODING]]>
 // CHECK:         %[[TRANSPOSE:.+]] = linalg.generic
@@ -93,7 +93,7 @@ util.func public @transpose_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x1
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding
 util.func public @fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: index, %d1: index, %d2: index) -> tensor<?x?x?xf32, #encoding> {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty(%d0, %d1, %d2) : tensor<?x?x?xf32>
@@ -112,7 +112,7 @@ util.func public @fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: index, %d1: inde
   %2 = iree_encoding.set_encoding %1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #encoding>
   util.return %2 : tensor<?x?x?xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding
 // CHECK-LABEL: @fusion_dynamic
 // CHECK-SAME:    {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
 // CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32, #[[$ENCODING]]>
@@ -126,7 +126,7 @@ util.func public @fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: index, %d1: inde
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing_encoding
 util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: index, %d1: index, %d2: index) -> (tensor<?x?x?xf32, #encoding>, tensor<?x?x?xf32, #encoding>) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty(%d0, %d1, %d2) : tensor<?x?x?xf32>
@@ -146,7 +146,7 @@ util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: i
   %3 = iree_encoding.set_encoding %1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #encoding>
   util.return %2, %3 : tensor<?x?x?xf32, #encoding>, tensor<?x?x?xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding
 // CHECK-LABEL: @multi_encoding_fusion_dynamic
 // CHECK-SAME:    {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
 // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32, #[[$ENCODING]]>

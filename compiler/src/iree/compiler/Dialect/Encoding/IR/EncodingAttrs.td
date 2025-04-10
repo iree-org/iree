@@ -289,6 +289,8 @@ def TestingEncodingAttr :
       ]>
     ]> {
   let mnemonic = "testing_encoding";
+  let assemblyFormat = "( `<` $layouts^ `>` )?";
+
   let summary = "An encoding attribute for testing purpose";
 
   let description = [{
@@ -300,9 +302,6 @@ def TestingEncodingAttr :
     OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
     "layouts.">:$layouts
   );
-
-  let hasCustomAssemblyFormat = 1;
-  let genVerifyDecl = 0;
 }
 
 def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
