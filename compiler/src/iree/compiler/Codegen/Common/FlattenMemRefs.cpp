@@ -166,40 +166,6 @@ static bool checkLayout(Value val) {
 namespace {
 
 template <typename T>
-struct FlattenTemplate : public OpRewritePattern<T> {
-  LogicalResult matchAndRewrite(T op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = getTargetMemref(op);
-    if (!needFlattenning(memref) || !checkLayout(memref))
-      return rewriter.notifyMatchFailure(op,
-                                         "nothing to do or unsupported layout");
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
-    replaceOp(op, rewriter, flatMemref, offset);
-    return success();
-  }
-
-  virtual Value getTargetMemref(T op) = 0;
-  virtual void replaceOp(T op, PatternRewriter &rewriter, Value flatMemref,
-                         Value offset) = 0;
-};
-
-template <typename T>
-struct FlattenHelperBase {
-  LogicalResult matchAndRewrite(T op, PatternRewriter &rewriter) const {
-    Value memref = getTargetMemref(op);
-    if (!needFlattenning(memref) || !checkLayout(memref))
-      return rewriter.notifyMatchFailure(op,
-                                         "nothing to do or unsupported layout");
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op->getLoc(), memref, op->getOperands());
-    replaceOp(op, rewriter, flatMemref, offset);
-    return success();
-  }
-  virtual ~FlattenHelperBase() = default;
-};
-
-template <typename T>
 struct MemRefRewritePatternBase : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
@@ -209,7 +175,7 @@ struct MemRefRewritePatternBase : public OpRewritePattern<T> {
       return rewriter.notifyMatchFailure(op,
                                          "nothing to do or unsupported layout");
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op->getLoc(), memref, op->getOperands());
+        rewriter, op->getLoc(), memref, op.getIndices());
     replaceOp(op, rewriter, flatMemref, offset);
     return success();
   }
@@ -322,8 +288,7 @@ struct FlattenVectorTransferRead
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
-    auto transferReadOp =
-        cast<vector::TransferReadOp>(op);
+    auto transferReadOp = cast<vector::TransferReadOp>(op);
     auto newTransferRead = rewriter.create<vector::TransferReadOp>(
         op->getLoc(), transferReadOp.getType(), flatMemref, ValueRange{offset},
         transferReadOp.getPadding());
