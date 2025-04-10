@@ -184,12 +184,14 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
-      // TODO(hanchung): Implement the interface method. It is required to make
-      // set/unset_encoding ops happy.
       IREEEncoding_SerializableEncodingAttrInterface,
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "cloneWithLayouts",
+      ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
         "getReductionDims",
-      ]>
+      ]>,
     ]> {
   let mnemonic = "matmul_k";
   let summary = [{An attribute that tracks reduction dimensions for matmul}];
@@ -233,6 +235,10 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
   let parameters = (ins
     "DenseI32ArrayAttr":$k_dims
   );
+
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<int32_t>":$k_dims)>
+  ];
 }
 
 //===---------------------------------------------------------------------===//

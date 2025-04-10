@@ -499,6 +499,21 @@ std::optional<SmallVector<int32_t>> MatmulKAttr::getReductionDims() const {
 }
 
 //===---------------------------------------------------------------------===//
+// iree_encoding.matmul_k
+//===---------------------------------------------------------------------===//
+
+MatmulKAttr MatmulKAttr::get(MLIRContext *ctx, ArrayRef<int32_t> kDims) {
+  return get(ctx, DenseI32ArrayAttr::get(ctx, kDims));
+}
+
+bool MatmulKAttr::isSerialized() const { return false; }
+
+Attribute MatmulKAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+  MLIRContext *ctx = getContext();
+  return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+}
+
+//===---------------------------------------------------------------------===//
 // iree_encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
