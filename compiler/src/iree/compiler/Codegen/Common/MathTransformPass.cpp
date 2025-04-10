@@ -118,13 +118,6 @@ static bool predicateF32Cast(StringRef name,
 static bool predicateApprox(StringRef name,
                             IREE::HAL::ExecutableTargetAttr target) {
   if (clNativeMathPrecision) { // Legacy.
-    if (name == math::ErfOp::getOperationName()) {
-      // The legacy implementation had a bug: it always applied polynomial
-      // approximation of math.erf, even when clNativeMathPrecision was passed.
-      // We actually have CI tests that rely on that bug: they pass
-      // clNativeMathPrecision but fail unless math.erf is approximated.
-      return true;
-    }
     return false;
   }
   if (isROCMBackend(target)) {
