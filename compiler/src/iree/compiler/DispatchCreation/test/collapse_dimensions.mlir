@@ -754,3 +754,51 @@ util.func @elementwise_dynamic(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[DISPATCH]]
 //  CHECK-SAME:     {{.+}} output_shape [%[[DIM0]], %[[DIM1]]]
 //       CHECK:   util.return %[[EXPAND]] : tensor<?x?xf32>
+
+// -----
+
+util.func public @masked_attention_dynamic(%arg0: index, %arg1: tensor<4x8x4x?x32x128xf16>, %arg2: tensor<4x?x32x8x128xf16>, %arg3: tensor<4x?x32x8x128xf16>) -> tensor<4x?x32x8x4x128xf16> {
+  %c32 = arith.constant 32 : index
+  %0 = arith.divsi %arg0, %c32 : index
+  %1 = affine.apply affine_map<()[s0] -> (s0 floordiv 32)>()[%arg0]
+  %2 = flow.dispatch.region -> (tensor<4x?x32x8x4x128xf16>{%1}) {
+    %3 = tensor.empty(%1) : tensor<4x?x32x8x4x128xf16>
+    %4 = tensor.empty(%0) : tensor<4x8x4x?x32x128xf16>
+    %cst = arith.constant 0xFC00 : f16
+    %cst_0 = arith.constant 0.000000e+00 : f16
+    %5 = tensor.empty(%0, %0) : tensor<4x8x4x?x32x?x32xf16>
+    %cst_1 = arith.constant 8.837890e-02 : f16
+    %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%5 : tensor<4x8x4x?x32x?x32xf16>) {
+    ^bb0(%out: f16):
+      %9 = linalg.index 4 : index
+      %10 = linalg.index 3 : index
+      %11 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 32)>()[%9, %10]
+      %12 = linalg.index 6 : index
+      %13 = linalg.index 5 : index
+      %14 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 32)>()[%12, %13]
+      %15 = arith.cmpi sge, %11, %14 : index
+      %16 = arith.select %15, %cst_0, %cst : f16
+      linalg.yield %16 : f16
+    } -> tensor<4x8x4x?x32x?x32xf16>
+    %7 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d8, d1, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d8, d1, d5)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d7, d8)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg1, %arg2, %arg3, %cst_1, %6 : tensor<4x8x4x?x32x128xf16>, tensor<4x?x32x8x128xf16>, tensor<4x?x32x8x128xf16>, f16, tensor<4x8x4x?x32x?x32xf16>) outs(%4 : tensor<4x8x4x?x32x128xf16>) {
+    ^bb0(%arg4: f32):
+      iree_linalg_ext.yield %arg4 : f32
+    } -> tensor<4x8x4x?x32x128xf16>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d1, d2, d5)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%7 : tensor<4x8x4x?x32x128xf16>) outs(%3 : tensor<4x?x32x8x4x128xf16>) {
+    ^bb0(%in: f16, %out: f16):
+      linalg.yield %in : f16
+    } -> tensor<4x?x32x8x4x128xf16>
+    flow.return %8 : tensor<4x?x32x8x4x128xf16>
+  }
+  util.return %2 : tensor<4x?x32x8x4x128xf16>
+}
+
+// CHECK-LABEL: util.func public @masked_attention_dynamic
+//       CHECK:   flow.dispatch.region
+//       CHECK:   %[[MASK:.+]] = linalg.generic
+//  CHECK-SAME:     outs({{.*}} : tensor<4x8x4x?x?xf16>)
+//       CHECK:   %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:     ins({{.*}}, %[[MASK]] :
+//  CHECK-SAME:     outs({{.*}} : tensor<4x8x4x?x128xf16>)
+//       CHECK:   %[[RES:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ATTN]] : tensor<4x8x4x?x128xf16>)
