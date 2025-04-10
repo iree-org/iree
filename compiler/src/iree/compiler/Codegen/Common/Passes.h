@@ -142,6 +142,40 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
 
 void populateDecomposeMemrefsPatterns(RewritePatternSet &patterns);
 
+/// Add a pattern to combine instructions across scf.for boundary. It is common
+/// when doing incremental lowering to generate transient ops that cancel each
+/// other out. Canonicalization usually clean up those operations. When the
+/// value is loop carried, MLIR canonicalization currently doesn't remove the
+/// redundant operations.
+///
+/// The pattern added here provides a workaround to MLIR's limitation, and does
+/// ad hoc clean up of instructions found in IREE. Once we have a more general
+/// mechanism in MLIR this pattern can be completely removed.
+///
+/// This pattern does this kind of transformation on scf.for:
+/// ```
+/// %21 = vector.shape_cast %20 : vector<4xf32> to vector<1x4xf32>
+/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %21)
+///    -> vector<1x4xf32> {
+///    [...]
+///    %100 = vector.shape_cast %arg4 : vector<1x4xf32> to vector<4xf32>
+///    [...]
+///    %109 = vector.shape_cast %108 : vector<4xf32> to vector<1x4xf32>
+///    scf.yield %109 : vector<1x4xf32>
+///  }
+///  %24 = vector.shape_cast %22 : vector<1x4xf32> to vector<4xf32>
+/// ```
+/// ->
+/// ```
+/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %20)
+///    -> vector<4xf32> {
+///    [...]
+///    scf.yield %108 : vector<4xf32>
+///  }
+/// ```
+void populateForOpInductionVarShapePatterns(RewritePatternSet &,
+                                            PatternBenefit = 1);
+
 //----------------------------------------------------------------------------//
 // Register CodeGen Common Passes
 //----------------------------------------------------------------------------//
