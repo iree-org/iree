@@ -71,6 +71,8 @@ createConvertToDestinationPassingStylePass(
 
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 
+std::unique_ptr<Pass> createDecomposeMemrefsPass();
+
 /// Pass to perform linalg on tensor bufferization. The function passed into
 /// the pass through the `allocationFn` argument is invoked whenever a new
 /// buffer is to be created. The callback will be passed the Values for the
@@ -137,6 +139,8 @@ void populateVectorizePadPatterns(RewritePatternSet &patterns,
 /// read and write ops.
 void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
                                                  PatternBenefit benefit = 1);
+
+void populateDecomposeMemrefsPatterns(RewritePatternSet &patterns);
 
 //----------------------------------------------------------------------------//
 // Register CodeGen Common Passes
