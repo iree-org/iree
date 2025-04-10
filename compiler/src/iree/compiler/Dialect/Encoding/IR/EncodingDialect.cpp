@@ -18,7 +18,6 @@
 #include "mlir/Transforms/InliningUtils.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.cpp.inc"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypeInterfaces.cpp.inc"
@@ -36,7 +35,7 @@ struct EncodingOpAsmInterface : public OpAsmDialectInterface {
   // `.` or end with a numeric digit([0-9]+). Returns success if an alias was
   // provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (llvm::isa<EncodingAttr, MatmulKAttr, TestingEncodingAttr,
+    if (llvm::isa<EncodingAttr, MatmulKAttr, LayoutAttr, TestingEncodingAttr,
                   UnknownEncodingAttr>(attr)) {
       os << "encoding";
       return AliasResult::OverridableAlias;
@@ -71,10 +70,7 @@ struct EncodingInlinerInterface : public DialectInlinerInterface {
 void IREEEncodingDialect::initialize() {
   addInterfaces<EncodingOpAsmInterface, EncodingInlinerInterface>();
 
-  addAttributes<
-#define GET_ATTRDEF_LIST
-#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
-      >();
+  registerAttributes();
 
 #define GET_OP_LIST
   addOperations<

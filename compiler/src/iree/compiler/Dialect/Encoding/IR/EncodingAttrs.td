@@ -45,6 +45,44 @@ def EncodingOpTypeAttr:
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
+def LayoutAttr :
+    IREEEncoding_Attr<"Layout", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "isIdentityLayout",
+        "calculateStorageSizeInBytes",
+      ]>
+    ]> {
+  let mnemonic = "layout";
+  let assemblyFormat = "`<` $layouts `>`";
+
+  let summary = [{Indicates potential serialized layouts}];
+  let description = [{
+    This attribute describes the potential layouts of the encoding. It is an
+    array because a device could have multiple target layouts.
+
+    It has a verifier that will ensure that all the attributes in layouts
+    implement SerializableEncodingAttrInterface.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "Serialized layouts">:$layouts
+  );
+
+  // Implement custom builders to bypass the verification assertion in Base::get
+  // method, i.e., `assert(succeeded(ConcreteT::verifyInvariants(...)))`.
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "ArrayAttr":$layouts)>,
+  ];
+
+  let genVerifyDecl = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
+
 def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];
@@ -63,9 +101,7 @@ def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
-        "isIdentityLayout",
         "cloneWithLayouts",
-        "calculateStorageSizeInBytes",
       ]>
     ]> {
   let mnemonic = "encoding";
@@ -94,11 +130,7 @@ def EncodingAttr :
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
-    "This is useful for handling skinny dimension sizes">:$iteration_sizes,
-    OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
-    "layouts of the encoding. It is an array because a device could have "
-    "multiple target device. Note that it can be any attribute that "
-    "implements SerializableEncodingAttrInterface.">:$layouts
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes
   );
 
   let builders = [
@@ -106,8 +138,7 @@ def EncodingAttr :
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes,
-        CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
+        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes)>
   ];
 
   let extraClassDeclaration = [{
@@ -347,7 +378,8 @@ def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "getLayout",
-      ]>
+      ]>,
+      IREEEncoding_SerializableEncodingAttrInterface
     ]> {
   let mnemonic = "specialized_encoding";
 

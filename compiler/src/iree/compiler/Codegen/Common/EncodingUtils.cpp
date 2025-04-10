@@ -76,9 +76,11 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   markUnknownOpDynamicallyLegal([](Operation *op) {
     auto typeHasDataTilingEncoding = [](Type t) -> bool {
       auto tensorType = dyn_cast<RankedTensorType>(t);
-      if (!tensorType)
+      if (!tensorType || !tensorType.getEncoding()) {
         return false;
-      return getEncodingAttr(tensorType) != nullptr;
+      }
+      return isa<IREE::Encoding::EncodingAttr, IREE::Encoding::LayoutAttr>(
+          tensorType.getEncoding());
     };
     auto valueHasDataTilingEncoding = [=](Value v) -> bool {
       return typeHasDataTilingEncoding(v.getType());
@@ -103,15 +105,12 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
 
 std::optional<IREE::Codegen::MaterializeEncodingInfo>
 getEncodingInfoFromLayouts(RankedTensorType type) {
-  auto encodingAttr = IREE::Encoding::getEncodingAttr(type);
-  if (!encodingAttr) {
+  auto layoutAttr =
+      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
+  if (!layoutAttr) {
     return std::nullopt;
   }
-  ArrayAttr layoutsAttr = encodingAttr.getLayouts();
-  if (!layoutsAttr) {
-    return std::nullopt;
-  }
-  ArrayRef<Attribute> layouts = layoutsAttr.getValue();
+  ArrayRef<Attribute> layouts = layoutAttr.getLayouts().getValue();
   assert(layouts.size() == 1 && "only single layout is supported");
   if (auto layout = dyn_cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])) {
     return layout.getEncodingInfo(type);

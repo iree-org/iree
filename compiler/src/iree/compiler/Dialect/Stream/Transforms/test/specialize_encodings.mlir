@@ -21,12 +21,8 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
   %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<?x?xf32, #encoding>{%d0, %d1} : index
   util.return %size0, %size1 : index, index
 }
-// CHECK:       #[[$ENCODING0:.+]] = #iree_encoding.encoding
-// CHECK-SAME:    #iree_cpu.vmvx_encoding_layout
-// CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
-// CHECK:       #[[$ENCODING1:.+]] = #iree_encoding.encoding
-// CHECK-SAME:    #iree_cpu.cpu_encoding_layout
-// CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
+// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.layout<[#iree_cpu.vmvx_encoding_layout{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
+// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_layout{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
 // CHECK-LABEL: util.func public @tensor_sizeof
 // CHECK:         %[[D0_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING0]]>
 // CHECK:         %[[D1_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING1]]>
@@ -70,7 +66,7 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
   %size0 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<?x?xf32, #encoding>{%d0, %d1} : index
   util.return %size0 : index
 }
-// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.encoding
+// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.layout
 // CHECK-SAME:    #iree_gpu.gpu_encoding_layout
 // CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
 // CHECK-LABEL: util.func public @gpu_with_encoding_layout
@@ -125,28 +121,25 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
   util.return
 }
 
-// CHECK-DAG: #[[$NO_PAD_LHS:.+]] = #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
-// CHECK-DAG: #[[$NO_PAD_RHS:.+]] = #iree_encoding.encoding<operand_index = 1 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
-// CHECK-DAG: #[[$NO_PAD_OUT:.+]] = #iree_encoding.encoding<operand_index = 2 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 0]>]
-// CHECK-DAG: #[[$PAD_LHS_0:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]
-// CHECK-DAG: #[[$PAD_LHS_1:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 7]>]
-// CHECK-DAG: #[[$PAD_LHS_2:.+]] =  #iree_encoding.encoding<operand_index = 0 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 65]>]
-// CHECK-DAG: #[[$PAD_RHS:.+]] =    #iree_encoding.encoding<operand_index = 1 : index, {{.*}}, layouts = [#iree_encoding.pad_encoding_layout<[0, 64]>]
+// CHECK-DAG: #[[$NO_PAD:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 0]>]
+// CHECK-DAG: #[[$PAD_DIM1_64:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]
+// CHECK-DAG: #[[$PAD_LHS_1:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 7]>]
+// CHECK-DAG: #[[$PAD_LHS_2:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 65]>]
 
 // CHECK-LABEL: util.func public @with_pad_encoding
 //
-// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_LHS_0]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4160xf16, #[[$NO_PAD_LHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_DIM1_64]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4160xf16, #[[$NO_PAD]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x1337xf16, #[[$PAD_LHS_1]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<4096x4095xf16, #[[$PAD_LHS_2]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<4096x250xf16, #[[$NO_PAD_LHS]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<60x4096xf16, #[[$NO_PAD_LHS]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<1x4096xf16, #[[$NO_PAD_RHS]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<?x4096xf16, #[[$PAD_LHS_0]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<?x?xf16, #[[$NO_PAD_LHS]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_RHS]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$NO_PAD_OUT]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_RHS]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x250xf16, #[[$NO_PAD]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<60x4096xf16, #[[$NO_PAD]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<1x4096xf16, #[[$NO_PAD]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<?x4096xf16, #[[$PAD_DIM1_64]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<?x?xf16, #[[$NO_PAD]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_DIM1_64]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$NO_PAD]]>
+// CHECK: stream.tensor.empty {{.*}} : tensor<4096x4096xf16, #[[$PAD_DIM1_64]]>
 //
 // CHECK-NEXT: util.return
 
@@ -849,12 +842,8 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
   util.return
 }
 
-// CHECK-DAG:   #[[DEVICE_A_LHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_A_RHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_A_OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2{{.+}} layouts = [#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_B_LHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0{{.+}} layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_B_RHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1{{.+}} layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
-// CHECK-DAG:   #[[DEVICE_B_OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2{{.+}} layouts = [#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
+// CHECK-DAG:   #[[ENCODING_123:.+]] = #iree_encoding.layout<[#iree_encoding.specialized_encoding<123, tensor<?x?xf32>>]
+// CHECK-DAG:   #[[ENCODING_456:.+]] = #iree_encoding.layout<[#iree_encoding.specialized_encoding<456, tensor<?x?xf32>>]
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -875,16 +864,16 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // CHECK-SAME:        %[[ARG5:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG6:[a-zA-Z0-9]+]]
 // CHECK:           %[[LHS_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_LHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK:           %[[RHS_BINDING:.+]] = stream.binding.subspan %[[ARG1]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_RHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK:           %[[OUT_BINDING:.+]] = stream.binding.subspan %[[ARG6]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[DEVICE_A_OUT_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK:           %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_LHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_LHS_ENCODING]]>
 // CHECK:           %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_RHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_RHS_ENCODING]]>
 // CHECK:           %[[INIT:.+]] = tensor.empty({{.+}}) : tensor<?x?xf32, #[[ORIG_OUT_ENCODING]]>
 // CHECK:           %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]
@@ -902,16 +891,16 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // CHECK-SAME:        %[[ARG5:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG6:[a-zA-Z0-9]+]]
 // CHECK:           %[[LHS_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_LHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK:           %[[RHS_BINDING:.+]] = stream.binding.subspan %[[ARG1]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_RHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK:           %[[OUT_BINDING:.+]] = stream.binding.subspan %[[ARG6]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[DEVICE_B_OUT_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK:           %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_LHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_LHS_ENCODING]]>
 // CHECK:           %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_RHS_ENCODING]]>>
+// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_RHS_ENCODING]]>
 // CHECK:           %[[INIT:.+]] = tensor.empty({{.+}}) : tensor<?x?xf32, #[[ORIG_OUT_ENCODING]]>
 // CHECK:           %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]

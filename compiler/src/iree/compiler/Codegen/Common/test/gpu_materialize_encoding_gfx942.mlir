@@ -1204,7 +1204,7 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x16_BF16() {
 //----------------------------------------------------------------------------//
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>}>
-#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
+#encoding = #iree_encoding.layout<[#iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>

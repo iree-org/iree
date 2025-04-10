@@ -36,7 +36,7 @@ namespace {
 // if there's no encoding at all.
 static PadEncodingLayoutAttr getPadLayout(RankedTensorType type) {
   auto encoding =
-      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
+      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
   if (!encoding) {
     return nullptr;
   }
