@@ -182,18 +182,6 @@ func.func @set_encoding_ops_with_iteration_sizes(%arg0: tensor<?x?xf32>) {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], layouts = [{}]>
-func.func @set_encoding_ops_with_layouts(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  return %0 : tensor<?x?xf32, #encoding>
-}
-// CHECK-DAG:   #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], layouts = [{}]>
-// CHECK:       func.func @set_encoding_ops_with_layouts(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]:
-// CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
-
-// -----
-
 #encoding = #iree_encoding.unspecialized_encoding<123>
 func.func @unspecialized_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
