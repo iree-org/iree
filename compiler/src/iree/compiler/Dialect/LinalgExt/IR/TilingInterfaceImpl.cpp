@@ -88,7 +88,7 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
     OpFoldResult ub = getDim(builder, loc, getUpdates(), dim);
-    ranges.emplace_back(Range{zero, ub, one});
+    ranges.push_back(Range{zero, ub, one});
   }
   return ranges;
 }
@@ -282,8 +282,8 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 //===----------------------------------------------------------------------===//
 
 SmallVector<utils::IteratorType> GatherOp::getLoopIteratorTypes() {
-  return {static_cast<size_t>(getOutputType().getRank()),
-          utils::IteratorType::parallel};
+  return SmallVector<utils::IteratorType>(getOutputType().getRank(),
+                                          utils::IteratorType::parallel);
 }
 
 SmallVector<Range> GatherOp::getIterationDomain(OpBuilder &builder) {
@@ -293,7 +293,7 @@ SmallVector<Range> GatherOp::getIterationDomain(OpBuilder &builder) {
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getOutputType().getRank())) {
     OpFoldResult ub = getDim(builder, loc, getOutput(), dim);
-    ranges.emplace_back(Range{zero, ub, one});
+    ranges.push_back(Range{zero, ub, one});
   }
   return ranges;
 }
@@ -345,10 +345,10 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
     sourceOffsets.push_back(zeroAttr);
     sourceSizes.push_back(getDim(builder, loc, getSource(), dim));
   }
-  for (auto dim : llvm::seq<int64_t>(indexDepth, sourceRank)) {
-    sourceOffsets.push_back(offsets[dim - indexDepth + getBatchRank()]);
-    sourceSizes.push_back(sizes[dim - indexDepth + getBatchRank()]);
-  }
+  llvm::append_range(sourceOffsets,
+                     offsets.slice(getBatchRank(), sourceRank - indexDepth));
+  llvm::append_range(sourceSizes,
+                     sizes.slice(getBatchRank(), sourceRank - indexDepth));
   SmallVector<OpFoldResult> sourceStrides(sourceRank, oneAttr);
   Operation *sourceSlice = getSlice(builder, loc, getSource(), sourceOffsets,
                                     sourceSizes, sourceStrides);
