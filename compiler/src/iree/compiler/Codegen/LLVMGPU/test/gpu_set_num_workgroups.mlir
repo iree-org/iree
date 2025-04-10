@@ -304,12 +304,11 @@ func.func @sort_op() {
   return
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [64, 1, 1]>
+//       CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
 //       CHECK: func.func @sort_op()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: iree_linalg_ext.sort
-//  CHECK-SAME:     lowering_config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{thread = [1, 0], workgroup = [1, 0]}>
 
 // -----
 
