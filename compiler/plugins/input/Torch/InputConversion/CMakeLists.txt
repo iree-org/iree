@@ -37,6 +37,7 @@ iree_cc_library(
     "BindSymbolicShapes.cpp"
     "BitCastQuantTensor.cpp"
     "ConvertTMTensorToLinalgExt.cpp"
+    "ConvertTorchUnstructuredToLinalgExt.cpp"
     "FuncConversion.cpp"
     "SetStrictSymbolicShapes.cpp"
     "Passes.cpp"
