@@ -254,6 +254,23 @@ def IREEEncoding_EncodingTypeInterface :
     >,
     InterfaceMethod<
       [{
+        Returns the tensor type with the updated encoding type.
+      }],
+      /*retTy=*/"::mlir::Type",
+      /*methodName=*/"updateEncodingType",
+      /*args=*/(ins
+        "::mlir::Type":$type)
+    >,
+    InterfaceMethod<
+      [{
+        Returns the encoding.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getEncoding",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      [{
         Returns the same type but with the updated encoding.
       }],
       /*retTy=*/"::mlir::Type",

@@ -135,7 +135,10 @@ public:
     return llvm::cast<RankedTensorType>(boundType);
   }
 
+  // Interface methods for IREE::Encoding::EncodingTypeInterface.
   Type getEncodingType() const;
+  Type updateEncodingType(Type type) const;
+  Attribute getEncoding() const;
   Type updateEncoding(Attribute encoding) const;
 };
 
