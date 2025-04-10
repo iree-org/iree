@@ -68,6 +68,11 @@ iree_status_t iree_hal_hip_semaphore_wait_hip_events(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     hipStream_t stream);
 
+// Waits until all exported timepoints (up to value) have been
+// subitted to the dispatch thread.
+iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value);
+
 iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_hal_hip_per_device_info_t* device,
