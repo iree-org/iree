@@ -95,6 +95,7 @@ iree_cc_library(
     VhloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

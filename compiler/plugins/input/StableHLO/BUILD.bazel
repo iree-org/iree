@@ -24,7 +24,6 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/plugins/input/StableHLO/Conversion",
-        "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/PluginAPI",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
