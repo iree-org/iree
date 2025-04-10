@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRTransforms
     StablehloOps
     VhloOps
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::StableHLO::Conversion
   PUBLIC
