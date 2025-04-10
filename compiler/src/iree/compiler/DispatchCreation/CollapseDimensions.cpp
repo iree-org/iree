@@ -549,7 +549,11 @@ bool CollapseInfo::updateFromOther(FailureOr<AffineMap> otherToThisMap,
       newReassociation.push_back(newIndicies);
     }
   }
-  reassociation = std::move(newReassociation);
+
+  if (didChange) {
+    reassociation = std::move(newReassociation);
+    collapsableLoops = getCollapsedFromReassociation(reassociation);
+  }
   return didChange;
 }
 
