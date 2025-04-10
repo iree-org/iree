@@ -49,27 +49,41 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   auto encoding = dyn_cast<IREE::Encoding::MatmulKAttr>(
       encodingOp.getResultType().getEncoding());
   if (!encoding) {
-    return failure();
+    return rewriter.notifyMatchFailure(encodingOp, "only matmul_k is handled");
   }
   auto collapseOp =
       encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
   if (!collapseOp) {
-    return failure();
+    return rewriter.notifyMatchFailure(encodingOp,
+                                       "expected a collapse_shape producer");
   }
-  if (!(IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) &&
-        IREE::Flow::isNonNullAndOutsideDispatch(collapseOp))) {
-    return failure();
+  if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
+      !IREE::Flow::isNonNullAndOutsideDispatch(collapseOp)) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "expected that both operations are outside dispatch");
   }
 
-  SmallVector<int32_t> kDims(encoding.getKDims().asArrayRef());
+  ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
   llvm::SetVector<int32_t> kDimsSet(kDims.begin(), kDims.end());
+
+  // Bail out if it is not propagable.
+  // TODO: Relax the check to allow transforming innermost reduction dimensions.
+  // We need to revisit the matmul_k encoding semantic.
+  SmallVector<ReassociationIndices, 4> reassociationMaps =
+      collapseOp.getReassociationIndices();
+  for (int32_t k : kDims) {
+    if (reassociationMaps[k].size() != 1) {
+      return rewriter.notifyMatchFailure(
+          encodingOp,
+          "expected collaps_shape ops to not transform k dimensions");
+    }
+  }
 
   // Get a mapping from original iteration space to expanded iteration space.
   MLIRContext *ctx = rewriter.getContext();
   unsigned numDims = 0;
   SmallVector<int32_t> newKDims;
-  for (auto [idx, reassociation] :
-       llvm::enumerate(collapseOp.getReassociationIndices())) {
+  for (auto [idx, reassociation] : llvm::enumerate(reassociationMaps)) {
     if (kDimsSet.count(idx)) {
       newKDims.append(llvm::to_vector(
           llvm::seq<int32_t>(numDims, numDims + reassociation.size())));
@@ -77,11 +91,8 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
     numDims += reassociation.size();
   }
 
-  auto newEncodingAttr = IREE::Encoding::MatmulKAttr::get(
-      ctx, encoding.getOperandIndex(), encoding.getElementTypes(),
-      rewriter.getDenseI32ArrayAttr(newKDims), encoding.getLayouts());
-
   // Create the new encoding op.
+  auto newEncodingAttr = IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
   RankedTensorType newEncodingType =
       collapseOp.getSrcType().cloneWithEncoding(newEncodingAttr);
   Value newEncodingOp = rewriter.create<IREE::Encoding::SetEncodingOp>(
