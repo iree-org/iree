@@ -2729,7 +2729,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       })
       .Case<IREE::LinalgExt::SortOp>([&](auto sortOp) {
         LDBG("Sort Config");
-        return setSortConfig(target, entryPointFn, sortOp);
+        return IREE::GPU::setSortConfig(target, entryPointFn, sortOp);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp,
