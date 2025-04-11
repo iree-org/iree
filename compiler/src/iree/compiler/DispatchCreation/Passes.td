@@ -305,6 +305,9 @@ def SetEncodingPass :
   let options = [
     Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
            "provides padding size hints that will be attached to encodings.">,
+    Option<"setMatmulKEncoding",
+           "set-matmulk-encoding", "bool", /*default=*/"false",
+           "Set encodings using iree_encoding.matmul_k.">
   ];
 }
 

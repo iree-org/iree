@@ -31,16 +31,16 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::MatmulKAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-Value setEncoding(OpBuilder &builder, Location loc, Value source,
-                  EncodingAttr encodingAttr) {
-  auto sourceType = cast<RankedTensorType>(source.getType());
-  auto resultType = RankedTensorType::get(
-      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
+static Value setEncoding(OpBuilder &builder, Location loc, Value source,
+                         Attribute encodingAttr) {
+  auto resultType =
+      cast<RankedTensorType>(source.getType()).cloneWithEncoding(encodingAttr);
   return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
@@ -163,8 +163,10 @@ class SetContractionOpEncoding final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  explicit SetContractionOpEncoding(MLIRContext *ctx, int64_t factor)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), padFactor(factor) {}
+  explicit SetContractionOpEncoding(MLIRContext *ctx, int64_t factor,
+                                    bool matmulKEncoding)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), padFactor(factor),
+        setMatmulKEncoding(matmulKEncoding) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
@@ -228,9 +230,26 @@ public:
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-      auto encoding =
-          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
-                            elemTypes, maps, iterationSizes);
+      MLIRContext *ctx = linalgOp.getContext();
+      Attribute encoding;
+      if (!setMatmulKEncoding) {
+        encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
+                                     iterationSizes);
+      } else {
+        SmallVector<int32_t> kDims;
+        AffineMap indexingMap = maps[operandIndex];
+        auto cDims = linalg::inferContractionDims(linalgOp);
+        linalgOp.dump();
+        for (auto k : cDims->k) {
+          std::optional<unsigned> dimIdx =
+              indexingMap.getResultPosition(rewriter.getAffineDimExpr(k));
+          if (!dimIdx) {
+            continue;
+          }
+          kDims.push_back(dimIdx.value());
+        }
+        encoding = MatmulKAttr::get(ctx, rewriter.getDenseI32ArrayAttr(kDims));
+      }
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
@@ -251,6 +270,7 @@ public:
 
 private:
   int64_t padFactor = 32;
+  bool setMatmulKEncoding = true;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
@@ -284,7 +304,8 @@ struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<SetContractionOpEncoding>(context, padFactor);
+    patterns.add<SetContractionOpEncoding>(context, padFactor,
+                                           setMatmulKEncoding);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.add<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
