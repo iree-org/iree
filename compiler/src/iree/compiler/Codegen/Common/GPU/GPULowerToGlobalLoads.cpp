@@ -7,6 +7,7 @@
 #include <numeric>
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -69,7 +70,7 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
       loc, newSliceType, tensor, offset, newShapeOfSlice, strides);
 }
 
-static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
+static Value distributeLinalgCopyToThreads(RewriterBase &rewriter,
                                           linalg::CopyOp copy,
                                           ArrayRef<int64_t> workgroupSize,
                                           ArrayRef<int64_t> subgroupSize) {
@@ -102,7 +103,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
       copy.getLoc(), lowerBounds, upperBounds, tileSizes,
-      /*outputs=*/ValueRange(), /*mapping=*/rewriter.getArrayAttr(mapping));
+      /*outputs=*/ValueRange{copy.getResult(0)}, /*mapping=*/rewriter.getArrayAttr(mapping));
   rewriter.setInsertionPointToStart(newForallOp.getBody());
 
   auto inductionVars = newForallOp.getInductionVars();
@@ -118,7 +119,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   // TODO: make it multidimensional.
   //Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, gpu::Dimension::x);
-  //Value laneId = rewriter.create<gpu::LaneIdOp>(loc, gpu::Dimension::x);
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
 
   // compute number of loads per thread
   auto sliceType = cast<RankedTensorType>(globalSlice->getType());
@@ -127,11 +128,27 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
       std::multiplies<int64_t>());
   auto numLoads = sliceSize / ((elementBitWidth / 8) * subgroupSize[0]);
   
+  Value globalSliceValue = *globalSlice;
+  Value gatherOffset = laneId;
+  Value gatherStride = rewriter.create<arith::ConstantIndexOp>(
+      loc, (elementBitWidth / 8) * subgroupSize[0]);
   for (int i = 0; i < numLoads; ++i) {
+    //compute the offset
+    auto delinearizedIndex =
+        rewriter
+            .create<affine::AffineDelinearizeIndexOp>(
+                loc, gatherOffset, sliceType.getShape())
+            .getMultiIndex();
+    globalSliceValue = rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
+        loc, sliceType, globalSliceValue, *localSlice, delinearizedIndex);
+    if (i < numLoads - 1) {
+      gatherOffset =
+          rewriter.create<arith::AddIOp>(loc, gatherOffset, gatherStride);
+    }
   }
 
   rewriter.create<scf::YieldOp>(loc, *localSlice);
-  return true;
+  return newForallOp->getResult(0);
 }
 
 } // namespace
@@ -187,12 +204,9 @@ struct GPULowerToGlobalLoadsPass final
     IRRewriter rewriter(context);
     for (auto copy : copies) {
       rewriter.setInsertionPoint(copy);
-      bool success = distributeLinalgCopyToThreads(
+      auto newCopy = distributeLinalgCopyToThreads(
           rewriter, copy, *workgroupSize, *subgroupSize);
-      if (!success) {
-        copy.emitOpError("failed to distribute copy");
-        return signalPassFailure();
-      }
+      rewriter.replaceAllOpUsesWith(copy, newCopy);
     }
 
   }

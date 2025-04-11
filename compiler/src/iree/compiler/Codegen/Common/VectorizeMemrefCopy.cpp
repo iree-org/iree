@@ -27,6 +27,7 @@ struct ConvertLinalgCopyToMemrefCopy final : OpRewritePattern<linalg::CopyOp> {
       return failure();
     }
     
+    /*
     auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
     if (config) {
       // Generate memref.copy with global load/dma
@@ -39,6 +40,7 @@ struct ConvertLinalgCopyToMemrefCopy final : OpRewritePattern<linalg::CopyOp> {
           copyOp.getDpsInitOperand(0)->get());
     }
     rewriter.eraseOp(copyOp);
+    */
     return success();
   }
 };

@@ -467,12 +467,12 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
     TODO: Add description
   }];
 
-  let arguments = (ins  AnyMemRef:$input, AnyMemRef:$output);
-  let results   = (outs);
+  let arguments = (ins  AnyTensor:$source, AnyTensor:$target, Variadic<Index>:$indices);
+  let results   = (outs AnyTensor:$modified_target);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat = [{
-    $input `,` $output attr-dict `:` type($input) `,` type($output)
+    $source`[` $indices `]` `->` $target attr-dict `:` type($source) `,` type($target) `->` type($modified_target)
   }];
 }
 
