@@ -31,16 +31,16 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::MatmulKAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-Value setEncoding(OpBuilder &builder, Location loc, Value source,
-                  EncodingAttr encodingAttr) {
-  auto sourceType = cast<RankedTensorType>(source.getType());
-  auto resultType = RankedTensorType::get(
-      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
+static Value setEncoding(OpBuilder &builder, Location loc, Value source,
+                         Attribute encodingAttr) {
+  auto resultType =
+      cast<RankedTensorType>(source.getType()).cloneWithEncoding(encodingAttr);
   return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
@@ -163,11 +163,13 @@ class SetContractionOpEncoding final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  explicit SetContractionOpEncoding(MLIRContext *ctx)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx) {}
+  explicit SetContractionOpEncoding(MLIRContext *ctx, EncodingOptions &option)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx),
+        encodingOption(option) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+
     if (!linalgOp.hasPureTensorSemantics()) {
       return failure();
     }
@@ -227,17 +229,40 @@ public:
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
-    auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-      auto encoding =
-          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
-                            elemTypes, maps, iterationSizes);
+    auto setEncodingWrapper = [&](Value src,
+                                  int64_t operandIndex) -> FailureOr<Value> {
+      MLIRContext *ctx = linalgOp.getContext();
+      Attribute encoding;
+      if (encodingOption == EncodingOptions::Default) {
+        encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
+                                     iterationSizes);
+      } else if (encodingOption == EncodingOptions::MatmulK) {
+        SmallVector<int32_t> kDims;
+        AffineMap indexingMap = maps[operandIndex];
+        auto cDims = linalg::inferContractionDims(linalgOp);
+        for (auto k : cDims->k) {
+          std::optional<unsigned> dimIdx =
+              indexingMap.getResultPosition(rewriter.getAffineDimExpr(k));
+          if (!dimIdx) {
+            continue;
+          }
+          kDims.push_back(dimIdx.value());
+        }
+        encoding = MatmulKAttr::get(ctx, rewriter.getDenseI32ArrayAttr(kDims));
+      } else {
+        // Unknown option specified.
+        return failure();
+      }
       return setEncoding(rewriter, loc, src, encoding);
     };
-    Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
-    Value encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
-    Value encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
-    Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
-                          ValueRange{encodedLhs, encodedRhs, encodedOut})
+    auto encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
+    auto encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
+    auto encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
+    if (failed(encodedLhs) || failed(encodedRhs) || failed(encodedOut)) {
+      return failure();
+    }
+    Value opTiled = clone(rewriter, linalgOp, encodedOut->getType(),
+                          ValueRange{*encodedLhs, *encodedRhs, *encodedOut})
                         ->getResult(0);
 
     // Sizes are computed by original output size.
@@ -248,6 +273,9 @@ public:
     rewriter.replaceOp(linalgOp, result);
     return success();
   }
+
+private:
+  EncodingOptions encodingOption;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
@@ -276,12 +304,16 @@ struct FoldFillWithSetEncoding final
   }
 };
 
-struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
-  using Base::Base;
+class SetEncodingPass : public impl::SetEncodingPassBase<SetEncodingPass> {
+public:
+  using impl::SetEncodingPassBase<SetEncodingPass>::SetEncodingPassBase;
+  explicit SetEncodingPass(const EncodingOptions &option) {
+    this->encodingOption = option;
+  }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<SetContractionOpEncoding>(context);
+    patterns.add<SetContractionOpEncoding>(context, encodingOption.getValue());
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.add<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);

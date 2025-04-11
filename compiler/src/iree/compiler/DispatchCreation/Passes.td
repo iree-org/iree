@@ -306,6 +306,21 @@ def SetEncodingPass :
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
   ];
+    let options =
+      [Option<"encodingOption", "encoding-option",
+              "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+              /*default=*/
+              "mlir::iree_compiler::DispatchCreation::EncodingOptions::Default",
+              "Select the type of encoding options to add.",
+              [{::llvm::cl::values(
+            clEnumValN(mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
+                       "matmulk",
+                      "Adds the matmul k attribute."),
+            clEnumValN(mlir::iree_compiler::DispatchCreation::EncodingOptions::Default,
+                       "default",
+                       "Adds default attribute.")
+        )}]>,
+  ];
 }
 
 def ConvertEncodingToFlowPass :

@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-encoding))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-encoding{encoding-option=matmulk}))" %s | FileCheck %s --check-prefix=MATMULK
 
 util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
@@ -1160,3 +1161,30 @@ util.func public @region_with_workgroup_count(%arg0: !hal.buffer_view, %arg1: !h
 // CHECK-LABEL:  util.func public @region_with_workgroup_count
 // CHECK-NOT:      iree_encoding.set_encoding
 // CHECK-NOT:      iree_encoding.unset_encoding
+
+// -----
+
+util.func public @matmul_f32f32f32_k_encoding(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
+    %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<250x500xf32>)
+      outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
+  util.return %0 : tensor<100x500xf32>
+}
+//  MATMULK-DAG: #[[LHS_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
+//  MATMULK-DAG: #[[RHS_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [0]>
+//  MATMULK-DAG: #[[OUT_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = []>
+//      MATMULK: util.func public @matmul_f32f32f32_k_encoding(
+// MATMULK-SAME:     %[[ARG0:.+]]: tensor<100x250xf32>
+// MATMULK-SAME:     %[[ARG1:.+]]: tensor<250x500xf32>
+// MATMULK-SAME:     %[[ARG2:.+]]: tensor<100x500xf32>
+//      MATMULK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
+// MATMULK-SAME:       tensor<100x250xf32, #[[LHS_ENCODING]]>
+//      MATMULK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
+// MATMULK-SAME:       tensor<250x500xf32, #[[RHS_ENCODING]]>
+//      MATMULK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
+// MATMULK-SAME:       tensor<100x500xf32, #[[OUT_ENCODING]]>
+//      MATMULK:   %[[MATMUL:.+]] = linalg.matmul
+// MATMULK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// MATMULK-SAME:       outs(%[[OUTS]] :
+//      MATMULK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[MATMUL]] : tensor<100x500xf32, #[[OUT_ENCODING]]> -> tensor<100x500xf32>
+//      MATMULK:   util.return %[[RESULT]]
