@@ -278,6 +278,172 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// GatherOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> GatherOp::getLoopIteratorTypes() {
+  return {static_cast<size_t>(getOutputType().getRank()),
+          utils::IteratorType::parallel};
+}
+
+SmallVector<Range> GatherOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getOutputType().getRank())) {
+    OpFoldResult ub = getDim(builder, loc, getOutput(), dim);
+    ranges.emplace_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+FailureOr<TilingResult>
+GatherOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  assert(offsets.size() >= 1 && sizes.size() >= 1);
+  Location loc = getLoc();
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  SmallVector<Operation *> slices;
+
+  // Slice of the result.
+  auto resultRank = getOutputType().getRank();
+  SmallVector<OpFoldResult> resultStrides(resultRank, oneAttr);
+  Operation *resultSlice =
+      getSlice(builder, loc, getOutput(), offsets, sizes, resultStrides);
+  if (!resultSlice) {
+    return emitOpError("failed to get result slice");
+  }
+  Value tiledResult = resultSlice->getResult(0);
+
+  // Slice of indices.
+  auto indicesRank = getIndicesType().getRank();
+  SmallVector<OpFoldResult> indicesOffsets(offsets.take_front(getBatchRank()));
+  SmallVector<OpFoldResult> indicesSizes(sizes.take_front(getBatchRank()));
+  if (getBatchRank() != getIndicesType().getRank()) {
+    indicesOffsets.push_back(zeroAttr);
+    indicesSizes.push_back(builder.getIndexAttr(getIndexDepth()));
+  }
+  SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
+
+  Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
+                                     indicesSizes, indicesStrides);
+  if (!indicesSlice) {
+    return emitOpError("failed to get indices slices");
+  }
+  Value tiledIndices = indicesSlice->getResult(0);
+
+  // Slice of the source.
+  auto sourceRank = getSourceType().getRank();
+  auto indexDepth = getIndexDepth();
+
+  // The first `indexDepth` dims are not tiled
+  SmallVector<OpFoldResult> sourceOffsets, sourceSizes;
+  for (auto dim : llvm::seq<int64_t>(0, indexDepth)) {
+    sourceOffsets.push_back(zeroAttr);
+    sourceSizes.push_back(getDim(builder, loc, getSource(), dim));
+  }
+  for (auto dim : llvm::seq<int64_t>(indexDepth, sourceRank)) {
+    sourceOffsets.push_back(offsets[dim - indexDepth + getBatchRank()]);
+    sourceSizes.push_back(sizes[dim - indexDepth + getBatchRank()]);
+  }
+  SmallVector<OpFoldResult> sourceStrides(sourceRank, oneAttr);
+  Operation *sourceSlice = getSlice(builder, loc, getSource(), sourceOffsets,
+                                    sourceSizes, sourceStrides);
+  if (!sourceSlice) {
+    return emitOpError("failed to get source tensor slice");
+  }
+  Value tiledSource = sourceSlice->getResult(0);
+
+  slices.push_back(sourceSlice);
+  slices.push_back(indicesSlice);
+  slices.push_back(resultSlice);
+
+  SmallVector<Type> resultTypes;
+  if (getNumResults()) {
+    resultTypes.push_back(tiledResult.getType());
+  }
+  Operation *tiledScatterOp =
+      mlir::clone(builder, getOperation(), resultTypes,
+                  ValueRange{tiledSource, tiledIndices, tiledResult});
+  return TilingResult{{tiledScatterOp},
+                      SmallVector<Value>(tiledScatterOp->getResults()),
+                      slices};
+}
+
+LogicalResult GatherOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+FailureOr<TilingResult>
+GatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                     ValueRange ivs) {
+  auto indexDepth = getIndexDepth();
+  Value result = b.create<memref::LoadOp>(loc, getOutput(), ivs);
+  SmallVector<Value> starts;
+  SmallVector<Value> loadIndices;
+  append_range(loadIndices, ivs.take_front(getBatchRank()));
+  //
+  // Populate with empty values.
+  auto sourceTy = getSourceType();
+  starts.resize(sourceTy.getRank(), Value());
+  auto resultIvs = ivs.drop_front(getBatchRank());
+  //
+  int64_t offset = starts.size() - resultIvs.size();
+  for (auto [idx, iv] : llvm::enumerate(resultIvs)) {
+    starts[idx + offset] = iv;
+  }
+  //
+  ArrayRef<int64_t> dimMap = getDimensionMap();
+  //
+  if (getIndicesType().getRank() > getBatchRank()) {
+    loadIndices.push_back(Value());
+  }
+  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
+    if (getIndicesType().getRank() > getBatchRank()) {
+      loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
+    }
+    Value idx = b.create<memref::LoadOp>(loc, getIndices(), loadIndices);
+    Value ret = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
+
+    auto dim = dimMap[i];
+
+    if (starts[dim])
+      ret = b.create<arith::AddIOp>(loc, ret, starts[dim]);
+    starts[dim] = ret;
+  }
+
+  Value init = b.create<memref::LoadOp>(loc, getSource(), starts);
+
+  IRMapping bvm;
+  Block &block = getRegion().front();
+  bvm.map(block.getArgument(0), init);
+  bvm.map(block.getArgument(1), result);
+  for (auto &blockOp : block.without_terminator()) {
+    b.clone(blockOp, bvm);
+  }
+  // The last op is linalg_ext.yield op. Store the operand to
+  // destination.
+  b.create<memref::StoreOp>(
+      loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
+      getOutput(), ivs);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
 
