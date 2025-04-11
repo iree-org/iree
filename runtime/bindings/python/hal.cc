@@ -1373,7 +1373,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__int__",
            [](enum iree_hal_element_types_t self) { return (uint64_t)self; });
 
-  py::enum_<iree_hal_external_timepoint_type_t>(m, "ExternalTimepointType")
+  py::enum_<iree_hal_external_timepoint_type_t>(m, "ExternalTimepointType", py::is_arithmetic(), py::is_flag())
            .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE)
            .value("WAIT_PRIMITIVE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE)
            .value("CUDA_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT)
@@ -1383,7 +1383,7 @@ void SetupHalBindings(nanobind::module_ m) {
              return (uint64_t)self;
            });
   
-  py::enum_<enum iree_hal_semaphore_compatibility_bits_t>(m, "SemaphoreCompatibility")
+  py::enum_<enum iree_hal_semaphore_compatibility_bits_t>(m, "SemaphoreCompatibility", py::is_arithmetic(), py::is_flag())
            .value("NONE", IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE)
            .value("HOST_WAIT", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT)
            .value("DEVICE_WAIT", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT)
@@ -1400,7 +1400,7 @@ void SetupHalBindings(nanobind::module_ m) {
              return (uint64_t)self;
            });
 
-  py::enum_<iree_hal_external_timepoint_flag_bits_t>(m, "ExternalTimepointFlags")
+  py::enum_<iree_hal_external_timepoint_flag_bits_t>(m, "ExternalTimepointFlags", py::is_arithmetic(), py::is_flag())
            .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_FLAG_NONE)
            .export_values()
            .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
