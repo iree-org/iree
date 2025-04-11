@@ -179,7 +179,7 @@ struct MemRefRewritePatternBase : public OpRewritePattern<T> {
     replaceOp(op, rewriter, flatMemref, offset);
     return success();
   }
-  virtual Value getTargetMemref(Operation *op) const = 0;
+  virtual Value getTargetMemref(T op) const = 0;
   virtual void replaceOp(Operation *op, PatternRewriter &rewriter,
                          Value flatMemref, Value offset) const = 0;
   virtual ~MemRefRewritePatternBase() = default;
@@ -187,8 +187,8 @@ struct MemRefRewritePatternBase : public OpRewritePattern<T> {
 
 struct FlattenMemrefLoad : public MemRefRewritePatternBase<memref::LoadOp> {
   using MemRefRewritePatternBase<memref::LoadOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<memref::LoadOp>(op).getMemref();
+  Value getTargetMemref(memref::LoadOp op) const override {
+    return op.getMemref();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -201,8 +201,8 @@ struct FlattenMemrefLoad : public MemRefRewritePatternBase<memref::LoadOp> {
 
 struct FlattenVectorLoad : public MemRefRewritePatternBase<vector::LoadOp> {
   using MemRefRewritePatternBase<vector::LoadOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<vector::LoadOp>(op).getBase();
+  Value getTargetMemref(vector::LoadOp op) const override {
+    return op.getBase();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -215,8 +215,8 @@ struct FlattenVectorLoad : public MemRefRewritePatternBase<vector::LoadOp> {
 
 struct FlattenMemrefStore : public MemRefRewritePatternBase<memref::StoreOp> {
   using MemRefRewritePatternBase<memref::StoreOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<memref::StoreOp>(op).getMemref();
+  Value getTargetMemref(memref::StoreOp op) const override {
+    return op.getMemref();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -230,8 +230,8 @@ struct FlattenMemrefStore : public MemRefRewritePatternBase<memref::StoreOp> {
 
 struct FlattenVectorStore : public MemRefRewritePatternBase<vector::StoreOp> {
   using MemRefRewritePatternBase<vector::StoreOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<vector::StoreOp>(op).getBase();
+  Value getTargetMemref(vector::StoreOp op) const override {
+    return op.getBase();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -247,8 +247,8 @@ struct FlattenVectorMaskedLoad
     : public MemRefRewritePatternBase<vector::MaskedLoadOp> {
   using MemRefRewritePatternBase<
       vector::MaskedLoadOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<vector::MaskedLoadOp>(op).getBase();
+  Value getTargetMemref(vector::MaskedLoadOp op) const override {
+    return op.getBase();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -265,8 +265,8 @@ struct FlattenVectorMaskedStore
     : public MemRefRewritePatternBase<vector::MaskedStoreOp> {
   using MemRefRewritePatternBase<
       vector::MaskedStoreOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<vector::MaskedStoreOp>(op).getBase();
+  Value getTargetMemref(vector::MaskedStoreOp op) const override {
+    return op.getBase();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -283,8 +283,8 @@ struct FlattenVectorTransferRead
     : public MemRefRewritePatternBase<vector::TransferReadOp> {
   using MemRefRewritePatternBase<
       vector::TransferReadOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<vector::TransferReadOp>(op).getSource();
+  Value getTargetMemref(vector::TransferReadOp op) const override {
+    return op.getSource();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
@@ -300,8 +300,8 @@ struct FlattenVectorTransferWrite
     : public MemRefRewritePatternBase<vector::TransferWriteOp> {
   using MemRefRewritePatternBase<
       vector::TransferWriteOp>::MemRefRewritePatternBase;
-  Value getTargetMemref(Operation *op) const override {
-    return cast<vector::TransferWriteOp>(op).getSource();
+  Value getTargetMemref(vector::TransferWriteOp op) const override {
+    return op.getSource();
   }
   void replaceOp(Operation *op, PatternRewriter &rewriter, Value flatMemref,
                  Value offset) const override {
