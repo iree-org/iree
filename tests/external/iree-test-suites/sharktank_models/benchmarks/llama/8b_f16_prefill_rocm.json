@@ -2,7 +2,7 @@
     "inputs": [
         "4x128xi64",
         "4xi64",
-        "4x128xi64",
+        "4x4xi64",
         "34x2097152xf16"
     ],
     "function_run": "prefill_bs4",
