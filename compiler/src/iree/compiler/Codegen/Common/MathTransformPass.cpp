@@ -18,9 +18,8 @@ namespace mlir::iree_compiler {
 /// ""use native hardware operations instead of polynomial approximation".
 static llvm::cl::opt<bool> clNativeMathPrecision(
     "iree-codegen-gpu-native-math-precision",
-    llvm::cl::desc("Deprecated! This flag had buggy/unintentional semantics. "
-                   "Its original description said: \"Skip polynomial lowering "
-                   "for math op natively available on GPU.\""),
+    llvm::cl::desc("Deprecated! This flag doesn't do anything anymore and will "
+                   "be removed soon."),
     llvm::cl::init(false));
 
 #define GEN_PASS_DEF_MATHTRANSFORMPASS
@@ -71,12 +70,6 @@ static bool predicateRewrite(StringRef name,
     // implementation like math.powf.
     return true;
   }
-  if (clNativeMathPrecision) { // Legacy.
-    if (name == math::Exp2Op::getOperationName() ||
-        name == math::RoundEvenOp::getOperationName()) {
-      return false;
-    }
-  }
   if (isROCMBackend(target)) {
     // On ROCm, we do not need most rewrites as we can generally bottom out on
     // either device library functions, or handling of intrinsics in AMDGPU.
@@ -94,10 +87,7 @@ static bool predicateRewrite(StringRef name,
 
 static bool predicateF32Cast(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
-  (void)target;                // Currently unused.
-  if (clNativeMathPrecision) { // Legacy.
-    return false;
-  }
+  (void)target; // Currently unused.
   StringRef atan = math::AtanOp::getOperationName();
   StringRef atan2 = math::Atan2Op::getOperationName();
   StringRef cos = math::CosOp::getOperationName();
@@ -117,9 +107,6 @@ static bool predicateF32Cast(StringRef name,
 
 static bool predicateApprox(StringRef name,
                             IREE::HAL::ExecutableTargetAttr target) {
-  if (clNativeMathPrecision) { // Legacy.
-    return false;
-  }
   if (isROCMBackend(target)) {
     // On ROCm, we do not need most rewrites as we can generally bottom out on
     // either device library functions, or handling of intrinsics in AMDGPU.
@@ -156,8 +143,11 @@ struct DeprecationWarningForNativeMathPrecision {
   DeprecationWarningForNativeMathPrecision() {
     if (clNativeMathPrecision) {
       clNativeMathPrecision.error(
-          "This option is deprecated. The MathTransformPass should do the "
-          "right things for each target.");
+          "This option is deprecated, does not do anything anymore, and will "
+          "be removed soon. It was mainly used on the ROCm target, but the "
+          "behavior that it once enabled is now default on ROCm. More "
+          "generally, MathTransformPass should do the right things for each "
+          "target.");
     }
   }
 };
