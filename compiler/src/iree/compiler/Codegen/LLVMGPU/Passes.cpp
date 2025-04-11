@@ -1107,9 +1107,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass)
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
-      // Convert BF16 operations to occur as F32.
-      .addPass(createConvertBf16ArithToF32Pass)
-      .addPass(createConvertBf16ToUInt16BuffersPass)
       // Math dialect ops rewrites, approximations, casts.
       .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
