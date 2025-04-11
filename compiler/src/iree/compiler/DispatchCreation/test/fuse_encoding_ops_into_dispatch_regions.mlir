@@ -62,6 +62,37 @@ util.func public @reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#encoding = #iree_encoding.matmul_k<k_dims = [2]>
+util.func public @matmul_k_reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<2x11008x128xf32, #encoding> {
+  %0 = tensor.empty() : tensor<2x11008x128xf32>
+  %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
+    %5 = linalg.generic {
+        indexing_maps = [#map, #map1],
+        iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+        ins(%arg0 : tensor<2x11008x128x16xf32>)
+        outs(%0 : tensor<2x11008x128xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %6 = arith.addf %in, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<2x11008x128xf32>
+    flow.return %5 : tensor<2x11008x128xf32>
+  }
+  %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
+  util.return %2 : tensor<2x11008x128xf32, #encoding>
+}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [2]>
+// CHECK-LABEL: @matmul_k_reduction_fusion
+// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region
+// CHECK:         %[[REDUCTION:.+]] = linalg.generic
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[REDUCTION]]
+// CHECK:         flow.return %[[SET_ENCODING]] :
+// CHECK:       }
+// CHECK:       util.return %[[DISPATCH]] : tensor<2x11008x128xf32, #[[$ENCODING]]>
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
 #encoding = #iree_encoding.testing_encoding<>
