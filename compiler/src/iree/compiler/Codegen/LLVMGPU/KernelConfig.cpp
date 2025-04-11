@@ -28,6 +28,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -277,18 +278,6 @@ static bool hasReductionIterator(linalg::LinalgOp &op) {
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
-/// Returns the intersection of two vectors.
-static SmallVector<unsigned> findIntersection(ArrayRef<unsigned> vec1,
-                                              ArrayRef<unsigned> vec2) {
-  SmallVector<unsigned> intersection;
-  for (unsigned element : vec1) {
-    if (llvm::is_contained(vec2, element)) {
-      intersection.push_back(element);
-    }
-  }
-  return intersection;
-}
-
 /// The bitwidth of the init and src operands is used to determine the
 /// bitwidth of the operation. The bitwidth is minimum of the init and src
 /// operands.
@@ -347,7 +336,7 @@ static LogicalResult checkSingleCombiner(linalg::LinalgOp op) {
 static llvm::FailureOr<IREE::GPU::LoweringConfigAttr>
 getVectorDistributeReductionConfig(linalg::LinalgOp op,
                                    IREE::GPU::TargetAttr target,
-                                   ArrayRef<unsigned> sharedWgpDims,
+                                   llvm::SmallDenseSet<unsigned> &sharedWgpDims,
                                    int64_t workgroupSize, int64_t subgroupSize,
                                    int64_t threadLoads) {
   MLIRContext *context = op.getContext();
@@ -381,8 +370,11 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
     }
 
     int64_t lastDimWgpTileSize = workgroupSize * threadLoads;
+
+    // Setting subgroupBasis to minimum i.e., 1 and threadBasis
+    // to maximum i.e., subgroupSize.
     int64_t subgroupBasis = 1;
-    int64_t threadBasis = 64;
+    int64_t threadBasis = subgroupSize;
 
     lastDimWgpTileSize = llvm::APIntOps::GreatestCommonDivisor(
                              {64, static_cast<uint64_t>(parallelSize)},
@@ -435,10 +427,6 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
   SmallVector<int64_t> partialReductionTileSizes(op.getNumLoops(), 0);
   int64_t lastReductionDim = reductionDims.back();
 
-  for (int64_t dim : parallelDims) {
-    workgroupTileSizes[dim] = 1;
-  }
-
   auto isMatmulLike = [](linalg::LinalgOp &linalgOp) -> bool {
     return linalg::isaContractionOpInterface(linalgOp) &&
            linalgOp.getNumParallelLoops() >= 2;
@@ -478,7 +466,7 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
                              {64, static_cast<uint64_t>(lastReductionDimSize)})
                              .getZExtValue();
 
-  int64_t threadBasis = 64;
+  int64_t threadBasis = subgroupSize;
   while (partialReductionSize % (threadBasis * threadLoads) != 0)
     threadBasis >>= 1;
 
@@ -522,11 +510,15 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   SmallVector<unsigned> sharedParallelDims;
   linalg::LinalgOp op = computeOps.front();
   op.getParallelDims(sharedParallelDims);
+  llvm::SmallDenseSet<unsigned> sharedParallelSet(sharedParallelDims.begin(),
+                                                  sharedParallelDims.end());
 
   for (linalg::LinalgOp linalgOp : computeOps) {
     SmallVector<unsigned> currParallelDims;
     linalgOp.getParallelDims(currParallelDims);
-    sharedParallelDims = findIntersection(sharedParallelDims, currParallelDims);
+    llvm::SmallDenseSet<unsigned> currParallelSet(currParallelDims.begin(),
+                                                  currParallelDims.end());
+    llvm::set_intersect(sharedParallelSet, currParallelSet);
   }
 
   for (linalg::LinalgOp linalgOp : computeOps) {
@@ -539,7 +531,7 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
       if (reductionOp ||
           (indexingMap.getNumInputs() > indexingMap.getNumResults())) {
         auto loweringConfig = getVectorDistributeReductionConfig(
-            linalgOp, target, sharedParallelDims, workgroupSize, subgroupSize,
+            linalgOp, target, sharedParallelSet, workgroupSize, subgroupSize,
             threadLoads);
         if (failed(loweringConfig)) {
           return failure();
