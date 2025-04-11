@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-hoist-encoding-ops))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-hoist-encoding-ops{hoist-encodings-for-constexpr=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-CONST
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -247,3 +248,8 @@ util.func public @hoist_encoding_only() -> tensor<640x320xf32> {
 // CHECK:         %[[CST:.+]] = arith.constant
 // CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
 // CHECK:         flow.dispatch.region
+
+// NO-CONST-LABEL: util.func public @hoist_encoding_only(
+// NO-CONST:         %[[CST:.+]] = arith.constant
+// NO-CONST:         flow.dispatch.region
+// NO-CONST:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
