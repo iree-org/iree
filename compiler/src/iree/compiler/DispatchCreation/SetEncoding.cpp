@@ -163,8 +163,8 @@ class SetContractionOpEncoding final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  explicit SetContractionOpEncoding(MLIRContext *ctx, int64_t factor)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), padFactor(factor) {}
+  explicit SetContractionOpEncoding(MLIRContext *ctx)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
@@ -248,9 +248,6 @@ public:
     rewriter.replaceOp(linalgOp, result);
     return success();
   }
-
-private:
-  int64_t padFactor = 32;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
@@ -284,7 +281,7 @@ struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<SetContractionOpEncoding>(context, padFactor);
+    patterns.add<SetContractionOpEncoding>(context);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.add<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
