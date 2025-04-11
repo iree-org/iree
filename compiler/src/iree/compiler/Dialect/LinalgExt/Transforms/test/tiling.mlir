@@ -2628,8 +2628,6 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME:           ins(%[[SOURCE]], %[[INDEX]]
 // CHECK-SAME:           outs(%[[RESULT]]
 
-
-
 // -----
 
 func.func @gather_2d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?x2xi32>, %arg2 : memref<?xi32>) {
