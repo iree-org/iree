@@ -568,13 +568,14 @@ struct HALInterfaceWorkgroupOpsConverter final
   }
 };
 
-class ConvertNullPointerOp : public ConvertToLLVMPattern {
+class ConvertNullPointerOp
+    : public ConvertOpToLLVMPattern<IREE::Codegen::NullPointerOp> {
 public:
-  ConvertNullPointerOp(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(IREE::Codegen::NullPointerOp::getOperationName(),
-                             context, converter) {}
+  using ConvertOpToLLVMPattern<
+      IREE::Codegen::NullPointerOp>::ConvertOpToLLVMPattern;
+
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::Codegen::NullPointerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<LLVM::ZeroOp>(
         op, LLVM::LLVMPointerType::get(getContext()));
@@ -650,8 +651,7 @@ void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
   patterns.add<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp,
-               ConvertNullPointerOp, ConvertIREEUtilAssumeIntOp>(context,
-                                                                 converter);
+               ConvertNullPointerOp, ConvertIREEUtilAssumeIntOp>(converter);
   converter.addConversion([context](IREE::Codegen::NullPointerType type) {
     return LLVM::LLVMPointerType::get(context);
   });
