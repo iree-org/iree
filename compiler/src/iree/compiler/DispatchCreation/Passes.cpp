@@ -41,14 +41,6 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<int> clPadFactor(
-    "iree-dispatch-creation-pad-factor",
-    llvm::cl::desc("Provides padding size hints that will be attached to "
-                   "encodings. This only affects the experimental data tiling "
-                   "path in DispatchCreation with "
-                   "iree-dispatch-creation-experimental-data-tiling."),
-    llvm::cl::init(32));
-
 static llvm::cl::opt<bool> clEnablePadHandling(
     "iree-flow-enable-pad-handling",
     llvm::cl::desc("Enable native handling of tensor.pad operations."),
@@ -252,9 +244,7 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
-        .addPass([] {
-          return createSetEncodingPass(SetEncodingPassOptions{clPadFactor});
-        })
+        .addPass(createSetEncodingPass)
         // SetEncodingOps should not be in the same dispatch as the data-tiled
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
