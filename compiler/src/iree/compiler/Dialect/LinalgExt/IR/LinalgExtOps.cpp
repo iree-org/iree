@@ -1738,8 +1738,9 @@ LogicalResult Im2colOp::verify() {
   llvm::sort(permVec);
   for (int64_t i = 0; i < static_cast<int64_t>(sharedRank); ++i) {
     if (permVec[i] != i) {
-      return op->emitOpError("input_filter_perm must be a permutation of [0, ")
-             << sharedRank << "), but got an invalid entry: " << permVec[i];
+      return op->emitOpError(
+                 "expected input_filter_perm to be a permutation of [0, ")
+             << sharedRank << ")";
     }
   }
 
