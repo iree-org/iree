@@ -306,10 +306,6 @@ def SetEncodingPass :
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
   ];
-  let options = [
-    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
-           "provides padding size hints that will be attached to encodings.">,
-  ];
 }
 
 def ConvertEncodingToFlowPass :
