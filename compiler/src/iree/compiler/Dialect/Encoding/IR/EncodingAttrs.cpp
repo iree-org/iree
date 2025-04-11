@@ -666,63 +666,10 @@ TestingEncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   return TestingEncodingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
-Attribute UnspecializedEncodingAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) {
-    return {};
-  }
-  IntegerAttr seed;
-  if (failed(p.parseAttribute(seed))) {
-    return {};
-  }
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), seed);
-}
-
-void UnspecializedEncodingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttributeWithoutType(getSeed());
-  os << ">";
-}
-
 Attribute
 UnspecializedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
   MLIRContext *ctx = getContext();
   return SpecializedEncodingAttr::get(ctx, getSeed(), /*type=*/{});
-}
-
-Attribute SpecializedEncodingAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) {
-    return {};
-  }
-
-  IntegerAttr seed;
-  if (failed(p.parseAttribute(seed))) {
-    return {};
-  }
-
-  TypeAttr typeAttr;
-  if (succeeded(p.parseOptionalComma()) && failed(p.parseAttribute(typeAttr))) {
-    return {};
-  }
-
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), seed, typeAttr);
-}
-
-void SpecializedEncodingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttributeWithoutType(getSeed());
-  if (auto typeAttr = getType()) {
-    os << ", ";
-    p.printAttribute(typeAttr);
-  }
-  os << ">";
 }
 
 Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
