@@ -80,18 +80,14 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   }
 
   // Get a mapping from original iteration space to expanded iteration space.
-  MLIRContext *ctx = rewriter.getContext();
-  unsigned numDims = 0;
   SmallVector<int32_t> newKDims;
-  for (auto [idx, reassociation] : llvm::enumerate(reassociationMaps)) {
-    if (kDimsSet.count(idx)) {
-      newKDims.append(llvm::to_vector(
-          llvm::seq<int32_t>(numDims, numDims + reassociation.size())));
-    }
-    numDims += reassociation.size();
+  for (int32_t kDim : kDims) {
+    newKDims.append(reassociationMaps[kDim].begin(),
+                    reassociationMaps[kDim].end());
   }
 
   // Create the new encoding op.
+  MLIRContext *ctx = rewriter.getContext();
   auto newEncodingAttr = IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
   RankedTensorType newEncodingType =
       collapseOp.getSrcType().cloneWithEncoding(newEncodingAttr);
