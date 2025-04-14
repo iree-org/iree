@@ -233,7 +233,7 @@ public:
       MLIRContext *ctx = linalgOp.getContext();
       Attribute encoding;
       switch (encodingOption) {
-      case EncodingOptions::Default: {
+      case EncodingOptions::Generic: {
         encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
                                      iterationSizes);
         break;
@@ -306,7 +306,7 @@ struct FoldFillWithSetEncoding final
   }
 };
 
-struct SetEncodingPass : public impl::SetEncodingPassBase<SetEncodingPass> {
+struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
   using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();

@@ -17,7 +17,7 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
-enum class EncodingOptions { MatmulK, Default };
+enum class EncodingOptions { MatmulK, Generic };
 
 //===----------------------------------------------------------------------===//
 // Pipelines

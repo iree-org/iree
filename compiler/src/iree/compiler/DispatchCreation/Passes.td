@@ -311,15 +311,15 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
         "encodingOption", "encoding-option",
         "mlir::iree_compiler::DispatchCreation::EncodingOptions",
         /*default=*/
-        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Default",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
         "Select the type of encoding options to add.",
         [{::llvm::cl::values(
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
-                "matmulk", "Adds the matmul k attribute."),
+                "matmulk", "Only encodes reduction dimensions in the encoding."),
             clEnumValN(
-                mlir::iree_compiler::DispatchCreation::EncodingOptions::Default,
-                "default", "Adds default attribute."))}]>,
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
   ];
 }
 

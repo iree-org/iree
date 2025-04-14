@@ -80,14 +80,16 @@ static llvm::cl::opt<bool> clHoistEncodingsForConstExpr(
                    "--iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<EncodingOptions> clSetEncodingStrategy(
+static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
-    llvm::cl::values(clEnumValN(EncodingOptions::Default, "default",
-                                "Default strategy"),
-                     clEnumValN(EncodingOptions::MatmulK, "matmulk",
-                                "Only capture matmulk attribute")),
-    llvm::cl::init(EncodingOptions::Default));
+    llvm::cl::values(
+        clEnumValN(
+            DispatchCreation::EncodingOptions::Generic, "generic",
+            "Using EncodingAttr which encodes as much information as possible"),
+        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
+                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 //===----------------------------------------------------------------------===//
 // Utilities

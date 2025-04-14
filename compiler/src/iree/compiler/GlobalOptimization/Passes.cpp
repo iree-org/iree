@@ -64,11 +64,13 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-global-opt-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
-    llvm::cl::values(clEnumValN(DispatchCreation::EncodingOptions::Default,
-                                "default", "Default strategy"),
-                     clEnumValN(DispatchCreation::EncodingOptions::MatmulK,
-                                "matmulk", "Only capture matmulk attribute")),
-    llvm::cl::init(DispatchCreation::EncodingOptions::Default));
+    llvm::cl::values(
+        clEnumValN(
+            DispatchCreation::EncodingOptions::Generic, "generic",
+            "Using EncodingAttr which encodes as much information as possible"),
+        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
+                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 static llvm::cl::opt<bool> clWarnOnUninitializedValues(
     "iree-global-opt-enable-warn-on-uninitialized-values",
