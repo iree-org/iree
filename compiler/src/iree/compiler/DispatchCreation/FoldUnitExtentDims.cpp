@@ -77,6 +77,7 @@ class FoldExpandIntoExport
     if (barrierOp) {
       SmallVector<Value> newSources = barrierOp.getSources();
       newSources[expandIdx] = expandOp.getSrc();
+      rewriter.setInsertionPoint(barrierOp);
       newResult = rewriter
                       .replaceOpWithNewOp<IREE::HAL::TensorBarrierOp>(
                           barrierOp, newSources, barrierOp.getSignalFence())
@@ -89,6 +90,7 @@ class FoldExpandIntoExport
                            : nullptr;
     Attribute newExportAffinity =
         exportOp.getAffinity() ? exportOp.getAffinity().value() : nullptr;
+    rewriter.setInsertionPoint(exportOp);
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
         exportOp, exportOp.getTarget().getType(), newResult,
         TypeAttr::get(exportOp.getSourceEncoding()), newExportName,
