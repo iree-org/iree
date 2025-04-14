@@ -70,12 +70,14 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
       loc, newSliceType, tensor, offset, newShapeOfSlice, strides);
 }
 
-static Value distributeLinalgCopyToThreads(RewriterBase &rewriter,
+static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
                                           linalg::CopyOp copy,
                                           ArrayRef<int64_t> workgroupSize,
                                           ArrayRef<int64_t> subgroupSize) {
   Location loc = copy.getLoc();
   MLIRContext *context = rewriter.getContext();
+
+  OpBuilder::InsertionGuard guard(rewriter);
 
   SmallVector<OpFoldResult> tileSizes;
 
@@ -148,7 +150,7 @@ static Value distributeLinalgCopyToThreads(RewriterBase &rewriter,
   }
 
   rewriter.create<scf::YieldOp>(loc, *localSlice);
-  return newForallOp->getResult(0);
+  rewriter.replaceOp(copy, newForallOp);
 }
 
 } // namespace
@@ -204,9 +206,8 @@ struct GPULowerToGlobalLoadsPass final
     IRRewriter rewriter(context);
     for (auto copy : copies) {
       rewriter.setInsertionPoint(copy);
-      auto newCopy = distributeLinalgCopyToThreads(
+      distributeLinalgCopyToThreads(
           rewriter, copy, *workgroupSize, *subgroupSize);
-      rewriter.replaceAllOpUsesWith(copy, newCopy);
     }
 
   }
