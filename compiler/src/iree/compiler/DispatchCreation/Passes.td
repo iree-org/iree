@@ -298,28 +298,28 @@ def HoistEncodingOpsPass :
 }
 
 
-def SetEncodingPass :
-    InterfacePass<"iree-dispatch-creation-set-encoding", "mlir::FunctionOpInterface"> {
+def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
+                                    "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
   ];
-    let options =
-      [Option<"encodingOption", "encoding-option",
-              "mlir::iree_compiler::DispatchCreation::EncodingOptions",
-              /*default=*/
-              "mlir::iree_compiler::DispatchCreation::EncodingOptions::Default",
-              "Select the type of encoding options to add.",
-              [{::llvm::cl::values(
-            clEnumValN(mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
-                       "matmulk",
-                      "Adds the matmul k attribute."),
-            clEnumValN(mlir::iree_compiler::DispatchCreation::EncodingOptions::Default,
-                       "default",
-                       "Adds default attribute.")
-        )}]>,
+  let options = [
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Default",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
+                "matmulk", "Adds the matmul k attribute."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Default,
+                "default", "Adds default attribute."))}]>,
   ];
 }
 

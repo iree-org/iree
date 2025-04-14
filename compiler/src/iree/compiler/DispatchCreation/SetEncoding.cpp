@@ -233,10 +233,13 @@ public:
                                   int64_t operandIndex) -> FailureOr<Value> {
       MLIRContext *ctx = linalgOp.getContext();
       Attribute encoding;
-      if (encodingOption == EncodingOptions::Default) {
+      switch (encodingOption) {
+      case EncodingOptions::Default: {
         encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
                                      iterationSizes);
-      } else if (encodingOption == EncodingOptions::MatmulK) {
+        break;
+      }
+      case EncodingOptions::MatmulK: {
         SmallVector<int32_t> kDims;
         AffineMap indexingMap = maps[operandIndex];
         auto cDims = linalg::inferContractionDims(linalgOp);
@@ -249,9 +252,11 @@ public:
           kDims.push_back(dimIdx.value());
         }
         encoding = MatmulKAttr::get(ctx, rewriter.getDenseI32ArrayAttr(kDims));
-      } else {
-        // Unknown option specified.
+        break;
+      }
+      default: {
         return failure();
+      }
       }
       return setEncoding(rewriter, loc, src, encoding);
     };
