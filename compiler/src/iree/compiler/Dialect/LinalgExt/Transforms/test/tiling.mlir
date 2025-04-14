@@ -2584,3 +2584,85 @@ module attributes { transform.with_named_sequence } {
 //      CHECK:       %[[INDEX:.+]] = affine.apply #[[MAP]](%[[IV]])[%[[NEW_INDEX]]]
 //      CHECK:       linalg.generic
 // CHECK-SAME:           ins(%{{.+}}, %[[INDEX]] :
+
+// -----
+
+func.func @gather_1d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?xi32>, %arg2 : memref<?x?xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%arg0, %arg1: memref<?x?xi32>, memref<?xi32>)
+    outs(%arg2: memref<?x?xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
+//      CHECK: func @gather_1d_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG2]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG2]], %[[C1]]
+//      CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
+//      CHECK:     scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C20]]
+//  CHECK-DAG:       %[[MIN0:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
+//  CHECK-DAG:       %[[MIN1:.+]] = affine.min #[[MAP1]](%[[J]])[%[[D1]]]
+//  CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]], %[[J]]] [%[[MIN0]], %[[MIN1]]] [1, 1]
+//  CHECK-DAG:       %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[MIN0]]] [1]
+//  CHECK-DAG:       %[[D2:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:       %[[SOURCE:.+]] = memref.subview %[[ARG0]][0, %[[J]]] [%[[D2]], %[[MIN1]]] [1, 1]
+//      CHECK:       iree_linalg_ext.gather
+// CHECK-SAME:           ins(%[[SOURCE]], %[[INDEX]]
+// CHECK-SAME:           outs(%[[RESULT]]
+
+// -----
+
+func.func @gather_2d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?x2xi32>, %arg2 : memref<?xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%arg0, %arg1: memref<?x?xi32>, memref<?x2xi32>)
+    outs(%arg2: memref<?xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [13] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//      CHECK: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 13)>
+//      CHECK: func @gather_2d_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C13:.+]] = arith.constant 13
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG2]], %[[C0]]
+//      CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C13]]
+//  CHECK-DAG:     %[[MIN:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
+//  CHECK-DAG:     %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]]] [%[[MIN]]] [1]
+//  CHECK-DAG:     %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]], 0] [%[[MIN]], 2] [1, 1]
+//  CHECK-DAG:     %[[D1:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:     %[[D2:.+]] = memref.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:     %[[SOURCE:.+]] = memref.subview %[[ARG0]][0, 0] [%[[D1]], %[[D2]]] [1, 1]
+//      CHECK:     iree_linalg_ext.gather
+// CHECK-SAME:         ins(%[[SOURCE]], %[[INDEX]]
+// CHECK-SAME:         outs(%[[RESULT]]

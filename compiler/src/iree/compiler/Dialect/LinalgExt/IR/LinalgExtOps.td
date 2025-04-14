@@ -224,7 +224,13 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 }
 
 def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+        ["getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "generateResultTileValue"]>]> {
   let summary = "Gather operator";
   let description = [{
     Takes two inputs (`source` and `indices`) and outputs value (`output`).
