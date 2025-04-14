@@ -263,9 +263,6 @@ public:
     auto encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
     auto encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
     auto encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
-    if (encodedLhs || encodedRhs || encodedOut) {
-      return failure();
-    }
     Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
                           ValueRange{encodedLhs, encodedRhs, encodedOut})
                         ->getResult(0);
