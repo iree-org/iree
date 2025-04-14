@@ -8,10 +8,10 @@ hal.executable private @pad_matmul_static_dispatch_0  {
   builtin.module {
     func.func @pad_matmul_static_dispatch_0(%arg0: tensor<250x500xf32>, %arg1: tensor<500x1020xf32>) -> tensor<250x1020xf32> {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<250x500xf32>>
-      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<500x1020xf32>>
-      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
-      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [500, 1020], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<500x1020xf32>> -> tensor<500x1020xf32>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<250x500xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<500x1020xf32>>
+      %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
+      %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [500, 1020], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<500x1020xf32>> -> tensor<500x1020xf32>
 
       %50 = tensor.empty() : tensor<250x1020xf32>
       %cst = arith.constant 0.000000e+00 : f32
@@ -19,8 +19,8 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       // CHECK:      %[[CST:.+]] = arith.constant 0.000000e+00 : f32
       // CHECK:      %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64)
       // CHECK:      %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64)
-      // CHECK:      %[[D2:.+]] = flow.dispatch.tensor.load %[[D0]], offsets = [0, 0], sizes = [250, 500]
-      // CHECK:      %[[D3:.+]] = flow.dispatch.tensor.load %[[D1]], offsets = [0, 0], sizes = [500, 1020]
+      // CHECK:      %[[D2:.+]] = iree_tensor_ext.dispatch.tensor.load %[[D0]], offsets = [0, 0], sizes = [250, 500]
+      // CHECK:      %[[D3:.+]] = iree_tensor_ext.dispatch.tensor.load %[[D1]], offsets = [0, 0], sizes = [500, 1020]
       // CHECK:      %[[D4:.+]] = tensor.empty() : tensor<250x1020xf32>
       // CHECK-NEXT: %[[D5:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D4]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
       // CHECK-NEXT: %[[D6:.+]] = bufferization.alloc_tensor() copy(%[[D2]]) : tensor<250x500xf32>

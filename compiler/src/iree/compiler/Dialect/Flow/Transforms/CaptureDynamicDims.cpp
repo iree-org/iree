@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
@@ -21,7 +22,7 @@ namespace {
 // TODO(benvanik): rework flow.dispatch.workgroups to hold shape dimension
 // mappings for the region instead of needing this pass and the tie ops.
 
-// Captures dynamic dimensions of !flow.dispatch.tensor operands.
+// Captures dynamic dimensions of !iree_tensor_ext.dispatch.tensor operands.
 // Tries to deduplicate with any that may already be captured by construction.
 //
 // Thanks to all dimensions being captured by the flow.dispatch.workgroups op
@@ -56,8 +57,8 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   // SSA value pair.
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
   auto captureTensorDims = [&](Value externalValue, Value internalValue) {
-    auto tensorType =
-        llvm::dyn_cast<IREE::Flow::DispatchTensorType>(internalValue.getType());
+    auto tensorType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        internalValue.getType());
     if (!tensorType)
       return;
     if (tensorType.hasStaticShape())
@@ -78,9 +79,9 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     unsigned insertionPosition = entryBlock->getNumArguments();
     for (auto argType : llvm::reverse(entryBlock->getArgumentTypes())) {
       auto flowTensorType =
-          llvm::dyn_cast<IREE::Flow::DispatchTensorType>(argType);
-      if (!flowTensorType ||
-          flowTensorType.getAccess() != IREE::Flow::TensorAccess::WriteOnly) {
+          llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(argType);
+      if (!flowTensorType || flowTensorType.getAccess() !=
+                                 IREE::TensorExt::TensorAccess::WriteOnly) {
         break;
       }
       insertionPosition--;

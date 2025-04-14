@@ -14,18 +14,18 @@ iree_cc_library(
   NAME
     ExternalModels
   HDRS
-    "FlowExternalModels.h"
     "HALExternalModels.h"
     "Interfaces.h"
     "LinalgExtExternalModels.h"
     "StreamExternalModels.h"
+    "TensorExtExternalModels.h"
     "UtilExternalModels.h"
   SRCS
-    "FlowExternalModels.cpp"
     "HALExternalModels.cpp"
     "Interfaces.cpp"
     "LinalgExtExternalModels.cpp"
     "StreamExternalModels.cpp"
+    "TensorExtExternalModels.cpp"
     "UtilExternalModels.cpp"
   DEPS
     MLIRArithDialect

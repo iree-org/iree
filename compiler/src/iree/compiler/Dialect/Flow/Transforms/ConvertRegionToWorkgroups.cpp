@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -195,7 +196,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
            "dynamic dims not found among arguments");
     SmallVector<Value> bbArgDims =
         llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
-    Value loadedTensor = rewriter.create<IREE::Flow::DispatchTensorLoadOp>(
+    Value loadedTensor = rewriter.create<IREE::TensorExt::DispatchTensorLoadOp>(
         loc, tensorType, inputBbArg, bbArgDims);
     bvm.map(it.value(), loadedTensor);
     argValues.push_back(loadedTensor);
@@ -239,7 +240,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
 #endif // NDEBUG
       SmallVector<Value> bbArgDims =
           llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
-      rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
+      rewriter.create<IREE::TensorExt::DispatchTensorStoreOp>(
           loc, it.value(), outputBbArg, bbArgDims);
     }
 

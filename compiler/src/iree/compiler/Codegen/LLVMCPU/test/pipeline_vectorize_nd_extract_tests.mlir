@@ -17,9 +17,9 @@ func.func @main_dispatch_77_generic_1x257x257x21() attributes {hal.executable.ta
   %c32_i32 = arith.constant 32 : i32
   %cst_2 = arith.constant 1.000000e+00 : f32
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c1115136) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x33x33x21xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x257x257x21xf32>>
-  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 33, 33, 21], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x33x33x21xf32>> -> tensor<1x33x33x21xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c1115136) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33x33x21xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x257x257x21xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 33, 33, 21], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33x33x21xf32>> -> tensor<1x33x33x21xf32>
   %3 = tensor.empty() : tensor<1x257x257x21xf32>
   %4 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x257x257x21xf32>) {
   ^bb0(%out: f32):
@@ -83,7 +83,7 @@ func.func @main_dispatch_77_generic_1x257x257x21() attributes {hal.executable.ta
     %58 = arith.addf %56, %57 : f32
     linalg.yield %58 : f32
   } -> tensor<1x257x257x21xf32>
-  flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [1, 257, 257, 21], strides = [1, 1, 1, 1] : tensor<1x257x257x21xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x257x257x21xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [1, 257, 257, 21], strides = [1, 1, 1, 1] : tensor<1x257x257x21xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x257x257x21xf32>>
   return
 }
 

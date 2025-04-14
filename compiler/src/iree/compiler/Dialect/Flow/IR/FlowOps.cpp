@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -80,7 +82,8 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
     if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
       requiredCount += shapedType.getNumDynamicDims();
     } else if (auto tensorType =
-                   llvm::dyn_cast<DispatchTensorType>(value.getType())) {
+                   llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+                       value.getType())) {
       requiredCount += tensorType.getNumDynamicDims();
     }
   }
@@ -93,27 +96,7 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   return success();
 }
 
-static LogicalResult produceSliceErrorMsg(SliceVerificationResult result,
-                                          Operation *op,
-                                          RankedTensorType expectedType) {
-  switch (result) {
-  case SliceVerificationResult::Success:
-    return success();
-  case SliceVerificationResult::RankTooLarge:
-    return op->emitError("expected rank to be smaller or equal to ")
-           << "the other rank. ";
-  case SliceVerificationResult::SizeMismatch:
-    return op->emitError("expected type to be ")
-           << expectedType << " or a rank-reduced version. (size mismatch) ";
-  case SliceVerificationResult::ElemTypeMismatch:
-    return op->emitError("expected element type to be ")
-           << expectedType.getElementType();
-  default:
-    llvm_unreachable("unexpected slicing op verification result");
-  }
-}
-
-// Gets the dropped dimensions for `flow.dispatch.tensor.load/store`.
+// Gets the dropped dimensions for `iree_tensor_ext.dispatch.tensor.load/store`.
 static llvm::SmallBitVector
 getDroppedDimsImpl(RankedTensorType slicedObjectType,
                    ArrayRef<OpFoldResult> mixedSizes) {
@@ -154,7 +137,8 @@ static std::optional<BlockArgument> getBindingArgument(Value v) {
     return std::nullopt;
   }
   Operation *definingOp = v.getDefiningOp();
-  if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(definingOp)) {
+  if (auto loadOp =
+          dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(definingOp)) {
     return getBindingArgument(loadOp.getSource());
   }
   return std::nullopt;
@@ -163,9 +147,9 @@ static std::optional<BlockArgument> getBindingArgument(Value v) {
 /// Returns `true` if the slice (described by the `offset`, `sizes` and
 /// `strides`) spans the dispatch type.
 static bool doesSliceSpanWholeTarget(
-    IREE::Flow::DispatchTensorType dispatchType, ValueRange dispatchTypeDims,
-    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
-    ArrayRef<OpFoldResult> strides) {
+    IREE::TensorExt::DispatchTensorType dispatchType,
+    ValueRange dispatchTypeDims, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides) {
   // All offsets must be zero.
   if (!llvm::all_of(offsets, [](OpFoldResult ofr) {
         return isConstantIntValue(ofr, 0);
@@ -697,7 +681,7 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
   SmallVector<OpFoldResult> shape;
   unsigned dynamicIdx = 0;
   auto tensorType =
-      llvm::cast<IREE::Flow::DispatchTensorType>(getResult().getType());
+      llvm::cast<IREE::TensorExt::DispatchTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
     if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
@@ -706,18 +690,6 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
     }
   }
   reifiedReturnShapes.push_back(shape);
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch.tensor.load
-//===----------------------------------------------------------------------===//
-
-LogicalResult DispatchTensorLoadOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
-                                 getSourceDims()))) {
-    return failure();
-  }
   return success();
 }
 
@@ -739,11 +711,11 @@ static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
 }
 
 /// Implements default offset, sizes and strides, for
-/// `flow.dispatch.tensor.load/store` ops. When no offsets, sizes and strides
-/// are specified, the offsets are all zeros, sizes are same as the dispatch
-/// tensor and strides are all 1.
+/// `iree_tensor_ext.dispatch.tensor.load/store` ops. When no offsets, sizes and
+/// strides are specified, the offsets are all zeros, sizes are same as the
+/// dispatch tensor and strides are all 1.
 static void getDefaultOffsetSizeAndStrides(
-    OpBuilder &builder, IREE::Flow::DispatchTensorType dispatchTensorType,
+    OpBuilder &builder, IREE::TensorExt::DispatchTensorType dispatchTensorType,
     ValueRange dynamicDims, SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) {
@@ -763,183 +735,6 @@ static void getDefaultOffsetSizeAndStrides(
     sizes[dim.index()] = builder.getI64IntegerAttr(dim.value());
   }
   return;
-}
-
-RankedTensorType
-DispatchTensorLoadOp::inferResultType(IREE::Flow::DispatchTensorType sourceType,
-                                      ArrayRef<OpFoldResult> mixedSizes) {
-  auto shape =
-      llvm::map_to_vector(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
-        if (auto attr = dyn_cast<Attribute>(valueOrAttr)) {
-          return llvm::cast<IntegerAttr>(attr).getInt();
-        }
-        return ShapedType::kDynamic;
-      });
-  return RankedTensorType::get(shape, sourceType.getBoundElementType());
-}
-
-llvm::SmallBitVector DispatchTensorLoadOp::getDroppedDims() {
-  return getDroppedDimsImpl(getType(), getMixedSizes());
-}
-
-void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 RankedTensorType returnType, Value source,
-                                 ValueRange sourceDynamicDims,
-                                 ArrayRef<NamedAttribute> attributes) {
-  SmallVector<OpFoldResult> offsets, strides, sizes;
-  getDefaultOffsetSizeAndStrides(
-      builder, llvm::cast<IREE::Flow::DispatchTensorType>(source.getType()),
-      sourceDynamicDims, offsets, sizes, strides);
-  build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
-        strides, attributes);
-}
-
-void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 RankedTensorType returnType, Value source,
-                                 ValueRange sourceDynamicDims,
-                                 ArrayRef<OpFoldResult> mixedOffsets,
-                                 ArrayRef<OpFoldResult> mixedSizes,
-                                 ArrayRef<OpFoldResult> mixedStrides,
-                                 ArrayRef<NamedAttribute> attributes) {
-  SmallVector<Value> offsets;
-  SmallVector<Value> sizes;
-  SmallVector<Value> strides;
-  SmallVector<int64_t> staticOffsets;
-  SmallVector<int64_t> staticSizes;
-  SmallVector<int64_t> staticStrides;
-
-  processMixedOperands(mixedOffsets, offsets, staticOffsets,
-                       ShapedType::kDynamic);
-  processMixedOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamic);
-  processMixedOperands(mixedStrides, strides, staticStrides,
-                       ShapedType::kDynamic);
-
-  build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
-        strides, staticOffsets, staticSizes, staticStrides);
-  state.addAttributes(attributes);
-}
-
-void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 Value source, ValueRange sourceDynamicDims,
-                                 ArrayRef<OpFoldResult> mixedOffsets,
-                                 ArrayRef<OpFoldResult> mixedSizes,
-                                 ArrayRef<OpFoldResult> mixedStrides,
-                                 ArrayRef<NamedAttribute> attributes) {
-  auto returnType = inferResultType(
-      llvm::cast<DispatchTensorType>(source.getType()), mixedSizes);
-  build(builder, state, returnType, source, sourceDynamicDims, mixedOffsets,
-        mixedSizes, mixedStrides);
-}
-
-LogicalResult DispatchTensorLoadOp::reifyResultShapes(
-    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  auto mixedSizes = getMixedSizes();
-  SmallVector<OpFoldResult> shape;
-  if (!mixedSizes.empty()) {
-    // Slicing out a tile; return the size sliced.
-    shape.reserve(mixedSizes.size());
-    auto droppedDims = getDroppedDims();
-    for (auto mixedSize : llvm::enumerate(mixedSizes)) {
-      if (droppedDims.test(mixedSize.index())) {
-        continue;
-      }
-      shape.push_back(mixedSize.value());
-    }
-  } else {
-    // Result size matches the source size (no slicing).
-    unsigned dynamicIdx = 0;
-    for (int64_t dim : getType().getShape()) {
-      if (ShapedType::isDynamic(dim)) {
-        shape.push_back(getSourceDims()[dynamicIdx++]);
-      } else {
-        shape.push_back(b.getIndexAttr(dim));
-      }
-    }
-  }
-  reifiedReturnShapes.push_back(shape);
-  return success();
-}
-
-Value DispatchTensorLoadOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
-}
-
-::std::optional<unsigned>
-DispatchTensorLoadOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  return {0}; // source
-}
-
-SmallVector<int64_t> DispatchTensorLoadOp::getTiedResultOperandIndices() {
-  return {0}; // source
-}
-
-bool DispatchTensorLoadOp::isLoadOfWholeSource() {
-  return doesSliceSpanWholeTarget(getSourceType(), getSourceDims(),
-                                  getMixedOffsets(), getMixedSizes(),
-                                  getMixedStrides());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch.tensor.store
-//===----------------------------------------------------------------------===//
-
-LogicalResult DispatchTensorStoreOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getTarget()},
-                                 getTargetDims()))) {
-    return failure();
-  }
-
-  // We only verify that the source tensor type is consistent with the type
-  // inferred from the slice sizes.
-  RankedTensorType sourceTensorType = getValue().getType();
-  auto inferredType = RankedTensorType::get(getStaticSizes(),
-                                            sourceTensorType.getElementType());
-  SliceVerificationResult result =
-      isRankReducedType(inferredType, sourceTensorType);
-  return produceSliceErrorMsg(result, *this, inferredType);
-}
-
-void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
-                                  Value value, Value target,
-                                  ValueRange targetDynamicDims,
-                                  ArrayRef<NamedAttribute> attributes) {
-  SmallVector<OpFoldResult> offsets, sizes, strides;
-  getDefaultOffsetSizeAndStrides(
-      builder, llvm::cast<IREE::Flow::DispatchTensorType>(target.getType()),
-      targetDynamicDims, offsets, sizes, strides);
-  build(builder, state, value, target, targetDynamicDims, offsets, sizes,
-        strides, attributes);
-}
-
-void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
-                                  Value value, Value target,
-                                  ValueRange targetDynamicDims,
-                                  ArrayRef<OpFoldResult> mixedOffsets,
-                                  ArrayRef<OpFoldResult> mixedSizes,
-                                  ArrayRef<OpFoldResult> mixedStrides,
-                                  ArrayRef<NamedAttribute> attributes) {
-  SmallVector<Value> offsets, sizes, strides;
-  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
-  processMixedOperands(mixedOffsets, offsets, staticOffsets,
-                       ShapedType::kDynamic);
-  processMixedOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamic);
-  processMixedOperands(mixedStrides, strides, staticStrides,
-                       ShapedType::kDynamic);
-
-  build(builder, state, ArrayRef<Type>(), value, target, targetDynamicDims,
-        offsets, sizes, strides, staticOffsets, staticSizes, staticStrides);
-  state.addAttributes(attributes);
-}
-
-llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
-  return getDroppedDimsImpl(llvm::cast<RankedTensorType>(getValue().getType()),
-                            getMixedSizes());
-}
-
-bool DispatchTensorStoreOp::isStoreToWholeTarget() {
-  return doesSliceSpanWholeTarget(getTargetType(), getTargetDims(),
-                                  getMixedOffsets(), getMixedSizes(),
-                                  getMixedStrides());
 }
 
 //===----------------------------------------------------------------------===//
@@ -991,10 +786,11 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   for (auto operand : llvm::enumerate(arguments)) {
     Type type = operand.value().getType();
     if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
-      type = DispatchTensorType::get(operandAliases[operand.index()]
-                                         ? TensorAccess::ReadWrite
-                                         : TensorAccess::ReadOnly,
-                                     tensorType);
+      type = IREE::TensorExt::DispatchTensorType::get(
+          operandAliases[operand.index()]
+              ? IREE::TensorExt::TensorAccess::ReadWrite
+              : IREE::TensorExt::TensorAccess::ReadOnly,
+          tensorType);
     }
     workgroupBody->addArgument(type, operand.value().getLoc());
   }
@@ -1005,7 +801,8 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     }
     Type type = resultType.value();
     if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
-      type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
+      type = IREE::TensorExt::DispatchTensorType::get(
+          IREE::TensorExt::TensorAccess::WriteOnly, tensorType);
     }
     workgroupBody->addArgument(type, state.location);
   }
@@ -1157,18 +954,22 @@ bool DispatchWorkgroupsOp::isOperandHoistable(OpOperand *operand) {
 // Refines the tensor access from what is declared on |type| based on actual
 // usage. We expect that the access was set correctly to begin with but today
 // we sometimes specify things too wide.
-static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
+static IREE::TensorExt::TensorAccess
+refineTensorAccess(Value value, IREE::TensorExt::DispatchTensorType type) {
   auto tensorAccess = type.getAccess();
-  if (tensorAccess == TensorAccess::ReadWrite) {
+  if (tensorAccess == IREE::TensorExt::TensorAccess::ReadWrite) {
     // If the argument is a result with `readwrite` access, return false if the
     // value is only written to. Check this by looking at the uses of the
-    // argument being only the `target` of `flow.dispatch.tensor.store` ops.
+    // argument being only the `target` of
+    // `iree_tensor_ext.dispatch.tensor.store` ops.
     bool hasReads = false;
     bool hasWrites = false;
     for (OpOperand &uses : value.getUses()) {
       TypeSwitch<Operation *>(uses.getOwner())
-          .Case<DispatchTensorLoadOp>([&](auto loadOp) { hasReads = true; })
-          .Case<DispatchTensorStoreOp>([&](auto storeOp) { hasWrites = true; })
+          .Case<IREE::TensorExt::DispatchTensorLoadOp>(
+              [&](auto loadOp) { hasReads = true; })
+          .Case<IREE::TensorExt::DispatchTensorStoreOp>(
+              [&](auto storeOp) { hasWrites = true; })
           .Default([&](auto op) {
             // Treat unknown ops conservatively as read/write.
             hasReads = true;
@@ -1176,9 +977,9 @@ static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
           });
     }
     if (hasReads && !hasWrites)
-      tensorAccess = TensorAccess::ReadOnly;
+      tensorAccess = IREE::TensorExt::TensorAccess::ReadOnly;
     if (!hasReads && hasWrites)
-      tensorAccess = TensorAccess::WriteOnly;
+      tensorAccess = IREE::TensorExt::TensorAccess::WriteOnly;
   }
   return tensorAccess;
 }
@@ -1186,14 +987,17 @@ static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
 IREE::Util::ValueAccess
 DispatchWorkgroupsOp::getOperandAccess(unsigned operandIndex) {
   BlockArgument arg = getWorkgroupBody().front().getArgument(operandIndex);
-  if (auto tensorType = llvm::dyn_cast<DispatchTensorType>(arg.getType())) {
+  if (auto tensorType =
+          llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
-        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
-            (tensorAccess == TensorAccess::ReadWrite),
-        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
-            (tensorAccess == TensorAccess::WriteOnly),
-        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+        /*isRead=*/(tensorAccess == IREE::TensorExt::TensorAccess::ReadOnly) ||
+            (tensorAccess == IREE::TensorExt::TensorAccess::ReadWrite),
+        /*isWrite=*/
+        (tensorAccess == IREE::TensorExt::TensorAccess::ReadWrite) ||
+            (tensorAccess == IREE::TensorExt::TensorAccess::WriteOnly),
+        /*isDiscard=*/
+        (tensorAccess == IREE::TensorExt::TensorAccess::WriteOnly));
   } else {
     return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
                                    /*isWrite=*/false,
@@ -1206,14 +1010,17 @@ DispatchWorkgroupsOp::getResultAccess(unsigned resultIndex) {
   unsigned startIndex = getWorkgroupBody().getNumArguments() - getNumResults();
   BlockArgument arg =
       getWorkgroupBody().front().getArgument(startIndex + resultIndex);
-  if (auto tensorType = llvm::dyn_cast<DispatchTensorType>(arg.getType())) {
+  if (auto tensorType =
+          llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
-        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
-            (tensorAccess == TensorAccess::ReadWrite),
-        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
-            (tensorAccess == TensorAccess::WriteOnly),
-        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+        /*isRead=*/(tensorAccess == IREE::TensorExt::TensorAccess::ReadOnly) ||
+            (tensorAccess == IREE::TensorExt::TensorAccess::ReadWrite),
+        /*isWrite=*/
+        (tensorAccess == IREE::TensorExt::TensorAccess::ReadWrite) ||
+            (tensorAccess == IREE::TensorExt::TensorAccess::WriteOnly),
+        /*isDiscard=*/
+        (tensorAccess == IREE::TensorExt::TensorAccess::WriteOnly));
   } else {
     return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
                                    /*isWrite=*/false,
@@ -1349,27 +1156,6 @@ LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
            << " out of bounds of dispatch dimensions; expected [0, 3)";
   }
   return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch.workload.ordinal
-//===----------------------------------------------------------------------===//
-
-void DispatchWorkloadOrdinalOp::inferResultDivisibility(
-    ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
-    IREE::Util::SetIntDivisibilityFn setResultDivisibility) {
-  if (argDivs[0].isUninitialized()) {
-    setResultDivisibility(getResult(),
-                          IREE::Util::ConstantIntDivisibility(1, 1));
-    return;
-  }
-  setResultDivisibility(getResult(), argDivs[0].getValue());
-}
-
-void DispatchWorkloadOrdinalOp::inferResultRanges(
-    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRange) {
-  assert(!argRanges.empty() && "expected range of input to be set");
-  setResultRange(getResult(), argRanges[0]);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1988,7 +1774,8 @@ ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
 // Public methods
 //===----------------------------------------------------------------------===//
 
-/// Pattern to fold `flow.dispatch.tensor.load` -> `tensor.extract_slice`.
+/// Pattern to fold `iree_tensor_ext.dispatch.tensor.load` ->
+/// `tensor.extract_slice`.
 // TODO(ravishankarm): Eventually this should go in as a canonicalization at the
 // Flow level.
 struct FoldTensorLoadWithExtractSlice
@@ -1999,13 +1786,13 @@ struct FoldTensorLoadWithExtractSlice
                                 PatternRewriter &rewriter) const override {
     auto dispatchTensorLoadOp =
         extractSliceOp.getSource()
-            .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+            .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
     if (!dispatchTensorLoadOp)
       return failure();
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
-    // `flow.dispatch.tensor.load1 (i.e. the consumer).
+    // `iree_tensor_ext.dispatch.tensor.load1 (i.e. the consumer).
     if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
             extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
@@ -2013,7 +1800,7 @@ struct FoldTensorLoadWithExtractSlice
       return failure();
     }
 
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
         extractSliceOp, extractSliceOp.getType(),
         dispatchTensorLoadOp.getSource(), dispatchTensorLoadOp.getSourceDims(),
         offsets, sizes, strides);
@@ -2021,16 +1808,17 @@ struct FoldTensorLoadWithExtractSlice
   }
 };
 
-/// Pattern to fold `tensor.insert_slice` with `flow.dispatch.tensor.store`
-/// operations.
+/// Pattern to fold `tensor.insert_slice` with
+/// `iree_tensor_ext.dispatch.tensor.store` operations.
 // TODO(ravishankarm): Eventually this should go in as a canonicalization at the
 // Flow level.
 struct FoldInsertSliceWithTensorStoreOp
-    : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
-  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
+    : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
+  using OpRewritePattern<
+      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp dispatchTensorStoreOp,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp dispatchTensorStoreOp,
                   PatternRewriter &rewriter) const override {
     auto insertSliceOp =
         dispatchTensorStoreOp.getValue().getDefiningOp<tensor::InsertSliceOp>();
@@ -2038,8 +1826,8 @@ struct FoldInsertSliceWithTensorStoreOp
       return failure();
 
     // Check that the `dest` of the `tensor.insert_slice` and target of the
-    // `flow.dispatch.tensor.store` are the same interface binding, if these
-    // are still in a dispatch region.
+    // `iree_tensor_ext.dispatch.tensor.store` are the same interface binding,
+    // if these are still in a dispatch region.
     std::optional<BlockArgument> destBinding =
         getBindingArgument(insertSliceOp.getDest());
     std::optional<BlockArgument> targetBinding =
@@ -2050,7 +1838,7 @@ struct FoldInsertSliceWithTensorStoreOp
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
-    // `flow.dispatch.tensor.store` (i.e. the consumer).
+    // `iree_tensor_ext.dispatch.tensor.store` (i.e. the consumer).
     if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
             insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
@@ -2058,7 +1846,7 @@ struct FoldInsertSliceWithTensorStoreOp
       return failure();
     }
 
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         dispatchTensorStoreOp, insertSliceOp.getSource(),
         dispatchTensorStoreOp.getTarget(),
         dispatchTensorStoreOp.getTargetDims(), offsets, sizes, strides);
@@ -2068,7 +1856,8 @@ struct FoldInsertSliceWithTensorStoreOp
 
 void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
-  DispatchTensorLoadOp::getCanonicalizationPatterns(results, context);
+  IREE::TensorExt::DispatchTensorLoadOp::getCanonicalizationPatterns(results,
+                                                                     context);
 }
 
 void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(

@@ -14,8 +14,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
@@ -495,7 +495,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
     const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
+    IREE::TensorExt::DispatchTensorType dispatchTensorType,
+    ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   auto boundTensorType =
       llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
@@ -535,7 +536,8 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
 static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
     const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
+    IREE::TensorExt::DispatchTensorType dispatchTensorType,
+    ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
       getPackedDimsForDispatchTensor(builder, loc, typeConverter,
@@ -565,11 +567,12 @@ struct MaterializeInterfaceBindingEncoding
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+    auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
         subspanOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
-          subspanOp, "expected result type to be !flow.dispatch.tensor");
+          subspanOp,
+          "expected result type to be !iree_tensor_ext.dispatch.tensor");
     }
     auto boundTensorType =
         llvm::dyn_cast<RankedTensorType>(resultType.getBoundType());
@@ -597,7 +600,7 @@ struct MaterializeInterfaceBindingEncoding
       newDynamicDims = convertedDynamicDims.value();
     }
 
-    auto newResultType = IREE::Flow::DispatchTensorType::get(
+    auto newResultType = IREE::TensorExt::DispatchTensorType::get(
         resultType.getAccess(), convertedBoundType);
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
@@ -607,18 +610,20 @@ struct MaterializeInterfaceBindingEncoding
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.load` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
 /// materializing the encoding.
-struct MaterializeFlowDispatchTensorLoadOp
-    : public OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorLoadOp> {
+struct MaterializeTensorExtDispatchTensorLoadOp
+    : public OpMaterializeEncodingPattern<
+          IREE::TensorExt::DispatchTensorLoadOp> {
   using OpMaterializeEncodingPattern<
-      IREE::Flow::DispatchTensorLoadOp>::OpMaterializeEncodingPattern;
+      IREE::TensorExt::DispatchTensorLoadOp>::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
+                  OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the load covers the entire
-    // `!flow.dispatch.tensor` type.
+    // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial loads.
     if (!loadOp.isLoadOfWholeSource()) {
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
@@ -649,7 +654,7 @@ struct MaterializeFlowDispatchTensorLoadOp
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
         loadOp, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
         newStrides);
 
@@ -657,18 +662,20 @@ struct MaterializeFlowDispatchTensorLoadOp
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
 /// materializing the encoding.
-struct MaterializeFlowDispatchTensorStoreOp
-    : public OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorStoreOp> {
+struct MaterializeTensorExtDispatchTensorStoreOp
+    : public OpMaterializeEncodingPattern<
+          IREE::TensorExt::DispatchTensorStoreOp> {
   using OpMaterializeEncodingPattern<
-      IREE::Flow::DispatchTensorStoreOp>::OpMaterializeEncodingPattern;
+      IREE::TensorExt::DispatchTensorStoreOp>::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
+                  OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the store covers the entire
-    // `!flow.dispatch.tensor` type.
+    // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial stores.
     if (!storeOp.isStoreToWholeTarget()) {
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
@@ -700,7 +707,7 @@ struct MaterializeFlowDispatchTensorStoreOp
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         storeOp, adaptor.getValue(), adaptor.getTarget(), newDynamicDims,
         newOffsets, newMixedSizes, newStrides);
     return success();
@@ -991,23 +998,24 @@ void populateMaterializeEncodingPatterns(
   MLIRContext *context = patterns.getContext();
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
             subspanOp.getResult().getType());
-        // For types that are not `Flow::DispatchTensorType` mark as legal.
+        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
           return true;
         return resultType == typeConverter.convertType(resultType);
       });
 
-  patterns.insert<
-      MaterializeContractionOp, SetEncodingOpLoweringConversion,
-      UnsetEncodingOpLoweringConversion,
-      MaterializeDPSOperation<linalg::FillOp>,
-      MaterializeDPSOperation<linalg::GenericOp>,
-      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
-      MaterializeFlowDispatchTensorLoadOp, MaterializeFlowDispatchTensorStoreOp,
-      MaterializeInterfaceBindingEncoding>(context, typeConverter,
-                                           materializeEncodingValueFn);
+  patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
+                  UnsetEncodingOpLoweringConversion,
+                  MaterializeDPSOperation<linalg::FillOp>,
+                  MaterializeDPSOperation<linalg::GenericOp>,
+                  MaterializeOperation<tensor::EmptyOp>,
+                  MaterializeOptimizationBarrierOp,
+                  MaterializeTensorExtDispatchTensorLoadOp,
+                  MaterializeTensorExtDispatchTensorStoreOp,
+                  MaterializeInterfaceBindingEncoding>(
+      context, typeConverter, materializeEncodingValueFn);
 };
 
 } // namespace mlir::iree_compiler

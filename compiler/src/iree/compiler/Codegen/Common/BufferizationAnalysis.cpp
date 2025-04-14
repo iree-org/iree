@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -58,7 +59,7 @@ static bool canUsersHandleSubviews(Operation *op) {
   // TODO(ravishankarm): Maybe this is too aggressive, might have to switch this
   // to have a white-list instead of blacklist.
   for (Operation *user : op->getUsers()) {
-    if (isa<IREE::Flow::DispatchTensorStoreOp, tensor::CollapseShapeOp,
+    if (isa<IREE::TensorExt::DispatchTensorStoreOp, tensor::CollapseShapeOp,
             tensor::ExpandShapeOp>(user)) {
       return false;
     }
@@ -94,10 +95,10 @@ static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
   return success();
 }
 
-/// Adds the result of the `flow.dispatch.tensor.load` op to the same
+/// Adds the result of the `iree_tensor_ext.dispatch.tensor.load` op to the same
 /// equivalence class as the source.
 static LogicalResult
-analyseInterfaceLoadTensorOp(IREE::Flow::DispatchTensorLoadOp loadOp,
+analyseInterfaceLoadTensorOp(IREE::TensorExt::DispatchTensorLoadOp loadOp,
                              BufferizationPlan &plan) {
   plan.unionSets(loadOp.getResult(), loadOp.getSource());
   return success();
@@ -147,8 +148,9 @@ static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
   return true;
 }
 
-/// Returns true if the value and target of a `flow.dispatch.tensor.store`
-/// operation can be added to the same equivalence set. This can be done only if
+/// Returns true if the value and target of a
+/// `iree_tensor_ext.dispatch.tensor.store` operation can be added to the same
+/// equivalence set. This can be done only if
 /// - The `value` is not from a equivalence set that contains a read-only
 ///   tensor.
 /// - All `hal.interface.binding.subspan` operations in the equivalence class of
@@ -156,9 +158,8 @@ static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
 ///   assumed that the equivalence classes contain only 1 such instruction.
 /// This method asserts that the `target` equivalence class already contains a
 /// `hal.interface.binding.subspan` op.'
-static bool
-canSetStoreValueAndTargetAsEquivalent(IREE::Flow::DispatchTensorStoreOp storeOp,
-                                      BufferizationPlan &plan) {
+static bool canSetStoreValueAndTargetAsEquivalent(
+    IREE::TensorExt::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
   if (!canSetsBeMerged(storeOp.getValue(), storeOp.getTarget(), plan)) {
     return false;
   }
@@ -172,16 +173,16 @@ canSetStoreValueAndTargetAsEquivalent(IREE::Flow::DispatchTensorStoreOp storeOp,
     return true;
   }
   // If the binding and offsets are the same, make sure that the
-  // !flow.dispatch.tensor is read-write.
-  auto sourceType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+  // !iree_tensor_ext.dispatch.tensor is read-write.
+  auto sourceType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
       valueInterfaceBinding.getType());
   return sourceType &&
-         sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
+         sourceType.getAccess() == IREE::TensorExt::TensorAccess::ReadWrite;
 }
 
 /// Tries to add the `value` and `target` to the same equivalence class.
 static LogicalResult
-analyseInterfaceStoreTensorOp(IREE::Flow::DispatchTensorStoreOp storeOp,
+analyseInterfaceStoreTensorOp(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                               BufferizationPlan &plan) {
   // The value and target can be union-ed if the set the value is part of does
   // not contain any hal.interface.binding.subspan from a different binding.
@@ -509,12 +510,12 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
           return analyseConstantOp(constantOp, plan);
         })
-        .Case<IREE::Flow::DispatchTensorLoadOp>(
-            [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+        .Case<IREE::TensorExt::DispatchTensorLoadOp>(
+            [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
               return analyseInterfaceLoadTensorOp(loadOp, plan);
             })
-        .Case<IREE::Flow::DispatchTensorStoreOp>(
-            [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+        .Case<IREE::TensorExt::DispatchTensorStoreOp>(
+            [&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
               return analyseInterfaceStoreTensorOp(storeOp, plan);
             })
         .Case<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -621,7 +622,8 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
   });
 
   if (funcOp
-          .walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
+          .walk([&](IREE::TensorExt::DispatchTensorStoreOp storeOp)
+                    -> WalkResult {
             return analyseInterfaceStoreTensorOp(storeOp, plan);
           })
           .wasInterrupted()) {

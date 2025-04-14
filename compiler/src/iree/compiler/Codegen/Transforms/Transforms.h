@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -37,10 +38,10 @@ struct SliceAndDynamicDims {
 };
 SliceAndDynamicDims
 cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                            IREE::Flow::DispatchTensorStoreOp storeOp);
+                            IREE::TensorExt::DispatchTensorStoreOp storeOp);
 SliceAndDynamicDims
 cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                            IREE::Flow::DispatchTensorLoadOp loadOp);
+                            IREE::TensorExt::DispatchTensorLoadOp loadOp);
 
 /// Creates an allocation in the entry block of the function if the size is
 /// statically bounded. For a static allocation, it returns an allocation
@@ -141,15 +142,16 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
 /// computation has already been resolved.
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter,
-    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
     mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 /// Wrapper around `lowerWorkgroupCountFromSliceOp` method that
-/// takes the `flow.dispatch.workgroup_count_from_slice` op
+/// takes the `iree_tensor_ext.dispatch.workgroup_count_from_slice` op
 /// as an argument. Looks up the `hal.executable.export` operation
-/// and finds the `flow.dispatch.workgroup_count_from_slice` op to lower.
+/// and finds the `iree_tensor_ext.dispatch.workgroup_count_from_slice` op to
+/// lower.
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,

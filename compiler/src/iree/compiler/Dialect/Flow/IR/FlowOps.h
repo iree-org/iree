@@ -35,8 +35,9 @@ void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context);
 
 // Patterns to fold tensor.extract_slice/insert_slice with
-// flow.dispatch.tensor.load/store. These patterns may not be canonicalizers,
-// since they might change the parallelism semantics in non-obvious ways.
+// iree_tensor_ext.dispatch.tensor.load/store. These patterns may not be
+// canonicalizers, since they might change the parallelism semantics in
+// non-obvious ways.
 void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
     RewritePatternSet &results, MLIRContext *context);
 
