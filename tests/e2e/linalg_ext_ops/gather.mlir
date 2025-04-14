@@ -1,4 +1,4 @@
-func.func @gather0() {
+func.func @gather_from_splat_tensor() {
   %source = util.unfoldable_constant dense<0> : tensor<10x10xi32>
   %empty = tensor.empty() : tensor<1x10xi32>
   %indices = util.unfoldable_constant dense<0> : tensor<1xi32>
@@ -9,12 +9,12 @@ func.func @gather0() {
                       iree_linalg_ext.yield %arg0 : i32
   } -> tensor<1x10xi32>
 
-  check.expect_eq_const(%result, dense<[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]> : tensor<1x10xi32>)
+  check.expect_eq_const(%result, dense<0> : tensor<1x10xi32>)
             : tensor<1x10xi32>
   return
 }
 
-func.func @gather1() {
+func.func @gather_2d_index_with_batch() {
   %source = util.unfoldable_constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
   %empty = tensor.empty() : tensor<2xi32>
   %indices = util.unfoldable_constant dense<[[0, 1], [1, 0]]> : tensor<2x2xi32>
@@ -28,7 +28,7 @@ func.func @gather1() {
   return
 }
 
-func.func @gather2() {
+func.func @gather_2d_index_no_batch() {
   %source = util.unfoldable_constant dense<[[[0], [1]], [[0], [0]]]> : tensor<2x2x1xi32>
   %empty = tensor.empty() : tensor<1xi32>
   %indices = util.unfoldable_constant dense<[0, 1]> : tensor<2xi32>
@@ -42,7 +42,7 @@ func.func @gather2() {
   return
 }
 
-func.func @gather3() {
+func.func @gather_1d_index_no_batch() {
   %source = util.unfoldable_constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
   %empty = tensor.empty() : tensor<2xi32>
   %indices = util.unfoldable_constant dense<[1]> : tensor<1xi32>
