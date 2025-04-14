@@ -12,6 +12,8 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-linalg-ext-convert-conv-to-im2col-op"
+
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 #define GEN_PASS_DEF_CONVERTCONVTOIM2COLOPPASS
@@ -69,15 +71,16 @@ static void collectDimExprs(ArrayRef<AffineExpr> exprs,
     } else if (auto binOpExpr = dyn_cast<AffineBinaryOpExpr>(expr)) {
       collectDimExprs({binOpExpr.getLHS(), binOpExpr.getRHS()}, out);
     } else {
-      llvm::errs() << "Non-dimension expression found: " << expr << "\n";
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Non-dimension expression found: " << expr << "\n");
     }
   }
 }
 
-// Computes `inputFilterPerm` that maps the input spatial and channel order to
+// Computes `inputKPerm` that maps the input spatial and channel order to
 // filter's.
-static SmallVector<int64_t> computeInputFilterPerm(AffineMap inputMap,
-                                                   AffineMap filterMap) {
+static SmallVector<int64_t> computeinputKPerm(AffineMap inputMap,
+                                              AffineMap filterMap) {
   DenseSet<AffineExpr> inputDimsSet;
   DenseSet<AffineExpr> filterDimsSet;
   collectDimExprs(inputMap.getResults(), inputDimsSet);
@@ -101,16 +104,14 @@ static SmallVector<int64_t> computeInputFilterPerm(AffineMap inputMap,
     });
   }
   // Compute the permutation that maps inputSharedDims to filterSharedDims.
-  SmallVector<int64_t> inputFilterPerm;
+  SmallVector<int64_t> inputKPerm;
   for (AffineExpr filterExpr : filterSharedDims) {
     auto it = llvm::find(inputSharedDims, filterExpr);
-    if (it == inputSharedDims.end()) {
-      llvm_unreachable(
-          "Filter dimension not found in input shared dimensions.");
-    }
-    inputFilterPerm.push_back(std::distance(inputSharedDims.begin(), it));
+    assert(it != inputSharedDims.end() &&
+           "Filter dimension not found in input shared dimensions");
+    inputKPerm.push_back(std::distance(inputSharedDims.begin(), it));
   }
-  return inputFilterPerm;
+  return inputKPerm;
 }
 
 namespace {
@@ -265,8 +266,7 @@ public:
     SmallVector<OpFoldResult> kOffset(kBasis.size(), rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> mOffset(mBasis.size(), rewriter.getIndexAttr(0));
 
-    SmallVector<int64_t> inputFilterPerm =
-        computeInputFilterPerm(inputMap, filterMap);
+    SmallVector<int64_t> inputKPerm = computeinputKPerm(inputMap, filterMap);
 
     auto loc = linalgOp.getLoc();
     Value colTensor = rewriter.create<tensor::EmptyOp>(
@@ -276,7 +276,7 @@ public:
             .create<IREE::LinalgExt::Im2colOp>(
                 loc, input, /*output=*/colTensor, convDims.strides,
                 convDims.dilations, kernelSizes, mOffset, mBasis, kOffset,
-                kBasis, batchPos, mPos, kPos, inputFilterPerm)
+                kBasis, batchPos, mPos, kPos, inputKPerm)
             .getResult(0);
 
     Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(

@@ -10,7 +10,7 @@ module {
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
             m_offset = [%m_off] * [1] k_offset = [%k_off] * [1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-            input_filter_perm = [0, 1, 2]
+            input_k_perm = [0, 1, 2]
             ins(%arg0 : tensor<2x34x34x640xf32>)
             outs(%0 : tensor<2x?x4xf32>) -> tensor<2x?x4xf32>
     return %7 : tensor<2x?x4xf32>
@@ -55,7 +55,7 @@ module {
             strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
             m_offset = [%m_off] * [1] k_offset = [%k_off] * [1]
             batch_pos = [1] m_pos = [3, 2] k_pos = [0]
-            input_filter_perm = [0, 1, 2]
+            input_k_perm = [0, 1, 2]
             ins(%arg0 : tensor<640x2x101x172xf32>)
             outs(%0 : tensor<2x?x?xf32>) -> tensor<2x?x?xf32>
     return %8 : tensor<2x?x?xf32>
@@ -101,7 +101,7 @@ module {
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
             m_offset = [%m0, %m1] * [%m_stride, 1] k_offset = [%k, 0] * [4, 1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-            input_filter_perm = [0, 1, 2]
+            input_k_perm = [0, 1, 2]
             ins(%arg0 : tensor<2x34x34x640xf32>)
             outs(%0 : tensor<2x?x?x2x4xf32>) -> tensor<2x?x?x2x4xf32>
     return %7 : tensor<2x?x?x2x4xf32>
@@ -151,7 +151,7 @@ module {
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
             m_offset = [%m0, %m1] * [32, 1] k_offset = [%k, 0] * [4, 1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-            input_filter_perm = [0, 1, 2]
+            input_k_perm = [0, 1, 2]
             ins(%arg0 : tensor<2x640x34x34xf32>)
             outs(%0 : tensor<2x1x1x2x4xf32>) -> tensor<2x1x1x2x4xf32>
     return %7 : tensor<2x1x1x2x4xf32>
@@ -172,7 +172,7 @@ module {
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
             m_offset = [%m_off] * [1] k_offset = [%k_off] * [1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-            input_filter_perm = [0, 1, 2]
+            input_k_perm = [0, 1, 2]
             ins(%arg0 : tensor<2x34x34x640xf32>)
             outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
     return %7 : tensor<2x2x4xf32>
@@ -252,7 +252,7 @@ module {
   %im2col = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
                               m_offset = [0, 0] * [2, 1] k_offset = [0] * [1]
                               batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-                              input_filter_perm = [0, 1, 2]
+                              input_k_perm = [0, 1, 2]
                               ins(%padded : tensor<1x8x9x9xf32>)
                               outs(%empty : tensor<1x2x2x12xf32>) -> tensor<1x2x2x12xf32>
   return %im2col : tensor<1x2x2x12xf32>
@@ -275,7 +275,7 @@ module {
     %1 = iree_linalg_ext.im2col strides = [1] dilations = [1] kernel_size = [2]
                             m_offset = [0] * [1] k_offset = [0] * [1]
                             batch_pos = [0] m_pos = [1] k_pos = [2]
-                            input_filter_perm = [1, 0]
+                            input_k_perm = [1, 0]
                             ins(%arg0 : tensor<1x3x2xf32>)
                             outs(%0 : tensor<1x2x4xf32>) -> tensor<1x2x4xf32>
     return %1 : tensor<1x2x4xf32>
@@ -309,7 +309,7 @@ module {
     %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
                             m_offset = [0, 0] * [14, 1] k_offset = [0] * [1]
                             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-                            input_filter_perm = [2, 0, 1]
+                            input_k_perm = [2, 0, 1]
                             ins(%arg0 : tensor<1x16x16x4xf32>)
                             outs(%0 : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
     return %1 : tensor<1x14x14x36xf32>

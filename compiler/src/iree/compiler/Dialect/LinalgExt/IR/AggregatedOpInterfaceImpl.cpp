@@ -778,20 +778,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     kBasis.push_back(size);
   }
 
-  // Check if the reduction dimension has different layouts between input and
-  // filter, if so, transpose the order of (P, Q, C) according to
-  // `inputFilterPerm` encoded in im2col metadata.
-  auto isIdentityPermutation = [](ArrayRef<int64_t> perm) -> bool {
-    return llvm::equal(llvm::seq<int64_t>(0, perm.size()), perm);
-  };
-
-  ArrayRef<int64_t> inputFilterPerm = getInputFilterPerm();
-  if (!isIdentityPermutation(inputFilterPerm)) {
-    SmallVector<OpFoldResult> origKBasis = kBasis;
-    for (auto [newIdx, transIdx] : llvm::enumerate(inputFilterPerm)) {
-      kBasis[newIdx] = origKBasis[transIdx];
-    }
-  }
+  // Transpose the order of (P, Q, C) according to `inputKPerm` encoded in
+  // im2col metadata.
+  ArrayRef<int64_t> inputKPerm = getInputKPerm();
+  applyPermutationToVector(kBasis, getInputKPerm());
 
   OpFoldResult kIndex = kOffset;
   for (auto [i, ivIdx, stride] :
@@ -809,21 +799,17 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
           .getResults();
   // Split the delinearized offsets into the window offsets (for M offsets)
   // and the K offsets for the input tensor based on the layout.
-  auto getIndex = [&inputFilterPerm](int64_t value) -> int64_t {
-    auto it = std::find(inputFilterPerm.begin(), inputFilterPerm.end(), value);
-    return static_cast<int64_t>(std::distance(inputFilterPerm.begin(), it));
-  };
-
   SmallVector<Value> windowOffset, inputKOffset;
   int delinKIdx = 0;
+  SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
   for (int i = 0; i < getInputRank(); ++i) {
     if (batchPosSet.contains(i))
       continue;
     if (mPosSet.contains(i)) {
-      windowOffset.push_back(delinKOffset[getIndex(delinKIdx++)]);
+      windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
       continue;
     }
-    inputKOffset.push_back(delinKOffset[getIndex(delinKIdx++)]);
+    inputKOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
   }
 
   // Compute offsets for extract. The linearized im2col result M offset is
