@@ -365,12 +365,11 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   if (getNumResults()) {
     resultTypes.push_back(tiledResult.getType());
   }
-  Operation *tiledScatterOp =
+  Operation *tiledGatherOp =
       mlir::clone(builder, getOperation(), resultTypes,
                   ValueRange{tiledSource, tiledIndices, tiledResult});
-  return TilingResult{{tiledScatterOp},
-                      SmallVector<Value>(tiledScatterOp->getResults()),
-                      slices};
+  return TilingResult{
+      {tiledGatherOp}, SmallVector<Value>(tiledGatherOp->getResults()), slices};
 }
 
 LogicalResult GatherOp::getResultTilePosition(
