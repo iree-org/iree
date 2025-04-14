@@ -45,7 +45,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 // `hal.tensor.export` op if they are directly consumed by them or optionally
 // consumed by `hal.tensor.barrier` op that is then consumed by the export op.
 // This is useful becuase folding unit extent dims often results in expand
-// shapes that can then be bubbled up be other patterns blocking further
+// shapes that can then be bubbled up by other patterns blocking further
 // optimizations.
 
 class FoldExpandIntoExport
@@ -91,7 +91,7 @@ class FoldExpandIntoExport
         exportOp.getAffinity() ? exportOp.getAffinity().value() : nullptr;
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
         exportOp, exportOp.getTarget().getType(), newResult,
-        TypeAttr::get(expandOp.getResult().getType()), newExportName,
+        TypeAttr::get(exportOp.getSourceEncoding()), newExportName,
         newExportAffinity);
 
     return success();

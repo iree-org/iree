@@ -132,14 +132,14 @@ util.func public @scatter(%arg0 : tensor<4xi64>, %arg1 : tensor<4x1xi32>, %arg2 
 
 util.func public @no_barrier(%arg0 : tensor<4096x2048xf32>) -> !hal.buffer_view {
   %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [4096, 1, 1, 2048] : tensor<4096x2048xf32> into tensor<4096x1x1x2048xf32>
-  %8 = hal.tensor.export on(#hal.device.promise<@dev_a>) %expanded "output" : tensor<4096x1x1x2048xf32> -> !hal.buffer_view
+  %8 = hal.tensor.export on(#hal.device.promise<@dev_a>) %expanded "output" : tensor<2048x2x1x2048xf32> as tensor<4096x1x1x2048xf32> -> !hal.buffer_view
   util.return %8 : !hal.buffer_view
 }
 // CHECK-LABEL: func public @no_barrier
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-NOT:    tensor.expand_shape
 //      CHECK:    %[[EXPORT:.+]] =  hal.tensor.export on(#hal.device.promise<@dev_a>) %[[ARG0]] "output"
-// CHECK-SAME:      : tensor<4096x1x1x2048xf32> as tensor<4096x2048xf32> -> !hal.buffer_view
+// CHECK-SAME:      : tensor<2048x2x1x2048xf32> as tensor<4096x2048xf32> -> !hal.buffer_view
 //      CHECK:    util.return %[[EXPORT]]
 
 // -----
