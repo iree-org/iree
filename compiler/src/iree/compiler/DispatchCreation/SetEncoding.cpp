@@ -229,8 +229,7 @@ public:
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
-    auto setEncodingWrapper = [&](Value src,
-                                  int64_t operandIndex) -> FailureOr<Value> {
+    auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
       MLIRContext *ctx = linalgOp.getContext();
       Attribute encoding;
       switch (encodingOption) {
@@ -251,11 +250,12 @@ public:
           }
           kDims.push_back(dimIdx.value());
         }
-        encoding = MatmulKAttr::get(ctx, rewriter.getDenseI32ArrayAttr(kDims));
+        encoding = MatmulKAttr::get(ctx, kDims);
         break;
       }
       default: {
-        return failure();
+        assert(false && "Unsupported encoding option");
+        return Value();
       }
       }
       return setEncoding(rewriter, loc, src, encoding);
@@ -263,11 +263,11 @@ public:
     auto encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
     auto encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
     auto encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
-    if (failed(encodedLhs) || failed(encodedRhs) || failed(encodedOut)) {
+    if (encodedLhs || encodedRhs || encodedOut) {
       return failure();
     }
-    Value opTiled = clone(rewriter, linalgOp, encodedOut->getType(),
-                          ValueRange{*encodedLhs, *encodedRhs, *encodedOut})
+    Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
+                          ValueRange{encodedLhs, encodedRhs, encodedOut})
                         ->getResult(0);
 
     // Sizes are computed by original output size.
@@ -309,12 +309,8 @@ struct FoldFillWithSetEncoding final
   }
 };
 
-class SetEncodingPass : public impl::SetEncodingPassBase<SetEncodingPass> {
-public:
-  using impl::SetEncodingPassBase<SetEncodingPass>::SetEncodingPassBase;
-  explicit SetEncodingPass(const EncodingOptions &option) {
-    this->encodingOption = option;
-  }
+struct SetEncodingPass : public impl::SetEncodingPassBase<SetEncodingPass> {
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

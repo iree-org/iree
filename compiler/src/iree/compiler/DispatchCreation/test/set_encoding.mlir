@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes="CHECK-ALL, CHECK"
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-encoding{encoding-option=matmulk}))" %s | FileCheck %s --check-prefixes="CHECK-ALL, MATMULK"
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-encoding{encoding-option=matmulk}))" %s | FileCheck %s --check-prefixes=CHECK-ALL,MATMULK
 
 util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
