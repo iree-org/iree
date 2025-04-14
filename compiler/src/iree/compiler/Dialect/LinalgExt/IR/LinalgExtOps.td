@@ -223,6 +223,95 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   }];
 }
 
+def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+  let summary = "Gather operator";
+  let description = [{
+    Takes two inputs (`source` and `indices`) and outputs value (`output`).
+    The operation returns the value at the slices specified by `indices` by
+    combining the gathered value from `source` with the value in `output`
+    using the computation specified in `region`. The `region` specifies a binary
+    operation of signature `(T, T) -> T`, where `T` is the element-type of
+    `source` & `output`. The first argument is from `source` and the second is
+    from `output`.
+
+    The size of the `dimension_map` attribute is used to determine how many
+    indices are used to index into `source`, i.e. `index_depth`. The
+    `dimension_map` attribute describes which index value maps to which dimension
+    in the destination.
+
+    This operation preforms the opposite operation of `iree_linalg_ext.scatter`.
+    Instead of scattering `updates` into `original`, it gathers the values from
+    `source` into `output` using the indices in `indices`. See the documentation
+    on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
+    semantics.
+  }];
+  let arguments = (ins
+      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
+      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      DenseI64ArrayAttr:$dimension_map
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict `dimension_map` `=` $dimension_map
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    static constexpr unsigned kSourceOpNum = 0;
+    static constexpr unsigned kIndicesOpNum = 1;
+    static constexpr unsigned kResultOpNum = 2;
+
+    /// Utility to get the number of indices used to index into `source`.
+    int64_t getIndexDepth() {
+      return getDimensionMap().size();
+    }
+
+    /// Utility to get rank of the portion of `output` that is contiguous.
+    int64_t getOutputSliceRank() {
+      return getSourceType().getRank() - getIndexDepth();
+    }
+
+    /// Utility to get the rank of the portion of `indices` that represents the
+    /// batch dimensions.
+    int64_t getBatchRank() {
+      return getOutputType().getRank() - getOutputSliceRank();
+    }
+
+    Value getSource(){
+      return getOperand(kSourceOpNum);
+    }
+
+    ShapedType getSourceType(){
+      return cast<ShapedType>(getSource().getType());
+    }
+
+    Value getIndices(){
+      return getOperand(kIndicesOpNum);
+    }
+
+    ShapedType getIndicesType(){
+      return cast<ShapedType>(getIndices().getType());
+    }
+
+    Value getOutput(){
+      return getOperand(kResultOpNum);
+    }
+
+    ShapedType getOutputType(){
+      return cast<ShapedType>(getOutput().getType());
+    }
+
+    /// For DPS interface.
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
