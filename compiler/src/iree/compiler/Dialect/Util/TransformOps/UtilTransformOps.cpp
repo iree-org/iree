@@ -63,7 +63,7 @@ IREE::Util::transform_dialect::CreateSerializedModuleOp::apply(
 
   // Map the temporary module to the block argument of the body.
   // This should never fail per the verifier.
-  auto scope = state.make_region_scope(getBody());
+  TransformState::RegionScope scope = state.make_region_scope(getBody());
   if (failed(state.mapBlockArguments(getBody().front().getArgument(0),
                                      tempModule->getOperation()))) {
     return DiagnosedSilenceableFailure::definiteFailure();
