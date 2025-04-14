@@ -376,6 +376,14 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/std::nullopt);
 
+  // Step 0. Apply any user annotated lowering strategies. This runs first as
+  // steps 1 - 4 are essentially applying patterns based on the lowering config,
+  // so a custom strategy runs first circumventing that.
+  //
+  // In the future there may be cases where we want the custom strategy run at
+  // later points in the pipeline.
+  funcPassManager.addPass(createLoweringConfigInterpreterPass());
+
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());

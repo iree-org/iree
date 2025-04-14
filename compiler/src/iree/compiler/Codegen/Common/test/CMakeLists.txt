@@ -59,6 +59,7 @@ iree_lit_test_suite(
     "link_tuning_specs.mlir"
     "llvmcpu_materialize_encoding.mlir"
     "lower_ukernel_to_calls.mlir"
+    "lowering_config_interpreter.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_encoding_into_padding.mlir"
     "materialize_tuning_specs.mlir"
@@ -107,6 +108,7 @@ iree_lit_test_suite(
   DATA
     batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
+    external_strategy_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir
