@@ -44,6 +44,14 @@ def DistributeMmaToLanesPass :
   ];
 }
 
+def DropResourceCastsPass :
+    Pass<"iree-gpu-drop-resource-casts", ""> {
+  let summary = "Drops iree_gpu.buffer_resource_cast ops that aren't obviously resolvable";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def LowerIREEGPUOpsPass :
     InterfacePass<"iree-gpu-lower-ops", "mlir::FunctionOpInterface"> {
   let summary = "Post bufferization lowerings of iree_gpu ops before late lowerings";
