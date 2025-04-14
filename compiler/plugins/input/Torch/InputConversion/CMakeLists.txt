@@ -40,6 +40,7 @@ iree_cc_library(
     "ConvertTorchUnstructuredToLinalgExt.cpp"
     "FuncConversion.cpp"
     "SetStrictSymbolicShapes.cpp"
+    "TorchToIREE.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
