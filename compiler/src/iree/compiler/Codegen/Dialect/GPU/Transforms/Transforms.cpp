@@ -1469,7 +1469,15 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
   Location loc = forallOp->getLoc();
   assert(isLaneMappableForall(forallOp) && "mapping non-lane forall op");
 
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, /*upperBound=*/nullptr);
+  auto upperBounds = forallOp.getLoopUpperBounds();
+  std::optional<IntegerAttr> upperBound;
+  if (upperBounds && upperBounds->size() > 0) {
+    if (auto upperBoundAttr = (*upperBounds)[0].dyn_cast<Attribute>()) {
+      upperBound = dyn_cast<IntegerAttr>(upperBoundAttr);
+    }
+  }
+  Value laneId = rewriter.create<gpu::LaneIdOp>(
+      loc, upperBound ? rewriter.getIndexAttr(upperBound->getInt()) : nullptr);
   rewriter.eraseOp(forallOp.getTerminator());
   rewriter.setInsertionPoint(forallOp);
   rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
