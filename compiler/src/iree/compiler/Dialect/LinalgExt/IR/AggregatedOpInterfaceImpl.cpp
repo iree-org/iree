@@ -781,7 +781,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // Transpose the order of (P, Q, C) according to `inputKPerm` encoded in
   // im2col metadata.
   ArrayRef<int64_t> inputKPerm = getInputKPerm();
-  applyPermutationToVector(kBasis, getInputKPerm());
+  applyPermutationToVector(kBasis, inputKPerm);
 
   OpFoldResult kIndex = kOffset;
   for (auto [i, ivIdx, stride] :
