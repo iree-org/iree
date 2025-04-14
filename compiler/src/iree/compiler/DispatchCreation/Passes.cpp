@@ -253,6 +253,7 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
           return DispatchCreation::createHoistEncodingOpsPass(
               HoistEncodingOpsPassOptions{clHoistEncodingsForConstExpr});
         })
+        .addPass(DispatchCreation::createPropagateEncodingsPass)
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
