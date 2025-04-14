@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -336,14 +337,15 @@ static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
   // If the producer is a dispatch tensor load, then the `op` is decomposable
   // if it is a PackOp.
   if (isa<linalg::PackOp>(op) &&
-      op->getOperand(0).getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+      op->getOperand(0)
+          .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>()) {
     return success();
   }
   // If all consumers are dispatch tensor stores, then the `op` is decomposable
   // if it is an UnPackOp.
   if (isa<linalg::UnPackOp>(op) &&
       llvm::all_of(op->getUsers(), [&](Operation *user) {
-        return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+        return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
       })) {
     return success();
   }

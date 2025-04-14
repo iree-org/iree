@@ -13,8 +13,8 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
@@ -826,7 +826,7 @@ bool needToPrmoteCForCooperativeMatrix(linalg::LinalgOp matmulOp) {
   if (!result.hasOneUse())
     return true; // Be conservative.
   Operation *user = *result.getUsers().begin();
-  if (isa<IREE::Flow::DispatchTensorStoreOp>(user))
+  if (isa<IREE::TensorExt::DispatchTensorStoreOp>(user))
     return false;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(user)) {
     return !isCooperativeMatrixFusable(genericOp);

@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/ExternalInterfaces/FlowExternalModels.h"
+#include "iree/compiler/ExternalInterfaces/TensorExtExternalModels.h"
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
@@ -14,10 +14,11 @@ namespace {
 
 struct DispatchTensorLoadOpInterface
     : public ValueBoundsOpInterface::ExternalModel<
-          DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
+          DispatchTensorLoadOpInterface,
+          IREE::TensorExt::DispatchTensorLoadOp> {
   void populateBoundsForShapedValueDim(Operation *op, Value value, int64_t dim,
                                        ValueBoundsConstraintSet &cstr) const {
-    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     assert(value == loadOp.getResult() && "invalid value");
     cstr.bound(value)[dim] == loadOp.getMixedSizes()[dim];
   }
@@ -25,10 +26,11 @@ struct DispatchTensorLoadOpInterface
 
 struct WorkloadOrdinalOpInterface
     : public ValueBoundsOpInterface::ExternalModel<
-          WorkloadOrdinalOpInterface, IREE::Flow::DispatchWorkloadOrdinalOp> {
+          WorkloadOrdinalOpInterface,
+          IREE::TensorExt::DispatchWorkloadOrdinalOp> {
   void populateBoundsForIndexValue(Operation *op, Value value,
                                    ValueBoundsConstraintSet &cstr) const {
-    auto ordinalOp = cast<IREE::Flow::DispatchWorkloadOrdinalOp>(op);
+    auto ordinalOp = cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op);
     assert(value == ordinalOp.getResult() && "value must be op result");
     cstr.bound(value) == ordinalOp.getOperand();
   }
@@ -36,12 +38,12 @@ struct WorkloadOrdinalOpInterface
 
 } // namespace
 
-void registerFlowExternalModels(DialectRegistry &registry) {
+void registerTensorExtExternalModels(DialectRegistry &registry) {
   registry.addExtension(
-      +[](MLIRContext *ctx, IREE::Flow::FlowDialect *dialect) {
-        IREE::Flow::DispatchTensorLoadOp::attachInterface<
+      +[](MLIRContext *ctx, IREE::TensorExt::IREETensorExtDialect *dialect) {
+        IREE::TensorExt::DispatchTensorLoadOp::attachInterface<
             DispatchTensorLoadOpInterface>(*ctx);
-        IREE::Flow::DispatchWorkloadOrdinalOp::attachInterface<
+        IREE::TensorExt::DispatchWorkloadOrdinalOp::attachInterface<
             WorkloadOrdinalOpInterface>(*ctx);
       });
 }

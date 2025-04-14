@@ -9,12 +9,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -68,7 +66,7 @@ static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
 }
 
 static MemRefType
-getMemrefTypeForTensor(IREE::Flow::DispatchTensorType tensorType,
+getMemrefTypeForTensor(IREE::TensorExt::DispatchTensorType tensorType,
                        MemRefLayoutAttrInterface layout = {},
                        Attribute memorySpace = {}) {
   return MemRefType::get(tensorType.getShape(),
@@ -84,7 +82,7 @@ static Value
 findOrCreateSubspanBuffer(RewriterBase &rewriter,
                           IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
   // Ensure that this a tensor subspan op.
-  auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+  auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
       subspanOp.getResult().getType());
   assert(shapedType && shapedType.hasRank());
 
@@ -172,10 +170,10 @@ namespace {
 
 /// Check if the two tensor types (with their respective dynamic dimension
 /// values) have the same shape.
-static bool equalTensorShape(RankedTensorType tensorType,
-                             ValueRange tensorDynSizes,
-                             IREE::Flow::DispatchTensorType dispatchTensorType,
-                             ValueRange dispatchTensorDynSizes) {
+static bool
+equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
+                 IREE::TensorExt::DispatchTensorType dispatchTensorType,
+                 ValueRange dispatchTensorDynSizes) {
   return llvm::equal(tensorType.getShape(), dispatchTensorType.getShape()) &&
          tensorDynSizes.size() == dispatchTensorDynSizes.size() &&
          llvm::equal(tensorDynSizes, dispatchTensorDynSizes);
@@ -183,19 +181,20 @@ static bool equalTensorShape(RankedTensorType tensorType,
 
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
-          DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
+          DispatchTensorLoadOpInterface,
+          IREE::TensorExt::DispatchTensorLoadOp> {
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
-    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
-    auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+    auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
+    auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
         loadOp.getSource().getType());
     assert(shapedType && "unexpected source type");
-    return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
+    return shapedType.getAccess() != IREE::TensorExt::TensorAccess::ReadOnly;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     auto tensorSubspanOp =
         loadOp.getSource()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
@@ -203,7 +202,7 @@ struct DispatchTensorLoadOpInterface
     Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
     if (equalTensorShape(loadOp.getType(), loadOp.sizes(),
-                         llvm::cast<IREE::Flow::DispatchTensorType>(
+                         llvm::cast<IREE::TensorExt::DispatchTensorType>(
                              loadOp.getSource().getType()),
                          loadOp.getSourceDims())) {
       // The entire tensor is loaded.
@@ -227,7 +226,8 @@ struct DispatchTensorLoadOpInterface
 
 struct DispatchTensorStoreOpInterface
     : public BufferizableOpInterface::ExternalModel<
-          DispatchTensorStoreOpInterface, IREE::Flow::DispatchTensorStoreOp> {
+          DispatchTensorStoreOpInterface,
+          IREE::TensorExt::DispatchTensorStoreOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return true;
@@ -246,7 +246,7 @@ struct DispatchTensorStoreOpInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     auto tensorSubspanOp =
         storeOp.getTarget()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
@@ -256,7 +256,7 @@ struct DispatchTensorStoreOpInterface
     if (!equalTensorShape(
             llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
             storeOp.getSizes(),
-            llvm::cast<IREE::Flow::DispatchTensorType>(
+            llvm::cast<IREE::TensorExt::DispatchTensorType>(
                 storeOp.getTarget().getType()),
             storeOp.getTargetDims())) {
       // Writing to a part of the tensor.
@@ -524,14 +524,14 @@ struct PackUnPackOpInterface
 struct DispatchTensorLoadOpSubsetInterface
     : public SubsetOpInterface::ExternalModel<
           DispatchTensorLoadOpSubsetInterface,
-          IREE::Flow::DispatchTensorLoadOp> {
+          IREE::TensorExt::DispatchTensorLoadOp> {
   bool operatesOnEquivalentSubset(
       Operation *op, SubsetOpInterface candidate,
       function_ref<bool(Value, Value)> equivalenceFn) const {
     // Returns true if the value of a `loadOp` bufferizes to an equivalent
     // DispatchTensorStoreOp result that bufferizes inplace.
-    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
-    auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
+    auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     if (!storeOp)
       return false;
     return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
@@ -548,15 +548,15 @@ struct DispatchTensorLoadOpSubsetInterface
 struct DispatchTensorStoreOpSubsetInterface
     : public SubsetOpInterface::ExternalModel<
           DispatchTensorStoreOpSubsetInterface,
-          IREE::Flow::DispatchTensorStoreOp> {
+          IREE::TensorExt::DispatchTensorStoreOp> {
 
   bool operatesOnEquivalentSubset(
       Operation *op, SubsetOpInterface candidate,
       function_ref<bool(Value, Value)> equivalenceFn) const {
     // Returns true if the value of a `storeOp` bufferizes to an equivalent
     // DispatchTensorLoadOp result that bufferizes inplace.
-    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
-    auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
+    auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     if (!loadOp)
       return false;
     return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
@@ -573,7 +573,7 @@ struct DispatchTensorStoreOpSubsetInterface
 struct DispatchTensorStoreOpSubsetInsertionInterface
     : public SubsetInsertionOpInterface::ExternalModel<
           DispatchTensorStoreOpSubsetInsertionInterface,
-          IREE::Flow::DispatchTensorStoreOp> {
+          IREE::TensorExt::DispatchTensorStoreOp> {
 
   OpOperand &getSourceOperand(Operation *op) const {
     return op->getOpOperand(0);
@@ -585,8 +585,8 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
 
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
-    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
-    auto loadOp = builder.create<IREE::Flow::DispatchTensorLoadOp>(
+    auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
+    auto loadOp = builder.create<IREE::TensorExt::DispatchTensorLoadOp>(
         loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
         storeOp.getTarget(), storeOp.getTargetDims(), storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
@@ -595,7 +595,7 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
 
   SmallVector<Value>
   getValuesNeededToBuildSubsetExtraction(Operation *op) const {
-    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     SmallVector<Value> neededValues;
     // Collect all values that are needed to construct the replacement op.
     neededValues.push_back(storeOp.getTarget());
@@ -626,19 +626,18 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   // Register IREE operations.
   registerIREEGPUBufferizationInterfaces(registry);
   registry.addExtension(
-      +[](MLIRContext *ctx, IREE::Flow::FlowDialect *dialect) {
+      +[](MLIRContext *ctx, IREE::TensorExt::IREETensorExtDialect *dialect) {
         // DispatchTensorLoadOp
-        IREE::Flow::DispatchTensorLoadOp::attachInterface<
+        IREE::TensorExt::DispatchTensorLoadOp::attachInterface<
             DispatchTensorLoadOpInterface>(*ctx);
-        IREE::Flow::DispatchTensorLoadOp::attachInterface<
+        IREE::TensorExt::DispatchTensorLoadOp::attachInterface<
             DispatchTensorLoadOpSubsetInterface>(*ctx);
-
         // DispatchTensorStoreOp
-        IREE::Flow::DispatchTensorStoreOp::attachInterface<
+        IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpInterface>(*ctx);
-        IREE::Flow::DispatchTensorStoreOp::attachInterface<
+        IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInterface>(*ctx);
-        IREE::Flow::DispatchTensorStoreOp::attachInterface<
+        IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInsertionInterface>(*ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx,

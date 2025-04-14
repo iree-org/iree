@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -353,13 +354,13 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 /// only DispatchTensorStoreOp consumers.
 LogicalResult isAtBoundary(Operation *op) {
   if (isa<linalg::PackOp>(op)) {
-    if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
+    if (isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp>(
             op->getOperand(0).getDefiningOp())) {
       return success();
     }
   } else if (isa<linalg::UnPackOp>(op)) {
     if (llvm::all_of(op->getUsers(), [](Operation *user) {
-          return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+          return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
         })) {
       return success();
     }
