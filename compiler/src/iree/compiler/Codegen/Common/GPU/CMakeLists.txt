@@ -60,6 +60,7 @@ iree_cc_library(
     "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUDistributionPatterns.cpp"
+    "GPUDropResourceCasts.cpp"
     "GPUFuseAndHoistParallelLoops.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPUGreedilyDistributeToThreads.cpp"
@@ -141,6 +142,7 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Utils
