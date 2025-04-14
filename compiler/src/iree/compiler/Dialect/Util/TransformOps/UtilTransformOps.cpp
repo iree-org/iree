@@ -8,14 +8,153 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+LogicalResult
+IREE::Util::transform_dialect::CreateSerializedModuleOp::verify() {
+  if (!getBody().hasOneBlock()) {
+    return emitOpError() << "expected single block body";
+  }
+  Block *body = &getBody().front();
+  if (body->getNumArguments() != 1) {
+    return emitOpError() << "expected body with single block argument.";
+  }
+  if (!isa<transform::TransformHandleTypeInterface>(
+          body->getArgument(0).getType())) {
+    return emitOpError()
+           << "expected body argument to be a transform op handle type";
+  }
+  if (!body->empty()) {
+    for (Operation &op : *body) {
+      if (!isa<transform::TransformOpInterface>(&op)) {
+        InFlightDiagnostic diag = emitOpError()
+                                  << "expected children ops to implement "
+                                     "TransformOpInterface";
+        diag.attachNote(op.getLoc()) << "op without interface";
+        return diag;
+      }
+    }
+  }
+  return success();
+}
+
+void IREE::Util::transform_dialect::CreateSerializedModuleOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::producesHandle(getOperation()->getOpResults(), effects);
+}
+
+DiagnosedSilenceableFailure
+IREE::Util::transform_dialect::CreateSerializedModuleOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+
+  // Create a temporary module that will be erased once out of scope.
+  OwningOpRef<ModuleOp> tempModule(ModuleOp::create(getLoc()));
+
+  // Map the temporary module to the block argument of the body.
+  // This should never fail per the verifier.
+  transform::TransformState::RegionScope scope =
+      state.make_region_scope(getBody());
+  if (failed(state.mapBlockArguments(getBody().front().getArgument(0),
+                                     tempModule->getOperation()))) {
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+
+  // Apply the contained ops one by one.
+  for (Operation &transform : getBody().front()) {
+    DiagnosedSilenceableFailure result =
+        state.applyTransform(cast<transform::TransformOpInterface>(transform));
+    // TODO: Support better error propagation.
+    if (result.isSilenceableFailure())
+      return DiagnosedSilenceableFailure::definiteFailure();
+    // Pass through the error message from definite failures.
+    if (result.isDefiniteFailure())
+      return result;
+  }
+
+  // Serialize the module as bytecode to a string.
+  std::string buffer;
+  llvm::raw_string_ostream os(buffer);
+  if (failed(writeBytecodeToFile(tempModule->getOperation(), os))) {
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+
+  auto bufferSize = static_cast<int64_t>(buffer.size());
+  auto bufferShape =
+      VectorType::get(bufferSize, IntegerType::get(rewriter.getContext(), 8));
+  auto serializedModule = DenseElementsAttr::getFromRawBuffer(
+      bufferShape, ArrayRef(buffer.data(), buffer.data() + bufferSize));
+
+  // Return the serialized module as a DenseElementsAttr.
+  transformResults.setParams(cast<OpResult>(getResult()), {serializedModule});
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// DeserializeModuleOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::Util::transform_dialect::DeserializeModuleOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Attribute> params = state.getParams(getModule());
+  if (params.size() != 1) {
+    return emitDefiniteFailure() << "requires exactly one parameter associated";
+  }
+
+  auto serializedModule =
+      dyn_cast<IREE::Util::SerializableAttrInterface>(params[0]);
+  if (!serializedModule) {
+    return emitDefiniteFailure() << "input must be serializable to deserialize";
+  }
+
+  auto containerOps = state.getPayloadOps(getContainer());
+  if (!llvm::hasSingleElement(containerOps)) {
+    return emitDefiniteFailure()
+           << "Only one op can be specified as a container";
+  }
+
+  auto containerOp = dyn_cast<ModuleOp>(*containerOps.begin());
+  if (!containerOp) {
+    return emitDefiniteFailure() << "Expected module op as a container";
+  }
+
+  SmallVector<char, 0> bytecode;
+  if (failed(serializedModule.serializeToVector(
+          getLoc(), llvm::endianness::native, bytecode))) {
+    return emitDefiniteFailure() << "Failed to deserialize module";
+  }
+
+  // Invoke parseSourceString directly to construct the deserialized module
+  // at the end of the container block.
+  ParserConfig config(rewriter.getContext());
+  LocationAttr sourceFileLoc;
+  if (failed(parseSourceString(StringRef(bytecode.data(), bytecode.size()),
+                               containerOp.getBody(0), config,
+                               /*sourceName=*/"", &sourceFileLoc))) {
+    return emitDefiniteFailure() << "Failed to deserialize module";
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void IREE::Util::transform_dialect::DeserializeModuleOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getContainerMutable(), effects);
+  transform::onlyReadsHandle(getModuleMutable(), effects);
+  transform::modifiesPayload(effects);
+}
 
 //===----------------------------------------------------------------------===//
 // GetNearestSymbolTableOp

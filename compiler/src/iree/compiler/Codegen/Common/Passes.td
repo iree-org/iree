@@ -451,6 +451,16 @@ def LowerExecutableUsingTransformDialectPass :
   let summary = "Lower executables using the transform dialect recipe provided in the module.";
 }
 
+def LoweringConfigInterpreterPass :
+    Pass<"iree-codegen-lowering-config-interpreter"> {
+  let summary = "Pass to apply lowering config annotated strategies.";
+  let description = [{
+    This pass runs the transform dialect interpreter and applies the named
+    sequence transformation specified by lowering configs annotated on
+    operations.
+  }];
+}
+
 def LowerUKernelOpsToCallsPass :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
