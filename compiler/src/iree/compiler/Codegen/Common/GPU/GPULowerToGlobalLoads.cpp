@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -105,7 +106,8 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
       copy.getLoc(), lowerBounds, upperBounds, tileSizes,
-      /*outputs=*/ValueRange{copy.getResult(0)}, /*mapping=*/rewriter.getArrayAttr(mapping));
+      /*outputs=*/ValueRange{copy.getOperand(0)}, /*mapping=*/rewriter.getArrayAttr(mapping));
+
   rewriter.setInsertionPointToStart(newForallOp.getBody());
 
   auto inductionVars = newForallOp.getInductionVars();
@@ -130,7 +132,7 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
       std::multiplies<int64_t>());
   auto numLoads = sliceSize / ((elementBitWidth / 8) * subgroupSize[0]);
   
-  Value globalSliceValue = *globalSlice;
+  Value localSliceValue = *localSlice;
   Value gatherOffset = laneId;
   Value gatherStride = rewriter.create<arith::ConstantIndexOp>(
       loc, (elementBitWidth / 8) * subgroupSize[0]);
@@ -141,15 +143,24 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
             .create<affine::AffineDelinearizeIndexOp>(
                 loc, gatherOffset, sliceType.getShape())
             .getMultiIndex();
-    globalSliceValue = rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
-        loc, sliceType, globalSliceValue, *localSlice, delinearizedIndex);
+    localSliceValue = rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
+        loc, sliceType, *globalSlice, localSliceValue, delinearizedIndex);
     if (i < numLoads - 1) {
       gatherOffset =
           rewriter.create<arith::AddIOp>(loc, gatherOffset, gatherStride);
     }
   }
 
-  rewriter.create<scf::YieldOp>(loc, *localSlice);
+  // get scf.forall.in_parallel:
+  /*
+  auto inParallel = newForallOp.getTerminator();
+  rewriter.setInsertionPoint(inParallel.getBody(), inParallel.getBody()->begin());
+  // create a store:
+  rewriter.create<tensor::InsertSliceOp>(
+      loc, localSliceValue, *globalSlice, inductionVars,
+      ValueRange{rewriter.create<arith::ConstantIndexOp>(
+          loc, sliceType.getDimSize(sliceType.getRank() - 1))});
+  */
   rewriter.replaceOp(copy, newForallOp);
 }
 
@@ -209,7 +220,6 @@ struct GPULowerToGlobalLoadsPass final
       distributeLinalgCopyToThreads(
           rewriter, copy, *workgroupSize, *subgroupSize);
     }
-
   }
 };
 } // namespace
