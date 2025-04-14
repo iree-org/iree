@@ -16,6 +16,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+namespace mlir::iree_compiler::DispatchCreation {
 //===----------------------------------------------------------------------===//
 // Command Line Options
 //===----------------------------------------------------------------------===//
@@ -79,7 +80,16 @@ static llvm::cl::opt<bool> clHoistEncodingsForConstExpr(
                    "--iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(true));
 
-namespace mlir::iree_compiler::DispatchCreation {
+static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
+    "iree-dispatch-creation-set-encoding-strategy",
+    llvm::cl::desc("Set the encoding strategy for operations."),
+    llvm::cl::values(
+        clEnumValN(
+            DispatchCreation::EncodingOptions::Generic, "generic",
+            "Using EncodingAttr which encodes as much information as possible"),
+        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
+                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -244,7 +254,10 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
-        .addPass(createSetEncodingPass)
+        .addPass([&]() {
+          return DispatchCreation::createSetEncodingPass(
+              DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
+        })
         // SetEncodingOps should not be in the same dispatch as the data-tiled
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
