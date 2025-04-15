@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "ExternalModels",
     srcs = [
+        "EncodingExternalModels.cpp",
         "FlowExternalModels.cpp",
         "HALExternalModels.cpp",
         "Interfaces.cpp",
@@ -23,6 +24,7 @@ iree_compiler_cc_library(
         "UtilExternalModels.cpp",
     ],
     hdrs = [
+        "EncodingExternalModels.h",
         "FlowExternalModels.h",
         "HALExternalModels.h",
         "Interfaces.h",

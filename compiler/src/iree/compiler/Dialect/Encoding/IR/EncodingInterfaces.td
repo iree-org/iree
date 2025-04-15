@@ -264,4 +264,82 @@ def IREEEncoding_EncodingTypeInterface :
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// Encoding Propagation Attribute & Op Interfaces
+//===----------------------------------------------------------------------===//
+
+def IREEEncoding_PropagationAttrInterface :
+  AttrInterface<"EncodingPropagationAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query new encoding attributes that can be propagated to
+    the operands and result of the operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the encodings can be propagated across the operation.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isPropagable",
+      /*args=*/(ins
+        "::mlir::Value":$target
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+      Returns the new encodings for operand and result types
+      for the given operation.
+      }],
+      /*retTy=*/"llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
+      /*methodName=*/"generateEncodings",
+      /*args=*/(ins
+        "::mlir::Value":$target
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
+    >
+  ];
+}
+
+def IREEEncoding_PropagationOpInterface :
+  OpInterface<"EncodingPropagationOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+      Interface used to propagate encodings across the operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Transforms the op with given encodings. It replaces the uses of the op
+        except the opResult, if succeeded.
+        TODO(pashu123): We might want to pass moduleOp and symbolTable to the
+        method because it's a whole-program optimization.
+      }],
+      /*retTy=*/"llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationResult>",
+      /*methodName=*/"propagateEncoding",
+      /*args=*/(ins
+        "::mlir::RewriterBase &":$builder,
+        "::mlir::iree_compiler::IREE::Encoding::PropagationEncoding":$encodings,
+        "::mlir::OpResult":$opResult
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
+    >
+  ];
+}
+
 #endif // IREE_DIALECT_ENCODING_INTERFACES

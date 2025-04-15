@@ -14,5 +14,4 @@
 // clang-format off: must be included after all LLVM/MLIR headers
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h.inc" // IWYU pragma: keep
 // clang-format on
-
 #endif // IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGDIALECT_H_
