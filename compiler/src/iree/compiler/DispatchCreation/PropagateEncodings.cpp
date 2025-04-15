@@ -46,57 +46,51 @@ struct PropagateEncodingsPass
 
 LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
     IREE::Encoding::SetEncodingOp encodingOp, PatternRewriter &rewriter) const {
-  auto encoding = dyn_cast<IREE::Encoding::MatmulKAttr>(
-      encodingOp.getResultType().getEncoding());
-  if (!encoding) {
-    return rewriter.notifyMatchFailure(encodingOp, "only matmul_k is handled");
+  Value target = encodingOp.getSource();
+  auto propagationAttrInterface =
+      dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
+          encodingOp.getResultType().getEncoding());
+
+  if (!propagationAttrInterface ||
+      !propagationAttrInterface.isPropagable(target)) {
+    return failure();
+  }
+  // Get the encoding attributes for the operands and results of the operation.
+  FailureOr<IREE::Encoding::PropagationEncoding> propagationEncodings =
+      propagationAttrInterface.generateEncodings(target);
+
+  if (failed(propagationEncodings)) {
+    return failure();
   }
   auto collapseOp =
       encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+
   if (!collapseOp) {
     return rewriter.notifyMatchFailure(encodingOp,
                                        "expected a collapse_shape producer");
   }
+
   if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
       !IREE::Flow::isNonNullAndOutsideDispatch(collapseOp)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "expected that both operations are outside dispatch");
   }
+  auto propagationResult =
+      dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(
+          collapseOp.getOperation());
 
-  ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
-  llvm::SetVector<int32_t> kDimsSet(kDims.begin(), kDims.end());
-
-  // Bail out if it is not propagable.
-  // TODO: Relax the check to allow transforming innermost reduction dimensions.
-  // We need to revisit the matmul_k encoding semantic.
-  SmallVector<ReassociationIndices, 4> reassociationMaps =
-      collapseOp.getReassociationIndices();
-  for (int32_t k : kDims) {
-    if (reassociationMaps[k].size() != 1) {
-      return rewriter.notifyMatchFailure(
-          encodingOp,
-          "expected collaps_shape ops to not transform k dimensions");
-    }
+  if (!propagationResult) {
+    return failure();
   }
-
-  // Get a mapping from original iteration space to expanded iteration space.
-  SmallVector<int32_t> newKDims;
-  for (int32_t kDim : kDims) {
-    newKDims.append(reassociationMaps[kDim].begin(),
-                    reassociationMaps[kDim].end());
+  // Propagate the set encoding and generate the new encoding operations.
+  FailureOr<IREE::Encoding::PropagationResult> maybeResult =
+      propagationResult.propagateEncoding(
+          rewriter, *propagationEncodings,
+          cast<OpResult>(encodingOp.getSource()));
+  if (failed(maybeResult)) {
+    return failure();
   }
-
-  // Create the new encoding op.
-  MLIRContext *ctx = rewriter.getContext();
-  auto newEncodingAttr = IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
-  RankedTensorType newEncodingType =
-      collapseOp.getSrcType().cloneWithEncoding(newEncodingAttr);
-  Value newEncodingOp = rewriter.create<IREE::Encoding::SetEncodingOp>(
-      encodingOp.getLoc(), newEncodingType, collapseOp.getSrc());
-  Value newCollapseOp = rewriter.create<tensor::CollapseShapeOp>(
-      collapseOp.getLoc(), encodingOp.getResultType(), newEncodingOp,
-      collapseOp.getReassociationIndices());
-  rewriter.replaceOp(encodingOp, newCollapseOp);
+  rewriter.replaceOp(encodingOp, maybeResult->replacement);
   return success();
 }
 
