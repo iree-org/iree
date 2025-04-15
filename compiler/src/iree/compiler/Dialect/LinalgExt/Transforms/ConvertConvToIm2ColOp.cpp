@@ -77,9 +77,9 @@ static void collectDimExprs(ArrayRef<AffineExpr> exprs,
   }
 }
 
-// Computes `inputKPerm` that maps the input spatial and channel order to
-// filter's.
-static SmallVector<int64_t> computeinputKPerm(AffineMap inputMap,
+// Computes `inputKPerm` that maps the input spatial and channel dimension order
+// to filter's.
+static SmallVector<int64_t> computeInputKPerm(AffineMap inputMap,
                                               AffineMap filterMap) {
   DenseSet<AffineExpr> inputDimsSet;
   DenseSet<AffineExpr> filterDimsSet;
@@ -266,7 +266,7 @@ public:
     SmallVector<OpFoldResult> kOffset(kBasis.size(), rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> mOffset(mBasis.size(), rewriter.getIndexAttr(0));
 
-    SmallVector<int64_t> inputKPerm = computeinputKPerm(inputMap, filterMap);
+    SmallVector<int64_t> inputKPerm = computeInputKPerm(inputMap, filterMap);
 
     auto loc = linalgOp.getLoc();
     Value colTensor = rewriter.create<tensor::EmptyOp>(
