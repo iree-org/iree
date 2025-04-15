@@ -147,7 +147,14 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto numParts = workgroupSize[0] / subgroupSize[0];
 
   auto globalSlice = sliceTensor(rewriter, copy.getOperand(0), numParts, inductionVars);
-  auto localSlice = sliceTensor(rewriter, copy.getResult(0), numParts, inductionVars);
+  //auto localSlice = sliceTensor(rewriter, copy.getResult(0), numParts, inductionVars);
+  // create an empty tensor with same shape of globalSlice:
+  auto localSliceType = RankedTensorType::get(
+      cast<RankedTensorType>(globalSlice->getType()).getShape(),
+      cast<RankedTensorType>(globalSlice->getType()).getElementType());
+  auto localSlice = rewriter.create<tensor::EmptyOp>(
+      loc, TypeRange{localSliceType}, ValueRange{});
+
   if (!globalSlice || !localSlice) {
     copy.emitOpError("failed to slice tensor");
   }
@@ -163,7 +170,7 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
       std::multiplies<int64_t>());
   auto numLoads = sliceSize / ((elementBitWidth / 8) * subgroupSize[0]);
   
-  Value localSliceValue = *localSlice;
+  Value localSliceValue = localSlice;
   Value gatherOffset = laneId;
   Value gatherStride = rewriter.create<arith::ConstantIndexOp>(
       loc, (elementBitWidth / 8) * subgroupSize[0]);
