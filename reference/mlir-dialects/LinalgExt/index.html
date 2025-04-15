@@ -4728,6 +4728,7 @@ semantics.</p>
               `batch_pos` `=` $batch_pos
               `m_pos` `=` $m_pos
               `k_pos` `=` $k_pos
+              `input_k_perm` `=` $input_k_perm
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
               (`-&gt;` type($results)^)?
@@ -4786,6 +4787,16 @@ would have strides along the M dim of 32 for</code>M0<code>, meaning as</code>M0
 by 1, the index into the flat</code>M<code>increases by 32. Along the K dim, strides
 would be 4 for</code>K0<code>, and 1 for</code>K1<code>, meaning as</code>K0<code>increases by 1, the
 index into the flat</code>K<code>increases by 4. The strides in M from</code>m_strides<code>are orthogonal to the strides in</code>K<code>from</code>k_strides`.</p>
+<p>The <code>input_k_perm</code> attribute defines the permutation needed to align the
+reduction dimensions of the input layout with those of the filter layout
+when computing the K dimension of the im2col output. This is useful when the
+layout of the filter (e.g., <code>CHW</code>) differs from that of the input (e.g., <code>HWC</code>).
+For instance, an <code>input_k_perm = [2, 0, 1]</code> indicates the input indices needs
+to be transposed from <code>HWC</code> to <code>CHW</code> layout before extracting slices during
+decomposition. The identity permutation (e.g., input_k_perm = [0, 1, 2])
+indicates that the input layout is already aligned with the filter layout
+in terms of reduction dimensions, so no transposition of indices is necessary
+before slice extraction.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
@@ -4801,6 +4812,7 @@ index into the flat</code>K<code>increases by 4. The strides in M from</code>m_s
 <tr><td><code>batch_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>m_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>k_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>input_k_perm</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
