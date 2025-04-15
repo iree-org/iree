@@ -1,0 +1,30 @@
+{
+    "inputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/toy_llama_inputs/decode_next_tokens.npy"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/toy_llama_inputs/decode_seq_lens.npy"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/toy_llama_inputs/decode_start_positions.npy"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/toy_llama_inputs/decode_seq_block_ids.npy"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/toy_llama_inputs/decode_cache_state.npy"
+        }
+    ],
+    "device": "hip",
+    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/real_weights.irpa",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/8b_f16_random.mlir",
+    "compiler_flags": [
+        "--iree-hal-target-device=hip",
+        "--iree-opt-level=O3",
+        "--iree-hal-indirect-command-buffers=true",
+        "--iree-stream-resource-memory-model=discrete",
+        "--iree-hal-memoization=true"
+    ],
+    "run_function": "decode_bs4"
+}
