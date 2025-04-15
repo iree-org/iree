@@ -40,6 +40,7 @@ def IREEGPU_LoweringConfigAttr :
         "getTilingLevelSizes",
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
+        "getLoweringStrategy",
       ]>
     ]> {
   let mnemonic = "lowering_config";

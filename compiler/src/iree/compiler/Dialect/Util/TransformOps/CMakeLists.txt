@@ -32,8 +32,10 @@ iree_cc_library(
   DEPS
     ::UtilTransformOpsGen
     LLVMSupport
+    MLIRBytecodeWriter
     MLIRIR
     MLIRPDLDialect
+    MLIRParser
     MLIRSupport
     MLIRTransformDialect
     MLIRTransformDialectInterfaces

@@ -296,7 +296,6 @@
     "onnx/node/generated/test_slice_negative_axes",
     "onnx/node/generated/test_slice_start_out_of_bounds",
     "onnx/node/generated/test_stft",
-    "onnx/node/generated/test_stft_with_window",
     "onnx/node/generated/test_tfidfvectorizer_tf_batch_onlybigrams_skip0",
     "onnx/node/generated/test_tfidfvectorizer_tf_batch_onlybigrams_skip5",
     "onnx/node/generated/test_tfidfvectorizer_tf_batch_uniandbigrams_skip5",

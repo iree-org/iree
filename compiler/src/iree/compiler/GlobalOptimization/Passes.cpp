@@ -61,6 +61,17 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
         clEnumValN(DemotionOption::None, "none", "Demote no contraction ops.")),
     llvm::cl::init(DemotionOption::None));
 
+static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
+    "iree-global-opt-set-encoding-strategy",
+    llvm::cl::desc("Set the encoding strategy for operations."),
+    llvm::cl::values(
+        clEnumValN(
+            DispatchCreation::EncodingOptions::Generic, "generic",
+            "Using EncodingAttr which encodes as much information as possible"),
+        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
+                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
+
 static llvm::cl::opt<bool> clWarnOnUninitializedValues(
     "iree-global-opt-enable-warn-on-uninitialized-values",
     llvm::cl::desc("Warn on some classes of uses of uninitialized values."),
@@ -175,8 +186,10 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
-    FunctionLikeNest(mainPassManager)
-        .addPass(DispatchCreation::createSetEncodingPass);
+    FunctionLikeNest(mainPassManager).addPass([&]() {
+      return DispatchCreation::createSetEncodingPass(
+          DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
+    });
     // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
     // we can use `FunctionLikNest` here.
     if (clEnableEarlyMaterialization) {
