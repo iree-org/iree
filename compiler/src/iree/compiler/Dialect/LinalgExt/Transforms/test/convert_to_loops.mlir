@@ -1410,3 +1410,113 @@ func.func @unpack(%arg0: memref<1x4x6x6x2xf32>, %arg1: memref<1x6x6x8xf32>) {
 // CHECK:         }
 // CHECK:       }
 // CHECK:     }
+
+// -----
+
+func.func @gather_1d_indices(%arg0 : memref<10x10xi32>, %arg1 : memref<1xi32>, %arg2 : memref<1x10xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%arg0, %arg1: memref<10x10xi32>, memref<1xi32>)
+    outs(%arg2: memref<1x10xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @gather_1d_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C1]] step %[[C1]] {
+// CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[C10]] step %[[C1]] {
+// CHECK:             %[[IDX:.+]] = memref.load %[[ARG1]][%[[I]]] : memref<1xi32>
+// CHECK:             %[[CAST:.+]] = arith.index_cast %[[IDX]] : i32 to index
+// CHECK:             %[[LOAD:.+]] = memref.load %[[ARG0]][%[[CAST]], %[[J]]] : memref<10x10xi32>
+
+// -----
+
+func.func @gather_2d_indices(%arg0 : memref<2x2xi32>, %arg1 : memref<2x2xi32>, %arg2 : memref<2xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%arg0, %arg1: memref<2x2xi32>, memref<2x2xi32>)
+    outs(%arg2: memref<2xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @gather_2d_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:           %[[IDX0:.+]] = memref.load %[[ARG1]][%[[I]], %[[C0]]] : memref<2x2xi32>
+// CHECK:           %[[CAST0:.+]] = arith.index_cast %[[IDX0]] : i32 to index
+// CHECK:           %[[IDX1:.+]] = memref.load %[[ARG1]][%[[I]], %[[C1]]] : memref<2x2xi32>
+// CHECK:           %[[CAST1:.+]] = arith.index_cast %[[IDX1]] : i32 to index
+// CHECK:           %[[LOAD0:.+]] = memref.load %[[ARG0]][%[[CAST0]], %[[CAST1]]] : memref<2x2xi32>
+// CHECK:           memref.store %[[LOAD0]], %[[ARG2]][%[[I]]] : memref<2xi32>
+
+// -----
+
+func.func @gather_perm_dim_map(%arg0 : memref<2x2xi32>, %arg1 : memref<2x2xi32>, %arg2 : memref<2xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [1, 0]
+    ins(%arg0, %arg1: memref<2x2xi32>, memref<2x2xi32>)
+    outs(%arg2: memref<2xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @gather_perm_dim_map
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:           %[[IDX0:.+]] = memref.load %[[ARG1]][%[[I]], %[[C0]]] : memref<2x2xi32>
+// CHECK:           %[[CAST0:.+]] = arith.index_cast %[[IDX0]] : i32 to index
+// CHECK:           %[[IDX1:.+]] = memref.load %[[ARG1]][%[[I]], %[[C1]]] : memref<2x2xi32>
+// CHECK:           %[[CAST1:.+]] = arith.index_cast %[[IDX1]] : i32 to index
+// CHECK:           %[[LOAD0:.+]] = memref.load %[[ARG0]][%[[CAST1]], %[[CAST0]]] : memref<2x2xi32>
+// CHECK:           memref.store %[[LOAD0]], %[[ARG2]][%[[I]]] : memref<2xi32>
+
+// -----
+
+func.func @gather_inline_region(%arg0 : memref<2x2xi32>, %arg1 : memref<2x2xi32>, %arg2 : memref<2xi32>) {
+  %cst = arith.constant 3 : i32
+  iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%arg0, %arg1: memref<2x2xi32>, memref<2x2xi32>)
+    outs(%arg2: memref<2xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      %0 = arith.muli %bb0, %cst : i32
+      iree_linalg_ext.yield %0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func @gather_inline_region
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : i32
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:           %[[IDX0:.+]] = memref.load %[[ARG1]][%[[I]], %[[C0]]] : memref<2x2xi32>
+// CHECK:           %[[CAST0:.+]] = arith.index_cast %[[IDX0]] : i32 to index
+// CHECK:           %[[IDX1:.+]] = memref.load %[[ARG1]][%[[I]], %[[C1]]] : memref<2x2xi32>
+// CHECK:           %[[CAST1:.+]] = arith.index_cast %[[IDX1]] : i32 to index
+// CHECK:           %[[LOAD0:.+]] = memref.load %[[ARG0]][%[[CAST0]], %[[CAST1]]] : memref<2x2xi32>
+// CHECK:           %[[MUL:.+]] = arith.muli %[[LOAD0]], %[[C3]] : i32
+// CHECK:           memref.store %[[MUL]], %[[ARG2]][%[[I]]] : memref<2xi32>
