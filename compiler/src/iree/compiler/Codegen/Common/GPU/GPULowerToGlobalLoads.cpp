@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include <numeric>
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -19,6 +20,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-lower-to-global-loads"
 
@@ -50,25 +52,51 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   // Create an extract slice
   SmallVector<int64_t> newShape(tensorType.getShape());
   newShape[outermostDim] = outermostDimSize / numParts;
-  auto newSliceType = RankedTensorType::get(newShape, tensorType.getElementType());
+  
+  // hack:
+  if (newShape[0] == 64) {
+    // [64, 64]
+    newShape = {256, 16};
+  } else if (newShape[0] == 256) {
+
+  }
+  
   // turn newShape into ValueRange:
   SmallVector<Value> newShapeOfSlice;
+    LLVM_DEBUG(llvm::dbgs() << "printing shapes dim for:\n");
+  LLVM_DEBUG(llvm::dbgs() << "tensor: " << tensor << "\n");
   for (auto dim : newShape) {
-    newShapeOfSlice.push_back(rewriter.create<arith::ConstantIndexOp>(loc, dim));
+    LLVM_DEBUG(
+        llvm::dbgs() << "newShapeOfSlice dim: " << dim << "\n");
+    newShapeOfSlice.push_back(
+        rewriter.create<arith::ConstantIndexOp>(loc, dim));
   }
   
   // offset
-  SmallVector<Value> offset(tensorType.getRank(),
-                            rewriter.create<arith::ConstantIndexOp>(loc, 0));
-  offset[outermostDim] = rewriter.create<arith::MulIOp>(loc, inductionVars[0],
-      rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize / numParts));
+  //SmallVector<Value> offsets(tensorType.getRank(),
+  //                          rewriter.create<arith::ConstantIndexOp>(loc, 0));
+  //offsets[outermostDim] = rewriter.create<arith::MulIOp>(loc, inductionVars[0],
+  //    rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize / numParts));
+  SmallVector<Value> offsets = {
+      rewriter.create<arith::MulIOp>(
+          loc, inductionVars[0],
+          rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize / numParts))
+  };
 
   // strides of 1:
-  SmallVector<Value> strides(tensorType.getRank(),
-                             rewriter.create<arith::ConstantIndexOp>(loc, 1));
-
+  SmallVector<Value> stridesValue;
+  // Hack:
+  SmallVector<int64_t> strides = {64, 1};
+  for (auto dim : strides) {
+    stridesValue.push_back(
+        rewriter.create<arith::ConstantIndexOp>(loc, dim));
+  }
+  
+  auto newSliceType = RankedTensorType::get(newShape, tensorType.getElementType());
+  auto noVals = ValueRange{};
   return rewriter.create<tensor::ExtractSliceOp>(
-      loc, newSliceType, tensor, offset, newShapeOfSlice, strides);
+      loc, newSliceType, tensor, offsets, noVals, noVals,
+      ArrayRef<int64_t>{INT64_MIN, 1}, newShape, strides);
 }
 
 static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
@@ -87,6 +115,9 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto rank = copyTensorType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
   int64_t elementBitWidth = copyTensorType.getElementTypeBitWidth();
+  
+  // TODO: determine tile sizes
+  tileSizes.push_back(rewriter.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
   tileSizes.push_back(rewriter.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
 
   // Construct a ForallOp:
