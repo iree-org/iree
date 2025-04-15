@@ -297,14 +297,37 @@ def HoistEncodingOpsPass :
   ];
 }
 
+def PropagateEncodingsPass :
+    InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
+  let summary = "Propagate encodings across other operations.";
+  let dependentDialects = [
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
 
-def SetEncodingPass :
-    InterfacePass<"iree-dispatch-creation-set-encoding", "mlir::FunctionOpInterface"> {
+def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
+                                    "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
+  ];
+  let options = [
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
+                "matmulk", "Only encodes reduction dimensions in the encoding."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
   ];
 }
 

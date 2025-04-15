@@ -88,7 +88,7 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
     OpFoldResult ub = getDim(builder, loc, getUpdates(), dim);
-    ranges.emplace_back(Range{zero, ub, one});
+    ranges.push_back(Range{zero, ub, one});
   }
   return ranges;
 }
@@ -275,6 +275,117 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
       loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
       getOriginal(), starts);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GatherOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> GatherOp::getLoopIteratorTypes() {
+  return SmallVector<utils::IteratorType>(getOutputType().getRank(),
+                                          utils::IteratorType::parallel);
+}
+
+SmallVector<Range> GatherOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getOutputType().getRank())) {
+    OpFoldResult ub = getDim(builder, loc, getOutput(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+FailureOr<TilingResult>
+GatherOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  assert(offsets.size() >= 1 && sizes.size() >= 1);
+  Location loc = getLoc();
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  SmallVector<Operation *> slices;
+
+  // Slice of the result.
+  auto resultRank = getOutputType().getRank();
+  SmallVector<OpFoldResult> resultStrides(resultRank, oneAttr);
+  Operation *resultSlice =
+      getSlice(builder, loc, getOutput(), offsets, sizes, resultStrides);
+  if (!resultSlice) {
+    return emitOpError("failed to get result slice");
+  }
+  Value tiledResult = resultSlice->getResult(0);
+
+  // Slice of indices.
+  auto indicesRank = getIndicesType().getRank();
+  SmallVector<OpFoldResult> indicesOffsets(offsets.take_front(getBatchRank()));
+  SmallVector<OpFoldResult> indicesSizes(sizes.take_front(getBatchRank()));
+  if (getBatchRank() != getIndicesType().getRank()) {
+    indicesOffsets.push_back(zeroAttr);
+    indicesSizes.push_back(builder.getIndexAttr(getIndexDepth()));
+  }
+  SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
+
+  Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
+                                     indicesSizes, indicesStrides);
+  if (!indicesSlice) {
+    return emitOpError("failed to get indices slices");
+  }
+  Value tiledIndices = indicesSlice->getResult(0);
+
+  // Slice of the source.
+  auto sourceRank = getSourceType().getRank();
+  auto indexDepth = getIndexDepth();
+
+  // The first `indexDepth` dims are not tiled
+  SmallVector<OpFoldResult> sourceOffsets, sourceSizes;
+  for (auto dim : llvm::seq<int64_t>(0, indexDepth)) {
+    sourceOffsets.push_back(zeroAttr);
+    sourceSizes.push_back(getDim(builder, loc, getSource(), dim));
+  }
+  llvm::append_range(sourceOffsets,
+                     offsets.slice(getBatchRank(), sourceRank - indexDepth));
+  llvm::append_range(sourceSizes,
+                     sizes.slice(getBatchRank(), sourceRank - indexDepth));
+  SmallVector<OpFoldResult> sourceStrides(sourceRank, oneAttr);
+  Operation *sourceSlice = getSlice(builder, loc, getSource(), sourceOffsets,
+                                    sourceSizes, sourceStrides);
+  if (!sourceSlice) {
+    return emitOpError("failed to get source tensor slice");
+  }
+  Value tiledSource = sourceSlice->getResult(0);
+
+  slices.push_back(sourceSlice);
+  slices.push_back(indicesSlice);
+  slices.push_back(resultSlice);
+
+  SmallVector<Type> resultTypes;
+  if (getNumResults()) {
+    resultTypes.push_back(tiledResult.getType());
+  }
+  Operation *tiledGatherOp =
+      mlir::clone(builder, getOperation(), resultTypes,
+                  ValueRange{tiledSource, tiledIndices, tiledResult});
+  return TilingResult{
+      {tiledGatherOp}, SmallVector<Value>(tiledGatherOp->getResults()), slices};
+}
+
+LogicalResult GatherOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+FailureOr<TilingResult>
+GatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
 }
 
 //===----------------------------------------------------------------------===//

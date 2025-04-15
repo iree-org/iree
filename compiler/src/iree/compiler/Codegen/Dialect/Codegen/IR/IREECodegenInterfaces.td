@@ -112,6 +112,19 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*defaultImplementation=*/[{
         return ::llvm::SmallVector<OpFoldResult>();
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the name of the custom lowering strategy to apply to the annotated
+        operation.
+      }],
+      /*retTy=*/"::std::optional<::llvm::StringRef>",
+      /*methodName=*/"getLoweringStrategy",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
     >
   ];
 }
