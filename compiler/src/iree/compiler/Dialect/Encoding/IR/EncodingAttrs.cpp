@@ -12,6 +12,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -544,9 +545,58 @@ static int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
-                                                 ArrayRef<int32_t> padding) {
-  return get(ctx, DenseI32ArrayAttr::get(ctx, padding));
+PadEncodingLayoutAttr
+PadEncodingLayoutAttr::get(MLIRContext *ctx, ArrayRef<int32_t> padding,
+                           ArrayRef<ReassociationIndices> reassociation) {
+  // TODO(hanchung): Replace OpBuilder with Builder for upstream
+  // getReassociationIndicesAttribute method.
+  OpBuilder builder(ctx);
+  ArrayAttr reassociationAttr;
+  if (!reassociation.empty() &&
+      llvm::any_of(reassociation, [](auto v) { return v.size() != 1; })) {
+    reassociationAttr =
+        getReassociationIndicesAttribute(builder, reassociation);
+  }
+  auto paddingAttr = builder.getDenseI32ArrayAttr(padding);
+  return Base::get(ctx, paddingAttr, reassociationAttr);
+}
+
+SmallVector<ReassociationIndices>
+PadEncodingLayoutAttr::getReassociationIndices() const {
+  SmallVector<ReassociationIndices> reassociationIndices;
+  auto reassociationAttr = getReassociation();
+
+  // Construct the identity reassociation map if the parameter is not set.
+  if (!reassociationAttr) {
+    for (auto i : llvm::seq<int64_t>(0, getPadding().size())) {
+      reassociationIndices.push_back({i});
+    }
+    return reassociationIndices;
+  }
+
+  for (auto attr : reassociationAttr) {
+    reassociationIndices.push_back(llvm::to_vector<2>(
+        llvm::map_range(cast<ArrayAttr>(attr), [&](Attribute indexAttr) {
+          return cast<IntegerAttr>(indexAttr).getInt();
+        })));
+  }
+  return reassociationIndices;
+}
+
+SmallVector<int64_t> PadEncodingLayoutAttr::getCollapsedShapeWithoutPadding(
+    ArrayRef<int64_t> shape) const {
+  SmallVector<ReassociationIndices> reassociations = getReassociationIndices();
+  SmallVector<int64_t> newShape(reassociations.size(), 1);
+  for (auto [i, indices] : llvm::enumerate(reassociations)) {
+    for (auto j : indices) {
+      if (ShapedType::isDynamic(shape[j])) {
+        newShape[i] = ShapedType::kDynamic;
+        break;
+      }
+      newShape[i] *= shape[j];
+    }
+  }
+  return newShape;
 }
 
 PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
@@ -563,8 +613,10 @@ bool PadEncodingLayoutAttr::isIdentityLayout() const {
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
+  SmallVector<int64_t> collapsedShape =
+      getCollapsedShapeWithoutPadding(type.getShape());
   ArrayRef<int32_t> padding = getPadding().asArrayRef();
-  assert(padding.size() == type.getRank() && "Invalid padding");
+  assert(padding.size() == collapsedShape.size() && "Invalid padding");
   LLVM_DEBUG(if (llvm::any_of(padding, [](int32_t x) { return x != 0; })) {
     llvm::dbgs() << "Non-zero padding: " << type << "\n";
   });
@@ -574,7 +626,7 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
   Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
 
   size_t dynamicDimIdx = 0;
-  for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
+  for (auto [dimSize, padValue] : llvm::zip_equal(collapsedShape, padding)) {
     if (!ShapedType::isDynamic(dimSize)) {
       staticProduct *= (dimSize + padValue);
       continue;

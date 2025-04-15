@@ -121,10 +121,10 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
   util.return
 }
 
-// CHECK-DAG: #[[$NO_PAD:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 0]>]
-// CHECK-DAG: #[[$PAD_DIM1_64:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]
-// CHECK-DAG: #[[$PAD_LHS_1:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 7]>]
-// CHECK-DAG: #[[$PAD_LHS_2:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 65]>]
+// CHECK-DAG: #[[$NO_PAD:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 0]>]
+// CHECK-DAG: #[[$PAD_DIM1_64:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 64]>]
+// CHECK-DAG: #[[$PAD_LHS_1:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 7]>]
+// CHECK-DAG: #[[$PAD_LHS_2:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 65]>]
 
 // CHECK-LABEL: util.func public @with_pad_encoding
 //
@@ -435,7 +435,7 @@ util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<padding = [0, 0]>]>
 // CHECK-LABEL: util.func public @drop_encoding
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
@@ -452,7 +452,7 @@ util.func public @ignore_encoding_by_identity_encoding(%arg0: index, %arg1: inde
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.pad_encoding_layout<padding = [0, 0]>]>
 // CHECK-LABEL: util.func public @ignore_encoding_by_identity_encoding
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 

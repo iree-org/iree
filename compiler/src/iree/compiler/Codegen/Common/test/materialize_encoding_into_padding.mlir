@@ -92,7 +92,7 @@ func.func @set_encoding_and_store_with_unresolved_encodings_from_executable() at
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
 #encoding_mmt = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
-#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 64]>]>
 func.func @set_pad_encoding_and_store() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
@@ -124,7 +124,7 @@ func.func @set_pad_encoding_and_store() {
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
 #encoding_mmt = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
-#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 0]>]>
 func.func @set_zero_pad_encoding_and_store() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
@@ -156,7 +156,7 @@ func.func @set_zero_pad_encoding_and_store() {
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
 #encoding_mmt = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
-#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 64]>]>
 func.func @dynamic_set_zero_pad_encoding_and_store() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
@@ -192,9 +192,9 @@ func.func @dynamic_set_zero_pad_encoding_and_store() {
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
 #encoding_mmt_lhs = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
-#pad_encoding_lhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+#pad_encoding_lhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 64]>]>
 #encoding_mmt_rhs = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f16, f16, f16]>
-#pad_encoding_rhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 128]>]>
+#pad_encoding_rhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 128]>]>
 #encoding_mmt_out = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f16]>
 func.func @load_from_padded_and_mmt() {
   %c0 = arith.constant 0 : index
@@ -255,7 +255,7 @@ func.func @load_from_padded_and_mmt() {
 
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
-#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+#pad_encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 64]>]>
 func.func @set_pad_encoding_and_store_with_resolved_layout() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
@@ -290,9 +290,9 @@ func.func @set_pad_encoding_and_store_with_resolved_layout() {
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
 #encoding_mmt_lhs = #iree_encoding.matmul_k<k_dims = [1]>
-#pad_encoding_lhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+#pad_encoding_lhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 64]>]>
 #encoding_mmt_rhs = #iree_encoding.matmul_k<k_dims = [1]>
-#pad_encoding_rhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 128]>]>
+#pad_encoding_rhs = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 128]>]>
 #encoding_mmt_out = #iree_encoding.matmul_k<k_dims = []>
 func.func @load_from_padded_and_mmt_using_matmul_k() {
   %c0 = arith.constant 0 : index

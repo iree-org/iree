@@ -251,13 +251,17 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
         ]>
     ]> {
   let mnemonic = "pad_encoding_layout";
-  let assemblyFormat = "`<` $padding `>`";
+  let assemblyFormat = "`<` struct(params) `>`";
 
   let summary = "An attribute that encodes padding values of tensor dimensions";
   let description = [{
     Associates tensor dimensions with pad values (numbers of appended elements).
     The logical dimensions of the tensors do not change, and the elements in the
     padded regions are left uninitialized.
+
+    The `reassociation` map describes how to collapse the dimensions before
+    applying padding. The size of the map has to be as the same as the number of
+    elements in `padding`.
 
     This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
     to provide a hook for tensor sizeof lowering. The implementation of this
@@ -266,15 +270,30 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
   }];
 
   let parameters = (ins
-    // How many padding elements to add along each tensor dimension.
-    "DenseI32ArrayAttr":$padding
+    // How many padding elements to add along each tensor dimension after
+    // collapsing the tensor type with `reassociation` map.
+    "DenseI32ArrayAttr":$padding,
+    // The reassociation map for collapsing the shape before padding each
+    // dimension.
+    OptionalParameter<"ArrayAttr", "">:$reassociation
   );
 
   let builders = [
-    AttrBuilder<(ins "ArrayRef<int32_t>":$padding)>
+    AttrBuilder<(ins
+      "ArrayRef<int32_t>":$padding,
+      CArg<"ArrayRef<ReassociationIndices>", "{}">:$reassociation
+    )>
   ];
 
   let extraClassDeclaration = [{
+    /// Returns the reassociation indices in `reassociation`. Returns an
+    /// identity reassociation map, if `reassociation` does not exist.
+    SmallVector<ReassociationIndices> getReassociationIndices() const;
+
+    /// Returns the shape that collapses `shape` using the `reassociation`.
+    SmallVector<int64_t> getCollapsedShapeWithoutPadding(
+        ArrayRef<int64_t> shape) const;
+
     /// Returns a PadEncodingLayoutAttr attribute that pads zero elements.
     static PadEncodingLayoutAttr getIdentityAttr(MLIRContext *ctx, int rank);
   }];

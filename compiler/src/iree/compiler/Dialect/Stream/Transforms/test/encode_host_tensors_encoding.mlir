@@ -122,11 +122,11 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic_using_layo
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_layout = #iree_encoding.pad_encoding_layout<padding = [0, 0]>
 #no_pad_encoding = #iree_encoding.layout<[#no_pad_layout]>
-#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_layout_a = #iree_encoding.pad_encoding_layout<padding = [0, 64]>
 #pad_encoding_a = #iree_encoding.layout<[#pad_layout_a]>
-#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_layout_b = #iree_encoding.pad_encoding_layout<padding = [64, 0]>
 #pad_encoding_b = #iree_encoding.layout<[#pad_layout_b]>
 util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
   %0 = stream.tensor.sizeof tensor<2048x4096xf16, #no_pad_encoding>{} : index
@@ -148,11 +148,11 @@ util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_layout = #iree_encoding.pad_encoding_layout<padding = [0, 0]>
 #no_pad_encoding = #iree_encoding.layout<[#no_pad_layout]>
-#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_layout_a = #iree_encoding.pad_encoding_layout<padding = [0, 64]>
 #pad_encoding_a = #iree_encoding.layout<[#pad_layout_a]>
-#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_layout_b = #iree_encoding.pad_encoding_layout<padding = [64, 0]>
 #pad_encoding_b = #iree_encoding.layout<[#pad_layout_b]>
 util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) -> index, index, index, index {
   %0 = stream.tensor.sizeof tensor<2048x?xf16, #no_pad_encoding>{%arg0} : index
@@ -225,4 +225,17 @@ util.func public @sizeof_multi_encoding_layouts(%arg0: index, %arg1: index) -> i
 //
 // CHECK-DAG:     %[[RES_0_1:.+]] = arith.maxui %[[SIZE0]], %[[SIZE1]]
 // CHECK-DAG:     %[[RES:.+]] = arith.maxui %[[RES_0_1]], %[[SIZE2]]
+// CHECK:         return %[[RES]]
+
+// -----
+
+#encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<padding = [0, 0, 0, 64], reassociation = [[0], [1], [2], [3, 4, 5]]>]>
+util.func public @pad_encoding_with_reassociation(%arg0: index) -> index {
+  %0 = stream.tensor.sizeof tensor<4x?x32x8x4x128xf16, #encoding>{%arg0} : index
+  util.return %0 : index
+}
+// CHECK-LABEL: @pad_encoding_with_reassociation
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[STATIC_SIZE:.+]] = arith.constant 1064960 : index
+// CHECK:         %[[RES:.+]] = arith.muli %[[ARG0]], %[[STATIC_SIZE]] overflow<nsw> : index
 // CHECK:         return %[[RES]]
