@@ -889,6 +889,17 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     would be 4 for `K0`, and 1 for `K1`, meaning as `K0` increases by 1, the
     index into the flat `K` increases by 4. The strides in M from `m_strides`
     are orthogonal to the strides in `K` from `k_strides`.
+
+    The `input_k_perm` attribute defines the permutation needed to align the
+    reduction dimensions of the input layout with those of the filter layout
+    when computing the K dimension of the im2col output. This is useful when the
+    layout of the filter (e.g., `CHW`) differs from that of the input (e.g., `HWC`).
+    For instance, an `input_k_perm = [2, 0, 1]` indicates the input indices needs
+    to be transposed from `HWC` to `CHW` layout before extracting slices during
+    decomposition. The identity permutation (e.g., input_k_perm = [0, 1, 2])
+    indicates that the input layout is already aligned with the filter layout
+    in terms of reduction dimensions, so no transposition of indices is necessary
+    before slice extraction.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -906,7 +917,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$static_k_strides,
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
-                       DenseI64ArrayAttr:$k_pos);
+                       DenseI64ArrayAttr:$k_pos,
+                       DenseI64ArrayAttr:$input_k_perm);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -925,6 +937,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `batch_pos` `=` $batch_pos
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
+    `input_k_perm` `=` $input_k_perm
     `ins` `(` $input `:` type($input) `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
@@ -941,7 +954,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<OpFoldResult>":$k_strides,
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
-      "ArrayRef<int64_t>":$k_dimensions)>
+      "ArrayRef<int64_t>":$k_dimensions,
+      "ArrayRef<int64_t>":$input_k_perm)>
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
