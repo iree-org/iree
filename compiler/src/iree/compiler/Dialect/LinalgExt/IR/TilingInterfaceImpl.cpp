@@ -392,19 +392,13 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                      ValueRange ivs) {
   auto indexDepth = getIndexDepth();
   Value result = b.create<memref::LoadOp>(loc, getOutput(), ivs);
-  SmallVector<Value> starts;
-  SmallVector<Value> loadIndices;
-  append_range(loadIndices, ivs.take_front(getBatchRank()));
+  SmallVector<Value> loadIndices(ivs.take_front(getBatchRank()));
 
   // Populate with empty values.
   auto sourceTy = getSourceType();
-  starts.resize(sourceTy.getRank(), Value());
   auto resultIvs = ivs.drop_front(getBatchRank());
-
-  int64_t offset = starts.size() - resultIvs.size();
-  for (auto [idx, iv] : llvm::enumerate(resultIvs)) {
-    starts[idx + offset] = iv;
-  }
+  SmallVector<Value> starts(sourceTy.getRank() - resultIvs.size(), Value());
+  llvm::append_range(starts, resultIvs);
 
   // The innermost dim of `indices` having an innermost dim for each index.
   bool hasIndexDim = getIndicesType().getRank() > getBatchRank();
@@ -414,7 +408,7 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   // Populate `starts` by loading indices from `indices`
   ArrayRef<int64_t> dimMap = getDimensionMap();
-  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
+  for (int64_t i = 0; i < indexDepth; ++i) {
     if (hasIndexDim) {
       loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
     }
