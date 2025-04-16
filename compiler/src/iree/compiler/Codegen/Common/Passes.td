@@ -421,6 +421,8 @@ def IREEExpandStridedMetadataPass :
     Pass<"iree-codegen-expand-strided-metadata", ""> {
   let summary = "Resolve memref.extract_strided_metadata operations";
   let options = [
+    Option<"allowSubviewExpansion", "allow-subview-expansion", "bool", /*default=*/"false",
+           "Enables expansion of memref.subview ops">,
     Option<"allowUnresolved", "allow-unresolved", "bool", /*default=*/"false",
            "Allow unresolved strided metadata op (for testing)">,
   ];
