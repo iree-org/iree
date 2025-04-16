@@ -588,7 +588,9 @@ util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, 
 //       CHECK:   flow.return %[[TRUNC]] : tensor<20x4096x64xf16>
 
 // -----
-
+// The expand_shape within the dispatch.region is hoisted out as
+// its a leaf node i.e the defining op of the source operand
+// is outside the dispatch.region.
 util.func public @collapse(%10: tensor<64x32x1280xi8>, %11 : tensor<10240x1280xi8>, %12 : tensor<10240xi32>, %13 : tensor<10240xf32>) -> (tensor<2x32x32x10240xf16>) {
   %c0_i32 = arith.constant 0 : i32
   %c0 = arith.constant 0 : index

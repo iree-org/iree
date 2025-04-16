@@ -1017,19 +1017,22 @@ void CollapseDimensionsPass::runOnOperation() {
   IRRewriter rewriter(context);
 
   SmallVector<IREE::Flow::DispatchRegionOp> modifiedDispatchOps;
-  funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
+  auto walkRes = funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
     FailureOr<IREE::Flow::DispatchRegionOp> newDispatchOp =
         hoistTensorReshapesOutOfDispatchRegion(
             rewriter, cast<IREE::Flow::DispatchRegionOp>(dispatchOp));
     if (failed(newDispatchOp)) {
-      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
-      return signalPassFailure();
+      return WalkResult::interrupt();
     }
     if (collapseDimensionsForDispatch(rewriter, newDispatchOp.value(),
                                       maxIterations)) {
       modifiedDispatchOps.push_back(newDispatchOp.value());
     }
+    return WalkResult::advance();
   });
+  if (walkRes.wasInterrupted()) {
+    return signalPassFailure();
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "[CollapseDims] : After collapsing ops: \n";
