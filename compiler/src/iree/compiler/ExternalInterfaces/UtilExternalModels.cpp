@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
@@ -126,11 +127,22 @@ struct UtilAssumeIntValueBoundsOpInterface
     auto [min, max] =
         assumeOp.getUnionedUnsignedRange(result.getResultNumber());
 
+    std::optional<int64_t> udiv =
+        assumeOp.getUnionedUnsignedDivisor(result.getResultNumber());
+
     if (min) {
       cstr.bound(result) >= *min;
     }
     if (max) {
       cstr.bound(result) <= *max;
+    }
+    if (udiv) {
+      AffineExpr expr =
+          cstr.getExpr(assumeOp.getOperand(result.getResultNumber()));
+      AffineExpr udivCst =
+          getAffineConstantExpr(udiv.value(), op->getContext());
+      AffineExpr clampExpr = expr.floorDiv(udivCst) * udivCst;
+      cstr.bound(result) == clampExpr;
     }
   }
 };
