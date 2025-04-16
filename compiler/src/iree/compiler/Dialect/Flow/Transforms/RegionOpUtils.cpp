@@ -877,6 +877,10 @@ bool isClonableIntoDispatchOp(Operation *op,
     return true;
   }
 
+  if (isa<IREE::LinalgExt::GatherOp>(op)) {
+    return true;
+  }
+
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
     if (clInlineConstantByteLength == 0)
       return false;

@@ -785,3 +785,34 @@ util.func @never_clone_insert_slice_ops(%arg0 : tensor<?xi32>, %arg1 : tensor<?x
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
 //   CHECK-NOT:   tensor.insert_slice
 //       CHECK:   return %[[DISPATCH]]
+
+util.func @clone_gather_elementwise(%source : tensor<2x2x2048xi32>,
+                                   %indices : tensor<2xi32>) -> tensor<2048xi32> {
+  %dispatch = flow.dispatch.region -> (tensor<2048xi32>) {
+    %cst = arith.constant 2 : i32
+    %empty = tensor.empty() : tensor<2048xi32>
+    %result = iree_linalg_ext.gather dimension_map = [0, 1]
+                            ins(%source, %indices : tensor<2x2x2048xi32>, tensor<2xi32>)
+                            outs(%empty: tensor<2048xi32>) {
+                      ^bb0(%arg0: i32, %arg1: i32):
+                        iree_linalg_ext.yield %arg0 : i32
+    } -> tensor<2048xi32>
+    %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%result : tensor<2048xi32>) outs(%empty: tensor<2048xi32>) {
+      ^bb0(%arg0: i32, %arg1: i32):
+        %0 = arith.muli %arg0, %cst : i32
+        linalg.yield %0 : i32
+    } -> tensor<2048xi32>
+    flow.return %generic : tensor<2048xi32>
+  }
+  util.return %dispatch : tensor<2048xi32>
+}
+// CHECK-LABEL: func public @clone_gather_elementwise
+// CHECK-SAME:     %[[SOURCE:.+]]: tensor<2x2x2048xi32>
+// CHECK-SAME:     %[[INDICES:.+]]: tensor<2xi32>
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//      CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
+// CHECK-SAME:         ins(%[[SOURCE]], %[[INDICES]] :
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[GATHER]] :
+//      CHECK:     flow.return %[[GENERIC]]
+//      CHECK:   util.return %[[DISPATCH]]
