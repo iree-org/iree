@@ -64,12 +64,13 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   SmallVector<Value> offsets = {rewriter.create<arith::MulIOp>(
       loc, index, rewriter.create<arith::ConstantIndexOp>(loc, numParts))};
 
-  // strides of 1:
-  SmallVector<Value> stridesValue;
-  // Hack:
-  SmallVector<int64_t> strides = {64, 1};
-  for (auto dim : strides) {
-    stridesValue.push_back(rewriter.create<arith::ConstantIndexOp>(loc, dim));
+  SmallVector<int64_t> strides;
+  for (auto i = tensorType.getRank() - 1; i >= 0; --i) {
+    if (i == 0) {
+      strides.push_back(1);
+    } else {
+      strides.push_back(tensorType.getDimSize(i));
+    }
   }
 
   auto newSliceType =
