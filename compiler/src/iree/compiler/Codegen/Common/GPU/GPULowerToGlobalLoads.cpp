@@ -177,13 +177,13 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
   Value gatherStride =
       rewriter.create<arith::ConstantIndexOp>(loc, subgroupLoadSizeEachTime);
 
-  Value subgroupOffset = 
+  Value subgroupStartOffset = 
       rewriter.create<arith::MulIOp>(loc, subgroupId,
                                      rewriter.create<arith::ConstantIndexOp>(
                                          loc, sliceSize));
   // laneId + subgroupOffset:
   Value gatherOffset =
-      rewriter.create<arith::AddIOp>(loc, subgroupOffset, laneId);
+      rewriter.create<arith::AddIOp>(loc, subgroupStartOffset, laneId);
 
   // upper bound
   auto numLoadsPerSlice = sliceSize / subgroupLoadSizeEachTime;
@@ -204,21 +204,32 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
     auto inductionVars = forOp.getInductionVar();
     auto loadArg = forOp.getInitArgs()[0];
 
-    // loop load offset = landId + i * gatherStride:
+    // global load offset = landId + i * gatherStride:
     auto loadOffsetComp =
         rewriter.create<arith::MulIOp>(loc, inductionVars, gatherStride);
     auto sliceLoadOffset =
         rewriter.create<arith::AddIOp>(loc, loadOffsetComp, gatherOffset);
 
     auto totalLoadOffset = 
-        rewriter.create<arith::AddIOp>(loc, sliceLoadOffset, subgroupOffset);
+        rewriter.create<arith::AddIOp>(loc, sliceLoadOffset, subgroupStartOffset);
 
-    auto delinearizedIndex = rewriter
+    auto delinearizedGlobalIndices = rewriter
                                  .create<affine::AffineDelinearizeIndexOp>(
                                      loc, totalLoadOffset, sliceType.getShape())
                                  .getMultiIndex();
+
+    // local subgroup load offset: subgroupStartOffset + (i * gatherStride)
+    Value subgroupLoadOffset =
+        rewriter.create<arith::MulIOp>(loc, inductionVars, gatherStride);
+    subgroupLoadOffset =
+        rewriter.create<arith::AddIOp>(loc, subgroupLoadOffset, laneId);
+    auto delinearizedLocalIndices = rewriter
+                                 .create<affine::AffineDelinearizeIndexOp>(
+                                     loc, subgroupLoadOffset, sliceType.getShape())
+                                 .getMultiIndex();
     auto loadedLocal = rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
-        loc, local.getType(), *globalSlice, loadArg, delinearizedIndex);
+        loc, local.getType(), *globalSlice, delinearizedGlobalIndices, loadArg,
+        delinearizedLocalIndices);
 
     rewriter.create<scf::YieldOp>(loc, ValueRange{loadedLocal});
   }
