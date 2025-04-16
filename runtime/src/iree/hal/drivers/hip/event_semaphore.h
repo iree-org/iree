@@ -29,8 +29,7 @@ typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_hip_event_semaphore_create(
     uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
-    iree_allocator_t host_allocator, 
-    iree_hal_hip_device_topology_t topology,
+    iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
     iree_hal_semaphore_t** out_semaphore);
 
 // Performs a multi-wait on one or more semaphores. Returns
@@ -65,8 +64,7 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
 // The refcount for the event is incremented here, and the caller
 // must decrement when no longer needed.
 iree_status_t iree_hal_hip_semaphore_wait_hip_events(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    hipStream_t stream);
+    iree_hal_semaphore_t* base_semaphore, uint64_t value, hipStream_t stream);
 
 // Waits until all exported timepoints (up to value) have been
 // subitted to the dispatch thread.
@@ -75,8 +73,8 @@ iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
 
 iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_hal_hip_per_device_info_t* device,
-    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool);
+    iree_hal_hip_per_device_info_t* device, hipStream_t dispatch_stream,
+    iree_hal_hip_event_pool_t* event_pool);
 
 iree_status_t iree_hal_hip_event_semaphore_advance(
     iree_hal_semaphore_t* semaphore);
