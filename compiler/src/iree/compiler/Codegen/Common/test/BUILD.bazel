@@ -55,6 +55,7 @@ iree_lit_test_suite(
             "gpu_materialize_encoding_gfx908.mlir",
             "gpu_materialize_encoding_gfx90a.mlir",
             "gpu_materialize_encoding_gfx942.mlir",
+            "gpu_materialize_encoding_gfx950.mlir",
             "hoist_statically_bound_allocations.mlir",
             "hoist_unrolled_vector_extract_insert_slice.mlir",
             "iree_comprehensive_bufferize.mlir",
