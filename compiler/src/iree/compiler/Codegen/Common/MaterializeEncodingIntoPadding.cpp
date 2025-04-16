@@ -287,11 +287,11 @@ struct MaterializeEncodingIntoPaddingPass final
     if (targetAttr) {
       targetConfig = targetAttr.getConfiguration();
     } else {
-      IREE::GPU::TargetAttr targetAttr = getCLGPUTarget(context);
+      IREE::GPU::TargetAttr gpuTargetAttr = getCLGPUTarget(context);
       SmallVector<NamedAttribute> items;
       items.emplace_back(
           IREE::Encoding::kEncodingResolverAttrName,
-          IREE::GPU::getHIPTargetEncodingLayoutAttr(targetAttr, "pad"));
+          IREE::GPU::getHIPTargetEncodingLayoutAttr(gpuTargetAttr, "pad"));
       targetConfig = DictionaryAttr::get(context, items);
     }
 
