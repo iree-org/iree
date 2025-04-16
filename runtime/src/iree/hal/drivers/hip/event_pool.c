@@ -73,8 +73,7 @@ static inline void iree_hal_hip_event_destroy(iree_hal_hip_event_t* event) {
 static inline iree_status_t iree_hal_hip_event_create(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_event_pool_t* pool, iree_allocator_t host_allocator,
-    hipEvent_t imported_event,
-    iree_hal_hip_event_t** out_event) {
+    hipEvent_t imported_event, iree_hal_hip_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(pool);
   IREE_ASSERT_ARGUMENT(out_event);
@@ -93,7 +92,7 @@ static inline iree_status_t iree_hal_hip_event_create(
   event->exported = false;
 
   iree_status_t status = iree_ok_status();
-  
+
   if (!event->hip_event) {
     status = IREE_HIP_CALL_TO_STATUS(
         symbols,
@@ -136,7 +135,8 @@ void iree_hal_hip_event_release(iree_hal_hip_event_t* event) {
 
 iree_status_t iree_hal_hip_event_export(iree_hal_hip_event_t* event) {
   if (event->imported) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "Cannot export an imported event");
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Cannot export an imported event");
   }
   event->exported = true;
   return iree_ok_status();
@@ -204,8 +204,7 @@ iree_status_t iree_hal_hip_event_pool_allocate(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < available_capacity; ++i) {
       status = iree_hal_hip_event_create(
-          symbols, event_pool, host_allocator,
-          NULL,
+          symbols, event_pool, host_allocator, NULL,
           &event_pool->available_list[event_pool->available_count++]);
       if (!iree_status_is_ok(status)) break;
     }
@@ -222,10 +221,11 @@ iree_status_t iree_hal_hip_event_pool_allocate(
 
 // Imports an external hip_event_t to the pool.
 iree_status_t iree_hal_hip_event_pool_import(
-  iree_hal_hip_event_pool_t* event_pool, hipEvent_t event, iree_hal_hip_event_t** out_event) {
-  iree_status_t status = iree_hal_hip_event_create(
-    event_pool->symbols, event_pool, event_pool->host_allocator,
-      event, out_event);
+    iree_hal_hip_event_pool_t* event_pool, hipEvent_t event,
+    iree_hal_hip_event_t** out_event) {
+  iree_status_t status =
+      iree_hal_hip_event_create(event_pool->symbols, event_pool,
+                                event_pool->host_allocator, event, out_event);
   if (iree_status_is_ok(status)) {
     iree_hal_hip_event_pool_retain(event_pool);
   }
@@ -299,8 +299,7 @@ iree_status_t iree_hal_hip_event_pool_acquire(
                                      event_pool->device_context));
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       iree_status_t status = iree_hal_hip_event_create(
-          event_pool->symbols, event_pool, event_pool->host_allocator,
-          NULL,
+          event_pool->symbols, event_pool, event_pool->host_allocator, NULL,
           &out_events[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
         // Must release all events we've acquired so far.
@@ -333,7 +332,8 @@ static void iree_hal_hip_event_pool_release_event(
   // Try first to release to the pool.
   iree_slim_mutex_lock(&event_pool->event_mutex);
   for (iree_host_size_t i = 0; i < event_count; ++i) {
-    if (!events[i]->imported && !events[i]->exported && event_pool->available_capacity > event_pool->available_count) {
+    if (!events[i]->imported && !events[i]->exported &&
+        event_pool->available_capacity > event_pool->available_count) {
       iree_hal_hip_event_retain(events[i]);
       event_pool->available_list[event_pool->available_count] = events[i];
       event_pool->available_count += 1;

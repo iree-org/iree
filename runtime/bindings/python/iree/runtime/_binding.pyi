@@ -355,13 +355,14 @@ class HalSemaphore:
         timeout: Optional[int] = None,
         deadline: Optional[int] = None,
     ) -> None: ...
-    def import_timepoint(self, value:int, timepoint: HalExternalTimepoint) -> None: ...
+    def import_timepoint(self, value: int, timepoint: HalExternalTimepoint) -> None: ...
     def export_timepoint(
-            self,
-            value:int,
-            requested_type: Union[ExternalTimepointType, int],
-            requested_flags: Union[ExternalTimepointFlags, int],
-            out_external_timepoint: HalExternalTimepoint) -> None: ...
+        self,
+        value: int,
+        requested_type: Union[ExternalTimepointType, int],
+        requested_flags: Union[ExternalTimepointFlags, int],
+        out_external_timepoint: HalExternalTimepoint,
+    ) -> None: ...
 
 class HalModuleDebugSink:
     def __init__(

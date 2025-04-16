@@ -291,35 +291,25 @@ class HalMappedMemory {
 };
 
 class HalExternalTimepoint {
-  public:
-  HalExternalTimepoint(): timepoint_{} {
-  }
+ public:
+  HalExternalTimepoint() : timepoint_{} {}
 
-  iree_hal_external_timepoint_type_t& type() {
-    return timepoint_.type;
-  }
+  iree_hal_external_timepoint_type_t& type() { return timepoint_.type; }
 
-  iree_hal_external_timepoint_flags_t& flags() {
-    return timepoint_.flags;
-  }
+  iree_hal_external_timepoint_flags_t& flags() { return timepoint_.flags; }
 
   iree_hal_semaphore_compatibility_t& compatibility() {
     return timepoint_.compatibility;
   }
 
-  void*& cuda_event() {
-    return timepoint_.handle.cuda_event;
-  }
+  void*& cuda_event() { return timepoint_.handle.cuda_event; }
 
-  void*& hip_event() {
-    return timepoint_.handle.hip_event;
-  }
+  void*& hip_event() { return timepoint_.handle.hip_event; }
 
-  iree_hal_external_timepoint_t& timepoint() {
-    return timepoint_;
-  }
-  private:
-    iree_hal_external_timepoint_t timepoint_;
+  iree_hal_external_timepoint_t& timepoint() { return timepoint_; }
+
+ private:
+  iree_hal_external_timepoint_t timepoint_;
 };
 
 class HalCommandBuffer
