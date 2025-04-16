@@ -162,27 +162,52 @@ getUnsupportedMNKShape(MMAIntrinsic intrinsic) {
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment) {
+  auto mfmaLhs16xK = [](int64_t k) -> MMASingleSubgroupLayout {
+    assert(k % 4 == 0 && "doesn't support blocked MFMAs");
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
+            /*element=*/{1, k / 4}};
+  };
+  auto mfmaRhsKx16 = [](int64_t k) -> MMASingleSubgroupLayout {
+    assert(k % 4 == 0 && "doesn't support blocked MFMAs");
+    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+            /*element=*/{k / 4, 1}};
+  };
+
+  auto mfmaLhs32xK = [](int64_t k) -> MMASingleSubgroupLayout {
+    assert(k % 2 == 0 && "doesn't support blocked MFMAs");
+    return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
+            /*element=*/{1, k / 2}};
+  };
+  auto mfmaRhsKx32 = [](int64_t k) -> MMASingleSubgroupLayout {
+    assert(k % 2 == 0 && "doesn't support blocked MFMAs");
+    return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
+            /*element=*/{k / 2, 1}};
+  };
+
+  const MMASingleSubgroupLayout mfmaAcc16x16 = {
+      /*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+      /*element=*/{4, 1}};
+  const MMASingleSubgroupLayout mfmaAcc32x32 = {
+      /*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
+      /*element=*/{4, 1}};
+
   switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 1}};
+      return mfmaLhs16xK(4);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{1, 1}};
+      return mfmaRhsKx16(4);
     case MMAFragment::Acc:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc16x16;
     }
+  // Note: the returned layout for f64 differs than for other MFMAs
   case MMAIntrinsic::MFMA_F64_16x16x4_F64:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 1}};
+      return mfmaLhs16xK(4);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{1, 1}};
+      return mfmaRhsKx16(4);
     case MMAFragment::Acc:
       return {/*outer=*/{4, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
               /*element=*/{1, 1}};
@@ -190,55 +215,43 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   case MMAIntrinsic::MFMA_F32_16x16x8_BF16: {
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 2}};
+      return mfmaLhs16xK(8);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{2, 1}};
+      return mfmaRhsKx16(8);
     case MMAFragment::Acc:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc16x16;
     }
   }
   case MMAIntrinsic::MFMA_F32_32x32x4_BF16:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
-              /*element=*/{1, 2}};
+      return mfmaLhs32xK(4);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
-              /*element=*/{2, 1}};
+      return mfmaRhsKx32(4);
     case MMAFragment::Acc:
-      return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc32x32;
     }
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
   case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 4}};
+      return mfmaLhs16xK(16);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{4, 1}};
+      return mfmaRhsKx16(16);
     case MMAFragment::Acc:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc16x16;
     }
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
   case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
-              /*element=*/{1, 4}};
+      return mfmaLhs32xK(8);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
-              /*element=*/{4, 1}};
+      return mfmaRhsKx32(8);
     case MMAFragment::Acc:
-      return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc32x32;
     }
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
@@ -247,14 +260,11 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 8}};
+      return mfmaLhs16xK(32);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{8, 1}};
+      return mfmaRhsKx16(32);
     case MMAFragment::Acc:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc16x16;
     }
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2FNUZ:
@@ -263,14 +273,11 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   case MMAIntrinsic::MFMA_I32_32x32x16_I8:
     switch (fragment) {
     case MMAFragment::Lhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
-              /*element=*/{1, 8}};
+      return mfmaLhs32xK(16);
     case MMAFragment::Rhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
-              /*element=*/{8, 1}};
+      return mfmaRhsKx32(16);
     case MMAFragment::Acc:
-      return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
-              /*element=*/{4, 1}};
+      return mfmaAcc32x32;
     }
   case MMAIntrinsic::WMMAR3_F32_16x16x16_F16:
   case MMAIntrinsic::WMMAR3_F32_16x16x16_BF16:
