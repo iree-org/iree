@@ -174,7 +174,7 @@ static bool isRootOp(Operation *op) {
     return !isa<linalg::FillOp>(op);
   }
   if (isa<TilingInterface>(op)) {
-    return !isa<tensor::PadOp, linalg::PackOp>(op);
+    return !isa<IREE::LinalgExt::GatherOp, tensor::PadOp, linalg::PackOp>(op);
   }
   return isa<linalg::UnPackOp>(op);
 }
