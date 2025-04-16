@@ -363,6 +363,7 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "StorageBitwidthsAttr":$storage,
     "SubgroupOpsAttr":$subgroup,
     "DotProductOpsAttr":$dot,
+    // MMAs available on this target. Heuristic MMA selection runs is order.
     "MMAOpsArrayAttr":$mma,
 
     // Limits
