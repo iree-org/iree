@@ -370,4 +370,38 @@ LogicalResult ValueBarrierOp::verify() {
   return success();
 }
 
+// AMD Specific Operations
+
+//===----------------------------------------------------------------------===//
+// BufferResourceCastOp
+//===----------------------------------------------------------------------===//
+
+struct FoldBufferCastOfTensorCast final
+    : OpRewritePattern<BufferResourceCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferResourceCastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    // Check whether the cast increases the amount of available static info.
+    auto tensorCast = castOp.getInput().getDefiningOp<tensor::CastOp>();
+    if (!tensorCast || !tensor::canFoldIntoConsumerOp(tensorCast)) {
+      return failure();
+    }
+
+    auto newBufferCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
+        castOp.getLoc(), tensorCast.getSource().getType(),
+        tensorCast.getSource(), castOp.getCacheSwizzleStride());
+    newBufferCast->setDiscardableAttrs(castOp->getDiscardableAttrDictionary());
+
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(
+        castOp, tensorCast.getResult().getType(), newBufferCast);
+    return success();
+  };
+};
+
+void BufferResourceCastOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *ctx) {
+  results.add<FoldBufferCastOfTensorCast>(ctx);
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

@@ -351,7 +351,6 @@ struct BufferResourceCastOpBufferizationInterface
                           const BufferizationOptions &options) const {
     auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
 
-    SmallVector<Value> buffers;
     FailureOr<Value> buffer = getBuffer(rewriter, castOp.getInput(), options);
     if (failed(buffer)) {
       return failure();
@@ -386,7 +385,7 @@ struct BufferResourceCastOpBufferizationInterface
                    .getResult();
     }
 
-    bufferization::replaceOpWithBufferizedValues(rewriter, op, buffers);
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer.value());
     return success();
   }
 };

@@ -492,6 +492,8 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
     $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
     attr-dict `:` type($result)
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
