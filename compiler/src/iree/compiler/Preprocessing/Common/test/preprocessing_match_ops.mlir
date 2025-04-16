@@ -149,7 +149,7 @@ func.func @call_external(%arg0: index,
                          %input_2d: tensor<?x20xf32>,
                          %input_lb: tensor<100xf32>,
                          %input_ub: tensor<3xf32>) {
-%0 = util.assume.int %arg0<umin = 12, umax = 16, udiv = 1> : index
+%0 = util.assume.int %arg0<umin = 12, umax = 16, udiv = 4> : index
 %input = tensor.empty(%0) : tensor<?xf32>
 //       CHECK: call @external
 //  CHECK-SAME:   match_status = "both_matched"
@@ -178,6 +178,7 @@ module attributes {transform.with_named_sequence} {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
     %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
     transform.iree.match.dim_bounds %in0[0], umin = 5, umax = 20 : !transform.any_value
+    transform.iree.match.dim_is_multiple_of %in0[0], 2 : !transform.any_value
     %0 = transform.param.constant "both_matched" -> !transform.any_param
     transform.yield %call, %0 : !transform.any_op, !transform.any_param
   }
