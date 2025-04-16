@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Builders.h"
 
 #define DEBUG_TYPE "iree-linalgExt-utils"
@@ -559,18 +560,12 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   // Build a mapping from canonical dim positions to their positions in the
   // original output map.
-  SmallVector<unsigned> canonicalToOriginalDimPos;
-  ArrayRef<AffineExpr> originalExprs = outputMap.getResults();
-  ArrayRef<AffineExpr> canonicalExprs = resultMap.getResults();
-  for (AffineExpr canonicalExpr : canonicalExprs) {
-    unsigned canonicalPos = cast<AffineDimExpr>(canonicalExpr).getPosition();
-    auto it = llvm::find_if(originalExprs, [&](AffineExpr e) {
-      return cast<AffineDimExpr>(e).getPosition() == canonicalPos;
-    });
-    assert(it != originalExprs.end() && "dim not found in originalExprs");
-    canonicalToOriginalDimPos.push_back(
-        std::distance(originalExprs.begin(), it));
-  }
+  SmallVector<int64_t> originalToCanonicalDimPos;
+  for (AffineExpr expr : outputMap.getResults())
+    originalToCanonicalDimPos.push_back(
+        cast<AffineDimExpr>(expr).getPosition());
+  SmallVector<int64_t> canonicalToOriginalDimPos =
+      invertPermutationVector(originalToCanonicalDimPos);
 
   // Lambda to remap dim indices from canonical order to original order.
   auto remapDims = [&](ArrayRef<unsigned> dims) -> SmallVector<unsigned> {
