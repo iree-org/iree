@@ -1022,6 +1022,7 @@ void CollapseDimensionsPass::runOnOperation() {
         hoistTensorReshapesOutOfDispatchRegion(
             rewriter, cast<IREE::Flow::DispatchRegionOp>(dispatchOp));
     if (failed(newDispatchOp)) {
+      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
       return WalkResult::interrupt();
     }
     if (collapseDimensionsForDispatch(rewriter, newDispatchOp.value(),
