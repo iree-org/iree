@@ -168,7 +168,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
             /*element=*/{1, k / 4}};
   };
   auto mfmaRhsKx16 = [](int64_t k) -> MMASingleSubgroupLayout {
-    assert(k % 4 == 0 && "doesn't support blockef MFMAs");
+    assert(k % 4 == 0 && "doesn't support blocked MFMAs");
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
             /*element=*/{k / 4, 1}};
   };
@@ -179,7 +179,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
             /*element=*/{1, k / 2}};
   };
   auto mfmaRhsKx32 = [](int64_t k) -> MMASingleSubgroupLayout {
-    assert(k % 2 == 0 && "doesn't support blockef MFMAs");
+    assert(k % 2 == 0 && "doesn't support blocked MFMAs");
     return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
             /*element=*/{k / 2, 1}};
   };
