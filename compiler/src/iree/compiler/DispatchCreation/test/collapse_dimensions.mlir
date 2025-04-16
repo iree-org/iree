@@ -802,3 +802,41 @@ util.func public @masked_attention_dynamic(%arg0: index, %arg1: tensor<4x8x4x?x3
 //  CHECK-SAME:     outs({{.*}} : tensor<4x8x4x?x128xf16>)
 //       CHECK:   %[[RES:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[ATTN]] : tensor<4x8x4x?x128xf16>)
+
+// -----
+
+util.func public @multi_reduction(%arg0 : tensor<32x16x16384xf32>, %arg1 : tensor<32xf32>) -> (tensor<32xf32>) {
+  %cst_0 = arith.constant 3.1 : f32
+  %dispatch = flow.dispatch.region -> (tensor<32xf32>) {
+    %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg0 : tensor<32x16x16384xf32>) outs(%arg1 : tensor<32xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %18 = arith.addf %in, %out : f32
+      linalg.yield %18 : f32
+    } -> tensor<32xf32>
+    %15 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg0, %13 : tensor<32x16x16384xf32>, tensor<32xf32>) outs(%arg1 : tensor<32xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %18 = arith.subf %in, %in_2 : f32
+      %19 = arith.mulf %18, %18 : f32
+      %20 = arith.addf %19, %out : f32
+      linalg.yield %20 : f32
+    } -> tensor<32xf32>
+    %14 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%15 : tensor<32xf32>) outs(%arg1 : tensor<32xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %18 = arith.divf %in, %cst_0 : f32
+      linalg.yield %18 : f32
+    } -> tensor<32xf32>
+    flow.return %14 : tensor<32xf32>
+  }
+  util.return %dispatch : tensor<32xf32>
+}
+// CHECK-LABEL: util.func public @multi_reduction
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//  CHECK-SAME:   %[[ARG1:[0-9a-zA-Z]+]]
+//       CHECK:   flow.dispatch.region
+//       CHECK:   %[[GEN0:.+]] = linalg.generic
+//  CHECK-SAME:     ins({{.+}} : tensor<32x262144xf32>)
+//       CHECK:   %[[GEN1:.+]] = linalg.generic
+//  CHECK-SAME:     ins({{.+}}, %[[GEN0]] : tensor<32x262144xf32>, tensor<32xf32>)
+//       CHECK:   %[[GEN2:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[GEN1]] : tensor<32xf32>)
+//       CHECK:   flow.return %[[GEN2]]
