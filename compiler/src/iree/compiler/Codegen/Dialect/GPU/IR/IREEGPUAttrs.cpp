@@ -206,8 +206,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     switch (fragment) {
     case MMAFragment::Lhs:
       return mfmaLhs16xK(4);
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 1}};
     case MMAFragment::Rhs:
       return mfmaRhsKx16(4);
     case MMAFragment::Acc:
