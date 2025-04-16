@@ -42,27 +42,16 @@ static constexpr int kPreferredCopyNumBits = 128;
 static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
                                         size_t numParts, Value index) {
   auto tensorType = cast<RankedTensorType>(tensor.getType());
-  auto outermostDim = tensorType.getRank() - 1;
-  auto outermostDimSize = tensorType.getDimSize(outermostDim);
+  auto outermostDimSize = tensorType.getDimSize(0);
   if (outermostDimSize % numParts != 0) {
     return std::nullopt;
   }
 
-  auto loc = tensor.getLoc();
-
   // Create an extract slice
   SmallVector<int64_t> newShape(tensorType.getShape());
-  newShape[outermostDim] = outermostDimSize / numParts;
+  newShape[0] = outermostDimSize / numParts;
 
-  // hack:
-  if (newShape[0] == 64) {
-    // [64, 64]
-    newShape = {16, 256};
-  } else if (newShape[0] == 256) {
-    newShape = {64, 64};
-  }
-
-  // turn newShape into ValueRange:
+  auto loc = tensor.getLoc();
   SmallVector<Value> newShapeOfSlice;
   for (auto dim : newShape) {
     newShapeOfSlice.push_back(
