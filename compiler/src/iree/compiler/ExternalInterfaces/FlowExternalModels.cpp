@@ -23,6 +23,17 @@ struct DispatchTensorLoadOpInterface
   }
 };
 
+struct WorkloadOrdinalOpInterface
+    : public ValueBoundsOpInterface::ExternalModel<
+          WorkloadOrdinalOpInterface, IREE::Flow::DispatchWorkloadOrdinalOp> {
+  void populateBoundsForIndexValue(Operation *op, Value value,
+                                   ValueBoundsConstraintSet &cstr) const {
+    auto ordinalOp = cast<IREE::Flow::DispatchWorkloadOrdinalOp>(op);
+    assert(value == ordinalOp.getResult() && "value must be op result");
+    cstr.bound(value) == ordinalOp.getOperand();
+  }
+};
+
 } // namespace
 
 void registerFlowExternalModels(DialectRegistry &registry) {
@@ -30,6 +41,8 @@ void registerFlowExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::Flow::FlowDialect *dialect) {
         IREE::Flow::DispatchTensorLoadOp::attachInterface<
             DispatchTensorLoadOpInterface>(*ctx);
+        IREE::Flow::DispatchWorkloadOrdinalOp::attachInterface<
+            WorkloadOrdinalOpInterface>(*ctx);
       });
 }
 
