@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numeric>
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -19,7 +20,6 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-lower-to-global-loads"
@@ -39,7 +39,7 @@ static constexpr int kPreferredCopyNumBits = 128;
 
 // Slice the tensor into numParts parts, and return the i-th part.
 static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
-                                        size_t numParts, ValueRange inductionVars) {
+                                        size_t numParts, Value index) {
   auto tensorType = cast<RankedTensorType>(tensor.getType());
   auto outermostDim = tensorType.getRank() - 1;
   auto outermostDimSize = tensorType.getDimSize(outermostDim);
@@ -52,47 +52,45 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   // Create an extract slice
   SmallVector<int64_t> newShape(tensorType.getShape());
   newShape[outermostDim] = outermostDimSize / numParts;
-  
+
   // hack:
   if (newShape[0] == 64) {
     // [64, 64]
     newShape = {256, 16};
   } else if (newShape[0] == 256) {
-
   }
-  
+
   // turn newShape into ValueRange:
   SmallVector<Value> newShapeOfSlice;
-    LLVM_DEBUG(llvm::dbgs() << "printing shapes dim for:\n");
+  LLVM_DEBUG(llvm::dbgs() << "printing shapes dim for:\n");
   LLVM_DEBUG(llvm::dbgs() << "tensor: " << tensor << "\n");
   for (auto dim : newShape) {
-    LLVM_DEBUG(
-        llvm::dbgs() << "newShapeOfSlice dim: " << dim << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "newShapeOfSlice dim: " << dim << "\n");
     newShapeOfSlice.push_back(
         rewriter.create<arith::ConstantIndexOp>(loc, dim));
   }
-  
+
   // offset
-  //SmallVector<Value> offsets(tensorType.getRank(),
+  // SmallVector<Value> offsets(tensorType.getRank(),
   //                          rewriter.create<arith::ConstantIndexOp>(loc, 0));
-  //offsets[outermostDim] = rewriter.create<arith::MulIOp>(loc, inductionVars[0],
-  //    rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize / numParts));
+  // offsets[outermostDim] = rewriter.create<arith::MulIOp>(loc, index,
+  //    rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize /
+  //    numParts));
   SmallVector<Value> offsets = {
-      rewriter.create<arith::MulIOp>(
-          loc, inductionVars[0],
-          rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize / numParts))
-  };
+      rewriter.create<arith::MulIOp>(loc, index,
+                                     rewriter.create<arith::ConstantIndexOp>(
+                                         loc, outermostDimSize / numParts))};
 
   // strides of 1:
   SmallVector<Value> stridesValue;
   // Hack:
   SmallVector<int64_t> strides = {64, 1};
   for (auto dim : strides) {
-    stridesValue.push_back(
-        rewriter.create<arith::ConstantIndexOp>(loc, dim));
+    stridesValue.push_back(rewriter.create<arith::ConstantIndexOp>(loc, dim));
   }
-  
-  auto newSliceType = RankedTensorType::get(newShape, tensorType.getElementType());
+
+  auto newSliceType =
+      RankedTensorType::get(newShape, tensorType.getElementType());
   auto noVals = ValueRange{};
   return rewriter.create<tensor::ExtractSliceOp>(
       loc, newSliceType, tensor, offsets, noVals, noVals,
@@ -108,6 +106,14 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   OpBuilder::InsertionGuard guard(rewriter);
 
+  auto getTotalSize = [](ArrayRef<int64_t> sizes) {
+    return std::accumulate(sizes.begin(), sizes.end(), 1,
+                           std::multiplies<int64_t>());
+  };
+
+  auto totalWorkgroupSize = getTotalSize(workgroupSize);
+
+  // We should only have 1 D tile?
   SmallVector<OpFoldResult> tileSizes;
 
   // Get the copy size:
@@ -115,10 +121,18 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto rank = copyTensorType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
   int64_t elementBitWidth = copyTensorType.getElementTypeBitWidth();
-  
+
+  // auto totalCopySize = getTotalSize(copyTensorType.getShape());
+
+  // divide the copy by subgroup:
+  assert(subgroupSize.size() == 1); // only 1-D
+  // auto subgroupCopySize = totalCopySize / subgroupSize[0];
+
   // TODO: determine tile sizes
-  tileSizes.push_back(rewriter.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
-  tileSizes.push_back(rewriter.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
+  tileSizes.push_back(
+      rewriter.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
+  tileSizes.push_back(
+      rewriter.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
 
   // Construct a ForallOp:
   SmallVector<OpFoldResult> lowerBounds(rank, rewriter.getIndexAttr(0));
@@ -137,17 +151,26 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
       copy.getLoc(), lowerBounds, upperBounds, tileSizes,
-      /*outputs=*/ValueRange{copy.getOperand(0)}, /*mapping=*/rewriter.getArrayAttr(mapping));
+      /*outputs=*/ValueRange{copy.getOperand(0)},
+      /*mapping=*/rewriter.getArrayAttr(mapping));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
 
   auto inductionVars = newForallOp.getInductionVars();
 
-  // TODO: properly handle workgroup sizes and subgroup sizes.
-  auto numParts = workgroupSize[0] / subgroupSize[0];
+  // TODO: make it multidimensional.
+  Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
 
-  auto globalSlice = sliceTensor(rewriter, copy.getOperand(0), numParts, inductionVars);
-  //auto localSlice = sliceTensor(rewriter, copy.getResult(0), numParts, inductionVars);
+  // TODO: properly handle workgroup sizes and subgroup sizes.
+  auto numParts = totalWorkgroupSize / subgroupSize[0];
+
+  auto globalSlice =
+      sliceTensor(rewriter, copy.getOperand(0), numParts, subgroupId);
+  if (!globalSlice) {
+    copy.emitOpError("failed to slice tensor");
+  }
+
   // create an empty tensor with same shape of globalSlice:
   auto localSliceType = RankedTensorType::get(
       cast<RankedTensorType>(globalSlice->getType()).getShape(),
@@ -155,35 +178,31 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto localSlice = rewriter.create<tensor::EmptyOp>(
       loc, TypeRange{localSliceType}, ValueRange{});
 
-  if (!globalSlice || !localSlice) {
-    copy.emitOpError("failed to slice tensor");
-  }
-
-  // TODO: make it multidimensional.
-  //Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, gpu::Dimension::x);
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
-
   // compute number of loads per thread
   auto sliceType = cast<RankedTensorType>(globalSlice->getType());
-  auto sliceSize = std::accumulate(
-      sliceType.getShape().begin(), sliceType.getShape().end(), 1,
-      std::multiplies<int64_t>());
-  auto numLoads = sliceSize / ((elementBitWidth / 8) * subgroupSize[0]);
-  
+  auto sliceSize = getTotalSize(sliceType.getShape());
+
+  auto elementByteWidth = elementBitWidth / 8;
+  auto subgroupLoadSizeEachTime = elementByteWidth * subgroupSize[0];
+  if (sliceSize % subgroupLoadSizeEachTime != 0) {
+    copy.emitOpError("slice size is not divisible by load size");
+    return;
+  }
+  auto numLoadsPerSlice = sliceSize / subgroupLoadSizeEachTime;
+
   Value localSliceValue = localSlice;
   Value gatherOffset = laneId;
-  Value gatherStride = rewriter.create<arith::ConstantIndexOp>(
-      loc, (elementBitWidth / 8) * subgroupSize[0]);
-  for (int i = 0; i < numLoads; ++i) {
-    //compute the offset
-    auto delinearizedIndex =
-        rewriter
-            .create<affine::AffineDelinearizeIndexOp>(
-                loc, gatherOffset, sliceType.getShape())
-            .getMultiIndex();
+  Value gatherStride =
+      rewriter.create<arith::ConstantIndexOp>(loc, subgroupLoadSizeEachTime);
+  for (int i = 0; i < numLoadsPerSlice; ++i) {
+    // compute the offset
+    auto delinearizedIndex = rewriter
+                                 .create<affine::AffineDelinearizeIndexOp>(
+                                     loc, gatherOffset, sliceType.getShape())
+                                 .getMultiIndex();
     localSliceValue = rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
         loc, sliceType, *globalSlice, localSliceValue, delinearizedIndex);
-    if (i < numLoads - 1) {
+    if (i < numLoadsPerSlice - 1) {
       gatherOffset =
           rewriter.create<arith::AddIOp>(loc, gatherOffset, gatherStride);
     }
@@ -192,7 +211,8 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
   // get scf.forall.in_parallel:
   /*
   auto inParallel = newForallOp.getTerminator();
-  rewriter.setInsertionPoint(inParallel.getBody(), inParallel.getBody()->begin());
+  rewriter.setInsertionPoint(inParallel.getBody(),
+  inParallel.getBody()->begin());
   // create a store:
   rewriter.create<tensor::InsertSliceOp>(
       loc, localSliceValue, *globalSlice, inductionVars,
@@ -207,7 +227,7 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
 namespace {
 struct GPULowerToGlobalLoadsPass final
     : impl::GPULowerToGlobalLoadsPassBase<GPULowerToGlobalLoadsPass> {
-  
+
   SmallVector<linalg::CopyOp> collectCopies(Operation *funcOp) {
     SmallVector<linalg::CopyOp> copies;
     // Walk in PreOrder so that parent operations are visited before children,
@@ -233,7 +253,7 @@ struct GPULowerToGlobalLoadsPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
-    
+
     // we will do this before/at the time of tiling, we need:
     // 1. tiling configurations, to compute how many to generate.
     SmallVector<linalg::CopyOp> copies = collectCopies(funcOp);
@@ -251,12 +271,12 @@ struct GPULowerToGlobalLoadsPass final
           "unimplemented: Distribution with dynamic subgroup size.");
       return signalPassFailure();
     }
-  
+
     IRRewriter rewriter(context);
     for (auto copy : copies) {
       rewriter.setInsertionPoint(copy);
-      distributeLinalgCopyToThreads(
-          rewriter, copy, *workgroupSize, *subgroupSize);
+      distributeLinalgCopyToThreads(rewriter, copy, *workgroupSize,
+                                    *subgroupSize);
     }
   }
 };
