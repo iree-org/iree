@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -56,30 +57,20 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   // hack:
   if (newShape[0] == 64) {
     // [64, 64]
-    newShape = {256, 16};
+    newShape = {16, 256};
   } else if (newShape[0] == 256) {
+    newShape = {64, 64};
   }
 
   // turn newShape into ValueRange:
   SmallVector<Value> newShapeOfSlice;
-  LLVM_DEBUG(llvm::dbgs() << "printing shapes dim for:\n");
-  LLVM_DEBUG(llvm::dbgs() << "tensor: " << tensor << "\n");
   for (auto dim : newShape) {
-    LLVM_DEBUG(llvm::dbgs() << "newShapeOfSlice dim: " << dim << "\n");
     newShapeOfSlice.push_back(
         rewriter.create<arith::ConstantIndexOp>(loc, dim));
   }
 
-  // offset
-  // SmallVector<Value> offsets(tensorType.getRank(),
-  //                          rewriter.create<arith::ConstantIndexOp>(loc, 0));
-  // offsets[outermostDim] = rewriter.create<arith::MulIOp>(loc, index,
-  //    rewriter.create<arith::ConstantIndexOp>(loc, outermostDimSize /
-  //    numParts));
-  SmallVector<Value> offsets = {
-      rewriter.create<arith::MulIOp>(loc, index,
-                                     rewriter.create<arith::ConstantIndexOp>(
-                                         loc, outermostDimSize / numParts))};
+  SmallVector<Value> offsets = {rewriter.create<arith::MulIOp>(
+      loc, index, rewriter.create<arith::ConstantIndexOp>(loc, numParts))};
 
   // strides of 1:
   SmallVector<Value> stridesValue;
@@ -94,7 +85,8 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   auto noVals = ValueRange{};
   return rewriter.create<tensor::ExtractSliceOp>(
       loc, newSliceType, tensor, offsets, noVals, noVals,
-      ArrayRef<int64_t>{INT64_MIN, 1}, newShape, strides);
+      /*static_offset =*/ArrayRef<int64_t>{INT64_MIN, 0},
+      /*static_shape =*/newShape, /*static_strides =*/strides);
 }
 
 static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
@@ -164,6 +156,8 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   // TODO: properly handle workgroup sizes and subgroup sizes.
   auto numParts = totalWorkgroupSize / subgroupSize[0];
+
+  LLVM_DEBUG(llvm::dbgs() << "numParts: " << numParts << "\n");
 
   auto globalSlice =
       sliceTensor(rewriter, copy.getOperand(0), numParts, subgroupId);
