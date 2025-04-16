@@ -275,13 +275,13 @@ iree_status_t iree_hal_metal_shared_event_multi_wait(
 }
 
 static iree_status_t iree_hal_metal_shared_event_import_timepoint(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_semaphore_t* base_semaphore, uint64_t value, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_t external_timepoint) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "timepoint export is not yet implemented");
 }
 
 static iree_status_t iree_hal_metal_shared_event_export_timepoint(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_semaphore_t* base_semaphore, uint64_t value, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_type_t requested_type,
     iree_hal_external_timepoint_flags_t requested_flags,
     iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
