@@ -290,7 +290,7 @@ static bool hasStorageBufferMemSpace(BaseMemRefType m) {
   Builder b(m.getContext());
   Attribute storageBufferMemSpace = b.getAttr<IREE::HAL::DescriptorTypeAttr>(
       IREE::HAL::DescriptorType::StorageBuffer);
-  return maybeMemorySpace && maybeMemorySpace != storageBufferMemSpace;
+  return maybeMemorySpace && maybeMemorySpace == storageBufferMemSpace;
 }
 
 /// Bufferization of iree_gpu.buffer_resource_cast. Bufferizes to
@@ -369,7 +369,7 @@ struct BufferResourceCastOpBufferizationInterface
         Value enableSwizzle =
             rewriter.create<arith::ConstantIntOp>(loc, 16384, i14Type);
 
-        Value stride14b = rewriter.create<arith::TruncIOp>(
+        Value stride14b = rewriter.create<arith::IndexCastOp>(
             loc, i14Type, maybeIndexCacheSwizzle);
         // stride[13:0] = swizzling stride
         // stride[14] = swizzle enabling bit
