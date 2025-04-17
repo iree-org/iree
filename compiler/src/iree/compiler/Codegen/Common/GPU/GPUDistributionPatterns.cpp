@@ -141,6 +141,10 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
                                 PatternRewriter &rewriter) const override {
     Block *oldLoopBody = forOp.getBody();
 
+    if (forOp.getInitArgs().empty()) {
+      return failure();
+    }
+
     // The new vector init_args of the loop.
     SmallVector<Value> newInitArgs;
     for (Value initArg : forOp.getInitArgs()) {
