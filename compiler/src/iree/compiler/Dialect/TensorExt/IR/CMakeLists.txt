@@ -30,8 +30,10 @@ iree_cc_library(
     ::TensorExtOpsGen
     LLVMSupport
     MLIRArithDialect
+    MLIRArithUtils
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRTensorDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

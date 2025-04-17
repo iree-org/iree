@@ -312,6 +312,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
   PUBLIC
 )
