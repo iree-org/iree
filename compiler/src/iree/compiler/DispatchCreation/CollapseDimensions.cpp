@@ -604,9 +604,9 @@ findRootOp(IREE::Flow::DispatchRegionOp regionOp) {
 // Reshape Hoisting
 //===---------------------------------------------------------------------===//
 
-/// Hoist `tensor.collapse_shape` ops at the beginning of the `dispatchOp`
-/// and `tensor.expand_shape` ops at the end of the `dispatchOp`, out of the
-/// dispatch.
+/// Hoist `tensor.collapse_shape` and `tensor.expand_shape` ops at the beginning
+/// of the `dispatchOp` and `tensor.expand_shape` ops at the end of the
+/// `dispatchOp`, out of the dispatch.
 static FailureOr<IREE::Flow::DispatchRegionOp>
 hoistTensorReshapesOutOfDispatchRegion(
     RewriterBase &rewriter, IREE::Flow::DispatchRegionOp dispatchOp) {
@@ -623,26 +623,27 @@ hoistTensorReshapesOutOfDispatchRegion(
   SetVector<Operation *> slice;
   getBackwardSlice(returnOp, &slice, sliceOptions);
 
-  // 2. Get the leaf operations that are tensor.collapse_shape ops.
-  SmallVector<tensor::CollapseShapeOp> leafs;
+  // 2. Get the leaf operations that are `tensor.collapse_shape` and
+  // `tensor_expand_shape` ops.
+  SmallVector<Operation *> reshapeLeafs;
   for (Operation *op : slice) {
-    auto collapseShapeOp = dyn_cast<tensor::CollapseShapeOp>(op);
-    if (!collapseShapeOp) {
+    if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(op)) {
       continue;
     }
     if (llvm::all_of(op->getOperands(), [&](Value operand) {
           Operation *definingOp = operand.getDefiningOp();
           return !definingOp || slice.count(definingOp) == 0;
         })) {
-      leafs.push_back(collapseShapeOp);
+      reshapeLeafs.push_back(op);
     }
   }
 
-  // 3. Clone the leaf `tensor.collapse_shape` ops outside the dispatch.
+  // 3. Clone the leaf `tensor.collapse_shape` and `tensor_expand_shape`  ops
+  // outside the dispatch.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(dispatchOp);
-  for (auto reshapeOp : leafs) {
-    Operation *clonedOp = rewriter.clone(*reshapeOp.getOperation());
+  for (auto reshapeOp : reshapeLeafs) {
+    Operation *clonedOp = rewriter.clone(*reshapeOp);
     rewriter.replaceOp(reshapeOp, clonedOp->getResults());
   }
 
@@ -998,11 +999,23 @@ void CollapseDimensionsPass::runOnOperation() {
   IRRewriter rewriter(context);
 
   SmallVector<IREE::Flow::DispatchRegionOp> modifiedDispatchOps;
-  funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
-    if (collapseDimensionsForDispatch(rewriter, dispatchOp, maxIterations)) {
-      modifiedDispatchOps.push_back(dispatchOp);
+  auto walkRes = funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
+    FailureOr<IREE::Flow::DispatchRegionOp> newDispatchOp =
+        hoistTensorReshapesOutOfDispatchRegion(
+            rewriter, cast<IREE::Flow::DispatchRegionOp>(dispatchOp));
+    if (failed(newDispatchOp)) {
+      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
+      return WalkResult::interrupt();
     }
+    if (collapseDimensionsForDispatch(rewriter, newDispatchOp.value(),
+                                      maxIterations)) {
+      modifiedDispatchOps.push_back(newDispatchOp.value());
+    }
+    return WalkResult::advance();
   });
+  if (walkRes.wasInterrupted()) {
+    return signalPassFailure();
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "[CollapseDims] : After collapsing ops: \n";

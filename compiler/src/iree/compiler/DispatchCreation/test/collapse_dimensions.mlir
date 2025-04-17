@@ -588,15 +588,18 @@ util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, 
 //       CHECK:   flow.return %[[TRUNC]] : tensor<20x4096x64xf16>
 
 // -----
-
-util.func public @collapse(%10: tensor<2x32x32x1280xi8>, %11 : tensor<10240x1280xi8>, %12 : tensor<10240xi32>, %13 : tensor<10240xf32>) -> (tensor<2x32x32x10240xf16>) {
+// The expand_shape within the dispatch.region is hoisted out as
+// its a leaf node i.e the defining op of the source operand
+// is outside the dispatch.region.
+util.func public @collapse(%10: tensor<64x32x1280xi8>, %11 : tensor<10240x1280xi8>, %12 : tensor<10240xi32>, %13 : tensor<10240xf32>) -> (tensor<2x32x32x10240xf16>) {
   %c0_i32 = arith.constant 0 : i32
   %c0 = arith.constant 0 : index
   %14 = tensor.empty() : tensor<2x32x32x10240xf16>
   %15 = tensor.empty() : tensor<2x32x32x10240xi32>
   %16 = linalg.fill ins(%c0_i32 : i32) outs(%15 : tensor<2x32x32x10240xi32>) -> tensor<2x32x32x10240xi32>
   %dispatch = flow.dispatch.region -> (tensor<2x32x32x10240xf16>) {
-    %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%10, %11 : tensor<2x32x32x1280xi8>, tensor<10240x1280xi8>) outs(%16 : tensor<2x32x32x10240xi32>) {
+    %expand = tensor.expand_shape %10 [[0, 1], [2], [3]] output_shape [2, 32, 32, 1280] : tensor<64x32x1280xi8> into tensor<2x32x32x1280xi8>
+    %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%expand, %11 : tensor<2x32x32x1280xi8>, tensor<10240x1280xi8>) outs(%16 : tensor<2x32x32x10240xi32>) {
     ^bb0(%in: i8, %in_0: i8, %out: i32):
       %19 = arith.extsi %in : i8 to i32
       %20 = arith.extsi %in_0 : i8 to i32
