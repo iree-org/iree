@@ -307,7 +307,7 @@ util.func public @conv_2d_hwcn_hwcf(%arg0: tensor<26x18x16x288xf32>, %arg1: tens
   util.return %0 : tensor<3x3x288x288xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0, d1, d4)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d0, d1, d4)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d2)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 // CHECK:      util.func public @conv_2d_hwcn_hwcf(
@@ -367,6 +367,44 @@ util.func public @conv_nhwc_hwfc_nobatch(%arg0: tensor<16x16x4xf32>, %arg1: tens
 // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
 // CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<14x14x9x4xf32>, tensor<9x16x4xf32>)
 // CHECK:      util.return %[[MATMUL]] : tensor<14x14x16xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 + d4, d2, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+module {
+  util.func public @conv_nhwc_fhc_two_batch(%arg0: tensor<16x26x16x96xf32>, %arg1: tensor<96x3x96xf32>, %arg2: tensor<16x24x16x96xf32>) -> tensor<16x24x16x96xf32> {
+    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x16x96xf32>, tensor<96x3x96xf32>) outs(%arg2 : tensor<16x24x16x96xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %1 = arith.mulf %in, %in_0 : f32
+      %2 = arith.addf %out, %1 : f32
+      linalg.yield %2 : f32
+    } -> tensor<16x24x16x96xf32>
+    util.return %0 : tensor<16x24x16x96xf32>
+  }
+}
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+// CHECK:      util.func public @conv_nhwc_fhc_two_batch(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x26x16x96xf32>
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<96x3x96xf32>
+// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<16x24x16x96xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<16x16x24x288xf32>
+// CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
+// CHECK-SAME:   strides = [1] dilations = [1] kernel_size = [3]
+// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
+// CHECK-SAME:   batch_pos = [0, 2] m_pos = [1] k_pos = [3]
+// CHECK-SAME:   ins(%[[ARG0]] : tensor<16x26x16x96xf32>)
+// CHECK-SAME:   outs(%[[EMPTY]] : tensor<16x16x24x288xf32>) -> tensor<16x16x24x288xf32>
+// CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG1]] {{\[}}[0], [1, 2]] : tensor<96x3x96xf32> into tensor<96x288xf32>
+// CHECK:      %[[MATMUL:.+]] = linalg.generic
+// CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[COLLAPSED]] : tensor<16x16x24x288xf32>, tensor<96x288xf32>)
+// CHECK:      util.return %[[MATMUL]] : tensor<16x24x16x96xf32>
 
 // -----
 
