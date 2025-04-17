@@ -141,7 +141,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 //===----------------------------------------------------------------------===//
 
 const WgpDetails *getCDNA3WgpDetails() {
-  // Note: these operations are listed in order of preference
+  // Note: these operations are listed in order of preference.
   static const MMAIntrinsic cdna3MMAOps[] = {
       // Introduced in CDNA3
       MMAIntrinsic::MFMA_F32_16x16x16_BF16,
