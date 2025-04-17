@@ -51,7 +51,7 @@ llvm::cl::opt<bool> clCodegenEnableDefaultTuningSpecs(
     "iree-codegen-enable-default-tuning-specs",
     llvm::cl::desc("Whether to enable default tuning spec transform libraries "
                    "shipped with the compiler"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<std::string> clCodegenTuningSpecDumpDir(
     "iree-codegen-dump-tuning-specs-to",
