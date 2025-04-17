@@ -10,7 +10,6 @@ from typing import (
     overload,
 )
 import asyncio
-import ctypes
 
 from .typing import HalModuleBufferViewTraceCallback
 
