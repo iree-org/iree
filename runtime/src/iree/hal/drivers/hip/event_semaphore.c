@@ -1184,8 +1184,7 @@ iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
   }
   bool do_wait = value_to_wait_for > semaphore->max_value_to_be_signaled;
   iree_slim_mutex_unlock(&semaphore->mutex);
-  // TEMP: busy loop.
-  // Basically if we have any exported timepoints, we want to block this
+  // If we have any exported timepoints, we want to block this
   // thread until they at LEAST have been recorded. This is because
   // once we return it is legal for any other operation to then submit
   // the exported event, which because of  hip ordering must occur
