@@ -194,6 +194,9 @@ static void distributeLinalgCopyToThreads(RewriterBase &rewriter,
       rewriter.create<arith::ConstantIndexOp>(loc, subgroupSize[0]),
       /*outputs=*/ValueRange{local});
 
+  // sync at the end of the loop across threads
+  rewriter.create<gpu::BarrierOp>(loc);
+
   // For loop body:
   {
     OpBuilder::InsertionGuard guard(rewriter);
