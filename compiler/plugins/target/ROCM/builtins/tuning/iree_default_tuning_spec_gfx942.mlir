@@ -285,7 +285,7 @@ transform.named_sequence @cast_and_call_pingpong_matmul(%mm: !transform.any_op {
   %out = transform.get_result %mm[all] : (!transform.any_op) -> !transform.any_value
   // Replace
   transform.util.cast_and_call inline_call %func(%ins) -> %out after %mm {
-        transform.type_conversion.tensor.cast_shape_dynamic_dims
+        transform.type_conversion.tensor.cast_shape_dynamic_dims ignore_dynamic_info
     } : (!transform.any_op, !transform.any_value, !transform.any_value, !transform.any_op) -> ()
   transform.yield
 }
@@ -317,7 +317,6 @@ transform.named_sequence
   -> (!transform.any_op, !transform.any_param) {
   %mmt = transform.include @match_mmt_f16_f16_f32_impl failures(propagate) (%matmul)
     : (!transform.any_op) -> !transform.any_op
-  transform.print %matmul : !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
 
