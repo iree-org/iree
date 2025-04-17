@@ -1100,7 +1100,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
-      // Barrier elimination before we reach unstructured control flow
+      // Barrier elimination before we reach unstructured control flow.
       .addPass(createGpuEliminateBarriers);
 
   // This pass needs to run before SCF -> CF.
