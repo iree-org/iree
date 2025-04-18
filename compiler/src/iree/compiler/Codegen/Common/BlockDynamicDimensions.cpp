@@ -142,6 +142,9 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
     IREE::Util::ConstantIntDivisibility currDivisibility =
         divisibilityInfo.lookup(index);
     uint64_t factor = currDivisibility.sdiv();
+    if (factor == 128) {
+      factor = 256;
+    }
     AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
     AffineExpr divExpr = s0.floorDiv(factor);
     OpFoldResult newDynamicDim = affine::makeComposedFoldedAffineApply(

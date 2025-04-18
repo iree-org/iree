@@ -48,6 +48,7 @@ iree_cc_library(
     "CombineBarrierRegions.cpp"
     "ConcretizeMmaShapes.cpp"
     "DistributeMmaToLanes.cpp"
+    "DropResourceCasts.cpp"
     "LowerIREEGPUOps.cpp"
     "Passes.cpp"
     "Transforms.cpp"

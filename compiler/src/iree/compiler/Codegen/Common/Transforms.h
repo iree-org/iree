@@ -84,7 +84,7 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
 /// Populate IREE patterns related to resolving
 /// `memref.extract_strided_metadata`.
 void populateIREEResolveExtractStridedMetadataPatterns(
-    RewritePatternSet &patterns);
+    RewritePatternSet &patterns, bool allowSubviewExpansion = false);
 
 /// Populate patterns that replaces maximumf/minimumf with minumf/maxnumf ops.
 /// This is supposed to be used for targets which have faulty codegen

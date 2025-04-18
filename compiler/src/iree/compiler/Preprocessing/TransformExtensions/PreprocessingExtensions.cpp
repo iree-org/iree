@@ -9,6 +9,7 @@
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -338,7 +339,17 @@ IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
            << "dim " << dim << " out of range for shaped type " << shapedType;
   }
   int64_t size = getSize();
-  if (shapedType.getShape()[dim] % size != 0) {
+  ValueBoundsConstraintSet::Variable dimVar(current, dim);
+
+  MLIRContext *ctx = current.getContext();
+  AffineMap modMap = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/1,
+                                    getAffineSymbolExpr(0, ctx) %
+                                        getAffineConstantExpr(size, ctx));
+  ValueBoundsConstraintSet::Variable modVar(modMap, {dimVar});
+  Builder b(ctx);
+  FailureOr<bool> maybeFailed = ValueBoundsConstraintSet::areEqual(
+      modVar, OpFoldResult{b.getIndexAttr(0)});
+  if (failed(maybeFailed) || !maybeFailed.value()) {
     return emitSilenceableError()
            << "dim " << dim << " of shaped type " << shapedType
            << " is not a multiple of " << size;

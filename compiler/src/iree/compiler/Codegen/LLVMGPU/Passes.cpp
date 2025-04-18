@@ -183,6 +183,7 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 
 static void addBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(IREE::GPU::createDropResourceCastsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
@@ -331,6 +332,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(IREE::GPU::createDropResourceCastsPass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
@@ -383,6 +385,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // In the future there may be cases where we want the custom strategy run at
   // later points in the pipeline.
   funcPassManager.addPass(createLoweringConfigInterpreterPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
@@ -457,6 +461,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // hoisting and fusion pass, as well as a lack of a fallback distribution
   // pass.
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
+
+  // Drop resource casts if needed. This is the last possible place to do so
+  // before greedy fusion.
+  funcPassManager.addPass(IREE::GPU::createDropResourceCastsPass());
   {
     OptimizeTensorInsertExtractSlicesPassOptions options;
     options.foldIdentitySlices = true;
@@ -1098,7 +1106,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass(createExpandGPUOpsPass);
+      .addPass(createExpandGPUOpsPass)
+      .addPass(createResolveSwizzleHintsPass)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1119,7 +1130,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createIREEExpandStridedMetadataPass)
+      .addPass([&]() {
+        IREEExpandStridedMetadataPassOptions options;
+        options.allowSubviewExpansion = true;
+        return createIREEExpandStridedMetadataPass(options);
+      })
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);

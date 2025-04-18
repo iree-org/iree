@@ -421,6 +421,8 @@ def IREEExpandStridedMetadataPass :
     Pass<"iree-codegen-expand-strided-metadata", ""> {
   let summary = "Resolve memref.extract_strided_metadata operations";
   let options = [
+    Option<"allowSubviewExpansion", "allow-subview-expansion", "bool", /*default=*/"false",
+           "Enables expansion of memref.subview ops">,
     Option<"allowUnresolved", "allow-unresolved", "bool", /*default=*/"false",
            "Allow unresolved strided metadata op (for testing)">,
   ];
@@ -595,6 +597,15 @@ def RematerializeParallelOpsPass :
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";
+}
+
+def ResolveSwizzleHintsPass :
+    InterfacePass<"iree-codegen-resolve-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Resolves iree_codegen.swizzle_hint ops";
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+  ];
 }
 
 def StripCompilationInfoPass :
