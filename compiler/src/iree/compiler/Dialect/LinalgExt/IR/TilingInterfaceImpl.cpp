@@ -2073,8 +2073,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Range> outputSlice =
       getPermutedRange(getOutputMap(), offsets, sizes);
 
-  Value scale = getScale();
-
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> slices;
 
@@ -2107,9 +2105,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(valueSliceOp->getResult(0));
     slices.push_back(valueSliceOp);
   }
-
-  // Scale
-  tiledOperands.emplace_back(scale);
 
   // Mask
   Value attnMask = getMask();
@@ -2233,8 +2228,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Range> maxSlice = getPermutedRange(getMaxMap(), offsets, sizes);
   SmallVector<Range> sumSlice = getPermutedRange(getSumMap(), offsets, sizes);
 
-  Value scale = getScale();
-
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> slices;
   /// Query
@@ -2266,8 +2259,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(valueSliceOp->getResult(0));
     slices.push_back(valueSliceOp);
   }
-
-  tiledOperands.emplace_back(scale);
 
   // Mask
   Value attnMask = getMask();
@@ -2459,8 +2450,6 @@ FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
   if (failed(appendSlice(getValue(), getValueMap(), offsets))) {
     return failure();
   }
-
-  tiledOperands.emplace_back(getScale());
 
   if (Value mask = getMask()) {
     if (failed(appendSlice(mask, *getMaskMap(), offsets))) {
