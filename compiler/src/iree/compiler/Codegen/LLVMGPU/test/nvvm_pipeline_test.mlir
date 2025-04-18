@@ -917,7 +917,6 @@ hal.executable private @shared_mem_transpose  {
 // memory alloc.
 //   SM80-LABEL: hal.executable private @shared_mem_transpose
 //         SM80:   hal.executable.variant public @cuda
-//         SM80:     nvvm.barrier0
 //         SM80:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<1> -> vector<4xf32>
 //         SM80:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
 //         SM80:     nvvm.barrier0

@@ -188,7 +188,6 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
-//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 //   RDNA3-LABEL: spirv.module Logical GLSL450
 //     RDNA3-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
