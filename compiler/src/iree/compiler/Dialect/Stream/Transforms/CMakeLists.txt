@@ -81,6 +81,7 @@ iree_cc_library(
     iree::compiler::Dialect::Stream::Conversion::StandardToStream
     iree::compiler::Dialect::Stream::Conversion::UtilToStream
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::Conversion

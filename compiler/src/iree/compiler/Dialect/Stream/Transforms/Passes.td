@@ -123,8 +123,8 @@ def MaterializeBuiltinsPass :
     "mlir::memref::MemRefDialect",
     "mlir::scf::SCFDialect",
     "mlir::vector::VectorDialect",
-    "IREE::Flow::FlowDialect",
     "IREE::Stream::StreamDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
     "IREE::Util::UtilDialect",
   ];
 }
@@ -175,10 +175,8 @@ def MaterializeEncodingsPass :
   let dependentDialects = [
     "mlir::func::FuncDialect",
     "IREE::Encoding::IREEEncodingDialect",
-    // TODO(#20249): Drop the Flow dependency once the needed operations and
-    // types are moved to other dialects like TensorExt.
-    "IREE::Flow::FlowDialect",
     "IREE::Stream::StreamDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 

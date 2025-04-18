@@ -12,7 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -82,8 +82,8 @@ struct MaterializePadEncodingTypeConverter final
       // tensor type without encodings.
       return type.dropEncoding();
     });
-    addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
-                      -> IREE::Flow::DispatchTensorType {
+    addConversion([&](IREE::TensorExt::DispatchTensorType dispatchTensorType)
+                      -> IREE::TensorExt::DispatchTensorType {
       auto type = dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
       if (!type) {
         return dispatchTensorType;
@@ -93,30 +93,31 @@ struct MaterializePadEncodingTypeConverter final
       if (getPadLayout(type)) {
         type = getPaddedType(type);
       }
-      return IREE::Flow::DispatchTensorType::get(dispatchTensorType.getAccess(),
-                                                 type);
+      return IREE::TensorExt::DispatchTensorType::get(
+          dispatchTensorType.getAccess(), type);
     });
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.load` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
 /// materializing the encoding. We extract a smaller tensor for the padded
 /// source. This way we do not create partial loads prematurely, which would be
 /// difficult to undo later on.
 struct MaterializeFlowDispatchTensorLoadOp final
-    : OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorLoadOp> {
+    : OpMaterializeEncodingPattern<IREE::TensorExt::DispatchTensorLoadOp> {
   using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
+                  OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the load covers the entire
-    // `!flow.dispatch.tensor` type.
+    // `!iree_tensor_ext.dispatch.tensor` type.
     if (!loadOp.isLoadOfWholeSource()) {
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
     }
 
-    IREE::Flow::DispatchTensorType sourceType = loadOp.getSourceType();
+    IREE::TensorExt::DispatchTensorType sourceType = loadOp.getSourceType();
     auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
     if (!hasNonZeroPadding(boundTensorType)) {
       // Let the Nop pattern handle this.
@@ -141,7 +142,7 @@ struct MaterializeFlowDispatchTensorLoadOp final
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
 
     Location loc = loadOp.getLoc();
-    Value newLoad = rewriter.create<IREE::Flow::DispatchTensorLoadOp>(
+    Value newLoad = rewriter.create<IREE::TensorExt::DispatchTensorLoadOp>(
         loc, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
         newStrides);
     auto extractType = RankedTensorType::get(boundTensorType.getShape(),
@@ -154,24 +155,25 @@ struct MaterializeFlowDispatchTensorLoadOp final
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
 /// materializing the encoding. We create a larger empty tensor for the
 /// destination and insert the value into it. This way we do not create partial
 /// stores prematurely, which would be difficult to undo later on.
 struct MaterializeFlowDispatchTensorStoreOp final
-    : OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorStoreOp> {
+    : OpMaterializeEncodingPattern<IREE::TensorExt::DispatchTensorStoreOp> {
   using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
+                  OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the store covers the entire
-    // `!flow.dispatch.tensor` type.
+    // `!iree_tensor_ext.dispatch.tensor` type.
     if (!storeOp.isStoreToWholeTarget()) {
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
     }
 
-    IREE::Flow::DispatchTensorType targetType = storeOp.getTargetType();
+    IREE::TensorExt::DispatchTensorType targetType = storeOp.getTargetType();
     auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
     if (!hasNonZeroPadding(boundTensorType)) {
       // Let the Nop pattern handle this.
@@ -180,8 +182,9 @@ struct MaterializeFlowDispatchTensorStoreOp final
 
     auto &typeConverter =
         *getTypeConverter<MaterializePadEncodingTypeConverter>();
-    IREE::Flow::DispatchTensorType newTargetType =
-        typeConverter.convertType<IREE::Flow::DispatchTensorType>(targetType);
+    IREE::TensorExt::DispatchTensorType newTargetType =
+        typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(
+            targetType);
     RankedTensorType paddedType = newTargetType.asRankedTensorType();
 
     Location loc = storeOp.getLoc();
@@ -204,14 +207,14 @@ struct MaterializeFlowDispatchTensorStoreOp final
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
 
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         storeOp, insertOp, adaptor.getTarget(), newDynamicDims, offsets,
         newMixedSizes, strides);
     return success();
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
 /// materializing the encoding. We can not reuse the existing one because it
 /// does not transform new dynamic dimension through interface. The other
 /// difference is that the converted type of the padding attribute is not as the
@@ -225,11 +228,12 @@ struct MaterializeInterfaceBindingEncoding final
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = dyn_cast<IREE::Flow::DispatchTensorType>(
+    auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
         subspanOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
-          subspanOp, "expected result type to be !flow.dispatch.tensor");
+          subspanOp,
+          "expected result type to be !iree_tensor_ext.dispatch.tensor");
     }
     auto newResultType = getTypeConverter()->convertType(resultType);
     SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();

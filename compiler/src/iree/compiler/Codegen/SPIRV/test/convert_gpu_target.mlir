@@ -10,7 +10,7 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
     #hal.pipeline.binding<storage_buffer>]>
   ) {
   ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -57,7 +57,7 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
     #hal.pipeline.binding<storage_buffer>]>
   ) {
   ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {

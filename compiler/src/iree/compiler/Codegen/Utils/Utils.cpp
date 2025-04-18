@@ -9,10 +9,10 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -296,11 +296,11 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
           [&](auto op) { return isReadOnly(op.getSource()); })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return llvm::cast<IREE::Flow::DispatchTensorType>(
+      .Case<IREE::TensorExt::DispatchTensorLoadOp>(
+          [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+            return llvm::cast<IREE::TensorExt::DispatchTensorType>(
                        loadOp.getSource().getType())
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+                       .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
 }
@@ -1585,7 +1585,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
                         ArrayRef<OpFoldResult> mixedSizes,
                         ArrayRef<OpFoldResult> mixedStrides,
-                        IREE::Flow::DispatchTensorType tensorType,
+                        IREE::TensorExt::DispatchTensorType tensorType,
                         ValueRange dynamicDims) {
   OpBuilder builder(tensorType.getContext());
   SmallVector<int64_t> tensorShape = llvm::to_vector(tensorType.getShape());
@@ -1597,7 +1597,7 @@ static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
 }
 
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::Flow::DispatchTensorType tensorType,
+                 IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims) {
   return isFullSlice(
       sliceLoadStoreOp.getMixedOffsets(), sliceLoadStoreOp.getMixedSizes(),

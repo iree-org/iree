@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -39,7 +40,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 ///   op `flow.dispatch.workgroups_count_from_body_slice`. This op is
 ///   resolved in the backends into the actual workgroup count computation.
 /// - To correlate back to the captured workload,
-/// `flow.dispatch.workload.ordinal`
+/// `iree_tensor_ext.dispatch.workload.ordinal`
 ///   to map the captured operand to the position in the workload list.
 static void createDefaultWorkgroupCountRegion(
     RewriterBase &rewriter, IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
@@ -70,7 +71,7 @@ static void createDefaultWorkgroupCountRegion(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
   auto defaultCountOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromSliceOp>(
+      rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
           loc, block->getArguments());
   rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp.getResults());
 
@@ -91,8 +92,9 @@ static void createDefaultWorkgroupCountRegion(
       if (!llvm::isa<IndexType>(operand.getType()))
         continue;
       BlockArgument arg = workgroupsOp.getInputBlockArgument(index);
-      auto ordinalOp = rewriter.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
-          loc, arg, rewriter.getIndexAttr(ordinalNumber++));
+      auto ordinalOp =
+          rewriter.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
+              loc, arg, rewriter.getIndexAttr(ordinalNumber++));
       rewriter.replaceAllUsesExcept(arg, ordinalOp, ordinalOp);
     }
   });

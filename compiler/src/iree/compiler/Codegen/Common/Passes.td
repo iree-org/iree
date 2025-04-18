@@ -491,7 +491,7 @@ def MaterializeEncodingIntoPaddingPass :
   let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
   let description = [{
     Handles padding introduced by `pad_encoding_layout` encoding layouts, which
-    requires `flow.dispatch.tensor.load`/`.store` to be adjusted to account for
+    requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
     padding regions.
     Materializes any other encoding layouts into nop.
   }];

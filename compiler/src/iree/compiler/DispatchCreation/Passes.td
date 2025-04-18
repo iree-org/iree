@@ -259,6 +259,7 @@ def FormDispatchRegionsPass :
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
     "IREE::LinalgExt::IREELinalgExtDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 
@@ -361,6 +362,7 @@ def ConvertDispatchRegionsToWorkgroupsPass :
     "mlir::scf::SCFDialect",
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
   let statistics = [
     Statistic<"numDispatches", "num-dispatches", "Number of dispatches created">
@@ -394,11 +396,13 @@ def MaterializeDefaultWorkgroupCountRegionPass:
         Apply dispatch workgroups canonicalization patterns.
       }];
       let dependentDialects = [
+        "IREE::TensorExt::IREETensorExtDialect",
         "mlir::affine::AffineDialect",
         "mlir::arith::ArithDialect",
         "mlir::linalg::LinalgDialect",
         "mlir::scf::SCFDialect",
         "IREE::Flow::FlowDialect",
+
       ];
 }
 

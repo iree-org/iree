@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"

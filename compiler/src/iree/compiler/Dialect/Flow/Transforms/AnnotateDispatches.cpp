@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
@@ -411,12 +412,13 @@ static std::string summarizeDispatchRegion(Region &region) {
   if (!bestOp) {
     std::string bestSummary = "";
     // Check if there is a possible slow memory copy as a dispatch. The current
-    // heuristic is to check if a dispatch.tensor.store stores a tensor that is
-    // directly loaded from a dispatch.tensor.load.
-    region.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+    // heuristic is to check if a iree_tensor_ext.dispatch.tensor.store stores a
+    // tensor that is directly loaded from a
+    // iree_tensor_ext.dispatch.tensor.load.
+    region.walk([&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
       Value input = storeOp.getValue();
       if (auto loadOp =
-              input.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+              input.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>()) {
         bestSummary = "slow_memcpy";
         return WalkResult::interrupt();
       }

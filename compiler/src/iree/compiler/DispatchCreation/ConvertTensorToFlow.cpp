@@ -197,14 +197,14 @@ void ConvertTensorToFlowPass::runOnOperation() {
   }
 
   // fold `tensor.insert_slice/extract_slice` operations with
-  // `flow.dispatch.tensor.load/store`.
+  // `iree_tensor_ext.dispatch.tensor.load/store`.
   RewritePatternSet foldExtractInsertSliceOps(context);
   IREE::Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
       foldExtractInsertSliceOps, context);
   if (failed(applyPatternsGreedily(funcOp,
                                    std::move(foldExtractInsertSliceOps)))) {
     funcOp->emitOpError("failed to insert/extract_slice with "
-                        "flow.dispatch.tensor.load/store");
+                        "iree_tensor_ext.dispatch.tensor.load/store");
     return signalPassFailure();
   }
 }

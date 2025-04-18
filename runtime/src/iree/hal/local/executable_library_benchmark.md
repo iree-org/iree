@@ -180,12 +180,12 @@ This is 3 buffers of 16 bytes each, which is enough to call most things:
 ```
 
 If you want to provide real data then you can look for the `flow.executable`
-with the `!flow.dispatch.tensor` operands:
+with the `!iree_tensor_ext.dispatch.tensor` operands:
 
 ```mlir
-  func.func @simple_mul_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>,
-                              %arg1: !flow.dispatch.tensor<readonly:4xf32>,
-                              %arg2: !flow.dispatch.tensor<writeonly:4xf32>) {
+  func.func @simple_mul_dispatch_0(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:4xf32>,
+                              %arg1: !iree_tensor_ext.dispatch.tensor<readonly:4xf32>,
+                              %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:4xf32>) {
 ```
 
 Now we know each binding is 4 floats and can get more realistic test data:
