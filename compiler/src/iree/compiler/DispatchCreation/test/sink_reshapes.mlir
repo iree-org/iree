@@ -236,38 +236,3 @@ func.func @fuse_softmax_with_truncate(%arg0 : tensor<4x64x?xf32>) -> tensor<4x64
 //       CHECK:   %[[TRUNC:.+]] = linalg.generic {{.*}} ins(%[[SOFTMAX]]
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[TRUNC]]
 //       CHECK:   return %[[EXPAND]]
-
-// -----
-
-func.func @bubble_across_bit_extend(%arg0: tensor<2x64x32xf16>, %arg1 : tensor<2xf32>) -> tensor<2xf32> {
-  %empty = tensor.empty() : tensor<2x64x32xf32>
-  %0 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
-                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-                  iterator_types = ["parallel", "parallel", "parallel"]}
-      ins(%arg0 : tensor<2x64x32xf16>) outs(%empty : tensor<2x64x32xf32>) {
-    ^bb0(%b0 : f16, %b1 : f32):
-      %0 = arith.extf %b0 : f16 to f32
-      linalg.yield %0 : f32
-  } -> tensor<2x64x32xf32>
-  %collapse = tensor.collapse_shape %0 [[0], [1, 2]] : tensor<2x64x32xf32> into tensor<2x2048xf32>
-  %1 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>],
-                  iterator_types = ["parallel", "reduction"]}
-      ins(%collapse : tensor<2x2048xf32>) outs(%arg1 : tensor<2xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32):
-      %2 = arith.addf %b0, %b1 : f32
-      linalg.yield %2  : f32
-  } -> tensor<2xf32>
-  func.return %1 : tensor<2xf32>
-}
-// CHECK-LABEL: func @bubble_across_bit_extend
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2x64x32xf16>
-//  CHECK-SAME:     %[[ARG1:.+]]: tensor<2xf32>
-//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ARG0]]
-//       CHECK:   %[[GEN0:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[COLLAPSE]] :
-//       CHECK:   %[[GEN1:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[GEN0]] :
-//       CHECK:   return %[[GEN1]]

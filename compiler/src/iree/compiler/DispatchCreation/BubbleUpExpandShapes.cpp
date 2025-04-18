@@ -21,7 +21,6 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -131,8 +130,13 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // If producer generic op is elementwise op, bubble up the expand shape
-        // past this operation.
+        // Do not push down collapse shape across consumer if it is a bit-extend
+        // op. The bit-extend ops get cloned into producer dispatches, and the
+        // `collapse_shape` op going past dequant, prevents this clong.
+        if (IREE::LinalgExt::isBitExtendOp(consumer)) {
+          return false;
+        }
+
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
           // If producer generic op is elementwise op, bubble up the expand
           // shape past this operation.
@@ -172,8 +176,6 @@ void BubbleUpExpandShapesPass::runOnOperation() {
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(
       bubbleExpandShapePatterns, context);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(
-      bubbleExpandShapePatterns);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
