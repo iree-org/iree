@@ -1,5 +1,93 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-encoding-into-padding))" \
+// RUN:   --iree-gpu-test-target=gfx942 \
 // RUN:   --split-input-file %s | FileCheck %s
+
+#binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+#binding = #hal.pipeline.binding<storage_buffer, Indirect>
+#encoding = #iree_encoding.matmul_k<k_dims = [1]>
+func.func @set_encoding_and_store_with_unresolved_encodings() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
+    : !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+  %4 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
+    : !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16, #encoding>>
+  %5 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+    : !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
+  %6 = iree_encoding.set_encoding %5 : tensor<2048x2048xf16> -> tensor<2048x2048xf16, #encoding>
+  flow.dispatch.tensor.store %6, %4, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+    : tensor<2048x2048xf16, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16, #encoding>>
+  return
+}
+// CHECK-LABEL: @set_encoding_and_store_with_unresolved_encodings
+// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+// CHECK:         %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+// CHECK-SAME:                  !flow.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+// CHECK:         %[[LD:.+]] = flow.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
+// CHECK:         flow.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+// CHECK-SAME:                  tensor<2048x2048xf16> -> !flow.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+
+// -----
+
+// The test is as the same as the
+// set_encoding_and_store_with_unresolved_encodings test, but it gets the
+// encoding resolver from executable target.
+
+#binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+#binding = #hal.pipeline.binding<storage_buffer, Indirect>
+#encoding = #iree_encoding.matmul_k<k_dims = [1]>
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {
+    abi = "hip",
+    iree.encoding.resolver = #iree_gpu.gpu_pad_layout<>,
+    iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+                                       features = "",
+                                       wgp = <compute = fp32,
+                                              storage =  b32,
+                                              subgroup =  none,
+                                              dot =  none,
+                                              mma = [<MFMA_F32_16x16x4_F32>],
+                                              subgroup_size_choices = [64],
+                                              max_workgroup_sizes = [1024, 1024, 1024],
+                                              max_thread_count_per_workgroup = 1024,
+                                              max_workgroup_memory_bytes = 65536,
+                                              max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+                                              max_load_instruction_bits = 128,
+                                              simds_per_wgp = 4,
+                                              vgpr_space_bits = 16384>>
+  }>
+func.func @set_encoding_and_store_with_unresolved_encodings_from_executable() attributes {
+  hal.executable.target = #executable_target
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
+    : !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+  %4 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
+    : !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16, #encoding>>
+  %5 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+    : !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
+  %6 = iree_encoding.set_encoding %5 : tensor<2048x2048xf16> -> tensor<2048x2048xf16, #encoding>
+  flow.dispatch.tensor.store %6, %4, offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+    : tensor<2048x2048xf16, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<2048x2048xf16, #encoding>>
+  return
+}
+// CHECK-LABEL: @set_encoding_and_store_with_unresolved_encodings_from_executable
+// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+// CHECK:         %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+// CHECK-SAME:                  !flow.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+// CHECK:         %[[LD:.+]] = flow.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+// CHECK-SAME:                  !flow.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
+// CHECK:         flow.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
+// CHECK-SAME:                  tensor<2048x2048xf16> -> !flow.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+
+
+// -----
 
 #binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 #binding = #hal.pipeline.binding<storage_buffer, Indirect>
