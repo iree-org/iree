@@ -35,6 +35,18 @@ struct ElementwiseOpFusionPass final
   using Base::Base;
   void runOnOperation() override;
 };
+} // namespace
+
+template <typename T>
+static SmallVector<T> applyProjectedPermutation(const SmallVectorImpl<T> &input,
+                                                ArrayRef<int64_t> projPerm) {
+  SmallVector<T> result;
+  result.reserve(projPerm.size());
+  for (int64_t idx : projPerm) {
+    result.push_back(input[idx]);
+  }
+  return result;
+}
 
 //===----------------------------------------------------------------------===//
 // GatherFusionPattern
@@ -44,6 +56,7 @@ struct ElementwiseOpFusionPass final
 // cannot be fused because it there is no producer-consumer
 // relationship between the two generics. This is because the indexing
 // is not affine (index values come from a tensor).
+namespace {
 struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
@@ -63,10 +76,20 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
     }
 
     // Check if the producerOp is fusible
-    if (producerOp.getNumResults() != 1 || !isElementwise(producerOp) ||
-        !IREE::LinalgExt::isBitExtendOp(producerOp)) {
+    if (producerOp.getNumResults() != 1 || !isElementwise(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
+    }
+
+    // Heuristic: only fuse bitextending and broadcasting producers
+    if (!IREE::LinalgExt::isBitExtendOp(producerOp) &&
+        !(llvm::all_of(
+            producerOp.getDpsInputOperands(), [&](OpOperand *operand) {
+              auto map = producerOp.getMatchingIndexingMap(operand);
+              return map.isProjectedPermutation() && !map.isPermutation();
+            }))) {
+      return rewriter.notifyMatchFailure(producerOp,
+                                         "producer op should not be fused");
     }
 
     OpBuilder::InsertionGuard g(rewriter);
@@ -83,7 +106,7 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
             return cast<AffineDimExpr>(expr).getPosition();
           });
       SmallVector<Value, 4> indices = extractOp.getIndices();
-      indices = applyPermutation(indices, perm);
+      indices = applyProjectedPermutation(indices, perm);
       auto newExtract = rewriter.create<tensor::ExtractOp>(
           extractOp.getLoc(), operand.get(), indices);
       extractOps.push_back(newExtract);
@@ -91,6 +114,15 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
     rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
                                consumerOp.getRegion().begin());
     Block &clonedBlock = consumerOp.getRegion().front();
+
+    // Replace `linalg.index` ops with the value of the index from `indices`.
+    SmallVector<Value, 4> indices = extractOp.getIndices();
+    indices = applyPermutationMap(resultMap, ArrayRef(indices));
+    SmallVector<linalg::IndexOp> indexOps(
+        clonedBlock.getOps<linalg::IndexOp>());
+    for (linalg::IndexOp indexOp : indexOps) {
+      rewriter.replaceOp(indexOp, indices[indexOp.getDim()]);
+    }
     auto producerTermOp = clonedBlock.getTerminator();
 
     rewriter.inlineBlockBefore(&clonedBlock, extractOp->getNextNode(),
