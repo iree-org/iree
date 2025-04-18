@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     ExternalModels
   HDRS
+    "EncodingExternalModels.h"
     "FlowExternalModels.h"
     "HALExternalModels.h"
     "Interfaces.h"
@@ -21,6 +22,7 @@ iree_cc_library(
     "StreamExternalModels.h"
     "UtilExternalModels.h"
   SRCS
+    "EncodingExternalModels.cpp"
     "FlowExternalModels.cpp"
     "HALExternalModels.cpp"
     "Interfaces.cpp"
