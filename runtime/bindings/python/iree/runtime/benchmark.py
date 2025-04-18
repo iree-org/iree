@@ -128,7 +128,7 @@ def benchmark_module(module, entry_function=None, inputs=[], timeout=None, **kwa
             continue
         elif len(split) <= 5:
             raise ValueError(
-                    f"Benchmark standard output is not expected. Line: '{line}' should have at least 6 columns.\nDetails: {args=},\n{out=}"
+                f"Benchmark standard output is not expected. Line: '{line}' should have at least 6 columns.\nDetails: {args=},\n{out=}"
             )
 
         benchmark_name = split[0]
