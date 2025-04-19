@@ -11,7 +11,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -1065,6 +1064,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
                                     bool forROCDL) {
+
   modulePassManager.addPass(
       createConvertHALDescriptorTypeToGPUAddressSpacePass());
   modulePassManager.addPass(createCanonicalizerPass());
@@ -1096,6 +1096,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createIREEBufferizeConstantsPass());
 
   FunctionLikeNest funcPassManager(modulePassManager);
+
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass);
