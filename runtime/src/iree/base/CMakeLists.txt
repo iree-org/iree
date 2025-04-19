@@ -11,28 +11,28 @@ iree_cc_library(
     base
   HDRS
     "api.h"
-  SRCS
-    "allocator.c"
     "allocator.h"
     "assert.h"
-    "bitfield.c"
     "bitfield.h"
-    "loop.c"
     "loop.h"
-    "loop_inline.c"
     "loop_inline.h"
-    "status.c"
     "status.h"
+    "string_builder.h"
+    "string_view.h"
+    "wait_source.h"
+  SRCS
+    "allocator.c"
+    "bitfield.c"
+    "loop.c"
+    "loop_inline.c"
+    "status.c"
     "status_cc.h"
     "status_payload.h"
     "status_stack_trace.c"
     "string_builder.c"
-    "string_builder.h"
     "string_view.c"
-    "string_view.h"
     "time.c"
     "wait_source.c"
-    "wait_source.h"
   DEPS
     ::core_headers
     iree::base::internal::time
