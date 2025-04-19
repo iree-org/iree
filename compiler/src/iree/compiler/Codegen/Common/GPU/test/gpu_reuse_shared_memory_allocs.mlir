@@ -217,3 +217,38 @@ func.func @alloc_with_if(%val : index) {
 //   CHECK-DAG:   %[[VIEW_A:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_B:.+]] = memref.view %[[ALLOC]][%[[C512]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_C:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>
+
+// -----
+
+func.func @shared_memory_disjoint_with_deallocs() {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %cst_f32 = arith.constant 0.000000e+00 : f32
+  %a = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
+  %b = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
+  %c = memref.alloc() : memref<32xf32, #gpu.address_space<workgroup>>
+  scf.for %arg0 = %c0 to %c128 step %c1 {
+    memref.store %cst_f32, %a[%arg0] : memref<128xf32, #gpu.address_space<workgroup>>
+    memref.store %cst_f32, %b[%arg0] : memref<256xf32, #gpu.address_space<workgroup>>
+
+  }
+  memref.store %cst_f32, %c[%c0] : memref<32xf32, #gpu.address_space<workgroup>>
+  memref.dealloc %a : memref<128xf32, #gpu.address_space<workgroup>>
+  memref.dealloc %b : memref<256xf32, #gpu.address_space<workgroup>>
+  memref.dealloc %c : memref<32xf32, #gpu.address_space<workgroup>>
+  return
+}
+// CHECK-LABEL: func.func @shared_memory_disjoint_with_deallocs
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<1536xi8, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   %[[VIEW_A:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1536xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   %[[VIEW_B:.+]] = memref.view %[[ALLOC]][%[[C512]]][] : memref<1536xi8, #gpu.address_space<workgroup>> to memref<256xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   %[[VIEW_C:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1536xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   scf.for
+//       CHECK:     memref.store {{.*}} %[[VIEW_A]]
+//       CHECK:     memref.store {{.*}} %[[VIEW_B]]
+//       CHECK:   }
+//       CHECK:   gpu.barrier
+//       CHECK:   memref.store {{.*}} %[[VIEW_C]]
