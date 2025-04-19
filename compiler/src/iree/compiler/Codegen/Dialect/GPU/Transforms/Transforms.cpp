@@ -1630,10 +1630,23 @@ struct LowerValueBarrierPattern
     return success();
   }
 };
+
+struct LowerGlobalLoadDMAPattern
+    : public OpRewritePattern<IREE::GPU::GlobalLoadDMAOp> {
+  using OpRewritePattern<IREE::GPU::GlobalLoadDMAOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
+                                PatternRewriter &rewriter) const override {
+    assert(false && "unimplemented");
+  }
+};
 } // namespace
 
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerValueBarrierPattern>(patterns.getContext());
+}
+
+void populateIREEGPULowerGlobalLoadDMAPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerGlobalLoadDMAPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

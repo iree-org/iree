@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -24,10 +26,21 @@ struct ConvertLinalgCopyToMemrefCopy final : OpRewritePattern<linalg::CopyOp> {
     if (copyOp.hasPureTensorSemantics()) {
       return failure();
     }
-    rewriter.create<memref::CopyOp>(copyOp.getLoc(),
-                                    copyOp.getDpsInputOperand(0)->get(),
-                                    copyOp.getDpsInitOperand(0)->get());
+    
+    /*
+    auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
+    if (config) {
+      // Generate memref.copy with global load/dma
+      rewriter.create<iree_compiler::IREE::GPU::GlobalLoadDMAOp>(
+          copyOp->getLoc(), copyOp->getOperand(0), copyOp->getOperand(1));
+    } else {
+      // Not using direct load for copying:
+      rewriter.create<memref::CopyOp>(
+          copyOp->getLoc(), copyOp.getDpsInputOperand(0)->get(),
+          copyOp.getDpsInitOperand(0)->get());
+    }
     rewriter.eraseOp(copyOp);
+    */
     return success();
   }
 };

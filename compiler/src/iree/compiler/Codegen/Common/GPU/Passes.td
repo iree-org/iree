@@ -50,6 +50,15 @@ def GPUDistributeCopyUsingForallPass :
   ];
 }
 
+def GPULowerToGlobalLoadsPass :
+    InterfacePass<"iree-codegen-gpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Emit direct global loads instructions.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";

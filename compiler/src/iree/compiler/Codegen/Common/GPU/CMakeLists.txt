@@ -65,6 +65,7 @@ iree_cc_library(
     "GPUGreedilyDistributeToThreads.cpp"
     "GPUInferMemorySpace.cpp"
     "GPULowerToUKernels.cpp"
+    "GPULowerToGlobalLoads.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPackToIntrinsics.cpp"

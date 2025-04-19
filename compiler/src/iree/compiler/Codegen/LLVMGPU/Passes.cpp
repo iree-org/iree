@@ -387,6 +387,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
+  funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
   funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   // Decompose packs and unpacks that are at the function boundary.
   funcPassManager.addPass(createDecomposeBoundaryPackUnPackOpsPass());
@@ -835,6 +836,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
+
+  funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
 
   // Tile to reduction loops.
   {

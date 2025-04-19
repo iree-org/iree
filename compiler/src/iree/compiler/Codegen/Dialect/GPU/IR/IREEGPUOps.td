@@ -456,4 +456,25 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
       [{  attr-dict ($values^ `:` type($values))? }];
 }
 
+//===----------------------------------------------------------------------===//
+// GlobalLoadDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
+    SameVariadicOperandSize]> {
+  let summary = "Does a global load DMA operation";
+  let description = [{
+    TODO: Add description
+  }];
+
+  let arguments = (ins  AnyTensor:$source, Variadic<Index>:$sourceIndices, AnyTensor:$target, Variadic<Index>:$targetIndices);
+  let results   = (outs AnyTensor:$modified_target);
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+  let assemblyFormat = [{
+    $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
+      `:` type($source) `,` type($target) `->` type($modified_target)
+  }];
+}
+
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
