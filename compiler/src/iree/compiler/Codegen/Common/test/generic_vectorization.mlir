@@ -1,5 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization))" --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true vectorize-padding=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
 
 func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
@@ -405,6 +405,33 @@ func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x6
 // CHECK-MASK:   scf.for
 // CHECK-MASK:     scf.for
 // CHECK-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x1x4x?xf32>
+
+// -----
+
+
+func.func @pad_lowered_as_masked_transfer_read(%arg0: tensor<?x?xf32>, %arg1: index) -> tensor<1x4xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %padded = tensor.pad %arg0 low[0, 0] high[%arg1, 0] {
+    ^bb0(%arg2: index, %arg3: index):
+      tensor.yield %cst : f32
+  } : tensor<?x?xf32> to tensor<1x4xf32>
+  return %padded : tensor<1x4xf32>
+}
+
+// CHECK-MASK-LABEL: func.func @pad_lowered_as_masked_transfer_read
+// CHECK-MASK-SAME:  %[[ARG0:.*]]: tensor<?x?xf32>
+// CHECK-MASK-SAME:  %[[ARG1:.*]]: index
+
+// CHECK-MASK-DAG: %[[CST:.*]] = arith.constant 0.0
+// CHECK-MASK-DAG: %[[C0:.*]] = arith.constant 0
+// CHECK-MASK-DAG: %[[C1:.*]] = arith.constant 1
+// CHECK-MASK:     %[[DIM0:.*]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK-MASK:     %[[DIM1:.*]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK-MASK:     %[[MASK:.*]] = vector.create_mask %[[DIM0]], %[[DIM1]]
+// CHECK-MASK:     %[[READ:.*]] = vector.transfer_read %[[ARG0]][%[[C0]], %[[C0]]], %[[CST]], %[[MASK]] {in_bounds = [true, true]}
+// CHECK-MASK:     %[[EMPTY:.*]] = tensor.empty()
+// CHECK-MASK:     %[[WRITE:.*]] = vector.transfer_write %[[READ]], %[[EMPTY]][%[[C0]], %[[C0]]] {in_bounds = [true, true]}
+// CHECK-MASK:     return %[[WRITE]]
 
 // -----
 
