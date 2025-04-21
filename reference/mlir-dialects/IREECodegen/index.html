@@ -1679,6 +1679,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_codegenswizzle_hint-codegenswizzlehintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3681,6 +3690,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_codegenswizzle_hint-codegenswizzlehintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3755,6 +3773,7 @@ within a backend.</p>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
 <li><a href="#iree_codegennull_pointer-codegennullpointerop">iree_codegen.null_pointer (Codegen::NullPointerOp)</a></li>
 <li><a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop">iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)</a></li>
+<li><a href="#iree_codegenswizzle_hint-codegenswizzlehintop">iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)</a></li>
 </ul>
 </li>
 <li><a href="#types">Types</a><ul>
@@ -3903,6 +3922,80 @@ This makes lowering more progressive and brings the following benefits:
 <tr>
 <td style="text-align: center;"><code>results</code></td>
 <td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="iree_codegenswizzle_hint-codegenswizzlehintop"><code>iree_codegen.swizzle_hint</code> (Codegen::SwizzleHintOp)<a class="headerlink" href="#iree_codegenswizzle_hint-codegenswizzlehintop" title="Permanent link">link</a></h3>
+<p><em>Hint to swizzle accesses according to an access pattern</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.swizzle_hint` $operand `[` $swizzle attr-dict `]` `:` type($result)
+</code></pre></div>
+<p>Optimization hint to swizzle all accesses to the memref this takes a view
+of. This only affects reads/writes immediately consuming this operation and
+is best effort. If the desired swizzling is not apparently possible, this
+op will no-op. As a result, it should not be relied on for correctness.</p>
+<p>Any subviews on this operation will cause swizzling to fail. The expectation
+is for all view like operations to fold into the accessing ops
+(loads/stores) before this op takes effect.</p>
+<p>Note that this only rewrites direct users. If there are any aliased loads
+or stores of the data from/to the |src| memref of a hintOp, those accesses
+will not be swizzled. This allows reusing an allocation with different
+swizzled access patterns as long as there is no data dependency between
+memory with different layouts. For example:</p>
+<div class="highlight"><pre><span></span><code>%0 = alloc()
+%1 = iree_codegen.swizzle_hint %0, #layout_0
+%2 = iree_codegen.swizzle_hint %0, #layout_1
+{
+   vector.store %1
+   vector.load %1
+     ^
+     |
+    unrelated
+     |
+     v
+   vector.store %2
+   vector.load %2
+}
+</code></pre></div>
+<p>If there is a data dependency between the accesses of %1 and %2, for example
+a value stored to %1 is loaded from %2, this is undefined behavior. Aliasing
+is otherwise perfectly legal.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>swizzle</code></td><td>IREE::Codegen::SwizzleAttrInterface</td><td>swizzling descriptor attributes</td></tr>
+</table>
+
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operand</code></td>
+<td>1D memref of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>1D memref of any type values</td>
 </tr>
 </tbody>
 </table>
