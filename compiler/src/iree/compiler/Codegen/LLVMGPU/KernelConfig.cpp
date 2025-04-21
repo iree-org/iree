@@ -2501,7 +2501,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
     std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUWarpReduction,
-            workgroupSize))) {
+            workgroupSize, preferredSubgroupSize))) {
       return failure();
     }
     return success();
