@@ -331,7 +331,8 @@ func.func @fold_reshapes_with_bindings() {
     linalg.yield %in : f32
   } -> tensor<?xf32>
   flow.dispatch.tensor.store %8, %5, offsets = [0], sizes = [%3], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%3}
-  return                                                                                                                                                                              }
+  return
+}
 // Reshapes can't fuse with non-projected permutation indexing maps. Check that
 // the reshapes are folded back into the bindings.
 //
@@ -349,3 +350,21 @@ func.func @fold_reshapes_with_bindings() {
 //  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?xf32>)
 //       CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
 //  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
+
+// -----
+
+// Check that patterns that bubble expand shapes past collapse shape kick in.
+func.func @check_bubble_up_patterns(%arg0 : tensor<4x32x?x32x?x32xf32>, %arg1 : index)
+    -> tensor<4x32x?x32x?xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1], [2, 3], [4, 5]]
+      : tensor<4x32x?x32x?x32xf32> into tensor<4x32x?x?xf32>
+  %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%arg1]
+  %expanded = tensor.expand_shape %collapsed [[0], [1], [2, 3], [4]]
+      output_shape [4, 32, %arg1, 32, %0]
+      : tensor<4x32x?x?xf32> into tensor<4x32x?x32x?xf32>
+  return %expanded : tensor<4x32x?x32x?xf32>
+}
+// CHECK-LABEL: func @check_bubble_up_patterns
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<4x32x?x32x?x32xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:   return %[[COLLAPSED]]
