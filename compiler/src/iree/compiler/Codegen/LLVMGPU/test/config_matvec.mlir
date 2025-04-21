@@ -34,7 +34,7 @@ func.func @dynamic_batch_matvec() {
 }
 
 //   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32]{{\]}}>
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
 // CDNA3-LABEL: func.func @dynamic_batch_matvec()
 //  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //       CDNA3:   linalg.batch_matmul
@@ -367,14 +367,14 @@ func.func @dynamic_parallel_dims(%dynsize : index, %input : tensor<4x?x4096xf16>
   return %2 : tensor<4x?xf32>
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //      CHECK: func @dynamic_parallel_dims
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 //  CDNA3-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}
-//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CDNA3: func @dynamic_parallel_dims
 // CDNA3-SAME:     translation_info = #[[TRANSLATION]]
 //      CDNA3:   linalg.generic

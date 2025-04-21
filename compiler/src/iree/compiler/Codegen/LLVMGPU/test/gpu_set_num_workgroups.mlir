@@ -699,7 +699,7 @@ func.func @i4_dequant_matvec() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
 // CHECK-LABEL: func.func @i4_dequant_matvec()
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
