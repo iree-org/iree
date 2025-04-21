@@ -164,186 +164,133 @@ static bool checkLayout(Value val) {
 }
 
 namespace {
-struct FlattenMemrefLoad : public OpRewritePattern<memref::LoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+template <typename T>
+static Value getTargetMemref(T op) {
+  if constexpr (std::is_same_v<T, memref::LoadOp>) {
+    return op.getMemref();
+  } else if constexpr (std::is_same_v<T, vector::LoadOp>) {
+    return op.getBase();
+  } else if constexpr (std::is_same_v<T, memref::StoreOp>) {
+    return op.getMemref();
+  } else if constexpr (std::is_same_v<T, vector::StoreOp>) {
+    return op.getBase();
+  } else if constexpr (std::is_same_v<T, vector::MaskedLoadOp>) {
+    return op.getBase();
+  } else if constexpr (std::is_same_v<T, vector::MaskedStoreOp>) {
+    return op.getBase();
+  } else if constexpr (std::is_same_v<T, vector::TransferReadOp>) {
+    return op.getSource();
+  } else if constexpr (std::is_same_v<T, vector::TransferWriteOp>) {
+    return op.getSource();
+  }
+  return {};
+}
 
-  LogicalResult matchAndRewrite(memref::LoadOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getMemref();
-    if (!needFlattenning(memref) || !checkLayout(memref))
-      return rewriter.notifyMatchFailure(op,
-                                         "nothing to do or unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
-
+template <typename T>
+static void replaceOp(T op, PatternRewriter &rewriter, Value flatMemref,
+                      Value offset) {
+  if constexpr (std::is_same_v<T, memref::LoadOp>) {
     auto newLoad = rewriter.create<memref::LoadOp>(
-        op.getLoc(), op.getType(), flatMemref, ValueRange{offset});
+        op->getLoc(), op->getResultTypes(), flatMemref, ValueRange{offset});
     newLoad->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newLoad.getResult());
-    return success();
-  }
-};
-
-struct FlattenVectorLoad : public OpRewritePattern<vector::LoadOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::LoadOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getBase();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
-
+  } else if constexpr (std::is_same_v<T, vector::LoadOp>) {
     auto newLoad = rewriter.create<vector::LoadOp>(
-        op.getLoc(), op.getType(), flatMemref, ValueRange{offset});
+        op->getLoc(), op->getResultTypes(), flatMemref, ValueRange{offset});
     newLoad->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newLoad.getResult());
-    return success();
-  }
-};
-
-struct FlattenMemrefStore : public OpRewritePattern<memref::StoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::StoreOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getMemref();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
+  } else if constexpr (std::is_same_v<T, memref::StoreOp>) {
     auto newStore = rewriter.create<memref::StoreOp>(
-        op->getLoc(), op.getValue(), flatMemref, ValueRange{offset});
+        op->getLoc(), op->getOperands().front(), flatMemref,
+        ValueRange{offset});
     newStore->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newStore);
-    return success();
-  }
-};
-
-struct FlattenVectorStore : public OpRewritePattern<vector::StoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::StoreOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getBase();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
+  } else if constexpr (std::is_same_v<T, vector::StoreOp>) {
     auto newStore = rewriter.create<vector::StoreOp>(
-        op->getLoc(), op.getValueToStore(), flatMemref, ValueRange{offset});
+        op->getLoc(), op->getOperands().front(), flatMemref,
+        ValueRange{offset});
     newStore->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newStore);
-    return success();
-  }
-};
-
-struct FlattenVectorMaskedLoad : public OpRewritePattern<vector::MaskedLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::MaskedLoadOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getBase();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
-
+  } else if constexpr (std::is_same_v<T, vector::TransferReadOp>) {
+    auto newTransferRead = rewriter.create<vector::TransferReadOp>(
+        op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
+        op.getPadding());
+    rewriter.replaceOp(op, newTransferRead.getResult());
+  } else if constexpr (std::is_same_v<T, vector::TransferWriteOp>) {
+    auto newTransferWrite = rewriter.create<vector::TransferWriteOp>(
+        op->getLoc(), op.getVector(), flatMemref, ValueRange{offset});
+    rewriter.replaceOp(op, newTransferWrite);
+  } else if constexpr (std::is_same_v<T, vector::MaskedLoadOp>) {
     auto newMaskedLoad = rewriter.create<vector::MaskedLoadOp>(
         op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
         op.getMask(), op.getPassThru());
     newMaskedLoad->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newMaskedLoad.getResult());
-    return success();
-  }
-};
-
-struct FlattenVectorMaskedStore
-    : public OpRewritePattern<vector::MaskedStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::MaskedStoreOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getBase();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
+  } else if constexpr (std::is_same_v<T, vector::MaskedStoreOp>) {
     auto newMaskedStore = rewriter.create<vector::MaskedStoreOp>(
         op->getLoc(), flatMemref, ValueRange{offset}, op.getMask(),
         op.getValueToStore());
     newMaskedStore->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newMaskedStore);
+  } else {
+    op.emitOpError("unimplemented: do not know how to replace op.");
+  }
+}
+
+template <typename T>
+struct MemRefRewritePatternBase : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    Value memref = getTargetMemref<T>(op);
+    if (!needFlattenning(memref) || !checkLayout(memref))
+      return rewriter.notifyMatchFailure(op,
+                                         "nothing to do or unsupported layout");
+    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
+        rewriter, op->getLoc(), memref, op.getIndices());
+    replaceOp<T>(op, rewriter, flatMemref, offset);
     return success();
   }
 };
+
+struct FlattenMemrefLoad : public MemRefRewritePatternBase<memref::LoadOp> {
+  using MemRefRewritePatternBase<memref::LoadOp>::MemRefRewritePatternBase;
+};
+
+struct FlattenVectorLoad : public MemRefRewritePatternBase<vector::LoadOp> {
+  using MemRefRewritePatternBase<vector::LoadOp>::MemRefRewritePatternBase;
+};
+
+struct FlattenMemrefStore : public MemRefRewritePatternBase<memref::StoreOp> {
+  using MemRefRewritePatternBase<memref::StoreOp>::MemRefRewritePatternBase;
+};
+
+struct FlattenVectorStore : public MemRefRewritePatternBase<vector::StoreOp> {
+  using MemRefRewritePatternBase<vector::StoreOp>::MemRefRewritePatternBase;
+};
+
+struct FlattenVectorMaskedLoad
+    : public MemRefRewritePatternBase<vector::MaskedLoadOp> {
+  using MemRefRewritePatternBase<
+      vector::MaskedLoadOp>::MemRefRewritePatternBase;
+};
+
+struct FlattenVectorMaskedStore
+    : public MemRefRewritePatternBase<vector::MaskedStoreOp> {
+  using MemRefRewritePatternBase<
+      vector::MaskedStoreOp>::MemRefRewritePatternBase;
+};
+
 struct FlattenVectorTransferRead
-    : public OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::TransferReadOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getSource();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
-
-    auto newTransferRead = rewriter.create<vector::TransferReadOp>(
-        op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
-        op.getPadding());
-    rewriter.replaceOp(op, newTransferRead.getResult());
-    return success();
-  }
+    : public MemRefRewritePatternBase<vector::TransferReadOp> {
+  using MemRefRewritePatternBase<
+      vector::TransferReadOp>::MemRefRewritePatternBase;
 };
 
 struct FlattenVectorTransferWrite
-    : public OpRewritePattern<vector::TransferWriteOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::TransferWriteOp op,
-                                PatternRewriter &rewriter) const override {
-    Value memref = op.getSource();
-    if (!needFlattenning(memref))
-      return rewriter.notifyMatchFailure(op, "nothing to do");
-
-    if (!checkLayout(memref))
-      return rewriter.notifyMatchFailure(op, "unsupported layout");
-
-    auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
-        rewriter, op.getLoc(), memref, op.getIndices());
-
-    auto newTransferWrite = rewriter.create<vector::TransferWriteOp>(
-        op.getLoc(), op.getVector(), flatMemref, ValueRange{offset});
-    rewriter.replaceOp(op, newTransferWrite);
-    return success();
-  }
+    : public MemRefRewritePatternBase<vector::TransferWriteOp> {
+  using MemRefRewritePatternBase<
+      vector::TransferWriteOp>::MemRefRewritePatternBase;
 };
 
 struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {

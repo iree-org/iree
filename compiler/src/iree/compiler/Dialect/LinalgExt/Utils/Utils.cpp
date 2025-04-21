@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Builders.h"
 
 #define DEBUG_TYPE "iree-linalgExt-utils"
@@ -386,9 +387,12 @@ bool isGatherlikeOp(Operation *op) {
   return hasTensorExtract;
 }
 
+//===---------------------------------------------------------------------===//
+// IGEMM details for generic convolutions
+//===---------------------------------------------------------------------===//
+
 FailureOr<IGEMMGenericConvDetails>
 getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
-
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
   MLIRContext *ctx = linalgOp->getContext();
   if (failed(convDimsOrFailure))
@@ -548,29 +552,47 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   SmallVector<AffineExpr> dims(numParallelDims + numKDims);
   bindDimsList<AffineExpr>(ctx, dims);
+  // Build the result map with dims in canonical order.
   auto resultMap = AffineMap::get(
       numParallelDims + numKDims, 0,
       SmallVector<AffineExpr>(dims.begin(), dims.begin() + numParallelDims),
       ctx);
 
+  // Build a mapping from canonical dim positions to their positions in the
+  // original output map.
+  SmallVector<int64_t> originalToCanonicalDimPos;
+  for (AffineExpr expr : outputMap.getResults())
+    originalToCanonicalDimPos.push_back(
+        cast<AffineDimExpr>(expr).getPosition());
+  SmallVector<int64_t> canonicalToOriginalDimPos =
+      invertPermutationVector(originalToCanonicalDimPos);
+
+  // Lambda to remap dim indices from canonical order to original order.
+  auto remapDims = [&](ArrayRef<unsigned> dims) -> SmallVector<unsigned> {
+    SmallVector<unsigned> mapped;
+    for (unsigned d : dims)
+      mapped.push_back(canonicalToOriginalDimPos[d]);
+    return mapped;
+  };
+
   // Prepare the input map.
-  int64_t numBDimsInFront = isBatchDimLast ? 0 : numBDims;
-  int64_t startingMPos =
-      isOutputChannelFirst ? numNDims + numBDimsInFront : numBDimsInFront;
-  int64_t startingBPos = isBatchDimLast ? startingMPos + numMDims : 0;
   SmallVector<AffineExpr> inputDims;
-  // Add the batch dimensions.
-  inputDims.insert(inputDims.end(), dims.begin() + startingBPos,
-                   dims.begin() + startingBPos + numBDims);
+  auto insertExprs = [&](ArrayRef<unsigned> indices) {
+    for (unsigned i : indices)
+      inputDims.push_back(dims[i]);
+  };
+
+  // Add the batch dims.
+  insertExprs(remapDims(convDims.batch));
   // Add the M dims.
-  inputDims.insert(inputDims.end(), dims.begin() + startingMPos,
-                   dims.begin() + startingMPos + numMDims);
-  // Add the reduction dims.
+  insertExprs(remapDims(convDims.outputImage));
+  // Add the reduction dims at the end.
   inputDims.insert(inputDims.end(), dims.begin() + numParallelDims, dims.end());
   auto inputMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
   // Prepare filter map.
+  int64_t numBDimsInFront = isBatchDimLast ? 0 : numBDims;
   int64_t currNPos =
       isOutputChannelFirst ? numBDimsInFront : numBDimsInFront + numMDims;
   int64_t currKPos = numBDims + numMDims + numNDims;

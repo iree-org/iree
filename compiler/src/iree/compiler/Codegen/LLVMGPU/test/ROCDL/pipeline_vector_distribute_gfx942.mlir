@@ -630,11 +630,9 @@ hal.executable public @pad_batch_matmul {
 // CHECK-SAME:        memref<196x16x24xf32
 // CHECK-SAME:        vector<1x1x1xf32>
 // RHS
-// The dynamic dimension should be removed after:
-// https://github.com/llvm/llvm-project/pull/112236
 // CHECK:             vector.transfer_read
-// CHECK-SAME:        in_bounds = [true, false, false]
-// CHECK-SAME:        memref<1x?x24xf32
+// CHECK-SAME:        in_bounds = [true, true, false]
+// CHECK-SAME:        memref<1x8x24xf32
 // CHECK-SAME:        vector<1x1x2xf32>
 // CHECK:           scf.yield
 // OUTPUT
