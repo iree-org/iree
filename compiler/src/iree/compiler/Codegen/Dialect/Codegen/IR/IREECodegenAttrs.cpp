@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -475,6 +476,129 @@ Operation *EncodingNopLayoutAttr::lowerOp(OpBuilder &b, Operation *op,
                                           TypeRange convertedResTypes,
                                           ValueRange convertedOperands) const {
   return clone(b, op, convertedResTypes, convertedOperands);
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.rotate_rows
+//===---------------------------------------------------------------------===//
+
+/// Given `r = |rotationInvariant|`, simplify affine maps of the following form:
+///
+/// ```
+///   %offset = affine.apply (d0, ..., dn) -> (f(d0, ..., dn) + c)
+/// ```
+///
+/// Where `c` is a constant, to:
+///
+/// ```
+///   %offset = affine.apply (d0, ..., dn) -> (f(d0, ..., dn) + c % r)
+/// ```
+static OpFoldResult getMinimumConstantOffsetMap(OpBuilder &b, Location loc,
+                                                OpFoldResult offset,
+                                                int64_t rotationInvariant) {
+  auto value = dyn_cast_if_present<Value>(offset);
+  if (!value)
+    return offset;
+
+  auto apply = value.getDefiningOp<affine::AffineApplyOp>();
+  if (!apply)
+    return offset;
+
+  AffineMap map = apply.getMap();
+  // Simplify the map to move `+ c` terms to the right most (first) expression
+  // in the tree.
+  map = simplifyAffineMap(map);
+  AffineExpr resultExpr = map.getResult(0);
+  auto addExpr = llvm::dyn_cast<AffineBinaryOpExpr>(resultExpr);
+
+  // After simplification, the add should be the first expression if present.
+  if (!addExpr || addExpr.getKind() != AffineExprKind::Add)
+    return offset;
+
+  // If RHS is not constant, nothing to do.
+  auto constantRhs = llvm::dyn_cast<AffineConstantExpr>(addExpr.getRHS());
+  if (!constantRhs)
+    return offset;
+
+  int64_t constantOffset = constantRhs.getValue();
+  int64_t baseMod = constantOffset % rotationInvariant;
+
+  // Skip constructing the new apply if it's not needed (c < rotationInvariant).
+  if (baseMod == constantOffset)
+    return offset;
+
+  AffineExpr newExpr =
+      addExpr.getLHS() + getAffineConstantExpr(baseMod, b.getContext());
+  map = AffineMap::get(map.getNumDims(), map.getNumSymbols(), newExpr);
+  return b.create<affine::AffineApplyOp>(loc, map, apply.getOperands())
+      .getResult();
+}
+
+OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                           OpFoldResult offset,
+                                           Value src) const {
+  // First normalize the producer of the offset if possible. Note that under
+  // this swizzling scheme, every `row_width ^ 2 / access_width` elements yields
+  // the same swizzling offset. This means we can modulo the id by this value
+  // to get the simplest offset possible in case we are accessing values from
+  // successive rows. This allows us to CSE the swizzling computation more
+  // effectively.
+  int64_t rotationInvariant =
+      getRowWidth() * (getRowWidth() / getAccessWidth());
+  OpFoldResult id =
+      getMinimumConstantOffsetMap(b, loc, offset, rotationInvariant);
+
+  // Number of elements per row.
+  Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
+  // Number of contiguous groups of elements per row (swizzled together).
+  Value rowAccessAlignmentVal =
+      b.create<arith::ConstantIndexOp>(loc, getRowWidth() / getAccessWidth());
+  // Number of elements per group.
+  Value accessWidthVal =
+      b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
+
+  Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+  // i = row # = |offset| floordiv |Num elements per row|
+  Value i = b.create<arith::DivUIOp>(loc, idVal, rowAlignmentVal);
+  // jByte = element column # = |offset| % |Num elements per row|
+  Value jElem = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
+  // j = group column # = jElem / |Num elements per group|
+  Value j = b.create<arith::DivUIOp>(loc, jElem, accessWidthVal);
+
+  // New j = ((i + j) % |Num groups per row|) * |Num elements per group|
+  Value sum = b.create<arith::AddIOp>(loc, i, j);
+  Value modByte = b.create<arith::RemUIOp>(loc, sum, rowAccessAlignmentVal);
+  Value mod = b.create<arith::MulIOp>(loc, modByte, accessWidthVal);
+
+  // Recompute the swizzled offset `(i * row width) + |new j|`
+  Value mul = b.create<arith::MulIOp>(loc, i, rowAlignmentVal);
+  Value swizzledId = b.create<arith::AddIOp>(loc, mod, mul);
+
+  // |swizzledId| is the new offset modulo the swizzle invariant, meaning to
+  // get the true swizzled offset take the difference between |swizzledId| and
+  // |id| to get change in offset and add it to |offset|.
+  //
+  // This increases the chance of being able to CSE the offset calculation. When
+  // multiple accesses to a memref only differ by a constant value (very common
+  // when working with statically shaped memrefs like shared/scratch memory).
+  Value diff = b.create<arith::SubIOp>(loc, swizzledId, idVal);
+  return b
+      .create<arith::AddIOp>(
+          loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+      .getResult();
+}
+
+int64_t RotateRowsAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t rowWidth, int64_t accessWidth) {
+  if (rowWidth % accessWidth != 0) {
+    return emitError() << "expected access width to divide row width";
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

@@ -169,4 +169,52 @@ def IREECodegen_LayoutAttrInterface :
   ];
 }
 
+def IREECodegen_SwizzleAttrInterface :
+  AttrInterface<"SwizzleAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that describes 1D memref swizzling patterns.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Swizzles |offset| into memref |src|.
+      }],
+      /*retTy=*/"::mlir::OpFoldResult",
+      /*methodName=*/"swizzleOffset",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::mlir::OpFoldResult":$offset,
+                    "::mlir::Value":$src),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return offset;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the number of elements that remain contiguous with the swizzling
+        pattern. This unrolls all accesses to this element count.
+
+        Currently swizzling is only supported if all accesses are multiples of
+        this value.
+
+        TODO: Support non-width aligned swizzling.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getAccessElementCount",
+      /*args=*/(ins)
+    >
+  ];
+}
+
+def IREECodegen_AnySwizzleAttr : Attr<Or<[
+  CPred<"isa<IREE::Codegen::SwizzleAttrInterface>($_self)">,
+]>, "swizzling descriptor attributes"> {
+  let storageType = [{ IREE::Codegen::SwizzleAttrInterface }];
+  let returnType = [{ IREE::Codegen::SwizzleAttrInterface }];
+  let convertFromStorage = "$_self";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES
