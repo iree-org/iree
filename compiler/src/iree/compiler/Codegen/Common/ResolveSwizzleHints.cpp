@@ -43,8 +43,8 @@ struct ResolveSwizzleHintsPass final
 /// %2 = vector.load %src[swizzleOffset(%src, %offset + 8)] : vector<4>
 /// %3 = vector.load %src[swizzleOffset(%src, %offset + 12)] : vector<4>
 /// %load = concat[%0, %1, %2, %3] : vector<16>
-void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
-                 IREE::Codegen::SwizzleHintOp hintOp) {
+static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
+                        IREE::Codegen::SwizzleHintOp hintOp) {
   Location hintLoc = hintOp.getLoc();
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   VectorType type = load.getVectorType();
@@ -95,8 +95,8 @@ void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
 /// vector.store %1, %src[swizzleOffset(%src, %offset + 4)] : vector<4>
 /// vector.store %2, %src[swizzleOffset(%src, %offset + 8)] : vector<4>
 /// vector.store %3, %src[swizzleOffset(%src, %offset + 12)] : vector<4>
-void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
-                  IREE::Codegen::SwizzleHintOp hintOp) {
+static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
+                         IREE::Codegen::SwizzleHintOp hintOp) {
   Location hintLoc = hintOp.getLoc();
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   VectorType type = store.getVectorType();
@@ -131,8 +131,8 @@ void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
-void resolveHintOp(RewriterBase &rewriter,
-                   IREE::Codegen::SwizzleHintOp hintOp) {
+static void resolveHintOp(RewriterBase &rewriter,
+                          IREE::Codegen::SwizzleHintOp hintOp) {
   SmallVector<vector::LoadOp> loads;
   SmallVector<vector::StoreOp> stores;
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
@@ -161,18 +161,18 @@ void resolveHintOp(RewriterBase &rewriter,
     return;
   }
 
-  for (auto load : loads) {
+  for (vector::LoadOp load : loads) {
     rewriter.setInsertionPoint(load);
     swizzleLoad(rewriter, load, hintOp);
   }
-  for (auto store : stores) {
+  for (vector::StoreOp store : stores) {
     rewriter.setInsertionPoint(store);
     swizzleStore(rewriter, store, hintOp);
   }
 }
 
 void ResolveSwizzleHintsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  FunctionOpInterface funcOp = getOperation();
 
   // Collect all hint ops.
   SmallVector<IREE::Codegen::SwizzleHintOp> hintOps;
@@ -183,7 +183,7 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   // guarantee all accesses of a particular hint are swizzled, this will
   // silently pass through for that hint.
   IRRewriter rewriter(funcOp->getContext());
-  for (auto hintOp : hintOps) {
+  for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
     resolveHintOp(rewriter, hintOp);
   }
 
