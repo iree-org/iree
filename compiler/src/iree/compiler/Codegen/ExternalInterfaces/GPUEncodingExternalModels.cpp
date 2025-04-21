@@ -437,7 +437,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     std::optional<IREE::GPU::L1CacheInfo> cache =
         IREE::GPU::getL1CacheInfo(gpuTarget);
     if (!cache) {
-      return IREE::Encoding::IdentityEncodingAttr::get(ctx);
+      return IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
     }
     return GPUPadLayoutAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
   }
