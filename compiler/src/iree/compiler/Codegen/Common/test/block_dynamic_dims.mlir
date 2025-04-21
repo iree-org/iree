@@ -308,3 +308,44 @@ func.func @check_ssa_violation(%dim : index,
 //  CHECK-SAME:       ins(%[[EXPANDED0]], %[[EXPANDED1]] :
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_reshapes_with_bindings() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = util.assume.int
+      %0<umin = 16, umax = 4080, udiv = 16>
+    : index
+  %3 = flow.dispatch.workload.ordinal %2, 0 : index
+  %4 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%3}
+  %5 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%3}
+  %6 = flow.dispatch.tensor.load %4, offsets = [0], sizes = [%3], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%3} -> tensor<?xf32>
+  %7 = tensor.empty(%3) : tensor<?xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0 floordiv 2)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?xf32>
+  flow.dispatch.tensor.store %8, %5, offsets = [0], sizes = [%3], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%3}
+  return                                                                                                                                                                              }
+// Reshapes can't fuse with non-projected permutation indexing maps. Check that
+// the reshapes are folded back into the bindings.
+//
+// CHECK-LABEL: func @fold_reshapes_with_bindings()
+//       CHECK:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(0)
+//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?xf32>>{%[[DIM:.+]]}
+//       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(1)
+//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
+//       CHECK:   %[[INPUT_TENSOR:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
+//  CHECK-SAME:       sizes = [%[[DIM]]]
+//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?xf32>>{%[[DIM]]}
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?xf32>)
+//       CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
+//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
