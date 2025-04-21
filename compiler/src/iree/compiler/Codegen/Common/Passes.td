@@ -597,6 +597,15 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+def ResolveSwizzleHintsPass :
+    InterfacePass<"iree-codegen-resolve-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Resolves iree_codegen.swizzle_hint ops";
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+  ];
+}
+
 def StripCompilationInfoPass :
     Pass<"iree-codegen-strip-compilation-info", "">{
    let summary = "Remove all the the lowering configuration and translation info attributes.";

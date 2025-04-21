@@ -82,6 +82,7 @@ iree_lit_test_suite(
             "rematerialize_parallel_ops.mlir",
             "remove_dead_allocs.mlir",
             "remove_trivial_loops.mlir",
+            "resolve_swizzle_hints.mlir",
             "repeated_matcher_use.mlir",
             "replace_slow_min_max_ops.mlir",
             "strip_compilation_info.mlir",
