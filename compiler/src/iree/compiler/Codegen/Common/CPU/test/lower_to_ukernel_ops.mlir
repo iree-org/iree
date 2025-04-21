@@ -554,7 +554,8 @@ func.func @query_tile_sizes_2d() -> (index, index)  attributes {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], layouts = [#iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [-9223372036854775808, -9223372036854775808], outerDimsPerm = [0, 1]}}>]>
+#encoding_attr = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.layout<[#iree_cpu.vmvx_encoding_layout<configuration = {encoding_attr = #encoding_attr, encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [-9223372036854775808, -9223372036854775808], outerDimsPerm = [0, 1]}}>]>
 func.func @query_tile_sizes_2d_with_layouts() -> (index, index)  attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {

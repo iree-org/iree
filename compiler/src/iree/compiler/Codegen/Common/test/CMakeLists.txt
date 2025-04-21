@@ -33,6 +33,7 @@ iree_lit_test_suite(
     "decompose_boundary_pack_unpack_ops.mlir"
     "decompose_conv2d.mlir"
     "decompose_linalg_generic.mlir"
+    "decompose_memref.mlir"
     "decompose_pack_unpack_ops.mlir"
     "decompose_softmax.mlir"
     "eliminate_empty_tensors.mlir"
@@ -58,6 +59,7 @@ iree_lit_test_suite(
     "link_tuning_specs.mlir"
     "llvmcpu_materialize_encoding.mlir"
     "lower_ukernel_to_calls.mlir"
+    "lowering_config_interpreter.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_encoding_into_padding.mlir"
     "materialize_tuning_specs.mlir"
@@ -78,6 +80,7 @@ iree_lit_test_suite(
     "remove_trivial_loops.mlir"
     "repeated_matcher_use.mlir"
     "replace_slow_min_max_ops.mlir"
+    "resolve_swizzle_hints.mlir"
     "strip_compilation_info.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
@@ -106,6 +109,7 @@ iree_lit_test_suite(
   DATA
     batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
+    external_strategy_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir

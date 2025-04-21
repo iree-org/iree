@@ -14,6 +14,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -272,6 +273,53 @@ IREE::transform_dialect::MatchCastCompatibleTypesOp::matchValue(
 }
 
 //===----------------------------------------------------------------------===//
+// MatchDimBoundsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchDimBoundsOp::matchValue(
+    Value current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  auto shapedType = dyn_cast<ShapedType>(current.getType());
+  if (!shapedType) {
+    return emitSilenceableError()
+           << "type " << current.getType() << " is not a shaped type";
+  }
+  int64_t dim = getDim();
+  if (dim >= shapedType.getRank()) {
+    return emitSilenceableError()
+           << "dim " << dim << " out of range for shaped type " << shapedType;
+  }
+  if (std::optional<int64_t> lb = getLowerBound()) {
+    auto constantLb = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::LB, {current, /*dim=*/dim},
+        /*stopCondition=*/nullptr, /*closedLB=*/true);
+    if (failed(constantLb)) {
+      return emitSilenceableError()
+             << "failed to compute constant lower bound for dim " << dim;
+    }
+    if (lb.value() > constantLb.value()) {
+      return emitSilenceableError()
+             << "dim " << dim << " is not >= " << lb.value();
+    }
+  }
+  if (std::optional<int64_t> ub = getUpperBound()) {
+    auto constantUb = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB, {current, /*dim=*/dim},
+        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(constantUb)) {
+      return emitSilenceableError()
+             << "failed to compute constant upper bound for dim " << dim;
+    }
+    if (ub.value() < constantUb.value()) {
+      return emitSilenceableError()
+             << "dim " << dim << " is not <= " << ub.value();
+    }
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
 // MatchDimIsMultipleOfOp
 //===----------------------------------------------------------------------===//
 
@@ -285,7 +333,7 @@ IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
            << "type " << current.getType() << " is not a shaped type";
   }
   int64_t dim = getDim();
-  if (dim > shapedType.getRank()) {
+  if (dim >= shapedType.getRank()) {
     return emitSilenceableError()
            << "dim " << dim << " out of range for shaped type " << shapedType;
   }

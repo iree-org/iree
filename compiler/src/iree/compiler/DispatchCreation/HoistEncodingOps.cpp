@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -188,9 +189,16 @@ void HoistEncodingOpsPass::runOnOperation() {
 
   SmallVector<IREE::Encoding::SetEncodingOp> candidates;
   funcOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
-    if (setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
-      candidates.push_back(setEncodingOp);
+    if (!setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+      return;
     }
+    Operation *src = setEncodingOp.getSource().getDefiningOp();
+    if (!hoistEncodingsForConstExpr && src &&
+        (isa<IREE::Util::GlobalLoadOp>(src) ||
+         src->hasTrait<OpTrait::ConstantLike>())) {
+      return;
+    }
+    candidates.push_back(setEncodingOp);
   });
   IRRewriter rewriter(ctx);
   for (auto setEncodingOp : candidates) {

@@ -56,7 +56,7 @@ static void collectTiledAndFusedOps(Operation *rootOp,
 /// Tile the root operation and fuse the producers of the root operation.
 /// If `onlyFuseProducerInputOperands` is set, only fuse producer input
 /// operands. Returns the tiled operation to be used for fusing consumers.
-FailureOr<Operation *>
+static FailureOr<scf::SCFTileAndFuseResult>
 tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
                          int64_t tilingLevel,
                          bool onlyFuseProducerInputOperands) {
@@ -136,10 +136,11 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
     }
   }
 
-  return tiledResults->tiledAndFusedOps.front();
+  return tiledResults;
 }
 
-static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
+static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
+                          MutableArrayRef<LoopLikeOpInterface> loops) {
 
   //  Typically, the consumers of the tiled operation are slices of the
   //  results of the tiled operation. These are expressed in IR using
@@ -169,7 +170,8 @@ static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp);
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
+                                              loops);
     if (failed(fusedResult)) {
       LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
                               << candidateSliceOp << "\n");
@@ -196,14 +198,17 @@ static LogicalResult tileRootAndFuse(IRRewriter &rewriter,
                                      int64_t tilingLevel,
                                      bool onlyFuseProducerInputOperands) {
 
-  FailureOr<Operation *> tiledOp = tileRootAndFuseProducers(
-      rewriter, rootOp, tilingLevel, onlyFuseProducerInputOperands);
+  FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+      tileRootAndFuseProducers(rewriter, rootOp, tilingLevel,
+                               onlyFuseProducerInputOperands);
 
-  if (failed(tiledOp))
+  if (failed(tileAndFuseResult))
     return failure();
 
-  if (!onlyFuseProducerInputOperands)
-    fuseConsumers(rewriter, tiledOp.value());
+  if (!onlyFuseProducerInputOperands) {
+    fuseConsumers(rewriter, tileAndFuseResult->tiledAndFusedOps.front(),
+                  tileAndFuseResult->loops);
+  }
 
   return success();
 }

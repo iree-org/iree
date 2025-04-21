@@ -541,8 +541,9 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
           .getResults();
 
   // Wait forever for signal.
-  rewriter.create<IREE::HAL::FenceAwaitOp>(loc, rewriter.getI32Type(),
-                                           timeoutMillis, signalFence);
+  rewriter.create<IREE::HAL::FenceAwaitOp>(
+      loc, rewriter.getI32Type(), timeoutMillis,
+      IREE::HAL::WaitFlagBitfield::None, signalFence);
 
   rewriter.create<IREE::Util::ReturnOp>(loc, callResults);
 }

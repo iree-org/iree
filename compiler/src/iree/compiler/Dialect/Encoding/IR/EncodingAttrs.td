@@ -41,6 +41,47 @@ def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
 def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
+
+def LayoutAttr :
+    IREEEncoding_Attr<"Layout", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "isIdentityLayout",
+        "calculateStorageSizeInBytes",
+      ]>
+    ]> {
+  let mnemonic = "layout";
+  let assemblyFormat = "`<` $layouts `>`";
+
+  let summary = [{Indicates potential serialized layouts}];
+  let description = [{
+    This attribute describes the potential layouts of the encoding. It is an
+    array because a device could have multiple target layouts.
+
+    It has a verifier that will ensure that all the attributes in layouts
+    implement SerializableEncodingAttrInterface.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "Serialized layouts">:$layouts
+  );
+
+  // Implement custom builders to bypass the verification assertion in Base::get
+  // method, i.e., `assert(succeeded(ConcreteT::verifyInvariants(...)))`.
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "ArrayAttr":$layouts)>,
+  ];
+
+  let genVerifyDecl = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
 
 def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let mnemonic = "packed_storage";
@@ -52,13 +93,18 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let genVerifyDecl = 0;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_encoding.encoding
+//===---------------------------------------------------------------------===//
+
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
         "isSerialized",
-        "isIdentityLayout",
         "cloneWithLayouts",
-        "calculateStorageSizeInBytes",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
+        "getReductionDims",
       ]>
     ]> {
   let mnemonic = "encoding";
@@ -79,23 +125,15 @@ def EncodingAttr :
     - The maps in `user_indexing_maps` should be composable.
   }];
 
-  let assemblyFormat = "`<` struct(params) `>`";
+  let hasCustomAssemblyFormat = 1;
 
   let parameters = (ins
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
-    // TODO(#19897): Switch round_dims_to to iteration_sizes.
-    // Note that today we abuse the attribute to carry narrow matrix
-    // information. The end goal is deprecating the field and add a
-    // "iteration_sizes" field to describe the shape. It is useful to
-    // handle narrow matrix cases.
-    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to,
-    OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
-    "layouts of the encoding. It is an array because a device could have "
-    "multiple target device. Note that it can be any attribute that "
-    "implements SerializableEncodingAttrInterface.">:$layouts
+    OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes
   );
 
   let builders = [
@@ -103,8 +141,7 @@ def EncodingAttr :
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo,
-        CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
+        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes)>
   ];
 
   let extraClassDeclaration = [{
@@ -128,8 +165,8 @@ def EncodingAttr :
     /// matching index of the given encoding's tensor, using getMapForOperandIndex.
     std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos) const;
 
-    /// Returns an integer array with values in `round_dims_to`.
-    ArrayRef<int64_t> getRoundDimsToArray() const;
+    /// Returns an integer array with values in `iteration_sizes`.
+    SmallVector<int64_t> getIterationSizesArray() const;
 
     /// Returns a vector with values in `element_types`.
     SmallVector<Type> getElementTypesArray();
@@ -143,7 +180,68 @@ def EncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.pad_encoding_layout
+// iree_encoding.matmul_k
+//===---------------------------------------------------------------------===//
+
+def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+        "isSerialized",
+        "cloneWithLayouts",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
+        "getReductionDims",
+      ]>,
+    ]> {
+  let mnemonic = "matmul_k";
+  let summary = [{An attribute that tracks reduction dimensions for matmul}];
+  let description = [{
+    The attribute is specialized for tracking the matmul reduction dimensions
+    only. The encoded dimensions are the reduction dimensions that will be
+    further used in a matmul.
+
+    Example: linalg.matmul ins(%lhs, %rhs) outs(%acc), where the indexing maps
+             are:
+
+      lhs: (M, N, K) -> (M, K)
+      rhs: (M, N, K) -> (K, N)
+      acc: (M, N, K) -> (M, N)
+
+    The encoding for the lhs is iree_encoding.matmul_k<k_dims = [1]>.
+    The encoding for the rhs is iree_encoding.matmul_k<k_dims = [0]>.
+    The encoding for the acc is iree_encoding.matmul_k<k_dims = []>.
+
+    Example: linalg.matmul_transpose_b ins(%lhs, %rhs) outs(%acc), where the
+             indexing maps are:
+
+      lhs: (M, N, K) -> (M, K)
+      rhs: (M, N, K) -> (N, K)
+      acc: (M, N, K) -> (M, N)
+
+    The encoding for the lhs is iree_encoding.matmul_k<k_dims = [1]>.
+    The encoding for the rhs is iree_encoding.matmul_k<k_dims = [1]>.
+    The encoding for the acc is iree_encoding.matmul_k<k_dims = []>.
+
+    There is no difference between static cases and dynamic cases because the
+    dimension sizes are not encoded.
+
+    Any encoding propagation that transforms reduction dimensions could result
+    in undefined behavior, because it does not encode the transformations. The
+    information is missing in this context.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    "DenseI32ArrayAttr":$k_dims
+  );
+
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<int32_t>":$k_dims)>
+  ];
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
@@ -183,7 +281,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.identity_encoding
+// iree_encoding.identity_encoding
 //===---------------------------------------------------------------------===//
 
 def IdentityEncodingAttr :
@@ -204,7 +302,7 @@ def IdentityEncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.unsupported_encoding
+// iree_encoding.unsupported_encoding
 //===---------------------------------------------------------------------===//
 
 def UnsupportedEncodingAttr :
@@ -271,33 +369,32 @@ def UnspecializedEncodingAttr :
       ]>
     ]> {
   let mnemonic = "unspecialized_encoding";
+  let assemblyFormat = "`<` $seed `>`";
 
   let summary = "An attribute that indicates the encoding is not yet specialized";
 
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
-    very basic interface methods of EncodingLayoutResolverAttrInterface that converts
-    it to the SpecializeEncodingAttr during encoding specialization. It is
-    mainly for testing purpose as some transformations do not depend on actual
-    dialects that implement the attribute interface.
+    very basic interface methods of EncodingLayoutResolverAttrInterface that
+    converts it to the SpecializeEncodingAttr during encoding specialization.
+    It is mainly for testing purpose as some transformations do not depend on
+    actual dialects that implement the attribute interface.
+
+    Different seed values indicate different layouts.
   }];
 
-  let parameters = (ins
-    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
-    "Different seed values indicate different layouts.">:$seed
-  );
-
-  let hasCustomAssemblyFormat = 1;
-  let genVerifyDecl = 0;
+  let parameters = (ins "int32_t":$seed);
 }
 
 def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "getLayout",
-      ]>
+      ]>,
+      IREEEncoding_SerializableEncodingAttrInterface
     ]> {
   let mnemonic = "specialized_encoding";
+  let assemblyFormat = "`<` $seed (`,` $type^)? `>`";
 
   let summary = "An attribute that indicates the encoding is specialized";
 
@@ -306,16 +403,14 @@ def SpecializedEncodingAttr :
     type. The attribute denotes the layout of the type. Different seed values
     indicate different layouts, which can be used to emulate different encoding
     attributes.
+
+    Different seed values indicate different layouts.
   }];
 
   let parameters = (ins
-    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
-    "Different seed values indicate different layouts.">:$seed,
-    AttrParameter<"TypeAttr", "">:$type
+    "int32_t":$seed,
+    OptionalParameter<"TypeAttr", "">:$type
   );
-
-  let hasCustomAssemblyFormat = 1;
-  let genVerifyDecl = 0;
 }
 
 #endif // IREE_DIALECT_ENCODING_ATTRS

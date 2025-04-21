@@ -160,15 +160,25 @@ func.func @set_encoding_ops_with_indexing_maps(%arg0: tensor<?x?xf32>) -> tensor
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], layouts = [{}]>
-func.func @set_encoding_ops_with_layouts(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [1, 1, 1]>
+#encoding1 = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, ?, ?]>
+#encoding2 = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, 1, ?]>
+func.func @set_encoding_ops_with_iteration_sizes(%arg0: tensor<?x?xf32>) {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  return %0 : tensor<?x?xf32, #encoding>
+  %1 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding1>
+  %2 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding2>
+  return
 }
-// CHECK-DAG:   #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], layouts = [{}]>
-// CHECK:       func.func @set_encoding_ops_with_layouts(
+// CHECK-DAG:   #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]], iteration_sizes = [1, 1, 1]>
+// CHECK-DAG:   #[[ENCODING1:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]], iteration_sizes = [?, ?, ?]>
+// CHECK-DAG:   #[[ENCODING2:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]], iteration_sizes = [?, 1, ?]>
+// CHECK:       func.func @set_encoding_ops_with_iteration_sizes(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]:
 // CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+// CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING1]]>
+// CHECK:         iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING2]]>
 
 // -----
 
@@ -219,5 +229,27 @@ func.func @testing_encoding_with_layouts(%arg0: tensor<?x?xf32, #encoding>) -> t
 }
 // CHECK:     #[[ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.unspecialized_encoding<123>]>
 // CHECK:      func.func @testing_encoding_with_layouts(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
+// CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.matmul_k<k_dims = [1]>
+func.func @matmul_k_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:     #[[ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
+// CHECK:      func.func @matmul_k_encoding(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
+// CHECK         return %[[ARG0]]
+
+// -----
+
+#encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+func.func @layout_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+// CHECK:     #[[ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+// CHECK:      func.func @layout_encoding(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK         return %[[ARG0]]

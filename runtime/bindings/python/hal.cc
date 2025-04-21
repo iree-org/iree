@@ -559,10 +559,11 @@ void HalDevice::QueueExecute(py::handle command_buffer,
           ? py::cast<HalCommandBuffer*>(command_buffer)->raw_ptr()
           : NULL;
 
-  CheckApiStatus(iree_hal_device_queue_execute(
-                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, cb, iree_hal_buffer_binding_table_empty()),
-                 "executing command buffers");
+  CheckApiStatus(
+      iree_hal_device_queue_execute(
+          raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list, cb,
+          iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE),
+      "executing command buffers");
 }
 
 void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,

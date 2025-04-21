@@ -1531,9 +1531,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -1561,9 +1560,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -1591,9 +1589,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -1652,9 +1649,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -1682,9 +1678,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -1712,9 +1707,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -1742,11 +1736,68 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-input-demote-f64-to-f32=false"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna3_pad_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling=true"
+    "--iree-hip-encoding-layout-resolver=pad"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna3_pad_i8
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--acc_type=i32"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling=true"
+    "--iree-hip-encoding-layout-resolver=pad"
   LABELS
     "noasan"
     "nomsan"
@@ -1874,9 +1925,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
@@ -1907,9 +1957,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -2099,9 +2148,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
@@ -2132,9 +2180,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
@@ -2165,9 +2212,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
+    "--iree-opt-data-tiling=false"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"

@@ -52,6 +52,7 @@ iree_cc_library(
     ::LoweringConfigInterfaceGen
     ::UKernelOpsGen
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
     MLIRBufferizationDialect

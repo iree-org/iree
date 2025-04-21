@@ -341,7 +341,7 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This converts slices of operations containing vector.contract op into
-    mma operations, targetting warp level tensorcore operations. If the vector
+    mma operations, targeting warp level tensorcore operations. If the vector
     operations are bigger than the native mma size it will first split up those
     vector operations.
 

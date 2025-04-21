@@ -27,6 +27,9 @@ hal.executable private @static {
     builtin.module {
 // CHECK-LABEL: func.func @static()
       func.func @static() {
+// CHECK-NEXT: gpu.lane_id upper_bound 32
+        %lane_id = gpu.lane_id
+
 // CHECK-NEXT: gpu.thread_id x upper_bound 64
 // CHECK-NEXT: gpu.thread_id y upper_bound 2
 // CHECK-NEXT: gpu.thread_id z upper_bound 1
@@ -61,6 +64,42 @@ hal.executable private @static {
         %workgroup_conut_x = hal.interface.workgroup.count[0] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
+
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+// Note: not the real target definition, missing types
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
+  wgp = <compute =  fp32,
+    storage =  b32,
+    subgroup =  arithmetic,
+    dot =  none, mma = [],
+    subgroup_size_choices = [32, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+
+hal.executable private @manual_subgroup_size {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target) {
+    hal.executable.export public @manual_subgroup_size ordinal(0) layout(#pipeline_layout) attributes {subgroup_size = 64 : index} {
+    ^bb0(%arg0: !hal.device):
+      %c32 = arith.constant 32 : index
+      %c8 = arith.constant 8 : index
+      %c1 = arith.constant 1 : index
+      hal.return %c32, %c8, %c1 : index, index, index
+    }
+    builtin.module {
+// CHECK-LABEL: func.func @manual_subgroup_size()
+      func.func @manual_subgroup_size() {
+// CHECK-NEXT: gpu.lane_id upper_bound 64
+        %lane_id = gpu.lane_id
 
         return
       }

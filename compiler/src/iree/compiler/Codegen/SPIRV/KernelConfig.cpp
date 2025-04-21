@@ -86,7 +86,7 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
 //===----------------------------------------------------------------------===//
 
 /// Decides the tiling and distribution parameters for one convolution
-/// dimension. Returns true if we can succesfully deduce.
+/// dimension. Returns true if we can successfully deduce.
 ///
 /// - `inputDim` is the size of the dimension to be distributed.
 /// - `residualThreads` is the remaining threads we can distribute.
@@ -126,7 +126,7 @@ static bool tileConvOneDim(const int64_t inputDim, const bool isInnerMostDim,
 
 /// Decides the tiling and distribution parameters for two convolution window
 /// dimensions to two workgroup dimensions as a square. Returns true if we can
-/// succesfully deduce.
+/// successfully deduce.
 static bool tileConvSquare(const int64_t oh, const int64_t ow,
                            int64_t &residualThreads,
                            int64_t &residualTilingFactor,

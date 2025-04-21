@@ -16,6 +16,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+namespace mlir::iree_compiler::DispatchCreation {
 //===----------------------------------------------------------------------===//
 // Command Line Options
 //===----------------------------------------------------------------------===//
@@ -40,14 +41,6 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     "iree-dispatch-creation-enable-fuse-padding-into-linalg-producer-ops",
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
-
-static llvm::cl::opt<int> clPadFactor(
-    "iree-dispatch-creation-pad-factor",
-    llvm::cl::desc("Provides padding size hints that will be attached to "
-                   "encodings. This only affects the experimental data tiling "
-                   "path in DispatchCreation with "
-                   "iree-dispatch-creation-experimental-data-tiling."),
-    llvm::cl::init(32));
 
 static llvm::cl::opt<bool> clEnablePadHandling(
     "iree-flow-enable-pad-handling",
@@ -80,7 +73,23 @@ static llvm::cl::opt<bool> clEnableDataTiling(
                    "path, --iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(false));
 
-namespace mlir::iree_compiler::DispatchCreation {
+static llvm::cl::opt<bool> clHoistEncodingsForConstExpr(
+    "iree-dispatch-creation-hoist-encodings-for-constexpr",
+    llvm::cl::desc("Enable the hoisting of encoding ops when the source is "
+                   "from globals. To use this path, "
+                   "--iree-opt-data-tiling=false must be set as wells"),
+    llvm::cl::init(true));
+
+static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
+    "iree-dispatch-creation-set-encoding-strategy",
+    llvm::cl::desc("Set the encoding strategy for operations."),
+    llvm::cl::values(
+        clEnumValN(
+            DispatchCreation::EncodingOptions::Generic, "generic",
+            "Using EncodingAttr which encodes as much information as possible"),
+        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
+                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -245,16 +254,19 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
-        .addPass([] {
-          return createSetEncodingPass(SetEncodingPassOptions{clPadFactor});
+        .addPass([&]() {
+          return DispatchCreation::createSetEncodingPass(
+              DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
         })
         // SetEncodingOps should not be in the same dispatch as the data-tiled
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
         // broadcasting ops.
-        .addPass(DispatchCreation::createHoistEncodingOpsPass)
-        // After SetEncodingOps are hoisted, try to fuse them with their
-        // producer dispatches to try to hide packing costs.
+        .addPass([&]() {
+          return DispatchCreation::createHoistEncodingOpsPass(
+              HoistEncodingOpsPassOptions{clHoistEncodingsForConstExpr});
+        })
+        .addPass(DispatchCreation::createPropagateEncodingsPass)
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }

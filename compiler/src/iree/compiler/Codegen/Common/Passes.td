@@ -167,6 +167,11 @@ def DecomposeConvolutionToLowerDimOpsPass :
   let summary = "Decomposes linalg convolution ops to lower dim ops";
 }
 
+def DecomposeMemrefsPass :
+    Pass<"iree-codegen-decompose-memrefs", ""> {
+  let summary = "Decomposes memrefs";
+}
+
 def DecomposeLinalgGenericPass :
     Pass<"iree-codegen-decompose-linalg-generic", ""> {
   let summary = "Decomposes linalg generic ops into individual ops";
@@ -446,6 +451,16 @@ def LowerExecutableUsingTransformDialectPass :
   let summary = "Lower executables using the transform dialect recipe provided in the module.";
 }
 
+def LoweringConfigInterpreterPass :
+    Pass<"iree-codegen-lowering-config-interpreter"> {
+  let summary = "Pass to apply lowering config annotated strategies.";
+  let description = [{
+    This pass runs the transform dialect interpreter and applies the named
+    sequence transformation specified by lowering configs annotated on
+    operations.
+  }];
+}
+
 def LowerUKernelOpsToCallsPass :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
@@ -580,6 +595,15 @@ def RematerializeParallelOpsPass :
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";
+}
+
+def ResolveSwizzleHintsPass :
+    InterfacePass<"iree-codegen-resolve-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Resolves iree_codegen.swizzle_hint ops";
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+  ];
 }
 
 def StripCompilationInfoPass :

@@ -26,6 +26,10 @@ include "mlir/Pass/PassBase.td"
 def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
+  let options = [
+    Option<"enableBubbleUpExpandShapesAcrossReductionOps", "enable-bubble-up-expand-shapes-across-reduction-ops", "bool",
+           /*default=*/"false", "Enables propagation of 'expand_shape's through 'linalg.generic's with reductions">
+  ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
   ];
@@ -54,6 +58,20 @@ def ElementwiseOpFusionPass :
 def FoldUnitExtentDimsPass :
     Pass<"iree-dispatch-creation-fold-unit-extent-dims", "mlir::ModuleOp"> {
   let summary = "Fold unit extent dimension of operations.";
+  let description = [{
+    Imports upstream patterns to fold unit extent dims but with IREE control.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
+def FoldUnitExtentDimsForFuncPass :
+    Pass<"iree-dispatch-creation-fold-unit-extent-dims-for-func", ""> {
+  let summary = "Fold unit extent dimension of operations on a function.";
   let description = [{
     Imports upstream patterns to fold unit extent dims but with IREE control.
   }];
@@ -268,6 +286,10 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
 def HoistEncodingOpsPass :
     InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
   let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
+  let options = [
+    Option<"hoistEncodingsForConstExpr", "hoist-encodings-for-constexpr", "bool", /*default=*/"true",
+           "Enable the hoisting when the source is a ConstExpr.">,
+  ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
@@ -275,9 +297,17 @@ def HoistEncodingOpsPass :
   ];
 }
 
+def PropagateEncodingsPass :
+    InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
+  let summary = "Propagate encodings across other operations.";
+  let dependentDialects = [
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
 
-def SetEncodingPass :
-    InterfacePass<"iree-dispatch-creation-set-encoding", "mlir::FunctionOpInterface"> {
+def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
+                                    "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
@@ -285,8 +315,19 @@ def SetEncodingPass :
     "IREE::Encoding::IREEEncodingDialect",
   ];
   let options = [
-    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
-           "provides padding size hints that will be attached to encodings.">,
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
+                "matmulk", "Only encodes reduction dimensions in the encoding."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
   ];
 }
 
