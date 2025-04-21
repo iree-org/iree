@@ -95,7 +95,9 @@ iree_status_t CPUClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
 }
 
 bool CPUClientInstance::SetDefaultCompilerFlags(CompilerJob* compiler_job) {
-  return compiler_job->SetFlag("--iree-hal-target-backends=llvm-cpu") &&
+  return compiler_job->SetFlag("--iree-hal-target-device=local") &&
+         compiler_job->SetFlag(
+             "--iree-hal-local-target-device-backends=llvm-cpu") &&
          compiler_job->SetFlag("--iree-llvmcpu-target-cpu=host");
 }
 

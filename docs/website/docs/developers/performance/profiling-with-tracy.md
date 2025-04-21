@@ -138,7 +138,7 @@ be built from source by using either the upstream CMake build or IREE's
     # basis, typically coming from the input .mlir or .py file.
 
     iree-compile program_input.mlir \
-      --iree-hal-target-backends={target} \
+      --iree-hal-target-device={target} \
       --iree-hal-executable-debug-level=3 \
       -o program.vmfb
     ```
@@ -214,8 +214,9 @@ allocation:
 
 #### Options for the `llvm-cpu` backend
 
-When using the `llvm-cpu` backend (`--iree-hal-target-backends=llvm-cpu` with
-`--device=local-task` or `--device=local-sync`), these options are available:
+When using the `llvm-cpu` backend (`--iree-hal-target-device=local` and
+`--iree-hal-local-target-device-backends=llvm-cpu` with `--device=local-task` or
+`--device=local-sync`), these options are available:
 
 * The `--iree-llvmcpu-link-embedded=false` flag uses the "system" linker
     (.so/.dylib/.dll) instead of the generic
@@ -232,7 +233,8 @@ Putting those flags and environment variables together in an example:
 
 ```shell hl_lines="2-5 8"
 iree-compile program_input.mlir \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-hal-executable-debug-level=3 \
   --iree-llvmcpu-link-embedded=false \
   --iree-llvmcpu-debug-symbols=true \
@@ -258,6 +260,16 @@ adb forward tcp:8086 tcp:8086
 
 You can also pass `-p <port>` to the capture tool to override the default port
 to connect to, or use the Tracy GUI which scans other ports too.
+
+The `TRACY_PORT` environment variable can be used to change the port used by the
+client application. For example, to run `iree-benchmark-module` on port 1234:
+
+```shell
+TRACY_PORT=1234 iree-benchmark-module \
+  --device=local-task \
+  --module=out.vmfb \
+  ...
+```
 
 ## :octicons-graph-16: Touring the Tracy profiler UI
 

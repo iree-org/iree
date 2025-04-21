@@ -1,0 +1,27 @@
+{
+    "inputs": [
+        "1x64xi64",
+        "1x64xi64",
+        "1x64xi64",
+        "1x64xi64"
+    ],
+    "function_run": "encode_prompts",
+    "benchmark_flags": [
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+        "--device_allocator=caching"
+    ],
+    "device": "local-task",
+    "golden_time_tolerance_multiplier": {
+        "cpu": 1.1
+    },
+    "golden_time_ms": {
+        "cpu": 410.0
+    },
+    "golden_dispatch": {
+        "cpu": 2100
+    },
+    "golden_size": {
+        "cpu": 540000
+    }
+}

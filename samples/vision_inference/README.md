@@ -4,7 +4,7 @@ This sample demonstrates how to run a MNIST handwritten digit detection vision
 model on an image using IREE's command line tools.
 
 A similar sample is implemented in C code over in the iree-experimental repository
-at https://github.com/iree-org/iree-experimental/tree/main/cpp/vision_inference
+at <https://github.com/iree-org/iree-experimental/tree/main/cpp/vision_inference>
 
 * This version of the sample uses a Python script to convert an image into the
   expected format then runs the compiled MNIST program through IREE's command
@@ -21,7 +21,8 @@ From this directory:
 iree-compile \
     ../models/mnist.mlir \
     --iree-input-type=stablehlo \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     -o /tmp/mnist_cpu.vmfb
 
 # Convert the test image to the 1x28x28x1xf32 buffer format the program expects.

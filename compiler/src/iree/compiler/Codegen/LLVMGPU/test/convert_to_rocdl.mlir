@@ -272,3 +272,36 @@ module {
 }
 //   CHECK-LABEL: llvm.func @null_pointer
 //   CHECK:       llvm.mlir.zero : !llvm.ptr
+
+// -----
+
+module {
+  func.func private @foo(vector<4xf32>)
+  func.func @swap_mfma() {
+    %in = arith.constant 1.0 : f32
+    %out = arith.constant dense<0.0> : vector<4xf32>
+    rocdl.s.setprio 1 { iree_gpu.swap_mfma = -10 }
+    rocdl.s.setprio 2 { iree_gpu.swap_mfma = 1 }
+    rocdl.s.setprio 3 { iree_gpu.swap_mfma = 2 }
+    rocdl.s.setprio 4 { iree_gpu.swap_mfma = 5 }
+    %0 = amdgpu.mfma %in * %in + %out {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    %1 = amdgpu.mfma %in * %in + %0 {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    %2 = amdgpu.mfma %in * %in + %1 {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    call @foo(%2) : (vector<4xf32>) -> ()
+    return
+  }
+}
+//   CHECK-LABEL: llvm.func @swap_mfma
+//   CHECK:         rocdl.s.setprio 1
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 2
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 3
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 4

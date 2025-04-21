@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -55,6 +56,16 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     newShape.append(swizzledTileShape);
     return RankedTensorType::get(newShape, packedType.getElementType());
   });
+  addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
+                    -> IREE::Flow::DispatchTensorType {
+    Type boundType = dispatchTensorType.getBoundType();
+    Type convertedBoundType = convertType(boundType);
+    if (convertedBoundType == boundType) {
+      return dispatchTensorType;
+    }
+    return IREE::Flow::DispatchTensorType::get(dispatchTensorType.getAccess(),
+                                               convertedBoundType);
+  });
 }
 
 MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
@@ -65,9 +76,11 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   markUnknownOpDynamicallyLegal([](Operation *op) {
     auto typeHasDataTilingEncoding = [](Type t) -> bool {
       auto tensorType = dyn_cast<RankedTensorType>(t);
-      if (!tensorType)
+      if (!tensorType || !tensorType.getEncoding()) {
         return false;
-      return getEncodingAttr(tensorType) != nullptr;
+      }
+      return isa<IREE::Encoding::ContractionEncodingAttrInterface,
+                 IREE::Encoding::LayoutAttr>(tensorType.getEncoding());
     };
     auto valueHasDataTilingEncoding = [=](Value v) -> bool {
       return typeHasDataTilingEncoding(v.getType());
@@ -92,15 +105,12 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
 
 std::optional<IREE::Codegen::MaterializeEncodingInfo>
 getEncodingInfoFromLayouts(RankedTensorType type) {
-  auto encodingAttr = IREE::Encoding::getEncodingAttr(type);
-  if (!encodingAttr) {
+  auto layoutAttr =
+      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
+  if (!layoutAttr) {
     return std::nullopt;
   }
-  ArrayAttr layoutsAttr = encodingAttr.getLayouts();
-  if (!layoutsAttr) {
-    return std::nullopt;
-  }
-  ArrayRef<Attribute> layouts = layoutsAttr.getValue();
+  ArrayRef<Attribute> layouts = layoutAttr.getLayouts().getValue();
   assert(layouts.size() == 1 && "only single layout is supported");
   if (auto layout = dyn_cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])) {
     return layout.getEncodingInfo(type);

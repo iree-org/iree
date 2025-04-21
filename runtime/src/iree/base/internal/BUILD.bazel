@@ -164,6 +164,7 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_binary(
     name = "flags_demo",
+    testonly = True,
     srcs = ["flags_demo.c"],
     deps = [
         ":flags",

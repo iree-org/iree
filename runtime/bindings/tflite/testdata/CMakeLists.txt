@@ -20,7 +20,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-native-bindings-support=false"
     "--iree-tflite-bindings-support"
-    "--iree-hal-target-backends=vmvx"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=vmvx"
   PUBLIC
   TESTONLY
 )
@@ -35,7 +36,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-native-bindings-support=false"
     "--iree-tflite-bindings-support"
-    "--iree-hal-target-backends=vmvx"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=vmvx"
   PUBLIC
   TESTONLY
 )
@@ -50,7 +52,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-native-bindings-support=false"
     "--iree-tflite-bindings-support"
-    "--iree-hal-target-backends=vmvx"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=vmvx"
   PUBLIC
   TESTONLY
 )

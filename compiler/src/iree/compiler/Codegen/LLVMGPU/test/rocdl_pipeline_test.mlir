@@ -88,10 +88,10 @@ hal.executable @dot_dispatch_0 {
 //         RDNA3:   hal.executable.variant public @rocm
 //       RDNA3-NOT:   llvm.store
 //           RDNA3:   llvm.br
-//   RDNA3-COUNT-1:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<32xf32>
-//  RDNA3-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<16xf32>
+//   RDNA3-COUNT-1:    llvm.load {{.*}} : !llvm.ptr<7> -> vector<32xf32>
+//  RDNA3-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<7> -> vector<16xf32>
 //  RDNA3-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
-//   RDNA3-COUNT-1:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<1>
+//   RDNA3-COUNT-1:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<7>
 //           RDNA3:   llvm.br
 
 // -----
@@ -135,9 +135,10 @@ hal.executable @ceildiv_expand_dispatch {
 //   CDNA3-LABEL: hal.executable public @ceildiv_expand_dispatch
 //         CDNA3:   hal.executable.variant public @rocm
 //     CDNA3-NOT:     arith.ceildivsi
-// CDNA3-COUNT-1:     llvm.select {{.*}} : vector<1xi1>, vector<1xi32>
-// CDNA3-COUNT-2:     llvm.sdiv {{.*}} : vector<1xi32>
-// CDNA3-COUNT-4:     llvm.icmp {{.*}} : vector<1xi32>
-// CDNA3-COUNT-2:     llvm.and {{.*}} : vector<1xi1>
-// CDNA3-COUNT-1:     llvm.or {{.*}} : vector<1xi1>
+// CDNA3-COUNT-1:     llvm.sdiv {{.*}} : vector<1xi32>
+// CDNA3-COUNT-1:     llvm.mul {{.*}} : vector<1xi32>
+// CDNA3-COUNT-3:     llvm.icmp {{.*}} : vector<1xi32>
+// CHECK-COUNT-1:     llvm.icmp {{.*}} : vector<1xi1>
+// CDNA3-COUNT-1:     llvm.and {{.*}} : vector<1xi1>
+// CDNA3-COUNT-1:     llvm.add {{.*}} : vector<1xi32>
 // CDNA3-COUNT-1:     llvm.select {{.*}} : vector<1xi1>, vector<1xi32>

@@ -375,13 +375,14 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
 
   // Queue execution.
   funcBuilder.create<IREE::HAL::DeviceQueueExecuteOp>(
-      loc, device, queueAffinity, waitFence, signalFence,
-      ValueRange{commandBuffer});
+      loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
+      IREE::HAL::ExecuteFlagBitfield::None);
 
   // Block until it completes.
   Value timeoutMillis = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 32);
   auto fenceOp = funcBuilder.create<IREE::HAL::FenceAwaitOp>(
-      loc, funcBuilder.getI32Type(), timeoutMillis, signalFence);
+      loc, funcBuilder.getI32Type(), timeoutMillis,
+      IREE::HAL::WaitFlagBitfield::None, signalFence);
   funcBuilder.create<IREE::Util::StatusCheckOkOp>(
       loc, fenceOp.getStatus(), "failed to wait on timepoint");
 

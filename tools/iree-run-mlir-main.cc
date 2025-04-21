@@ -20,7 +20,7 @@
 // Similar to iree-run-module the --device= flag can be used to specify which
 // drivers and devices should be used to execute the function. The tool will
 // try to infer which iree-compile flags are required for the devices used but
-// this can be overridden by passing the --iree-hal-target-backends= and related
+// this can be overridden by passing the --iree-hal-target-device= and related
 // flags explicitly. Likewise if only the target backend is specified the
 // devices to use will be inferred unless explicitly specified.
 //
@@ -28,7 +28,7 @@
 // $ iree-run-mlir --device=cuda://0 file.mlir
 // or to compile with the LLVM CPU backend and run with the local-task driver:
 // $ iree-run-mlir file.mlir \
-//       --Xcompiler,iree-hal-target-backends=llvm-cpu --device=local-task
+//       --Xcompiler,iree-hal-target-device=hip --device=hip:0
 //
 // Example usage in a lit test:
 //   // RUN: iree-run-mlir --device= %s --function=foo --input=2xf32=2,3 | \
@@ -42,7 +42,8 @@
 // Command line arguments are handled by LLVM's parser by default but -- can be
 // used to separate the compiler flags from the runtime flags, such as:
 // $ iree-run-mlir source.mlir --device=local-task -- \
-//       --iree-hal-target-backends=llvm-cpu
+//       --iree-hal-target-device=local \
+//       --iree-hal-local-target-device-backends=llvm-cpu
 //
 // In addition compiler/runtime flags can be passed in any order by prefixing
 // them with --Xcompiler or --Xruntime like `--Xruntime,device=local-task` or
@@ -114,7 +115,7 @@ std::string InferTargetBackendFromDevice(iree_string_view_t device_uri) {
   } else if (iree_string_view_starts_with(driver, IREE_SV("local-"))) {
     // Locally-executable devices default to the llvm-cpu target as that's
     // usually what people want for CPU execution; users can override by
-    // specifying --iree-hal-target-backends=vmvx instead.
+    // specifying --iree-hal-local-target-device-backends=vmvx instead.
     return "llvm-cpu";
   }
   // Many other backends have aliases that allow using the driver name. If there

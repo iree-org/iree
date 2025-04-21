@@ -171,8 +171,12 @@ func.func @foo(
 
 Compile it like this:
 
-```bash
-iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+```console
+$ iree-compile \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  prog.mlir \
+  -o /tmp/prog.vmfb
 ```
 
 !!! note
@@ -181,7 +185,7 @@ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
     trying to maximize performance.
 
     * To run on GPU or other non-CPU targets, explore other values for
-      `--iree-hal-target-backends=`. You will then need to pass a matching
+      `--iree-hal-target-device=`. You will then need to pass a matching
       `--device=` to `iree-run-module` below.
     * To cross-compile, explore `--iree-llvmcpu-target-triple=`.
     * To enable higher CPU performance by enabling CPU features:
@@ -258,7 +262,9 @@ only requirement is that both inputs have the same length, otherwise the
 `linalg.generic` will have undefined behavior.
 
 ```console
-$ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
 $ iree-run-module --module=/tmp/prog.vmfb \
   --input=10xf32=[0,1,2,3,4,5,6,7,8,9] \
   --input=10xf32=[90,80,70,60,50,40,30,20,10,0]
@@ -308,7 +314,9 @@ func.func @foo(
 ```
 
 ```console
-$ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
 $ iree-run-module --module=/tmp/prog.vmfb \
   --input=10xf32=[0,1,2,3,4,5,6,7,8,9] \
   --input=10xf32=[90,80,70,60,50,40,30,20,10,0]
@@ -368,7 +376,9 @@ func.func @foo(
 ```
 
 ```console
-$ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
 $ iree-run-module --module=/tmp/prog.vmfb --input=10xf32=[0,1,2,3,4,5,6,7,8,9]
 
 EXEC @foo
@@ -422,7 +432,9 @@ func.func @foo(
 ```
 
 ```console
-$ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
 $ iree-run-module --module=/tmp/prog.vmfb \
   --input=3x5xf32=[[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14]]
 
@@ -455,7 +467,9 @@ func.func @foo(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf3
 ```
 
 ```console
-$ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
 $ iree-run-module --module=/tmp/prog.vmfb \
   --input=2x2xf32=[[1,2][3,4]] \
   --input=2x2xf32=[[1,4][3,2]] \
@@ -568,7 +582,9 @@ module {
 ```
 
 ```console
-$ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
+$ iree-compile prog.mlir -o /tmp/prog.vmfb \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu
 $ iree-run-module --module=/tmp/prog.vmfb \
   --input=2x2xi8=[[-1,-2][-3,-4]] \
   --input=2x2xi8=[[1,4][3,2]] \

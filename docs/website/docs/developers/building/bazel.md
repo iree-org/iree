@@ -238,7 +238,9 @@ and execute a function in the compiled module:
 ```shell
 # iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
 $ ./bazel-bin/tools/iree-run-mlir \
-  --iree-hal-target-backends=vmvx --print-mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
+  --print-mlir \
   ./samples/models/simple_abs.mlir \
   --input=f32=-2
 ```

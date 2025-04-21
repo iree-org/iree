@@ -170,7 +170,8 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
     };
     status = iree_hal_device_queue_execute(
         device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-        signal_list, command_buffer, iree_hal_buffer_binding_table_empty());
+        signal_list, command_buffer, iree_hal_buffer_binding_table_empty(),
+        IREE_HAL_EXECUTE_FLAG_NONE);
   }
 
   if (iree_status_is_ok(status)) {

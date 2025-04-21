@@ -100,6 +100,88 @@ util.func public @tensorBitCastWithSingleUse(%input: tensor<5x24x48xi8>) -> tens
 
 // -----
 
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeStatic
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @tensorEncodeStatic(%input: tensor<30x2x96xf32>) -> tensor<30x2x96xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<30x2x96xf32, #[[$ENCODING]]> : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] : tensor<30x2x96xf32> in !stream.resource<*>{%[[ARG1]]} -> tensor<30x2x96xf32, #[[$ENCODING]]> in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %input : tensor<30x2x96xf32> -> tensor<30x2x96xf32, #encoding>
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<30x2x96xf32, #encoding>
+}
+
+// -----
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeStatic
+// CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @tensorEncodeStatic(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<4x4xf32, #[[$ENCODING]]> : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] : tensor<4x4xf32> in !stream.resource<*>{%[[ARG1]]} -> tensor<4x4xf32, #[[$ENCODING]]> in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %arg0 : tensor<4x4xf32> -> tensor<4x4xf32, #encoding>
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4x4xf32, #encoding>
+}
+
+// -----
+
+// Note: `ARG1` is the size of `ARG0` after the conversion.
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodePartialDynamic
+// CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:.[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @tensorEncodePartialDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2: index) -> tensor<5x?xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<5x?xf32, #[[$ENCODING]]>{%[[ARG2]]} : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] : tensor<?x4xf32>{%[[ARG2]]} in !stream.resource<*>{%[[ARG1]]} -> tensor<5x?xf32, #[[$ENCODING]]>{%[[ARG3]]} in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} -> tensor<5x?xf32, #encoding>{%arg2}
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<5x?xf32, #encoding>
+}
+
+// -----
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncodeFullyDynamic
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D1:[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @tensorEncodeFullyDynamic(%input: tensor<?x?xf32>, %d0: index, %d1: index) -> tensor<?x?xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32, #[[$ENCODING]]>{%[[D0]], %[[D1]]} : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] : tensor<?x?xf32>{%[[D0]], %[[D1]]} in !stream.resource<*>{%[[ARG1]]} -> tensor<?x?xf32, #[[$ENCODING]]>{%[[D0]], %[[D1]]} in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %input : tensor<?x?xf32>{%d0, %d1} -> tensor<?x?xf32, #encoding>{%d0, %d1}
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorEncodeChangeEncoding
+// CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:.[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.unspecialized_encoding<123>
+#encoding1 = #iree_encoding.unspecialized_encoding<456>
+util.func public @tensorEncodeChangeEncoding(%arg0 : tensor<?x4xf32, #encoding>, %arg1 : index) -> tensor<?x4xf32, #encoding1> {
+  // CHECK:      %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32, #iree_encoding.unspecialized_encoding<456>>{%[[ARG2]]} : index
+  // CHECK:      %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]]
+  // CHECK-SAME:   : tensor<?x4xf32, #iree_encoding.unspecialized_encoding<123>>{%[[ARG2]]} in !stream.resource<*>{%[[ARG1]]}
+  // CHECK-SAME:   -> tensor<?x4xf32, #iree_encoding.unspecialized_encoding<456>>{%[[ARG2]]} in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %arg0 : tensor<?x4xf32, #encoding>{%arg1} -> tensor<?x4xf32, #encoding1>{%arg1}
+  // CHECK:      util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<?x4xf32, #encoding1>
+}
+// -----
+
 // CHECK-LABEL: @tensorAlloca
 //  CHECK-SAME: (%[[DIM0:.+]]: index)
 util.func public @tensorAlloca(%dim0: index) -> tensor<?x0xf32> {

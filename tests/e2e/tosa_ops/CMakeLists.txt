@@ -499,7 +499,6 @@ iree_check_single_backend_test_suite(
   #   "webgpu"
   COMPILER_FLAGS
     "--iree-input-type=tosa"
-    "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
 
 iree_check_single_backend_test_suite(

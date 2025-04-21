@@ -127,7 +127,8 @@ iree-import-tflite ${TFLITE_PATH} -o ${IMPORT_PATH}
 
 # Compile for the CPU backend
 iree-compile \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     ${IMPORT_PATH} \
     -o ${MODULE_PATH}
 ```

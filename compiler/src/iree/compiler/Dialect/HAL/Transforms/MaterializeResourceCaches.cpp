@@ -147,11 +147,10 @@ static SmallVector<Value> inlineConstantBlockOp(
   return llvm::to_vector_of<Value>(callOp.getResults());
 }
 
-static Value initializeExecutable(DeviceResources &deviceResources,
-                                  Executable &executable,
-                                  OpBuilder &moduleBuilder,
-                                  Value initializerDevice,
-                                  OpBuilder &initializerBuilder) {
+static Value
+initializeExecutable(DeviceResources &deviceResources, Executable &executable,
+                     OpBuilder &moduleBuilder, Value initializerDevice,
+                     Value initializerAffinity, OpBuilder &initializerBuilder) {
   auto loc = executable.globalOp.getLoc();
   auto executableType = moduleBuilder.getType<IREE::HAL::ExecutableType>();
 
@@ -197,7 +196,7 @@ static Value initializeExecutable(DeviceResources &deviceResources,
 
     Value executableValue =
         caseBuilder.createOrFold<IREE::HAL::ExecutableCreateOp>(
-            loc, executableType, initializerDevice,
+            loc, executableType, initializerDevice, initializerAffinity,
             SymbolRefAttr::get(
                 executable.executableOp.getSymNameAttr(),
                 {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
@@ -235,6 +234,7 @@ static Value initializeExecutable(DeviceResources &deviceResources,
 static void initializeDeviceResources(DeviceResources &deviceResources,
                                       OpBuilder &moduleBuilder,
                                       Value initializerDevice,
+                                      Value initializerAffinity,
                                       OpBuilder &initializerBuilder) {
   // Initialize all executables.
   for (auto [i, it] : llvm::enumerate(deviceResources.executables)) {
@@ -242,7 +242,8 @@ static void initializeDeviceResources(DeviceResources &deviceResources,
     executable.globalOp.createStoreOp(
         executable.globalOp.getLoc(),
         initializeExecutable(deviceResources, executable, moduleBuilder,
-                             initializerDevice, initializerBuilder),
+                             initializerDevice, initializerAffinity,
+                             initializerBuilder),
         initializerBuilder);
   }
 }
@@ -276,11 +277,17 @@ static void buildDeviceResourceInitializer(DeviceResources &deviceResources,
       deviceResources.deviceOp.createLoadOp(loc, initializerBuilder)
           .getLoadedGlobalValue();
 
+  // TODO(benvanik): get queue affinity from somewhere? Today we mostly assume
+  // any queue will have execution scheduled but if we know that it won't (such
+  // as when sharding) we can reduce runtime load overhead.
+  Value initializerAffinity =
+      initializerBuilder.create<arith::ConstantIntOp>(loc, -1, 64);
+
   // If there are any fallbacks then we need to handle referencing their
   // resources and otherwise will initialize our own.
   if (deviceResources.fallbackDeviceResources.empty()) {
     initializeDeviceResources(deviceResources, moduleBuilder, initializerDevice,
-                              initializerBuilder);
+                              initializerAffinity, initializerBuilder);
   } else {
     SmallVector<int64_t> caseIndices;
     Value selectedIndex = buildIfElseTree(
@@ -309,7 +316,7 @@ static void buildDeviceResourceInitializer(DeviceResources &deviceResources,
     auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
     initializeDeviceResources(deviceResources, moduleBuilder, initializerDevice,
-                              defaultBuilder);
+                              initializerAffinity, defaultBuilder);
     defaultBuilder.create<scf::YieldOp>(loc);
   }
 

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -137,12 +138,15 @@ public:
     auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternLengthBytes, 32);
     Value pattern = op.getPattern();
-    if (patternBitWidth < 32) {
+    if (patternBitWidth < 64) {
       pattern = rewriter.createOrFold<arith::ExtUIOp>(
-          op.getLoc(), rewriter.getIntegerType(32), pattern);
+          op.getLoc(), rewriter.getIntegerType(64), pattern);
     }
     callOperands.push_back(pattern);
     callOperands.push_back(patternLengthConst);
+
+    callOperands.push_back(
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter));
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
@@ -183,7 +187,9 @@ public:
         castToImportType(adaptor.getTargetOffset(), rewriter.getI64Type(),
                          rewriter),
         castToImportType(adaptor.getLength(), rewriter.getI64Type(), rewriter),
-        targetBufferSlot};
+        targetBufferSlot,
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter),
+    };
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
         callOperands);
@@ -226,6 +232,7 @@ public:
         castToImportType(adaptor.getTargetOffset(), rewriter.getI64Type(),
                          rewriter),
         castToImportType(adaptor.getLength(), rewriter.getI64Type(), rewriter),
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter),
     };
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
@@ -341,13 +348,6 @@ public:
     auto i64Type = rewriter.getI64Type();
     Value zeroI32 = rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc());
 
-    auto flags = adaptor.getFlagsAttr()
-                     ? rewriter
-                           .create<IREE::VM::ConstI64Op>(
-                               op.getLoc(), adaptor.getFlagsAttr().getInt())
-                           .getResult()
-                     : rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc())
-                           .getResult();
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
         adaptor.getExecutable(),
@@ -355,7 +355,7 @@ public:
         castToImportType(adaptor.getWorkgroupX(), i32Type, rewriter),
         castToImportType(adaptor.getWorkgroupY(), i32Type, rewriter),
         castToImportType(adaptor.getWorkgroupZ(), i32Type, rewriter),
-        flags,
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
@@ -421,13 +421,6 @@ public:
 
     auto [workgroupsBufferSlot, workgroupsBuffer] =
         splitBufferSlot(op.getLoc(), adaptor.getWorkgroupsBuffer(), rewriter);
-    auto flags = adaptor.getFlagsAttr()
-                     ? rewriter
-                           .create<IREE::VM::ConstI64Op>(
-                               op.getLoc(), adaptor.getFlagsAttr().getInt())
-                           .getResult()
-                     : rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc())
-                           .getResult();
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
         adaptor.getExecutable(),
@@ -435,7 +428,7 @@ public:
         workgroupsBufferSlot,
         workgroupsBuffer,
         castToImportType(adaptor.getWorkgroupsOffset(), i64Type, rewriter),
-        flags,
+        getFlagsI64(op.getLoc(), adaptor.getFlagsAttr(), rewriter),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,

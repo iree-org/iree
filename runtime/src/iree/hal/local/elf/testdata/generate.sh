@@ -38,7 +38,8 @@ function compile_and_extract_library() {
       ${TESTDATA}/elementwise_mul.mlir
       -o="${TESTDATA}/${so_name}"
 
-      --iree-hal-target-backends=llvm-cpu
+      --iree-hal-target-device=local
+      --iree-hal-local-target-device-backends=llvm-cpu
       --iree-llvmcpu-debug-symbols=false
 
       "${compile_args[@]}"

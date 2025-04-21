@@ -36,7 +36,8 @@ The model can be compiled with the following command:
 ``` shell
 iree-compile \
     --iree-stream-partitioning-favor=min-peak-memory \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=x86_64-pc-linux-elf \
     --iree-llvmcpu-debug-symbols=false \
     samples/models/simple_abs.mlir \
@@ -49,11 +50,13 @@ In which
 * `--iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.
-* `--iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
+* `--iree-hal-target-device=local`: Compile to run on the local executor.
+* `--iree-hal-local-target-device-backends=llvm-cpu`: Compile using the LLVM CPU
+    target.
 * `--iree-llvmcpu-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
-    [elf_module library](https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/local/elf)
-* `--iree-llvmcpu-debug-symbols=false`: To reduce the artifact size
+    [elf_module library](https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/local/elf).
+* `--iree-llvmcpu-debug-symbols=false`: To reduce the artifact size.
 
 See [generate.sh](https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures.

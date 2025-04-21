@@ -16,6 +16,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -912,6 +913,24 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   return std::nullopt;
 }
 
+bool hasGlobalMemoryAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace)
+    return true;
+  auto intAttr = llvm::dyn_cast<IntegerAttr>(addrSpace);
+  // Accept both default numeric address space and HAL descriptor type address
+  // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
+  if (intAttr && intAttr.getInt() == 0)
+    return true;
+  auto gpuAttr = llvm::dyn_cast<gpu::AddressSpaceAttr>(addrSpace);
+  if (gpuAttr && gpuAttr.getValue() == gpu::AddressSpace::Global)
+    return true;
+  auto amdgpuAttr = llvm::dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr && amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer)
+    return true;
+  return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
+}
+
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
   auto addrSpace = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
       memrefType.getMemorySpace());
@@ -1008,10 +1027,14 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
 
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp) {
+  // The variant ops must have a ExecutableOp parent. Thus we iterate on the
+  // ExecutableOp using `getOps()` for efficiency. We do not need to walk
+  // through all the ops in the `moduleOp` in a nested fashion.
   SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
-  moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
-    executableVariantOps.push_back(executableOp);
-  });
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    auto iter = executableOp.getOps<IREE::HAL::ExecutableVariantOp>();
+    executableVariantOps.append(iter.begin(), iter.end());
+  }
   return executableVariantOps;
 }
 
@@ -1024,6 +1047,18 @@ queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
         [](IREE::GPU::MMAAttr attr) { return attr.getIntrinsic(); });
   }
   return mmaIntrinsics;
+}
+
+SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
+  SmallVector<Operation *> rootOps;
+
+  moduleOp.walk([&](Operation *op) {
+    if (hasRootOpInfo(op)) {
+      rootOps.push_back(op);
+    }
+  });
+
+  return rootOps;
 }
 
 } // namespace mlir::iree_compiler

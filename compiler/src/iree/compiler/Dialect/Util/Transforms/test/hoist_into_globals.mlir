@@ -336,15 +336,18 @@ module @do_not_hoist_non_value_type_results {
 
 // -----
 
-// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
-module @do_not_hoist_uses_within_dispatches {
+// CHECK-LABEL: @hoist_root_consumer_dispatch
+module @hoist_root_consumer_dispatch {
+  // CHECK: util.global private @[[HOISTED_SYM:.+]] : tensor<i32>
+  // CHECK: util.initializer {
+  // CHECK:       flow.dispatch.region -> (tensor<i32>)
+  // CHECK:       util.return
+  // CHECK: }
+  // CHECK: util.func public @main
   util.func public @main() -> (tensor<i32>) {
-    // CHECK:   %[[CST:.+]] = arith.constant
-    // CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-    // CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[CST]]
-    // CHECK:     flow.return %[[SLICE]]
-    // CHECK:   util.return %[[RESULT]]
     %cst = arith.constant dense<[2, 3]>: tensor<2xi32>
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : tensor<i32>
+    // CHECK: util.return %[[VAL]]
     %result = flow.dispatch.region -> (tensor<i32>) {
       %slice = tensor.extract_slice %cst[0] [1] [1] : tensor<2xi32> to tensor<i32>
       flow.return %slice : tensor<i32>
@@ -443,5 +446,20 @@ module @nested_program_const_expr {
       %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
       util.return %2 : i32
     }
+  }
+}
+
+// -----
+
+// We may attach ConstValueInfo to some op results, but not others, in some
+// special cases. Ensure we do not crash on such cases.
+
+// CHECK-LABEL: @partially_analyzed_op
+module @partially_analyzed_op {
+  util.func public @main(%arg0: i32, %arg1: i32) -> (i32, i32) {
+    %cst = arith.constant 1 : i32
+    %barrier0:2 = util.optimization_barrier %arg0, %arg1 : i32, i32
+    %barrier1:2 = util.optimization_barrier %cst, %barrier0#0 : i32, i32
+    util.return %barrier1#0, %barrier1#1 : i32, i32
   }
 }

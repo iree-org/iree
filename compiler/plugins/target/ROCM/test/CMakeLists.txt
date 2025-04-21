@@ -26,6 +26,7 @@ iree_lit_test_suite(
     iree-opt
   DATA
     tuning_spec_mmt_tile_and_fuse.mlir
+    tuning_spec_mmt_tile_and_fuse_default.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
@@ -40,7 +41,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "external_function_validation.mlir"
-    "gisel_abort.mlir"
     "smoketest.mlir"
     "target_device_features.mlir"
   TOOLS

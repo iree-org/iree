@@ -64,6 +64,7 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
@@ -210,6 +211,11 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               Location loc,
                                               OpFoldResult byteOffset,
                                               Type elementType);
+
+/// Clone an operation and drop all encodings.
+Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                  ValueRange convertedInputOperands,
+                                  ValueRange convertedOutputOperands);
 
 /// Check if a linalg.generic is representing an argmax operation.
 LogicalResult isArgmaxOp(linalg::GenericOp genericOp);

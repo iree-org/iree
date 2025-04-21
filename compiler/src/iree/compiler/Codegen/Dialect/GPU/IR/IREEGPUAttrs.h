@@ -72,6 +72,10 @@ int64_t getKSize(MMAIntrinsic intrinsic);
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
+MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
+                                                MMAFragment fragment,
+                                                bool colMajor);
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 

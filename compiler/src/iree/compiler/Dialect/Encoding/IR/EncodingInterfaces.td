@@ -123,6 +123,19 @@ def IREEEncoding_SerializableEncodingAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the encoding is known as an identity layout.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isIdentityLayout",
+      /*args=*/(ins
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Creates an encoding with a new layout list. It is valid to drop any
         other optional parameters used in layout resolving, because they are
         already resolved and being attached to the encoding attribute.
@@ -168,6 +181,7 @@ def IREEEncoding_SerializableEncodingAttrInterface :
         Returns the storage size (in bytes) for the tensor types with an
         optional encoding. Returns Value() if the size is unknown, i.e., it can
         not be inferred with existing information.
+        Returns nullptr on failure.
       }],
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"calculateStorageSizeInBytes",
@@ -191,6 +205,30 @@ def IREEEncoding_SerializableEncodingAttrInterface :
     /// and they are compatible with each other.
     static bool areCompatible(Attribute lhs, Attribute rhs);
   }];
+}
+
+def IREEEncoding_ContractionEncodingAttrInterface :
+  AttrInterface<"ContractionEncodingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query contraction information.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the reduction dimensions. Returns std::nullopt on failure.
+      }],
+      /*retTy=*/"std::optional<llvm::SmallVector<int32_t>>",
+      /*methodName=*/"getReductionDims",
+      /*args=*/(ins
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
+    >
+  ];
 }
 
 //===----------------------------------------------------------------------===//

@@ -793,6 +793,7 @@ func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [34] * [1] k_offset = [1000] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -832,6 +833,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK:              %[[IM2COL:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:           m_offset = [%[[MOFFSET]]] * [1] k_offset = [%[[KOFFSET]]] * [1]
 // CHECK-SAME:           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:           input_k_perm = [0, 1, 2]
 // CHECK-SAME:           ins(%[[EXTRACTED_SLICE]] : tensor<1x34x34x640xf32>)
 // CHECK-SAME:           outs(%[[EXTRACTED_SLICE_0]] : tensor<1x?x4xf32>) -> tensor<1x?x4xf32>
 // CHECK:              %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[IM2COL]] into %[[ARG6]]
@@ -849,6 +851,7 @@ func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2
   %1 = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
            m_offset = [42] * [1] k_offset = [7] * [1]
            batch_pos = [1] m_pos = [3, 2] k_pos = [0]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<640x2x101x172xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -890,6 +893,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK:              %[[IM2COL:.+]] = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
 // CHECK-SAME:           m_offset = [%[[MOFFSET]]] * [1] k_offset = [%[[KOFFSET]]] * [1]
 // CHECK-SAME:           batch_pos = [1] m_pos = [3, 2] k_pos = [0]
+// CHECK-SAME:           input_k_perm = [0, 1, 2]
 // CHECK-SAME:           ins(%[[EXTRACTED_SLICE]] : tensor<640x1x101x172xf32>)
 // CHECK-SAME:           outs(%[[EXTRACTED_SLICE_0]] : tensor<1x?x?xf32>) -> tensor<1x?x?xf32>
 // CHECK:              %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[IM2COL]] into %[[ARG6]]
@@ -908,6 +912,7 @@ func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [%mOffset] * [1] k_offset = [%kOffset] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<?x?x?x?xf32>)
            outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
   return %1 : tensor<?x?x?xf32>
@@ -953,6 +958,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK:              %[[IM2COL:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:           m_offset = [%[[MOFFSET]]] * [1] k_offset = [%[[KOFFSET]]] * [1]
 // CHECK-SAME:           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:           input_k_perm = [0, 1, 2]
 // CHECK-SAME:           ins(%[[EXTRACTED_SLICE]] : tensor<?x?x?x?xf32>)
 // CHECK-SAME:           outs(%[[EXTRACTED_SLICE_0]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
 // CHECK:              %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[IM2COL]] into %[[ARG6]]
@@ -972,6 +978,7 @@ module {
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
             m_offset = [0, 0] * [%m_stride, 1] k_offset = [0, 0] * [4, 1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+            input_k_perm = [0, 1, 2]
             ins(%arg0 : tensor<2x34x34x640xf32>)
             outs(%0 : tensor<2x32x32x1440x4xf32>) -> tensor<2x32x32x1440x4xf32>
     return %7 : tensor<2x32x32x1440x4xf32>
@@ -1020,6 +1027,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK:                  %[[IM2COL:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:               m_offset = [%[[ARG3]], %[[ARG5]]] * [%[[M_STRIDE]], 1] k_offset = [%[[ARG7]], %[[ARG9]]] * [4, 1]
 // CHECK-SAME:               batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:               input_k_perm = [0, 1, 2]
 // CHECK-SAME:               ins(%[[EXTRACTED_SLICE]] : tensor<1x34x34x640xf32>)
 // CHECK-SAME:               outs(%[[EXTRACTED_SLICE_0]] : tensor<1x?x?x?x2xf32>) -> tensor<1x?x?x?x2xf32>
 // CHECK:                  %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[IM2COL]] into %[[ARG10]]
@@ -2584,3 +2592,85 @@ module attributes { transform.with_named_sequence } {
 //      CHECK:       %[[INDEX:.+]] = affine.apply #[[MAP]](%[[IV]])[%[[NEW_INDEX]]]
 //      CHECK:       linalg.generic
 // CHECK-SAME:           ins(%{{.+}}, %[[INDEX]] :
+
+// -----
+
+func.func @gather_1d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?xi32>, %arg2 : memref<?x?xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%arg0, %arg1: memref<?x?xi32>, memref<?xi32>)
+    outs(%arg2: memref<?x?xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
+//      CHECK: func @gather_1d_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG2]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG2]], %[[C1]]
+//      CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
+//      CHECK:     scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C20]]
+//  CHECK-DAG:       %[[MIN0:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
+//  CHECK-DAG:       %[[MIN1:.+]] = affine.min #[[MAP1]](%[[J]])[%[[D1]]]
+//  CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]], %[[J]]] [%[[MIN0]], %[[MIN1]]] [1, 1]
+//  CHECK-DAG:       %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[MIN0]]] [1]
+//  CHECK-DAG:       %[[D2:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:       %[[SOURCE:.+]] = memref.subview %[[ARG0]][0, %[[J]]] [%[[D2]], %[[MIN1]]] [1, 1]
+//      CHECK:       iree_linalg_ext.gather
+// CHECK-SAME:           ins(%[[SOURCE]], %[[INDEX]]
+// CHECK-SAME:           outs(%[[RESULT]]
+
+// -----
+
+func.func @gather_2d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?x2xi32>, %arg2 : memref<?xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%arg0, %arg1: memref<?x?xi32>, memref<?x2xi32>)
+    outs(%arg2: memref<?xi32>) {
+    ^bb0(%bb0: i32, %bb1: i32):
+      iree_linalg_ext.yield %bb0 : i32
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [13] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//      CHECK: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 13)>
+//      CHECK: func @gather_2d_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C13:.+]] = arith.constant 13
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG2]], %[[C0]]
+//      CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C13]]
+//  CHECK-DAG:     %[[MIN:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
+//  CHECK-DAG:     %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]]] [%[[MIN]]] [1]
+//  CHECK-DAG:     %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]], 0] [%[[MIN]], 2] [1, 1]
+//  CHECK-DAG:     %[[D1:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:     %[[D2:.+]] = memref.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:     %[[SOURCE:.+]] = memref.subview %[[ARG0]][0, 0] [%[[D1]], %[[D2]]] [1, 1]
+//      CHECK:     iree_linalg_ext.gather
+// CHECK-SAME:         ins(%[[SOURCE]], %[[INDEX]]
+// CHECK-SAME:         outs(%[[RESULT]]

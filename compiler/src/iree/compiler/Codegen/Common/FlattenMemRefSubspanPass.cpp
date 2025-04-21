@@ -616,8 +616,8 @@ struct LinearizeTransferWriteIndices final
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        transferWriteOp, adaptor.getVector(), adaptor.getSource(), linearIndex,
-        AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferWriteOp, adaptor.getValueToStore(), adaptor.getSource(),
+        linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
         transferWriteOp.getInBoundsAttr());
     return success();
   }

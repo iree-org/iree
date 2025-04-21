@@ -117,7 +117,8 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
 }
 
 LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
-                            const amdgpu::Chipset &chipset, bool isWave64) {
+                            const amdgpu::Chipset &chipset, bool isWave64,
+                            uint32_t abiVersion) {
   // Oldest GFX arch supported is gfx60x.
   if (chipset.majorVersion < 6) {
     return emitError(loc, "pre-gfx6 chipsets are not supported");
@@ -134,6 +135,8 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
                  chipset.steppingVersion;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
   overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
+
+  overridePlatformGlobal(module, "__oclc_version", abiVersion, int32Type);
 
   // Link oclc configurations as globals.
   auto *boolType = llvm::Type::getInt8Ty(module->getContext());

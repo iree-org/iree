@@ -1,6 +1,10 @@
 # NOTE: not using bazel-to-cmake here because of the runtime unified rule.
 # We should figure out how to make bazel/cmake consistent with that.
 
+if(NOT IREE_BUILD_SAMPLES)
+  return()
+endif()
+
 iree_cc_binary(
   NAME
     hello_world_file
@@ -60,6 +64,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_runtime_demo_simple_mul_module"
   FLAGS
-    "--iree-hal-target-backends=vmvx"
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=vmvx"
   PUBLIC
 )

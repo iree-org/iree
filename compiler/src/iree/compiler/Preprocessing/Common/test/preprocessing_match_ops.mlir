@@ -139,6 +139,83 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
+func.func private @external(%arg0: tensor<?xf32>)
+func.func private @external_lb(%arg0: tensor<100xf32>)
+func.func private @external_ub(%arg0: tensor<3xf32>)
+func.func private @external_2d(%arg0: tensor<?x20xf32>)
+
+// CHECK-LABEL: func.func @call_external
+func.func @call_external(%arg0: index,
+                         %input_2d: tensor<?x20xf32>,
+                         %input_lb: tensor<100xf32>,
+                         %input_ub: tensor<3xf32>) {
+%0 = util.assume.int %arg0<umin = 12, umax = 16, udiv = 1> : index
+%input = tensor.empty(%0) : tensor<?xf32>
+//       CHECK: call @external
+//  CHECK-SAME:   match_status = "both_matched"
+  func.call @external(%input) {match_status = "unmatched"} : (tensor<?xf32>) -> ()
+//       CHECK: call @external_2d
+//  CHECK-SAME:   match_status = "dim1_matched"
+  func.call @external_2d(%input_2d) {match_status = "unmatched"} : (tensor<?x20xf32>) -> ()
+//       CHECK: call @external_lb
+//  CHECK-SAME:   match_status = "lb_matched"
+  func.call @external_lb(%input_lb) {match_status = "unmatched"} : (tensor<100xf32>) -> ()
+//       CHECK: call @external_ub
+//  CHECK-SAME:   match_status = "ub_matched"
+  func.call @external_ub(%input_ub) {match_status = "unmatched"} : (tensor<3xf32>) -> ()
+  return
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @dim1_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.match.operation_name %call ["func.call"] : !transform.any_op
+    %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.dim_bounds %in0[1], umin = 20, umax = 20 : !transform.any_value
+    %0 = transform.param.constant "dim1_matched" -> !transform.any_param
+    transform.yield %call, %0 : !transform.any_op, !transform.any_param
+  }
+  transform.named_sequence @both_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.match.operation_name %call ["func.call"] : !transform.any_op
+    %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.dim_bounds %in0[0], umin = 5, umax = 20 : !transform.any_value
+    %0 = transform.param.constant "both_matched" -> !transform.any_param
+    transform.yield %call, %0 : !transform.any_op, !transform.any_param
+  }
+  transform.named_sequence @lb_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.match.operation_name %call ["func.call"] : !transform.any_op
+    %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.dim_bounds %in0[0], umin = 75, none : !transform.any_value
+    %0 = transform.param.constant "lb_matched" -> !transform.any_param
+    transform.yield %call, %0 : !transform.any_op, !transform.any_param
+  }
+  transform.named_sequence @ub_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.match.operation_name %call ["func.call"] : !transform.any_op
+    %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
+    transform.iree.match.dim_bounds %in0[0], none, umax = 4 : !transform.any_value
+    %0 = transform.param.constant "ub_matched" -> !transform.any_param
+    transform.yield %call, %0 : !transform.any_op, !transform.any_param
+  }
+
+  transform.named_sequence @annotate(%call: !transform.any_op {transform.readonly},
+                                     %note: !transform.any_param {transform.readonly}) {
+    transform.annotate %call "match_status" = %note : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    %func = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op
+    transform.foreach_match in %module
+        @dim1_match -> @annotate,
+        @both_match -> @annotate,
+        @lb_match -> @annotate,
+        @ub_match -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
 module attributes {transform.with_named_sequence} {
 
   // CHECK: func.func @matmul_repeated_operand

@@ -90,7 +90,7 @@ Then run the following command to compile with the `cuda` target:
 
 ```shell hl_lines="2-3"
 iree-compile \
-    --iree-hal-target-backends=cuda \
+    --iree-hal-target-device=cuda \
     --iree-cuda-target=<...> \
     mobilenetv2.mlir -o mobilenet_cuda.vmfb
 ```

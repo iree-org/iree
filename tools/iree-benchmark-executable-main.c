@@ -256,7 +256,7 @@ static iree_status_t iree_benchmark_executable_run(
     IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
         args->device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
         signal_semaphore_list, command_buffer,
-        iree_hal_buffer_binding_table_empty()));
+        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
 
     // Block and wait for the submission to complete.
     // Note that this will include round-trip overhead and if the dispatch or
@@ -472,17 +472,19 @@ int main(int argc, char** argv) {
       "`iree-compile --compile-mode=hal-executable` mode.\n"
       "\n"
       "Example flags for various compilation backends:\n"
-      "  --iree-hal-target-backends=vmvx\n"
+      "  --iree-hal-target-device=local "
+      "--iree-hal-local-target-device-backends=vmvx\n"
       "    --device=local-sync or --device=local-task\n"
       "    --executable_format=vmvx-bytecode-fb\n"
-      "  --iree-hal-target-backends=llvm-cpu\n"
+      "  --iree-hal-target-device=local "
+      "--iree-hal-local-target-device-backends=llvm-cpu\n"
       "    --device=local-sync or --device=local-task\n"
       "    --executable_format=embedded-elf-x86_64\n"
       "    --executable_format=system-dll-x86_64\n"
-      "  --iree-hal-target-backends=cuda\n"
+      "  --iree-hal-target-device=cuda\n"
       "    --device=cuda\n"
       "    --executable_format=cuda-nvptx-fb\n"
-      "  --iree-hal-target-backends=vulkan-spirv\n"
+      "  --iree-hal-target-device=vulkan\n"
       "    --device=vulkan\n"
       "    --executable_format=vulkan-spirv-fb\n"
       "\n"

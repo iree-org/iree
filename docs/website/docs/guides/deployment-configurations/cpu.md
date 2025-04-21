@@ -109,11 +109,13 @@ With the requirements out of the way, we can now compile a model and run it.
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-import-onnx-mobilenet.md"
 
-Then run the following command to compile with the `llvm-cpu` target:
+Then run the following command to compile with the `local` device and `llvm-cpu`
+target compilation backend:
 
-``` shell hl_lines="2-3"
+``` shell hl_lines="2-4"
 iree-compile \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     --iree-llvmcpu-target-cpu=host \
     mobilenetv2.mlir -o mobilenet_cpu.vmfb
 ```

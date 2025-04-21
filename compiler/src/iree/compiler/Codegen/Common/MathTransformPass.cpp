@@ -18,9 +18,8 @@ namespace mlir::iree_compiler {
 /// ""use native hardware operations instead of polynomial approximation".
 static llvm::cl::opt<bool> clNativeMathPrecision(
     "iree-codegen-gpu-native-math-precision",
-    llvm::cl::desc("Deprecated! This flag had buggy/unintentional semantics. "
-                   "Its original description said: \"Skip polynomial lowering "
-                   "for math op natively available on GPU.\""),
+    llvm::cl::desc("Deprecated! This flag doesn't do anything anymore and will "
+                   "be removed soon."),
     llvm::cl::init(false));
 
 #define GEN_PASS_DEF_MATHTRANSFORMPASS
@@ -63,14 +62,23 @@ static void populateMathFunctionsRewritePatterns(
 
 static bool predicateRewrite(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
-  if (clNativeMathPrecision) { // Legacy.
-    if (name == math::Exp2Op::getOperationName() ||
-        name == math::RoundEvenOp::getOperationName()) {
-      return false;
-    }
+  if (name == math::FPowIOp::getOperationName()) {
+    // math.fpowi is a special op: it isn't really a "math function", rather
+    // it is generally used with a constant exponent that is a small integer,
+    // and it is then a shorthand for a few multiplications. That rewrite needs
+    // to happen to prevent falling back on a more expensive, more general
+    // implementation like math.powf.
+    return true;
   }
   if (isROCMBackend(target)) {
-    // On ROCm, we want to use device library functions.
+    // On ROCm, we do not need most rewrites as we can generally bottom out on
+    // either device library functions, or handling of intrinsics in AMDGPU.
+    return false;
+  }
+  if (isWebGPUBackend(target)) {
+    // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
+    // errors whenever Inf or NaN values arise at compile-time, which is not
+    // something that we can really prevent. Avoiding this rewrite helps a bit.
     return false;
   }
   // Currently enable all non-approximative rewrites.
@@ -79,10 +87,7 @@ static bool predicateRewrite(StringRef name,
 
 static bool predicateF32Cast(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
-  (void)target;                // Currently unused.
-  if (clNativeMathPrecision) { // Legacy.
-    return false;
-  }
+  (void)target; // Currently unused.
   StringRef atan = math::AtanOp::getOperationName();
   StringRef atan2 = math::Atan2Op::getOperationName();
   StringRef cos = math::CosOp::getOperationName();
@@ -102,18 +107,15 @@ static bool predicateF32Cast(StringRef name,
 
 static bool predicateApprox(StringRef name,
                             IREE::HAL::ExecutableTargetAttr target) {
-  if (clNativeMathPrecision) { // Legacy.
-    if (name == math::ErfOp::getOperationName()) {
-      // The legacy implementation had a bug: it always applied polynomial
-      // approximation of math.erf, even when clNativeMathPrecision was passed.
-      // We actually have CI tests that rely on that bug: they pass
-      // clNativeMathPrecision but fail unless math.erf is approximated.
-      return true;
-    }
+  if (isROCMBackend(target)) {
+    // On ROCm, we do not need most rewrites as we can generally bottom out on
+    // either device library functions, or handling of intrinsics in AMDGPU.
     return false;
   }
-  if (isROCMBackend(target)) {
-    // On ROCm, we want to use device library functions.
+  if (isWebGPUBackend(target)) {
+    // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
+    // errors whenever Inf or NaN values arise at compile-time, which is not
+    // something that we can really prevent. Avoiding this rewrite helps a bit.
     return false;
   }
   StringRef acos = math::AcosOp::getOperationName();
@@ -137,12 +139,27 @@ static bool predicateApprox(StringRef name,
 
 namespace {
 
+struct DeprecationWarningForNativeMathPrecision {
+  DeprecationWarningForNativeMathPrecision() {
+    if (clNativeMathPrecision) {
+      clNativeMathPrecision.error(
+          "This option is deprecated, does not do anything anymore, and will "
+          "be removed soon. It was mainly used on the ROCm target, but the "
+          "behavior that it once enabled is now default on ROCm. More "
+          "generally, MathTransformPass should do the right things for each "
+          "target.");
+    }
+  }
+};
+
 class MathTransformPass final
     : public impl::MathTransformPassBase<MathTransformPass> {
 public:
   using Base::Base;
 
   void runOnOperation() override {
+    static DeprecationWarningForNativeMathPrecision warning;
+
     RewritePatternSet patterns(&getContext());
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
     if (!target) {

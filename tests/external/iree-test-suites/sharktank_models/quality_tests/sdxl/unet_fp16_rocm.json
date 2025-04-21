@@ -1,0 +1,59 @@
+{
+    "inputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.0.bin",
+            "value": "1x4x128x128xf16"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.1.bin",
+            "value": "2x64x2048xf16"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.2.bin",
+            "value": "2x1280xf16"
+        },
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.3.bin",
+            "value": "1xf16"
+        }
+    ],
+    "outputs": [
+        {
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_output.0.bin",
+            "value": "1x4x128x128xf16"
+        }
+    ],
+    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlir",
+    "pipeline_mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
+    "device": "hip",
+    "compiler_flags": [
+        "--iree-hal-target-device=hip",
+        "--iree-opt-const-eval=false",
+        "--iree-opt-level=O3",
+        "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
+        "--iree-vm-target-truncate-unsupported-floats",
+        "--iree-llvmgpu-enable-prefetch=true",
+        "--iree-opt-data-tiling=false",
+        "--iree-codegen-gpu-native-math-precision=true",
+        "--iree-codegen-llvmgpu-use-vector-distribution",
+        "--iree-hip-waves-per-eu=2",
+        "--iree-execution-model=async-external",
+        "--iree-scheduling-dump-statistics-format=json",
+        "--iree-scheduling-dump-statistics-file=compilation_info.json",
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)"
+    ],
+    "pipeline_compiler_flags": [
+        "--verify=false",
+        "--iree-opt-const-eval=false",
+        "--iree-hal-target-device=hip"
+    ],
+    "threshold_args": [
+        "--expected_f16_threshold=0.705f"
+    ],
+    "run_function": "produce_image_latents",
+    "add_pipeline_module": true,
+    "tuner_file": {
+        "mi308": "attention_and_matmul_spec_unet_fp16_mi308.mlir"
+    }
+}

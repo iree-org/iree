@@ -1,5 +1,6 @@
 // RUN: iree-compile %s -o ignored.mlir \
-// RUN:     --iree-hal-target-backends=vmvx \
+// RUN:     --iree-hal-target-device=local \
+// RUN:     --iree-hal-local-target-device-backends=vmvx \
 // RUN:     --iree-hal-dump-executable-configurations-to=- | \
 // RUN: iree-compile - -o /dev/null \
 // RUN:     --compile-mode=hal-executable \
@@ -17,7 +18,8 @@
 // to their platform binary form, dumping their MLIR prior to lowering into the
 // backend representation (SPIR-V/LLVM-IR/etc):
 //  iree-compile some_input.mlir -o ignored.mlir \
-//      --iree-hal-target-backends=vmvx \
+//      --iree-hal-target-device=local \
+//      --iree-hal-local-target-device-backends=vmvx \
 //      --iree-hal-dump-executable-configurations-to=configs/ | \
 //  ls -1 sources/ | xargs -i sh -c "iree-compile configs/{}
 //      --compile-mode=hal-executable

@@ -117,6 +117,8 @@ def PropagateLinalgTransposePass :
            "Flag used for lit-testing bubbling patterns only. Not for general usage">,
     Option<"enableAttentionVTranspose", "enable-attention-v-transpose", "bool",
             /*default=*/"true", "Enable transposition of attention v operand">,
+    Option<"enableConvolutionPropagation", "enable-aggressive-propagation-through-conv", "bool",
+            /*default=*/"false", "enable propagation through convolutions">,
   ];
 }
 

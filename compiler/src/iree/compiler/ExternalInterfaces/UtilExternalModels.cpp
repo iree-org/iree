@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -490,13 +492,24 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 
   // Hoistable Op Interface registration.
 
-  // Register hoistable type interfaces for LinalgExt ops.
+  // Register hoistable op interfaces for Encoding ops.
   registry.addExtension(
       +[](MLIRContext *context, IREE::Encoding::IREEEncodingDialect *dialect) {
         UnhoistableOpInterfaceHelper<
             IREE::Encoding::SetEncodingOp>::registerOpInterface(context);
       });
-  // Register hoistable type interfaces for linalg ops.
+
+  // Register hoistable op interfaces for Flow ops.
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Flow::FlowDialect *dialect) {
+        UnhoistableOpInterfaceHelper<
+            IREE::Flow::DispatchWorkgroupCountOp>::registerOpInterface(context);
+
+        AlwaysHoistableOpInterfaceHelper<
+            IREE::Flow::TensorEncodeOp>::registerOpInterface(context);
+      });
+
+  // Register hoistable op interfaces for linalg ops.
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.
   registry.addExtension(
@@ -521,7 +534,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         AlwaysHoistableOpInterfaceHelper<
             linalg::PackOp, linalg::UnPackOp>::registerOpInterface(context);
       });
-  // Register hoistable type interfaces for tensor ops.
+  // Register hoistable op interfaces for tensor ops.
   registry.addExtension(
       +[](MLIRContext *context, tensor::TensorDialect *dialect) {
         // Never hoist empty and other pure metadata ops as a leaf. It's fine to

@@ -17,21 +17,19 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(IREE ASM C CXX)
+# If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
+# and we can just inform the user and then reset it.
+if(DEFINED CACHE{CMAKE_CXX_STANDARD})
+  message(WARNING "Unsetting cache value for CMAKE_CXX_STANDARD")
+  unset(CMAKE_CXX_STANDARD CACHE)
+endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-# LLVM defines this as a CACHE property and uses a policy that causes the
-# cache value to take precedence. This is causing us to mix 17/14 across
-# the boundary.
-# TODO: Remove this once the LLVM mechanism is updated. See:
-#   https://discourse.llvm.org/t/important-new-toolchain-requirements-to-build-llvm-will-most-likely-be-landing-within-a-week-prepare-your-buildbots/61447/9
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to" FORCE)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if(MSVC)
   enable_language(ASM_MASM)
-else()
-  enable_language(ASM)
 endif()
 
 # Set the default CMake build type so some of the build type dependent setting
@@ -80,6 +78,11 @@ option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
+option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
+
+if(IREE_USE_SYSTEM_DEPS)
+  message(WARNING "IREE_USE_SYSTEM_DEPS is on. This option is untested and may find incompatible dependencies.")
+endif()
 
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
@@ -776,14 +779,18 @@ endif()
 
 # Both the IREE and MLIR Python bindings require nanobind. We initialize it here
 # at the top level so that everything uses ours consistently.
-if(IREE_BUILD_PYTHON_BINDINGS OR IREE_BUILD_COMPILER)
-  include(FetchContent)
-  FetchContent_Declare(
-    nanobind
-    GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-    GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
-  )
-  FetchContent_MakeAvailable(nanobind)
+if(IREE_BUILD_PYTHON_BINDINGS)
+  if(IREE_USE_SYSTEM_DEPS)
+    find_package(nanobind REQUIRED)
+  else()
+    include(FetchContent)
+    FetchContent_Declare(
+        nanobind
+        GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+        GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
+    )
+    FetchContent_MakeAvailable(nanobind)
+  endif()
 endif()
 
 if(NOT IREE_BUILD_COMPILER)
@@ -883,8 +890,10 @@ if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
   )
 endif()
 
-iree_set_googletest_cmake_options()
-add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+if(IREE_BUILD_TESTS)
+  iree_set_googletest_cmake_options()
+  add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+endif()
 
 if(IREE_ENABLE_THREADING)
   # Benchmark.

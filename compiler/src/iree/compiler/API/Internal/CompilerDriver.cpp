@@ -1034,7 +1034,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
   // Done with the pipeline, mark the start of a new 'frame'.
-  IREE_TRACE_FRAME_MARK();
+  IREE_COMPILER_TRACE_FRAME_MARK();
   return true;
 }
 

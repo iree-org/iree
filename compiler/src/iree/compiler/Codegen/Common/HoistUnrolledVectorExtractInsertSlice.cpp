@@ -139,8 +139,10 @@ static scf::ForOp hoistVectorExtractInsertSlice(
   // computed iteratively but whose storage has become loop-invariant.
   NewYieldValuesFn yieldFn = [&](OpBuilder &b, Location loc,
                                  ArrayRef<BlockArgument> newBBArgs) {
-    return llvm::map_to_vector(insertOps,
-                               [](auto v) -> Value { return v.getSource(); });
+    return llvm::map_to_vector(
+        insertOps, [](vector::InsertStridedSliceOp sliceOp) -> Value {
+          return sliceOp.getValueToStore();
+        });
   };
   SmallVector<Value> extractResults = llvm::map_to_vector(
       extractOps, [](auto v) -> Value { return v.getResult(); });
@@ -160,7 +162,7 @@ static scf::ForOp hoistVectorExtractInsertSlice(
   for (auto [idx, insertStridedSliceOp] : llvm::enumerate(insertOps)) {
     insertStridedSliceOp->moveAfter(newForOp);
     rewriter.startOpModification(insertStridedSliceOp);
-    insertStridedSliceOp.getSourceMutable().assign(
+    insertStridedSliceOp.getValueToStoreMutable().assign(
         newForOp.getResults()[initArgNumber + idx + 1]);
     insertStridedSliceOp.getDestMutable().assign(
         newForOp.getResults()[initArgNumber]);

@@ -482,14 +482,10 @@ namespace {
 /// Swaps a device queue barrier with an immediate host fence signal when the
 /// wait fence is immediately resolved (null).
 struct ImmediatelyResolveDeviceQueueBarrier
-    : public OpRewritePattern<DeviceQueueExecuteOp> {
+    : public OpRewritePattern<DeviceQueueBarrierOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
+  LogicalResult matchAndRewrite(DeviceQueueBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
-    // Only looking for ops performing basic barriers.
-    if (!barrierOp.isBarrier())
-      return failure();
-
     // Check for whether we know the wait fence is immediately resolved in the
     // local scope. A more involved data flow analysis would let us handle more
     // cases (function calls, block edges, etc) that commonly arise.
@@ -510,19 +506,15 @@ struct ImmediatelyResolveDeviceQueueBarrier
 ///
 /// Example:
 ///  %fence0 = hal.fence.create
-///  hal.device.queue.execute signal(%fence0)
+///  hal.device.queue.barrier signal(%fence0)
 ///  hal.device.queue.execute wait(%fence0) signal(%fence1)
 /// ->
-///  hal.device.queue.execute signal(%fence1)
+///  hal.device.queue.barrier signal(%fence1)
 struct HoistDeviceQueueBarrierChain
-    : public OpRewritePattern<DeviceQueueExecuteOp> {
+    : public OpRewritePattern<DeviceQueueBarrierOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
+  LogicalResult matchAndRewrite(DeviceQueueBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
-    // Only looking for ops performing basic barriers.
-    if (!barrierOp.isBarrier())
-      return failure();
-
     // See if we can observe the original fence creation in the local scope.
     auto waitFence = barrierOp.getWaitFence();
     auto createOp =
@@ -572,17 +564,14 @@ struct HoistDeviceQueueBarrierChain
 ///
 /// Example (where %b is only used by the two ops):
 ///  hal.device.queue.execute wait(%a) signal(%b) commands(...)
-///  hal.device.queue.execute wait(%b) signal(%c)  // barrier
+///  hal.device.queue.barrier wait(%b) signal(%c)
 /// ->
 ///  hal.device.queue.execute wait(%a) signal(%c) commands(...)
 struct ElideDeviceQueueBarrierOp
-    : public OpRewritePattern<DeviceQueueExecuteOp> {
+    : public OpRewritePattern<DeviceQueueBarrierOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
+  LogicalResult matchAndRewrite(DeviceQueueBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
-    // Only looking for ops performing basic barriers.
-    if (!barrierOp.isBarrier())
-      return failure();
 
     // We're looking at the wait fence on the barrier back up to the signal
     // operation on that fence.
@@ -641,45 +630,25 @@ struct ElideDeviceQueueBarrierOp
 
   // Returns true if |op| signals |fence|.
   static bool isSignalingOp(Operation *op, Value fence) {
-    // For now we have a limited set of these ops but we should add an interface
-    // to generalize queue operations.
-    return TypeSwitch<Operation *, bool>(op)
-        .Case([&](IREE::HAL::DeviceQueueAllocaOp op) {
-          return op.getSignalFence() == fence;
-        })
-        .Case([&](IREE::HAL::DeviceQueueDeallocaOp op) {
-          return op.getSignalFence() == fence;
-        })
-        .Case([&](IREE::HAL::DeviceQueueExecuteOp op) {
-          return op.getSignalFence() == fence;
-        })
-        .Default([](Operation *op) { return false; });
+    if (auto queueOp = dyn_cast<IREE::HAL::DeviceQueueOpInterface>(op)) {
+      return queueOp.getQueueSignalFence() == fence;
+    }
+    return false;
   }
 
   // Updates |op| to signal |fence|.
   static LogicalResult updateOpToSignalFence(Operation *op, Value fence) {
-    // For now we have a limited set of these ops but we should add an interface
-    // to generalize queue operations.
-    return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case([&](IREE::HAL::DeviceQueueAllocaOp op) {
-          op.getSignalFenceMutable().assign(fence);
-          return success();
-        })
-        .Case([&](IREE::HAL::DeviceQueueDeallocaOp op) {
-          op.getSignalFenceMutable().assign(fence);
-          return success();
-        })
-        .Case([&](IREE::HAL::DeviceQueueExecuteOp op) {
-          op.getSignalFenceMutable().assign(fence);
-          return success();
-        })
-        .Default([](Operation *op) { return failure(); });
+    if (auto queueOp = dyn_cast<IREE::HAL::DeviceQueueOpInterface>(op)) {
+      queueOp.setQueueSignalFence(fence);
+      return success();
+    }
+    return failure();
   }
 };
 
 } // namespace
 
-void DeviceQueueExecuteOp::getCanonicalizationPatterns(
+void DeviceQueueBarrierOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<ImmediatelyResolveDeviceQueueBarrier>(context);
   results.insert<HoistDeviceQueueBarrierChain>(context);
@@ -1003,8 +972,8 @@ struct DeduplicateFenceJoinFences : public OpRewritePattern<FenceJoinOp> {
     auto newOperands = deduplicateFenceOperands(op.getFences());
     if (!newOperands)
       return failure();
-    rewriter.replaceOpWithNewOp<FenceJoinOp>(op, op.getResult().getType(),
-                                             newOperands.value());
+    rewriter.replaceOpWithNewOp<FenceJoinOp>(
+        op, op.getResult().getType(), op.getFlagsAttr(), newOperands.value());
     return success();
   }
 };
@@ -1108,9 +1077,10 @@ struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
     auto newOperands = deduplicateFenceOperands(op.getFences());
     if (newOperands == std::nullopt)
       return failure();
-    rewriter.replaceOpWithNewOp<FenceAwaitOp>(op, op.getStatus().getType(),
-                                              op.getTimeoutMillis(),
-                                              newOperands.value());
+    // TODO(benvanik): resolve flag sets.
+    rewriter.replaceOpWithNewOp<FenceAwaitOp>(
+        op, op.getStatus().getType(), op.getTimeoutMillis(), op.getFlagsAttr(),
+        newOperands.value());
     return success();
   }
 };

@@ -19,12 +19,14 @@ namespace mlir::iree_compiler::Preprocessing {
 /// Placeholder struct for preprocessing pass pipeline options.
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
 
-/// Adds a set of passes to the given pass manager that run preprocessing
-/// passes specified in textual pass-pipeline format using
-/// `iree-preprocessing-pass-pipeline`. This allows some user control
-/// on the sequence of preprocessing passes to run after conversion from input
-/// dialects like `stablehlo`/`tosa` before running the core IREE compilation
-/// pipelines (starting with the flow pipeline).
+/// Adds a set of passes to the given pass manager that are run after input
+/// conversion, but before any of the IREE compilation passes. There are many
+/// ways preprocessing passes can be added. These options are exercised in the
+/// following order
+/// 1. Using Command line options : See `PreprocessingOptions` to see the order
+///    of preference for different command line based preprocessing options.
+/// 2. Extensions specified by plugins : Plugins can specify a preprocessing
+///    pass pipeline to run.
 void buildPreprocessingPassPipeline(
     OpPassManager &passManager, const PreprocessingOptions &options,
     PipelineExtensions *pipelineExtensions = nullptr);

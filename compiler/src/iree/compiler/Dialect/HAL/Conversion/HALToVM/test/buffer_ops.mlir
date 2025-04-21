@@ -1,8 +1,40 @@
 // RUN: iree-opt --split-input-file --iree-vm-conversion --cse --iree-vm-target-index-bits=32 %s | FileCheck %s
 
+// CHECK-LABEL: @buffer_allocation_preserve
+// CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
+util.func public @buffer_allocation_preserve(%buffer: !hal.buffer) {
+  // CHECK: vm.call @hal.buffer.allocation.preserve(%[[BUFFER]])
+  hal.buffer.allocation.preserve<%buffer : !hal.buffer>
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_allocation_discard
+// CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
+util.func public @buffer_allocation_discard(%buffer: !hal.buffer) -> i1 {
+  // CHECK: %[[WAS_TERMINAL:.+]] = vm.call @hal.buffer.allocation.discard(%[[BUFFER]])
+  %was_terminal = hal.buffer.allocation.discard<%buffer : !hal.buffer> : i1
+  // CHECK: vm.return %[[WAS_TERMINAL]]
+  util.return %was_terminal : i1
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_allocation_is_terminal
+// CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
+util.func public @buffer_allocation_is_terminal(%buffer: !hal.buffer) -> i1 {
+  // CHECK: %[[IS_TERMINAL:.+]] = vm.call @hal.buffer.allocation.is_terminal(%[[BUFFER]])
+  %is_terminal = hal.buffer.allocation.is_terminal<%buffer : !hal.buffer> : i1
+  // CHECK: vm.return %[[IS_TERMINAL]]
+  util.return %is_terminal : i1
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_subspan
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-util.func public @buffer_subspan(%buffer : !hal.buffer) -> !hal.buffer {
+util.func public @buffer_subspan(%buffer: !hal.buffer) -> !hal.buffer {
   %c42 = arith.constant 42 : index
   %c43 = arith.constant 43 : index
   // CHECK: %[[RET:.+]] = vm.call @hal.buffer.subspan(%[[BUFFER]], %c42, %c43) {nosideeffects} : (!vm.ref<!hal.buffer>, i64, i64) -> !vm.ref<!hal.buffer>

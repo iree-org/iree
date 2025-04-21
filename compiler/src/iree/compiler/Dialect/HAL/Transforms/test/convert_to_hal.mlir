@@ -140,7 +140,7 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   // CHECK: hal.device.queue.execute<%[[DEVICE]]
   // CHECK-SAME: wait(%[[NULL_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
-  // CHECK-SAME: commands([%[[CMD]]])
+  // CHECK-SAME: commands(%[[CMD]])
 
   // CHECK: hal.fence.await until([%[[SIGNAL_FENCE]]])
   %result_ready = stream.timepoint.await %timepoint => %result_resource : !stream.resource<external>{%c16}

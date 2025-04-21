@@ -8,6 +8,7 @@
 #include <numeric>
 
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/MathExtras.h"
@@ -27,10 +28,6 @@ struct LLVMCPUVerifyVectorSizeLegalityPass
   using impl::LLVMCPUVerifyVectorSizeLegalityPassBase<
       LLVMCPUVerifyVectorSizeLegalityPass>::
       LLVMCPUVerifyVectorSizeLegalityPassBase;
-  explicit LLVMCPUVerifyVectorSizeLegalityPass(
-      int64_t maxAllowedNumberOfNativeVectors) {
-    this->maxAllowedNumberOfNativeVectors = maxAllowedNumberOfNativeVectors;
-  }
 
   void runOnOperation() override;
 };
@@ -53,25 +50,9 @@ static int64_t getTotalSizeInBytes(Type elemType, ArrayRef<int64_t> shape) {
 
 void LLVMCPUVerifyVectorSizeLegalityPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
-  // Use 64 bits as target hardware vector size if the native_vector_size is not
-  // present.
-  int64_t maxVectorSizeInBytes = 8;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  if (targetAttr) {
-    auto nativeVectorSizeAttr =
-        getConfigIntegerAttr(targetAttr, "native_vector_size");
-    if (nativeVectorSizeAttr) {
-      maxVectorSizeInBytes = nativeVectorSizeAttr->getInt();
-    }
-  }
-  constexpr int64_t kInt64Max = std::numeric_limits<int64_t>::max();
-  if (maxVectorSizeInBytes >
-      kInt64Max / this->maxAllowedNumberOfNativeVectors) {
-    funcOp.emitError("The value of maxAllowedNumberOfNativeVectors is too "
-                     "large, which causes integer overflow. Is it a bug?");
-    return signalPassFailure();
-  }
-  maxVectorSizeInBytes *= this->maxAllowedNumberOfNativeVectors;
+  int64_t maxVectorSizeInBytes =
+      getMaxVectorSizeForLargeVectorCheck(targetAttr);
 
   auto checkFn = [&](Type t) {
     auto vectorType = dyn_cast<VectorType>(t);
@@ -118,11 +99,6 @@ void LLVMCPUVerifyVectorSizeLegalityPass::runOnOperation() {
   }
 
   signalPassFailure();
-}
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createLLVMCPUVerifyVectorSizeLegalityPass(int64_t ratio) {
-  return std::make_unique<LLVMCPUVerifyVectorSizeLegalityPass>(ratio);
 }
 
 } // namespace mlir::iree_compiler

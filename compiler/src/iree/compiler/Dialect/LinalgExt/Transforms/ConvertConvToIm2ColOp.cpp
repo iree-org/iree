@@ -12,6 +12,8 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-linalg-ext-convert-conv-to-im2col-op"
+
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 #define GEN_PASS_DEF_CONVERTCONVTOIM2COLOPPASS
@@ -60,6 +62,58 @@ static SmallVector<int64_t> getBasisFromShape(ArrayRef<int64_t> shape) {
   return basis;
 }
 
+// Collect all AffineDimExprs from an AffineExpr.
+static void collectDimExprs(ArrayRef<AffineExpr> exprs,
+                            DenseSet<AffineExpr> &out) {
+  for (auto &expr : exprs) {
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+      out.insert(dimExpr);
+    } else if (auto binOpExpr = dyn_cast<AffineBinaryOpExpr>(expr)) {
+      collectDimExprs({binOpExpr.getLHS(), binOpExpr.getRHS()}, out);
+    } else {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Non-dimension expression found: " << expr << "\n");
+    }
+  }
+}
+
+// Computes `inputKPerm` that maps the input spatial and channel dimension order
+// to filter's.
+static SmallVector<int64_t> computeInputKPerm(AffineMap inputMap,
+                                              AffineMap filterMap) {
+  DenseSet<AffineExpr> inputDimsSet;
+  DenseSet<AffineExpr> filterDimsSet;
+  collectDimExprs(inputMap.getResults(), inputDimsSet);
+  collectDimExprs(filterMap.getResults(), filterDimsSet);
+
+  // Get shared dims from input and filter in order of appearance.
+  SmallVector<AffineExpr> inputSharedDims;
+  SmallVector<AffineExpr> filterSharedDims;
+  for (AffineExpr expr : inputMap.getResults()) {
+    expr.walk([&](AffineExpr dimExpr) {
+      if (filterDimsSet.contains(dimExpr)) {
+        inputSharedDims.push_back(dimExpr);
+      }
+    });
+  }
+  for (AffineExpr expr : filterMap.getResults()) {
+    expr.walk([&](AffineExpr dimExpr) {
+      if (inputDimsSet.contains(dimExpr)) {
+        filterSharedDims.push_back(dimExpr);
+      }
+    });
+  }
+  // Compute the permutation that maps inputSharedDims to filterSharedDims.
+  SmallVector<int64_t> inputKPerm;
+  for (AffineExpr filterExpr : filterSharedDims) {
+    auto it = llvm::find(inputSharedDims, filterExpr);
+    assert(it != inputSharedDims.end() &&
+           "Filter dimension not found in input shared dimensions");
+    inputKPerm.push_back(std::distance(inputSharedDims.begin(), it));
+  }
+  return inputKPerm;
+}
+
 namespace {
 
 using ControlFnTy = std::function<bool(Operation *)>;
@@ -67,7 +121,7 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // and linalg.matmul.
 // The following explains this for a linalg.conv_2d_nhwc_hwcf op.
 //
-// A convolution operaton can be written as a matrix-matrix multiplication by
+// A convolution operation can be written as a matrix-matrix multiplication by
 // unfolding the cross correlation between input and filter and explicitly copy
 // overlapped sliding window inputs.
 //
@@ -83,7 +137,7 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // size, |columns| = filter spatial size. To compute the output Y(i, j) we need
 // to calculate the dot product between filter window at input X(x, y)) and the
 // filter which will look like the following where r.h.s is the img2col matrix
-// and l.h.s is the flattned filter:
+// and l.h.s is the flattened filter:
 //
 // clang-format off
 // [x(0, 0), x(0, 1), x(1, 0), x(1, 1)]
@@ -93,10 +147,10 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // clang-format on
 //
 // In general for 2D case with (N, H, W, C) input and (Kh, Kw, C, D) filter
-// and output (N, Ho, Wo, D) the convolutin is the following matrix-matrix
+// and output (N, Ho, Wo, D) the convolution is the following matrix-matrix
 // multiplication (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in
-// the N input. For the case where N > 1 its a batched matrxi-matrix
-// multplication.
+// the N batches. For the case where N > 1 its a batched matrxi-matrix
+// multiplication.
 
 class ConvertConvGeneric final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
@@ -211,6 +265,9 @@ public:
 
     SmallVector<OpFoldResult> kOffset(kBasis.size(), rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> mOffset(mBasis.size(), rewriter.getIndexAttr(0));
+
+    SmallVector<int64_t> inputKPerm = computeInputKPerm(inputMap, filterMap);
+
     auto loc = linalgOp.getLoc();
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
@@ -219,7 +276,7 @@ public:
             .create<IREE::LinalgExt::Im2colOp>(
                 loc, input, /*output=*/colTensor, convDims.strides,
                 convDims.dilations, kernelSizes, mOffset, mBasis, kOffset,
-                kBasis, batchPos, mPos, kPos)
+                kBasis, batchPos, mPos, kPos, inputKPerm)
             .getResult(0);
 
     Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(

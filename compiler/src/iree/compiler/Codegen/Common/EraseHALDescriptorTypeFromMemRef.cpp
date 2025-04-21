@@ -79,7 +79,6 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
 
           Attribute globalSpace = gpu::AddressSpaceAttr::get(
               memRefType.getContext(), gpu::AddressSpace::Global);
-
           // Erase the #hal.descriptor_type memory space.
           if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
             return MemRefType::get(memRefType.getShape(),

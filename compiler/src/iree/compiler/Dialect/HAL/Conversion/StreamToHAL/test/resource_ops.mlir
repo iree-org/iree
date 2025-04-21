@@ -28,7 +28,8 @@ util.func public @resourceAlloca(%size: index) -> (!stream.resource<transient>, 
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%c0
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
+  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}DispatchStorage")
+  // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
   %0:2 = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]
@@ -49,7 +50,8 @@ util.func public @resourceAllocaAwait(%size: index, %await_timepoint: !stream.ti
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%c0
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
+  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}DispatchStorage")
+  // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
   %0:2 = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]
@@ -91,6 +93,35 @@ util.func public @resourceDeallocaAwait(%size: index, %resource: !stream.resourc
   %0 = stream.resource.dealloca on(#hal.device.affinity<@device>) await(%await_timepoint) => %resource : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[SIGNAL_FENCE]]
   util.return %0 : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @resourceRetain
+util.func private @resourceRetain(%arg0: !stream.resource<transient>, %arg1: index) {
+  // CHECK: hal.buffer.allocation.preserve<%arg0 : !hal.buffer>
+  stream.resource.retain %arg0 : !stream.resource<transient>{%arg1}
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @resourceRelease
+util.func private @resourceRelease(%arg0: !stream.resource<transient>, %arg1: index) -> i1 {
+  // CHECK: %[[WAS_TERMINAL:.+]] = hal.buffer.allocation.discard<%arg0 : !hal.buffer>
+  %was_terminal = stream.resource.release %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK: util.return %[[WAS_TERMINAL]]
+  util.return %was_terminal : i1
+}
+
+// -----
+
+// CHECK-LABEL: @resourceIsTerminal
+util.func private @resourceIsTerminal(%arg0: !stream.resource<transient>, %arg1: index) -> i1 {
+  // CHECK: %[[IS_TERMINAL:.+]] = hal.buffer.allocation.is_terminal<%arg0 : !hal.buffer>
+  %is_terminal = stream.resource.is_terminal %arg0 : !stream.resource<transient>{%arg1}
+  // CHECK: util.return %[[IS_TERMINAL]]
+  util.return %is_terminal : i1
 }
 
 // -----

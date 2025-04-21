@@ -832,7 +832,7 @@ bool isClonableIntoDispatchOp(Operation *op,
   // with bufferization. Make them clonable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          complex::CreateOp>(op)) {
+          complex::CreateOp, IREE::Encoding::UnsetEncodingOp>(op)) {
     return true;
   }
   if (LinalgExt::isBitExtendOp(op)) {
@@ -916,6 +916,17 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
       if (insertSliceUser.getDest() == v)
         return true;
+    }
+
+    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
+      // Only clone if used by Query, Mask, or scale.
+      if (!LinalgExt::isBitExtendOp(v.getDefiningOp()) &&
+          !llvm::is_contained<Value>(
+              {attentionOp.getQuery(), attentionOp.getMask(),
+               attentionOp.getScale(), attentionOp.getOutput()},
+              v)) {
+        return true;
+      }
     }
   }
   return false;

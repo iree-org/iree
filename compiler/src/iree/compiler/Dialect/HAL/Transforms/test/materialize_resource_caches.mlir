@@ -259,13 +259,14 @@ util.global private @device : !hal.device
 util.global private @_executable_exe : !hal.executable
 util.initializer {
   %c0 = arith.constant 0 : index
+  %affinity = arith.constant -1 : i64
   %device = hal.devices.get %c0 : !hal.device
   %format_ok, %format_supported = hal.device.query<%device : !hal.device> key("hal.executable.format" :: "some-format") : i1, i1
   %c-1 = arith.constant -1 : index
   %variant = arith.select %format_supported, %c0, %c-1 : index
   %selected = scf.index_switch %variant -> !hal.executable
   case 0 {
-    %exe = hal.executable.create device(%device : !hal.device) target(@exe0::@vmvx) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) affinity(%affinity) target(@exe0::@vmvx) : !hal.executable
     scf.yield %exe : !hal.executable
   }
   default {

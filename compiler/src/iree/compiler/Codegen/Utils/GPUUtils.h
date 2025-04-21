@@ -147,6 +147,11 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 /// Helper function to return native size for MMA.SYNC-based operations.
 std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 
+/// Return true if the given memref has one of the global address spaces - no
+/// adress space, explicit integer 0, #gpu.address_space<global>, or
+/// #amdgpu.address_space<fat_raw_buffer>
+bool hasGlobalMemoryAddressSpace(MemRefType memrefType);
+
 /// Return true if the given memref has workgroup memory space.
 bool hasSharedMemoryAddressSpace(MemRefType memrefType);
 
@@ -199,9 +204,8 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Returns std::nullopt if none found.
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
-/// Returns all `IREE::HAL::ExecutableVariantOp` operations from the
-/// given `mlir::ModuleOp`, ensuring they are returned in their original IR
-/// order.
+/// Returns the top-level `IREE::HAL::ExecutableVariantOp` operations from the
+/// given `moduleOp`, ensuring they are returned in their original IR order.
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
 
@@ -209,6 +213,10 @@ getExecutableVariantOps(mlir::ModuleOp moduleOp);
 // `IREE::HAL::ExecutableVariantOp`.
 SmallVector<IREE::GPU::MMAIntrinsic>
 queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
+
+// Returns all operations within the given module that are marked with the
+// tuner root op attribute (i.e., have the `root_op` UnitAttr).
+SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);
 
 } // namespace mlir::iree_compiler
 

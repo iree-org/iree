@@ -777,6 +777,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     }
     kBasis.push_back(size);
   }
+
+  // Transpose the order of (P, Q, C) according to `inputKPerm` encoded in
+  // im2col metadata.
+  ArrayRef<int64_t> inputKPerm = getInputKPerm();
+  applyPermutationToVector(kBasis, inputKPerm);
+
   OpFoldResult kIndex = kOffset;
   for (auto [i, ivIdx, stride] :
        llvm::enumerate(getKOutputDims(), getMixedKStrides())) {
@@ -792,17 +798,18 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
            /*hasOuterBound=*/true)
           .getResults();
   // Split the delinearized offsets into the window offsets (for M offsets)
-  // and the K offsets for the input tensor.
+  // and the K offsets for the input tensor based on the layout.
   SmallVector<Value> windowOffset, inputKOffset;
   int delinKIdx = 0;
+  SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
   for (int i = 0; i < getInputRank(); ++i) {
     if (batchPosSet.contains(i))
       continue;
     if (mPosSet.contains(i)) {
-      windowOffset.push_back(delinKOffset[delinKIdx++]);
+      windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
       continue;
     }
-    inputKOffset.push_back(delinKOffset[delinKIdx++]);
+    inputKOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
   }
 
   // Compute offsets for extract. The linearized im2col result M offset is

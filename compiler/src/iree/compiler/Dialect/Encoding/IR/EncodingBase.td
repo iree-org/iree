@@ -23,6 +23,9 @@ def IREEEncoding_Dialect : Dialect {
     A dialect defining IREE tensor encoding attributes and related ops, used to
     implement data-tiling.
   }];
+  let extraClassDeclaration = [{
+    void registerAttributes();
+  }];
   let useDefaultAttributePrinterParser = 1;
 }
 

@@ -42,15 +42,13 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *i8PtrType = llvm::PointerType::getUnqual(context);
-  auto *type =
-      llvm::StructType::create(context,
-                               {
-                                   i32Type,
-                                   llvm::PointerType::get(i8PtrType, 0),
-                               },
-                               "iree_hal_executable_import_table_v0_t",
-                               /*isPacked=*/false);
+  auto *type = llvm::StructType::create(context,
+                                        {
+                                            i32Type,
+                                            llvm::PointerType::get(context, 0),
+                                        },
+                                        "iree_hal_executable_import_table_v0_t",
+                                        /*isPacked=*/false);
   return type;
 }
 
@@ -98,18 +96,15 @@ static llvm::StructType *makeWorkgroupStateType(llvm::LLVMContext &context) {
 //      i8*)
 static llvm::FunctionType *
 makeDispatchFunctionType(llvm::LLVMContext &context) {
-  auto *environmentType = makeEnvironmentType(context);
-  auto *dispatchStateType = makeDispatchStateType(context);
-  auto *workgroupStateType = makeWorkgroupStateType(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  return llvm::FunctionType::get(
-      i32Type,
-      {
-          llvm::PointerType::get(environmentType, 0),
-          llvm::PointerType::get(dispatchStateType, 0),
-          llvm::PointerType::get(workgroupStateType, 0),
-      },
-      /*isVarArg=*/false);
+  auto *ptrType = llvm::PointerType::get(context, 0);
+  return llvm::FunctionType::get(i32Type,
+                                 {
+                                     ptrType,
+                                     ptrType,
+                                     ptrType,
+                                 },
+                                 /*isVarArg=*/false);
 }
 
 // %struct.iree_hal_executable_dispatch_attrs_v0_t = type {
@@ -182,17 +177,15 @@ makeStageLocationTableType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *i8PtrType = llvm::PointerType::getUnqual(context);
-  auto *sourceLocationType = makeSourceLocationType(context);
-  auto *type = llvm::StructType::create(
-      context,
-      {
-          i32Type,
-          llvm::PointerType::get(i8PtrType, 0),
-          llvm::PointerType::get(sourceLocationType, 0),
-      },
-      "iree_hal_executable_stage_location_table_v0_t",
-      /*isPacked=*/false);
+  auto *type =
+      llvm::StructType::create(context,
+                               {
+                                   i32Type,
+                                   llvm::PointerType::get(context, 0),
+                                   llvm::PointerType::get(context, 0),
+                               },
+                               "iree_hal_executable_stage_location_table_v0_t",
+                               /*isPacked=*/false);
   return type;
 }
 
@@ -211,26 +204,19 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *dispatchFunctionType = makeDispatchFunctionType(context);
-  auto *dispatchFunctionPointerType =
-      llvm::PointerType::get(dispatchFunctionType, 0);
-  auto *dispatchAttrsType = makeDispatchAttrsType(context);
-  auto *i8PtrType = llvm::PointerType::getUnqual(context);
-  auto *sourceLocationType = makeSourceLocationType(context);
-  auto *stageLocationTableType = makeStageLocationTableType(context);
-  auto *type = llvm::StructType::create(
-      context,
-      {
-          i32Type,
-          llvm::PointerType::get(dispatchFunctionPointerType, 0),
-          llvm::PointerType::get(dispatchAttrsType, 0),
-          llvm::PointerType::get(i8PtrType, 0),
-          llvm::PointerType::get(i8PtrType, 0),
-          llvm::PointerType::get(sourceLocationType, 0),
-          llvm::PointerType::get(stageLocationTableType, 0),
-      },
-      "iree_hal_executable_export_table_v0_t",
-      /*isPacked=*/false);
+  auto *ptrType = llvm::PointerType::get(context, 0);
+  auto *type = llvm::StructType::create(context,
+                                        {
+                                            i32Type,
+                                            ptrType,
+                                            ptrType,
+                                            ptrType,
+                                            ptrType,
+                                            ptrType,
+                                            ptrType,
+                                        },
+                                        "iree_hal_executable_export_table_v0_t",
+                                        /*isPacked=*/false);
   return type;
 }
 
@@ -288,12 +274,11 @@ static llvm::StructType *makeSourceTableType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *sourceFileType = makeSourceFileType(context);
   auto *type =
       llvm::StructType::create(context,
                                {
                                    i32Type,
-                                   llvm::PointerType::get(sourceFileType, 0),
+                                   llvm::PointerType::get(context, 0),
                                },
                                "iree_hal_executable_source_file_table_v0_t",
                                /*isPacked=*/false);
@@ -340,17 +325,16 @@ static llvm::StructType *makeLibraryType(llvm::StructType *libraryHeaderType) {
   auto *exportTableType = makeExportTableType(context);
   auto *constantTableType = makeConstantTableType(context);
   auto *sourceTableType = makeSourceTableType(context);
-  auto *type =
-      llvm::StructType::create(context,
-                               {
-                                   llvm::PointerType::get(libraryHeaderType, 0),
-                                   importTableType,
-                                   exportTableType,
-                                   constantTableType,
-                                   sourceTableType,
-                               },
-                               "iree_hal_executable_library_v0_t",
-                               /*isPacked=*/false);
+  auto *type = llvm::StructType::create(context,
+                                        {
+                                            llvm::PointerType::get(context, 0),
+                                            importTableType,
+                                            exportTableType,
+                                            constantTableType,
+                                            sourceTableType,
+                                        },
+                                        "iree_hal_executable_library_v0_t",
+                                        /*isPacked=*/false);
   return type;
 }
 
@@ -384,8 +368,8 @@ static llvm::Constant *createStringConstant(StringRef value,
 static llvm::Constant *createStringConstantOrNull(StringRef value,
                                                   llvm::Module *module) {
   if (value.empty()) {
-    auto i8Type = llvm::IntegerType::getInt8Ty(module->getContext());
-    return llvm::ConstantPointerNull::get(llvm::PointerType::get(i8Type, 0));
+    return llvm::ConstantPointerNull::get(
+        llvm::PointerType::get(module->getContext(), 0));
   }
   return createStringConstant(value, module);
 }
@@ -433,19 +417,16 @@ static llvm::Constant *createArrayConstant(StringRef name,
 llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   auto &context = module->getContext();
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *environmentStructType = makeEnvironmentType(context);
-  auto *environmentType = llvm::PointerType::get(environmentStructType, 0);
-  auto *libraryHeaderType = makeLibraryHeaderType(context);
+  auto *ptrType = llvm::PointerType::get(context, 0);
 
   // %struct.iree_hal_executable_library_header_t**
   // @iree_hal_library_query(i32, %struct.iree_hal_executable_environment_v0_t*)
-  auto *queryFuncType =
-      llvm::FunctionType::get(llvm::PointerType::get(libraryHeaderType, 0),
-                              {
-                                  i32Type,
-                                  environmentType,
-                              },
-                              /*isVarArg=*/false);
+  auto *queryFuncType = llvm::FunctionType::get(ptrType,
+                                                {
+                                                    i32Type,
+                                                    ptrType,
+                                                },
+                                                /*isVarArg=*/false);
   auto *func =
       llvm::Function::Create(queryFuncType, llvm::GlobalValue::InternalLinkage,
                              queryFuncName, *module);
@@ -461,10 +442,8 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
       builder.CreateICmpEQ(func->getArg(0),
                            llvm::ConstantInt::get(
                                i32Type, static_cast<int64_t>(Version::LATEST))),
-      builder.CreatePointerCast(v0,
-                                llvm::PointerType::get(libraryHeaderType, 0)),
-      llvm::ConstantPointerNull::get(
-          llvm::PointerType::get(libraryHeaderType, 0))));
+      builder.CreatePointerCast(v0, ptrType),
+      llvm::ConstantPointerNull::get(ptrType)));
 
   return func;
 }
@@ -473,10 +452,9 @@ llvm::Constant *
 LibraryBuilder::buildLibraryV0ImportTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *importTableType = makeImportTableType(context);
-  auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   llvm::Constant *symbolNames =
-      llvm::Constant::getNullValue(llvm::PointerType::get(i8Type, 0));
+      llvm::Constant::getNullValue(llvm::PointerType::get(context, 0));
   if (!imports.empty()) {
     SmallVector<llvm::Constant *> symbolNameValues;
     for (auto &import : imports) {
@@ -486,7 +464,7 @@ LibraryBuilder::buildLibraryV0ImportTable(std::string libraryName) {
       symbolNameValues.push_back(createStringConstant(symbolName, module));
     }
     symbolNames = createArrayConstant(libraryName + "_import_names",
-                                      llvm::PointerType::get(i8Type, 0),
+                                      llvm::PointerType::get(context, 0),
                                       symbolNameValues, module);
   }
   return llvm::ConstantStruct::get(
@@ -502,7 +480,6 @@ llvm::Constant *
 LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   auto &context = module->getContext();
   auto *exportTableType = makeExportTableType(context);
-  auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
   auto *sourceLocationType = makeSourceLocationType(context);
   auto *stageLocationTableType = makeStageLocationTableType(context);
@@ -510,18 +487,17 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   auto *i64Type = llvm::IntegerType::getInt64Ty(context);
+  auto *ptrType = llvm::PointerType::get(context, 0);
 
   // iree_hal_executable_export_table_v0_t::ptrs
   SmallVector<llvm::Constant *> exportPtrValues;
   for (auto dispatch : exports)
     exportPtrValues.push_back(dispatch.func);
   llvm::Constant *exportPtrs = createArrayConstant(
-      libraryName + "_funcs", llvm::PointerType::get(dispatchFunctionType, 0),
-      exportPtrValues, module);
+      libraryName + "_funcs", ptrType, exportPtrValues, module);
 
   // iree_hal_executable_export_table_v0_t::attrs
-  llvm::Constant *exportAttrs =
-      llvm::Constant::getNullValue(llvm::PointerType::get(i32Type, 0));
+  llvm::Constant *exportAttrs = llvm::Constant::getNullValue(ptrType);
   bool hasNonDefaultAttrs = llvm::any_of(exports, [](const auto &dispatch) {
     return !dispatch.attrs.isDefault();
   });
@@ -565,21 +541,17 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   }
 
   // iree_hal_executable_export_table_v0_t::names
-  llvm::Constant *exportNames =
-      llvm::Constant::getNullValue(llvm::PointerType::get(i8Type, 0));
+  llvm::Constant *exportNames = llvm::Constant::getNullValue(ptrType);
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
     SmallVector<llvm::Constant *> exportNameValues;
     for (auto dispatch : exports)
       exportNameValues.push_back(createStringConstant(dispatch.name, module));
-    exportNames = createArrayConstant(libraryName + "_names",
-                                      llvm::PointerType::get(i8Type, 0),
+    exportNames = createArrayConstant(libraryName + "_names", ptrType,
                                       exportNameValues, module);
   }
 
   // iree_hal_executable_export_table_v0_t::tags
-  auto *i8PtrType = llvm::PointerType::get(i8Type, 0);
-  llvm::Constant *exportTags =
-      llvm::Constant::getNullValue(llvm::PointerType::get(i8PtrType, 0));
+  llvm::Constant *exportTags = llvm::Constant::getNullValue(ptrType);
   bool hasAnyTags = llvm::any_of(
       exports, [](auto &dispatch) { return !dispatch.tag.empty(); });
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS && hasAnyTags) {
@@ -587,14 +559,12 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
     for (auto dispatch : exports)
       exportTagValues.push_back(
           createStringConstantOrNull(dispatch.tag, module));
-    exportTags = createArrayConstant(libraryName + "_tags",
-                                     llvm::PointerType::get(i8Type, 0),
+    exportTags = createArrayConstant(libraryName + "_tags", ptrType,
                                      exportTagValues, module);
   }
 
   // iree_hal_executable_export_table_v0_t::source_locations
-  llvm::Constant *exportSourceLocations = llvm::Constant::getNullValue(
-      llvm::PointerType::get(sourceLocationType, 0));
+  llvm::Constant *exportSourceLocations = llvm::Constant::getNullValue(ptrType);
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
     SmallVector<llvm::Constant *> exportSourceLocationValues;
     for (auto dispatch : exports) {
@@ -616,8 +586,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   }
 
   // iree_hal_executable_export_table_v0_t::stage_locations
-  llvm::Constant *exportStageLocations = llvm::Constant::getNullValue(
-      llvm::PointerType::get(stageLocationTableType, 0));
+  llvm::Constant *exportStageLocations = llvm::Constant::getNullValue(ptrType);
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
     SmallVector<llvm::Constant *> exportStageTableValues;
     for (auto dispatch : exports) {
@@ -638,8 +607,8 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
             }));
       }
       llvm::Constant *stageNamesPtr = createArrayConstant(
-          libraryName + "_" + dispatch.name + "_stage_names",
-          llvm::PointerType::get(i8Type, 0), exportStageNameValues, module);
+          libraryName + "_" + dispatch.name + "_stage_names", ptrType,
+          exportStageNameValues, module);
       llvm::Constant *sourceLocationsPtr = createArrayConstant(
           libraryName + "_" + dispatch.name + "_stage_source_locations",
           sourceLocationType, exportSourceLocationValues, module);
@@ -699,7 +668,7 @@ LibraryBuilder::buildLibraryV0SourceTable(std::string libraryName) {
   auto *sourceTableType = makeSourceTableType(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   llvm::Constant *sourceFilesValue =
-      llvm::Constant::getNullValue(llvm::PointerType::get(sourceFileType, 0));
+      llvm::Constant::getNullValue(llvm::PointerType::get(context, 0));
   if (!sourceFiles.empty()) {
     SmallVector<llvm::Constant *> sourceFileValues;
     for (auto &sourceFile : sourceFiles) {

@@ -172,6 +172,10 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("rocm");
 }
 
+bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
+}
+
 static const char *getDefaultEnabledUkernels(Attribute attr) {
   const char *kNone = "none";
   if (!attr) {
@@ -1157,6 +1161,20 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
     return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
                                                  {byteOffset, elementByteSize});
   }
+}
+
+Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                  ValueRange convertedInputOperands,
+                                  ValueRange convertedOutputOperands) {
+  SmallVector<Value> operands;
+  operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
+  operands.append(convertedOutputOperands.begin(),
+                  convertedOutputOperands.end());
+  return mlir::clone(
+      builder, op,
+      {cast<RankedTensorType>(convertedOutputOperands[0].getType())
+           .dropEncoding()},
+      operands);
 }
 
 LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {

@@ -32,7 +32,7 @@ the same module code between all various modes with minor differences.
 
 1. Build or install the `iree-base-compiler` binary:
 
-    ```
+    ```sh
     python -m pip install iree-base-compiler
     ```
 
@@ -41,15 +41,19 @@ the same module code between all various modes with minor differences.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
 
-    ```
+    ```sh
     # This simple sample doesn't use tensors and can be compiled in host-only
     # mode to avoid the need for the HAL.
-    iree-compile --iree-hal-target-backends=vmvx samples/custom_module/static/test/example.mlir -o=/tmp/example.vmfb
+    iree-compile \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
+        samples/custom_module/static/test/example.mlir \
+        -o=/tmp/example.vmfb
     ```
 
 3. Configure the IREE tools to include the custom module:
 
-    ```
+    ```sh
     cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
         -DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1 \
         -DIREE_EXTERNAL_TOOLING_MODULES=static_sample \
@@ -61,6 +65,7 @@ the same module code between all various modes with minor differences.
         -DIREE_EXTERNAL_TOOLING_MODULE_STATIC_SAMPLE_CREATE=create_sample_module
     cmake --build ../iree-build/ --target iree-run-module
     ```
+
     (here we force runtime execution tracing for demonstration purposes)
 
     [See here](https://iree.dev/building-from-source/getting-started/)
@@ -68,7 +73,7 @@ the same module code between all various modes with minor differences.
 
 4. Run the example program using the main `iree-run-module` tool:
 
-   ```
+   ```sh
    ../iree-build/tools/iree-run-module \
       --module=/tmp/example.vmfb \
       --function=main

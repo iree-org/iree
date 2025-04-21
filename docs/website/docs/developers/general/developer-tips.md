@@ -153,11 +153,12 @@ Flag | Files dumped
 
 === "CPU"
 
-    ```console hl_lines="5 6"
+    ```console hl_lines="6 7"
     $ mkdir -p /tmp/iree/simple_abs/
 
     $ iree-compile simple_abs.mlir \
-      --iree-hal-target-backends=llvm-cpu \
+      --iree-hal-target-device=local \
+      --iree-hal-local-target-device-backends=llvm-cpu \
       --iree-llvmcpu-link-embedded=false \
       --iree-hal-dump-executable-files-to=/tmp/iree/simple_abs \
       -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb
@@ -246,7 +247,7 @@ Flag | Files dumped
     $ mkdir -p /tmp/iree/simple_abs/
 
     $ iree-compile simple_abs.mlir \
-      --iree-hal-target-backends=vulkan-spirv \
+      --iree-hal-target-device=vulkan \
       --iree-hal-dump-executable-files-to=/tmp/iree/simple_abs \
       -o /tmp/iree/simple_abs/simple_abs_vulkan.vmfb
 
@@ -320,7 +321,7 @@ Flag | Files dumped
     $ mkdir -p /tmp/iree/simple_abs/
 
     $ iree-compile simple_abs.mlir \
-      --iree-hal-target-backends=cuda \
+      --iree-hal-target-device=cuda \
       --iree-hal-dump-executable-files-to=/tmp/iree/simple_abs \
       -o /tmp/iree/simple_abs/simple_abs_cuda.vmfb
 
@@ -395,9 +396,10 @@ The _benchmark_ files produced by `--iree-hal-dump-executable-benchmarks-to`
 can be compiled in isolation and passed to `iree-benchmark-module`, where they
 exercise the full IREE runtime for a single executable:
 
-```console hl_lines="3 6-11"
+```console hl_lines="4 7-12"
 $ iree-compile simple_abs.mlir \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-hal-dump-executable-benchmarks-to=/tmp/iree/simple_abs/ \
   -o /dev/null
 
@@ -417,9 +419,10 @@ directly, without using the IREE VM, HAL APIs, task system, etc. Note that this
 interface is much lower level and you must specify all push constants / binding
 parameters manually:
 
-```console hl_lines="3 6-13"
+```console hl_lines="4 7-14"
 $ iree-compile \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-hal-dump-executable-binaries-to=/tmp/iree/simple_abs/ \
   -o /dev/null
 
@@ -525,15 +528,17 @@ $ sed \
   simple_abs_abi.mlir > simple_exp_abi.mlir
 
 $ iree-compile simple_exp_abi.mlir \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   -o simple_exp_cpu.vmfb
 ```
 
 or explicitly resume from an intermediate phase with `--compile-from=<phase name>`:
 
-```console hl_lines="3"
+```console hl_lines="4"
 $ iree-compile simple_exp_abi.mlir \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --compile-from=abi \
   -o simple_exp_cpu.vmfb
 ```
@@ -543,9 +548,10 @@ $ iree-compile simple_exp_abi.mlir \
 The `--dump-compilation-phases-to` flag can be used to dump program IR after
 each phase, much like `--compile-to` but without exiting early:
 
-```console hl_lines="3"
+```console hl_lines="4"
 $ iree-compile simple_abs.mlir \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --dump-compilation-phases-to=/tmp/iree/simple_abs \
   -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb
 
@@ -569,7 +575,8 @@ As with `--compile-to`, these files can be used together with `--compile-from`:
 
 ```console
 $ iree-compile simple_abs.2.abi.mlir \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --compile-from=abi \
   -o simple_exp_cpu.vmfb
 ```

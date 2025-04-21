@@ -42,13 +42,6 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'unit_test')
     uses: ./.github/workflows/pkgci_unit_test.yml
 
-  # Tests for large programs.
-  regression_test:
-    name: Regression Test
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
-    uses: ./.github/workflows/pkgci_regression_test.yml
-
   ########################### Hardware/accelerators ###########################
   # Jobs that run unit tests on special hardware platforms or accelerators
   #############################################################################
@@ -133,7 +126,6 @@ jobs:
       - setup
       - build_packages
       - unit_test
-      - regression_test
       - test_amd_mi250
       - test_amd_mi300
       - test_amd_w7900

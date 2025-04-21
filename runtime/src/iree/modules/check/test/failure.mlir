@@ -1,4 +1,4 @@
-// RUN: iree-compile --iree-hal-target-backends=vmvx --iree-input-demote-f64-to-f32=false %s | iree-check-module --module=- --expect_failure | FileCheck %s
+// RUN: iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx --iree-input-demote-f64-to-f32=false %s | iree-check-module --module=- --expect_failure | FileCheck %s
 
 // CHECK-LABEL: expect_true_of_false
 // CHECK: Expected 0 to be nonzero

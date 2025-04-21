@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes))" %s | FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes{enable-bubble-up-expand-shapes-across-reduction-ops}))" %s | FileCheck %s --check-prefixes=CHECK,CHECK-AGGRESSIVE
 
 util.func public @bubbble_expand_through_extract(%arg0 : tensor<2x4096x5120xf16>) -> (tensor<2x64x64x2560xf16>) {
   %extracted_slice_237 = tensor.extract_slice %arg0[0, 0, 0] [2, 4096, 2560] [1, 1, 1] : tensor<2x4096x5120xf16> to tensor<2x4096x2560xf16>
@@ -77,7 +78,6 @@ util.func public @attention_v_reshape_propagation(%arg0: index,
 util.func @multiple_users(%arg0 : tensor<?x128xf16>,
     %arg1 : tensor<4x?x32x128xf16>) -> tensor<4x?x32x8x16xf16> {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   %dim = tensor.dim %arg0, %c0 : tensor<?x128xf16>
   %empty = tensor.empty(%dim) : tensor<4x?x32x128xf16>
   %0 = linalg.generic {
@@ -97,7 +97,7 @@ util.func @multiple_users(%arg0 : tensor<?x128xf16>,
       %2 = arith.addf %1, %b0 : f16
       linalg.yield %2 : f16
   } -> tensor<4x?x32x128xf16>
-  %1 = tensor.dim %0, %c1 : tensor<4x?x32x128xf16>
+  %1 = tensor.dim %arg0, %c0 : tensor<?x128xf16>
   %2 = tensor.expand_shape %0 [[0], [1], [2], [3, 4]] output_shape [4, %1, 32, 8, 16]
       : tensor<4x?x32x128xf16> into tensor<4x?x32x8x16xf16>
   util.return %2 : tensor<4x?x32x8x16xf16>
@@ -108,3 +108,29 @@ util.func @multiple_users(%arg0 : tensor<?x128xf16>,
 //       CHECK:   %[[EXPANDED_GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[EXPAND_SHAPE]] :
 //       CHECK:   return %[[EXPANDED_GENERIC]]
+
+// -----
+
+// Bubbling through reductions should apply when enabled via flag.
+util.func @bubble_up_through_reduction(%arg0: tensor<10x?xi64>) -> tensor<2x5xi64> {
+  %outs = tensor.empty() : tensor<10xi64>
+  %9 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%arg0 : tensor<10x?xi64>) outs(%outs : tensor<10xi64>) {
+  ^bb0(%in: i64, %out: i64):
+    %x = arith.addi %in, %out : i64
+    linalg.yield %x : i64
+  } -> tensor<10xi64>
+  %expanded = tensor.expand_shape %9 [[0, 1]] output_shape [2, 5] : tensor<10xi64> into tensor<2x5xi64>
+  util.return %expanded : tensor<2x5xi64>
+}
+//      CHECK-LABEL: func public @bubble_up_through_reduction
+//       CHECK-SAME:     %[[ARG0:.+]]: tensor
+//    CHECK-DEFAULT:   %[[GENERIC:.+]] = linalg.generic {{.+}} ins(%[[ARG0]]
+//    CHECK-DEFAULT:   %[[EXPANDED:.+]] = tensor.expand_shape %[[GENERIC]]
+//    CHECK-DEFAULT:   return %[[EXPANDED]]
+
+// CHECK-AGGRESSIVE:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]]
+// CHECK-AGGRESSIVE:   %[[EXPANDED_GENERIC:.+]] = linalg.generic {{.+}} ins(%[[EXPANDED]]
+// CHECK-AGGRESSIVE:   return %[[EXPANDED_GENERIC]]

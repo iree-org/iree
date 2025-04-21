@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 // TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -16,6 +17,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/ElementPackingUtils.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -45,11 +47,16 @@ namespace {
 static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
-  auto encoding = encodingType.getEncoding();
-  if (encoding && !llvm::isa<IREE::Encoding::EncodingAttr,
-                             IREE::Encoding::PackedStorageAttr>(encoding)) {
+  if (llvm::isa_and_nonnull<IREE::Encoding::PackedStorageAttr>(
+          encodingType.getEncoding())) {
+    return success();
+  }
+
+  auto serializableEncoding =
+      IREE::Encoding::getSerializableEncodingAttrInterface(encodingType);
+  if (serializableEncoding && !serializableEncoding.isSerialized()) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
-      d << "unsupported tensor encoding: " << encodingType;
+      d << "unsupported (unserialized) tensor encoding: " << encodingType;
     });
   }
   return success();

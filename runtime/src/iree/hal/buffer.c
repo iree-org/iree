@@ -219,11 +219,12 @@ IREE_API_EXPORT void iree_hal_buffer_initialize(
     iree_hal_buffer_usage_t allowed_usage,
     const iree_hal_buffer_vtable_t* vtable, iree_hal_buffer_t* buffer) {
   iree_hal_resource_initialize(vtable, &buffer->resource);
-  buffer->placement = placement;
   buffer->allocated_buffer = allocated_buffer;
   buffer->allocation_size = allocation_size;
   buffer->byte_offset = byte_offset;
   buffer->byte_length = byte_length;
+  buffer->placement = placement;
+  buffer->preserve_count = IREE_ATOMIC_VAR_INIT(1);
   buffer->memory_type = memory_type;
   buffer->allowed_access = allowed_access;
   buffer->allowed_usage = allowed_usage;
@@ -527,6 +528,38 @@ iree_hal_buffer_allocation_placement(const iree_hal_buffer_t* buffer) {
   return buffer == buffer->allocated_buffer
              ? buffer->placement
              : buffer->allocated_buffer->placement;
+}
+
+IREE_API_EXPORT void iree_hal_buffer_allocation_preserve(
+    iree_hal_buffer_t* buffer) {
+  if (IREE_UNLIKELY(!buffer)) return;
+  iree_atomic_uint32_t* preserve_count =
+      buffer == buffer->allocated_buffer
+          ? &buffer->preserve_count
+          : &buffer->allocated_buffer->preserve_count;
+  iree_atomic_fetch_add(preserve_count, 1, iree_memory_order_acquire);
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT bool iree_hal_buffer_allocation_discard(
+    iree_hal_buffer_t* buffer) {
+  if (IREE_UNLIKELY(!buffer)) return false;
+  iree_atomic_uint32_t* preserve_count =
+      buffer == buffer->allocated_buffer
+          ? &buffer->preserve_count
+          : &buffer->allocated_buffer->preserve_count;
+  return iree_atomic_fetch_sub(preserve_count, 1, iree_memory_order_release) ==
+         1;
+}
+
+IREE_API_EXPORT bool iree_hal_buffer_allocation_is_terminal(
+    const iree_hal_buffer_t* buffer) {
+  if (IREE_UNLIKELY(!buffer)) return false;
+  const iree_atomic_uint32_t* preserve_count =
+      buffer == buffer->allocated_buffer
+          ? &buffer->preserve_count
+          : &buffer->allocated_buffer->preserve_count;
+  return iree_atomic_load((iree_atomic_uint32_t*)preserve_count,
+                          iree_memory_order_acquire) == 1;
 }
 
 IREE_API_EXPORT iree_device_size_t

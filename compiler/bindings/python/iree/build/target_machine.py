@@ -29,13 +29,14 @@ class TargetMachine:
 
     @property
     def flag_list(self) -> list[str]:
+        # This is just a hard-coded machine model using a single IREE device
+        # type alias in the default configuration.
+        flags = []
         if self.iree_compile_device_type is not None:
-            # This is just a hard-coded machine model using a single IREE device
-            # type alias in the default configuration.
-            return [f"--iree-hal-target-device={self.iree_compile_device_type}"] + (
-                self.extra_flags or []
-            )
-        raise RuntimeError(f"Cannot compute iree-compile flags for: {self}")
+            flags.append(f"--iree-hal-target-device={self.iree_compile_device_type}")
+        if self.extra_flags:
+            flags.extend(self.extra_flags)
+        return flags
 
     def __repr__(self):
         r = f"TargetMachine({self.target_spec}, "
@@ -68,21 +69,23 @@ def handle_unknown_hal_target_device(mnemonic: str) -> list[TargetMachine]:
     return [TargetMachine(mnemonic, iree_compile_device_type=mnemonic)]
 
 
-@handle_hal_target_devices_from_flags("amdgpu", "hip")
+@handle_hal_target_devices_from_flags("hip")
 @expand_cl_arg_defaults
 def amdgpu_hal_target_from_flags(
-    mnemonic: str, *, amdgpu_target=cl_arg_ref("iree_amdgpu_target")
+    mnemonic: str, *, hip_target=cl_arg_ref("iree_hip_target")
 ) -> list[TargetMachine]:
-    if not amdgpu_target:
+    if not hip_target:
         raise RuntimeError(
-            "No AMDGPU targets specified. Pass a chip to target as "
-            "--iree-amdgpu-target=gfx..."
+            "No HIP targets specified. Pass a chip to target as "
+            "--iree-hip-target=gfx..."
         )
     return [
         TargetMachine(
-            f"amdgpu-{amdgpu_target}",
-            iree_compile_device_type="amdgpu",
-            extra_flags=[f"--iree-hip-target={amdgpu_target}"],
+            f"hip-{hip_target}",
+            extra_flags=[
+                "--iree-hal-target-device=hip",
+                f"--iree-hip-target={hip_target}",
+            ],
         )
     ]
 
@@ -96,7 +99,10 @@ def cpu_hal_target_from_flags(
     features=cl_arg_ref("iree_llvmcpu_target_cpu_features"),
 ) -> list[TargetMachine]:
     target_spec = "cpu"
-    extra_flags = []
+    extra_flags = [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+    ]
     if cpu:
         target_spec += f"-{cpu}"
         extra_flags.append(f"--iree-llvmcpu-target-cpu={cpu}")
@@ -107,7 +113,6 @@ def cpu_hal_target_from_flags(
     return [
         TargetMachine(
             f"cpu-{cpu or 'generic'}",
-            iree_compile_device_type="llvm-cpu",
             extra_flags=extra_flags,
         )
     ]
@@ -137,13 +142,12 @@ def _(p: argparse.ArgumentParser):
     )
 
     hip_g = p.add_argument_group(
-        title="IREE AMDGPU Target Options",
-        description="Options controlling explicit targeting of AMDGPU devices",
+        title="IREE HIP Target Options",
+        description="Options controlling explicit targeting of HIP devices",
     )
     hip_g.add_argument(
-        "--iree-amdgpu-target",
         "--iree-hip-target",
-        help="AMDGPU target selection (i.e. 'gfxYYYY')",
+        help="HIP target selection (i.e. 'gfxYYYY')",
     )
 
     cpu_g = p.add_argument_group(

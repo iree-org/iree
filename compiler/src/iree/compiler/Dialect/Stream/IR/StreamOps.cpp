@@ -34,18 +34,6 @@ namespace mlir::iree_compiler::IREE::Stream {
 // Op utilities used within the stream dialect
 //===----------------------------------------------------------------------===//
 
-// TODO(hanchung): Have a better fix. This is a fix for
-// https://reviews.llvm.org/D124649
-static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
-                       ArrayRef<Type> types,
-                       SmallVector<OpAsmParser::Argument> &args) {
-  for (auto [operand, type] : llvm::zip_equal(operands, types)) {
-    auto &arg = args.emplace_back();
-    arg.ssaName = operand;
-    arg.type = type;
-  }
-}
-
 // Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
 static LogicalResult
 verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
@@ -1078,7 +1066,7 @@ static ParseResult parseResourceRegion(
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
     ArrayAttr &tiedOperands, Region &body) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
+  SmallVector<OpAsmParser::Argument, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -1091,8 +1079,7 @@ static ParseResult parseResourceRegion(
       regionArgs.emplace_back();
       if (failed(parser.parseOperand(operands.back())) ||
           failed(parser.parseKeyword("as")) ||
-          failed(parser.parseOperand(regionArgs.back(),
-                                     /*allowResultNumber=*/false)) ||
+          failed(parser.parseArgument(regionArgs.back())) ||
           failed(parser.parseColon()) ||
           failed(parseSizeAwareType(parser, operandTypes.back(),
                                     operandSizes.back()))) {
@@ -1123,9 +1110,10 @@ static ParseResult parseResourceRegion(
     }
   }
 
-  SmallVector<OpAsmParser::Argument> args;
-  createArgs(regionArgs, operandTypes, args);
-  return parser.parseRegion(body, args);
+  for (auto [iterArg, type] : llvm::zip_equal(regionArgs, operandTypes)) {
+    iterArg.type = type;
+  }
+  return parser.parseRegion(body, regionArgs);
 }
 
 static void printResourceRegion(OpAsmPrinter &p, Operation *op,
@@ -1174,7 +1162,7 @@ static ParseResult parseExplicitResourceRegion(
     SmallVectorImpl<Type> &operandTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
     Region &body) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
+  SmallVector<OpAsmParser::Argument, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -1187,8 +1175,7 @@ static ParseResult parseExplicitResourceRegion(
       regionArgs.emplace_back();
       if (failed(parser.parseOperand(operands.back())) ||
           failed(parser.parseKeyword("as")) ||
-          failed(parser.parseOperand(regionArgs.back(),
-                                     /*allowResultNumber=*/false)) ||
+          failed(parser.parseArgument(regionArgs.back())) ||
           failed(parser.parseColon()) ||
           failed(parseSizeAwareType(parser, operandTypes.back(),
                                     operandSizes.back()))) {
@@ -1199,9 +1186,10 @@ static ParseResult parseExplicitResourceRegion(
       return failure();
     }
   }
-  SmallVector<OpAsmParser::Argument> args;
-  createArgs(regionArgs, operandTypes, args);
-  if (failed(parser.parseRegion(body, args))) {
+  for (auto [iterArg, type] : llvm::zip_equal(regionArgs, operandTypes)) {
+    iterArg.type = type;
+  }
+  if (failed(parser.parseRegion(body, regionArgs))) {
     return failure();
   }
   // HACK: I can't figure out how to make this work with the default parsing -
@@ -1484,7 +1472,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   if (locs.size() == 1) {
     auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
         locs.front(), resourceType, timepointType, storageSizes.front(),
-        awaitTimepoint, affinityAttr);
+        /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
     return {allocaOp, {allocaOp.getResult()}};
   }
   auto fusedLoc = builder.getFusedLoc(locs);
@@ -1514,7 +1502,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // Create the new alloca based on the total required size.
   auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
       fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
-      awaitTimepoint, affinityAttr);
+      /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
   auto slab = allocaOp.getResult();
   auto slabSize = packOp.getTotalLength();
 
@@ -1528,6 +1516,28 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
                           .getResult());
   }
   return {allocaOp, results};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.retain
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// stream.resource.release
+//===----------------------------------------------------------------------===//
+
+void ResourceReleaseOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
+}
+
+//===----------------------------------------------------------------------===//
+// stream.resource.is_terminal
+//===----------------------------------------------------------------------===//
+
+void ResourceIsTerminalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "is_terminal");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1824,7 +1834,7 @@ LogicalResult TensorImportOp::verify() {
   return success();
 }
 
-bool TensorImportOp::pinsValueAffinity() { return true; }
+bool TensorImportOp::pinsValueAffinity() { return getAffinity().has_value(); }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
@@ -1853,7 +1863,7 @@ LogicalResult TensorExportOp::verify() {
   return success();
 }
 
-bool TensorExportOp::pinsValueAffinity() { return true; }
+bool TensorExportOp::pinsValueAffinity() { return getAffinity().has_value(); }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
@@ -1950,6 +1960,25 @@ LogicalResult TensorCloneOp::verify() {
                             << sourceEncoding.getEncoding() << " to "
                             << resultEncoding.getEncoding() << "; not allowed";
   }
+  if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
+                                 op.getSourceEncodingDims())) ||
+      failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+bool TensorCloneOp::preferCloneToConsumers() { return true; }
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.encode
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEncodeOp::verify() {
+  TensorEncodeOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
                                  op.getSourceEncodingDims())) ||
       failed(verifyOpDynamicDims(op, op.getResultEncoding(),
@@ -2646,6 +2675,27 @@ SmallVector<int64_t> AsyncStoreOp::getTiedResultOperandIndices() {
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
+void AsyncDispatchOp::build(OpBuilder &builder, OperationState &state,
+                            ExecutableExportOp exportOp, ValueRange workload,
+                            TypeRange resultTypes, ValueRange operands,
+                            ValueRange operandSizes, ValueRange operandOffsets,
+                            ValueRange operandEnds, ValueRange operandLengths,
+                            ValueRange resultSizes,
+                            ArrayRef<int64_t> tiedOperands,
+                            AffinityAttr affinityAttr) {
+  StringRef executableOpSymName =
+      exportOp->getParentOp()
+          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+          .getValue();
+  auto entryPoint =
+      SymbolRefAttr::get(builder.getContext(), executableOpSymName,
+                         {SymbolRefAttr::get(exportOp)});
+  build(builder, state, resultTypes, workload,
+        builder.getArrayAttr({entryPoint}), operands, operandSizes,
+        operandOffsets, operandEnds, operandLengths, resultSizes,
+        cast<ArrayAttr>(builder.getIndexArrayAttr(tiedOperands)), affinityAttr);
+}
+
 static ParseResult parseDispatchOperands(
     OpAsmParser &parser,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOperands,
@@ -2773,6 +2823,16 @@ void AsyncDispatchOp::getAsyncAccessRanges(
     ranges.push_back({ResourceAccessBitfield::Write, result, Value{},
                       resultSize, resultSize});
   }
+}
+
+bool AsyncDispatchOp::preferCloneToConsumers() {
+  // If the dispatch does not consume any resources then it is effectively a
+  // slow splat and should be treated like one.
+  const bool consumesAny = llvm::any_of(
+      getResourceOperands(), +[](Value operand) {
+        return isa<IREE::Stream::AffinityTypeInterface>(operand.getType());
+      });
+  return !consumesAny;
 }
 
 //===----------------------------------------------------------------------===//

@@ -27,10 +27,6 @@ namespace mlir::iree_compiler {
 /// `Value` not directly supported as a value type by this class.
 class BufferizationPlan {
 public:
-  llvm::EquivalenceClasses<void *>::iterator findValue(Value v) const {
-    return mappedTensors.findValue(getPointer(v));
-  }
-
   llvm::EquivalenceClasses<void *>::iterator end() const {
     return mappedTensors.end();
   }

@@ -128,7 +128,8 @@ module attributes {
 }
 
 /// We test first with threading off so that the printers are legible.
-// RUN: iree-compile %s --iree-hal-target-backends=vulkan \
+// RUN: iree-compile %s \
+// RUN:   --iree-hal-target-device=vulkan \
 // RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@kernel_config \
 // RUN:   --compile-from=executable-sources \
 // RUN:   --compile-to=executable-targets \
@@ -141,7 +142,8 @@ module attributes {
 // CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [16, 1, 1]>
 
 /// Then test with threading to make sure it runs
-// RUN: iree-compile %s --iree-hal-target-backends=vulkan \
+// RUN: iree-compile %s \
+// RUN:   --iree-hal-target-device=vulkan \
 // RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@kernel_config \
 // RUN:   --compile-from=executable-sources \
 // RUN:   --compile-to=executable-targets \

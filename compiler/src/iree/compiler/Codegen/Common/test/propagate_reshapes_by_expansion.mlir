@@ -92,6 +92,91 @@ func.func @fold_collapse_into_stores_dynamic(%arg0 : tensor<2x?x32xf32>) {
 
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_into_stores_dynamic_partial_size(%arg0 : tensor<2x?x32xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+  %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
+  flow.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_size(
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
+//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+//       CHECK:   flow.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [0, 0, 0], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
+//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_into_stores_dynamic_partial_with_offset(%arg0 : tensor<2x?x32xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+  %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
+  flow.dispatch.tensor.store %2, %1, offsets = [0, 8], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_with_offset(
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
+//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+//       CHECK:   flow.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [0, 0, 8], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
+//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<2x?x32xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
+  flow.dispatch.tensor.store %2, %1, offsets = [8, 0], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_unsupported(
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
+//  CHECK-NEXT:   flow.dispatch.tensor.store %[[COLLAPSE]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<2x?x32xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  %3 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
+  flow.dispatch.tensor.store %3, %2, offsets = [0, 0], sizes = [%1, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_unsupported(
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
+//  CHECK-NEXT:   flow.dispatch.tensor.store %[[COLLAPSE]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall() {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index

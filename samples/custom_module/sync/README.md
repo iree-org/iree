@@ -21,17 +21,22 @@ custom calls that work asynchronously.
 
 1. Compile the [example module](./test/example.mlir) to a .vmfb file:
 
-    ```
-    iree-compile --iree-hal-target-backends=llvm-cpu samples/custom_module/sync/test/example.mlir -o=/tmp/example.vmfb
+    ```sh
+    iree-compile \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=llvm-cpu \
+        samples/custom_module/sync/test/example.mlir
+        -o=/tmp/example.vmfb
     ```
 
 2. Build the `iree_samples_custom_module_sync_run` CMake target :
 
-    ```
+    ```sh
     cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
         -DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1
     cmake --build ../iree-build/ --target iree_samples_custom_module_sync_run
     ```
+
     (here we force runtime execution tracing for demonstration purposes)
 
     [See here](https://iree.dev/building-from-source/getting-started/)
@@ -39,7 +44,7 @@ custom calls that work asynchronously.
 
 3. Run the example program to call the main function:
 
-   ```
+   ```sh
    ../iree-build/samples/custom_module/sync/custom-module-sync-run \
        /tmp/example.vmfb example.main
    ```

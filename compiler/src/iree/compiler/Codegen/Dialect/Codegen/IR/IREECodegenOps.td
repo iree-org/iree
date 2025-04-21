@@ -8,6 +8,7 @@
 #define IREE_CODEGEN_DIALECT_IREECODEGENOPS
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -101,6 +102,64 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
     ::mlir::Value getViewSource() { return getSource(); }
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// SwizzleHintOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
+    SameOperandsAndResultType, Pure]> {
+  let summary = "Hint to swizzle accesses according to an access pattern";
+  let description = [{
+    Optimization hint to swizzle all accesses to the memref this takes a view
+    of. This only affects reads/writes immediately consuming this operation and
+    is best effort. If the desired swizzling is not apparently possible, this
+    op will no-op. As a result, it should not be relied on for correctness.
+
+    Any subviews on this operation will cause swizzling to fail. The expectation
+    is for all view like operations to fold into the accessing ops
+    (loads/stores) before this op takes effect.
+
+    Note that this only rewrites direct users. If there are any aliased loads
+    or stores of the data from/to the |src| memref of a hintOp, those accesses
+    will not be swizzled. This allows reusing an allocation with different
+    swizzled access patterns as long as there is no data dependency between
+    memory with different layouts. For example:
+
+    ```
+    %0 = alloc()
+    %1 = iree_codegen.swizzle_hint %0, #layout_0
+    %2 = iree_codegen.swizzle_hint %0, #layout_1
+    {
+       vector.store %1
+       vector.load %1
+         ^
+         |
+        unrelated
+         |
+         v
+       vector.store %2
+       vector.load %2
+    }
+    ```
+
+    If there is a data dependency between the accesses of %1 and %2, for example
+    a value stored to %1 is loaded from %2, this is undefined behavior. Aliasing
+    is otherwise perfectly legal.
+  }];
+
+  let arguments = (ins MemRefRankOf<[AnyType], [1]>:$operand,
+                       IREECodegen_AnySwizzleAttr:$swizzle);
+  let results = (outs MemRefRankOf<[AnyType], [1]>:$result);
+
+  let assemblyFormat = [{
+    $operand `[` $swizzle attr-dict `]` `:` type($result)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// NullPointerOp
+//===----------------------------------------------------------------------===//
 
 def IREECodegen_NullPointerOp :
      Op<IREECodegen_Dialect, "null_pointer", [Pure]> {

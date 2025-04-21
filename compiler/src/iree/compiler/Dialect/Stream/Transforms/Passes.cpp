@@ -22,15 +22,6 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
-// TODO(hanchung): Enable the pass by default once the implementation is done.
-static llvm::cl::opt<bool> clSpecializeEncodings(
-    "iree-stream-experimental-specialize-encodings",
-    llvm::cl::desc(
-        "Enables SpecializeEncodingPass in Stream pass pipeline. This pass is "
-        "currently under development, so it is not enabled by default. It can "
-        "only handle limited cases at this moment."),
-    llvm::cl::init(true));
-
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -92,6 +83,16 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Conversion
   //----------------------------------------------------------------------------
 
+  // TODO(benvanik): cache the affinity analysis - if this pass does nothing (or
+  // once it converges) the analysis will be usable by AnnotateAffinities and
+  // ConvertToStream.
+  //
+  // Clone operations to consumers when the operations opt-in to such behavior.
+  //
+  // NOTE: CSE must not be run between this and ConvertToStream - doing so will
+  // undo the clones.
+  passManager.addPass(IREE::Stream::createCloneToConsumersPass());
+
   // Annotate all ops/resources with the analyzed affinities.
   // This should have no behavioral changes during conversion but allows for
   // debugging of analysis errors in end-user tooling.
@@ -114,6 +115,18 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 
   // Run inlining after having baked out affinities.
   passManager.addPass(mlir::createInlinerPass());
+
+  // Elide any redundant transfers now that affinities are baked out and we know
+  // where resources are located.
+  //
+  // TODO(benvanik): enable this pass after updating usage refinement: today
+  // the clones are not handled correctly and will result in usage analysis
+  // failing. This seems to be caused by transfers having some non-trivial logic
+  // during analysis that clone does not have and just applying the same logic
+  // to clones results in other errors around lifetime changes. The resource
+  // analysis and refinement logic likely needs a larger reworking.
+  //
+  // passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
 
   // Cleanup globals that were created during conversion.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
@@ -151,9 +164,8 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Tensor lowering and resource management
   //----------------------------------------------------------------------------
 
-  if (clSpecializeEncodings) {
-    passManager.addPass(IREE::Stream::createSpecializeEncodingsPass());
-  }
+  // Specialize the encodings before the lowering of stream tensor ops.
+  passManager.addPass(IREE::Stream::createSpecializeEncodingsPass());
 
   // Lower stream.tensor.* ops to stream.async.* ops based on
   // affinity/configuration assigned during placement.
@@ -161,6 +173,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Stream::createEncodeHostTensorsPass);
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
+  passManager.addPass(IREE::Stream::createMaterializeEncodingsPass());
 
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
@@ -226,6 +239,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // for partitioning/placement before turning them into opaque dispatches.
   passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
 
+  // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
+  // want to do this earlier to enable better deduplication but that makes the
+  // above passes trickier. Outlining may be more like "find chunks of streams
+  // useful to move into secondary command buffers."
+
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Everything must now be in stream.async.* form.
@@ -241,11 +259,8 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // Schedule fine-grained allocations and insert placeholders for larger/longer
   // lifetime allocations.
   passManager.addPass(IREE::Stream::createScheduleAllocationPass());
-  FunctionLikeNest(passManager)
-      // TODO(benvanik): passes to convert alloc to alloca and thread through
-      // streams. Ideally all transient allocs become stream-ordered allocas.
-      // createPropagateTransientsPass()
 
+  FunctionLikeNest(passManager)
       // Allocate backing storage for fused constant resources.
       // This expands packed constants into explicit forms with partitioned
       // storage buffers and upload logic.
@@ -265,11 +280,6 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // cleanup patterns.
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
   buildStreamCleanupPassPipeline(passManager, transformOptions);
-
-  // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
-  // want to do this earlier to enable better deduplication but that makes the
-  // above passes trickier. Outlining may be more like "find chunks of streams
-  // useful to move into secondary command buffers."
 
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());

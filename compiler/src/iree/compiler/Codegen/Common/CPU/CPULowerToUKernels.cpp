@@ -7,11 +7,13 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -534,11 +536,41 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (tensorType.getRank() != 2) {
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
-  auto encoding =
-      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
+  Attribute tensorEncoding = tensorType.getEncoding();
+  if (!tensorEncoding) {
+    return rewriter.notifyMatchFailure(op,
+                                       "tensorType does not have encodings");
+  }
+  IREE::Encoding::EncodingAttr encoding;
+  if (auto encodingAttr =
+          dyn_cast<IREE::Encoding::EncodingAttr>(tensorEncoding)) {
+    encoding = encodingAttr;
+  } else if (auto layoutAttr =
+                 dyn_cast<IREE::Encoding::LayoutAttr>(tensorEncoding)) {
+    if (layoutAttr.getLayouts().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "only single layout is handled");
+    }
+    auto encodingLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingLayoutAttr>(
+        layoutAttr.getLayouts().getValue()[0]);
+    if (!encodingLayoutAttr || !encodingLayoutAttr.getConfiguration()) {
+      return rewriter.notifyMatchFailure(
+          op, "only VMVX encoding resolver with a configuration is handled");
+    }
+
+    DictionaryAttr dictAttr = encodingLayoutAttr.getConfiguration();
+    std::optional<NamedAttribute> maybeEncodingAttr =
+        dictAttr.getNamed("encoding_attr");
+    if (!maybeEncodingAttr ||
+        !isa<IREE::Encoding::EncodingAttr>(maybeEncodingAttr->getValue())) {
+      return rewriter.notifyMatchFailure(op, "EncodingAttr is not found");
+    }
+    encoding =
+        cast<IREE::Encoding::EncodingAttr>(maybeEncodingAttr->getValue());
+  }
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }
+
   SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
   SmallVector<Value> inputValues;
   Location loc = op.getLoc();

@@ -1,4 +1,6 @@
-// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --device=local-task --module=- | FileCheck %s
+// RUN: iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \
+// RUN:   iree-benchmark-module --device=local-task --module=- | \
+// RUN:   FileCheck %s
 
 module {
   func.func @foo1() -> tensor<4xf32> {

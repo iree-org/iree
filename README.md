@@ -17,7 +17,10 @@ guides, and instructions on building from source.
 
 ## Project news
 
-* 2024-05-23: [IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
+* 2025-04-02:
+[AMD submitted an IREE-based SDXL implementation to the MLPerf benchmark suite](https://rocm.blogs.amd.com/artificial-intelligence/mi325x-accelerates-mlperf-inference/README.html#stable-diffusion-xl-sdxl-text-to-image-mlperf-inference-benchmark)
+* 2024-05-23:
+[IREE joins the LF AI & Data Foundation as a sandbox-stage project](https://lfaidata.foundation/blog/2024/05/23/announcing-iree-a-new-initiative-for-machine-learning-deployment/)
 
 ## Project status
 
@@ -88,6 +91,7 @@ Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@ir
 Date | Title | Recording | Slides
 ---- | ----- | --------- | ------
 2025-02-12 | The Long Tail of AI: SPIR-V in IREE and MLIR (Vulkanised) | [recording](https://youtu.be/0zwfc6UkxeE) | [slides](https://www.vulkan.org/user/pages/09.events/vulkanised-2025/T12-Jakub-Kuderski-AMD-IREE-MLIR.pdf)
+2024-10-01 | Unveiling the Inner Workings of IREE: An MLIR-Based Compiler for Diverse H/W | [recording](https://www.youtube.com/watch?v=a3T74I9gGH8) |
 2021-06-09 | IREE Runtime Design Tech Talk | [recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) | [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing)
 2020-08-20 | IREE CodeGen (MLIR Open Design Meeting) | [recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing) | [slides](https://docs.google.com/presentation/d/1NetHjKAOYg49KixY5tELqFp6Zr2v8_ujGzWZ_3xvqC8/edit)
 2020-03-18 | Interactive HAL IR Walkthrough | [recording](https://drive.google.com/file/d/1_sWDgAPDfrGQZdxAapSA90AD1jVfhp-f/view?usp=sharing) |

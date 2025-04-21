@@ -75,7 +75,8 @@ function ireeInitializeWorker() {
 //
 // In order to call functions on the program it must be compiled in a supported
 // configuration, such as with these flags:
-//     --iree-hal-target-backends=llvm
+//     --iree-hal-target-device=local
+//     --iree-hal-local-target-device-backends=llvm-cpu
 //     --iree-llvmcpu-target-triple=wasm32-unknown-emscripten
 //
 // Resolves with an opaque pointer to the program state on success.

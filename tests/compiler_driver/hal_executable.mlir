@@ -1,6 +1,8 @@
 // RUN: iree-compile --compile-mode=hal-executable \
 // RUN:   --mlir-print-ir-after=iree-hal-serialize-all-executables \
-// RUN:   --iree-hal-target-backends=vmvx %s \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=vmvx \
+// RUN:   %s \
 // RUN:   --o=/dev/null 2>&1 | FileCheck %s
 
 // Each entry point has a layout specification indicating the total number of

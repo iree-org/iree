@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(TORCH_MLIR_ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir")
+set(TORCH_MLIR_ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir" CACHE PATH "")
 set(IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_library(torch-iree_compiler_defs INTERFACE)
@@ -32,6 +32,11 @@ iree_cc_library(
     MLIRIR
     MLIRMLProgramDialect
     MLIRPass
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::Torch::InputConversion
     iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR

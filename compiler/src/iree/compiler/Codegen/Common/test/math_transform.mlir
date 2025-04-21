@@ -91,3 +91,32 @@ func.func @no_approx_on_rocm(%arg0: f16) -> f16 attributes {
   %11 = math.erf %10 : f16
   return %11 : f16
 }
+
+// -----
+
+// CHECK-LABEL: @rewrite_fpowi_const_exponent_on_llvmcpu
+func.func @rewrite_fpowi_const_exponent_on_llvmcpu(%arg0: f32) -> f32 attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
+} {
+  // math.fpowi with constant exponent should always be rewritten to muls.
+  // CHECK-NOT:    math.fpowi
+  // CHECK:        arith.mulf {{.*}} : f32
+  %c2 = arith.constant 2 : i32
+  %0 = math.fpowi %arg0, %c2 : f32, i32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @rewrite_fpowi_const_exponent_on_rocm
+func.func @rewrite_fpowi_const_exponent_on_rocm(%arg0: f32) -> f32 attributes {
+  hal.executable.target =  #hal.executable.target<"rocm", "rocm-hsaco-fb", {}>
+} {
+  // math.fpowi with constant exponent should always be rewritten to muls.
+  // CHECK-NOT:    math.fpowi
+  // CHECK:        arith.mulf {{.*}} : f32
+  // CHECK:        arith.mulf {{.*}} : f32
+  %c2 = arith.constant 3 : i32
+  %0 = math.fpowi %arg0, %c2 : f32, i32
+  return %0 : f32
+}

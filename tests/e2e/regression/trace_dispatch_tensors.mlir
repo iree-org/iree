@@ -1,5 +1,6 @@
 // RUN: iree-run-mlir \
-// RUN:   --Xcompiler,iree-hal-target-backends=vmvx \
+// RUN:   --Xcompiler,iree-hal-target-device=local \
+// RUN:   --Xcompiler,iree-hal-local-target-device-backends=vmvx \
 // RUN:   --Xcompiler,iree-flow-trace-dispatch-tensors \
 // RUN:   %s 2>&1 | FileCheck %s
 

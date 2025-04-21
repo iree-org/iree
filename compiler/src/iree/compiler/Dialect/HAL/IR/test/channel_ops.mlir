@@ -6,14 +6,14 @@ util.func public @channel_create(%device: !hal.device, %affinity: i64, %id: !uti
   //      CHECK: %channel = hal.channel.create
   // CHECK-SAME:   device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   affinity(%[[AFFINITY]])
-  // CHECK-SAME:   flags(0)
+  // CHECK-SAME:   flags("None")
   // CHECK-SAME:   id(%[[ID]])
   // CHECK-SAME:   group(%[[GROUP]])
   // CHECK-SAME:   rank(%[[RANK]])
   // CHECK-SAME:   count(%[[COUNT]]) : !hal.channel
   %channel = hal.channel.create device(%device : !hal.device)
                               affinity(%affinity)
-                                 flags(0)
+                                 flags("None")
                                     id(%id)
                                  group(%group)
                                   rank(%rank)
@@ -29,11 +29,11 @@ util.func public @channel_split(%base_channel: !hal.channel, %color: i32, %key: 
   //      CHECK: %channel = hal.channel.split<%[[BASE_CHANNEL]] : !hal.channel>
   // CHECK-SAME:   color(%[[COLOR]])
   // CHECK-SAME:   key(%[[KEY]])
-  // CHECK-SAME:   flags(0) : !hal.channel
+  // CHECK-SAME:   flags("None") : !hal.channel
   %channel = hal.channel.split<%base_channel : !hal.channel>
                               color(%color)
                                 key(%key)
-                              flags(0) : !hal.channel
+                              flags("None") : !hal.channel
   util.return
 }
 

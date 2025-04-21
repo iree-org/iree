@@ -1,4 +1,4 @@
-// RUN: iree-compile %s --iree-execution-model=async-external --iree-hal-target-backends=llvm-cpu | custom-module-async-run - example.main | FileCheck %s
+// RUN: iree-compile %s --iree-execution-model=async-external --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu | custom-module-async-run - example.main | FileCheck %s
 
 module @example {
   //===--------------------------------------------------------------------===//

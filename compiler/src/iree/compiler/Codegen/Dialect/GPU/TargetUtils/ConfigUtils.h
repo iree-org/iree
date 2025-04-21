@@ -47,6 +47,10 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
                                        mlir::FunctionOpInterface entryPoint,
                                        Operation *op);
 
+LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
+                            mlir::FunctionOpInterface entryPoint,
+                            Operation *op);
+
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options
 //===----------------------------------------------------------------------===//

@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
@@ -46,10 +47,12 @@ public:
     llvm::MapVector<Attribute, SmallVector<IREE::HAL::ExecutableConstantLoadOp>>
         allLoadOps;
     SmallVector<Location> allLoadLocs;
-    moduleOp.walk([&](IREE::HAL::ExecutableConstantLoadOp loadOp) {
-      allLoadOps[loadOp.getKeyAttr()].push_back(loadOp);
-      allLoadLocs.push_back(loadOp.getLoc());
-    });
+    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+      funcOp.walk([&](IREE::HAL::ExecutableConstantLoadOp loadOp) {
+        allLoadOps[loadOp.getKeyAttr()].push_back(loadOp);
+        allLoadLocs.push_back(loadOp.getLoc());
+      });
+    }
 
     // No constants found; omit the constant block entirely.
     if (allLoadOps.empty())

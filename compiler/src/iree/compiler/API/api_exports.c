@@ -25,6 +25,7 @@ extern void ireeCodegenDispatchLoweringPassPipelineAttrGet();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
 extern void ireeCodegenGetExecutableVariantOps();
+extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenQueryMMAIntrinsics();
 extern void ireeCodegenTranslationInfoAttrGet();
 extern void ireeCodegenTranslationInfoAttrGetParameters();

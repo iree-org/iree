@@ -60,7 +60,7 @@ util.func public @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
   // CHECK: %[[RET_TENSOR:.+]] = "some.op"(%[[ARG_TENSOR]]) : (tensor<4x8xf32>) -> tensor<8x4xf32>
   %0 = "some.op"(%arg0) : (tensor<4x8xf32>) -> tensor<8x4xf32>
   // CHECK: %[[RET_SIZE:.+]] = stream.tensor.sizeof tensor<8x4xf32>
-  // CHECK: %[[RET_EXTERNAL:.+]] = stream.tensor.import %[[RET_TENSOR]]
+  // CHECK: %[[RET_EXTERNAL:.+]] = stream.tensor.import consume %[[RET_TENSOR]]
   // CHECK: %[[RET:.+]] = stream.async.transfer %[[RET_EXTERNAL]]
   // CHECK: util.return %[[RET]], %[[RET_SIZE]] : !stream.resource<*>, index
   util.return %0 : tensor<8x4xf32>

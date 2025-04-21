@@ -319,7 +319,7 @@ static iree_status_t iree_hal_metal_device_queue_alloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_allocator_pool_t pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+    iree_hal_alloca_flags_t flags, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout()));
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
@@ -331,10 +331,11 @@ static iree_status_t iree_hal_metal_device_queue_alloca(
 static iree_status_t iree_hal_metal_device_queue_dealloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_buffer_t* buffer) {
+    const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_buffer_t* buffer,
+    iree_hal_dealloca_flags_t flags) {
   // TODO(benvanik): queue-ordered allocations.
   return iree_hal_device_queue_barrier(base_device, queue_affinity, wait_semaphore_list,
-                                       signal_semaphore_list);
+                                       signal_semaphore_list, IREE_HAL_EXECUTE_FLAG_NONE);
 }
 
 static iree_status_t iree_hal_metal_device_queue_read(
@@ -411,7 +412,8 @@ static iree_status_t iree_hal_metal_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_binding_table_t binding_table) {
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t flags) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 

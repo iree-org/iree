@@ -7,7 +7,8 @@ out = subprocess.run(
     [
         "../../../build/tools/iree-compile",
         sys.argv[1],
-        "--iree-hal-target-backends=vmvx",
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=vmvx",
         "--compile-to=executable-targets",
     ],
     stdout=subprocess.PIPE,

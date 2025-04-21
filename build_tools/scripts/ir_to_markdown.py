@@ -11,7 +11,8 @@ Example usage:
   # Get a dump of IR from a compiler tool:
   $ iree-opt \
     --iree-transformation-pipeline \
-    --iree-hal-target-backends=vmvx \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=vmvx \
     --mlir-disable-threading \
     --mlir-print-ir-after-all \
     --mlir-print-ir-after-change \

@@ -1,5 +1,32 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
+// CHECK-LABEL: @buffer_allocation_preserve
+util.func public @buffer_allocation_preserve(%arg0: !hal.buffer) {
+  // CHECK: hal.buffer.allocation.preserve<%arg0 : !hal.buffer>
+  hal.buffer.allocation.preserve<%arg0 : !hal.buffer>
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_allocation_discard
+util.func public @buffer_allocation_discard(%arg0: !hal.buffer) -> i1 {
+  // CHECK: hal.buffer.allocation.discard<%arg0 : !hal.buffer> : i1
+  %was_terminal = hal.buffer.allocation.discard<%arg0 : !hal.buffer> : i1
+  util.return %was_terminal : i1
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_allocation_is_terminal
+util.func public @buffer_allocation_is_terminal(%arg0: !hal.buffer) -> i1 {
+  // CHECK: hal.buffer.allocation.is_terminal<%arg0 : !hal.buffer> : i1
+  %is_terminal = hal.buffer.allocation.is_terminal<%arg0 : !hal.buffer> : i1
+  util.return %is_terminal : i1
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_subspan
 util.func public @buffer_subspan(%arg0: !hal.buffer) -> !hal.buffer {
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100

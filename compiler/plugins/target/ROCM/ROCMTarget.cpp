@@ -68,7 +68,7 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
-  bool experimentalPadLayout = false;
+  std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
 
@@ -108,10 +108,14 @@ struct ROCMOptions {
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<bool>("iree-hip-enable-experimental-pad-layout",
-                     experimentalPadLayout, cl::cat(category),
-                     cl::desc("Enables additional padding on allocations to "
-                              "maximize cache bandwidth."));
+    binder.opt<std::string>(
+        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
+        cl::cat(category),
+        cl::desc("Selects the way that encodings will be "
+                 "resolved. Options are: `none` (resolve to "
+                 "identity layout), `pad` (additional padding "
+                 "on allocations to maximize cache bandwidth), "
+                 "and `data-tiling` (enable data tiled layouts)"));
 
     binder.list<std::string>(
         "iree-hip-pass-plugin-path", passPlugins,
@@ -255,8 +259,10 @@ public:
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
       addConfig(kGPUTargetAttrName, target);
-      if (options.experimentalPadLayout) {
-        if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(target)) {
+      if (options.encodingLayoutResolver !=
+          GPU::kNoEncodingLayoutResolverName) {
+        if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(
+                target, options.encodingLayoutResolver)) {
           addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
@@ -543,6 +549,13 @@ public:
 
       llvmModule->setDataLayout(targetMachine->createDataLayout());
 
+      // Code object version * 100.
+      constexpr uint32_t abiVersion = 500;
+      // Let the backend know what code object version we're compiling for. This
+      // insulates us from changes to the default code object version that our
+      // CI or users may not be prepared for.
+      llvmModule->addModuleFlag(llvm::Module::Error,
+                                "amdhsa_code_object_version", abiVersion);
       for (llvm::Function &f : llvmModule->functions())
         f.addFnAttr(llvm::Attribute::AlwaysInline);
 
@@ -589,7 +602,7 @@ public:
 
       // Sets HIP platform globals based on the target architecture.
       if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
-                               isWave64))) {
+                               isWave64, abiVersion))) {
         return failure();
       }
 

@@ -64,9 +64,10 @@ int main(int argc, char **argv) {
   // Set flags.
   iree_compiler_error_t *err;
   const char *flags[] = {
-      "--iree-hal-target-backends=vmvx",
+      "--iree-hal-target-device=local",
+      "--iree-hal-local-target-device-backends=vmvx",
   };
-  err = ireeCompilerSessionSetFlags(state.session, 1, flags);
+  err = ireeCompilerSessionSetFlags(state.session, 2, flags);
   if (err) {
     fprintf(stderr, "ERROR: %s\n", ireeCompilerErrorGetMessage(err));
     mlirOperationDestroy(module);

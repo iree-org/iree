@@ -1193,6 +1193,7 @@ template <typename Range>
 static LogicalResult
 applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
                   Range &&payloadOps,
+                  MutableArrayRef<LoopLikeOpInterface> loops,
                   transform::TransformResults &transformResults) {
   SmallVector<Operation *> originalConsumerOps;
   SmallVector<Operation *> fusedConsumerOps;
@@ -1201,7 +1202,7 @@ applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
     rewriter.setInsertionPoint(target);
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, target);
+        scf::tileAndFuseConsumerOfSlice(rewriter, target, loops);
 
     if (failed(fuseConsumerResults))
       return failure();
@@ -1222,9 +1223,18 @@ DiagnosedSilenceableFailure transform_dialect::FuseConsumerOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  LogicalResult result =
-      applyFuseConsumer(rewriter, getOperation(),
-                        state.getPayloadOps(getTarget()), transformResults);
+  SmallVector<LoopLikeOpInterface> loops;
+  for (auto op : getLoops()) {
+    auto loopOp =
+        dyn_cast<LoopLikeOpInterface>(*state.getPayloadOps(op).begin());
+    if (!loopOp) {
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    loops.push_back(loopOp);
+  }
+  LogicalResult result = applyFuseConsumer(rewriter, getOperation(),
+                                           state.getPayloadOps(getTarget()),
+                                           loops, transformResults);
   return failed(result) ? DiagnosedSilenceableFailure::definiteFailure()
                         : DiagnosedSilenceableFailure::success();
 }

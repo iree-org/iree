@@ -46,6 +46,7 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_binary(
     name = "elf_module_test_binary",
+    testonly = True,
     srcs = ["elf_module_test_main.c"],
     deps = [
         ":elf_module",

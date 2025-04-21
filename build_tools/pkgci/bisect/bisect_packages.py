@@ -27,7 +27,7 @@ Example usage:
     bisect_packages.py \
         --good-ref=iree-3.0.0 \
         --bad-ref=main \
-        --test-command="iree-compile --iree-hal-target-backends=llvm-cpu -o /dev/null /tmp/repro.mlir"
+        --test-command="iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o /dev/null /tmp/repro.mlir"
 """
 
 

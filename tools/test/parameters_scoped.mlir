@@ -1,4 +1,6 @@
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
+// RUN: (iree-compile \
+// RUN:    --iree-hal-target-device=local \
+// RUN:    --iree-hal-local-target-device-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --module=- --function=echo \
 // RUN:    --parameters=a=%p/parameters_a.safetensors \
 // RUN:    --parameters=b=%p/parameters_b.safetensors \

@@ -73,7 +73,6 @@ LLVM_GPU_SRCS = enforce_glob(
         "concat.mlir",
         "expand_shape.mlir",
         "extract_slice.mlir",
-        "pack.mlir",
         "pack_i8.mlir",
         "tensor_cast.mlir",
         "tensor_insert_slice.mlir",
@@ -81,6 +80,9 @@ LLVM_GPU_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        # https://github.com/llvm/llvm-project/issues/131386 causes
+        # See bug #20294
+        "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
     ],
 )

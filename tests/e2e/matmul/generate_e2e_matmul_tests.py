@@ -574,7 +574,7 @@ def int_or_question_mark(s: DimSize):
 
 
 # Stringification used for generating alphanumeric identifiers, e.g.
-# func.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
+# util.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
 def int_or_DYN(s: DimSize):
     return s.value or "DYN"
 
@@ -701,20 +701,20 @@ def generate_function(
     compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
     if shape.accumulate:
         signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
-        import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
+        import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
         func_definition = func_definition + (
-            f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
+            f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
             f"{compute}\n"
-            f"  return %result: {acc_tensor_type}\n"
+            f"  util.return %result: {acc_tensor_type}\n"
             f"}}\n"
         )
     else:
         literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
         if acc_r == "?":
             signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
+            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
             func_definition = func_definition + (
-                f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
                 f"  %c0 = arith.constant 0 : index\n"
                 f"  %c1 = arith.constant 1 : index\n"
                 f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
@@ -723,19 +723,19 @@ def generate_function(
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
                 f"{compute}"
-                f"  return %result: {acc_tensor_type}\n"
+                f"  util.return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
         else:
             signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
+            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
             func_definition = func_definition + (
-                f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
                 f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
                 f"{compute}"
-                f"  return %result: {acc_tensor_type}\n"
+                f"  util.return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
     return MLIRFunction(
@@ -788,7 +788,7 @@ def generate_random_matrix(
         f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
         f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
         f"  %{name}_seed = arith.constant {pseudorandom_generator_seed} : i32\n"
-        f"  %{name} = call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
+        f"  %{name} = util.call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
     )
 
 
@@ -813,7 +813,7 @@ def generate_call(
 
     description = f"Matmul shape (MxKxN): {shape.m}x{shape.k}x{shape.n}"
     op = (
-        f"func.func @{func_name}() attributes {{\n"
+        f"util.func @{func_name}() attributes {{\n"
         f'  iree.reflection = {{description = "{description}"}}\n'
         "} {\n"
         "  %device_index = arith.constant 0 : index\n"
@@ -838,12 +838,12 @@ def generate_call(
         pseudorandom_generator_seed = pseudorandom_generator_seed - 1
         op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
         op = op + (
-            f"  %result = call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
+            f"  %result = util.call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
         )
     else:
         op = op + (
             f"  %acc = util.null : !hal.buffer_view\n"
-            f"  %result = call @module.{function.name}(%lhs, %rhs) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
+            f"  %result = util.call @module.{function.name}(%lhs, %rhs) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
         )
 
     op = op + (
@@ -851,10 +851,10 @@ def generate_call(
         f"  %k = arith.constant {shape.k} : i64\n"
         f"  %n = arith.constant {shape.n} : i64\n"
         f"  %transpose_rhs = arith.constant {transpose_rhs} : i32\n"
-        f"  call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
-    op = op + "  return\n"
+    op = op + "  util.return\n"
     op = op + "}\n"
 
     return TestCall(function=function, op=op)
@@ -994,8 +994,8 @@ def write_calls_file(functions, calls, filename, requirements):
 
     # Declare the custom module that generates arguments.
     module_definition = module_definition + (
-        "func.func private @matmul_test.generate_random_matrix(%device: !hal.device, %dim0: i64, %dim1: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
-        "func.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %transpose_rhs: i32, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
+        "util.func private @matmul_test.generate_random_matrix(%device: !hal.device, %dim0: i64, %dim1: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
+        "util.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %transpose_rhs: i32, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
         "\n"
     )
 

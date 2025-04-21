@@ -54,7 +54,8 @@ compile_sample() {
   echo "  Compiling '$1' sample..."
   "${HOST_TOOLS_BINARY_DIR}/iree-compile" "$2" \
     --iree-input-type=stablehlo \
-    --iree-hal-target-backends=llvm-cpu \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
     --iree-llvmcpu-target-cpu-features=+atomics,+bulk-memory,+simd128 \
     --o "${BINARY_DIR}/$1.vmfb"

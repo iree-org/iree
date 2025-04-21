@@ -182,7 +182,10 @@ def TestConversionPass : Pass<"iree-util-test-conversion", "mlir::ModuleOp"> {
   let options = [
     Option<"widenIntegers", "widen-integers",
       "bool", /*default=*/"false",
-      "Tests type conversion by widening integers to i32">
+      "Tests type conversion by widening integers to i32.">,
+    Option<"structuralConversion", "structural-conversion",
+      "bool", /*default=*/"true",
+      "Tests generic structural conversion ops.">
   ];
 }
 

@@ -3,7 +3,7 @@
 // CHECK-LABEL: @fence_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
 util.func public @fence_create(%device: !hal.device) -> !hal.fence {
-  // CHECK: %[[FLAGS:.+]] = vm.const.i32.zero
+  // CHECK: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %[[FENCE:.+]] = vm.call @hal.fence.create(%[[DEVICE]], %[[FLAGS]])
   %fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
   // CHECK: vm.return %[[FENCE]]
@@ -15,9 +15,10 @@ util.func public @fence_create(%device: !hal.device) -> !hal.fence {
 // CHECK-LABEL: @fence_join
 // CHECK-SAME: (%[[FENCE0:.+]]: !vm.ref<!hal.fence>, %[[FENCE1:.+]]: !vm.ref<!hal.fence>)
 util.func public @fence_join(%fence0: !hal.fence, %fence1: !hal.fence) -> !hal.fence {
+  // CHECK: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %[[JOIN:.+]] = vm.call.variadic @hal.fence.join
-  // CHECK-SAME: ([%[[FENCE0]], %[[FENCE1]]])
-  %fence = hal.fence.join at([%fence0, %fence1]) -> !hal.fence
+  // CHECK-SAME: (%[[FLAGS]], [%[[FENCE0]], %[[FENCE1]]])
+  %fence = hal.fence.join at([%fence0, %fence1]) flags("None") -> !hal.fence
   // CHECK: vm.return %[[JOIN]]
   util.return %fence : !hal.fence
 }
@@ -61,9 +62,10 @@ util.func public @fence_fail(%fence: !hal.fence, %status: i32) {
 // CHECK-SAME: (%[[FENCE0:.+]]: !vm.ref<!hal.fence>, %[[FENCE1:.+]]: !vm.ref<!hal.fence>,
 // CHECK-SAME:  %[[TIMEOUT:.+]]: i32)
 util.func public @fence_await(%fence0: !hal.fence, %fence1: !hal.fence, %timeout: i32) -> i32 {
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %[[STATUS:.+]] = vm.call.variadic @hal.fence.await
-  // CHECK-SAME: (%[[TIMEOUT]], [%[[FENCE0]], %[[FENCE1]]])
-  %status = hal.fence.await until([%fence0, %fence1]) timeout_millis(%timeout) : i32
+  // CHECK-SAME: (%[[TIMEOUT]], %[[FLAGS]], [%[[FENCE0]], %[[FENCE1]]])
+  %status = hal.fence.await until([%fence0, %fence1]) timeout_millis(%timeout) flags("None") : i32
   // CHECK: vm.return %[[STATUS]]
   util.return %status : i32
 }

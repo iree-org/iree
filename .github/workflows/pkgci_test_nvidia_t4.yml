@@ -22,7 +22,6 @@ jobs:
     # TODO(#18238): migrate to new runner cluster
     runs-on:
       - self-hosted # must come first
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - environment=prod
       - gpu
       - os-family=Linux
@@ -48,11 +47,11 @@ jobs:
         run: |
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages

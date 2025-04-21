@@ -237,7 +237,7 @@ util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%arg4)
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
-  // CHECK-SAME: commands([%[[CMD]]])
+  // CHECK-SAME: commands(%[[CMD]])
   // CHECK: util.return %[[SIGNAL_FENCE]]
   util.return %0 : !stream.timepoint
 }

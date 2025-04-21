@@ -12,7 +12,9 @@ module {
   }
 }
 
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
+// RUN: iree-compile %s \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
 // RUN:   --iree-opt-data-tiling=false \
 // RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@custom_matmul \
 // RUN:   --compile-to=executable-targets | \
@@ -23,7 +25,9 @@ module {
 // CODEGEN-DEFAULT:         %[[C1:.+]] = arith.constant 1 : index
 // CODEGEN-DEFAULT:         hal.return %[[C2]], %[[C1]], %[[C1]]
 
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
+// RUN: iree-compile %s \
+// RUN:   --iree-hal-target-device=local \
+// RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
 // RUN:   --iree-opt-data-tiling=false \
 // RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@custom_matmul | \
 // RUN: iree-run-module --module=- --function=matmul_static \

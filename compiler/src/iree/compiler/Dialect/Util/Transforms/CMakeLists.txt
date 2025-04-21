@@ -66,6 +66,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::Conversion
+    iree::compiler::Dialect::Util::Conversion::FuncToUtil
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils

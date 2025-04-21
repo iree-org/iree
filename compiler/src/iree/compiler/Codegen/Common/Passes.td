@@ -23,6 +23,7 @@ def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "
                 "statically known values.";
+  let dependentDialects = ["iree_compiler::IREE::Util::UtilDialect"];
 }
 
 def BubbleUpOrdinalOpsPass : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
@@ -166,6 +167,11 @@ def DecomposeConvolutionToLowerDimOpsPass :
   let summary = "Decomposes linalg convolution ops to lower dim ops";
 }
 
+def DecomposeMemrefsPass :
+    Pass<"iree-codegen-decompose-memrefs", ""> {
+  let summary = "Decomposes memrefs";
+}
+
 def DecomposeLinalgGenericPass :
     Pass<"iree-codegen-decompose-linalg-generic", ""> {
   let summary = "Decomposes linalg generic ops into individual ops";
@@ -270,6 +276,7 @@ def EraseHALDescriptorTypeFromMemRefPass
 def ConvertHALDescriptorTypeToGPUAddressSpacePass
     : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
   let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let dependentDialects = ["::mlir::gpu::GPUDialect"];
 }
 
 def ExtractAddressComputationPass : Pass<"iree-codegen-extract-address-computation"> {
@@ -392,6 +399,11 @@ def HoistStaticallyBoundAllocationsPass :
   ];
 }
 
+def IREEBufferizeConstantsPass :
+    Pass<"iree-codegen-iree-bufferize-constants", ""> {
+  let summary = "Convert from arith.constant on tensors to buffers";
+}
+
 def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -437,6 +449,16 @@ def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
 def LowerExecutableUsingTransformDialectPass :
     Pass<"iree-codegen-lower-executable-using-transform-dialect", "ModuleOp"> {
   let summary = "Lower executables using the transform dialect recipe provided in the module.";
+}
+
+def LoweringConfigInterpreterPass :
+    Pass<"iree-codegen-lowering-config-interpreter"> {
+  let summary = "Pass to apply lowering config annotated strategies.";
+  let description = [{
+    This pass runs the transform dialect interpreter and applies the named
+    sequence transformation specified by lowering configs annotated on
+    operations.
+  }];
 }
 
 def LowerUKernelOpsToCallsPass :
@@ -573,6 +595,15 @@ def RematerializeParallelOpsPass :
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";
+}
+
+def ResolveSwizzleHintsPass :
+    InterfacePass<"iree-codegen-resolve-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Resolves iree_codegen.swizzle_hint ops";
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+  ];
 }
 
 def StripCompilationInfoPass :

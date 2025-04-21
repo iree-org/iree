@@ -18,7 +18,7 @@ util.func public @fence_create_unused(%device: !hal.device) {
 // CHECK-LABEL: @fence_join_one
 // CHECK-SAME: %[[ARG:.+]]: !hal.fence
 util.func public @fence_join_one(%arg: !hal.fence) -> !hal.fence {
-  %join = hal.fence.join at([%arg]) -> !hal.fence
+  %join = hal.fence.join at([%arg]) flags("None") -> !hal.fence
   // CHECK: util.return %[[ARG]]
   util.return %join : !hal.fence
 }
@@ -30,7 +30,7 @@ util.func public @fence_join_one(%arg: !hal.fence) -> !hal.fence {
 // CHECK-LABEL: @fence_join_empty
 util.func public @fence_join_empty() -> !hal.fence {
   // CHECK: %[[JOIN:.+]] = util.null : !hal.fence
-  %join = hal.fence.join at([]) -> !hal.fence
+  %join = hal.fence.join at([]) flags("None") -> !hal.fence
   // CHECK: util.return %[[JOIN]]
   util.return %join : !hal.fence
 }
@@ -44,8 +44,8 @@ util.func public @fence_join_empty() -> !hal.fence {
 util.func public @fence_join_null(%arg0: !hal.fence, %arg1: !hal.fence) -> !hal.fence {
   // CHECK-NOT: util.null
   %null = util.null : !hal.fence
-  // CHECK: %[[JOIN:.+]] = hal.fence.join at([%[[ARG0]], %[[ARG1]]]) -> !hal.fence
-  %join = hal.fence.join at([%arg0, %null, %arg1]) -> !hal.fence
+  // CHECK: %[[JOIN:.+]] = hal.fence.join at([%[[ARG0]], %[[ARG1]]]) flags("None") -> !hal.fence
+  %join = hal.fence.join at([%arg0, %null, %arg1]) flags("None") -> !hal.fence
   // CHECK: util.return %[[JOIN]]
   util.return %join : !hal.fence
 }
@@ -57,8 +57,8 @@ util.func public @fence_join_null(%arg0: !hal.fence, %arg1: !hal.fence) -> !hal.
 // CHECK-LABEL: @fence_join_duplicate_fences
 // CHECK-SAME: %[[FENCE0:.+]]: !hal.fence, %[[FENCE1:.+]]: !hal.fence
 util.func public @fence_join_duplicate_fences(%fence0: !hal.fence, %fence1: !hal.fence) -> !hal.fence {
-  // CHECK: %[[JOIN:.+]] = hal.fence.join at([%[[FENCE0]], %[[FENCE1]]]) -> !hal.fence
-  %join = hal.fence.join at([%fence0, %fence1, %fence0]) -> !hal.fence
+  // CHECK: %[[JOIN:.+]] = hal.fence.join at([%[[FENCE0]], %[[FENCE1]]]) flags("None") -> !hal.fence
+  %join = hal.fence.join at([%fence0, %fence1, %fence0]) flags("None") -> !hal.fence
   // CHECK: util.return %[[JOIN]]
   util.return %join : !hal.fence
 }
@@ -111,7 +111,7 @@ util.func private @external_wait_call(!hal.fence)
 util.func public @fence_await_none() -> i32 {
   %timeout = arith.constant 123 : i32
   // CHECK: %[[STATUS:.+]] = arith.constant 0 : i32
-  %status = hal.fence.await until([]) timeout_millis(%timeout) : i32
+  %status = hal.fence.await until([]) timeout_millis(%timeout) flags("None") : i32
   // CHECK: util.return %[[STATUS]]
   util.return %status : i32
 }
@@ -127,7 +127,7 @@ util.func public @fence_await_null(%arg: !hal.fence) -> i32 {
   // CHECK-NOT: util.null
   %null = util.null : !hal.fence
   // CHECK: %[[STATUS:.+]] = hal.fence.await until([%[[ARG]]])
-  %status = hal.fence.await until([%arg, %null]) timeout_millis(%timeout) : i32
+  %status = hal.fence.await until([%arg, %null]) timeout_millis(%timeout) flags("None") : i32
   // CHECK: util.return %[[STATUS]]
   util.return %status : i32
 }
@@ -141,7 +141,7 @@ util.func public @fence_await_null(%arg: !hal.fence) -> i32 {
 util.func public @fence_await_duplicate_fences(%fence0: !hal.fence, %fence1: !hal.fence) -> i32 {
   %timeout = arith.constant 123 : i32
   // CHECK: %[[STATUS:.+]] = hal.fence.await until([%[[FENCE0]], %[[FENCE1]]])
-  %status = hal.fence.await until([%fence0, %fence1, %fence0]) timeout_millis(%timeout) : i32
+  %status = hal.fence.await until([%fence0, %fence1, %fence0]) timeout_millis(%timeout) flags("None") : i32
   // CHECK: util.return %[[STATUS]]
   util.return %status : i32
 }

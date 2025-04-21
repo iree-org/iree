@@ -22,13 +22,16 @@ that use those components.
 
     ```
     iree-compile \
-        --iree-hal-target-backends=vmvx \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
         module_a.mlir -o=module_a_sync.vmfb
     iree-compile \
-        --iree-hal-target-backends=vmvx \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
         module_b.mlir -o=module_b_sync.vmfb
     iree-compile \
-        --iree-hal-target-backends=vmvx \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
         pipeline_sync.mlir -o=pipeline_sync.vmfb
     ```
 
@@ -59,15 +62,18 @@ add the fences themselves.
     ```
     iree-compile \
         --iree-execution-model=async-external \
-        --iree-hal-target-backends=vmvx \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
         module_a.mlir -o=module_a_async.vmfb
     iree-compile \
         --iree-execution-model=async-external \
-        --iree-hal-target-backends=vmvx \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
         module_b.mlir -o=module_b_async.vmfb
     iree-compile \
         --iree-execution-model=async-external \
-        --iree-hal-target-backends=vmvx \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
         pipeline_async.mlir -o=pipeline_async.vmfb
     ```
 

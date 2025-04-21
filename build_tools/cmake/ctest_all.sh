@@ -186,6 +186,7 @@ if (( ${#excluded_tests[@]} )); then
 fi
 
 echo "*************** Running CTest ***************"
+echo "  Using CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL}"
 
 set -x
 ctest ${ctest_args[@]}
