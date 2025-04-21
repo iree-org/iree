@@ -410,7 +410,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     llvm::interleaveComma(convDims.filterLoop, llvm::dbgs());
     llvm::dbgs() << "\nconv input channel dims: ";
     llvm::interleaveComma(convDims.inputChannel, llvm::dbgs());
-    llvm::dbgs() << "\nconv depth multiplier: ";
+    llvm::dbgs() << "\nconv depth dims: ";
     llvm::interleaveComma(convDims.depth, llvm::dbgs());
     llvm::dbgs() << "\n";
   });
@@ -431,11 +431,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (!hasAllOneValues(convDims.dilations)) {
     LDBG("[unimplemented] expected no dilations (expected dilations to all be "
          "one).");
-    return failure();
-  }
-  // TODO: Support depthwise.
-  if (!convDims.depth.empty()) {
-    LDBG("[unimplemented] expected no depth");
     return failure();
   }
 
@@ -473,14 +468,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (outputChannelLastDim.value() < outputImageFirstDim.value())
     isOutputChannelFirst = true;
 
-  bool isBatchDimLast = false;
-  int64_t numBDims = (convDims.batch).size();
-  if (numBDims != 0) {
-    std::optional<int64_t> batchFirstDim = outputMap.getResultPosition(
-        getAffineDimExpr(convDims.batch[0], outputMap.getContext()));
-    if (batchFirstDim && outputChannelLastDim.value() < batchFirstDim.value())
-      isBatchDimLast = true;
-  }
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
@@ -508,14 +495,19 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   auto parallel = utils::IteratorType::parallel;
   auto reduction = utils::IteratorType::reduction;
-  SmallVector<utils::IteratorType> filterIterators;
+
+  // Parallel filter dims, in order.
   SmallVector<int64_t> filterNdims;
-  for (auto outputChannel : convDims.outputChannel) {
+  for (auto iterDim :
+       llvm::concat<const unsigned>(convDims.depth, convDims.outputChannel)) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
-        getAffineDimExpr(outputChannel, filterMap.getContext()));
+        getAffineDimExpr(iterDim, filterMap.getContext()));
     filterNdims.push_back(maybeDim.value());
   }
+  std::sort(filterNdims.begin(), filterNdims.end());
+
   SmallVector<ReassociationIndices> filterReassocIndices;
+  SmallVector<utils::IteratorType> filterIterators;
   // Interleave the parallel dims with the reduction dims.
   int64_t filterNdimPos = 0;
   for (auto collapsedDim : collapsedFilterReductionDim) {
@@ -543,9 +535,9 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     }
   }
 
-  int64_t numMDims = (convDims.outputImage).size();
-  int64_t numNDims = (convDims.outputChannel).size();
-  int64_t numParallelDims = numBDims + numMDims + numNDims;
+  int64_t numParallelDims = convDims.depth.size() + convDims.batch.size() +
+                            convDims.outputImage.size() +
+                            convDims.outputChannel.size();
   int64_t numKDims = collapsedFilterReductionDim.size();
   SmallVector<utils::IteratorType> genericIterators(numParallelDims, parallel);
   genericIterators.insert(genericIterators.end(), numKDims, reduction);
@@ -582,6 +574,8 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       inputDims.push_back(dims[i]);
   };
 
+  // Add the depth (group) dims.
+  insertExprs(remapDims(convDims.depth));
   // Add the batch dims.
   insertExprs(remapDims(convDims.batch));
   // Add the M dims.
@@ -592,17 +586,19 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
   // Prepare filter map.
-  int64_t numBDimsInFront = isBatchDimLast ? 0 : numBDims;
-  int64_t currNPos =
-      isOutputChannelFirst ? numBDimsInFront : numBDimsInFront + numMDims;
-  int64_t currKPos = numBDims + numMDims + numNDims;
+  int64_t currKPos = numParallelDims;
   SmallVector<AffineExpr> filterDims;
-
-  for (auto iter : filterIterators) {
-    if (iter == parallel) {
-      filterDims.push_back(dims[currNPos++]);
-    } else if (iter == reduction) {
+  for (const auto &[iter, indices] :
+       llvm::zip_equal(filterIterators, filterReassocIndices)) {
+    if (iter == reduction) {
       filterDims.push_back(dims[currKPos++]);
+    } else {
+      assert(iter == parallel && "expected a parallel dim");
+      assert(indices.size() == 1 && "expected a single reassociation index");
+      int64_t filterInputIdx = indices.front();
+      AffineExpr originalDim = filterMap.getResult(filterInputIdx);
+      int64_t canonicalDim = outputMap.getResultPosition(originalDim).value();
+      filterDims.push_back(dims[canonicalDim]);
     }
   }
   auto filterMapGEMM =

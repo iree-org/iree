@@ -170,6 +170,11 @@ struct IGEMMGenericConvDetails {
   /// Indicates if the OutputChannel is before the OutputImage in the output.
   /// This determines our lhs/rhs ordering.
   bool isOutputChannelFirst;
+
+  // Get the indexing map for the IGEMM image operand.
+  AffineMap getIgemmInputImageMap() {
+    return igemmContractionMaps[isOutputChannelFirst ? 1 : 0];
+  }
 };
 
 /// Populate `IGEMMGenericConvDetails` for a given convolution operation.
