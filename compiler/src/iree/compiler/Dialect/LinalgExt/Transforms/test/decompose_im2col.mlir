@@ -265,7 +265,7 @@ module {
 //       CHECK: %[[T2:.+]] = tensor.pad %[[T1]]
 //  CHECK-NEXT: ^bb0
 //  CHECK-NEXT:   tensor.yield
-//  CHECK-NEXT: } : tensor<1x?x?x?xf32> to tensor<1x1x1x1xf32>
+//  CHECK-NEXT: } : tensor<1x1x?x?xf32> to tensor<1x1x1x1xf32>
 
 // -----
 
