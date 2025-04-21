@@ -1223,9 +1223,8 @@ hal.executable public @main {
 // CHECK-DAG:     %[[C42:.+]] = arith.constant 42 : i32
 // CHECK:         scf.forall {{.*}} in (16, 4) {
 // CHECK:           scf.for
-// CHECK-DAG:         linalg.fill ins(%[[C42]] : i32) outs(%[[ALLOCA]] : memref<4x1xi32, #gpu.address_space<private>>)
-// CHECK-DAG:         %[[INPUT_SUBVIEW:.+]] = memref.subview {{.*}} : memref<100x250xi32, #amdgpu.address_space<fat_raw_buffer>> to memref<?x?xi32, strided<[250, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-// CHECK-DAG:         %[[ALLOCA_SUBVIEW:.+]] = memref.subview %[[ALLOCA]]{{.*}} : memref<4x1xi32, #gpu.address_space<private>> to memref<?x?xi32, strided<[1, 1]>, #gpu.address_space<private>>
-// CHECK-DAG:         memref.copy %[[INPUT_SUBVIEW]], %[[ALLOCA_SUBVIEW]] : memref<?x?xi32, strided<[250, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>> to memref<?x?xi32, strided<[1, 1]>, #gpu.address_space<private>>
+// CHECK:             %[[MASK:.+]] = vector.create_mask
+// CHECK:             %[[READ0:.+]] = vector.transfer_read{{.*}} %[[MASK]]
+// CHECK-DAG:         %[[ALLOCA_SUBVIEW:.+]] = memref.subview %[[ALLOCA]]{{.*}} : memref<4x1xi32, #gpu.address_space<private>> to memref<4xi32, strided<[1]>, #gpu.address_space<private>>
 // CHECK-DAG:         %[[READ:.+]] = vector.transfer_read{{.*}}: memref<1x4xi32, strided<[4, 1]>, #gpu.address_space<private>>, vector<4xi32>
 // CHECK-DAG:         vector.transfer_write %[[READ]]{{.*}}: vector<4xi32>, memref<16x4x16x32xi32, #amdgpu.address_space<fat_raw_buffer>>
