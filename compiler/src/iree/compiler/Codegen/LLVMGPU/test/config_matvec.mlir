@@ -34,7 +34,7 @@ func.func @dynamic_batch_matvec() {
 }
 
 //   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32]{{\]}}>
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
 // CDNA3-LABEL: func.func @dynamic_batch_matvec()
 //  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //       CDNA3:   linalg.batch_matmul
@@ -367,15 +367,57 @@ func.func @dynamic_parallel_dims(%dynsize : index, %input : tensor<4x?x4096xf16>
   return %2 : tensor<4x?xf32>
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //      CHECK: func @dynamic_parallel_dims
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 //  CDNA3-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}
-//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CDNA3: func @dynamic_parallel_dims
 // CDNA3-SAME:     translation_info = #[[TRANSLATION]]
 //      CDNA3:   linalg.generic
 // CDNA3-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> ()>
+func.func @test_dyn_reduction(%arg0: tensor<128x?x32xf8E4M3FNUZ>, %arg1: tensor<128x?x32x128xf8E4M3FNUZ>, %arg2: tensor<f32>) -> tensor<128x128xf8E4M3FNUZ> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant -2.400000e+02 : f8E4M3FNUZ
+  %cst_1 = arith.constant 2.400000e+02 : f8E4M3FNUZ
+  %0 = tensor.empty() : tensor<128x128xf8E4M3FNUZ>
+  %1 = tensor.empty() : tensor<128x128xf32>
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<128x128xf32>) -> tensor<128x128xf32>
+  %3 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<128x?x32xf8E4M3FNUZ>, tensor<128x?x32x128xf8E4M3FNUZ>) outs(%2 : tensor<128x128xf32>) {
+  ^bb0(%in: f8E4M3FNUZ, %in_2: f8E4M3FNUZ, %out: f32):
+    %5 = arith.extf %in : f8E4M3FNUZ to f32
+    %6 = arith.extf %in_2 : f8E4M3FNUZ to f32
+    %7 = arith.mulf %5, %6 : f32
+    %8 = arith.addf %out, %7 : f32
+    linalg.yield %8 : f32
+  } -> tensor<128x128xf32>
+  %4 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%3, %arg2 : tensor<128x128xf32>, tensor<f32>) outs(%0 : tensor<128x128xf8E4M3FNUZ>) {
+  ^bb0(%in: f32, %in_2: f32, %out: f8E4M3FNUZ):
+    %5 = arith.truncf %in : f32 to f8E4M3FNUZ
+    %6 = arith.truncf %in_2 : f32 to f8E4M3FNUZ
+    %7 = arith.divf %5, %6 : f8E4M3FNUZ
+    %8 = arith.cmpf ult, %7, %cst_0 : f8E4M3FNUZ
+    %9 = arith.select %8, %cst_0, %7 : f8E4M3FNUZ
+    %10 = arith.cmpf ugt, %9, %cst_1 : f8E4M3FNUZ
+    %11 = arith.select %10, %cst_1, %9 : f8E4M3FNUZ
+    linalg.yield %11 : f8E4M3FNUZ
+  } -> tensor<128x128xf8E4M3FNUZ>
+  return %4 : tensor<128x128xf8E4M3FNUZ>
+}
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 1, 64]{{\]}}>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK: func.func @test_dyn_reduction
+//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
