@@ -1129,7 +1129,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createIREEExpandStridedMetadataPass)
+      .addPass([]() {
+        IREEExpandStridedMetadataPassOptions options;
+        options.allowSubviewExpansion = true;
+        return createIREEExpandStridedMetadataPass(options);
+      })
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);

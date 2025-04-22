@@ -55,6 +55,7 @@ iree_lit_test_suite(
     "hoist_unrolled_vector_extract_insert_slice.mlir"
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
+    "iree_expand_strided_metadata_with_subview_expansion.mlir"
     "iree_loop_invariant_code_motion.mlir"
     "link_tuning_specs.mlir"
     "llvmcpu_materialize_encoding.mlir"
