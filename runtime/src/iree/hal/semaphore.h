@@ -110,6 +110,147 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_hal_semaphore_failure_free(
   }
 }
 
+// A bitfield indicating compatible semaphore behavior for a device.
+typedef uint32_t iree_hal_semaphore_compatibility_t;
+enum iree_hal_semaphore_compatibility_bits_t {
+  // Indicates (in the absence of other bits) the semaphore is not compatible
+  // with the device at all. Any attempts to use the semaphore for any usage
+  // will fail.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE = 0u,
+
+  // Indicates the HAL implementation can perform a host-side wait on the
+  // semaphore. The semaphore can be used as part of a submission at the cost of
+  // additional host-device synchronization.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT = 1u << 0,
+
+  // Indicates the HAL implementation can perform a device-side wait on the
+  // semaphore. The device can efficiently pipeline submissions when waiting
+  // without host (or user-mode) involvement.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT = 1u << 1,
+
+  // Indicates the HAL implementation can perform a host-side signal of the
+  // semaphore. The semaphore can be used as part of a submission at the cost of
+  // additional host-device synchronization.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL = 1u << 2,
+
+  // Indicates the HAL implementation can perform a device-side signal of the
+  // semaphore. The device can efficiently pipeline submissions when signaling
+  // without host (or user-mode) involvement.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL = 1u << 3,
+
+  // Semaphore is compatible with host-side emulation. Usage is allowed but will
+  // prevent the pipelining of submissions on the device-side.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY =
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL,
+
+  // Semaphore is compatible with device-side usage. The host cannot observe or
+  // interact with the semaphore.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_ONLY =
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
+
+  // Semaphore is compatible for all usage with the device.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL =
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
+};
+
+// Parses a semaphore compatibility bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_compatibility_parse(
+    iree_string_view_t value, iree_hal_semaphore_compatibility_t* out_value);
+
+// Formats a semaphore compatibility bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
+    iree_hal_semaphore_compatibility_t value,
+    iree_bitfield_string_temp_t* out_temp);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_external_timepoint_t
+//===----------------------------------------------------------------------===//
+
+// Defines the type of an external semaphore timepoint.
+// Timepoints represent a single point in time on the timeline of a semaphore as
+// a binary semaphore. An unsignaled timepoint indicates that the timeline has
+// not yet reached the payload value. A signaled timepoint indicates the
+// timeline has reached or exceeded the payload value.
+typedef enum iree_hal_external_timepoint_type_e {
+  IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE = 0,
+
+  // An iree_wait_primitive_t referencing a specific timepoint.
+  // Ownership of the wait primitive is transferred upon import or export and
+  // any operations performed on the event after are undefined.
+  //
+  // When imported the caller is allowed to signal the wait primitive using the
+  // iree_event_set or appropriate platform APIs. Since ownership is transferred
+  // the caller must retain a duplicate handle if it needs to signal after the
+  // import operation.
+  //
+  // When exported the caller is allowed to wait on the wait primitive using the
+  // iree_wait_* APIs or appropriate platform APIs. When no longer required the
+  // caller must use iree_wait_primitive_close or appropriate platform APIs to
+  // destroy the handle _only after the timepoint has been reached_. Attempting
+  // to destroy an exported wait primitive before it has been reached results in
+  // undefined behavior (but most likely a crash). The wait primitive type when
+  // exported is determined by the platform and underlying semaphore
+  // implementation.
+  IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE,
+
+  // A CUDA event (cuEvent) referencing a specific timepoint.
+  // Ownership of the event is transferred upon import or export and any
+  // operations performed on the event after are undefined.
+  //
+  // When imported the caller is allowed to record the event using
+  // `cuEventRecord`. Since ownership is transferred the caller must only record
+  // a single occurrence of the event using the reference to the event it
+  // retains. It is safest to record the event prior to importing.
+  //
+  // When exported the caller is allowed to query the timepoint for completion
+  // using `cuEventQuery` or wait on it using either `cuEventSynchronize` or
+  // `cuStreamWaitEvent`. When no longer required the caller must use
+  // `cuEventDestroy` _only after the timepoint has been reached_. Attempting to
+  // destroy an exported event before it has been reached results in undefined
+  // behavior (but most likely a crash).
+  IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT,
+
+  // A HIP event (hipEvent) referencing a specific timepoint.
+  // See IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT for more
+  // information.
+  IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT,
+} iree_hal_external_timepoint_type_t;
+
+// Flags for controlling iree_hal_external_timepoint_t implementation
+// details.
+enum iree_hal_external_timepoint_flag_bits_t {
+  IREE_HAL_EXTERNAL_TIMEPOINT_FLAG_NONE = 0u,
+};
+typedef uint32_t iree_hal_external_timepoint_flags_t;
+
+// Handle to an external semaphore timepoint.
+// Depending on type this may either be an owning reference that the caller must
+// release or a non-owning reference that remains live for as long as the HAL
+// semaphore it was exported from. See the type enum for more information.
+typedef struct iree_hal_external_timepoint_t {
+  // Type of the resource used to interpret the handle.
+  iree_hal_external_timepoint_type_t type;
+  // Flags indicating timepoint behavior.
+  iree_hal_external_timepoint_flags_t flags;
+  // Defines compatible operations that the owner may perform.
+  iree_hal_semaphore_compatibility_t compatibility;
+  union {
+    // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE
+    iree_wait_primitive_t wait_primitive;
+    // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT
+    void* cuda_event;  // cuEvent
+    // IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT
+    void* hip_event;  // hipEvent
+  } handle;
+} iree_hal_external_timepoint_t;
+
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
@@ -205,6 +346,33 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
 IREE_API_EXPORT iree_wait_source_t
 iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value);
 
+// TODO(benvanik): iree_hal_semaphore_import/iree_hal_semaphore_export for
+// supported timeline types. These may be Vulkan timeline semaphores, D3D12
+// fences, Metal shared events, HSA signals, or other primitives natively
+// supporting 64-bit payloads.
+
+// Imports a timepoint at |value| on the |semaphore| timeline from an external
+// timepoint object. Always prefer iree_hal_semaphore_import and
+// iree_hal_semaphore_export when supported to avoid additional timepoint
+// tracking overhead and churn on the returned timepoint objects.
+// See the iree_hal_external_timepoint_type_t enum for more information.
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint);
+
+// Exports a timepoint at |value| on the |semaphore| timeline as an external
+// timepoint object. Always prefer iree_hal_semaphore_import and
+// iree_hal_semaphore_export when supported to avoid additional timepoint
+// tracking overhead and churn on the returned timepoint objects.
+// See the iree_hal_external_timepoint_type_t enum for more information.
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_list_t
 //===----------------------------------------------------------------------===//
@@ -272,6 +440,17 @@ typedef struct iree_hal_semaphore_vtable_t {
 
   iree_status_t(IREE_API_PTR* wait)(iree_hal_semaphore_t* semaphore,
                                     uint64_t value, iree_timeout_t timeout);
+
+  iree_status_t(IREE_API_PTR* import_timepoint)(
+      iree_hal_semaphore_t* semaphore, uint64_t value,
+      iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_external_timepoint_t external_timepoint);
+  iree_status_t(IREE_API_PTR* export_timepoint)(
+      iree_hal_semaphore_t* semaphore, uint64_t value,
+      iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_external_timepoint_type_t requested_type,
+      iree_hal_external_timepoint_flags_t requested_flags,
+      iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint);
 } iree_hal_semaphore_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_semaphore_vtable_t);
 

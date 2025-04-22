@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/per_device_information.h"
 
 typedef struct iree_hal_hip_event_t iree_hal_hip_event_t;
 typedef struct iree_hal_hip_event_pool_t iree_hal_hip_event_pool_t;
@@ -28,7 +29,8 @@ typedef iree_status_t (*iree_hal_hip_event_semaphore_scheduled_callback_t)(
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_hip_event_semaphore_create(
     uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
-    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
+    iree_allocator_t host_allocator, iree_hal_hip_device_topology_t topology,
+    iree_hal_semaphore_t** out_semaphore);
 
 // Performs a multi-wait on one or more semaphores. Returns
 // IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before |timeout|.
@@ -61,14 +63,18 @@ iree_status_t iree_hal_hip_semaphore_notify_forward_progress_to(
 // is visible on the host.
 // The refcount for the event is incremented here, and the caller
 // must decrement when no longer needed.
-iree_status_t iree_hal_hip_semaphore_get_hip_event(
-    iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_hal_hip_event_pool_t* event_pool,
-    iree_hal_hip_event_t** out_hip_event);
+iree_status_t iree_hal_hip_semaphore_wait_hip_events(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value, hipStream_t stream);
+
+// Waits until all exported timepoints (up to value) have been
+// submitted to the dispatch thread.
+iree_status_t iree_hal_hip_semaphore_for_exported_timepoints(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value);
 
 iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    hipStream_t dispatch_stream, iree_hal_hip_event_pool_t* event_pool);
+    iree_hal_hip_per_device_info_t* device, hipStream_t dispatch_stream,
+    iree_hal_hip_event_pool_t* event_pool);
 
 iree_status_t iree_hal_hip_event_semaphore_advance(
     iree_hal_semaphore_t* semaphore);

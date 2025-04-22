@@ -112,48 +112,6 @@ typedef struct iree_hal_device_profiling_options_t {
   const char* file_path;
 } iree_hal_device_profiling_options_t;
 
-// A bitfield indicating compatible semaphore behavior for a device.
-typedef uint64_t iree_hal_semaphore_compatibility_t;
-enum iree_hal_semaphore_compatibility_bits_t {
-  // Indicates (in the absence of other bits) the semaphore is not compatible
-  // with the device at all. Any attempts to use the semaphore for any usage
-  // will fail.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE = 0u,
-
-  // Indicates the device can perform a host-side wait on the semaphore.
-  // The semaphore can be used as part of a submission at the cost of additional
-  // host-device synchronization.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT = 1u << 0,
-
-  // Indicates the device can perform a device-side wait on the semaphore.
-  // The device can efficiently pipeline submissions when waiting without
-  // host (or user-mode) involvement.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT = 1u << 1,
-
-  // Indicates the device can perform a host-side signal of the semaphore.
-  // The semaphore can be used as part of a submission at the cost of additional
-  // host-device synchronization.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL = 1u << 2,
-
-  // Indicates the device can perform a device-side signal of the semaphore.
-  // The device can efficiently pipeline submissions when signaling without
-  // host (or user-mode) involvement.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL = 1u << 3,
-
-  // Semaphore is compatible with host-side emulation. Usage is allowed but will
-  // prevent the pipelining of submissions on the device-side.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY =
-      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
-      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL,
-
-  // Semaphore is compatible for all usage with the device.
-  IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL =
-      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
-      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT |
-      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL |
-      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
-};
-
 // Bitfield specifying flags controlling an async allocation operation.
 typedef uint64_t iree_hal_alloca_flags_t;
 enum iree_hal_alloca_flag_bits_t {
