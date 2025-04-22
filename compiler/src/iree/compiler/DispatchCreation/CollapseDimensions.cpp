@@ -668,6 +668,7 @@ hoistTensorReshapesOutOfDispatchRegion(
       ValueRange resultDims = dispatchOp.getResultDynamicDims(resultIndex);
       newDynamicDims.append(resultDims.begin(), resultDims.end());
       newYieldVals.push_back(yieldedValue);
+      newDynamicDims.assign(dynamicDimsList.begin(), dynamicDimsList.end());
       continue;
     }
 

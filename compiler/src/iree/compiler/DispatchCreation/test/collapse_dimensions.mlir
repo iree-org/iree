@@ -843,3 +843,28 @@ util.func public @multi_reduction(%arg0 : tensor<32x16x16384xf32>, %arg1 : tenso
 //       CHECK:   %[[GEN2:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[GEN1]] : tensor<32xf32>)
 //       CHECK:   flow.return %[[GEN2]]
+
+// -----
+
+util.func public @test_dynamic_pass_through(%arg0 : index, %arg1 : tensor<4x?xi64>,
+    %arg2 : tensor<256x256xf16>) -> tensor<4x?x256xf16> {
+  %20 = flow.dispatch.region -> (tensor<4x?x256xf16>{%arg0}) {
+    %216 = tensor.empty(%arg0) : tensor<4x?x256xf16>
+    %217 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+        iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<4x?xi64>)
+        outs(%216 : tensor<4x?x256xf16>) {
+    ^bb0(%in: i64, %out: f16):
+      %218 = arith.index_cast %in : i64 to index
+      %219 = linalg.index 2 : index
+      %extracted = tensor.extract %arg2[%218, %219] : tensor<256x256xf16>
+      linalg.yield %extracted : f16
+    } -> tensor<4x?x256xf16>
+    flow.return %217 : tensor<4x?x256xf16>
+  }
+  util.return %20 : tensor<4x?x256xf16>
+}
+// CHECK-LABEL: @test_dynamic_pass_through(
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:   return %[[DISPATCH]]
