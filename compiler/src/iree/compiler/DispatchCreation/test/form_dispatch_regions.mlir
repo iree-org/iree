@@ -1323,10 +1323,10 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20x30x50xbf16>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x20x40x50xbf16>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x20x40x50xbf16>
+//       CHECK:   %[[Q:.+]] = linalg.generic
 //       CHECK:   %[[K:.+]] = linalg.generic
 //       CHECK:   %[[V:.+]] = linalg.generic
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[Q:.+]] = linalg.generic
 //       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
 //       CHECK:     flow.return %[[ATTENTION]]
