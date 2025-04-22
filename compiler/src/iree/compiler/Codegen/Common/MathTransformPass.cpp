@@ -109,7 +109,8 @@ static bool predicateF32Cast(StringRef name,
 }
 
 static bool predicateApprox(StringRef name,
-                            IREE::HAL::ExecutableTargetAttr target) {
+                            IREE::HAL::ExecutableTargetAttr target,
+                            bool hasFastExp) {
   if (isROCMBackend(target)) {
     // On ROCm, we do not need most rewrites as we can generally bottom out on
     // either device library functions, or handling of intrinsics in AMDGPU.
@@ -121,11 +122,13 @@ static bool predicateApprox(StringRef name,
     // something that we can really prevent. Avoiding this rewrite helps a bit.
     return false;
   }
+  // Continue with the existing list for standard approximations
   StringRef acos = math::AcosOp::getOperationName();
   StringRef asin = math::AsinOp::getOperationName();
   StringRef atan = math::AtanOp::getOperationName();
   StringRef atan2 = math::Atan2Op::getOperationName();
   StringRef cos = math::CosOp::getOperationName();
+  StringRef erf = math::ErfOp::getOperationName();
   StringRef sin = math::SinOp::getOperationName();
   StringRef tanh = math::TanhOp::getOperationName();
   StringRef log = math::LogOp::getOperationName();
@@ -134,7 +137,16 @@ static bool predicateApprox(StringRef name,
   StringRef exp = math::ExpOp::getOperationName();
   StringRef expm1 = math::ExpM1Op::getOperationName();
   StringRef cbrt = math::CbrtOp::getOperationName();
-  StringRef erf = math::ErfOp::getOperationName();
+
+  // List of ops that have specific device library implementations enabled by hasFastExp.
+  StringRef opsWithDeviceLibImpl[] = {erf};
+
+  // If hasFastExp is enabled and the op is in our device-lib list,
+  // don't apply the standard polynomial approximation.
+  if (hasFastExp && llvm::is_contained(opsWithDeviceLibImpl, name)) {
+    return false;
+  }
+
   return llvm::is_contained({atan, atan2, tanh, log, log2, log1p, erf, asin,
                              acos, exp, expm1, cbrt, sin, cos},
                             name);
@@ -192,7 +204,9 @@ public:
 
     populateMathPolynomialApproximationPatterns(
         patterns,
-        [target](StringRef name) { return predicateApprox(name, target); });
+        [this, target](StringRef name) { 
+          return predicateApprox(name, target, hasFastExp); 
+        });
         
     // Add device-lib implementation patterns
     populateDeviceLibMathPatterns(

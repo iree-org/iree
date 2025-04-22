@@ -14,7 +14,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 // Pattern to lower math.erf to its device lib implementation (from erfF.cl)
-// Pattern to lower math.erf to its device lib implementation (from erfF.cl)
 struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
   using OpRewritePattern<math::ErfOp>::OpRewritePattern;
 
@@ -26,8 +25,6 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
 
     // Create constants
     auto f32Type = rewriter.getF32Type();
-    auto zeroF = rewriter.create<arith::ConstantOp>(
-        loc, f32Type, rewriter.getF32FloatAttr(0.0f));
     auto oneF = rewriter.create<arith::ConstantOp>(
         loc, f32Type, rewriter.getF32FloatAttr(1.0f));
     
@@ -78,22 +75,22 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
     Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
     
     // First nested MAD: MATH_MAD(t, -0x1.268bc2p-11f, 0x1.420828p-8f)
-    Value mad1 = rewriter.create<arith::FmaOp>(loc, t, c1_0, c1_1);
+    Value mad1 = rewriter.create<math::FmaOp>(loc, t, c1_0, c1_1);
     
     // Second nested MAD: MATH_MAD(t, mad1, -0x1.b5937p-6f)
-    Value mad2 = rewriter.create<arith::FmaOp>(loc, t, mad1, c1_2);
+    Value mad2 = rewriter.create<math::FmaOp>(loc, t, mad1, c1_2);
     
     // Third nested MAD: MATH_MAD(t, mad2, 0x1.ce077cp-4f)
-    Value mad3 = rewriter.create<arith::FmaOp>(loc, t, mad2, c1_3);
+    Value mad3 = rewriter.create<math::FmaOp>(loc, t, mad2, c1_3);
     
     // Fourth nested MAD: MATH_MAD(t, mad3, -0x1.81266p-2f)
-    Value mad4 = rewriter.create<arith::FmaOp>(loc, t, mad3, c1_4);
+    Value mad4 = rewriter.create<math::FmaOp>(loc, t, mad3, c1_4);
     
     // Fifth nested MAD: MATH_MAD(t, mad4, 0x1.06eba0p-3f)
-    Value p = rewriter.create<arith::FmaOp>(loc, t, mad4, c1_5);
+    Value p = rewriter.create<math::FmaOp>(loc, t, mad4, c1_5);
     
     // Final BUILTIN_FMA_F32(ax, p, ax)
-    Value result = rewriter.create<arith::FmaOp>(loc, ax, p, ax);
+    Value result = rewriter.create<math::FmaOp>(loc, ax, p, ax);
     
     rewriter.create<scf::YieldOp>(loc, result);
     
@@ -102,25 +99,25 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
     
     // Complex polynomial approximation for |x| >= 1.0
     // Start with MATH_MAD(ax, 0x1.1d3156p-16f, -0x1.8d129p-12f)
-    Value mad5 = rewriter.create<arith::FmaOp>(loc, ax, c2_0, c2_1);
+    Value mad5 = rewriter.create<math::FmaOp>(loc, ax, c2_0, c2_1);
     
     // MATH_MAD(ax, mad5, 0x1.f9a6d2p-9f)
-    Value mad6 = rewriter.create<arith::FmaOp>(loc, ax, mad5, c2_2);
+    Value mad6 = rewriter.create<math::FmaOp>(loc, ax, mad5, c2_2);
     
     // MATH_MAD(ax, mad6, -0x1.8c3164p-6f)
-    Value mad7 = rewriter.create<arith::FmaOp>(loc, ax, mad6, c2_3);
+    Value mad7 = rewriter.create<math::FmaOp>(loc, ax, mad6, c2_3);
     
     // MATH_MAD(ax, mad7, 0x1.b4e9c8p-4f)
-    Value mad8 = rewriter.create<arith::FmaOp>(loc, ax, mad7, c2_4);
+    Value mad8 = rewriter.create<math::FmaOp>(loc, ax, mad7, c2_4);
     
     // MATH_MAD(ax, mad8, 0x1.4515fap-1f)
-    Value mad9 = rewriter.create<arith::FmaOp>(loc, ax, mad8, c2_5);
+    Value mad9 = rewriter.create<math::FmaOp>(loc, ax, mad8, c2_5);
     
     // MATH_MAD(ax, mad9, 0x1.078e50p-3f)
-    Value mad10 = rewriter.create<arith::FmaOp>(loc, ax, mad9, c2_6);
+    Value mad10 = rewriter.create<math::FmaOp>(loc, ax, mad9, c2_6);
     
     // BUILTIN_FMA_F32(ax, mad10, ax)
-    Value p2 = rewriter.create<arith::FmaOp>(loc, ax, mad10, ax);
+    Value p2 = rewriter.create<math::FmaOp>(loc, ax, mad10, ax);
     
     // Negate p2
     Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
@@ -145,8 +142,7 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
     return success();
   }
 };
-
-} // namespace
+} // anonymous namespace
 
 void populateDeviceLibMathPatterns(
     RewritePatternSet &patterns,
