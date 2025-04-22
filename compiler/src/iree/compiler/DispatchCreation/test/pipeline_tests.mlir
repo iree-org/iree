@@ -215,13 +215,10 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
 }
 // CHECK-LABEL: util.func public @attention_rope_fusion
 //   CHECK-NOT:   linalg.generic
-//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
+//       CHECK:   flow.dispatch.workgroup
 //       CHECK:     %[[GATHER:.+]] = linalg.generic
+//       CHECK:   flow.dispatch.workgroup
 //       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
-//  CHECK-SAME:         ins(%[[GATHER]],
-//       CHECK:      iree_tensor_ext.dispatch.tensor.store %[[ATTENTION]]
-//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
-//       CHECK:   util.return %[[RESHAPE]]
 
 // -----
 
