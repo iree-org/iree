@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -997,7 +998,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
 // insertion point is set to the first use of the |arg| where all required
 // dynamic dimension SSA values are present.
 static bool insertBindingOp(BlockArgument arg,
-                            IREE::Flow::DispatchTensorType tensorType,
+                            IREE::TensorExt::DispatchTensorType tensorType,
                             Value zero, OpBuilder &builder) {
   // No uses: don't need a binding op.
   if (arg.use_empty())
@@ -1135,7 +1136,8 @@ struct ConvertExecutableOp
         for (auto arg : funcOp.front().getArguments()) {
           auto oldType = arg.getType();
           if (auto tensorType =
-                  llvm::dyn_cast<IREE::Flow::DispatchTensorType>(oldType)) {
+                  llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+                      oldType)) {
             // Now a binding - insert the stream.binding.subspan op to slice it.
             auto newType = rewriter.getType<IREE::Stream::BindingType>();
             newTypes.push_back(newType);

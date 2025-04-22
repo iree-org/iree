@@ -15,19 +15,19 @@ package(
 iree_compiler_cc_library(
     name = "ExternalModels",
     srcs = [
-        "FlowExternalModels.cpp",
         "HALExternalModels.cpp",
         "Interfaces.cpp",
         "LinalgExtExternalModels.cpp",
         "StreamExternalModels.cpp",
+        "TensorExtExternalModels.cpp",
         "UtilExternalModels.cpp",
     ],
     hdrs = [
-        "FlowExternalModels.h",
         "HALExternalModels.h",
         "Interfaces.h",
         "LinalgExtExternalModels.h",
         "StreamExternalModels.h",
+        "TensorExtExternalModels.h",
         "UtilExternalModels.h",
     ],
     deps = [
@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:GPUDialect",

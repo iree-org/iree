@@ -27,6 +27,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/CommandLine.h"
@@ -553,7 +554,8 @@ checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
 
   // TODO(pashu123): Check for multiple stores.
   entryPoint.walk([&](Operation *op) {
-    if (auto firstStore = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(op)) {
+    if (auto firstStore =
+            dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
       numStores += 1;
       if (numStores > 1) {
         return WalkResult::interrupt();

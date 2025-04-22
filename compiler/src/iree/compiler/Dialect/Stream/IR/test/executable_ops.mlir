@@ -9,10 +9,10 @@ stream.executable private @executable {
     // CHECK-NEXT: util.func private @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index) {
     util.func private @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index) {
       %c0 = arith.constant 0 : index
-      // CHECK-DAG: = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<?x5x64xf32>>{%arg2}
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<?x5x64xf32>>{%arg2}
-      // CHECK-DAG: = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x5x4xf32>>{%arg2}
-      %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x5x4xf32>>{%arg2}
+      // CHECK-DAG: = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x5x64xf32>>{%arg2}
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x5x64xf32>>{%arg2}
+      // CHECK-DAG: = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x5x4xf32>>{%arg2}
+      %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x5x4xf32>>{%arg2}
       // CHECK: util.return
       util.return
     }
@@ -75,7 +75,7 @@ stream.executable private @executable {
   builtin.module {
     util.func private @dispatch(%arg0: !stream.binding, %arg1: index) {
       %c0 = arith.constant 0 : index
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<?x5x64xf32>>{%arg1}
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x5x64xf32>>{%arg1}
       util.return
     }
   }

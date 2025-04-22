@@ -17,7 +17,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 
@@ -283,7 +282,7 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
     // If there are no workgroup distribution loops, set the default
     // number of workgroups to {1, 1, 1}. Note: that this only kicks
     // in if the export op region has
-    // `flow.dispatch.workgroup_count_from_slice
+    // `iree_tensor_ext.dispatch.workgroup_count_from_slice
     return lowerWorkgroupCountFromSliceOp(rewriter, funcOp,
                                           ArrayRef<OpFoldResult>{});
   }

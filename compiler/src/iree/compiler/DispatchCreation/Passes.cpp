@@ -343,7 +343,7 @@ void buildDispatchCreationPassPipeline(
       ///   resolved in the backends into the actual workgroup count
       ///   computation.
       /// - To correlate back to the captured workload,
-      /// `flow.dispatch.workload.ordinal`
+      /// `iree_tensor_ext.dispatch.workload.ordinal`
       ///   to map the captured operand to the position in the workload list.
       .addPass(
           DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass);

@@ -20,10 +20,10 @@ func.func @argmax_1d_f16i64() attributes {
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
-  %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
-  %10 = flow.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  %8 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf16>>{%8}
+  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
   %11 = tensor.empty() : tensor<i64>
   %12 = tensor.empty() : tensor<f16>
   %13 = linalg.fill ins(%c0_i64 : i64) outs(%11 : tensor<i64>) -> tensor<i64>
@@ -37,7 +37,7 @@ func.func @argmax_1d_f16i64() attributes {
     %20 = arith.select %19, %17, %out_0 : i64
     linalg.yield %18, %20 : f16, i64
   } -> (tensor<f16>, tensor<i64>)
-  flow.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !flow.dispatch.tensor<writeonly:tensor<i64>>
+  iree_tensor_ext.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
   return
 }
 
@@ -68,10 +68,10 @@ func.func @argmax_2d_f32i64() attributes {
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16xi64>>
-  %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x?xf32>>{%8}
-  %10 = flow.dispatch.tensor.load %9, offsets = [0, 0], sizes = [16, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16x?xf32>>{%8} -> tensor<16x?xf32>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xi64>>
+  %8 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x?xf32>>{%8}
+  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0, 0], sizes = [16, %8], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x?xf32>>{%8} -> tensor<16x?xf32>
   %11 = tensor.empty() : tensor<16xi64>
   %12 = tensor.empty() : tensor<16xf32>
   %13 = linalg.fill ins(%c0_i64 : i64) outs(%11 : tensor<16xi64>) -> tensor<16xi64>
@@ -85,7 +85,7 @@ func.func @argmax_2d_f32i64() attributes {
     %20 = arith.select %19, %17, %out_0 : i64
     linalg.yield %18, %20 : f32, i64
   } -> (tensor<16xf32>, tensor<16xi64>)
-  flow.dispatch.tensor.store %15#1, %7, offsets = [0], sizes = [16], strides = [1] : tensor<16xi64> -> !flow.dispatch.tensor<writeonly:tensor<16xi64>>
+  iree_tensor_ext.dispatch.tensor.store %15#1, %7, offsets = [0], sizes = [16], strides = [1] : tensor<16xi64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xi64>>
   return
 }
 
@@ -118,10 +118,10 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
-  %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
-  %10 = flow.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  %8 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf16>>{%8}
+  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
   %11 = tensor.empty() : tensor<i64>
   %12 = tensor.empty() : tensor<f16>
   %13 = linalg.fill ins(%c0_i64 : i64) outs(%11 : tensor<i64>) -> tensor<i64>
@@ -135,7 +135,7 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {
     %20 = arith.select %19, %17, %out_0 : i64
     linalg.yield %18, %20 : f16, i64
   } -> (tensor<f16>, tensor<i64>)
-  flow.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !flow.dispatch.tensor<writeonly:tensor<i64>>
+  iree_tensor_ext.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
   return
 }
 
@@ -166,10 +166,10 @@ func.func @not_neg_inf_init_argmax_1d() attributes {
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
-  %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
-  %10 = flow.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  %8 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf16>>{%8}
+  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
   %11 = tensor.empty() : tensor<i64>
   %12 = tensor.empty() : tensor<f16>
   %13 = linalg.fill ins(%c0_i64 : i64) outs(%11 : tensor<i64>) -> tensor<i64>
@@ -183,7 +183,7 @@ func.func @not_neg_inf_init_argmax_1d() attributes {
     %20 = arith.select %19, %17, %out_0 : i64
     linalg.yield %18, %20 : f16, i64
   } -> (tensor<f16>, tensor<i64>)
-  flow.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !flow.dispatch.tensor<writeonly:tensor<i64>>
+  iree_tensor_ext.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
   return
 }
 

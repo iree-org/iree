@@ -43,16 +43,16 @@ util.func public @main(%arg0: tensor<833xi32>, %arg1: tensor<833x833xf32>, %arg2
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<833x833xf32>
 //  CHECK-SAME:     %[[ARG2:.+]]: tensor<f32>
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups(%[[ARG0]], %[[ARG1]], %[[ARG2]])
-//  CHECK-NEXT:       %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:tensor<833xi32>>
-//  CHECK-SAME:       %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:tensor<833x833xf32>>
-//  CHECK-SAME:       %[[ARG5:.+]]: !flow.dispatch.tensor<readonly:tensor<f32>>
-//  CHECK-SAME:       %[[ARG6:.+]]: !flow.dispatch.tensor<writeonly:tensor<f32>>
-//   CHECK-DAG:     %[[L0:.+]] = flow.dispatch.tensor.load %[[ARG3]]
-//   CHECK-DAG:     %[[L1:.+]] = flow.dispatch.tensor.load %[[ARG4]]
-//   CHECK-DAG:     %[[L2:.+]] = flow.dispatch.tensor.load %[[ARG5]]
+//  CHECK-NEXT:       %[[ARG3:.+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<833xi32>>
+//  CHECK-SAME:       %[[ARG4:.+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<833x833xf32>>
+//  CHECK-SAME:       %[[ARG5:.+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+//  CHECK-SAME:       %[[ARG6:.+]]: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32>>
+//   CHECK-DAG:     %[[L0:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG3]]
+//   CHECK-DAG:     %[[L1:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG4]]
+//   CHECK-DAG:     %[[L2:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG5]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[L0]], %[[L0]], %[[L1]], %[[L2]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG6]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[ARG6]]
 //       CHECK:   return %[[DISPATCH]]
 
 // -----
@@ -98,7 +98,7 @@ util.func public @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi4>, %arg1:
 //       CHECK:     %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC1]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC2]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC2]]
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
 //       CHECK:   return %[[RESHAPE]]
 
@@ -139,16 +139,16 @@ util.func public @verify_operand_cse(%arg0: !hal.buffer_view, %arg1: !hal.buffer
 
 // CHECK-LABEL: func public @verify_operand_cse
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-//   CHECK-DAG:     %[[DIM1:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 0
-//   CHECK-DAG:     %[[DIM2:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 1
-//   CHECK-DAG:     %[[DIM3:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 2
-//   CHECK-DAG:     %[[DIM4:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 3
-//       CHECK:   flow.dispatch.tensor.load
+//   CHECK-DAG:     %[[DIM1:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
+//   CHECK-DAG:     %[[DIM2:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1
+//   CHECK-DAG:     %[[DIM3:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2
+//   CHECK-DAG:     %[[DIM4:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 3
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [%[[DIM1]], %[[DIM2]], 64]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x64xf32>>{%[[DIM1]], %[[DIM2]]}
-//       CHECK:   flow.dispatch.tensor.load
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x64xf32>>{%[[DIM1]], %[[DIM2]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [%[[DIM3]], 64, %[[DIM4]]]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x64x?xf32>>{%[[DIM3]], %[[DIM4]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x64x?xf32>>{%[[DIM3]], %[[DIM4]]}
 
 // -----
 
@@ -219,7 +219,7 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
 //       CHECK:     %[[GATHER:.+]] = linalg.generic
 //       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:         ins(%[[GATHER]],
-//       CHECK:      flow.dispatch.tensor.store %[[ATTENTION]]
+//       CHECK:      iree_tensor_ext.dispatch.tensor.store %[[ATTENTION]]
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
 //       CHECK:   util.return %[[RESHAPE]]
 
@@ -261,7 +261,7 @@ util.func public @verify_bubbling(%arg0: !hal.buffer_view, %arg2: !hal.fence) ->
 //   CHECK-NOT:   linalg.generic
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
 //       CHECK:     %[[GEN:.+]] = linalg.generic
-//       CHECK:      flow.dispatch.tensor.store %[[GEN]]
+//       CHECK:      iree_tensor_ext.dispatch.tensor.store %[[GEN]]
 //   CHECK-NOT:   linalg.generic
 
 // -----

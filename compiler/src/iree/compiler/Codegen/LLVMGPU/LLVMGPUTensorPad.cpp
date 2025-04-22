@@ -7,7 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -26,7 +26,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 static FailureOr<SmallVector<int64_t>>
-getPaddedShapeFromTensorLoad(IREE::Flow::DispatchTensorLoadOp tensorLoad,
+getPaddedShapeFromTensorLoad(IREE::TensorExt::DispatchTensorLoadOp tensorLoad,
                              ArrayRef<int64_t> origShape) {
   // Determine the padded shape from the load.
   SmallVector<int64_t> paddedShape(origShape.begin(), origShape.end());
@@ -57,7 +57,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
   IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(op);
   auto tensorLoad =
-      op.getDest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+      op.getDest().getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
   if (!tensorLoad) {
     return failure();
   }

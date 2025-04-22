@@ -83,6 +83,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 

@@ -22,9 +22,9 @@ module {
     %cst_0 = arith.constant 0.000000e+00 : f32
     %c384 = arith.constant 384 : index
     %c128 = arith.constant 128 : index
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<512x128xf32>>
-    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x128xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x128xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -35,9 +35,9 @@ module {
     %6 = affine.apply #map0()[%workgroup_count_x]
     %7 = tensor.empty() : tensor<64x64xf32>
     scf.for %arg0 = %3 to %c384 step %4 {
-      %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<64x512xf32>
+      %8 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 512], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<64x512xf32>
       scf.for %arg1 = %5 to %c128 step %6 {
-        %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [512, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x128xf32>> -> tensor<512x64xf32>
+        %9 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [512, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x128xf32>> -> tensor<512x64xf32>
         %10 = scf.for %arg2 = %c0 to %c64 step %c16 iter_args(%arg3 = %7) -> (tensor<64x64xf32>) {
           %11 = scf.for %arg4 = %c0 to %c64 step %c16 iter_args(%arg5 = %arg3) -> (tensor<64x64xf32>) {
             %12 = scf.for %arg6 = %c0 to %c512 step %c32 iter_args(%arg7 = %cst) -> (vector<16x16xf32>) {
@@ -52,7 +52,7 @@ module {
           }
           scf.yield %11 : tensor<64x64xf32>
         }
-        flow.dispatch.tensor.store %10, %2, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
+        iree_tensor_ext.dispatch.tensor.store %10, %2, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x128xf32>>
       }
     }
     return
@@ -69,14 +69,14 @@ module {
 //  CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 //  CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
-//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
-//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : !flow.dispatch.tensor<readonly:tensor<512x128xf32>>
-//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) : !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
+//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>>
+//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x128xf32>>
+//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x128xf32>>
 //      CHECK: %[[DST_TILE_INIT:.+]] = tensor.empty()
 //      CHECK: scf.for %[[I_IDX:.+]] = {{.*}} to %[[C384]] step %{{[0-9]*}} {
-//      CHECK:   %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>
+//      CHECK:   %[[LHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>
 //      CHECK:   scf.for %[[J_IDX:.+]] = {{.*}} to %[[C128]] step %{{[0-9]*}} {
-//      CHECK:     %[[RHS_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]], {{.*}} -> tensor<512x64xf32>
+//      CHECK:     %[[RHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS]], {{.*}} -> tensor<512x64xf32>
 //      CHECK:     {{.*}} = scf.for %[[L1_I:.+]] = %[[C0]] to %[[C64]] step %[[C16]]
 // CHECK-SAME:       iter_args(%[[ITER0:.+]] = %[[DST_TILE_INIT]]) -> (tensor<64x64xf32>)
 //      CHECK:       {{.*}} = scf.for %[[L1_J:.+]] = %[[C0]] to %[[C64]] step %[[C16]]
@@ -121,13 +121,13 @@ module {
     %c1835008 = arith.constant 1835008 : index
     %c0 = arith.constant 0 : index
     %c64 = arith.constant 64 : index
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<384xi32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
-    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<readonly:tensor<384x384xf32>>
-    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
-    %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) offset(%c1835008) : !flow.dispatch.tensor<readonly:tensor<2x512xf32>>
-    %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(5) : !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
-    %6 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384xi32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x384xf32>>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>>
+    %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) offset(%c1835008) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x512xf32>>
+    %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(5) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x512xf32>>
+    %6 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -139,11 +139,11 @@ module {
     %11 = tensor.empty() : tensor<64x64xf32>
     %12 = tensor.empty() : tensor<32x32xf32>
     scf.for %arg0 = %7 to %c384 step %8 {
-      %13 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [64], strides = [1] : !flow.dispatch.tensor<readonly:tensor<384xi32>> -> tensor<64xi32>
-      %14 = flow.dispatch.tensor.load %2, offsets = [%arg0, 0], sizes = [64, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x384xf32>> -> tensor<64x384xf32>
+      %13 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%arg0], sizes = [64], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384xi32>> -> tensor<64xi32>
+      %14 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [%arg0, 0], sizes = [64, 384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x384xf32>> -> tensor<64x384xf32>
       scf.for %arg1 = %9 to %c512 step %10 {
-        %15 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<64x64xf32>
-        %16 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [384, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<384x64xf32>
+        %15 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<64x64xf32>
+        %16 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [384, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<384x64xf32>
         %17 = scf.for %arg2 = %c0 to %c64 step %c32 iter_args(%arg3 = %11) -> (tensor<64x64xf32>) {
           %18 = tensor.extract_slice %13[%arg2] [32] [1] : tensor<64xi32> to tensor<32xi32>
           %19 = scf.for %arg4 = %c0 to %c64 step %c32 iter_args(%arg5 = %arg3) -> (tensor<64x64xf32>) {
@@ -174,7 +174,7 @@ module {
           }
           scf.yield %19 : tensor<64x64xf32>
         }
-        flow.dispatch.tensor.store %17, %5, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
+        iree_tensor_ext.dispatch.tensor.store %17, %5, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x512xf32>>
       }
     }
     return

@@ -28,7 +28,7 @@ hal.executable private @ex0 {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -188,7 +188,7 @@ hal.executable private @ex_0 {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -200,7 +200,7 @@ hal.executable private @ex_0 {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -214,7 +214,7 @@ hal.executable private @ex_0 {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -226,7 +226,7 @@ hal.executable private @ex_0 {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -242,7 +242,7 @@ hal.executable private @ex_1 {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

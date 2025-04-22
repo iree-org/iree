@@ -24,9 +24,9 @@ func.func @fold_collapse_into_loads_dynamic() -> tensor<?x32xf32> {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0}
-  %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, %0, 32], strides = [1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0} -> tensor<2x?x32xf32>
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0}
+  %2 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, %0, 32], strides = [1, 1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0} -> tensor<2x?x32xf32>
   %3 = tensor.collapse_shape %2 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
   return %3 : tensor<?x32xf32>
 }
@@ -34,10 +34,10 @@ func.func @fold_collapse_into_loads_dynamic() -> tensor<?x32xf32> {
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
 //       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%[[CONST]]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x32xf32>>{%[[SHAPE]]}
-//       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x32xf32>>{%[[SHAPE]]}
+//       CHECK:   %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SUBSPAN]]
 //  CHECK-SAME:       offsets = [0, 0], sizes = [%[[SHAPE]], 32], strides = [1, 1]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x32xf32>>{%[[SHAPE]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x32xf32>>{%[[SHAPE]]}
 
 // -----
 
@@ -47,9 +47,9 @@ func.func @fold_expand_into_loads_dynamic() -> tensor<2x?x16x32xf32> {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0}
-  %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, %0, 32], strides = [1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0} -> tensor<2x?x32xf32>
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0}
+  %2 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, %0, 32], strides = [1, 1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x?x32xf32>>{%0} -> tensor<2x?x32xf32>
   %3 = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%0]
   %4 = tensor.expand_shape %2 [[0], [1, 2], [3]] output_shape [2, %3, 16, 32] : tensor<2x?x32xf32> into tensor<2x?x16x32xf32>
   return %4 : tensor<2x?x16x32xf32>
@@ -59,10 +59,10 @@ func.func @fold_expand_into_loads_dynamic() -> tensor<2x?x16x32xf32> {
 //   CHECK-DAG:   %[[CONST:.+]] = hal.interface.constant.load
 //       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C16]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<2x?x16x32xf32>>{%[[SHAPE]]}
-//       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x?x16x32xf32>>{%[[SHAPE]]}
+//       CHECK:   %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SUBSPAN]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [2, %[[SHAPE]], 16, 32], strides = [1, 1, 1, 1]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<2x?x16x32xf32>>{%[[SHAPE]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x?x16x32xf32>>{%[[SHAPE]]}
 
 // -----
 
@@ -72,10 +72,10 @@ func.func @fold_collapse_into_stores_dynamic(%arg0 : tensor<2x?x32xf32>) {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
-  flow.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 32], strides = [1, 1]
-      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic(
@@ -83,10 +83,10 @@ func.func @fold_collapse_into_stores_dynamic(%arg0 : tensor<2x?x32xf32>) {
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
 //       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
-//       CHECK:   flow.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
 //  CHECK-SAME:       offsets = [0, 0, 0], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
 
 // -----
 
@@ -96,10 +96,10 @@ func.func @fold_collapse_into_stores_dynamic_partial_size(%arg0 : tensor<2x?x32x
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
   %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
-  flow.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 32], strides = [1, 1]
-      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_size(
@@ -107,10 +107,10 @@ func.func @fold_collapse_into_stores_dynamic_partial_size(%arg0 : tensor<2x?x32x
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
 //       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
-//       CHECK:   flow.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
 //  CHECK-SAME:       offsets = [0, 0, 0], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
 
 // -----
 
@@ -120,10 +120,10 @@ func.func @fold_collapse_into_stores_dynamic_partial_with_offset(%arg0 : tensor<
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
   %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
-  flow.dispatch.tensor.store %2, %1, offsets = [0, 8], sizes = [%0, 32], strides = [1, 1]
-      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, 8], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x40xf32>>{%0}
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_with_offset(
@@ -131,10 +131,10 @@ func.func @fold_collapse_into_stores_dynamic_partial_with_offset(%arg0 : tensor<
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
 //       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
-//       CHECK:   flow.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
 //  CHECK-SAME:       offsets = [0, 0, 8], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
 
 // -----
 
@@ -144,15 +144,15 @@ func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
-  flow.dispatch.tensor.store %2, %1, offsets = [8, 0], sizes = [%0, 32], strides = [1, 1]
-      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [8, 0], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_unsupported(
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
-//  CHECK-NEXT:   flow.dispatch.tensor.store %[[COLLAPSE]]
+//  CHECK-NEXT:   iree_tensor_ext.dispatch.tensor.store %[[COLLAPSE]]
 
 // -----
 
@@ -163,15 +163,15 @@ func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   %3 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
-  flow.dispatch.tensor.store %3, %2, offsets = [0, 0], sizes = [%1, 32], strides = [1, 1]
-      : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  iree_tensor_ext.dispatch.tensor.store %3, %2, offsets = [0, 0], sizes = [%1, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_unsupported(
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
-//  CHECK-NEXT:   flow.dispatch.tensor.store %[[COLLAPSE]]
+//  CHECK-NEXT:   iree_tensor_ext.dispatch.tensor.store %[[COLLAPSE]]
 
 // -----
 
@@ -182,7 +182,7 @@ func.func @expand_dest_forall() {
   %c0 = arith.constant 0 : index
   %index = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
   %1 = tensor.empty(%index) : tensor<?x64x32xf32>
   %extra = tensor.empty() : tensor<32x32xf32>
   %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
@@ -198,8 +198,8 @@ func.func @expand_dest_forall() {
         : tensor<1x16x16xf32> into tensor<?x64x32xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-  flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [%index, 64, 32], strides = [1, 1, 1]
-     : tensor<?x64x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
+  iree_tensor_ext.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [%index, 64, 32], strides = [1, 1, 1]
+     : tensor<?x64x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
   return
 }
 
@@ -217,9 +217,9 @@ func.func @expand_dest_forall() {
 //       CHECK:     tensor.parallel_insert_slice %[[BARRIER]] into %[[ARG2]]
 //  CHECK-SAME:         [0, %[[ARG0]], %[[OFFSET]], 0, 0] [1, 16, 2, 4, 2] [1, 1, 1, 1, 1]
 //  CHECK-SAME:         tensor<1x16x2x4x2xf32> into tensor<?x64x4x4x2xf32>
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0, 0, 0, 0, 0], sizes = [%[[LOAD_CONST]], 64, 4, 4, 2], strides = [1, 1, 1, 1, 1]
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<?x64x4x4x2xf32>>{%[[LOAD_CONST]]}
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x4x4x2xf32>>{%[[LOAD_CONST]]}
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
@@ -228,9 +228,9 @@ func.func @expand_dest_forall_multiresult() {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64)
-      offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32x32xf32>>
+      offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
   %2 = tensor.empty() : tensor<32xf32>
   %3 = tensor.empty() : tensor<32x32xf32>
   %4:2 = scf.forall (%arg0) = (0) to (32) step (16)
@@ -247,10 +247,10 @@ func.func @expand_dest_forall_multiresult() {
           : tensor<16xf32> into tensor<32xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<y>]}
-  flow.dispatch.tensor.store %4#1, %0, offsets = [0], sizes = [32], strides = [1]
-    : tensor<32xf32> -> !flow.dispatch.tensor<writeonly:tensor<32xf32>>
-  flow.dispatch.tensor.store %4#0, %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1]
-    : tensor<32x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<32x32xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4#1, %0, offsets = [0], sizes = [32], strides = [1]
+    : tensor<32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4#0, %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1]
+    : tensor<32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
   return
 }
 
@@ -272,12 +272,12 @@ func.func @expand_dest_forall_multiresult() {
 //       CHECK:     tensor.parallel_insert_slice %[[BARRIER]] into %[[ARG2]]
 //  CHECK-SAME:         [%[[OFFSET]], 0] [2, 8] [1, 1]
 //  CHECK-SAME:         tensor<2x8xf32> into tensor<4x8xf32>
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]]#1, %[[SUBSPAN0]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]]#1, %[[SUBSPAN0]]
 //  CHECK-SAME:   offsets = [0, 0], sizes = [4, 8], strides = [1, 1]
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]]#0, %[[SUBSPAN1]]
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x8xf32>>
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]]#0, %[[SUBSPAN1]]
 //  CHECK-SAME:   offsets = [0, 0], sizes = [32, 32], strides = [1, 1]
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<32x32xf32>>
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
 
 
 // -----
@@ -291,7 +291,7 @@ func.func @noexpand_dest_forall_dynamicpacked() {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   %2 = tensor.empty() : tensor<32xf32>
   %4 = scf.forall (%arg0) = (0) to (32) step (16)
        shared_outs(%arg2 = %2) -> (tensor<32xf32>) {
@@ -305,8 +305,8 @@ func.func @noexpand_dest_forall_dynamicpacked() {
           : tensor<?xf32> into tensor<32xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<y>]}
-  flow.dispatch.tensor.store %4, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32>
-    -> !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32>
+    -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   return
 }
 
@@ -315,9 +315,9 @@ func.func @noexpand_dest_forall_dynamicpacked() {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
 //       CHECK:   %[[SCFFORALL:.+]] = scf.forall (%[[ARG0:.+]]) = (0) to (32) step (16)
 //  CHECK-SAME:       shared_outs(%[[ARG2:.+]] = %[[EMPTY]]) -> (tensor<32xf32>) {
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0], sizes = [32], strides = [1] : tensor<32xf32>
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
@@ -325,7 +325,7 @@ func.func @noexpand_dest_forall_dynamicpacked() {
 func.func @expand_dest_forall_unsupporteduse() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   %2 = tensor.empty() : tensor<32xf32>
   %4 = scf.forall (%arg0) = (0) to (32) step (16)
        shared_outs(%arg2 = %2) -> (tensor<32xf32>) {
@@ -340,7 +340,7 @@ func.func @expand_dest_forall_unsupporteduse() {
           : tensor<16xf32> into tensor<32xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<y>]}
-  flow.dispatch.tensor.store %4, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32> -> !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   return
 }
 
@@ -349,9 +349,9 @@ func.func @expand_dest_forall_unsupporteduse() {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
 //       CHECK:   %[[SCFFORALL:.+]] = scf.forall (%[[ARG0:.+]]) = (0) to (32) step (16)
 //  CHECK-SAME:       shared_outs(%[[ARG2:.+]] = %[[EMPTY]]) -> (tensor<32xf32>) {
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0], sizes = [32], strides = [1] : tensor<32xf32>
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
 
 
 // -----
@@ -361,7 +361,7 @@ func.func @expand_dest_forall_unsupporteduse() {
 func.func @noexpand_dest_forall_nomapping() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   %2 = tensor.empty() : tensor<32xf32>
   %4 = scf.forall (%arg0) = (0) to (32) step (16)
        shared_outs(%arg2 = %2) -> (tensor<32xf32>) {
@@ -375,7 +375,7 @@ func.func @noexpand_dest_forall_nomapping() {
           : tensor<16xf32> into tensor<32xf32>
     }
   }
-  flow.dispatch.tensor.store %4, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32> -> !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
   return
 }
 
@@ -384,9 +384,9 @@ func.func @noexpand_dest_forall_nomapping() {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
 //       CHECK:   %[[SCFFORALL:.+]] = scf.forall (%[[ARG0:.+]]) = (0) to (32) step (16)
 //  CHECK-SAME:       shared_outs(%[[ARG2:.+]] = %[[EMPTY]]) -> (tensor<32xf32>) {
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0], sizes = [32], strides = [1] : tensor<32xf32>
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<32xf32>>
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
 
 
 // -----
@@ -396,7 +396,7 @@ func.func @noexpand_dest_forall_nomapping() {
 func.func @noexpand_dest_forall_notfullslicestore() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<34xf32>>
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<34xf32>>
   %2 = tensor.empty() : tensor<32xf32>
   %4 = scf.forall (%arg0) = (0) to (32) step (16)
        shared_outs(%arg2 = %2) -> (tensor<32xf32>) {
@@ -410,7 +410,7 @@ func.func @noexpand_dest_forall_notfullslicestore() {
           : tensor<16xf32> into tensor<32xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<y>]}
-  flow.dispatch.tensor.store %4, %0, offsets = [1], sizes = [32], strides = [1] : tensor<32xf32> -> !flow.dispatch.tensor<writeonly:tensor<34xf32>>
+  iree_tensor_ext.dispatch.tensor.store %4, %0, offsets = [1], sizes = [32], strides = [1] : tensor<32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<34xf32>>
   return
 }
 
@@ -419,9 +419,9 @@ func.func @noexpand_dest_forall_notfullslicestore() {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
 //       CHECK:   %[[SCFFORALL:.+]] = scf.forall (%[[ARG0:.+]]) = (0) to (32) step (16)
 //  CHECK-SAME:       shared_outs(%[[ARG2:.+]] = %[[EMPTY]]) -> (tensor<32xf32>) {
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [1], sizes = [32], strides = [1] : tensor<32xf32>
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<34xf32>>
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<34xf32>>
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
@@ -431,7 +431,7 @@ func.func @expand_dest_forall_chained() {
   %c0 = arith.constant 0 : index
   %index = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
   %1 = tensor.empty(%index) : tensor<?x64x32xf32>
   %extra = tensor.empty() : tensor<32x32xf32>
   %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
@@ -450,8 +450,8 @@ func.func @expand_dest_forall_chained() {
         : tensor<1x16x16xf32> into tensor<?x64x32xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-  flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [%index, 64, 32], strides = [1, 1, 1]
-     : tensor<?x64x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
+  iree_tensor_ext.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [%index, 64, 32], strides = [1, 1, 1]
+     : tensor<?x64x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
   return
 }
 
@@ -470,6 +470,6 @@ func.func @expand_dest_forall_chained() {
 //       CHECK:     tensor.parallel_insert_slice %[[BARRIER]] into %[[ARG2]]
 //  CHECK-SAME:         [0, %[[OFFSET1]], 0, %[[OFFSET0]], 0, 0] [1, 8, 2, 2, 4, 2] [1, 1, 1, 1, 1, 1]
 //  CHECK-SAME:         tensor<1x8x2x2x4x2xf32> into tensor<?x32x2x4x4x2xf32>
-//       CHECK:   flow.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCFFORALL]], %[[SUBSPAN]]
 //  CHECK-SAME:   offsets = [0, 0, 0, 0, 0, 0], sizes = [%[[LOAD_CONST]], 32, 2, 4, 4, 2], strides = [1, 1, 1, 1, 1, 1]
-//  CHECK-SAME:   !flow.dispatch.tensor<writeonly:tensor<?x32x2x4x4x2xf32>>{%[[LOAD_CONST]]}
+//  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32x2x4x4x2xf32>>{%[[LOAD_CONST]]}

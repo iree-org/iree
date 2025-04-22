@@ -468,21 +468,21 @@ module {
     %53 = arith.shli %52, %c32_i64 : i64
     %54 = arith.ori %51, %53 : i64
     %55 = arith.index_castui %54 : i64 to index
-    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35}
-    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45}
-    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
+    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35}
+    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45}
+    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %workgroup_count_y = hal.interface.workgroup.count[1] : index
     scf.for %arg0 = %workgroup_id_y to %30 step %workgroup_count_y {
       scf.for %arg1 = %workgroup_id_x to %40 step %workgroup_count_x {
-        %59 = flow.dispatch.tensor.load %56, offsets = [%arg0, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35} -> tensor<1x?x16x1xf32>
-        %60 = flow.dispatch.tensor.load %57, offsets = [%arg1, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45} -> tensor<1x?x16x1xf32>
-        %61 = flow.dispatch.tensor.load %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55} -> tensor<1x1x16x16xf32>
+        %59 = iree_tensor_ext.dispatch.tensor.load %56, offsets = [%arg0, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35} -> tensor<1x?x16x1xf32>
+        %60 = iree_tensor_ext.dispatch.tensor.load %57, offsets = [%arg1, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45} -> tensor<1x?x16x1xf32>
+        %61 = iree_tensor_ext.dispatch.tensor.load %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55} -> tensor<1x1x16x16xf32>
         %dim = tensor.dim %60, %c1 : tensor<1x?x16x1xf32>
         %62 = iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%59, %60 : tensor<1x?x16x1xf32>, tensor<1x?x16x1xf32>) outs(%61 : tensor<1x1x16x16xf32>) (%c1, %c1, %dim, %c16_i32, %c16_i32, %c1_i32, %c1281_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"]} strided_outer_dims(1) -> tensor<1x1x16x16xf32>
-        flow.dispatch.tensor.store %62, %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : tensor<1x1x16x16xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
+        iree_tensor_ext.dispatch.tensor.store %62, %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : tensor<1x1x16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
       }
     }
     return

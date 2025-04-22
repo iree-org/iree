@@ -26,8 +26,8 @@ hal.executable private @pooling_nhwc_sum_f32 {
         %c8 = arith.constant 8 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x24x24x8xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
         %2 = tensor.empty() : tensor<12x12xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -35,7 +35,7 @@ hal.executable private @pooling_nhwc_sum_f32 {
         %3 = affine.apply affine_map<()[s0] -> (s0 * 24)>()[%workgroup_id_z]
         %4 = affine.apply affine_map<()[s0] -> (s0 * 24)>()[%workgroup_id_y]
         %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_x]
-        %6 = flow.dispatch.tensor.load %0, offsets = [0, %3, %4, %5], sizes = [1, %c24, %c24, %c8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>> -> tensor<1x?x?x?xf32>
+        %6 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, %3, %4, %5], sizes = [1, %c24, %c24, %c8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x24x24x8xf32>> -> tensor<1x?x?x?xf32>
         %7 = tensor.empty() : tensor<1x2x2x8xf32>
         %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
         %9 = linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, lowering_config = #config, strides = dense<12> : vector<2xi64>}
@@ -45,7 +45,7 @@ hal.executable private @pooling_nhwc_sum_f32 {
         %10 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_id_z]
         %11 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_id_y]
         %12 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_x]
-        flow.dispatch.tensor.store %cast, %1, offsets = [0, %10, %11, %12], sizes = [1, %c2, %c2, %c8], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
+        iree_tensor_ext.dispatch.tensor.store %cast, %1, offsets = [0, %10, %11, %12], sizes = [1, %c2, %c2, %c8], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
         return
       }
     }

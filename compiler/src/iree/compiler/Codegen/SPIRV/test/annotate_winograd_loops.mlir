@@ -14,8 +14,8 @@ func.func @_wino_input_dispatch_0() {
   %c1 = arith.constant 1 : index
   %c32 = arith.constant 32 : index
   %0 = tensor.empty() : tensor<8x8xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -24,8 +24,8 @@ func.func @_wino_input_dispatch_0() {
     %3 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
     %4 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
     scf.for %arg1 = %3 to %c1280 step %4 {
-      %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, %arg0, 0, 0, %arg1], sizes = [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>> -> tensor<8x8x1x2x2x32xf32>
-      %6 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, 0, %arg1], sizes = [1, 10, 10, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>> -> tensor<1x10x10x32xf32>
+      %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, %arg0, 0, 0, %arg1], sizes = [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>> -> tensor<8x8x1x2x2x32xf32>
+      %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg0, 0, 0, %arg1], sizes = [1, 10, 10, 32], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>> -> tensor<1x10x10x32xf32>
       %7 = scf.for %arg2 = %c0 to %c2 step %c1 iter_args(%arg3 = %5) -> (tensor<8x8x1x2x2x32xf32>) {
         %8 = affine.apply affine_map<(d0) -> (d0 * 6)>(%arg2)
         %9 = affine.min affine_map<(d0) -> (d0 * -6 + 10, 8)>(%arg2)
@@ -47,7 +47,7 @@ func.func @_wino_input_dispatch_0() {
         }
         scf.yield %10 : tensor<8x8x1x2x2x32xf32>
       }
-      flow.dispatch.tensor.store %7, %2, offsets = [0, 0, %arg0, 0, 0, %arg1], sizes = [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
+      iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, %arg0, 0, 0, %arg1], sizes = [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
     }
   }
   return
@@ -67,9 +67,9 @@ func.func @_wino_input_dispatch_0() {
 // CHECK:        %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<8x8xf32>
 // CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]])
-// CHECK-SAME:     : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
+// CHECK-SAME:     : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
 // CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]])
-// CHECK-SAME:     : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
+// CHECK-SAME:     : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
 // CHECK:        %[[WORKGROUP_COUNT_X:.+]] = hal.interface.workgroup.count[0] : index
 // CHECK:        %[[WORKGROUP_ID_Y:.+]] = hal.interface.workgroup.id[1] : index
@@ -78,11 +78,11 @@ func.func @_wino_input_dispatch_0() {
 // CHECK-DAG:        %[[D3:.+]] = affine.apply #[[MAP]]()[%[[WORKGROUP_ID_X]]]
 // CHECK-DAG:        %[[D4:.+]] = affine.apply #[[MAP]]()[%[[WORKGROUP_COUNT_X]]]
 // CHECK:          scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[D3]] to %[[C1280]] step %[[D4]] {
-// CHECK:            %[[D5:.+]] = flow.dispatch.tensor.load %[[D2]], offsets = [0, 0, %[[ARG0]], 0, 0, %[[ARG1]]], sizes
+// CHECK:            %[[D5:.+]] = iree_tensor_ext.dispatch.tensor.load %[[D2]], offsets = [0, 0, %[[ARG0]], 0, 0, %[[ARG1]]], sizes
 // CHECK-SAME:         = [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] :
-// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>> -> tensor<8x8x1x2x2x32xf32>
-// CHECK:            %[[D6:.+]] = flow.dispatch.tensor.load %[[D1]], offsets = [%[[ARG0]], 0, 0, %[[ARG1]]], sizes = [1,
-// CHECK-SAME:         10, 10, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>> ->
+// CHECK-SAME:         !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>> -> tensor<8x8x1x2x2x32xf32>
+// CHECK:            %[[D6:.+]] = iree_tensor_ext.dispatch.tensor.load %[[D1]], offsets = [%[[ARG0]], 0, 0, %[[ARG1]]], sizes = [1,
+// CHECK-SAME:         10, 10, 32], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>> ->
 // CHECK-SAME:         tensor<1x10x10x32xf32>
 // CHECK:            %[[D7:.+]] = scf.for %[[ARG2:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C2]] step %[[C1]]
 // CHECK-SAME:         iter_args(%[[ARG3:[a-zA-Z0-9_]+]] = %[[D5]]) -> (tensor<8x8x1x2x2x32xf32>) {
@@ -118,9 +118,9 @@ func.func @_wino_input_dispatch_0() {
 // CHECK:              } {iree.gpu.distribute_dim = 1 : index}
 // CHECK:              scf.yield %[[D10]] : tensor<8x8x1x2x2x32xf32>
 // CHECK:            } {iree.gpu.distribute_dim = 2 : index}
-// CHECK:            flow.dispatch.tensor.store %[[D7]], %[[D2]], offsets = [0, 0, %[[ARG0]], 0, 0, %[[ARG1]]], sizes =
+// CHECK:            iree_tensor_ext.dispatch.tensor.store %[[D7]], %[[D2]], offsets = [0, 0, %[[ARG0]], 0, 0, %[[ARG1]]], sizes =
 // CHECK-SAME:         [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x32xf32> ->
-// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
+// CHECK-SAME:         !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
 // CHECK:          }
 // CHECK:        }
 // CHECK:        return

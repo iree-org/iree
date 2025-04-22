@@ -21,9 +21,9 @@ hal.executable private @fused_fill_batch_matmul {
         %cst = arith.constant 0.000000e+00 : f32
         %c4 = arith.constant 4 : index
         %c1024 = arith.constant 1024 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<4x1024x1024xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<4x1024x1024xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<4x1024x1024xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1024x1024xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1024x1024xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1024x1024xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -38,15 +38,15 @@ hal.executable private @fused_fill_batch_matmul {
             %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
             scf.for %arg2 = %7 to %c1024 step %8 {
               %10 = affine.min affine_map<(d0) -> (8, -d0 + 1024)>(%arg1)[]
-              %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [1, %10, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1024x1024xf32>> -> tensor<1x?x1024xf32>
+              %11 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [1, %10, 1024], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1024x1024xf32>> -> tensor<1x?x1024xf32>
               %12 = affine.min affine_map<(d0) -> (64, -d0 + 1024)>(%arg2)[]
-              %13 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1024, %12], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1024x1024xf32>> -> tensor<1x1024x?xf32>
+              %13 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1024, %12], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1024x1024xf32>> -> tensor<1x1024x?xf32>
               %15 = affine.min affine_map<(d0) -> (-d0 + 1024, 8)>(%arg1)[]
               %16 = affine.min affine_map<(d0) -> (-d0 + 1024, 64)>(%arg2)[]
               %17 = tensor.empty(%15, %16) : tensor<1x?x?xf32>
               %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<1x?x?xf32>) -> tensor<1x?x?xf32>
               %19 = linalg.batch_matmul {lowering_config = #config} ins(%11, %13 : tensor<1x?x1024xf32>, tensor<1x1024x?xf32>) outs(%18 : tensor<1x?x?xf32>) -> tensor<1x?x?xf32>
-              flow.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, %10, %12], strides = [1, 1, 1] : tensor<1x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x1024x1024xf32>>
+              iree_tensor_ext.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, %10, %12], strides = [1, 1, 1] : tensor<1x?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1024x1024xf32>>
             }
           }
         }

@@ -72,14 +72,13 @@ public:
 } // namespace
 
 /// Returns the subview into the buffer that is supposed to be populated with
-/// the `value` of the `flow.dispatch.tensor.store` operation. This can be used
-/// to compute the results in place.
-static Value
-getTensorLoadOpForTensorStoreOp(OpBuilder &b,
-                                IREE::Flow::DispatchTensorStoreOp storeOp) {
+/// the `value` of the `iree_tensor_ext.dispatch.tensor.store` operation. This
+/// can be used to compute the results in place.
+static Value getTensorLoadOpForTensorStoreOp(
+    OpBuilder &b, IREE::TensorExt::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
   SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
-  Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
+  Value tensorLoadOp = b.create<IREE::TensorExt::DispatchTensorLoadOp>(
       storeOp.getLoc(),
       llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
       storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
@@ -132,10 +131,10 @@ static Value getTiedResultForOperand(OpOperand &operand,
 
 /// To perform updates directly into the result buffer, the uses need to be
 /// walked to get to a value already mapped to a buffer or a
-/// `flow.dispatch.tensor.store` operation. For each use, gets the tied result
-/// and follow its uses. The traversed uses and thir tied results are returned
-/// in `traversedUses`.
-static IREE::Flow::DispatchTensorStoreOp
+/// `iree_tensor_ext.dispatch.tensor.store` operation. For each use, gets the
+/// tied result and follow its uses. The traversed uses and thir tied results
+/// are returned in `traversedUses`.
+static IREE::TensorExt::DispatchTensorStoreOp
 walkUseToGetDispatchTensorStoreOp(Value value, const BufferizationPlan &plan,
                                   SmallVectorImpl<OpOperand *> &traversedUses,
                                   llvm::DenseSet<Value> &processed) {
@@ -144,7 +143,7 @@ walkUseToGetDispatchTensorStoreOp(Value value, const BufferizationPlan &plan,
     processed.insert(value);
     OpOperand &use = *value.use_begin();
     user = use.getOwner();
-    if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(user)) {
+    if (auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(user)) {
       return storeOp;
     }
     value = getTiedResultForOperand(use, plan);
@@ -154,7 +153,7 @@ walkUseToGetDispatchTensorStoreOp(Value value, const BufferizationPlan &plan,
   }
   // If the value has a use which is a store, then use that directly.
   for (Operation *user : value.getUsers()) {
-    if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(user)) {
+    if (auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(user)) {
       return storeOp;
     }
   }
@@ -189,17 +188,19 @@ static LogicalResult
 modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
                              const BufferizationPlan &plan,
                              llvm::DenseSet<Value> &processed) {
-  // Traverse the use-def chains to get the `flow.dispatch.tensor.store`
-  // operation keeping track of all the traversed operations. Note that the
-  // equivalence set construction should ensure that all operations traversed
-  // here have a single use.
+  // Traverse the use-def chains to get the
+  // `iree_tensor_ext.dispatch.tensor.store` operation keeping track of all the
+  // traversed operations. Note that the equivalence set construction should
+  // ensure that all operations traversed here have a single use.
   Operation *resultValueOp = resultValue.getOwner();
   SmallVector<OpOperand *> traversedUses;
-  IREE::Flow::DispatchTensorStoreOp storeOp = walkUseToGetDispatchTensorStoreOp(
-      resultValue, plan, traversedUses, processed);
+  IREE::TensorExt::DispatchTensorStoreOp storeOp =
+      walkUseToGetDispatchTensorStoreOp(resultValue, plan, traversedUses,
+                                        processed);
   if (!storeOp) {
     return resultValueOp->emitOpError(
-        "failed walk of uses to get to flow.dispatch.tensor.store op");
+        "failed walk of uses to get to iree_tensor_ext.dispatch.tensor.store "
+        "op");
   }
 
   OpBuilder::InsertionGuard g(b);
@@ -535,7 +536,7 @@ struct RemoveCstOutsDependency
 ///    ...
 ///    scf.yield %false
 ///  }
-///  flow.dispatch.tensor.store %0, %target, ...
+///  iree_tensor_ext.dispatch.tensor.store %0, %target, ...
 /// ```
 ///
 /// to
@@ -543,18 +544,18 @@ struct RemoveCstOutsDependency
 /// ```mlir
 ///  scf.if %cond {
 ///    ...
-///    flow.dispatch.tensor.store %true, %target
+///    iree_tensor_ext.dispatch.tensor.store %true, %target
 ///  } else {
 ///    ...
-///    flow.dispatch.tensor.store %true, %target
+///    iree_tensor_ext.dispatch.tensor.store %true, %target
 ///  }
 /// ```
 /// This is a workaround for #11273 while a proper fix lands.
 struct SwitchStoreOfIfResultValue
-    : public OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
+    : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp,
+  LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto ifOp = storeOp.getValue().getDefiningOp<scf::IfOp>();
     if (!ifOp) {
@@ -571,7 +572,7 @@ struct SwitchStoreOfIfResultValue
       auto yieldedVal = yieldOp.getOperand(resultNumber);
       SliceAndDynamicDims sliceAndDynamicDims =
           cloneOffsetsSizesAndStrides(rewriter, storeOp);
-      rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
+      rewriter.create<IREE::TensorExt::DispatchTensorStoreOp>(
           storeOp.getLoc(), yieldedVal, storeOp.getTarget(),
           sliceAndDynamicDims.dynamicDims, sliceAndDynamicDims.offsets,
           sliceAndDynamicDims.sizes, sliceAndDynamicDims.strides);
