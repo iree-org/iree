@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRComplexDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfaces
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRSupport

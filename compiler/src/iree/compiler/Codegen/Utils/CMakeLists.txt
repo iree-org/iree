@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfaces
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
@@ -79,6 +80,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfaces
     MLIRSupport
     MLIRVectorDialect
   PUBLIC
