@@ -1128,7 +1128,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass([&]() {
+      .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
         options.allowSubviewExpansion = true;
         return createIREEExpandStridedMetadataPass(options);
