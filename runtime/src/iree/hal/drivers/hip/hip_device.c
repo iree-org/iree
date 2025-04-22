@@ -1549,12 +1549,10 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     }
 
     if (iree_status_is_ok(status)) {
-      if (iree_status_is_ok(status)) {
-        for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-          iree_hal_hip_semaphore_wait_until_timepoints_exported(
-              signal_semaphore_list.semaphores[i],
-              signal_semaphore_list.payload_values[i]);
-        }
+      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+        iree_hal_hip_semaphore_for_exported_timepoints(
+            signal_semaphore_list.semaphores[i],
+            signal_semaphore_list.payload_values[i]);
       }
 
       *out_buffer = buffer;
@@ -1648,7 +1646,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
 
     if (iree_status_is_ok(status)) {
       for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-        iree_hal_hip_semaphore_wait_until_timepoints_exported(
+        iree_hal_hip_semaphore_for_exported_timepoints(
             signal_semaphore_list.semaphores[i],
             signal_semaphore_list.payload_values[i]);
       }
@@ -2098,7 +2096,7 @@ static iree_status_t iree_hal_hip_device_queue_read(
   }
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-      iree_hal_hip_semaphore_wait_until_timepoints_exported(
+      iree_hal_hip_semaphore_for_exported_timepoints(
           signal_semaphore_list.semaphores[i],
           signal_semaphore_list.payload_values[i]);
     }
@@ -2131,7 +2129,7 @@ static iree_status_t iree_hal_hip_device_queue_write(
               target_offset, length, flags, options));
 
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-    iree_hal_hip_semaphore_wait_until_timepoints_exported(
+    iree_hal_hip_semaphore_for_exported_timepoints(
         signal_semaphore_list.semaphores[i],
         signal_semaphore_list.payload_values[i]);
   }
@@ -2457,7 +2455,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
 
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-      iree_hal_hip_semaphore_wait_until_timepoints_exported(
+      iree_hal_hip_semaphore_for_exported_timepoints(
           signal_semaphore_list.semaphores[i],
           signal_semaphore_list.payload_values[i]);
     }

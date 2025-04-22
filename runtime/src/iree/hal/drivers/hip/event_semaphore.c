@@ -49,7 +49,7 @@ typedef enum {
   IREE_HAL_HIP_SEMAPHORE_QUEUE_ITEM_INTERNAL,
   // A queue item attached to an imported timepoint.
   IREE_HAL_HIP_SEMAPHORE_QUEUE_ITEM_IMPORTED,
-  // A queue items attached to an exported timepoint.
+  // A queue item attached to an exported timepoint.
   IREE_HAL_HIP_SEMAPHORE_QUEUE_ITEM_EXPORTED,
 } iree_hal_hip_semaphore_queue_item_type_t;
 
@@ -75,9 +75,9 @@ typedef struct iree_hal_hip_semaphore_queue_item_t {
   iree_hal_hip_cpu_event_t* cpu_event;
   iree_hal_hip_semaphore_work_item_t* work_item;
   iree_hal_hip_per_device_info_t* created_device;
-  bool has_been_waited_on;
-  bool has_been_signaled;
-  bool is_external;
+  bool has_been_waited_on : 1;
+  bool has_been_signaled : 1;
+  bool is_external : 1;
 } iree_hal_hip_semaphore_queue_item_t;
 
 typedef struct iree_hal_hip_semaphore_t {
@@ -1057,7 +1057,7 @@ static iree_status_t iree_hal_hip_semaphore_import_timepoint(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_external_timepoint_t external_timepoint) {
   if (external_timepoint.type != IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "invalid timepoint type for HIP semaphore");
   }
 
@@ -1108,7 +1108,7 @@ static iree_status_t iree_hal_hip_semaphore_export_timepoint(
   if ((requested_type & IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT) == 0) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "HIP only supports the import of DEVICE_WAIT timepoints");
+        "HIP only supports the export of DEVICE_WAIT timepoints");
   }
 
   int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
@@ -1162,7 +1162,7 @@ bool iree_hal_hip_semaphore_timepoint_already_exported(
   return ret;
 }
 
-iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
+iree_status_t iree_hal_hip_semaphore_for_exported_timepoints(
     iree_hal_semaphore_t* base_semaphore, uint64_t value) {
   int64_t value_to_wait_for = 0;
   iree_hal_hip_semaphore_t* semaphore =
@@ -1187,7 +1187,7 @@ iree_status_t iree_hal_hip_semaphore_wait_until_timepoints_exported(
   // If we have any exported timepoints, we want to block this
   // thread until they at LEAST have been recorded. This is because
   // once we return it is legal for any other operation to then submit
-  // the exported event, which because of  hip ordering must occur
+  // the exported event, which because of hip ordering must occur
   // after the record.
   if (do_wait) {
     IREE_TRACE_ZONE_BEGIN(z0);

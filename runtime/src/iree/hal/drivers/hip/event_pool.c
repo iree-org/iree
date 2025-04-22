@@ -93,13 +93,13 @@ static inline iree_status_t iree_hal_hip_event_create(
 
   iree_status_t status = iree_ok_status();
 
-  if (!event->hip_event) {
+  if (event->hip_event) {
+    event->imported = true;
+  } else {
     status = IREE_HIP_CALL_TO_STATUS(
         symbols,
         hipEventCreateWithFlags(&event->hip_event, hipEventDisableTiming),
         "hipEventCreateWithFlags");
-  } else {
-    event->imported = true;
   }
   if (iree_status_is_ok(status)) {
     *out_event = event;
