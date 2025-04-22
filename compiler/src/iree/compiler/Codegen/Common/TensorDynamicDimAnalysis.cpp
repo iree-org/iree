@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
@@ -96,9 +96,10 @@ static void transferTensorDimInfo(
 }
 
 // Update the tensor dimension information for result of a
-// `flow.dispatch.tensor.load` operation.
+// `iree_tensor_ext.dispatch.tensor.load` operation.
 static void updateTensorDimInfo(
-    IREE::Flow::DispatchTensorLoadOp flowLoadOp, const DataFlowSolver &solver,
+    IREE::TensorExt::DispatchTensorLoadOp flowLoadOp,
+    const DataFlowSolver &solver,
     TensorDynamicDimAnalysis::TensorDimDivisibilityInfo &divisibilityInfo,
     TensorDynamicDimAnalysis::TensorDimRangeInfo &rangeInfo) {
   // If there are no dynamic dimensions, nothing to do.
@@ -173,9 +174,10 @@ static void updateTensorDimInfo(
   });
 
   TypeSwitch<Operation *, void>(op)
-      .Case<IREE::Flow::DispatchTensorLoadOp, tensor::EmptyOp>([&](auto op) {
-        updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
-      })
+      .Case<IREE::TensorExt::DispatchTensorLoadOp, tensor::EmptyOp>(
+          [&](auto op) {
+            updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
+          })
       .Case<DestinationStyleOpInterface>([&](auto op) {
         updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
       });

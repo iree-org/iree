@@ -18,18 +18,18 @@ util.func public @fold_tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups()
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[DEST_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK:           %[[SRC_BUF:.+]] =  stream.binding.subspan %[[SRC_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<readonly:tensor<4x5xf32>>
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x5xf32>>
 // CHECK:           %[[DEST_BUF:.+]] =  stream.binding.subspan %[[DEST_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<writeonly:tensor<4x5xf32, #[[ENCODING]]>>
-// CHECK:           %[[VAL:.+]] = flow.dispatch.tensor.load %[[SRC_BUF]]
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x5xf32, #[[ENCODING]]>>
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [4, 5], strides = [1, 1]
 // CHECK:           %[[ENCODED_VAL:.+]] =  iree_encoding.set_encoding %[[VAL]] : tensor<4x5xf32> -> tensor<4x5xf32, #[[ENCODING]]>
-// CHECK:           flow.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [4, 5], strides = [1, 1]
 // CHECK-LABEL:   util.func public @encode_static_shape(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
@@ -50,22 +50,22 @@ util.func public @encode_static_shape(%resource: !stream.resource<*>, %total_siz
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D1_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_D0_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_ARG:[a-zA-Z0-9]+]]: !stream.binding
-// CHECK-DAG:       %[[SRC_D1:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D1_ARG]], 0 : index
-// CHECK-DAG:       %[[DEST_D0:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D0_ARG]], 1 : index
+// CHECK-DAG:       %[[SRC_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D1_ARG]], 0 : index
+// CHECK-DAG:       %[[DEST_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D0_ARG]], 1 : index
 // CHECK:           %[[SRC_BUF:.+]] =  stream.binding.subspan %[[SRC_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<readonly:tensor<4x?xf32>>{%[[SRC_D1]]}
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xf32>>{%[[SRC_D1]]}
 // CHECK:           %[[DEST_BUF:.+]] =  stream.binding.subspan %[[DEST_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<writeonly:tensor<?x5xf32, #[[ENCODING]]>>{%[[DEST_D0]]}
-// CHECK:           %[[VAL:.+]] = flow.dispatch.tensor.load %[[SRC_BUF]]
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x5xf32, #[[ENCODING]]>>{%[[DEST_D0]]}
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [4, %[[SRC_D1]]], strides = [1, 1]
 // CHECK:           %[[ENCODED_VAL:.+]] =  iree_encoding.set_encoding %[[VAL]] : tensor<4x?xf32> -> tensor<?x5xf32, #[[ENCODING]]>
-// CHECK:           flow.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[DEST_D0]], 5], strides = [1, 1]
 // CHECK-LABEL:   util.func public @mixed_static_dynamic_encoding(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
@@ -88,7 +88,7 @@ util.func public @mixed_static_dynamic_encoding(%resource: !stream.resource<*>, 
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -96,18 +96,18 @@ util.func public @mixed_static_dynamic_encoding(%resource: !stream.resource<*>, 
 // CHECK-SAME:      %[[DEST_D0_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_D1_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_ARG:[a-zA-Z0-9]+]]: !stream.binding
-// CHECK-DAG:       %[[SRC_D0:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D0_ARG]], 0 : index
-// CHECK-DAG:       %[[SRC_D1:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D1_ARG]], 1 : index
-// CHECK-DAG:       %[[DEST_D0:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D0_ARG]], 2 : index
-// CHECK-DAG:       %[[DEST_D1:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D1_ARG]], 3 : index
+// CHECK-DAG:       %[[SRC_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D0_ARG]], 0 : index
+// CHECK-DAG:       %[[SRC_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D1_ARG]], 1 : index
+// CHECK-DAG:       %[[DEST_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D0_ARG]], 2 : index
+// CHECK-DAG:       %[[DEST_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D1_ARG]], 3 : index
 // CHECK:           %[[SRC_BUF:.+]] =  stream.binding.subspan %[[SRC_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[SRC_D0]], %[[SRC_D1]]}
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[SRC_D0]], %[[SRC_D1]]}
 // CHECK:           %[[DEST_BUF:.+]] =  stream.binding.subspan %[[DEST_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING]]>>{%[[DEST_D0]], %[[DEST_D1]]}
-// CHECK:           %[[VAL:.+]] = flow.dispatch.tensor.load %[[SRC_BUF]]
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING]]>>{%[[DEST_D0]], %[[DEST_D1]]}
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[SRC_D0]], %[[SRC_D1]]], strides = [1, 1]
 // CHECK:           %[[ENCODED_VAL:.+]] =  iree_encoding.set_encoding %[[VAL]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
-// CHECK:           flow.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[DEST_D0]], %[[DEST_D1]]], strides = [1, 1]
 // CHECK-LABEL:   util.func public @encode_result_resource(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
@@ -130,7 +130,7 @@ util.func public @encode_result_resource(%resource: !stream.resource<*>, %total_
 #encoding = #iree_encoding.testing_encoding<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -138,18 +138,18 @@ util.func public @encode_result_resource(%resource: !stream.resource<*>, %total_
 // CHECK-SAME:      %[[DEST_D0_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_D1_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_ARG:[a-zA-Z0-9]+]]: !stream.binding
-// CHECK-DAG:       %[[SRC_D0:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D0_ARG]], 0 : index
-// CHECK-DAG:       %[[SRC_D1:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D1_ARG]], 1 : index
-// CHECK-DAG:       %[[DEST_D0:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D0_ARG]], 2 : index
-// CHECK-DAG:       %[[DEST_D1:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D1_ARG]], 3 : index
+// CHECK-DAG:       %[[SRC_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D0_ARG]], 0 : index
+// CHECK-DAG:       %[[SRC_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D1_ARG]], 1 : index
+// CHECK-DAG:       %[[DEST_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D0_ARG]], 2 : index
+// CHECK-DAG:       %[[DEST_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D1_ARG]], 3 : index
 // CHECK:           %[[SRC_BUF:.+]] =  stream.binding.subspan %[[SRC_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING]]>>{%[[SRC_D0]], %[[SRC_D1]]}
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING]]>>{%[[SRC_D0]], %[[SRC_D1]]}
 // CHECK:           %[[DEST_BUF:.+]] =  stream.binding.subspan %[[DEST_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[DEST_D0]], %[[DEST_D1]]}
-// CHECK:           %[[VAL:.+]] = flow.dispatch.tensor.load %[[SRC_BUF]]
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[DEST_D0]], %[[DEST_D1]]}
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[SRC_D0]], %[[SRC_D1]]], strides = [1, 1]
 // CHECK:           %[[DECODED_VAL:.+]] =  iree_encoding.unset_encoding %[[VAL]] : tensor<?x?xf32, #[[ENCODING]]> -> tensor<?x?xf32>
-// CHECK:           flow.dispatch.tensor.store %[[DECODED_VAL]], %[[DEST_BUF]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[DECODED_VAL]], %[[DEST_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[DEST_D0]], %[[DEST_D1]]], strides = [1, 1]
 // CHECK-LABEL:   util.func public @decode_source_resource(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
@@ -174,7 +174,7 @@ util.func public @decode_source_resource(%resource: !stream.resource<*>, %total_
 #encoding1 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-// CHECK-NEXT:      flow.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -182,19 +182,19 @@ util.func public @decode_source_resource(%resource: !stream.resource<*>, %total_
 // CHECK-SAME:      %[[DEST_D0_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_D1_ARG:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[DEST_ARG:[a-zA-Z0-9]+]]: !stream.binding
-// CHECK-DAG:       %[[SRC_D0:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D0_ARG]], 0 : index
-// CHECK-DAG:       %[[SRC_D1:.+]] =  flow.dispatch.workload.ordinal %[[SRC_D1_ARG]], 1 : index
-// CHECK-DAG:       %[[DEST_D0:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D0_ARG]], 2 : index
-// CHECK-DAG:       %[[DEST_D1:.+]] =  flow.dispatch.workload.ordinal %[[DEST_D1_ARG]], 3 : index
+// CHECK-DAG:       %[[SRC_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D0_ARG]], 0 : index
+// CHECK-DAG:       %[[SRC_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[SRC_D1_ARG]], 1 : index
+// CHECK-DAG:       %[[DEST_D0:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D0_ARG]], 2 : index
+// CHECK-DAG:       %[[DEST_D1:.+]] =  iree_tensor_ext.dispatch.workload.ordinal %[[DEST_D1_ARG]], 3 : index
 // CHECK:           %[[SRC_BUF:.+]] =  stream.binding.subspan %[[SRC_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING0]]>>{%[[SRC_D0]], %[[SRC_D1]]}
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING0]]>>{%[[SRC_D0]], %[[SRC_D1]]}
 // CHECK:           %[[DEST_BUF:.+]] =  stream.binding.subspan %[[DEST_ARG]]{{.+}} : !stream.binding
-// CHECK-SAME:        -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING1]]>>{%[[DEST_D0]], %[[DEST_D1]]}
-// CHECK:           %[[VAL:.+]] = flow.dispatch.tensor.load %[[SRC_BUF]]
+// CHECK-SAME:        -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING1]]>>{%[[DEST_D0]], %[[DEST_D1]]}
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[SRC_D0]], %[[SRC_D1]]], strides = [1, 1]
 // CHECK:           %[[DECODED_VAL:.+]] = iree_encoding.unset_encoding %[[VAL]] : tensor<?x?xf32, #[[ENCODING0]]> -> tensor<?x?xf32>{%[[SRC_D0]], %[[SRC_D1]]}
 // CHECK:           %[[ENCODED_VAL:.+]] = iree_encoding.set_encoding %[[DECODED_VAL]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING1]]>
-// CHECK:           flow.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[ENCODED_VAL]], %[[DEST_BUF]]
 // CHECK-SAME:        offsets = [0, 0], sizes = [%[[DEST_D0]], %[[DEST_D1]]], strides = [1, 1]
 // CHECK-LABEL:   util.func public @update_encoding(
 // CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]

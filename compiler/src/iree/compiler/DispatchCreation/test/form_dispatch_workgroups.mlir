@@ -33,13 +33,13 @@ util.func public @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
 // CHECK-LABEL: util.func public @simple_test_with_cfg
 //  CHECK-SAME:     %[[ARG0:.+]]: i1
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups(%[[ARG0]])
-//  CHECK-NEXT:       %[[ARG1:.+]]: i1, %[[ARG2:.+]]: !flow.dispatch.tensor
+//  CHECK-NEXT:       %[[ARG1:.+]]: i1, %[[ARG2:.+]]: !iree_tensor_ext.dispatch.tensor
 //       CHECK:     %[[CST:.+]] = arith.constant
 //       CHECK:     ^[[BB1:.+]]:
 //       CHECK:       %[[EMPTY:.+]] = tensor.empty()
-//       CHECK:       flow.dispatch.tensor.store %[[EMPTY]], %[[ARG2]]
+//       CHECK:       iree_tensor_ext.dispatch.tensor.store %[[EMPTY]], %[[ARG2]]
 //       CHECK:       flow.return
 //       CHECK:     ^[[BB2:.+]]:
-//       CHECK:       flow.dispatch.tensor.store %[[CST]], %[[ARG2]]
+//       CHECK:       iree_tensor_ext.dispatch.tensor.store %[[CST]], %[[ARG2]]
 //       CHECK:       flow.return
 //       CHECK:   util.return %[[RESULT]]

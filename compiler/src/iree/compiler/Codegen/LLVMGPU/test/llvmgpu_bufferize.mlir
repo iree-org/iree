@@ -8,10 +8,10 @@ func.func @bufferize_with_thread_private_memory(%arg0: index) {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %cst_ved = arith.constant dense<0.000000e+00> : vector<1x1x4x4xf16>
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
-  %2 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg0, %arg0, %arg0], sizes = [1, 1, 8, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>> -> tensor<1x1x8x64xf16>
-  %3 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readonly:tensor<320xf16>> -> tensor<1xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<320xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg0, %arg0, %arg0, %arg0], sizes = [1, 1, 8, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>> -> tensor<1x1x8x64xf16>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%arg0], sizes = [1], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<320xf16>> -> tensor<1xf16>
   %4 = scf.forall (%arg1, %arg2) in (2, 16) shared_outs(%arg3 = %2) -> (tensor<1x1x8x64xf16>) {
     %5 = affine.apply affine_map<(d0) -> (d0 * 4)>(%arg1)
     %6 = affine.apply affine_map<(d0) -> (d0 * 4)>(%arg2)
@@ -27,7 +27,7 @@ func.func @bufferize_with_thread_private_memory(%arg0: index) {
       tensor.parallel_insert_slice %11 into %arg3[0, 0, %5, %6] [1, 1, 4, 4] [1, 1, 1, 1] : tensor<1x1x4x4xf16> into tensor<1x1x8x64xf16>
     }
   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
-  flow.dispatch.tensor.store %4, %1, offsets = [%arg0, %arg0, %arg0, %arg0], sizes = [1, 1, 8, 64], strides = [1, 1, 1, 1] : tensor<1x1x8x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
+  iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [%arg0, %arg0, %arg0, %arg0], sizes = [1, 1, 8, 64], strides = [1, 1, 1, 1] : tensor<1x1x8x64xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
   return
 }
 // CHECK-LABEL: func.func @bufferize_with_thread_private_memory
