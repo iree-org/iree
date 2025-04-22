@@ -15,3 +15,5 @@ import %workspace%/configured.bazelrc
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.
 try-import %workspace%/user.bazelrc
+
+common --enable_bzlmod

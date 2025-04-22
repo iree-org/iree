@@ -56,6 +56,23 @@ llvm_configure(
 ###############################################################################
 
 ###############################################################################
+# torch-mlir
+
+new_local_repository(
+    name = "torch-mlir-raw",
+    build_file_content = "#empty",
+    path = "third_party/torch-mlir",
+)
+
+load("@torch-mlir-raw//utils/bazel:configure.bzl", "torch_mlir_configure")
+
+torch_mlir_configure(
+    name = "torch-mlir",
+)
+
+###############################################################################
+
+###############################################################################
 # All other IREE submodule dependencies
 
 load("//build_tools/bazel:workspace.bzl", "configure_iree_cuda_deps", "configure_iree_submodule_deps")
