@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/APInt.h"
@@ -33,18 +34,6 @@
 namespace mlir::iree_compiler {
 
 namespace {
-
-/// Returns the underlying index if the given value is a constant index.
-std::optional<int64_t> getConstantIndex(Value value) {
-  if (!isa<IndexType>(value.getType()))
-    return std::nullopt;
-
-  APInt val;
-  if (!matchPattern(value, m_ConstantInt(&val)))
-    return std::nullopt;
-
-  return val.getSExtValue();
-}
 
 class LoopPrefetcher {
 public:
