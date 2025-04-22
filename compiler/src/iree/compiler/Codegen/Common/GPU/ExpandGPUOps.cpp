@@ -22,8 +22,15 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
+class ExpandGPUOpsPass final : public impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
+private:
   // Apply AMD GPU targetting patterns
+  bool forROCDL = false;
+
+public:
+  using impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass>::ExpandGPUOpsPassBase;
+  ExpandGPUOpsPass(bool forROCDL) : forROCDL(forROCDL) {}
+
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -38,11 +45,11 @@ struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     StringRef targetArch = target.getArch();
     auto maybeChipset = amdgpu::Chipset::parse(targetArch);
-    if (succeeded(maybeChipset)) {
+    if (succeeded(maybeChipset) && forROCDL) {
       populateGpuLowerSubgroupReduceToDPPPatterns(
-          patterns, *subgroupSize, /* shuffleBitwidth=*/32, *maybeChipset, PatternBenefit(2));
+          patterns, *subgroupSize, *maybeChipset, PatternBenefit(2));
       populateGpuLowerClusteredSubgroupReduceToDPPPatterns(
-          patterns, *subgroupSize, /* shuffleBitwidth=*/32, *maybeChipset, PatternBenefit(2));
+          patterns, *subgroupSize, *maybeChipset, PatternBenefit(2));
     }
 
     populateGpuBreakDownSubgroupReducePatterns(
@@ -56,5 +63,10 @@ struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
 };
 
 } // namespace
+
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createExpandGPUOpsPass(bool forROCDL) {
+  return std::make_unique<ExpandGPUOpsPass>(forROCDL);
+}
 
 } // namespace mlir::iree_compiler
