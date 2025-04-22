@@ -458,6 +458,9 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
   }
 
   int64_t lastReductionDimSize = bounds[reductionDims.back()];
+  if (ShapedType::isDynamic(lastReductionDimSize)) {
+    return failure();
+  }
   if (lastReductionDimSize % threadLoads != 0) {
     return failure();
   }
@@ -692,13 +695,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
 
+  int64_t numDynamicReductionDims = 0;
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      numDynamicReductionDims++;
+    }
+  }
+
   int64_t subgroupSize = 0;
   for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0) {
+    if (reductionSize % s == 0 || numDynamicReductionDims > 0) {
       subgroupSize = s;
       break;
     }
   }
+
   if (subgroupSize == 0)
     return failure();
 
@@ -718,7 +729,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   unsigned vectorSize = largestLoadSizeInBits / *bitWidth;
   unsigned threadLoads = vectorSize;
-  while ((reductionSize / vectorSize) % subgroupSize != 0) {
+  while (numDynamicReductionDims == 0 &&
+         (reductionSize / vectorSize) % subgroupSize != 0) {
     vectorSize /= 2;
   }
   // Deduce the workgroup size we should use for reduction. Currently a
@@ -734,9 +746,13 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                         .getZExtValue();
   }
 
-  int64_t parallelSize = 1;
+  std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
-    parallelSize *= bounds[dim];
+    if (ShapedType::isDynamic(bounds[dim])) {
+      parallelSize = std::nullopt;
+      break;
+    }
+    *parallelSize *= bounds[dim];
   }
 
   // Total parallel size that can fill the GPU with enough workgorups.
@@ -744,13 +760,13 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
-  while (parallelSize > parallelThreshold &&
+  while (parallelSize && *parallelSize > parallelThreshold &&
          (workgroupSize / 2) % subgroupSize == 0 &&
          reductionSize / (workgroupSize * vectorSize) < targetVectorCount) {
     // Use less subgroups per workgroup..
     workgroupSize /= 2;
     // in order to host more workgroups per hardware compute unit.
-    parallelSize /= 2;
+    *parallelSize /= 2;
   }
 
   // TODO(pashu123): Currently, the threadLoads is done on the basis of
