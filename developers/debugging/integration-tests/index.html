@@ -3713,9 +3713,8 @@ flagfile.</li>
 <p>Once a suspicious dispatch is identified, we can create a test case based on
 the dispatch function. The dispatch function can be derived after the
 <code>OutlineDispatchRegions</code> pass. The function signatures have to be modified
-manually. You'll have to put <code>iree_tensor_ext.dispatch.tensor.load</code> variables to
-function arguments, and replace <code>iree_tensor_ext.dispatch.tensor.store</code> with
-<code>return</code> op.</p>
+manually. You'll have to put <code>flow.dispatch.tensor.load</code> variables to function
+arguments, and replace <code>flow.dispatch.tensor.store</code> with <code>return</code> op.</p>
 <p>Note: This only works when dispatch formation logics are identical between runs.</p>
 <h2 id="iree-experimental-repository-tests">iree-experimental repository tests<a class="headerlink" href="#iree-experimental-repository-tests" title="Permanent link">link</a></h2>
 <p>Follow <a href="https://github.com/iree-org/iree-experimental#readme">README</a> to run the
