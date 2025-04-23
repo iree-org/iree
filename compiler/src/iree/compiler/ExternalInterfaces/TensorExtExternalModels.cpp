@@ -6,11 +6,16 @@
 
 #include "iree/compiler/ExternalInterfaces/TensorExtExternalModels.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 namespace {
+
+//===----------------------------------------------------------------------===//
+// Op Interfaces
+//===----------------------------------------------------------------------===//
 
 struct DispatchTensorLoadOpInterface
     : public ValueBoundsOpInterface::ExternalModel<
@@ -36,6 +41,27 @@ struct WorkloadOrdinalOpInterface
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Type Interfaces
+//===----------------------------------------------------------------------===//
+
+struct EncodingTypeExternalModel
+    : public IREE::Encoding::EncodingTypeInterface::ExternalModel<
+          EncodingTypeExternalModel, IREE::TensorExt::DispatchTensorType> {
+
+  Type getEncodingType(Type type) const {
+    auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
+    return dispatchTensorType.getBoundType();
+  }
+
+  Type updateEncoding(Type type, Attribute encoding) const {
+    auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
+    return IREE::TensorExt::DispatchTensorType::get(
+        dispatchTensorType.getAccess(), dispatchTensorType.getShape(),
+        dispatchTensorType.getBoundElementType(), encoding);
+  }
+};
+
 } // namespace
 
 void registerTensorExtExternalModels(DialectRegistry &registry) {
@@ -45,6 +71,8 @@ void registerTensorExtExternalModels(DialectRegistry &registry) {
             DispatchTensorLoadOpInterface>(*ctx);
         IREE::TensorExt::DispatchWorkloadOrdinalOp::attachInterface<
             WorkloadOrdinalOpInterface>(*ctx);
+        IREE::TensorExt::DispatchTensorType::attachInterface<
+            EncodingTypeExternalModel>(*ctx);
       });
 }
 
