@@ -66,9 +66,10 @@ struct TranslateTargetExecutableVariantsPass
     targetBackend->buildTranslationPassPipeline(variantOp.getTargetAttr(),
                                                 passManager);
     if (failed(runPipeline(passManager, variantOp))) {
-      variantOp.emitError() << "failed to run translation of source "
-                               "executable to target executable for backend "
-                            << variantOp.getTarget();
+      emitError(variantOp->getLoc())
+          << "failed to run translation of source executable to target "
+             "executable for backend "
+          << variantOp.getTarget();
       return signalPassFailure();
     }
   }
@@ -106,7 +107,6 @@ struct TranslateAllExecutablesPass
     IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());
 
     if (failed(runPipeline(passManager, executableOp))) {
-      llvm::errs() << "failed to translate executables\n";
       return signalPassFailure();
     }
   }
