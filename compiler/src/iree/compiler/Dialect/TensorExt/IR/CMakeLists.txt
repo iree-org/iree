@@ -34,7 +34,6 @@ iree_cc_library(
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRTensorDialect
-    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )
