@@ -61,24 +61,27 @@ public:
       return failure();
     SmallVector<int64_t> inputShape(inputTy.getShape());
     replacementExprs.reserve(inputMap.getNumResults());
+    bool noReplacement = true;
     // walk through input map and look for expressions of the form cst*dim
     for (auto [pos, expr] : llvm::enumerate(inputMap.getResults())) {
-      // ensure expr is simplified
-      // expr = simplifyAffineExpr(expr, inputMap.getNumDims(),
-      // inputMap.getNumSymbols()); skip dim exprs and constant exprs
+      // skip dim exprs and constant exprs
       if (isa<AffineDimExpr>(expr) || isa<AffineConstantExpr>(expr)) {
         replacementExprs.push_back(expr);
         continue;
       }
       // look at binary op expressions
       auto binexpr = dyn_cast<AffineBinaryOpExpr>(expr);
+      // fail if we see some unexpected kind of expression
       if (!binexpr)
         return failure();
       auto rhs = dyn_cast<AffineConstantExpr>(binexpr.getRHS());
       auto lhs = dyn_cast<AffineDimExpr>(binexpr.getLHS());
       // binary expressions must be of the form cst*dim
-      if (!rhs || !lhs || binexpr.getKind() != AffineExprKind::Mul)
-        return failure();
+      if (!rhs || !lhs || binexpr.getKind() != AffineExprKind::Mul) {
+        replacementExprs.push_back(expr);
+        continue;
+      }
+      noReplacement = false;
       strides.insert(std::pair<unsigned, int64_t>(pos, rhs.getValue()));
       int64_t newSize = staticShape[lhs.getPosition()];
       if (newSize == ShapedType::kDynamic || newSize == 0)
@@ -86,6 +89,11 @@ public:
       inputShape[pos] = newSize;
       replacementExprs.push_back(lhs);
     }
+
+    // fail if we don't have any work to do
+    if (noReplacement)
+      return failure();
+
     mapRange[0] =
         AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                        replacementExprs, op.getContext());
