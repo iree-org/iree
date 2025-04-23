@@ -550,38 +550,32 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       SmallVector<AffineExpr>(dims.begin(), dims.begin() + numParallelDims),
       ctx);
 
-  // Build a mapping from canonical dim positions to their positions in the
-  // original output map.
-  SmallVector<int64_t> originalToCanonicalDimPos;
-  for (AffineExpr expr : outputMap.getResults())
-    originalToCanonicalDimPos.push_back(
-        cast<AffineDimExpr>(expr).getPosition());
-  SmallVector<int64_t> canonicalToOriginalDimPos =
-      invertPermutationVector(originalToCanonicalDimPos);
+  // Build a mapping from original conv output map dimensions to their canonical
+  // dimensions, as used by the IGEMM maps.
+  DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
+  for (auto [idx, expr] : llvm::enumerate(outputMap.getResults())) {
+    auto convDimIdx = cast<AffineDimExpr>(expr).getPosition();
+    convToIgemmDimMap[convDimIdx] = getAffineDimExpr(idx, expr.getContext());
+  }
 
-  // Lambda to remap dim indices from canonical order to original order.
-  auto remapDims = [&](ArrayRef<unsigned> dims) -> SmallVector<unsigned> {
-    SmallVector<unsigned> mapped;
+  // Lambda to remap conv dim indices to igemm dimensions.
+  auto remapDims = [&](ArrayRef<unsigned> dims) -> SmallVector<AffineExpr> {
+    SmallVector<AffineExpr> mapped;
     for (unsigned d : dims)
-      mapped.push_back(canonicalToOriginalDimPos[d]);
+      mapped.push_back(convToIgemmDimMap.at(d));
     return mapped;
   };
 
   // Prepare the input map.
   SmallVector<AffineExpr> inputDims;
-  auto insertExprs = [&](ArrayRef<unsigned> indices) {
-    for (unsigned i : indices)
-      inputDims.push_back(dims[i]);
-  };
-
   // Add the batch dims.
-  insertExprs(remapDims(convDims.batch));
+  inputDims.append(remapDims(convDims.batch));
   // Add the depth (group) dims.
-  insertExprs(remapDims(convDims.depth));
+  inputDims.append(remapDims(convDims.depth));
   // Add the M dims.
-  insertExprs(remapDims(convDims.outputImage));
+  inputDims.append(remapDims(convDims.outputImage));
   // Add the reduction dims at the end.
-  inputDims.insert(inputDims.end(), dims.begin() + numParallelDims, dims.end());
+  inputDims.append(dims.begin() + numParallelDims, dims.end());
   auto inputMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
@@ -596,9 +590,8 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       assert(iter == parallel && "expected a parallel dim");
       assert(indices.size() == 1 && "expected a single reassociation index");
       int64_t filterInputIdx = indices.front();
-      AffineExpr originalDim = filterMap.getResult(filterInputIdx);
-      int64_t canonicalDim = outputMap.getResultPosition(originalDim).value();
-      filterDims.push_back(dims[canonicalDim]);
+      auto convDim = cast<AffineDimExpr>(filterMap.getResult(filterInputIdx));
+      filterDims.push_back(convToIgemmDimMap.at(convDim.getPosition()));
     }
   }
   auto filterMapGEMM =
@@ -635,6 +628,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   igemmDetails.filterReassocIndices = filterReassocIndices;
   igemmDetails.isOutputChannelFirst = isOutputChannelFirst;
   igemmDetails.convDims = convDims;
+  igemmDetails.convToIgemmDimMap = convToIgemmDimMap;
   igemmDetails.igemmLoopIterators = igemmLoopIterators;
   return igemmDetails;
 }

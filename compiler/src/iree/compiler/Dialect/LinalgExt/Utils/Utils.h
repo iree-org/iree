@@ -162,6 +162,9 @@ struct IGEMMGenericConvDetails {
   SmallVector<Value> igemmOperands;
   /// The inferred convolution dimensions.
   mlir::linalg::ConvolutionDimensions convDims;
+  /// Mapping from dimensions in 'convDims' to dimensions in
+  /// 'igemmContractionMaps'. This only includes parallel dimensions.
+  DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   /// The reassociation indices used to computer the collapse shape of the
   /// filter in IGEMM transformation.
   SmallVector<ReassociationIndices> filterReassocIndices;

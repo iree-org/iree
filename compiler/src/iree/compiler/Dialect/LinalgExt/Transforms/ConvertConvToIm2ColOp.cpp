@@ -200,11 +200,13 @@ public:
     auto im2colBatchIterDims =
         llvm::to_vector(llvm::concat<unsigned>(convDims.depth, convDims.batch));
     SmallVector<int64_t> batchPos(im2colBatchIterDims.size());
-    for (auto dim : im2colBatchIterDims) {
-      auto dimExpr = getAffineDimExpr(dim, inputMap.getContext());
-      int64_t im2colInputDim = inputMap.getResultPosition(dimExpr).value();
+    for (int64_t convDim : im2colBatchIterDims) {
+      AffineExpr convDimExpr = getAffineDimExpr(convDim, getContext());
+      int64_t im2colInputDim = inputMap.getResultPosition(convDimExpr).value();
+
+      AffineExpr igemmDimExpr = igemmConvDetails.convToIgemmDimMap.at(convDim);
       int64_t igemmInputDim = igemmConvDetails.getIgemmInputImageMap()
-                                  .getResultPosition(dimExpr)
+                                  .getResultPosition(igemmDimExpr)
                                   .value();
       batchPos[igemmInputDim] = im2colInputDim;
     }
