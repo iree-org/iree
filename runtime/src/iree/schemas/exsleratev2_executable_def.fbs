@@ -1,0 +1,77 @@
+// Exslerate V2 Schema
+// This schema defines the serialization format for neural network models
+
+namespace iree.exsleratev2.hal.exsleratev2;
+
+// Value type for register configurations
+enum Valuetype : uint8 {
+    Literal = 0,    // Direct value
+    MemRefDef = 1   // Reference to a memory definition
+}
+
+// Data buffer categories
+enum DataCategory : uint8 {
+    weights = 0,        // Convolution weights
+    bias = 1,           // Bias values
+    input = 2,          // Input activation data
+    output = 3,         // Output activation data
+    atomic_bank = 4,    // Atomic operation bank definitions
+    atomic_offset = 5,  // Atomic operation offset values
+    lifetime = 6    ,    // Lifetime information for buffers
+    bnweight = 7 ,
+    bnbias = 8 ,
+    lut = 9
+}
+
+// Memory reference definition
+table MemRefDef {
+    id: uint32;             // Reference ID to know which address to be loaded to CSR
+    shape: [int32];         // Dimensions of the tensor (e.g., [224, 224, 3] for an image)
+    data_type: int8;        // Data type of the elements
+    alignment: uint32;      // Required memory alignment in bytes
+}
+
+// Register value configuration
+table RegisterValue {
+    value_type: Valuetype;  // Type of the value (literal or memory reference)
+    literal_value: uint32;  // Literal value if value_type is Literal
+    memrefdef_id: uint32;   // Reference to MemRefDef ID if value_type is MemRefDef
+}
+
+
+// Define specific buffer types for different data categories
+table Int8Buffer {
+    data: [int8];           // For weights, bias, input, output
+}
+
+table Uint32Buffer {
+    data: [uint32];         // For atomic_bank, atomic_offset, lifetime
+}
+
+// Union to represent different buffer data types
+union BufferData {
+    Int8Buffer,
+    Uint32Buffer
+}
+
+// Data buffer definition with union type
+table DataBufferDef {
+    category: DataCategory;  // Category of the data (weights, bias, etc.)
+    buffer: BufferData;      // The actual buffer data with appropriate type
+}
+
+// Layer definition
+table LayerDef {
+    csr_configs: [RegisterValue];  // Layer-specific CSR register configurations
+    data_buffers: [DataBufferDef]; // Layer's static data (weights, bias, etc.)
+    mem_ref_defs: [MemRefDef];     // Memory metadata for inputs, outputs, etc.
+}
+
+// Main executable definition
+table ExecutableDef {
+    entry_points: [string];        // Named entry points into the model
+    layers: [LayerDef];            // Each layer's configurations and data
+}
+
+// Root type declaration
+root_type ExecutableDef;

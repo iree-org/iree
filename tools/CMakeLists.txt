@@ -395,6 +395,18 @@ if(IREE_BUILD_COMPILER)
     INSTALL_COMPONENT IREETools-Compiler
   )
 
+  iree_cc_binary(
+  NAME
+    iree-dump-slfb
+  SRCS
+    "iree-dump-slfb-main.cc"
+  DEPS
+    iree::schemas::exsleratev2_executable_def_c_fbs
+    iree::base::internal::flatcc::parsing
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+
   # Ensure FileCheck and associated binaries get built. Tests don't have
   # dependencies in CMake because they aren't targets. So until we fix that, we
   # just force this to get built.
