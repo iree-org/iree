@@ -10,7 +10,7 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -37,8 +37,9 @@ public:
                   (isa<arith::MulIOp>(first) && isa<arith::AddIOp>(second)))
                 return true;
               return false;
-            }))
+            })) {
       return failure();
+    }
 
     SmallVector<AffineMap> mapRange = op.getIndexingMapsArray();
     unsigned inputPos = op.getDpsInputOperand(0)->getOperandNumber();
@@ -50,11 +51,12 @@ public:
     // For now, we are only handling the case where the first input is the
     // only non-projected permutation.
     if (!filterMap.isProjectedPermutation() ||
-        !resultMap.isProjectedPermutation())
+        !resultMap.isProjectedPermutation()) {
       return failure();
+    }
     if (inputMap.isProjectedPermutation())
       return failure();
-    auto staticShape = op.getStaticLoopRanges();
+    SmallVector<int64_t, 4> staticShape = op.getStaticLoopRanges();
 
     llvm::SmallDenseMap<unsigned, int64_t> strides;
     SmallVector<AffineExpr> replacementExprs;
@@ -64,21 +66,21 @@ public:
       return failure();
     SmallVector<int64_t> inputShape(inputTy.getShape());
     replacementExprs.reserve(inputMap.getNumResults());
-    // walk through input map and look for expressions of the form `dim * cst`
+    // Walk through input map and look for expressions of the form `dim * cst`.
     for (auto [pos, expr] : llvm::enumerate(inputMap.getResults())) {
-      // skip dim exprs and constant exprs
+      // Skip dim exprs and constant exprs.
       if (isa<AffineDimExpr>(expr) || isa<AffineConstantExpr>(expr)) {
         replacementExprs.push_back(expr);
         continue;
       }
-      // look at binary op expressions
+      // Look at binary op expressions.
       auto binexpr = dyn_cast<AffineBinaryOpExpr>(expr);
-      // fail if we see some unexpected kind of expression
+      // Fail if we see some unexpected kind of expression.
       if (!binexpr)
         return failure();
       auto rhs = dyn_cast<AffineConstantExpr>(binexpr.getRHS());
       auto lhs = dyn_cast<AffineDimExpr>(binexpr.getLHS());
-      // binary expressions must be of the form `dim * cst`
+      // Binary expressions must be of the form `dim * cst`.
       if (!rhs || !lhs || binexpr.getKind() != AffineExprKind::Mul) {
         replacementExprs.push_back(expr);
         continue;
@@ -91,7 +93,7 @@ public:
       replacementExprs.push_back(lhs);
     }
 
-    // fail if we don't have any work to do
+    // Fail if we don't have any work to do.
     if (strides.empty())
       return failure();
 
@@ -129,18 +131,14 @@ struct ConvertStridedContractionToContractionPass
     : public impl::ConvertStridedContractionToContractionPassBase<
           ConvertStridedContractionToContractionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-    registry.insert<tensor::TensorDialect>();
-    registry.insert<arith::ArithDialect>();
+    registry.insert<arith::ArithDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConvertStridedContractionToContraction>(context);
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
 } // namespace
