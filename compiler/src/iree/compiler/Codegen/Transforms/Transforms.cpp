@@ -541,6 +541,28 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
 
     moveLoopInvariantCode(loopLike);
   });
+
+  // linalg.generic operations are also loop-like, but they don't have
+  // LoopLikeOpInterface implemented for them.
+  target->walk([&](linalg::GenericOp genericOp) {
+    // Ideally, we should be checking if the linalg.generic op has a trip count
+    // of zero, but while that is possible and can be written using
+    // ValueBoundsConstraintSet, it is usually not needed. Unlike loops, which
+    // can have arbitary operations inside them, the loop invariant operations
+    // inside a linalg.generic operations are usually operations performed on
+    // scalars. Hoisting scalar constants does not have a big cost even if the
+    // trip count is zero.
+    moveLoopInvariantCode(
+        &genericOp.getBodyRegion(),
+        [&](Value value, Region *) {
+          return !genericOp->isAncestor(value.getParentRegion()->getParentOp());
+        },
+        [&](Operation *op, Region *) {
+          return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
+                 isSpeculatable(op);
+        },
+        [&](Operation *op, Region *) { op->moveBefore(genericOp); });
+  });
 }
 
 //===---------------------------------------------------------------------===//

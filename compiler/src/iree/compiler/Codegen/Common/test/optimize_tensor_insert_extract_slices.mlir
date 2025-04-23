@@ -339,3 +339,32 @@ func.func @push_up_extract_slice(%arg0: index, %arg1: vector<64x64xf32>, %arg2: 
 // CHECK-LABEL: @push_up_extract_slice
 //       CHECK:   tensor.extract_slice
 //       CHECK:   vector.transfer_write
+
+// -----
+
+#trait = {
+  indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+  iterator_types = ["parallel", "parallel"]
+}
+
+func.func @licm_generic(%source: tensor<32x32xf16>, %idx : index) -> tensor<32x32xf16> {
+  %empty = tensor.empty() : tensor<32x32xf16>
+  %c2 = arith.constant 2 : index
+  %out = linalg.generic #trait outs(%empty : tensor<32x32xf16>) {
+  ^bb0(%o: f16):
+    %rem = arith.remsi %idx, %c2 : index
+    %div = arith.divsi %idx, %c2 : index
+    %extracted = tensor.extract %source[%rem, %div] : tensor<32x32xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<32x32xf16>
+  func.return %out : tensor<32x32xf16>
+}
+
+// CHECK-LABEL: @licm_generic
+// CHECK-NOT: linalg.generic
+// CHECK: arith.remsi
+// CHECK: arith.divsi
+// CHECK: tensor.extract
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.extract
+// CHECK: return
