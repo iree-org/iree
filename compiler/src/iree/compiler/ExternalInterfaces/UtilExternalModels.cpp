@@ -126,11 +126,29 @@ struct UtilAssumeIntValueBoundsOpInterface
     auto [min, max] =
         assumeOp.getUnionedUnsignedRange(result.getResultNumber());
 
+    std::optional<int64_t> udiv =
+        assumeOp.getUnionedUnsignedDivisor(result.getResultNumber());
+
     if (min) {
       cstr.bound(result) >= *min;
     }
     if (max) {
       cstr.bound(result) <= *max;
+    }
+    if (udiv) {
+      // To represent the divisibility guarantee, emit a bound clamping the
+      // value to the udiv value. i.e.
+      //
+      // v == floordiv(v, udiv) * udiv
+      //
+      // Mod/divide folders can cleanup such terms with the appropriate bounds
+      // query.
+      AffineExpr expr =
+          cstr.getExpr(assumeOp.getOperand(result.getResultNumber()));
+      AffineExpr udivCst =
+          getAffineConstantExpr(udiv.value(), op->getContext());
+      AffineExpr clampExpr = expr.floorDiv(udivCst) * udivCst;
+      cstr.bound(result) == clampExpr;
     }
   }
 };
