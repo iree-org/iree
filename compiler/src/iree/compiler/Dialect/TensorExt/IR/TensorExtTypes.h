@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTTYPES_H_
 #define IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTTYPES_H_
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
@@ -40,8 +39,7 @@ enum class TensorAccess : uint32_t {
 // we can't extend it and reuse all of this.
 class DispatchTensorType
     : public Type::TypeBase<DispatchTensorType, Type,
-                            detail::DispatchTensorTypeStorage,
-                            IREE::Encoding::EncodingTypeInterface::Trait> {
+                            detail::DispatchTensorTypeStorage> {
 public:
   using ImplType = detail::DispatchTensorTypeStorage;
 
@@ -126,9 +124,6 @@ public:
     }
     return llvm::cast<RankedTensorType>(boundType);
   }
-
-  Type getEncodingType() const;
-  Type updateEncoding(Attribute encoding) const;
 };
 
 void printType(DispatchTensorType &type, DialectAsmPrinter &p);
