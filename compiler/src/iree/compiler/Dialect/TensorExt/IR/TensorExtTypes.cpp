@@ -108,13 +108,6 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
   return hasStaticShape() && getShape() == shape;
 }
 
-Type DispatchTensorType::getEncodingType() const { return getBoundType(); }
-
-Type DispatchTensorType::updateEncoding(Attribute encoding) const {
-  return DispatchTensorType::get(getAccess(), getShape(), getBoundElementType(),
-                                 encoding);
-}
-
 LogicalResult
 DispatchTensorType::verify(function_ref<InFlightDiagnostic()> emitError,
                            uint32_t access, Type boundType) {
