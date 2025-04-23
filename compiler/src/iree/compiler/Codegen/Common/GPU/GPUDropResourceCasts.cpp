@@ -7,8 +7,8 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir::iree_compiler {
@@ -39,8 +39,7 @@ static Operation *isTriviallyProducedByViewLike(Value input,
     next = slice.getSource();
   }
 
-  // TODO: Flow dependency is moving to TensorExt.
-  auto tensorLoad = next.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+  auto tensorLoad = next.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
   if (!tensorLoad || (requiresSingleSource && !tensorLoad->hasOneUse())) {
     return nullptr;
   }

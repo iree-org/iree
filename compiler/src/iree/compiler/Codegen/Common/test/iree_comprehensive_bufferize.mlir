@@ -3042,14 +3042,14 @@ func.func @simple_resource_cast() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<2xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
   %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
-  %0 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
-    : !flow.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
   %1 = iree_gpu.buffer_resource_cast %0 : tensor<2xf32>
-  flow.dispatch.tensor.store %1, %arg1, offsets=[0], sizes=[2], strides=[1]
-    : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2xf32>>
+  iree_tensor_ext.dispatch.tensor.store %1, %arg1, offsets=[0], sizes=[2], strides=[1]
+    : tensor<2xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
   return
 }
 
@@ -3070,9 +3070,9 @@ func.func @drop_resource_cast_if_not_storage_buffer() -> tensor<2xf32> {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<2xf32>>
-  %0 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
-    : !flow.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
   %empty = tensor.empty() : tensor<2xf32>
   %copy = linalg.copy ins(%0 : tensor<2xf32>) outs(%empty : tensor<2xf32>) -> tensor<2xf32>
   %1 = iree_gpu.buffer_resource_cast %copy : tensor<2xf32>
@@ -3092,14 +3092,14 @@ func.func @cache_swizzle_resource_cast(%stride: index) {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<2xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
   %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
-  %0 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
-    : !flow.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
   %1 = iree_gpu.buffer_resource_cast %0 cacheSwizzleStride(%stride) : tensor<2xf32>
-  flow.dispatch.tensor.store %1, %arg1, offsets=[0], sizes=[2], strides=[1]
-    : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2xf32>>
+  iree_tensor_ext.dispatch.tensor.store %1, %arg1, offsets=[0], sizes=[2], strides=[1]
+    : tensor<2xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
   return
 }
 
