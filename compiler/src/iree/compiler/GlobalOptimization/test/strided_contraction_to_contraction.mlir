@@ -4,7 +4,7 @@ util.func public @strided_from_output_static(%input: tensor<2x118x182x448xbf16>,
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<2x59x91x896xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<2x59x91x896xf32>) -> tensor<2x59x91x896xf32>
-  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1 * 2, d2 * 2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%input, %filter : tensor<2x118x182x448xbf16>, tensor<896x448xbf16>) outs(%1 : tensor<2x59x91x896xf32>) {
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, 2 * d1, d2 * 2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%input, %filter : tensor<2x118x182x448xbf16>, tensor<896x448xbf16>) outs(%1 : tensor<2x59x91x896xf32>) {
   ^bb0(%in: bf16, %in_0: bf16, %out: f32):
     %3 = arith.extf %in : bf16 to f32
     %4 = arith.extf %in_0 : bf16 to f32

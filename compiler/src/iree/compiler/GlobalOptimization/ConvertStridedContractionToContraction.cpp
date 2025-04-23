@@ -41,11 +41,14 @@ public:
       return failure();
 
     SmallVector<AffineMap> mapRange = op.getIndexingMapsArray();
-    AffineMap inputMap = mapRange[0];
-    AffineMap filterMap = mapRange[1];
-    AffineMap resultMap = mapRange[2];
-    // For now, we are only handling the case where the input is the only
-    // non-projected permutation.
+    unsigned inputPos = op.getDpsInputOperand(0)->getOperandNumber();
+    unsigned filterPos = op.getDpsInputOperand(1)->getOperandNumber();
+    unsigned resInitPos = op.getDpsInitOperand(0)->getOperandNumber();
+    AffineMap inputMap = mapRange[inputPos];
+    AffineMap filterMap = mapRange[filterPos];
+    AffineMap resultMap = mapRange[resInitPos];
+    // For now, we are only handling the case where the first input is the
+    // only non-projected permutation.
     if (!filterMap.isProjectedPermutation() ||
         !resultMap.isProjectedPermutation())
       return failure();
@@ -92,7 +95,7 @@ public:
     if (strides.empty())
       return failure();
 
-    mapRange[0] =
+    mapRange[inputPos] =
         AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                        replacementExprs, op.getContext());
     auto sliceTy = RankedTensorType::get(inputShape, inputTy.getElementType());
