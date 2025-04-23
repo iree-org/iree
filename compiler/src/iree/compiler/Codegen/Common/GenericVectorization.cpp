@@ -162,14 +162,13 @@ void GenericVectorizationPass::runOnOperation() {
 
     // Try to vectorize to transfer_gather, if possible.
     if (isa<linalg::GenericOp>(op) && vectorizeToTransferGather) {
-      if (succeeded(IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
-              rewriter, cast<linalg::GenericOp>(op), vectorSizes,
-              scalableVecDims, vectorizeGatherAccesses))) {
-        continue;
-      }
+      (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
+          rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
+          vectorizeGatherAccesses);
+    } else {
+      (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                              vectorizeGatherAccesses);
     }
-    (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                            vectorizeGatherAccesses);
   };
 
   {

@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/Builders.h"
-
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::VectorExt {
@@ -303,20 +302,27 @@ getIterationSpaceToMemorySpaceMap(linalg::GenericOp genericOp,
 }
 
 static AffineMap inversePerm(AffineMap map) {
-  assert(map.isProjectedPermutation(/*allowZeroInResults=*/true) &&
-         "Expected projected permutation with zeros");
   MLIRContext *context = map.getContext();
   AffineExpr zero = mlir::getAffineConstantExpr(0, context);
   // Start with all the results as 0.
   SmallVector<AffineExpr, 4> exprs(map.getNumInputs(), zero);
   for (unsigned i : llvm::seq(unsigned(0), map.getNumResults())) {
     // Skip zeros from input map. 'exprs' is already initialized to zero.
-    if (isa<AffineConstantExpr>(map.getResult(i))) {
+    if (auto constant = dyn_cast<AffineConstantExpr>(map.getResult(i))) {
+      if (constant.getValue() != 0) {
+        return AffineMap();
+      }
       continue;
     }
 
-    // Reverse each dimension existing in the original map result.
-    exprs[map.getDimPosition(i)] = getAffineDimExpr(i, context);
+    if (isa<AffineDimExpr>(map.getResult(i))) {
+      // Reverse each dimension existing in the original map result.
+      exprs[map.getDimPosition(i)] = getAffineDimExpr(i, context);
+      continue;
+    }
+
+    // Fail if the expr is not a constant or a dim expr.
+    return AffineMap();
   }
   return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, context);
 }
@@ -327,19 +333,6 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     RewriterBase &rewriter, linalg::GenericOp linalgOp,
     ArrayRef<int64_t> vectorSizes, ArrayRef<bool> scalableVecDims,
     bool vectorizeNDExtract) {
-
-  Location loc = linalgOp->getLoc();
-  SmallVector<int64_t> canonicalVectorSizes(vectorSizes);
-  SmallVector<bool> canonicalScalableDims(scalableVecDims);
-
-  // If vector sizes are not provided, assume static vector sizes and use loop
-  // ranges.
-  if (vectorSizes.empty()) {
-    assert(canonicalScalableDims.empty() &&
-           "vector sizes not provided but scalable vector sizes provided");
-    canonicalVectorSizes = linalgOp.getStaticLoopRanges();
-    canonicalScalableDims.append(linalgOp.getNumLoops(), false);
-  }
 
   // Since upstream vectorization does not support hooks to vectorize individual
   // operations inside a linalg.generic, we take an alternate approach here,
@@ -371,8 +364,28 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
 
   // If no extract op was found, call generic vectorization.
   if (!extractOp) {
-    return linalg::vectorize(rewriter, linalgOp, canonicalVectorSizes,
-                             canonicalScalableDims, vectorizeNDExtract);
+    return linalg::vectorize(rewriter, linalgOp, vectorSizes, scalableVecDims,
+                             vectorizeNDExtract);
+  }
+
+  Location loc = linalgOp->getLoc();
+  SmallVector<int64_t> canonicalVectorSizes(vectorSizes);
+  SmallVector<bool> canonicalScalableDims(scalableVecDims);
+
+  // If vector sizes are not provided, assume static vector sizes and use loop
+  // ranges.
+  if (vectorSizes.empty()) {
+    assert(canonicalScalableDims.empty() &&
+           "vector sizes not provided but scalable vector sizes provided");
+    canonicalVectorSizes = linalgOp.getStaticLoopRanges();
+    canonicalScalableDims.append(linalgOp.getNumLoops(), false);
+
+    // loop ranges must be static to infer vector sizes.
+    if (llvm::any_of(canonicalVectorSizes, [](int64_t size) {
+          return ShapedType::isDynamic(size);
+        })) {
+      return failure();
+    }
   }
 
   AffineMap itSpaceToExtract =
@@ -464,13 +477,12 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   rewriter.replaceOp(linalgOp, postOp);
 
   if (failed(vectorizeGatherLikeGenericToTransferGather(
-          rewriter, preOp, canonicalVectorSizes, canonicalScalableDims,
-          vectorizeNDExtract))) {
+          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract))) {
     return failure();
   };
 
   if (failed(vectorizeGatherLikeGenericToTransferGather(
-          rewriter, postOp, canonicalVectorSizes, canonicalScalableDims,
+          rewriter, postOp, vectorSizes, scalableVecDims,
           vectorizeNDExtract))) {
     return failure();
   }
