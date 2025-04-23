@@ -62,21 +62,6 @@ static SmallVector<int64_t> getBasisFromShape(ArrayRef<int64_t> shape) {
   return basis;
 }
 
-// Collect all AffineDimExprs from an AffineExpr.
-static void collectDimExprs(ArrayRef<AffineExpr> exprs,
-                            DenseSet<AffineExpr> &out) {
-  for (auto &expr : exprs) {
-    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-      out.insert(dimExpr);
-    } else if (auto binOpExpr = dyn_cast<AffineBinaryOpExpr>(expr)) {
-      collectDimExprs({binOpExpr.getLHS(), binOpExpr.getRHS()}, out);
-    } else {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Non-dimension expression found: " << expr << "\n");
-    }
-  }
-}
-
 // Computes `inputKPerm` that maps the input spatial and channel dimension order
 // to filter's.
 static SmallVector<int64_t>
@@ -86,16 +71,16 @@ computeInputKPerm(AffineMap inputMap, AffineMap filterMap,
   auto reductionDims =
       llvm::concat<const unsigned>(convDims.inputChannel, convDims.filterLoop);
   SmallVector<int64_t> inputReductionDims;
-  for (auto dimExpr : inputMap.getResults()) {
-    for (auto reductionDim : reductionDims) {
+  for (AffineExpr dimExpr : inputMap.getResults()) {
+    for (unsigned reductionDim : reductionDims) {
       if (dimExpr.isFunctionOfDim(reductionDim)) {
         inputReductionDims.push_back(reductionDim);
       }
     }
   }
   SmallVector<int64_t> filterReductionDims;
-  for (auto dimExpr : filterMap.getResults()) {
-    for (auto reductionDim : reductionDims) {
+  for (AffineExpr dimExpr : filterMap.getResults()) {
+    for (unsigned reductionDim : reductionDims) {
       if (dimExpr.isFunctionOfDim(reductionDim)) {
         filterReductionDims.push_back(reductionDim);
       }
