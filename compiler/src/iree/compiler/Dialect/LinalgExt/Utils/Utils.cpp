@@ -574,10 +574,10 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
       inputDims.push_back(dims[i]);
   };
 
-  // Add the depth (group) dims.
-  insertExprs(remapDims(convDims.depth));
   // Add the batch dims.
   insertExprs(remapDims(convDims.batch));
+  // Add the depth (group) dims.
+  insertExprs(remapDims(convDims.depth));
   // Add the M dims.
   insertExprs(remapDims(convDims.outputImage));
   // Add the reduction dims at the end.
