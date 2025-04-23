@@ -61,8 +61,7 @@ public:
       return failure();
     SmallVector<int64_t> inputShape(inputTy.getShape());
     replacementExprs.reserve(inputMap.getNumResults());
-    bool noReplacement = true;
-    // walk through input map and look for expressions of the form cst*dim
+    // walk through input map and look for expressions of the form `dim * cst`
     for (auto [pos, expr] : llvm::enumerate(inputMap.getResults())) {
       // skip dim exprs and constant exprs
       if (isa<AffineDimExpr>(expr) || isa<AffineConstantExpr>(expr)) {
@@ -76,12 +75,11 @@ public:
         return failure();
       auto rhs = dyn_cast<AffineConstantExpr>(binexpr.getRHS());
       auto lhs = dyn_cast<AffineDimExpr>(binexpr.getLHS());
-      // binary expressions must be of the form cst*dim
+      // binary expressions must be of the form `dim * cst`
       if (!rhs || !lhs || binexpr.getKind() != AffineExprKind::Mul) {
         replacementExprs.push_back(expr);
         continue;
       }
-      noReplacement = false;
       strides.insert(std::pair<unsigned, int64_t>(pos, rhs.getValue()));
       int64_t newSize = staticShape[lhs.getPosition()];
       if (newSize == ShapedType::kDynamic || newSize == 0)
@@ -91,7 +89,7 @@ public:
     }
 
     // fail if we don't have any work to do
-    if (noReplacement)
+    if (strides.empty())
       return failure();
 
     mapRange[0] =
