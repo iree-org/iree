@@ -14,8 +14,8 @@
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -348,7 +348,7 @@ struct MaterializeEncodingIntoPaddingPass final
       context->getOrLoadDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
       // TODO: Drop these when we deprecate partial loads/stores.
-      IREE::Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
+      IREE::TensorExt::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
           patterns, context);
       if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
         operation.emitOpError("folding patterns failed");

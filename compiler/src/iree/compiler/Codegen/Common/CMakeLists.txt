@@ -233,13 +233,13 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
@@ -311,8 +311,6 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Dialect::TensorExt::IR

@@ -127,23 +127,6 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
   return droppedDims;
 }
 
-/// Returns the `hal.interface.binding` a value comes from.
-static std::optional<BlockArgument> getBindingArgument(Value v) {
-  if (BlockArgument blockArg = llvm::dyn_cast<BlockArgument>(v)) {
-    if (isa<IREE::Flow::DispatchWorkgroupsOp>(
-            blockArg.getOwner()->getParentOp())) {
-      return blockArg;
-    }
-    return std::nullopt;
-  }
-  Operation *definingOp = v.getDefiningOp();
-  if (auto loadOp =
-          dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(definingOp)) {
-    return getBindingArgument(loadOp.getSource());
-  }
-  return std::nullopt;
-}
-
 /// Returns `true` if the slice (described by the `offset`, `sizes` and
 /// `strides`) spans the dispatch type.
 static bool doesSliceSpanWholeTarget(
@@ -1774,97 +1757,10 @@ ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
 // Public methods
 //===----------------------------------------------------------------------===//
 
-/// Pattern to fold `iree_tensor_ext.dispatch.tensor.load` ->
-/// `tensor.extract_slice`.
-// TODO(ravishankarm): Eventually this should go in as a canonicalization at the
-// Flow level.
-struct FoldTensorLoadWithExtractSlice
-    : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
-                                PatternRewriter &rewriter) const override {
-    auto dispatchTensorLoadOp =
-        extractSliceOp.getSource()
-            .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-    if (!dispatchTensorLoadOp)
-      return failure();
-
-    SmallVector<OpFoldResult> offsets, sizes, strides;
-    // `tensor.extract_slice` (i.e. the producer) folds **into**
-    // `iree_tensor_ext.dispatch.tensor.load1 (i.e. the consumer).
-    if (failed(affine::mergeOffsetsSizesAndStrides(
-            rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
-            extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
-            sizes, strides))) {
-      return failure();
-    }
-
-    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
-        extractSliceOp, extractSliceOp.getType(),
-        dispatchTensorLoadOp.getSource(), dispatchTensorLoadOp.getSourceDims(),
-        offsets, sizes, strides);
-    return success();
-  }
-};
-
-/// Pattern to fold `tensor.insert_slice` with
-/// `iree_tensor_ext.dispatch.tensor.store` operations.
-// TODO(ravishankarm): Eventually this should go in as a canonicalization at the
-// Flow level.
-struct FoldInsertSliceWithTensorStoreOp
-    : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
-
-  LogicalResult
-  matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp dispatchTensorStoreOp,
-                  PatternRewriter &rewriter) const override {
-    auto insertSliceOp =
-        dispatchTensorStoreOp.getValue().getDefiningOp<tensor::InsertSliceOp>();
-    if (!insertSliceOp)
-      return failure();
-
-    // Check that the `dest` of the `tensor.insert_slice` and target of the
-    // `iree_tensor_ext.dispatch.tensor.store` are the same interface binding,
-    // if these are still in a dispatch region.
-    std::optional<BlockArgument> destBinding =
-        getBindingArgument(insertSliceOp.getDest());
-    std::optional<BlockArgument> targetBinding =
-        getBindingArgument(dispatchTensorStoreOp.getTarget());
-    if (destBinding != targetBinding) {
-      return failure();
-    }
-
-    SmallVector<OpFoldResult> offsets, sizes, strides;
-    // `tensor.insert_slice` (i.e. the producer) folds **into**
-    // `iree_tensor_ext.dispatch.tensor.store` (i.e. the consumer).
-    if (failed(affine::mergeOffsetsSizesAndStrides(
-            rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
-            insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
-            sizes, strides))) {
-      return failure();
-    }
-
-    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
-        dispatchTensorStoreOp, insertSliceOp.getSource(),
-        dispatchTensorStoreOp.getTarget(),
-        dispatchTensorStoreOp.getTargetDims(), offsets, sizes, strides);
-    return success();
-  }
-};
-
 void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   IREE::TensorExt::DispatchTensorLoadOp::getCanonicalizationPatterns(results,
                                                                      context);
-}
-
-void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-    RewritePatternSet &patterns, MLIRContext *context) {
-  patterns
-      .insert<FoldTensorLoadWithExtractSlice, FoldInsertSliceWithTensorStoreOp>(
-          context);
 }
 
 //===----------------------------------------------------------------------===//
