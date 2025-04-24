@@ -21,14 +21,6 @@ func.func @load_from_memref_invalid_shape(%arg0: memref<5xf32>) -> tensor<4xf32>
 
 // -----
 
-func.func @load_from_memref_mixed_static_dynamic_shape(%arg0: memref<?xf32>) -> tensor<4xf32> {
-  // expected-error @+1 {{source and result shape and element type must match}}
-  %value = iree_codegen.load_from_memref %arg0 : memref<?xf32> -> tensor<4xf32>
-  return %value : tensor<4xf32>
-}
-
-// -----
-
 func.func @load_from_memref_invalid_element_type(%arg0: memref<4xf32>) -> tensor<4xf16> {
   // expected-error @+1 {{source and result shape and element type must match}}
   %value = iree_codegen.load_from_memref %arg0 : memref<4xf32> -> tensor<4xf16>
@@ -40,14 +32,6 @@ func.func @load_from_memref_invalid_element_type(%arg0: memref<4xf32>) -> tensor
 func.func @store_to_memref_invalid_shape(%arg0: tensor<4xf32>, %arg1: memref<5xf32>) {
   // expected-error @+1 {{value and target shape and element type must match}}
   iree_codegen.store_to_memref %arg0, %arg1 : tensor<4xf32> into memref<5xf32>
-  return
-}
-
-// -----
-
-func.func @store_to_memref_mixed_static_dynamic_shape(%arg0: tensor<?xf32>, %arg1: memref<4xf32>) {
-  // expected-error @+1 {{value and target shape and element type must match}}
-  iree_codegen.store_to_memref %arg0, %arg1 : tensor<?xf32> into memref<4xf32>
   return
 }
 
