@@ -204,9 +204,10 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       ShapedType::isDynamic(bounds[contractionDims.k.back()])) {
     return failure();
   }
+
   // We can support unaligned shapes as long as there are no dynamic dimensions
   // as finding padding bounds for dynamic dimensions is not guaranteed.
-  // TODO (nirvedhmeshram) : Add support so that we can find the bounds
+  // TODO(nirvedhmeshram): Add support so that we can find the bounds
   // information.
   bool canSupportUnaligned = true;
 
@@ -235,13 +236,12 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     }
     kDims.push_back(kDim);
   }
-
   for (int64_t batchDim : contractionDims.batch) {
-    if (!ShapedType::isDynamic(bounds[batchDim])) {
-      batchDims.push_back(batchDim);
-    } else {
+    if (ShapedType::isDynamic(bounds[batchDim])) {
       canSupportUnaligned = false;
+      continue;
     }
+    batchDims.push_back(batchDim);
   }
 
   auto getDimBounds = [&](SmallVector<int64_t> dims) -> SmallVector<int64_t> {
