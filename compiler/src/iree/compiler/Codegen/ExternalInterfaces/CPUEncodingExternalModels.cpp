@@ -97,10 +97,13 @@ getExpandedType(RankedTensorType type, bool isBatched, bool isTransposed,
 
 /// Given an input Value and a desired output element type, create and return
 /// an element-wise linalg::GenericOp that extends the input Value to the
-/// output element type.
+/// output element type. Returns `input` if casting is not needed.
 static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
                                       Location loc, Type outElemType) {
   auto inputType = cast<RankedTensorType>(input.getType());
+  if (inputType.getElementType() == outElemType) {
+    return input;
+  }
   SmallVector<AffineMap> maps(
       2, builder.getMultiDimIdentityMap(inputType.getRank()));
   SmallVector<utils::IteratorType> iteratorTypes(inputType.getRank(),
