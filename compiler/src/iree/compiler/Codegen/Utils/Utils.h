@@ -21,6 +21,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -212,6 +213,13 @@ Value findOrCreateSubspanBuffer(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//
+
+/// Given a SubsetInsertionOpInterface, find all values that are needed to
+/// build an equivalent subset extraction, and set the insertion point to the
+/// last of these values.
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp);
 
 /// Check if the two tensor types (with their respective dynamic dimension
 /// values) have the same shape.

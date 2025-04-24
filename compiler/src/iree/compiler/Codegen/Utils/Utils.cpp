@@ -1247,6 +1247,36 @@ Value findOrCreateSubspanBuffer(
 // Misc. utility functions
 //===---------------------------------------------------------------------===//
 
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp) {
+  DominanceInfo domInfo;
+  SmallVector<Value> values = subsetOp.getValuesNeededToBuildSubsetExtraction();
+  Operation *lastOp = nullptr;
+  bool setInsertionPointBefore = false;
+  for (auto val : values) {
+    auto definingOp = val.getDefiningOp();
+    if (!definingOp) {
+      definingOp =
+          &cast<BlockArgument>(val).getOwner()->getOperations().front();
+    }
+    if (!definingOp || (lastOp && domInfo.dominates(definingOp, lastOp)))
+      continue;
+    lastOp = definingOp;
+
+    // For block arguments we want the insertion point to be at the start of
+    // the block, so we need to set the insertion point before the first op
+    // in the block.
+    setInsertionPointBefore = isa<BlockArgument>(val);
+  }
+  if (setInsertionPointBefore) {
+    builder.setInsertionPoint(lastOp);
+  } else {
+    builder.setInsertionPointAfter(lastOp);
+  }
+  return lastOp;
+}
+
 bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
                       IREE::TensorExt::DispatchTensorType dispatchTensorType,
                       ValueRange dispatchTensorDynSizes) {

@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -37,20 +38,19 @@ static Value getBufferizedSubspanOrSubview(
   MemRefType subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
       tensorType.getShape(), cast<MemRefType>(subspanMemref.getType()), offsets,
       sizes, strides);
-  return rewriter
-      .create<memref::SubViewOp>(loc, subviewMemRefType, subspanMemref, offsets,
-                                 sizes, strides)
-      .getResult();
+  return rewriter.create<memref::SubViewOp>(
+      loc, subviewMemRefType, subspanMemref, offsets, sizes, strides);
 }
 
 static void
-bufferizeDispatchTensorLoad(IRRewriter &rewriter,
+bufferizeDispatchTensorLoad(RewriterBase &rewriter,
                             IREE::TensorExt::DispatchTensorLoadOp loadOp) {
   Value source = loadOp.getSource();
   auto subspanOp = source.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
   if (!subspanOp) {
     return;
   }
+  OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(loadOp);
   Value sourceBuffer = getBufferizedSubspanOrSubview(
       rewriter, loadOp->getLoc(), subspanOp, loadOp.getType(),
@@ -64,20 +64,28 @@ bufferizeDispatchTensorLoad(IRRewriter &rewriter,
 }
 
 static void
-bufferizeDispatchTensorStore(IRRewriter &rewriter,
+bufferizeDispatchTensorStore(RewriterBase &rewriter,
                              IREE::TensorExt::DispatchTensorStoreOp storeOp) {
   Value target = storeOp.getTarget();
   auto subspanOp = target.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
   if (!subspanOp) {
     return;
   }
-  rewriter.setInsertionPoint(storeOp);
+  // For the store_to_memref op, generate any subviews as early as possible in
+  // the IR. This opens more opportunities for using the store_to_memref op's
+  // SubsetInsertionOpInterface, since equivalent subset extractions can only be
+  // created after the store_to_memref op's output (the subspan or subview) in
+  // the IR.
+  OpBuilder::InsertionGuard g(rewriter);
+  (void)setInsertionPointAfterLastNeededValue(
+      rewriter, cast<SubsetInsertionOpInterface>(storeOp.getOperation()));
   Value outputBuffer = getBufferizedSubspanOrSubview(
       rewriter, storeOp->getLoc(), subspanOp, storeOp.getValueType(),
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides());
 
   Value value = storeOp.getValue();
+  rewriter.setInsertionPoint(storeOp);
   rewriter.replaceOpWithNewOp<IREE::Codegen::StoreToMemrefOp>(storeOp, value,
                                                               outputBuffer);
 }
