@@ -205,29 +205,34 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     return failure();
   }
 
-  // We can support unaligned shapes as long as there are no dynamic dimensions
-  // as finding padding bounds for dynamic dimensions is not guaranteed.
-  // TODO(nirvedhmeshram): Add support so that we can find the bounds
-  // information.
+  // We can support unaligned shapes as long as there are no dynamic reuduction
+  // dimensions as finding padding bounds for dynamic reduction dimensions is
+  // not guaranteed. The reason finding bounds for parallel dynamic dimensions
+  // is possible is that padding happens after workgroup distribution so the
+  // parallel dimensions are tiled but the reduction dimensions are not tiled at
+  // that stage.
+  // TODO(nirvedhmeshram): Add support so that we can find the bounds for
+  // reduction dimensions.
   bool canSupportUnaligned = true;
 
   // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
   // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
   // computing an MMA schedule.
   SmallVector<int64_t> mDims, nDims, kDims, batchDims;
-  for (int64_t mDim : contractionDims.m) {
-    if (ShapedType::isDynamic(bounds[mDim])) {
-      canSupportUnaligned = false;
-      continue;
+  for (int64_t batchDim : contractionDims.batch) {
+    if (!ShapedType::isDynamic(bounds[batchDim])) {
+      batchDims.push_back(batchDim);
     }
-    mDims.push_back(mDim);
+  }
+  for (int64_t mDim : contractionDims.m) {
+    if (!ShapedType::isDynamic(bounds[mDim])) {
+      mDims.push_back(mDim);
+    }
   }
   for (int64_t nDim : contractionDims.n) {
-    if (ShapedType::isDynamic(bounds[nDim])) {
-      canSupportUnaligned = false;
-      continue;
+    if (!ShapedType::isDynamic(bounds[nDim])) {
+      nDims.push_back(nDim);
     }
-    nDims.push_back(nDim);
   }
   for (int64_t kDim : contractionDims.k) {
     if (ShapedType::isDynamic(bounds[kDim])) {
@@ -235,13 +240,6 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       continue;
     }
     kDims.push_back(kDim);
-  }
-  for (int64_t batchDim : contractionDims.batch) {
-    if (ShapedType::isDynamic(bounds[batchDim])) {
-      canSupportUnaligned = false;
-      continue;
-    }
-    batchDims.push_back(batchDim);
   }
 
   auto getDimBounds = [&](SmallVector<int64_t> dims) -> SmallVector<int64_t> {
