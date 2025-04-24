@@ -73,8 +73,7 @@ void ExtractStridedMetadataOp::getAsmResultNames(
 LogicalResult LoadFromMemrefOp::verify() {
   RankedTensorType resultType = getResult().getType();
   MemRefType sourceType = getSource().getType();
-  if (failed(verifyCompatibleShape(resultType.getShape(),
-                                   sourceType.getShape())) ||
+  if (!llvm::equal(resultType.getShape(), sourceType.getShape()) ||
       resultType.getElementType() != sourceType.getElementType()) {
     return emitOpError("source and result shape and element type must match");
   }
@@ -95,8 +94,7 @@ void LoadFromMemrefOp::getEffects(
 LogicalResult StoreToMemrefOp::verify() {
   RankedTensorType valueType = getValue().getType();
   MemRefType targetType = getTarget().getType();
-  if (failed(
-          verifyCompatibleShape(valueType.getShape(), targetType.getShape())) ||
+  if (!llvm::equal(valueType.getShape(), targetType.getShape()) ||
       valueType.getElementType() != targetType.getElementType()) {
     return emitOpError("value and target shape and element type must match");
   }
