@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/TensorExt/Transforms/Transforms.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -199,7 +200,7 @@ void ConvertTensorToFlowPass::runOnOperation() {
   // fold `tensor.insert_slice/extract_slice` operations with
   // `iree_tensor_ext.dispatch.tensor.load/store`.
   RewritePatternSet foldExtractInsertSliceOps(context);
-  IREE::Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
+  IREE::TensorExt::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
       foldExtractInsertSliceOps, context);
   if (failed(applyPatternsGreedily(funcOp,
                                    std::move(foldExtractInsertSliceOps)))) {
