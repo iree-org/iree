@@ -435,7 +435,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
                      lowering_config = #config,
                      decomposition_config = {
                       qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_m_count = 2, subgroup_n_count = 1, promote_operands = [0, 1]}>},
-                      pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_m_count = 2, subgroup_n_count = 1, promote_operands = [1]}>}
+                      pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 1, promote_operands = [1]}>}
                      }}
                      ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) {
                       ^bb0(%score: f32):
@@ -460,8 +460,9 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK: transfer_read
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128
-// CHECK-SAME: -> (vector<2x1x4xf32>, vector<2x1x4xf32>, vector<2x4x1x1x4x1xf32>)
-// CHECK-COUNT-48:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-SAME: -> (vector<2x1x1xf32>, vector<2x1x1xf32>, vector<2x4x1x1x1x4xf32>)
+// CHECK-COUNT-32:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
@@ -509,7 +510,7 @@ hal.executable private @attention_mfma_32x32x16 {
                                                          lowering_config = #config,
                                                          decomposition_config = {
                                                           qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>, subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [0, 1]}>},
-                                                          pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>, subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1]}>}
+                                                          pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1]}>}
                                                          }}
         ins(%4, %5, %6, %cst : tensor<24x64x4608x128xf16>, tensor<24x4608x128xf16>, tensor<24x4608x128xf16>, f16) outs(%8 : tensor<24x64x4608x128xf16>) {
               ^bb0(%score: f32):
@@ -528,8 +529,9 @@ hal.executable private @attention_mfma_32x32x16 {
 
 // CHECK-LABEL: func.func @attention_mfma_32x32x16()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
-// CHECK-SAME: -> (vector<1x4x4xf32>, vector<1x4x4xf32>, vector<1x2x4x1x4x1xf32>)
-// CHECK-COUNT-24:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
+// CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x2x1x4x1x4xf32>)
+// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
+// CHECK-COUNT-8:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
