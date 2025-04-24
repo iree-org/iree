@@ -155,6 +155,8 @@ void buildGlobalOptimizationPassPipeline(
       });
 
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
+  mainPassManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
