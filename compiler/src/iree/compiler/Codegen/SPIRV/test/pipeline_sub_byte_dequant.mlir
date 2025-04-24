@@ -10,19 +10,19 @@ hal.executable @i4_dequant {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @i4_dequant layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @i4_dequant() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072x128xi4>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072xf32>>
-        %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<131072x128xf32>>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [131072, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<131072x128xi4>> -> tensor<131072x128xi4>
-        %5 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [131072], strides = [1] : !flow.dispatch.tensor<readonly:tensor<131072xf32>> -> tensor<131072xf32>
-        %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [131072], strides = [1] : !flow.dispatch.tensor<readonly:tensor<131072xf32>> -> tensor<131072xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<131072x128xi4>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<131072xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<131072xf32>>
+        %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<131072x128xf32>>
+        %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [131072, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<131072x128xi4>> -> tensor<131072x128xi4>
+        %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [131072], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<131072xf32>> -> tensor<131072xf32>
+        %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0], sizes = [131072], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<131072xf32>> -> tensor<131072xf32>
         %7 = tensor.empty() : tensor<131072x128xf32>
         %8 = linalg.generic {
                indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
@@ -35,7 +35,7 @@ hal.executable @i4_dequant {
           %12 = arith.mulf %11, %in_0 : f32
           linalg.yield %12 : f32
         } -> tensor<131072x128xf32>
-        flow.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [131072, 128], strides = [1, 1] : tensor<131072x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<131072x128xf32>>
+        iree_tensor_ext.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [131072, 128], strides = [1, 1] : tensor<131072x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<131072x128xf32>>
         return
       }
     }

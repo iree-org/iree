@@ -14,8 +14,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -42,9 +41,10 @@ struct BufferizeCopyOnlyDispatchesPass final
   using impl::BufferizeCopyOnlyDispatchesPassBase<
       BufferizeCopyOnlyDispatchesPass>::BufferizeCopyOnlyDispatchesPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
-                    IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    memref::MemRefDialect, tensor::TensorDialect>();
+    registry
+        .insert<affine::AffineDialect, bufferization::BufferizationDialect,
+                linalg::LinalgDialect, memref::MemRefDialect,
+                tensor::TensorDialect, IREE::TensorExt::IREETensorExtDialect>();
   }
 
   void runOnOperation() override;
@@ -54,19 +54,20 @@ struct BufferizeCopyOnlyDispatchesPass final
 void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   auto funcOp = getOperation();
 
-  /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
-  /// operations coming from `flow.dispatch.tensor.load` operations. If so,
-  /// this dispatch is just a copy dispatch.
-  bool hasFlowDispatchStore = false;
-  auto walkResult =
-      funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
-        hasFlowDispatchStore = true;
+  /// Check if the dispatch has all sources for
+  /// `iree_tensor_ext.dispatch.tensor.store` operations coming from
+  /// `iree_tensor_ext.dispatch.tensor.load` operations. If so, this dispatch is
+  /// just a copy dispatch.
+  bool hasDispatchStore = false;
+  auto walkResult = funcOp.walk(
+      [&](IREE::TensorExt::DispatchTensorStoreOp storeOp) -> WalkResult {
+        hasDispatchStore = true;
         return success(isReadOnly(storeOp.getValue()));
       });
   if (walkResult.wasInterrupted())
     return;
   // The function is just a copy and is not yet bufferized.
-  if (!hasFlowDispatchStore)
+  if (!hasDispatchStore)
     return;
 
   // Apply the bufferization passes.

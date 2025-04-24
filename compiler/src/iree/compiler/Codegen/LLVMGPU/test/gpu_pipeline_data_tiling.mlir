@@ -14,17 +14,17 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
       hal.executable.export public @export ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device):
-        %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
         func.func @set_encoding() {
           %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32768x1280xi8>>
-          %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32768x1280xi8, #encoding>>
-          %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32768, 1280], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32768x1280xi8>> -> tensor<32768x1280xi8>
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32768x1280xi8>>
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32768x1280xi8, #encoding>>
+          %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32768, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32768x1280xi8>> -> tensor<32768x1280xi8>
           %3 = iree_encoding.set_encoding %2 : tensor<32768x1280xi8> -> tensor<32768x1280xi8, #encoding>
-          flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [32768, 1280], strides = [1, 1] : tensor<32768x1280xi8, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<32768x1280xi8, #encoding>>
+          iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [32768, 1280], strides = [1, 1] : tensor<32768x1280xi8, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32768x1280xi8, #encoding>>
           return
         }
       }

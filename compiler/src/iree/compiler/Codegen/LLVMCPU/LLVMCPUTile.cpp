@@ -22,6 +22,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile"
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -49,7 +50,7 @@ struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
 
 void LLVMCPUTilePass::runOnOperation() {
   if (tilingLevel == -1) {
-    LLVM_DEBUG(llvm::dbgs() << "tilingLevel not set, skip tiling\n");
+    LDBG("tilingLevel not set, skip tiling");
     return;
   }
   MLIRContext *context = &getContext();
@@ -59,7 +60,7 @@ void LLVMCPUTilePass::runOnOperation() {
   FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
       getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(rootLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
+    LDBG("can't find lowering_config, skip tiling");
     return;
   }
 
@@ -75,7 +76,7 @@ void LLVMCPUTilePass::runOnOperation() {
     if (isa<tensor::PadOp>(computeOp))
       continue;
 
-    LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
+    LDBG("candidate: " << op);
     SmallVector<int64_t> tileSizes;
     SmallVector<bool> tileScalableFlags;
     if (auto loweringConfig =
@@ -89,7 +90,7 @@ void LLVMCPUTilePass::runOnOperation() {
     }
 
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
-      LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
+      LDBG("tiling sizes are all zeros, skip tiling");
       continue;
     }
 
@@ -112,7 +113,7 @@ void LLVMCPUTilePass::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
+    LDBG("----- cleanup failed -----");
     return signalPassFailure();
   }
 }

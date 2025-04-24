@@ -352,6 +352,8 @@ def GenericVectorizationPass :
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
       "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+    Option<"vectorizeToTransferGather", "vectorize-to-transfer-gather", "bool", /*default=*/"false",
+      "Enables vectorization of gather-like operations that may generate iree_vector_ext.transfer_gather">,
     Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",
       "Enable cleanups after vectorization. The patterns touch the structure"
       "generated from tiling so it affects later steps like bufferization and vector hoisting.">,
@@ -421,6 +423,8 @@ def IREEExpandStridedMetadataPass :
     Pass<"iree-codegen-expand-strided-metadata", ""> {
   let summary = "Resolve memref.extract_strided_metadata operations";
   let options = [
+    Option<"allowSubviewExpansion", "allow-subview-expansion", "bool", /*default=*/"false",
+           "Enables expansion of memref.subview ops">,
     Option<"allowUnresolved", "allow-unresolved", "bool", /*default=*/"false",
            "Allow unresolved strided metadata op (for testing)">,
   ];
@@ -491,7 +495,7 @@ def MaterializeEncodingIntoPaddingPass :
   let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
   let description = [{
     Handles padding introduced by `pad_encoding_layout` encoding layouts, which
-    requires `flow.dispatch.tensor.load`/`.store` to be adjusted to account for
+    requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
     padding regions.
     Materializes any other encoding layouts into nop.
   }];

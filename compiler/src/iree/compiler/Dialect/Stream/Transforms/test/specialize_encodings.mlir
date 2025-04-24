@@ -507,7 +507,7 @@ stream.executable private @executable {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: index) {
       %c0 = arith.constant 0 : index
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<16xf32, #encoding>>
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16xf32, #encoding>>
       return
     }
   }
@@ -543,8 +543,8 @@ stream.executable private @ex {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %1 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
-      %2 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
+      %1 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
+      %2 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
       return
     }
   }
@@ -590,8 +590,8 @@ stream.executable private @ex {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %1 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
-      %2 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
+      %1 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
+      %2 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32, #encoding>>
       return
     }
   }
@@ -644,13 +644,13 @@ stream.executable private @ex {
   builtin.module {
     func.func @set_encoding(%arg0: !stream.binding, %arg1: index, %arg2: index, %arg3: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %0 = flow.dispatch.workload.ordinal %arg1, 0 : index
-      %1 = flow.dispatch.workload.ordinal %arg2, 1 : index
-      %2 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
-      %3 = stream.binding.subspan %arg3[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
-      %4 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
+      %0 = iree_tensor_ext.dispatch.workload.ordinal %arg1, 0 : index
+      %1 = iree_tensor_ext.dispatch.workload.ordinal %arg2, 1 : index
+      %2 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
+      %3 = stream.binding.subspan %arg3[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
+      %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
       %5 = iree_encoding.set_encoding %4 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-      flow.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
+      iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
       return
     }
   }
@@ -677,13 +677,13 @@ util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %
 // CHECK-SAME:        %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG3:[a-zA-Z0-9]+]]
 // CHECK:           %[[SRC_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>
 // CHECK:           %[[DEST_BINDING:.+]] = stream.binding.subspan %[[ARG3]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[DEVICE_A_ENCODING]]>
-// CHECK:           %[[SRC:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #[[DEVICE_A_ENCODING]]>
+// CHECK:           %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BINDING]]
 // CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
 // CHECK-SAME:         tensor<?x?xf32> -> tensor<?x?xf32, #[[ORIG_ENCODING]]>
-// CHECK:           flow.dispatch.tensor.store %[[SET_ENCODING]], %[[DEST_BINDING]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[SET_ENCODING]], %[[DEST_BINDING]]
 // CHECK:       stream.executable private @[[$EX1:.+]] {
 // CHECK:         func.func @set_encoding(
 // CHECK-SAME:        %[[ARG0:[a-zA-Z0-9]+]]
@@ -691,13 +691,13 @@ util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %
 // CHECK-SAME:        %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG3:[a-zA-Z0-9]+]]
 // CHECK:           %[[SRC_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>
 // CHECK:           %[[DEST_BINDING:.+]] = stream.binding.subspan %[[ARG3]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[DEVICE_B_ENCODING]]>
-// CHECK:           %[[SRC:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #[[DEVICE_B_ENCODING]]>
+// CHECK:           %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BINDING]]
 // CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
 // CHECK-SAME:         tensor<?x?xf32> -> tensor<?x?xf32, #[[ORIG_ENCODING]]>
-// CHECK:           flow.dispatch.tensor.store %[[SET_ENCODING]], %[[DEST_BINDING]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[SET_ENCODING]], %[[DEST_BINDING]]
 // CHECK-LABEL: util.func public @multi_device_set_encoding
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@set_encoding
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@set_encoding
@@ -719,13 +719,13 @@ stream.executable private @ex {
   builtin.module {
     func.func @unset_encoding(%arg0: !stream.binding, %arg1: index, %arg2: index, %arg3: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %0 = flow.dispatch.workload.ordinal %arg1, 0 : index
-      %1 = flow.dispatch.workload.ordinal %arg2, 1 : index
-      %2 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%0, %1}
-      %3 = stream.binding.subspan %arg3[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
-      %4 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%0, %1} -> tensor<?x?xf32, #encoding>
+      %0 = iree_tensor_ext.dispatch.workload.ordinal %arg1, 0 : index
+      %1 = iree_tensor_ext.dispatch.workload.ordinal %arg2, 1 : index
+      %2 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%0, %1}
+      %3 = stream.binding.subspan %arg3[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
+      %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%0, %1} -> tensor<?x?xf32, #encoding>
       %5 = iree_encoding.unset_encoding %4 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%0, %1}
-      flow.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
+      iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
       return
     }
   }
@@ -751,15 +751,15 @@ util.func public @multi_device_unset_encoding(%arg0: !stream.resource<external>,
 // CHECK-SAME:        %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG3:[a-zA-Z0-9]+]]
 // CHECK:           %[[SRC_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_ENCODING]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_ENCODING]]>>
 // CHECK:           %[[DEST_BINDING:.+]] = stream.binding.subspan %[[ARG3]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
-// CHECK:           %[[SRC:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_ENCODING]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>
+// CHECK:           %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_A_ENCODING]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_ENCODING]]>
 // CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[SRC]]
 // CHECK-SAME:         tensor<?x?xf32, #[[ORIG_ENCODING]]> -> tensor<?x?xf32>
-// CHECK:           flow.dispatch.tensor.store %[[UNSET_ENCODING]], %[[DEST_BINDING]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[UNSET_ENCODING]], %[[DEST_BINDING]]
 // CHECK:       stream.executable private @[[$EX1:.+]] {
 // CHECK:         func.func @unset_encoding(
 // CHECK-SAME:        %[[ARG0:[a-zA-Z0-9]+]]
@@ -767,15 +767,15 @@ util.func public @multi_device_unset_encoding(%arg0: !stream.resource<external>,
 // CHECK-SAME:        %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG3:[a-zA-Z0-9]+]]
 // CHECK:           %[[SRC_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_ENCODING]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_ENCODING]]>>
 // CHECK:           %[[DEST_BINDING:.+]] = stream.binding.subspan %[[ARG3]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
-// CHECK:           %[[SRC:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_ENCODING]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>
+// CHECK:           %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SRC_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[DEVICE_B_ENCODING]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_ENCODING]]>
 // CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[SRC]]
 // CHECK-SAME:         tensor<?x?xf32, #[[ORIG_ENCODING]]> -> tensor<?x?xf32>
-// CHECK:           flow.dispatch.tensor.store %[[UNSET_ENCODING]], %[[DEST_BINDING]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[UNSET_ENCODING]], %[[DEST_BINDING]]
 // CHECK-LABEL: util.func public @multi_device_unset_encoding
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@unset_encoding
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@unset_encoding
@@ -804,19 +804,19 @@ stream.executable private @ex {
     func.func @gemm(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !stream.binding) {
       %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
-      %0 = flow.dispatch.workload.ordinal %arg2, 0 : index
-      %1 = flow.dispatch.workload.ordinal %arg3, 1 : index
-      %2 = flow.dispatch.workload.ordinal %arg4, 2 : index
-      %3 = flow.dispatch.workload.ordinal %arg5, 3 : index
-      %4 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%2, %0}
-      %5 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding1>>{%1, %3}
-      %6 = stream.binding.subspan %arg6[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding2>>{%2, %3}
-      %7 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%2, %0], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%2, %0} -> tensor<?x?xf32, #encoding>
-      %8 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%1, %3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding1>>{%1, %3} -> tensor<?x?xf32, #encoding1>
+      %0 = iree_tensor_ext.dispatch.workload.ordinal %arg2, 0 : index
+      %1 = iree_tensor_ext.dispatch.workload.ordinal %arg3, 1 : index
+      %2 = iree_tensor_ext.dispatch.workload.ordinal %arg4, 2 : index
+      %3 = iree_tensor_ext.dispatch.workload.ordinal %arg5, 3 : index
+      %4 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%2, %0}
+      %5 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding1>>{%1, %3}
+      %6 = stream.binding.subspan %arg6[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding2>>{%2, %3}
+      %7 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%2, %0], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding>>{%2, %0} -> tensor<?x?xf32, #encoding>
+      %8 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%1, %3], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding1>>{%1, %3} -> tensor<?x?xf32, #encoding1>
       %9 = tensor.empty(%2, %3) : tensor<?x?xf32, #encoding2>
       %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x?xf32, #encoding2>) -> tensor<?x?xf32, #encoding2>
       %11 = linalg.matmul ins(%7, %8 : tensor<?x?xf32, #encoding>, tensor<?x?xf32, #encoding1>) outs(%10 : tensor<?x?xf32, #encoding2>) -> tensor<?x?xf32, #encoding2>
-      flow.dispatch.tensor.store %11, %6, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xf32, #encoding2> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding2>>{%2, %3}
+      iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xf32, #encoding2> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding2>>{%2, %3}
       return
     }
   }
@@ -864,23 +864,23 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // CHECK-SAME:        %[[ARG5:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG6:[a-zA-Z0-9]+]]
 // CHECK:           %[[LHS_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK:           %[[RHS_BINDING:.+]] = stream.binding.subspan %[[ARG1]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK:           %[[OUT_BINDING:.+]] = stream.binding.subspan %[[ARG6]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING_123]]>>
-// CHECK:           %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING_123]]>>
+// CHECK:           %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_LHS_ENCODING]]>
-// CHECK:           %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
+// CHECK:           %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_123]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_RHS_ENCODING]]>
 // CHECK:           %[[INIT:.+]] = tensor.empty({{.+}}) : tensor<?x?xf32, #[[ORIG_OUT_ENCODING]]>
 // CHECK:           %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]
 // CHECK:           %[[MATMUL:.+]] = linalg.matmul
 // CHECK-SAME:        ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:        outs(%[[FILL]]
-// CHECK:           flow.dispatch.tensor.store %[[MATMUL]], %[[OUT_BINDING]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[MATMUL]], %[[OUT_BINDING]]
 // CHECK:       stream.executable private @[[$EX1:.+]] {
 // CHECK:         func.func @gemm(
 // CHECK-SAME:        %[[ARG0:[a-zA-Z0-9]+]]
@@ -891,23 +891,23 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // CHECK-SAME:        %[[ARG5:[a-zA-Z0-9]+]]
 // CHECK-SAME:        %[[ARG6:[a-zA-Z0-9]+]]
 // CHECK:           %[[LHS_BINDING:.+]] = stream.binding.subspan %[[ARG0]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK:           %[[RHS_BINDING:.+]] = stream.binding.subspan %[[ARG1]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK:           %[[OUT_BINDING:.+]] = stream.binding.subspan %[[ARG6]]
-// CHECK-SAME:        !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING_456]]>>
-// CHECK:           %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #[[ENCODING_456]]>>
+// CHECK:           %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_LHS_ENCODING]]>
-// CHECK:           %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
-// CHECK-SAME:        !flow.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
+// CHECK:           %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+// CHECK-SAME:        !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #[[ENCODING_456]]>>
 // CHECK-SAME:        -> tensor<?x?xf32, #[[ORIG_RHS_ENCODING]]>
 // CHECK:           %[[INIT:.+]] = tensor.empty({{.+}}) : tensor<?x?xf32, #[[ORIG_OUT_ENCODING]]>
 // CHECK:           %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]
 // CHECK:           %[[MATMUL:.+]] = linalg.matmul
 // CHECK-SAME:        ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:        outs(%[[FILL]]
-// CHECK:           flow.dispatch.tensor.store %[[MATMUL]], %[[OUT_BINDING]]
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[MATMUL]], %[[OUT_BINDING]]
 // CHECK-LABEL: util.func public @multi_device_gemm
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX0]]::@gemm
 // CHECK:         stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX1]]::@gemm
@@ -926,8 +926,8 @@ stream.executable private @executable {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: index, %arg2: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4x?xf32>>{%arg1}
-      %1 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1}
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xf32>>{%arg1}
+      %1 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1}
       return
     }
   }
@@ -944,8 +944,8 @@ util.func public @tensor_dispatch_with_unknown_and_serialized_encodings(%arg0: !
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK-DAG:       stream.binding.subspan %[[ARG0]]{{.+}} !flow.dispatch.tensor<readonly:tensor<4x?xf32>>
-// CHECK-DAG:       stream.binding.subspan %[[ARG2]]{{.+}} !flow.dispatch.tensor<writeonly:tensor<4x?xf32, #[[$SERIALIZED_ENCODING]]>>
+// CHECK-DAG:       stream.binding.subspan %[[ARG0]]{{.+}} !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xf32>>
+// CHECK-DAG:       stream.binding.subspan %[[ARG2]]{{.+}} !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32, #[[$SERIALIZED_ENCODING]]>>
 // CHECK-LABEL: util.func public @tensor_dispatch_with_unknown_and_serialized_encodings(
 // CHECK:         stream.tensor.dispatch
 // CHECK:           tensor<4x?xf32, #[[$UNKNOWN_ENCODING]]>
@@ -966,8 +966,8 @@ stream.executable private @executable {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: index, %arg2: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4x?xf32>>{%arg1}
-      %1 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1}
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xf32>>{%arg1}
+      %1 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1}
       return
     }
   }
@@ -984,8 +984,8 @@ util.func public @tensor_dispatch_with_unknown_and_unserialized_encodings(%arg0:
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK-DAG:       stream.binding.subspan %[[ARG0]]{{.+}} !flow.dispatch.tensor<readonly:tensor<4x?xf32>>
-// CHECK-DAG:       stream.binding.subspan %[[ARG2]]{{.+}} !flow.dispatch.tensor<writeonly:tensor<4x?xf32, #[[$SERIALIZED_ENCODING]]>>
+// CHECK-DAG:       stream.binding.subspan %[[ARG0]]{{.+}} !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xf32>>
+// CHECK-DAG:       stream.binding.subspan %[[ARG2]]{{.+}} !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32, #[[$SERIALIZED_ENCODING]]>>
 // CHECK-LABEL: util.func public @tensor_dispatch_with_unknown_and_unserialized_encodings(
 // CHECK:         stream.tensor.dispatch
 // CHECK:           tensor<4x?xf32, #[[$UNKNOWN_ENCODING]]>

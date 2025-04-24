@@ -40,6 +40,15 @@ static LogicalResult splitReductionOnMatmul(
   SmallVector<NamedAttribute> prunedAttributeList =
       linalg::getPrunedAttributeList(op);
 
+  // Do not transform the matmul ops that have encoded operands.
+  auto hasEncoding = [](Type type) -> bool {
+    auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+    return rankedTensorType && rankedTensorType.getEncoding();
+  };
+  if (llvm::any_of(op.getOperandTypes(), hasEncoding)) {
+    return failure();
+  }
+
   FailureOr<linalg::SplitReductionResult> result =
       linalg::splitReduction(rewriter, op, controlSplitReductionFn);
   if (failed(result)) {

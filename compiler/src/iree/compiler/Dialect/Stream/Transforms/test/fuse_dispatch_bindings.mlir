@@ -23,15 +23,15 @@ stream.executable private @rebaseBindingsEx {
       %c20 = arith.constant 20 : index
 
       // CHECK: %[[SUBSPAN_A:.+]] = stream.binding.subspan %[[BINDING_A]][%[[OFFSET_A]]]
-      %subspan_a = stream.binding.subspan %binding_a[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
+      %subspan_a = stream.binding.subspan %binding_a[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_A]]
-      util.optimization_barrier %subspan_a : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
+      util.optimization_barrier %subspan_a : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>
 
       // CHECK: %[[SUM_OFFSET_B:.+]] = arith.addi %[[OFFSET_B]], %c20
       // CHECK-NEXT: %[[SUBSPAN_B:.+]] = stream.binding.subspan %[[BINDING_B]][%[[SUM_OFFSET_B]]]
-      %subspan_b = stream.binding.subspan %binding_b[%c20] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
+      %subspan_b = stream.binding.subspan %binding_b[%c20] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_B]]
-      util.optimization_barrier %subspan_b : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
+      util.optimization_barrier %subspan_b : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>
 
       // CHECK-NEXT: util.optimization_barrier %[[OPERAND]] : index
       util.optimization_barrier %operand : index
@@ -105,21 +105,21 @@ stream.executable private @deduplicateBindingsEx {
       %c40 = arith.constant 40 : index
 
       // CHECK: %[[SUBSPAN_A:.+]] = stream.binding.subspan %[[BINDING_A]][%[[OFFSET_A]]]
-      %subspan_a = stream.binding.subspan %binding_a[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
+      %subspan_a = stream.binding.subspan %binding_a[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_A]]
-      util.optimization_barrier %subspan_a : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
+      util.optimization_barrier %subspan_a : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>
 
       // CHECK: %[[SUM_OFFSET_B:.+]] = arith.addi %[[OFFSET_B]], %c20
       // CHECK-NEXT: %[[SUBSPAN_B:.+]] = stream.binding.subspan %[[BINDING_B]][%[[SUM_OFFSET_B]]]
-      %subspan_b = stream.binding.subspan %binding_b[%c20] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
+      %subspan_b = stream.binding.subspan %binding_b[%c20] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_B]]
-      util.optimization_barrier %subspan_b : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
+      util.optimization_barrier %subspan_b : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>
 
       // CHECK: %[[SUM_OFFSET_C:.+]] = arith.addi %[[OFFSET_C]], %c40
       // CHECK-NEXT: %[[SUBSPAN_C:.+]] = stream.binding.subspan %[[BINDING_A]][%[[SUM_OFFSET_C]]]
-      %subspan_c = stream.binding.subspan %binding_c[%c40] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
+      %subspan_c = stream.binding.subspan %binding_c[%c40] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_C]]
-      util.optimization_barrier %subspan_c : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
+      util.optimization_barrier %subspan_c : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<20xi8>>
 
       // CHECK-NEXT: util.optimization_barrier %[[OPERAND]] : index
       util.optimization_barrier %operand : index

@@ -355,7 +355,7 @@ hal.executable private @argument_with_assume {
         %arg_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
         %arg_index = arith.index_cast %arg_i32 : i32 to index
         %arg = util.assume.int %arg_index[<umin=0, umax=4>, <umin=4, umax=7>] : index
-        %ordinal = flow.dispatch.workload.ordinal %arg, 0 : index
+        %ordinal = iree_tensor_ext.dispatch.workload.ordinal %arg, 0 : index
         // CHECK-NOT: scf.for
         //     CHECK: gpu.barrier
         scf.for %arg3 = %ordinal to %c8 step %c8 {
