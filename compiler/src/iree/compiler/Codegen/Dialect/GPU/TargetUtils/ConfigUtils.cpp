@@ -208,39 +208,39 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // as finding padding bounds for dynamic dimensions is not guaranteed.
   // TODO (nirvedhmeshram) : Add support so that we can find the bounds
   // information.
-  bool canSupportUnAligned = true;
+  bool canSupportUnaligned = true;
 
   // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
   // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
   // computing an MMA schedule.
   SmallVector<int64_t> mDims, nDims, kDims, batchDims;
   for (int64_t mDim : contractionDims.m) {
-    if (!ShapedType::isDynamic(bounds[mDim])) {
-      mDims.push_back(mDim);
-    } else {
-      canSupportUnAligned = false;
+    if (ShapedType::isDynamic(bounds[mDim])) {
+      canSupportUnaligned = false;
+      continue;
     }
+    mDims.push_back(mDim);
   }
   for (int64_t nDim : contractionDims.n) {
-    if (!ShapedType::isDynamic(bounds[nDim])) {
-      nDims.push_back(nDim);
-    } else {
-      canSupportUnAligned = false;
+    if (ShapedType::isDynamic(bounds[nDim])) {
+      canSupportUnaligned = false;
+      continue;
     }
+    nDims.push_back(nDim);
   }
   for (int64_t kDim : contractionDims.k) {
-    if (!ShapedType::isDynamic(bounds[kDim])) {
-      kDims.push_back(kDim);
-    } else {
-      canSupportUnAligned = false;
+    if (ShapedType::isDynamic(bounds[kDim])) {
+      canSupportUnaligned = false;
+      continue;
     }
+    kDims.push_back(kDim);
   }
 
   for (int64_t batchDim : contractionDims.batch) {
     if (!ShapedType::isDynamic(bounds[batchDim])) {
       batchDims.push_back(batchDim);
     } else {
-      canSupportUnAligned = false;
+      canSupportUnaligned = false;
     }
   }
 
@@ -280,7 +280,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // the GEMM is accumulating (i.e doesnt have a zero fill dpsInit) as that
   // buffer currently gets materialized as private memory. We need to add
   // missing patterns to fix that.
-  if (!schedule && canSupportUnAligned) {
+  if (!schedule && canSupportUnaligned) {
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
     doCPromotion = true;
