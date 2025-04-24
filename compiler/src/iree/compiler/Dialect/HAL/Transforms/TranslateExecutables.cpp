@@ -58,7 +58,8 @@ struct TranslateTargetExecutableVariantsPass
 
     auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {
-      variantOp.emitError() << "unregistered target backend '" << target << "'";
+      emitError(variantOp->getLoc())
+          << "unregistered target backend '" << target << "'";
       return signalPassFailure();
     }
 
