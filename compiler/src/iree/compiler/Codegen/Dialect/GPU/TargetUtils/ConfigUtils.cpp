@@ -204,8 +204,8 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       ShapedType::isDynamic(bounds[contractionDims.k.back()])) {
     return failure();
   }
-  // we can support unaligned shapes as long as there are no dynamic dimensions
-  // as finding padding bounds for dynamic dimensions is not gauranted.
+  // We can support unaligned shapes as long as there are no dynamic dimensions
+  // as finding padding bounds for dynamic dimensions is not guaranteed.
   // TODO (nirvedhmeshram) : Add support so that we can find the bounds
   // information.
   bool canSupportUnAligned = true;
