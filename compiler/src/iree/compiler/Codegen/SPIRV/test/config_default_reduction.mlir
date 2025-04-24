@@ -16,9 +16,9 @@
 func.func @subgroup_reduce_f32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x512xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
-  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x512xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
   %3 = tensor.empty() : tensor<2xf32>
   %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2xf32>) -> tensor<2xf32>
   %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<2x512xf32>) outs(%4 : tensor<2xf32>) {
@@ -26,7 +26,7 @@ func.func @subgroup_reduce_f32() attributes {hal.executable.target = #executable
     %6 = arith.addf %out, %in : f32
     linalg.yield %6 : f32
   } -> tensor<2xf32>
-  flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2xf32>>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
   return
 }
 
@@ -55,9 +55,9 @@ func.func @subgroup_reduce_f32() attributes {hal.executable.target = #executable
 func.func @subgroup_reduce_f16() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x4096x4096xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16x4096x4096xf16>>
-  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 4096, 4096], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x4096x4096xf16>> -> tensor<16x4096x4096xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x4096x4096xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x4096x4096xf16>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 4096, 4096], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x4096x4096xf16>> -> tensor<16x4096x4096xf16>
   %3 = tensor.empty() : tensor<16x4096x4096xf16>
   %4 = tensor.empty() : tensor<16x4096xf16>
   %5 = linalg.fill ins(%cst : f16) outs(%4 : tensor<16x4096xf16>) -> tensor<16x4096xf16>
@@ -71,7 +71,7 @@ func.func @subgroup_reduce_f16() attributes {hal.executable.target = #executable
     %8 = arith.divf %in, %in_0 : f16
     linalg.yield %8 : f16
   } -> tensor<16x4096x4096xf16>
-  flow.dispatch.tensor.store %7, %1, offsets = [0, 0, 0], sizes = [16, 4096, 4096], strides = [1, 1, 1] : tensor<16x4096x4096xf16> -> !flow.dispatch.tensor<writeonly:tensor<16x4096x4096xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %1, offsets = [0, 0, 0], sizes = [16, 4096, 4096], strides = [1, 1, 1] : tensor<16x4096x4096xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x4096x4096xf16>>
   return
 }
 
@@ -110,10 +110,10 @@ func.func @subgroup_reduce_dynamic() attributes {hal.executable.target = #execut
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8xf32>>
-  %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8x?xf32>>{%8}
-  %10 = flow.dispatch.tensor.load %9, offsets = [0, 0], sizes = [8, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x?xf32>>{%8} -> tensor<8x?xf32>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xf32>>
+  %8 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x?xf32>>{%8}
+  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0, 0], sizes = [8, %8], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x?xf32>>{%8} -> tensor<8x?xf32>
   %11 = tensor.empty() : tensor<8xf32>
   %12 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%11 : tensor<8xf32>) -> tensor<8xf32>
   %13 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%10 : tensor<8x?xf32>) outs(%12 : tensor<8xf32>) attrs =  {lowering_config = #config} {
@@ -122,7 +122,7 @@ func.func @subgroup_reduce_dynamic() attributes {hal.executable.target = #execut
     %15 = arith.addf %14, %out : f32
     linalg.yield %15 : f32
   } -> tensor<8xf32>
-  flow.dispatch.tensor.store %13, %7, offsets = [0], sizes = [8], strides = [1] : tensor<8xf32> -> !flow.dispatch.tensor<writeonly:tensor<8xf32>>
+  iree_tensor_ext.dispatch.tensor.store %13, %7, offsets = [0], sizes = [8], strides = [1] : tensor<8xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xf32>>
   return
 }
 

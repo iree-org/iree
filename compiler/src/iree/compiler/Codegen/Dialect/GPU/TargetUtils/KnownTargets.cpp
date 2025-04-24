@@ -141,13 +141,8 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 //===----------------------------------------------------------------------===//
 
 const WgpDetails *getCDNA3WgpDetails() {
+  // Note: these operations are listed in order of preference.
   static const MMAIntrinsic cdna3MMAOps[] = {
-      // Introduced in CDNA1, still present in CDNA3
-      MMAIntrinsic::MFMA_F32_16x16x4_F32,
-      MMAIntrinsic::MFMA_F32_16x16x16_F16,
-      MMAIntrinsic::MFMA_F32_32x32x8_F16,
-      // Introduced in CDNA2, still present in CDNA3
-      MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA3
       MMAIntrinsic::MFMA_F32_16x16x16_BF16,
       MMAIntrinsic::MFMA_F32_32x32x8_BF16,
@@ -161,6 +156,12 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
+      // Introduced in CDNA2, still present in CDNA3
+      MMAIntrinsic::MFMA_F64_16x16x4_F64,
+      // Introduced in CDNA1, still present in CDNA3
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
+      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_32x32x8_F16,
   };
   static const WgpDetails cdna3Wgp = {allComputeBits,
                                       allStorageBits,
@@ -181,16 +182,16 @@ const WgpDetails *getCDNA3WgpDetails() {
 
 const WgpDetails *getCDNA2WgpDetails() {
   static const MMAIntrinsic cdna2MMAOps[] = {
+      // Introduced in CDNA2
+      MMAIntrinsic::MFMA_F32_16x16x8_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4_BF16,
+      MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
       MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
-      // Introduced in CDNA2
-      MMAIntrinsic::MFMA_F32_16x16x8_BF16,
-      MMAIntrinsic::MFMA_F32_32x32x4_BF16,
-      MMAIntrinsic::MFMA_F64_16x16x4_F64,
   };
   static const WgpDetails cdna2Wgp = {allComputeBits,
                                       allStorageBits,

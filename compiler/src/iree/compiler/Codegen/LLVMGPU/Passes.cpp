@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -35,6 +36,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -229,7 +231,8 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 }
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
-                                      bool vectorizeCopies = true) {
+                                      bool vectorizeCopies = true,
+                                      bool enableMasking = false) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -243,6 +246,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
+  options.enableVectorMasking = enableMasking;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -351,13 +355,13 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 /// only DispatchTensorStoreOp consumers.
 LogicalResult isAtBoundary(Operation *op) {
   if (isa<linalg::PackOp>(op)) {
-    if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
+    if (isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp>(
             op->getOperand(0).getDefiningOp())) {
       return success();
     }
   } else if (isa<linalg::UnPackOp>(op)) {
     if (llvm::all_of(op->getUsers(), [](Operation *user) {
-          return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+          return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
         })) {
       return success();
     }
@@ -476,7 +480,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 6. Lower special ops and vectorize.
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
-  addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false);
+  addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false,
+                            /*enableMasking=*/true);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueBarriersPass());
 
@@ -1040,6 +1045,12 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       // full complexity.
       .addPass(createVectorTransferLoweringPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
+      // Resolve swizzling hints before lowering affine ops but after
+      // lowering vector (transfer) ops.
+      .addPass(createResolveSwizzleHintsPass)
+      // Canonicalize and CSE to attempt to deduplicate swizzle computation.
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createPropagateDispatchSizeBoundsPass)
       // Hoist loop invariant variables to give affine decomposition pass the
@@ -1098,7 +1109,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass(createExpandGPUOpsPass);
+      .addPass(createExpandGPUOpsPass)
+      // Barrier elimination before we reach unstructured control flow.
+      .addPass(createGpuEliminateBarriers);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1119,7 +1132,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createIREEExpandStridedMetadataPass)
+      .addPass([]() {
+        IREEExpandStridedMetadataPassOptions options;
+        options.allowSubviewExpansion = true;
+        return createIREEExpandStridedMetadataPass(options);
+      })
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);

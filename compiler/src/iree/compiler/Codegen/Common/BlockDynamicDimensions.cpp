@@ -360,6 +360,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+    tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
     linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                 context);
     // Add some additional patterns that can simplify the IR and remove dead
@@ -389,6 +390,9 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
+    // Add patterns to fold the remaining reshape operation with their interface
+    // bindings or `tensor.empty` operations.
+    populateReshapeToInterfaceTensorPatterns(removeBarrierOpsPatterns);
     tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
     linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                 context);

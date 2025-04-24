@@ -406,6 +406,27 @@ struct GPUHostEncodingLayoutResolverAttrInterface final
   }
 };
 
+struct GPUPadDeviceEncodingLayoutAttrInterface final
+    : Codegen::LayoutAttrInterface::ExternalModel<
+          GPUPadDeviceEncodingLayoutAttrInterface, GPUPadLayoutAttr> {
+
+  // TODO(#20160): Do not implement the interface method because it is
+  // data-tiling specific. It is a workaround to reuse encoding materialization
+  // patterns, because we query types from the method in the conversion. We
+  // should really move them to interface methods, then we can delete the
+  // workaround.
+  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
+                                          RankedTensorType type) const {
+    return MaterializeEncodingInfo{};
+  }
+
+  Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
+                     TypeRange convertedResTypes,
+                     ValueRange convertedOperands) const {
+    return clone(b, op, convertedResTypes, convertedOperands);
+  }
+};
+
 struct GPUPadEncodingLayoutResolverAttrInterface final
     : Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
           GPUPadEncodingLayoutResolverAttrInterface, GPUPadLayoutAttr> {
@@ -416,7 +437,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     std::optional<IREE::GPU::L1CacheInfo> cache =
         IREE::GPU::getL1CacheInfo(gpuTarget);
     if (!cache) {
-      return IREE::Encoding::IdentityEncodingAttr::get(ctx);
+      return IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
     }
     return GPUPadLayoutAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
   }
@@ -535,6 +556,7 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
             GPUHostEncodingLayoutResolverAttrInterface,
             GPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<
+            GPUPadDeviceEncodingLayoutAttrInterface,
             GPUPadEncodingLayoutResolverAttrInterface>(*ctx);
       });
 }

@@ -965,9 +965,9 @@ static iree_status_t iree_hal_hip_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  return iree_hal_hip_event_semaphore_create(initial_value, device->hip_symbols,
-                                             device->host_allocator,
-                                             out_semaphore);
+  return iree_hal_hip_event_semaphore_create(
+      initial_value, device->hip_symbols, device->host_allocator,
+      iree_hal_hip_device_make_topology(device), out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -1176,7 +1176,8 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     status = iree_hal_hip_semaphore_create_event_and_record_if_necessary(
         signal_semaphore_list.semaphores[i],
-        signal_semaphore_list.payload_values[i], stream,
+        signal_semaphore_list.payload_values[i],
+        &device->devices[device_ordinal], stream,
         device->devices[device_ordinal].device_event_pool);
     if (!iree_status_is_ok(status)) {
       break;
@@ -1244,10 +1245,9 @@ static iree_status_t iree_hal_hip_device_stream_wait_for_semaphores(
     IREE_TRACE_ZONE_BEGIN_NAMED(
         z1, "iree_hal_hip_device_stream_wait_for_semaphores_get_hip_event");
     iree_hal_hip_event_t* event = NULL;
-    status = iree_hal_hip_semaphore_get_hip_event(
+    status = iree_hal_hip_semaphore_wait_hip_events(
         wait_semaphore_list.semaphores[i],
-        wait_semaphore_list.payload_values[i],
-        device->devices[device_ordinal].device_event_pool, &event);
+        wait_semaphore_list.payload_values[i], stream);
     if (!iree_status_is_ok(status)) {
       IREE_TRACE_ZONE_END(z1);
       break;
@@ -1549,6 +1549,12 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
     }
 
     if (iree_status_is_ok(status)) {
+      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+        iree_hal_hip_semaphore_for_exported_timepoints(
+            signal_semaphore_list.semaphores[i],
+            signal_semaphore_list.payload_values[i]);
+      }
+
       *out_buffer = buffer;
     } else {
       if (buffer) {
@@ -1636,6 +1642,14 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
       }
     } else {
       iree_hal_hip_device_destroy_buffer_callback_data(callback_data);
+    }
+
+    if (iree_status_is_ok(status)) {
+      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+        iree_hal_hip_semaphore_for_exported_timepoints(
+            signal_semaphore_list.semaphores[i],
+            signal_semaphore_list.payload_values[i]);
+      }
     }
 
     IREE_TRACE_ZONE_END(z0);
@@ -2080,6 +2094,14 @@ static iree_status_t iree_hal_hip_device_queue_read(
   } else {
     iree_hal_hip_device_destroy_queue_read_callback_data(callback_data);
   }
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      iree_hal_hip_semaphore_for_exported_timepoints(
+          signal_semaphore_list.semaphores[i],
+          signal_semaphore_list.payload_values[i]);
+    }
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -2105,6 +2127,12 @@ static iree_status_t iree_hal_hip_device_queue_write(
               base_device, queue_affinity, wait_semaphore_list,
               signal_semaphore_list, source_buffer, source_offset, target_file,
               target_offset, length, flags, options));
+
+  for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+    iree_hal_hip_semaphore_for_exported_timepoints(
+        signal_semaphore_list.semaphores[i],
+        signal_semaphore_list.payload_values[i]);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return loop_status;
@@ -2423,6 +2451,14 @@ static iree_status_t iree_hal_hip_device_queue_execute(
     }
   } else {
     iree_hal_hip_device_destroy_callback_data(callback_data);
+  }
+
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+      iree_hal_hip_semaphore_for_exported_timepoints(
+          signal_semaphore_list.semaphores[i],
+          signal_semaphore_list.payload_values[i]);
+    }
   }
 
   IREE_TRACE_ZONE_END(z0);

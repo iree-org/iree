@@ -27,6 +27,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/CommandLine.h"
@@ -553,7 +554,8 @@ checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
 
   // TODO(pashu123): Check for multiple stores.
   entryPoint.walk([&](Operation *op) {
-    if (auto firstStore = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(op)) {
+    if (auto firstStore =
+            dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
       numStores += 1;
       if (numStores > 1) {
         return WalkResult::interrupt();
@@ -2480,14 +2482,28 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   if (numDynamicDims > 0) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
     int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
-    reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
+    // We should set the subgroup size on:
+    // Priority 1: The innermost reduction dimension with static shapes.
+    // Priority 2: If there's no reduction dimension with static shapes
+    // then the innermost reduction dim.
+    unsigned lastNonDynamicReductionDim = reductionDims.back();
+    if (reductionDims.size() > 1) {
+      for (unsigned dim : reductionDims) {
+        if (ShapedType::isDynamic(bounds[dim])) {
+          reductionTileSizes[dim] = 1;
+        } else {
+          lastNonDynamicReductionDim = dim;
+        }
+      }
+    }
+    reductionTileSizes[lastNonDynamicReductionDim] = preferredSubgroupSize;
     TileSizesListType tileSizes;
     tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
     tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
     std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUWarpReduction,
-            workgroupSize))) {
+            workgroupSize, preferredSubgroupSize))) {
       return failure();
     }
     return success();

@@ -12,6 +12,37 @@
 #include "iree/hal/device.h"
 
 //===----------------------------------------------------------------------===//
+// String utils
+//===----------------------------------------------------------------------===//
+
+static const iree_bitfield_string_mapping_t
+    iree_hal_semaphore_compatibility_mappings[] = {
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL, IREE_SVL("ALL")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY, IREE_SVL("HOST_ONLY")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_ONLY, IREE_SVL("DEVICE_ONLY")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT, IREE_SVL("HOST_WAIT")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT, IREE_SVL("DEVICE_WAIT")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL, IREE_SVL("HOST_SIGNAL")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
+         IREE_SVL("DEVICE_SIGNAL")},
+};
+
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_compatibility_parse(
+    iree_string_view_t value, iree_hal_semaphore_compatibility_t* out_value) {
+  return iree_bitfield_parse(
+      value, IREE_ARRAYSIZE(iree_hal_semaphore_compatibility_mappings),
+      iree_hal_semaphore_compatibility_mappings, out_value);
+}
+
+IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
+    iree_hal_semaphore_compatibility_t value,
+    iree_bitfield_string_temp_t* out_temp) {
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_hal_semaphore_compatibility_mappings),
+      iree_hal_semaphore_compatibility_mappings, out_temp);
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
@@ -131,6 +162,35 @@ iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value) {
       .data = value,
       .ctl = iree_hal_semaphore_wait_source_ctl,
   };
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint) {
+  IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
+  iree_status_t status = _VTABLE_DISPATCH(semaphore, import_timepoint)(
+      semaphore, value, queue_affinity, external_timepoint);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
+  IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
+  iree_status_t status = _VTABLE_DISPATCH(semaphore, export_timepoint)(
+      semaphore, value, queue_affinity, requested_type, requested_flags,
+      out_external_timepoint);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

@@ -30,5 +30,5 @@ util.func @fuse_conv(%arg0 : tensor<2x130x130x16xf32>, %arg1 : tensor<3x3x16x320
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>]
 //  CHECK-SAME:     ins(%[[CONV]] :
-//       CHECK:   flow.dispatch.tensor.store %[[GENERIC]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]]
 //       CHECK: return %[[DISPATCH]]
