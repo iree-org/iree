@@ -171,5 +171,56 @@ def IREECodegen_NullPointerOp :
   let assemblyFormat = "attr-dict";
 }
 
+//===----------------------------------------------------------------------===//
+// LoadFrom/StoreToMemref Ops
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_LoadFromMemrefOp : Op<IREECodegen_Dialect, "load_from_memref",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = [{loads a tensor from a memref}];
+  let description = [{
+    Loads a tensor from a memref with a compatible shape and the same element
+    type. The read_only attribute indicates that the source buffer from which
+    the tensor is read is a read only buffer. This hint can be used by
+    bufferization to determine whether or not the buffer that this op reads
+    from may be written.
+  }];
+
+  let arguments = (ins
+    AnyStridedMemRef:$source,
+    UnitAttr:$read_only
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source attr-dict `:` type($source) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def IREECodegen_StoreToMemrefOp : Op<IREECodegen_Dialect, "store_to_memref",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = [{stores a tensor into a memref}];
+  let description = [{
+    Stores a tensor into a memref with a compatible shape and the same element
+    type.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    AnyStridedMemRef:$target
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $value `,` $target
+    attr-dict `:` type($value) `into` type($target)
+  }];
+
+  let hasVerifier = 1;
+}
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS
