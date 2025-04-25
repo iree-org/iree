@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN: --pass-pipeline="builtin.module(func.func(iree-rocdl-buffer-instructions-optimization))" %s \
+// RUN: --pass-pipeline="builtin.module(func.func(iree-rocdl-buffer-instructions-optimization, canonicalize, cse))" %s \
 // RUN:  | FileCheck %s
 
 func.func @simplify_mask(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
@@ -162,8 +162,9 @@ func.func @no_simplify_mask_nonunit(%1 : memref<1x?x?x8xbf16, #amdgpu.address_sp
 
 // -----
 
-// This type of simplification is supported by upstream vectorization canonicalization so we dont support it here.
-func.func @no_simplify_trivial(%1 : memref<1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>) -> vector<1x8xbf16> {
+// This type of simplification is taken care of by canonicalization directly, the test just shows
+// that we didnt break that behavior.
+func.func @simplify_trivial(%1 : memref<1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>) -> vector<1x8xbf16> {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
   %c1 = arith.constant 1 : index
@@ -173,9 +174,8 @@ func.func @no_simplify_trivial(%1 : memref<1x8xbf16, #amdgpu.address_space<fat_r
   return %read : vector<1x8xbf16>
 }
 
-// CHECK-LABEL: @no_simplify_trivial
+// CHECK-LABEL: @simplify_trivial
 //  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>)
-//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
+//   CHECK-NOT: vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
-//  CHECK-SAME: %[[MASK]]
 //       CHECK: return %[[READ]] : vector<1x8xbf16>

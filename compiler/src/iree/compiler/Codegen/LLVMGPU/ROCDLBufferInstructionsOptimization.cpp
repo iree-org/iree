@@ -8,7 +8,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 #define DEBUG_TYPE "iree-codegen-rocdl-buffer-instructions-optimization"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
@@ -113,8 +113,10 @@ struct SimplifyMaskVectorTransferRead final
     auto newReadOp = rewriter.create<vector::TransferReadOp>(
         loc, readOp.getVectorType(), readOp.getSource(), readOp.getIndices(),
         readOp.getPadding(), ArrayRef<bool>{inBounds});
-    rewriter.replaceOpWithNewOp<arith::SelectOp>(readOp, selectValue, newReadOp,
-                                                 constantValue);
+
+    auto selectOp = rewriter.create<arith::SelectOp>(loc, selectValue,
+                                                     newReadOp, constantValue);
+    rewriter.replaceAllUsesWith(readOp, selectOp);
 
     return success();
   }
@@ -127,7 +129,7 @@ struct ROCDLBufferInstructionsOptimizationPass final
 
     RewritePatternSet patterns(&getContext());
     patterns.add<SimplifyMaskVectorTransferRead>(&getContext());
-    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
+    walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
 
