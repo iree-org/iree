@@ -43,8 +43,8 @@ Value createi1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
 // %masked_read
 //   = arith.select %0 && ... && %n ? %read : %padding : index,vector<1x ... x1x8xbf16>
 // clang-format on
-class SimplifyMaskVectorTransferRead
-    : public OpRewritePattern<vector::CreateMaskOp> {
+struct SimplifyMaskVectorTransferRead final
+    : OpRewritePattern<vector::CreateMaskOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::CreateMaskOp maskOp,
@@ -53,7 +53,8 @@ class SimplifyMaskVectorTransferRead
     auto readOp = dyn_cast<vector::TransferReadOp>(
         *(maskOp.getResult().getUsers().begin()));
     if (!readOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(maskOp,
+                                         "only TransferReadOp supported");
     }
 
     auto sourceType = dyn_cast<MemRefType>(readOp.getSource().getType());
@@ -62,45 +63,50 @@ class SimplifyMaskVectorTransferRead
     }
     // This optimization only works on fat raw buffers.
     if (!hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
-      return failure();
+      return rewriter.notifyMatchFailure(maskOp,
+                                         "only supported for fat raw buffers");
     }
 
     SmallVector<bool> inBounds = readOp.getInBoundsValues();
     if (inBounds.size() != sourceType.getRank()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          maskOp, "only supported in presence of in_bounds attr");
     }
 
     SmallVector<Value> maskIndices = maskOp.getOperands();
     ArrayRef<int64_t> maskShape = maskOp.getResult().getType().getShape();
     SmallVector<Value> ValuesToAnd;
-    for (auto [idx, i] : llvm::enumerate(maskIndices)) {
-      auto constantValue = getConstantIndex(i);
+    for (auto [idx, maskIndex] : llvm::enumerate(maskIndices)) {
+      std::optional<int64_t> constantValue = getConstantIndex(maskIndex);
       // We only support the pattern for reads that are in-bounds.
-      if (inBounds[idx] != true) {
-        return failure();
+      if (!inBounds[idx]) {
+        return rewriter.notifyMatchFailure(
+            maskOp, "only supported for in_bounds reads");
       }
       if (constantValue) {
         // We bail-out if we can statically determine that a mask dim is not
         // full.
         if (maskShape[idx] != constantValue) {
-          return failure();
+          return rewriter.notifyMatchFailure(
+              maskOp, "not a all ones or an all zeros mask.");
         }
       } else {
         // The non-constant dimensions are only allowed to be unit to ensure
         // an all ones or an all zeros mask.
         if (maskShape[idx] != 1) {
-          return failure();
+          return rewriter.notifyMatchFailure(
+              maskOp, "non-unit, non-constant dimension found");
         }
-        ValuesToAnd.push_back(i);
+        ValuesToAnd.push_back(maskIndex);
       }
     }
     // There are no non-constant unit dimensions which means this is
     // a always one mask, such masks should be folded by vector
     // canonicalizations so we dont handle it.
-    if (ValuesToAnd.size() == 0) {
-      return failure();
+    if (ValuesToAnd.empty()) {
+      return rewriter.notifyMatchFailure(maskOp, "trivial mask not supported");
     }
-    auto selectValue = createi1And(loc, ValuesToAnd, rewriter);
+    Value selectValue = createi1And(loc, ValuesToAnd, rewriter);
     auto constantValue = rewriter.create<vector::SplatOp>(
         loc, readOp.getVectorType(), readOp.getPadding());
 
@@ -118,11 +124,10 @@ struct ROCDLBufferInstructionsOptimizationPass final
     : impl::ROCDLBufferInstructionsOptimizationPassBase<
           ROCDLBufferInstructionsOptimizationPass> {
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
 
-    RewritePatternSet patterns(funcOp.getContext());
-    patterns.add<SimplifyMaskVectorTransferRead>(funcOp.getContext());
-    (void)applyPatternsGreedily(funcOp, std::move(patterns));
+    RewritePatternSet patterns(&getContext());
+    patterns.add<SimplifyMaskVectorTransferRead>(&getContext());
+    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
   }
 };
 
