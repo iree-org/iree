@@ -693,6 +693,162 @@ func.func @gather_static_memref(
 
 // -----
 
+func.func @map_scatter_tensor_static(
+    %input: tensor<4x16x64xf32>, %output: tensor<4x16x64xf32>
+) -> tensor<4x16x64xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index, %idx2: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %idx2, %mask : index, index, index, i1
+  } : tensor<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+  return %0 : tensor<4x16x64xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_tensor_static(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[IDX2]], %[[MASK]]
+//       CHECK:   } : tensor<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+//       CHECK:   return %[[RES]] : tensor<4x16x64xf32>
+
+// -----
+
+func.func @map_scatter_tensor_dynamic(
+    %input: tensor<?x?xf32>, %output: tensor<?x?xf32>
+) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : tensor<?x?xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_tensor_dynamic(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[MASK]]
+//       CHECK:   } : tensor<?x?xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
+//       CHECK:   return %[[RES]] : tensor<?x?xf32>
+
+// -----
+
+func.func @map_scatter_input_sliced(
+    %input: tensor<63xf32>, %output: tensor<64xf32>
+) -> tensor<64xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<63xf32> into tensor<64xf32> -> tensor<64xf32>
+  return %0 : tensor<64xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_input_sliced(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : tensor<63xf32> into tensor<64xf32> -> tensor<64xf32>
+//       CHECK:   return %[[RES]] : tensor<64xf32>
+
+// -----
+
+func.func @map_scatter_output_sliced(
+    %input: tensor<64xf32>, %output: tensor<63xf32>
+) -> tensor<63xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %c63 = arith.constant 63 : index
+      %mask = arith.cmpi uge, %idx0, %c63 : index
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<64xf32> into tensor<63xf32> -> tensor<63xf32>
+  return %0 : tensor<63xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_output_sliced(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[BOUND:.+]] = arith.constant 63 : index
+//       CHECK:       %[[MASK:.+]] = arith.cmpi uge, %[[IDX0]], %[[BOUND]] : index
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : tensor<64xf32> into tensor<63xf32> -> tensor<63xf32>
+//       CHECK:   return %[[RES]] : tensor<63xf32>
+
+// -----
+
+func.func @map_scatter_different_rank(
+    %input: tensor<64xf32>, %output: tensor<32x2xf32>
+) -> tensor<32x2xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      %out_idx:2 = affine.delinearize_index %idx0 into (32, 2) : index, index
+      iree_linalg_ext.yield %out_idx#0, %out_idx#1, %mask : index, index, i1
+  } : tensor<64xf32> into tensor<32x2xf32> -> tensor<32x2xf32>
+  return %0 : tensor<32x2xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_different_rank(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       %[[OUT_IDX:.+]]:2 = affine.delinearize_index %[[IDX0]] into (32, 2) : index, index
+//       CHECK:       iree_linalg_ext.yield %[[OUT_IDX]]#0, %[[OUT_IDX]]#1, %[[MASK]]
+//       CHECK:   } : tensor<64xf32> into tensor<32x2xf32> -> tensor<32x2xf32>
+//       CHECK:   return %[[RES]] : tensor<32x2xf32>
+
+// -----
+
+func.func @map_scatter_memref_dynamic(
+    %input: memref<?x?xf32>, %output: memref<?x?xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : memref<?x?xf32> into memref<?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_memref_dynamic(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[MASK]]
+//       CHECK:   } : memref<?x?xf32> into memref<?x?xf32>
+//       CHECK:   return
+
+// -----
+
+func.func @map_scatter_memref_static(
+    %input: memref<16xf32>, %output: memref<16xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : memref<16xf32> into memref<16xf32>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_memref_static(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : memref<16xf32> into memref<16xf32>
+//       CHECK:   return
+
+// -----
+
 func.func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
     -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 1 : index
