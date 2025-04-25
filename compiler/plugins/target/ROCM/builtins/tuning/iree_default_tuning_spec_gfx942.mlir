@@ -524,14 +524,14 @@ util.func private @pingpong_large_f8_expanded(%lhs_base: !exp_in_ty_f8, %rhs_bas
 
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c16 : index
     %lhs_thread_local = tensor.extract_slice %lhs_init [0, %delin#0, %vec] [1, 1, 16] [1, 1, 1] : !exp_block_in_f8 to tensor<1x1x16xf8E4M3FNUZ>
     %lhs_vec_local = vector.transfer_read %lhs_thread_local [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x16xf8E4M3FNUZ>, vector<1x16xf8E4M3FNUZ>
     vector.transfer_write %lhs_vec_local, %lhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
   } {mapping = [#gpu.thread<linear_dim_0>]}
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c16 : index
     %rhs_thread_local = tensor.extract_slice %rhs_init [%delin#0, %vec] [1, 16] [1, 1] : !block_in_f8 to tensor<1x16xf8E4M3FNUZ>
     %rhs_vec_local = vector.transfer_read %rhs_thread_local [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x16xf8E4M3FNUZ>, vector<1x16xf8E4M3FNUZ>
     vector.transfer_write %rhs_vec_local, %rhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
@@ -544,6 +544,7 @@ util.func private @pingpong_large_f8_expanded(%lhs_base: !exp_in_ty_f8, %rhs_bas
   %1 = scf.forall (%id) in (512) shared_outs(%out = %0) -> tensor<1x16x16x16x16xf32> {
     %ids:4 = affine.delinearize_index %id into (2, 4, 4, 16) : index, index, index, index
     %inner_id = arith.muli %ids#2, %c8 : index
+    %inner_id_acc = arith.muli %ids#2, %c4 : index
     %m_outer_id = arith.muli %ids#0, %c8 : index
     %n_outer_id = arith.muli %ids#1, %c4 : index
     %delin:2 = affine.delinearize_index %id into (64, 8) : index, index
@@ -708,7 +709,7 @@ util.func private @pingpong_large_f8_expanded(%lhs_base: !exp_in_ty_f8, %rhs_bas
     %empty = tensor.empty() : tensor<1x8x1x4x4xf32>
     %4 = vector.transfer_write %tp, %empty[%c0, %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<8x1x4x4xf32>, tensor<1x8x1x4x4xf32>
     scf.forall.in_parallel {
-      tensor.parallel_insert_slice %4 into %out[0, %m_outer_id, %ids#3, %n_outer_id, %inner_id] [1, 8, 1, 4, 4] [1, 1, 1, 1, 1] : tensor<1x8x1x4x4xf32> into tensor<1x16x16x16x16xf32>
+      tensor.parallel_insert_slice %4 into %out[0, %m_outer_id, %ids#3, %n_outer_id, %inner_id_acc] [1, 8, 1, 4, 4] [1, 1, 1, 1, 1] : tensor<1x8x1x4x4xf32> into tensor<1x16x16x16x16xf32>
     }
   } {mapping = [#gpu.thread<linear_dim_0>]}
   %collapse = tensor.collapse_shape %1 [[0], [1, 2], [3, 4]] : tensor<1x16x16x16x16xf32> into tensor<1x256x256xf32>
