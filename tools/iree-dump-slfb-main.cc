@@ -139,20 +139,44 @@ void deserializeFromSLFb(const char *filename) {
         flatbuffers_generic_t buffer =
             iree_exsleratev2_hal_exsleratev2_DataBufferDef_buffer(data_buffer);
 
-        auto int8_buffer =
-            (iree_exsleratev2_hal_exsleratev2_Int8Buffer_table_t)buffer;
-        flatbuffers_int8_vec_t data =
-            iree_exsleratev2_hal_exsleratev2_Int8Buffer_data(int8_buffer);
+        if (category == 0) {
+          auto int8_buffer =
+              (iree_exsleratev2_hal_exsleratev2_Int8Buffer_table_t)buffer;
+          flatbuffers_int8_vec_t data =
+              iree_exsleratev2_hal_exsleratev2_Int8Buffer_data(int8_buffer);
 
-        printf("    %zu: category=%u\n", j, category);
-        if (data) {
-          printf("    Int8Buffer (%zu bytes):\n[",
-                 flatbuffers_int8_vec_len(data));
-          for (size_t i = 0; i < flatbuffers_int8_vec_len(data); i++) {
-            printf("%d ", flatbuffers_int8_vec_at(data, i));
+          printf("    %zu: category=%u\n", j, category);
+          if (data) {
+            printf("    Int8Buffer (%zu bytes):\n[",
+                   flatbuffers_int8_vec_len(data));
+            for (size_t i = 0; i < flatbuffers_int8_vec_len(data); i++) {
+              printf("%d ", flatbuffers_int8_vec_at(data, i));
+            }
           }
+          printf("]\n");
+        } else {
+          auto uint32_buffer =
+              (iree_exsleratev2_hal_exsleratev2_Uint32Buffer_table_t)buffer;
+
+          // Safe pointer check
+          if (!uint32_buffer) {
+            printf("    [ERROR: Null buffer pointer]\n");
+            continue;
+          }
+
+          flatbuffers_uint32_vec_t data =
+              iree_exsleratev2_hal_exsleratev2_Uint32Buffer_data(uint32_buffer);
+
+          printf("    %zu: category=%u\n", j, category);
+          if (data) {
+            printf("    Uint32Buffer (%zu bytes):\n[",
+                   flatbuffers_uint32_vec_len(data));
+            for (size_t i = 0; i < flatbuffers_uint32_vec_len(data); i++) {
+              printf("%u ", flatbuffers_uint32_vec_at(data, i));
+            }
+          }
+          printf("]\n");
         }
-        printf("]\n");
       }
     }
   }
