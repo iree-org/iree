@@ -49,7 +49,7 @@ struct SimplifyMaskVectorTransferRead final
 
   LogicalResult matchAndRewrite(vector::CreateMaskOp maskOp,
                                 PatternRewriter &rewriter) const override {
-    auto loc = maskOp.getLoc();
+    Location loc = maskOp.getLoc();
     auto readOp = dyn_cast<vector::TransferReadOp>(
         *(maskOp.getResult().getUsers().begin()));
     if (!readOp) {
