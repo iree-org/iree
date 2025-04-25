@@ -493,6 +493,12 @@ class OptimizeIntArithmeticPass
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     for (int i = 0;; ++i) {
       LLVM_DEBUG(dbgs() << "  * Starting iteration: " << i << "\n");
+      // NOTE(jtuyls): Erasing all data flow solver states here should be safe.
+      // Manually updating and invalidating appropriate states in the
+      // inserted patterns might speed up the transformation, but this
+      // currently results in occasional crashes. See
+      // https://github.com/iree-org/iree/issues/20636.
+      solver.eraseAllStates();
       if (failed(solver.initializeAndRun(op))) {
         emitError(op->getLoc()) << "failed to perform int range analysis";
         return signalPassFailure();
