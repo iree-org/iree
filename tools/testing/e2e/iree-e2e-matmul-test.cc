@@ -630,6 +630,10 @@ static iree_status_t check_matmul_results(FILE* file,
     // numerical summary, as most of the reference matrix entries hadn't been
     // computed. Rerun now with check_every=1 to get that numerical logging.
     iree_status_ignore(status);
+    fprintf(file,
+            "Incorrect numerical results detected! Now computing the whole "
+            "reference matrix to log more detailed numerical error "
+            "diagnostics. This may take a while for larger matrices...\n");
     status = check_matmul_results_impl(file, results, 1);
   }
   IREE_TRACE_ZONE_END(z0);
