@@ -177,6 +177,14 @@ static bool isEligibleForCollapse(Operation *op) {
     return false;
   }
 
+  auto hasEncoding = [](Type type) -> bool {
+    auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+    return rankedTensorType && rankedTensorType.getEncoding();
+  };
+  if (llvm::any_of(op->getOperandTypes(), hasEncoding)) {
+    return false;
+  }
+
   // TODO(guray) Currently we can only collapse when result of all the
   // AffineMaps are dimensions. Possible to collapse cases like
   // affine_map<d0, d1+d2> with affine_map<d0, d1+d2>, however, this is not
