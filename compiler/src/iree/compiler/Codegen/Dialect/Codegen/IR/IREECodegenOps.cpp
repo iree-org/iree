@@ -65,3 +65,49 @@ void ExtractStridedMetadataOp::getAsmResultNames(
     setNameFn(getStrides().front(), "strides");
   }
 }
+
+//===----------------------------------------------------------------------===//
+// LoadFromMemrefOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult LoadFromMemrefOp::verify() {
+  RankedTensorType resultType = getResult().getType();
+  MemRefType sourceType = getSource().getType();
+  if (failed(verifyCompatibleShape(resultType.getShape(),
+                                   sourceType.getShape())) ||
+      resultType.getElementType() != sourceType.getElementType()) {
+    return emitOpError("source and result shapes must be compatible and "
+                       "element types must match");
+  }
+  return success();
+}
+
+void LoadFromMemrefOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
+                       SideEffects::DefaultResource::get());
+}
+
+//===----------------------------------------------------------------------===//
+// StoreToMemrefOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult StoreToMemrefOp::verify() {
+  RankedTensorType valueType = getValue().getType();
+  MemRefType targetType = getTarget().getType();
+  if (failed(
+          verifyCompatibleShape(valueType.getShape(), targetType.getShape())) ||
+      valueType.getElementType() != targetType.getElementType()) {
+    return emitOpError("value and target shapes must be compatible and element "
+                       "types must match");
+  }
+  return success();
+}
+
+void StoreToMemrefOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  effects.emplace_back(MemoryEffects::Write::get(), &getTargetMutable(),
+                       SideEffects::DefaultResource::get());
+}
