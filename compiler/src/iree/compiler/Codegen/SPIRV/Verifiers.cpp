@@ -148,7 +148,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
   LLVM_DEBUG(llvm::dbgs() << "verifying op: " << *op << "\n"
                           << "chosen workgroup size: "
-                          << llvm::interleaved_array(workgroupSize) << "\n";);
+                          << llvm::interleaved_array(workgroupSize) << "\n");
 
   FailureOr<int64_t> maybeDepth =
       getSoftwarePipelineDepth(translationInfo.getConfiguration());
@@ -184,8 +184,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
       workgroupSize[1] > maxWorkGroupSize[1] ||
       workgroupSize[2] > maxWorkGroupSize[2]) {
     return op->emitOpError("expected workgroup size dimensions not exceeding ")
-           << "[" << maxWorkGroupSize[0] << ", " << maxWorkGroupSize[1] << ", "
-           << maxWorkGroupSize[2] << "]";
+           << llvm::interleaved_array(maxWorkGroupSize);
   }
 
   // Verify the total workgroup size should not exceed maxThreads.
