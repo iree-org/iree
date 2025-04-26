@@ -134,3 +134,32 @@ util.func @bubble_up_through_reduction(%arg0: tensor<10x?xi64>) -> tensor<2x5xi6
 // CHECK-AGGRESSIVE:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]]
 // CHECK-AGGRESSIVE:   %[[EXPANDED_GENERIC:.+]] = linalg.generic {{.+}} ins(%[[EXPANDED]]
 // CHECK-AGGRESSIVE:   return %[[EXPANDED_GENERIC]]
+
+// -----
+
+// Check that dim resolution kicks in during expand shape propagation
+util.func public @verify_dim_propagation(%arg0: index,
+    %arg1: tensor<16x32x128x?xf8E4M3FNUZ>) -> tensor<16x1x32x128x?xbf16> {
+  %c3 = arith.constant 3 : index
+  %0 = tensor.empty(%arg0) : tensor<16x32x128x?xbf16>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<16x32x128x?xf8E4M3FNUZ>) outs(%0 : tensor<16x32x128x?xbf16>) {
+    ^bb0(%in: f8E4M3FNUZ, %out: bf16):
+      %2 = arith.extf %in : f8E4M3FNUZ to bf16
+      linalg.yield %2 : bf16
+    } -> tensor<16x32x128x?xbf16>
+  %dim = tensor.dim %1, %c3 : tensor<16x32x128x?xbf16>
+  %expanded = tensor.expand_shape %1 [[0, 1], [2], [3], [4]]
+      output_shape [16, 1, 32, 128, %dim]
+      : tensor<16x32x128x?xbf16> into tensor<16x1x32x128x?xbf16>
+  util.return %expanded : tensor<16x1x32x128x?xbf16>
+}
+// CHECK-LABEL: @verify_dim_propagation
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG1]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[EXPAND]]
+//       CHECK:   return %[[GENERIC]]

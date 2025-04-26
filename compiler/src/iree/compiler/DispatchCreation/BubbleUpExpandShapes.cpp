@@ -21,6 +21,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -176,6 +177,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(
       bubbleExpandShapePatterns, context);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(
+      bubbleExpandShapePatterns);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
