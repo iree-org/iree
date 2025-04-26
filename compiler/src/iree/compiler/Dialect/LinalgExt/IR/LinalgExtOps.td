@@ -322,6 +322,14 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
 def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     [LinalgExtInterface, DestinationStyleOpInterface,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+        ["getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "getIterationDomainTileFromOperandTile",
+         "getTiledImplementationFromOperandTile",
+         "generateScalarImplementation"]>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
   let summary = "Scatter with a mapping from source indices to result indices";
   let description = [{

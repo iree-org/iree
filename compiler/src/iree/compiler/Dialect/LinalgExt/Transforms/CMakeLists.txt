@@ -39,6 +39,7 @@ iree_cc_library(
     "RewriteFft.cpp"
     "SplitReduction.cpp"
     "TileAttention.cpp"
+    "Transforms.cpp"
     "TransposeFusion.cpp"
   DEPS
     ::PassesIncGen

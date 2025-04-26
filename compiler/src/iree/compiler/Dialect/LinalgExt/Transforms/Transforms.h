@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -69,5 +70,18 @@ collapseOpIterationDims(AttentionOp op,
 FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
                                               int64_t fftLength,
                                               PatternRewriter &rewriter);
+
+// Helper to apply transformations to the source index block arguments of the
+// mapScatterOp's transformation body, and replace the uses of the previous
+// source indices with the values returned by `transformationBuilder`. The
+// argument to `transformationBuilder` function will be an ArrayRef of the new
+// block arguments, the number of which is determined by `numSourceIndices`.
+// The `transformationBuilder` should return the replacements for the old
+// block arguments.
+void insertTransformationAtMapScatterStart(
+    OpBuilder &builder, MapScatterOp mapScatterOp,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numSourceIndices);
 
 }; // namespace mlir::iree_compiler::IREE::LinalgExt
