@@ -39,6 +39,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-cpu-encoding-external-models"
@@ -215,9 +216,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
-    LLVM_DEBUG(llvm::dbgs() << "candidate: "; llvm::interleaveComma(
-                   ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
-               llvm::dbgs() << " penalty:" << ratedTile.paddingPenalty << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "candidate: "
+               << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
+               << " penalty:" << ratedTile.paddingPenalty << "\n");
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -233,10 +235,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
   LLVM_DEBUG(
-      llvm::dbgs() << "bestRatedTile: "; llvm::interleaveComma(
-          ArrayRef<int64_t>{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K},
-          llvm::dbgs());
-      llvm::dbgs() << " penalty:" << bestRatedTile.paddingPenalty << "\n");
+      llvm::dbgs() << "bestRatedTile: "
+                   << llvm::interleaved(ArrayRef{
+                          bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
+                   << " penalty:" << bestRatedTile.paddingPenalty << "\n");
   return bestRatedTile;
 }
 
