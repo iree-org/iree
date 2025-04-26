@@ -2674,3 +2674,76 @@ module attributes { transform.with_named_sequence } {
 //      CHECK:     iree_linalg_ext.gather
 // CHECK-SAME:         ins(%[[SOURCE]], %[[INDEX]]
 // CHECK-SAME:         outs(%[[RESULT]]
+
+// -----
+
+func.func @map_scatter_tensor(
+    %input: tensor<?xf32>, %output: tensor<?xf32>
+) -> tensor<?xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<?xf32> into tensor<?xf32> -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.map_scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [8] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+//      CHECK: func @map_scatter_tensor
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[INPUT]], %[[C0]]
+//  CHECK-DAG:   %[[TRUE:.+]] = arith.constant true
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C8]]
+// CHECK-SAME:       iter_args(%[[LOOP_ARG:.+]] = %[[OUTPUT]])
+//  CHECK-DAG:     %[[TILE_SIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D0]]]
+//  CHECK-DAG:     %[[INPUT_TILE:.+]] = tensor.extract_slice %[[INPUT]]
+// CHECK-SAME:       [%[[IV]]] [%[[TILE_SIZE]]] [1]
+//      CHECK:     iree_linalg_ext.map_scatter %[[INPUT_TILE]] into %[[LOOP_ARG]]
+// CHECK-NEXT:       ^bb0(%[[IDX:.+]]: index):
+//  CHECK-DAG:         %[[IDX_OFFSET:.+]] = affine.apply #[[MAP1]](%[[IDX]], %[[IV]])
+//      CHECK:         iree_linalg_ext.yield %[[IDX_OFFSET]], %[[TRUE]]
+
+// -----
+
+func.func @map_scatter_memref(%input: memref<?xf32>, %output: memref<?xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : memref<?xf32> into memref<?xf32>
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.map_scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [8] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+//      CHECK: func @map_scatter_memref
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[INPUT]], %[[C0]]
+//  CHECK-DAG:   %[[TRUE:.+]] = arith.constant true
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C8]]
+//  CHECK-DAG:     %[[TILE_SIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D0]]]
+//  CHECK-DAG:     %[[INPUT_TILE:.+]] = memref.subview %[[INPUT]]
+// CHECK-SAME:       [%[[IV]]] [%[[TILE_SIZE]]] [1]
+//      CHECK:     iree_linalg_ext.map_scatter %[[INPUT_TILE]] into %[[OUTPUT]]
+// CHECK-NEXT:       ^bb0(%[[IDX:.+]]: index):
+//  CHECK-DAG:         %[[IDX_OFFSET:.+]] = affine.apply #[[MAP1]](%[[IDX]], %[[IV]])
+//      CHECK:         iree_linalg_ext.yield %[[IDX_OFFSET]], %[[TRUE]]
