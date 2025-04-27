@@ -123,6 +123,16 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def CombineLayoutTransformationPass :
+    InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations on the results of a dispatch into a single operation.";
+  let dependentDialects = [
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
