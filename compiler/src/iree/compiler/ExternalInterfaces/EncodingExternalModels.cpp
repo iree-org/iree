@@ -21,7 +21,7 @@ struct ContractionAttrPropagationInterface
   bool isPropagable(Attribute attr, Value target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
 
-    TypeSwitch<Operation *>(target.getDefiningOp())
+    return TypeSwitch<Operation *, bool>(target.getDefiningOp())
         .Case<tensor::CollapseShapeOp>([&](auto op) {
           auto collapseOp = cast<tensor::CollapseShapeOp>(op);
           ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
@@ -37,16 +37,14 @@ struct ContractionAttrPropagationInterface
           return true;
         })
         .Default([&](auto) { return false; });
-
-    return false;
   }
 
   FailureOr<IREE::Encoding::PropagationEncoding>
   generateEncodings(Attribute attr, Value target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
-    FailureOr<IREE::Encoding::PropagationEncoding> propEncoding;
-
-    TypeSwitch<Operation *>(target.getDefiningOp())
+    return TypeSwitch<Operation *,
+                      FailureOr<IREE::Encoding::PropagationEncoding>>(
+               target.getDefiningOp())
         .Case<tensor::CollapseShapeOp>([&](auto op) {
           auto collapseOp = cast<tensor::CollapseShapeOp>(op);
           ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
@@ -63,14 +61,14 @@ struct ContractionAttrPropagationInterface
           auto resultEncodingAttr =
               IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
 
-          propEncoding->operandEncodings.push_back(resultEncodingAttr);
+          IREE::Encoding::PropagationEncoding propEncoding;
+          propEncoding.operandEncodings.push_back(resultEncodingAttr);
           // The result encoding will be the same as the encoding
           // present in the set encoding operation.
-          propEncoding->resultEncodings.push_back(encoding);
+          propEncoding.resultEncodings.push_back(encoding);
+          return propEncoding;
         })
-        .Default([&](auto) { propEncoding = failure(); });
-
-    return propEncoding;
+        .Default([&](auto) { return failure(); });
   }
 };
 
@@ -84,9 +82,10 @@ struct ContractionOpPropagationInterface
 
     auto operandEncodings = encodings.operandEncodings;
     auto resultEncodings = encodings.resultEncodings;
-    FailureOr<IREE::Encoding::PropagationResult> result;
 
-    TypeSwitch<Operation *>(opResult.getOwner())
+    return TypeSwitch<Operation *,
+                      FailureOr<IREE::Encoding::PropagationResult>>(
+               opResult.getOwner())
         .Case<tensor::CollapseShapeOp>([&](auto op) {
           auto collapseShapeOp = cast<tensor::CollapseShapeOp>(op);
           RankedTensorType operandEncodingType =
@@ -105,12 +104,12 @@ struct ContractionOpPropagationInterface
               collapseShapeOp.getLoc(), resultEncodingType, newEncodingOp,
               collapseShapeOp.getReassociationIndices());
 
-          result->replacement = newCollapseOp;
-          result->generatedEncodingOps.push_back(newEncodingOp.getDefiningOp());
+          IREE::Encoding::PropagationResult result;
+          result.replacement = newCollapseOp;
+          result.generatedEncodingOps.push_back(newEncodingOp.getDefiningOp());
+          return result;
         })
-        .Default([&](auto) { result = failure(); });
-
-    return result;
+        .Default([&](auto) { return failure(); });
   }
 };
 
