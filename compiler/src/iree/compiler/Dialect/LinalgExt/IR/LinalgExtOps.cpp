@@ -13,10 +13,12 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/iterator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -32,9 +34,11 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -320,6 +324,29 @@ GatherOp::reifyResultShapes(OpBuilder &b,
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//
+
+void MapScatterOp::build(OpBuilder &builder, OperationState &state, Value input,
+                         Value output) {
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  build(builder, state, resultType, input, output);
+
+  // Add the transformation block with an identity transformation.
+  Region *region = state.regions[0].get();
+  auto inputType = cast<ShapedType>(input.getType());
+  SmallVector<Location> blockArgLocs(inputType.getRank(), state.location);
+  SmallVector<Type> indexTypes(inputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(region, region->end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+  Value mask = builder.create<arith::ConstantIntOp>(state.location, /*value=*/1,
+                                                    /*width=*/1);
+  yieldedValues.push_back(mask);
+  builder.create<IREE::LinalgExt::YieldOp>(state.location, yieldedValues);
+}
 
 LogicalResult MapScatterOp::verify() {
   if (getInputType().getElementType() != getOutputType().getElementType()) {

@@ -361,6 +361,10 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     `:` type($input) `into` type($output) (`->` type($results)^)?
   }];
 
+  let builders = [
+    OpBuilder<(ins "Value":$input, "Value":$output)>
+  ];
+
   let extraClassDeclaration = [{
     ShapedType getInputType() {
       return cast<ShapedType>(getInput().getType());
