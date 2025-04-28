@@ -90,9 +90,9 @@ def GPUDistributeScfForPass :
   ];
 }
 
-def GPUDropResourceCastsPass :
-    Pass<"iree-codegen-gpu-drop-resource-casts", ""> {
-  let summary = "Drops iree_gpu.buffer_resource_cast ops that aren't obviously resolvable";
+def GPUBubbleResourceCastsPass :
+    Pass<"iree-codegen-gpu-bubble-resource-casts", ""> {
+  let summary = "Bubbles iree_gpu.buffer_resource_cast ops upwards.";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
