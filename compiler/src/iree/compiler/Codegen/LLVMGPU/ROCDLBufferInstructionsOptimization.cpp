@@ -20,10 +20,10 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-Value createi1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
+Value createI1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
   Value base =
       builder.create<arith::IndexCastUIOp>(loc, builder.getI1Type(), values[0]);
-  for (auto value : values.drop_front()) {
+  for (Value value : values.drop_front()) {
     Value rhs =
         builder.create<arith::IndexCastUIOp>(loc, builder.getI1Type(), value);
     base = builder.create<arith::AndIOp>(loc, base, rhs);
@@ -106,7 +106,7 @@ struct SimplifyMaskVectorTransferRead final
     if (ValuesToAnd.empty()) {
       return rewriter.notifyMatchFailure(maskOp, "trivial mask not supported");
     }
-    Value selectValue = createi1And(loc, ValuesToAnd, rewriter);
+    Value selectValue = createI1And(loc, ValuesToAnd, rewriter);
     auto constantValue = rewriter.create<vector::SplatOp>(
         loc, readOp.getVectorType(), readOp.getPadding());
 
@@ -126,7 +126,6 @@ struct ROCDLBufferInstructionsOptimizationPass final
     : impl::ROCDLBufferInstructionsOptimizationPassBase<
           ROCDLBufferInstructionsOptimizationPass> {
   void runOnOperation() override {
-
     RewritePatternSet patterns(&getContext());
     patterns.add<SimplifyMaskVectorTransferRead>(&getContext());
     walkAndApplyPatterns(getOperation(), std::move(patterns));

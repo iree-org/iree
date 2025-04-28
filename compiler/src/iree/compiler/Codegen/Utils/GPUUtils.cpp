@@ -936,7 +936,7 @@ bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType) {
   if (!addrSpace) {
     return false;
   }
-  auto amdgpuAttr = llvm::dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  auto amdgpuAttr = dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
   if (amdgpuAttr &&
       amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer) {
     return true;
