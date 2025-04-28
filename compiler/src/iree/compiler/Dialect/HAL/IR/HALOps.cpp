@@ -435,17 +435,6 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
     return failure();
   }
 
-  // Verify the return types match.
-  for (auto returnOp : body.getOps<IREE::HAL::ReturnOp>()) {
-    for (auto [resultType, returnType] :
-         llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
-      if (resultType != returnType) {
-        return returnOp.emitOpError()
-               << "operands do not match expected region return types";
-      }
-    }
-  }
-
   return success();
 }
 
@@ -474,57 +463,15 @@ static ParseResult parseOptionalWorkgroupCountRegion(OpAsmParser &parser,
   if (failed(parser.parseOptionalKeyword("count"))) {
     return success();
   }
-
-  SmallVector<OpAsmParser::Argument> args;
-  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
-                                      /*allowType=*/true,
-                                      /*allowAttrs=*/true))) {
-    return failure();
-  }
-
-  // Return types must be 3 dimensions (workgroup count XYZ).
-  SmallVector<Type> returnTypes;
-  if (failed(parser.parseArrowTypeList(returnTypes))) {
-    return failure();
-  }
-  if (returnTypes.size() != 3 ||
-      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "workgroup count region must return the XYZ dimension counts";
-  }
-
-  // Parse region contents.
-  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
-    return failure();
-  }
-
-  // Verify the return types match.
-  for (auto returnOp : body.getOps<IREE::HAL::ReturnOp>()) {
-    for (auto [resultType, returnType] :
-         llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
-      if (resultType != returnType) {
-        return returnOp.emitOpError()
-               << "operands do not match expected region return types";
-      }
-    }
-  }
-
-  return success();
+  return parseWorkgroupCountRegion(parser, body);
 }
 
 static void printOptionalWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
                                               Region &body) {
   if (body.empty())
     return;
-  p << "count(";
-  llvm::interleaveComma(body.getArguments(), p,
-                        [&](BlockArgument arg) { p.printRegionArgument(arg); });
-  p << ")";
-  Type indexType = IndexType::get(body.getContext());
-  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
-  p << " ";
-  p.printRegion(body, /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/true);
+  p << "count";
+  printWorkgroupCountRegion(p, op, body);
 }
 
 //===----------------------------------------------------------------------===//
@@ -792,8 +739,9 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   return success();
 }
 
-static LogicalResult
-verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
+static LogicalResult verifyWorkgroupCountWorkload(Operation *op,
+                                                  ValueRange workload,
+                                                  Region &region) {
   // Verify the workload operands match the expected capture args.
   auto regionArguments =
       llvm::make_filter_range(region.getArgumentTypes(), [](Type type) {
@@ -815,6 +763,50 @@ verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
              << capturedType;
     }
   }
+  return success();
+}
+
+// Verifies that the workgroup count region matches the expected
+// signature. Returns success if the region is empty.
+static LogicalResult verifyWorkgroupCountRegion(Operation *op, Region &region) {
+  if (region.empty())
+    return success();
+
+  // Verify one of the supported signatures.
+  bool validArguments = true;
+  if (region.getNumArguments() == 0) {
+    // Need at least a !hal.device.
+    validArguments = false;
+  } else if (!llvm::isa<IREE::HAL::DeviceType>(
+                 region.getArgument(0).getType())) {
+    // !hal.device must come first.
+    validArguments = false;
+  } else {
+    // All remaining arguments need to be of type index (today).
+    for (BlockArgument &blockArg : region.getArguments().drop_front(1)) {
+      if (!llvm::isa<IndexType>(blockArg.getType())) {
+        validArguments = false;
+        break;
+      }
+    }
+  }
+  if (!validArguments) {
+    return op->emitOpError(
+        "expected workgroup_count to take (%device: !hal.device, "
+        "%workload_0: index, %workload_1: index, ...");
+  }
+
+  // Verify the return types are XYZ index counts.
+  for (auto returnOp : region.getOps<IREE::HAL::ReturnOp>()) {
+    auto returnTypes = returnOp.getOperandTypes();
+    if (returnTypes.size() != 3 ||
+        !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+      return op->emitError(
+          "workgroup count region must return the XYZ dimension counts as "
+          "`index` types");
+    }
+  }
+
   return success();
 }
 
@@ -847,8 +839,10 @@ LogicalResult DispatchExternOp::verify() {
       return failure();
   }
 
-  if (failed(
-          verifyWorkgroupCountRegion(op, getWorkload(), getWorkgroupCount()))) {
+  if (failed(verifyWorkgroupCountRegion(op, getWorkgroupCount()))) {
+    return failure();
+  } else if (failed(verifyWorkgroupCountWorkload(op, getWorkload(),
+                                                 getWorkgroupCount()))) {
     return failure();
   }
 
@@ -1516,45 +1510,15 @@ LogicalResult ExecutableOp::verify() {
 
 LogicalResult ExecutableExportOp::verify() {
   ExecutableExportOp op = *this;
-  Block *body = getWorkgroupCountBody();
-  // When there is no body, nothing to verify.
-  if (!body)
-    return success();
 
-  if (!llvm::hasSingleElement(getWorkgroupCount())) {
+  // When there is no body, nothing to verify.
+  if (!getWorkgroupCountBody()) {
+    return success();
+  } else if (!llvm::hasSingleElement(getWorkgroupCount())) {
     return op.emitOpError() << "expected a single region block";
   }
-  bool validArguments = true;
-  if (body->getNumArguments() == 0) {
-    // Need at least a !hal.device.
-    validArguments = false;
-  } else if (!llvm::isa<IREE::HAL::DeviceType>(
-                 body->getArgument(0).getType())) {
-    // !hal.device must come first.
-    validArguments = false;
-  } else {
-    // All remaining arguments need to be of type index (today).
-    for (BlockArgument &blockArg : body->getArguments().drop_front(1)) {
-      if (!llvm::isa<IndexType>(blockArg.getType())) {
-        validArguments = false;
-        break;
-      }
-    }
-  }
-  if (!validArguments) {
-    return op.emitOpError(
-        "expected workgroup_count to take (%device: !hal.device, "
-        "%workload_0: index, %workload_1: index, ...");
-  }
-  // Check that the last statement in the block is `hal.return` operation.
-  // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
-  // should generate this check, but it doesnt.
-  auto returnOp = dyn_cast<ReturnOp>(body->getTerminator());
-  if (!returnOp || returnOp.getOperands().size() != getNumWorkgroupDims()) {
-    return op.emitOpError("expected operation to yield ")
-           << getNumWorkgroupDims() << " values";
-  }
-  return success();
+
+  return verifyWorkgroupCountRegion(op, getWorkgroupCount());
 }
 
 // Calculates the workgroup count (x, y, z) given the total N-dimensional
