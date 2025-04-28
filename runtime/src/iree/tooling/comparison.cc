@@ -37,7 +37,7 @@ static iree_hal_buffer_equality_t iree_tooling_equality_from_flags(void) {
   } else if (strcmp(FLAG_equality_mode, "exact") == 0) {
     equality.mode = IREE_HAL_BUFFER_EQUALITY_EXACT;
   } else {
-    IREE_ASSERT(false && "unhandled equality mode");
+    IREE_ASSERT_UNREACHABLE("unhandled equality mode");
   }
   equality.f16_threshold = FLAG_expected_f16_threshold;
   equality.f32_threshold = FLAG_expected_f32_threshold;
