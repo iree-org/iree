@@ -709,22 +709,8 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: vector.extract {{.*}}[0, 0] : vector<1xf16> from vector<4x1x1xf16>
-// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<4x1xf16>
-// CHECK: vector.insert {{.*}} [0, 0, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
-// CHECK: vector.extract {{.*}}[1, 0] : vector<1xf16> from vector<4x1x1xf16>
-// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<4x1xf16>
-// CHECK: vector.insert {{.*}} [0, 1, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
-// CHECK: vector.extract {{.*}}[2, 0] : vector<1xf16> from vector<4x1x1xf16>
-// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<4x1xf16>
-// CHECK: vector.insert {{.*}} [0, 2, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
-// CHECK: vector.extract {{.*}}[3, 0] : vector<1xf16> from vector<4x1x1xf16>
-// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<4x1xf16>
-
-// CHECK: vector.insert {{.*}} [1, 0, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
-// CHECK: vector.insert {{.*}} [1, 1, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
-// CHECK: vector.insert {{.*}} [1, 2, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
-// CHECK: vector.insert {{.*}} [1, 3, 0, 0] : vector<4x1xf16> into vector<2x4x1x1x4x1xf16>
+// CHECK: %[[BROAD:.+]] = vector.broadcast %{{.*}} : vector<4x1x1xf16> to vector<2x1x4x4x1x1xf16>
+// CHECK: %[[TRANS:.+]] = vector.transpose %[[BROAD]], [0, 3, 1, 4, 2, 5]
 
 // -----
 
@@ -753,16 +739,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[EXTRACT:.+]] = vector.extract %{{.*}}[0, 0] : vector<4xf16> from vector<1x1x4xf16>
-// CHECK: %[[BCAST:.+]] = vector.broadcast %[[EXTRACT]] : vector<4xf16> to vector<1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 0, 0, 0, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 0, 0, 1, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 1, 0, 0, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 1, 0, 1, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [1, 0, 0, 0, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [1, 0, 0, 1, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [1, 1, 0, 0, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}} [1, 1, 0, 1, 0, 0] : vector<1x4x4xf16> into vector<2x2x1x2x1x1x1x4x4xf16>
+// CHECK: vector.broadcast %{{.*}} : vector<1x1x4xf16> to vector<2x2x1x2x1x1x1x4x4xf16>
 
 // -----
 
@@ -790,10 +767,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-LABEL: func @scalar_broadcast
-// CHECK-SAME:  (%[[SRC:.*]]: f16)
-// CHECK: %[[BCAST:.*]] = vector.broadcast %[[SRC]] : f16 to vector<2x2x1x2x1x1x1x4x4xf16>
-// CHECK: iree_vector_ext.to_simd %[[BCAST]] : vector<2x2x1x2x1x1x1x4x4xf16> -> vector<32x256x64xf16>
+// CHECK: vector.broadcast %{{.*}} : f16 to vector<2x2x1x2x1x1x1x4x4xf16>
 
 // -----
 
@@ -821,20 +795,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-LABEL: func @zero_rank_broadcast
-// CHECK-SAME:  (%[[SRC:.*]]: vector<f16>)
-// CHECK: %[[SRC_SIMT:.*]] = iree_vector_ext.to_simt %[[SRC]] : vector<f16>
-// CHECK: %[[EXTRACT:.*]] = vector.extract %[[SRC_SIMT]]
-// CHECK: %[[BCAST:.*]] = vector.broadcast %[[EXTRACT]] : f16 to vector<1x4x4xf16>
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: vector.insert %[[BCAST]], %{{.*}}
-// CHECK: %[[OUT:.*]] = vector.insert %[[BCAST]], %{{.*}}
-// CHECK: iree_vector_ext.to_simd %[[OUT]] : vector<2x2x1x2x1x1x1x4x4xf16> -> vector<32x256x64xf16>
+// CHECK: vector.broadcast %{{.*}} : vector<f16> to vector<2x2x1x2x1x1x1x4x4xf16>
 
 // -----
 
