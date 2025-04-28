@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
@@ -36,12 +37,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op))
     return success();
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "verifying op: " << *op << "\n";
-    llvm::dbgs() << "chosen workgroup size: [";
-    llvm::interleaveComma(workgroupSize, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "verifying op: " << *op << "\n"
+                          << "chosen workgroup size: "
+                          << llvm::interleaved_array(workgroupSize) << "\n");
 
   FailureOr<int64_t> maybeDepth =
       getSoftwarePipelineDepth(translationInfo.getConfiguration());
@@ -148,12 +146,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
     return success();
   }
-  LLVM_DEBUG({
-    llvm::dbgs() << "verifying op: " << *op << "\n";
-    llvm::dbgs() << "chosen workgroup size: [";
-    llvm::interleaveComma(workgroupSize, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "verifying op: " << *op << "\n"
+                          << "chosen workgroup size: "
+                          << llvm::interleaved_array(workgroupSize) << "\n");
 
   FailureOr<int64_t> maybeDepth =
       getSoftwarePipelineDepth(translationInfo.getConfiguration());
@@ -189,8 +184,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
       workgroupSize[1] > maxWorkGroupSize[1] ||
       workgroupSize[2] > maxWorkGroupSize[2]) {
     return op->emitOpError("expected workgroup size dimensions not exceeding ")
-           << "[" << maxWorkGroupSize[0] << ", " << maxWorkGroupSize[1] << ", "
-           << maxWorkGroupSize[2] << "]";
+           << llvm::interleaved_array(maxWorkGroupSize);
   }
 
   // Verify the total workgroup size should not exceed maxThreads.

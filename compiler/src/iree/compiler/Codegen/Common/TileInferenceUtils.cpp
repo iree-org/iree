@@ -7,6 +7,7 @@
 #include <numeric>
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -113,11 +114,9 @@ inferWorkgroupTileMultiplesFromPackUnPack(
           ? packedMultiples
           : unPackedMultiples;
   LLVM_DEBUG({
-    DBGS() << "\nInferred " << op->getName() << " multiples:\nsrc: [";
-    llvm::interleaveComma(srcMultiples, llvm::dbgs());
-    llvm::dbgs() << "]\nresult: [";
-    llvm::interleaveComma(destMultiples, llvm::dbgs());
-    llvm::dbgs() << "]\n\n";
+    DBGS() << "\nInferred " << op->getName()
+           << " multiples:\nsrc: " << llvm::interleaved_array(srcMultiples)
+           << "\nresult: " << llvm::interleaved_array(destMultiples) << "\n\n";
   });
   return {srcMultiples, destMultiples};
 }
@@ -134,9 +133,7 @@ static void inferWorkgroupTileMultiplesFromLinalgOp(
   auto dbgsPrintMultiples = [](SmallVector<SmallVector<int64_t>> multiples) {
     LLVM_DEBUG({
       for (auto [i, m] : llvm::enumerate(multiples)) {
-        DBGS() << "operand " << i << ": [";
-        llvm::interleaveComma(m, llvm::dbgs());
-        llvm::dbgs() << "]\n";
+        DBGS() << "operand " << i << ": " << llvm::interleaved_array(m) << "\n";
       }
     });
   };
@@ -168,11 +165,7 @@ static void inferWorkgroupTileMultiplesFromLinalgOp(
     }
   }
 
-  LLVM_DEBUG({
-    DBGS() << "\niterationMultiples: [";
-    llvm::interleaveComma(iterationMultiples, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+  LDBG("\niterationMultiples: " << llvm::interleaved_array(iterationMultiples));
 }
 
 /// Given a set of multiples, and reassociations for expansion, return the
@@ -262,11 +255,8 @@ static SmallVector<int64_t> inferResultWorkgroupTileMultiples(OpResult result) {
             /*collapsedMultiples=*/srcMultiples,
             /*expandedShape=*/expandOp.getResultType().getShape(),
             /*reassociations=*/expandOp.getReassociationIndices());
-        LLVM_DEBUG({
-          DBGS() << "\nInferred expand_shape result multiples: [";
-          llvm::interleaveComma(resultMultiples, llvm::dbgs());
-          llvm::dbgs() << "]\n";
-        });
+        LDBG("\nInferred expand_shape result multiples: "
+             << llvm::interleaved_array(resultMultiples));
         return resultMultiples;
       })
       .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
@@ -335,11 +325,8 @@ static SmallVector<int64_t> inferUseWorkgroupTileMultiples(OpOperand *use) {
             /*collapsedMultiples=*/destMultiples,
             /*expandedShape=*/collapseOp.getSrcType().getShape(),
             /*reassociations=*/collapseOp.getReassociationIndices());
-        LLVM_DEBUG({
-          DBGS() << "\nInferred collapse_shape source multiples: ";
-          llvm::interleaveComma(srcMultiples, llvm::dbgs());
-          llvm::dbgs() << "]\n";
-        });
+        LDBG("\nInferred collapse_shape source multiples: "
+             << llvm::interleaved_array(srcMultiples));
         return srcMultiples;
       })
       .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
@@ -357,7 +344,7 @@ static SmallVector<int64_t> inferUseWorkgroupTileMultiples(OpOperand *use) {
             .first;
       })
       .Default([&](Operation *) {
-        LDBG("Unsupported operation. Defualting to all 1: " << use->get());
+        LDBG("Unsupported operation. Defaulting to all 1: " << use->get());
         return getDefaultValueMultiples(use->get());
       });
 }

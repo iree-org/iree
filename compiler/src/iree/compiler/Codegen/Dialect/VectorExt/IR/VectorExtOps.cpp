@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -141,10 +142,8 @@ void TransferGatherOp::print(OpAsmPrinter &p) {
   if (getMask())
     p << ", " << getMask();
   printTransferAttrs(p, *this, {"indexed"});
-  p << " : ";
-  p << getShapedType() << ", ";
-  llvm::interleaveComma(getIndexVecs().getType(), p);
-  p << ", " << getType();
+  p << " : " << getShapedType() << ", "
+    << llvm::interleaved(getIndexVecs().getType()) << ", " << getType();
 }
 
 static LogicalResult

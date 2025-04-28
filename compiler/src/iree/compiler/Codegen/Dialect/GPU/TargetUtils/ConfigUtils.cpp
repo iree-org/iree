@@ -20,6 +20,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -736,11 +737,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       for (unsigned i = maxCandidate; i >= 1; i >>= 1) {
         candidates.push_back(i * workgroupTileMultiple);
       }
-      LLVM_DEBUG({
-        llvm::dbgs() << "Base candidate tile sizes: [";
-        llvm::interleaveComma(candidates, llvm::dbgs());
-        llvm::dbgs() << "]\n";
-      });
+      LDBG(
+          "Base candidate tile sizes: " << llvm::interleaved_array(candidates));
 
       int64_t candidateWorkgroupSize = 1;
       for (int64_t candidate : candidates) {
@@ -771,7 +769,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           bool hasIdleThreads = distInfo.partitionableLoops.size() == 1 &&
                                 candidate <= subgroupSize;
           int vectorSize = hasIdleThreads ? 1 : numVectorElements;
-          LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
+          LDBG("Use vector size: " << vectorSize);
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
           candidateWorkgroupSize = candidate / vectorSize;
           assert(numThreads % (candidate / vectorSize) == 0);
@@ -798,8 +796,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           numThreads /= candidateWorkgroupSize;
         }
         workgroupTileSizes[shapeDim] = scaledTileSize;
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Chosen workgroup tile size: " << scaledTileSize << "\n");
+        LDBG("Chosen workgroup tile size: " << scaledTileSize);
         assert(numThreads >= 1);
         break;
       }

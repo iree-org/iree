@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
@@ -50,8 +51,8 @@ LogicalResult LinalgTransformationFilter::checkAndNotify(RewriterBase &rewriter,
 
     // 2. Has no filter but was expecting a filter.
     return rewriter.notifyMatchFailure(op, [&](Diagnostic &diag) {
-      diag << " does not have any filter from list: ";
-      interleaveComma(matchDisjunction, diag);
+      diag << " does not have any filter from list: "
+           << llvm::interleaved(matchDisjunction);
     });
   }
 
@@ -64,8 +65,8 @@ LogicalResult LinalgTransformationFilter::checkAndNotify(RewriterBase &rewriter,
 
   // 5. Fail to match.
   return rewriter.notifyMatchFailure(op, [&](Diagnostic &diag) {
-    diag << " does not have any filter from list: ";
-    interleaveComma(matchDisjunction, diag);
+    diag << " does not have any filter from list: "
+         << llvm::interleaved(matchDisjunction);
   });
 }
 

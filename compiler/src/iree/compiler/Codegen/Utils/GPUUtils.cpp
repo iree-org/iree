@@ -16,6 +16,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -781,10 +782,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     // to 1.
     SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
-    LLVM_DEBUG({
-      llvm::interleaveComma(mmaShape, DBGS() << "shape for vector.contract: ");
-      llvm::dbgs() << "\n";
-    });
+    LDBG("shape for vector.contract: " << llvm::interleaved(mmaShape));
     return mmaShape;
   }
 
@@ -794,11 +792,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       return std::nullopt;
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
-    LLVM_DEBUG({
-      llvm::interleaveComma(outputShape,
-                            DBGS() << "shape for vector.xfer_write: ");
-      llvm::dbgs() << "\n";
-    });
+    LDBG("shape for vector.xfer_write: " << llvm::interleaved(outputShape));
     return outputShape;
   }
 
@@ -811,10 +805,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     std::optional<int> operandId =
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      LLVM_DEBUG({
-        DBGS() << "Failed to get operandId for vector::xfer_read: " << *op
-               << "\n";
-      });
+      LDBG("Failed to get operandId for vector::xfer_read: " << *op);
       return std::nullopt;
     }
 
@@ -866,22 +857,14 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
-        LLVM_DEBUG({
-          llvm::interleaveComma(readShape,
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
-        LLVM_DEBUG({
-          llvm::interleaveComma(readShape,
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
         return readShape;
       }
       // For matrixB.
@@ -900,11 +883,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
             return std::nullopt;
           sliceType = vecType;
         }
-        LLVM_DEBUG({
-          llvm::interleaveComma(sliceType.getShape(),
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: "
+             << llvm::interleaved(sliceType.getShape()));
         return llvm::to_vector(sliceType.getShape());
       }
     }
