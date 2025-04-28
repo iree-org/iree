@@ -25,13 +25,12 @@
 ]>
 hal.executable private @main_dispatch_0 {
 hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16 ordinal(0) layout(#pipeline_layout) attributes {subgroup_size = 64 : index, translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>, workgroup_size = [64 : index, 16 : index, 1 : index]} {
-  ^bb0(%arg0: !hal.device):
+  hal.executable.export public @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c250 = arith.constant 250 : index
     %c500 = arith.constant 500 : index
     %c1 = arith.constant 1 : index
     hal.return %c250, %c500, %c1 : index, index, index
-  }
+  } attributes {subgroup_size = 64 : index, translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>, workgroup_size = [64 : index, 16 : index, 1 : index]}
   builtin.module {
     func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16() {
       %c128 = arith.constant 128 : index

@@ -223,7 +223,7 @@ util.func public @command_buffer_collective(
 
 hal.executable @ex {
   hal.executable.variant @backend target(<"backend", "format">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>)
@@ -269,7 +269,7 @@ util.func public @command_buffer_dispatch(
 
 hal.executable @ex {
   hal.executable.variant @backend target(<"backend", "format">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>)
@@ -304,7 +304,7 @@ util.func public @command_buffer_dispatch_indirect(
 
 hal.executable @ex {
   hal.executable.variant @backend target(<"backend", "format">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>)

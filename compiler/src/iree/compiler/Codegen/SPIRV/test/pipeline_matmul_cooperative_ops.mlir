@@ -20,8 +20,7 @@
 
 hal.executable public @matmul_256x1024x128_div_exp {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -211,8 +210,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
 ]>
 hal.executable public @batch_matmul_16x128x256x512_div {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
@@ -320,8 +318,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 hal.executable public @matmul_32x32x32_div {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matmul_32x32x32_div layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    hal.executable.export public @matmul_32x32x32_div layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -371,8 +368,7 @@ hal.executable public @matmul_32x32x32_div {
 
 hal.executable public @generic_batch_matmul_32x128x512x64 {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @generic_batch_matmul_32x128x512x64 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+    hal.executable.export public @generic_batch_matmul_32x128x512x64 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }

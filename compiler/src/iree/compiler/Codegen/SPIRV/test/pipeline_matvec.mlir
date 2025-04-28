@@ -17,8 +17,7 @@ hal.executable @i4_dequant_unit_matmul_f16 {
       max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [65535, 65535, 65535]>>
     }>) {
-    hal.executable.export @i4_dequant_unit_matmul_f16 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @i4_dequant_unit_matmul_f16 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -125,8 +124,7 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
       max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [65535, 65535, 65535]>>
   }>) {
-    hal.executable.export @i4_dequant_matvec_f16_subgroup_64 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @i4_dequant_matvec_f16_subgroup_64 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }

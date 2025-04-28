@@ -459,7 +459,7 @@ func.func @multi_result() {
       %22:2 = linalg.generic {indexing_maps = [#map, #map, #map, #map], iterator_types = ["parallel", "parallel"]}
         ins(%20, %21 : tensor<?x?xf32>, tensor<?x?xf32>)
         outs(%shape, %shape : tensor<?x?xf32>, tensor<?x?xf32>) {
-        ^bb0(%arg2: f32, %arg3 : f32, %arg4 : f32, %arg5 : f32):  // no predecessors
+        ^bb0(%arg2: f32, %arg3 : f32, %arg4 : f32, %arg5 : f32):
           %23 = arith.mulf %arg2, %arg3 : f32
           %24 = arith.addf %arg2, %arg3 : f32
           linalg.yield %23, %24 : f32, f32
@@ -536,7 +536,7 @@ func.func @unused_ins_operand() {
         %26 = tensor.empty(%22, %23) : tensor<?x?xi32>
         %27 = tensor.empty(%22, %23, %24) : tensor<?x?x?xi32>
         %28 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%25, %26 : tensor<?x?x?xi32>, tensor<?x?xi32>) outs(%27 : tensor<?x?x?xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [1, 4, 4]]>} {
-        ^bb0(%arg3: i32, %arg4: i32, %arg5: i32):  // no predecessors
+        ^bb0(%arg3: i32, %arg4: i32, %arg5: i32):
           %29 = arith.index_cast %arg3 : i32 to index
           %30 = linalg.index 0 : index
           %31 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%30, %arg0)

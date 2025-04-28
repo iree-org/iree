@@ -5,7 +5,7 @@ func.func @reduce_window_nonoverlapping_1x4x6x1xf32() {
                                         [[19.0], [20.0], [21.0], [22.0], [23.0], [24.0]]]]> : tensor<1x4x6x1xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce_window"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
@@ -21,7 +21,7 @@ func.func @reduce_window_overlapping_4x6xf32() {
                                         [[19.0], [20.0], [21.0], [22.0], [23.0], [24.0]]]]> : tensor<1x4x6x1xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce_window"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
@@ -40,7 +40,7 @@ func.func @reduce_window_max_4x6xf32() {
                                         [[19.0], [20.0], [21.0], [22.0], [23.0], [24.0]]]]> : tensor<1x4x6x1xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce_window"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.maximum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
@@ -56,7 +56,7 @@ func.func @reduce_window_min_4x6xf32() {
                                         [[19.0], [20.0], [21.0], [22.0], [23.0], [24.0]]]]> : tensor<1x4x6x1xf32>
   %1 = util.unfoldable_constant dense<14.0> : tensor<f32>
   %res = "stablehlo.reduce_window"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.minimum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,
@@ -72,7 +72,7 @@ func.func @reduce_window_max_with_padding_4x6xf32() {
                                         [[19.0], [20.0], [21.0], [22.0], [23.0], [24.0]]]]> : tensor<1x4x6x1xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce_window"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.maximum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {window_dimensions = array<i64: 1, 2, 3, 1>,

@@ -465,6 +465,69 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<OptionalWorkgroupCountRegion>($body)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseOptionalWorkgroupCountRegion(OpAsmParser &parser,
+                                                     Region &body) {
+  // Empty region if not specified.
+  if (failed(parser.parseOptionalKeyword("count"))) {
+    return success();
+  }
+
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
+  }
+
+  // Return types must be 3 dimensions (workgroup count XYZ).
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 3 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "workgroup count region must return the XYZ dimension counts";
+  }
+
+  // Parse region contents.
+  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+
+  // Verify the return types match.
+  for (auto returnOp : body.getOps<IREE::HAL::ReturnOp>()) {
+    for (auto [resultType, returnType] :
+         llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
+      if (resultType != returnType) {
+        return returnOp.emitOpError()
+               << "operands do not match expected region return types";
+      }
+    }
+  }
+
+  return success();
+}
+
+static void printOptionalWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                              Region &body) {
+  if (body.empty())
+    return;
+  p << "count(";
+  llvm::interleaveComma(body.getArguments(), p,
+                        [&](BlockArgument arg) { p.printRegionArgument(arg); });
+  p << ")";
+  Type indexType = IndexType::get(body.getContext());
+  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.*
 //===----------------------------------------------------------------------===//
 
@@ -1450,70 +1513,6 @@ LogicalResult ExecutableOp::verify() {
 //===----------------------------------------------------------------------===//
 // hal.executable.export
 //===----------------------------------------------------------------------===//
-
-ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
-                                      OperationState &result) {
-  StringAttr visibilityAttr;
-  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
-    return failure();
-  }
-
-  StringAttr nameAttr;
-  IREE::HAL::PipelineLayoutAttr layoutAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result.attributes))) {
-    return failure();
-  }
-  if (succeeded(parser.parseOptionalKeyword("ordinal"))) {
-    IntegerAttr ordinalAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(ordinalAttr,
-                                     parser.getBuilder().getIndexType())) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-    result.addAttribute("ordinal", ordinalAttr);
-  }
-  if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
-      failed(parser.parseAttribute(layoutAttr)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
-    return failure();
-  }
-  result.addAttribute("layout", layoutAttr);
-
-  std::unique_ptr<Region> region;
-  SmallVector<OpAsmParser::Argument> regionOperands;
-  // A missing optional region is materialized as an empty region.
-  (void)parser.parseOptionalRegion(region, regionOperands);
-  result.addRegion(std::move(region));
-
-  return success();
-}
-
-void ExecutableExportOp::print(OpAsmPrinter &p) {
-  Operation *op = getOperation();
-  p << ' ';
-  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
-  p << ' ';
-  p.printSymbolName(getSymName());
-  if (getOrdinalAttr()) {
-    p << " ordinal(";
-    p.printAttributeWithoutType(getOrdinalAttr());
-    p << ")";
-  }
-  p << " layout(";
-  p.printAttribute(getLayout());
-  p << ")";
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
-  if (getWorkgroupCount().empty())
-    return;
-  p << " ";
-  p.printRegion(getWorkgroupCount());
-}
 
 LogicalResult ExecutableExportOp::verify() {
   ExecutableExportOp op = *this;
