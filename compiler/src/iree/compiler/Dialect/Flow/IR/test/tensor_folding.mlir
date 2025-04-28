@@ -424,7 +424,7 @@ util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index)
 
 // -----
 
-// CHECK-LABEL: @ElideIntermediateTranfersTwoTransfers
+// CHECK-LABEL: @ElideIntermediateTransferTwoTransfers
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
 util.func public @ElideIntermediateTranfersTwoTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
   %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
