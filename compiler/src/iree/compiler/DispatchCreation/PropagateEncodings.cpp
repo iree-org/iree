@@ -50,7 +50,6 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   auto propagationAttrInterface =
       dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
           encodingOp.getResultType().getEncoding());
-
   if (!propagationAttrInterface ||
       !propagationAttrInterface.isPropagable(target)) {
     return failure();
@@ -64,12 +63,10 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   }
   auto collapseOp =
       encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
-
   if (!collapseOp) {
     return rewriter.notifyMatchFailure(encodingOp,
                                        "expected a collapse_shape producer");
   }
-
   if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
       !IREE::Flow::isNonNullAndOutsideDispatch(collapseOp)) {
     return rewriter.notifyMatchFailure(

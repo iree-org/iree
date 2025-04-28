@@ -20,8 +20,11 @@ struct ContractionAttrPropagationInterface
           ContractionAttrPropagationInterface, IREE::Encoding::MatmulKAttr> {
   bool isPropagable(Attribute attr, Value target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
-
-    return TypeSwitch<Operation *, bool>(target.getDefiningOp())
+    Operation *attachedToOperation = target.getDefiningOp();
+    if (!attachedToOperation) {
+      return false;
+    }
+    return TypeSwitch<Operation *, bool>(attachedToOperation)
         .Case<tensor::CollapseShapeOp>([&](auto op) {
           auto collapseOp = cast<tensor::CollapseShapeOp>(op);
           ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
@@ -80,6 +83,7 @@ struct ContractionOpPropagationInterface
                     IREE::Encoding::PropagationEncoding encodings,
                     OpResult opResult) const {
 
+    Location loc = op->getLoc();
     auto operandEncodings = encodings.operandEncodings;
     auto resultEncodings = encodings.resultEncodings;
 
@@ -93,15 +97,14 @@ struct ContractionOpPropagationInterface
                   operandEncodings.front());
 
           Value newEncodingOp = builder.create<IREE::Encoding::SetEncodingOp>(
-              collapseShapeOp.getLoc(), operandEncodingType,
-              collapseShapeOp.getSrc());
+              loc, operandEncodingType, collapseShapeOp.getSrc());
 
           auto resultEncodingType =
               dyn_cast<RankedTensorType>(opResult.getType())
                   .cloneWithEncoding(resultEncodings.front());
 
           Value newCollapseOp = builder.create<tensor::CollapseShapeOp>(
-              collapseShapeOp.getLoc(), resultEncodingType, newEncodingOp,
+              loc, resultEncodingType, newEncodingOp,
               collapseShapeOp.getReassociationIndices());
 
           IREE::Encoding::PropagationResult result;
