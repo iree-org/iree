@@ -381,9 +381,7 @@ module {
 //       CHECK:       %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[kParts]]#0, %[[hIDX]], %[[wIDX]], 0] [1, 1, 1, 4] [1, 1, 1, 1]
 //       CHECK:       %[[EMPTY:.+]] = tensor.empty() : tensor<4x1x1x1xf32>
 //       CHECK:       %[[TRANS:.+]] = linalg.transpose ins(%[[IN_SLICE]] : tensor<1x1x1x4xf32>) outs(%[[EMPTY]] : tensor<4x1x1x1xf32>) permutation = [3, 1, 2, 0]
-//       CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUT2]][0, %[[M0]], %[[M1]], %[[K]]] [4, 1, 1, 1] [1, 1, 1, 1]
-//       CHECK:       %[[COPY:.+]] = linalg.copy ins(%[[TRANS]] : tensor<4x1x1x1xf32>) outs(%[[OUT_SLICE]] : tensor<4x1x1x1xf32>) -> tensor<4x1x1x1xf32>
-//       CHECK:       %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[OUT2]][0, %[[M0]], %[[M1]], %[[K]]] [4, 1, 1, 1] [1, 1, 1, 1]
+//       CHECK:       %[[INSERT:.+]] = tensor.insert_slice %[[TRANS]] into %[[OUT2]][0, %[[M0]], %[[M1]], %[[K]]] [4, 1, 1, 1] [1, 1, 1, 1]
 //       CHECK:      scf.yield %[[INSERT]] : tensor<4x2x2x2xf32>
 //       CHECK:    scf.yield %[[kLOOP]] : tensor<4x2x2x2xf32>
 //       CHECK:  scf.yield %[[mLOOP1]] : tensor<4x2x2x2xf32>

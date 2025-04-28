@@ -683,12 +683,14 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // batch dim in front, and tiling should be along the batch dim.
   SmallVector<Range> iterationDomain(getIterationDomain(b));
   unsigned innerDim = getInputRank() - 1;
-  OpFoldResult innerTileSize = getBatchPos().back() == innerDim
-                                   ? iterationDomain.front().size
-                                   : iterationDomain.back().size;
-  auto constTileSize = getConstantIntValue(innerTileSize);
+  // Currently only a single batch dim is supported for tiling along batch dim.
+  // TODO: generalize to support multi-batch dimensions.
+  OpFoldResult vectorizedTileSize = getBatchPos().front() == innerDim
+                                        ? iterationDomain.front().size
+                                        : iterationDomain.back().size;
+  auto constTileSize = getConstantIntValue(vectorizedTileSize);
   if (constTileSize) {
-    innerTileSize = b.getIndexAttr(constTileSize.value());
+    vectorizedTileSize = b.getIndexAttr(constTileSize.value());
   }
 
   SmallVector<OpFoldResult> inputSizes =
@@ -709,17 +711,17 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // the innermost dimension.
   bool vectorizeInnerKLoop =
       getKPos().back() == innerDim &&
-      willBeContiguousSlice(innerSliceSize, innerTileSize, kOffset);
+      willBeContiguousSlice(innerSliceSize, vectorizedTileSize, kOffset);
   bool vectorizeInnerBLoop =
       getBatchPos().back() == innerDim &&
-      willBeContiguousSlice(innerSliceSize, innerTileSize,
+      willBeContiguousSlice(innerSliceSize, vectorizedTileSize,
                             /*offset=*/b.getIndexAttr(0));
   if (vectorizeInnerKLoop) {
     iterationDomain.pop_back();
   } else if (vectorizeInnerBLoop) {
     iterationDomain.erase(iterationDomain.begin());
   } else {
-    innerTileSize = b.getIndexAttr(1);
+    vectorizedTileSize = b.getIndexAttr(1);
   }
 
   // Build loop nest.
@@ -871,9 +873,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   const int64_t kPos = getKPos().front();
   const int64_t bPos = getBatchPos().front();
   if (vectorizeInnerBLoop) {
-    sliceSizes[bPos] = innerTileSize;
+    sliceSizes[bPos] = vectorizedTileSize;
   } else {
-    sliceSizes[kPos] = innerTileSize;
+    sliceSizes[kPos] = vectorizedTileSize;
   }
 
   // Set the batch and K offsets for the input tensor.
@@ -896,7 +898,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   ShapedType outputType = getOutputType();
   SmallVector<OpFoldResult> inputTileSizes(
       std::min<int64_t>(getOutputRank(), getInputRank()), b.getIndexAttr(1));
-  inputTileSizes.back() = innerTileSize;
+  inputTileSizes.back() = vectorizedTileSize;
 
   SmallVector<int64_t> tileSizeStatic;
   SmallVector<Value> tileSizeDynamic;
@@ -911,8 +913,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   sliceSizes = SmallVector<OpFoldResult>(getOutputRank(), one);
   sliceStrides = SmallVector<OpFoldResult>(getOutputRank(), one);
 
-  RankedTensorType resultType;
-  TypedValue<RankedTensorType> result;
+  Value inputForInsert;
   // If the im2col input tensor has the batch dim at last and can be vectorized,
   // transpose the dimensions to match the output order (Batch, M, K).
   if (vectorizeInnerBLoop) {
@@ -930,32 +931,30 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
                                            outputType.getElementType());
     auto transposeOp =
         b.create<linalg::TransposeOp>(nestedLoc, extract, empty, transposePerm);
-    resultType = cast<RankedTensorType>(transposeOp->getResult(0).getType());
-    result = cast<TypedValue<RankedTensorType>>(transposeOp->getResult(0));
-    sliceSizes.front() = innerTileSize;
+    inputForInsert = transposeOp->getResult(0);
+    sliceSizes.front() = vectorizedTileSize;
     for (auto [idx, iv] : llvm::enumerate(ivs))
       sliceOffsets[++idx] = iv;
   } else {
-    resultType = extractType;
-    result = extract.getResult();
-    sliceSizes.back() = innerTileSize;
+    // Insert a `linalg.copy` so there is something to vectorize in the
+    // decomposition. Without this copy, the extract and insert slice ops
+    // do not get vectorized, and the sequence becomes a scalar memref.copy.
+    // This memref.copy could be vectorized after bufferization, but it is
+    // probably better to vectorize during generic vectorization.
+    sliceSizes.back() = vectorizedTileSize;
     for (auto [idx, iv] : llvm::enumerate(ivs))
       sliceOffsets[idx] = iv;
+    Value copyDest = b.create<tensor::ExtractSliceOp>(
+        nestedLoc, extractType, loopNest.loops.back().getRegionIterArg(0),
+        sliceOffsets, sliceSizes, sliceStrides);
+    auto copiedSlice =
+        b.create<linalg::CopyOp>(nestedLoc, extract.getResult(), copyDest);
+    inputForInsert = copiedSlice.getResult(0);
   }
 
-  // Insert a `linalg.copy` so there is something to vectorize in the
-  // decomposition. Without this copy, the extract and insert slice ops
-  // do not get vectorized, and the sequence becomes a scalar memref.copy.
-  // This memref.copy could be vectorized after bufferization, but it is
-  // probably better to vectorize during generic vectorization.
-  Value copyDest = b.create<tensor::ExtractSliceOp>(
-      nestedLoc, resultType, loopNest.loops.back().getRegionIterArg(0),
+  auto insert = b.create<tensor::InsertSliceOp>(
+      nestedLoc, inputForInsert, loopNest.loops.back().getRegionIterArg(0),
       sliceOffsets, sliceSizes, sliceStrides);
-  auto copiedSlice = b.create<linalg::CopyOp>(nestedLoc, result, copyDest);
-  auto insert =
-      b.create<tensor::InsertSliceOp>(nestedLoc, copiedSlice.getResult(0),
-                                      loopNest.loops.back().getRegionIterArg(0),
-                                      sliceOffsets, sliceSizes, sliceStrides);
   auto yieldOp =
       cast<scf::YieldOp>(loopNest.loops.back().getBody()->getTerminator());
   yieldOp->getOpOperands().front().assign(insert.getResult());
