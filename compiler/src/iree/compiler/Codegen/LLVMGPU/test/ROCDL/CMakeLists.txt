@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_kernel_for_translation.mlir"
+    "buffer_instructions_optimization.mlir"
     "config_igemm_tile_and_fuse.mlir"
     "config_tile_and_fuse.mlir"
     "config_user_vector_distribute.mlir"
