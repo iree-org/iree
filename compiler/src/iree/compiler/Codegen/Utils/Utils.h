@@ -289,6 +289,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
 
+/// Returns the underlying index if the given value is a constant index.
+std::optional<int64_t> getConstantIndex(Value value);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

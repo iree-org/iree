@@ -931,6 +931,19 @@ bool hasGlobalMemoryAddressSpace(MemRefType memrefType) {
   return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
 }
 
+bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace) {
+    return false;
+  }
+  auto amdgpuAttr = dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr &&
+      amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer) {
+    return true;
+  }
+  return false;
+}
+
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
   auto addrSpace = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
       memrefType.getMemorySpace());

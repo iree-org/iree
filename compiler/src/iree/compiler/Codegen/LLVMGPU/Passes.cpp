@@ -345,6 +345,8 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
   addIREEPostBufferizationPasses(funcPassManager);
 
+  funcPassManager.addPass(createROCDLBufferInstructionsOptimizationPass());
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
