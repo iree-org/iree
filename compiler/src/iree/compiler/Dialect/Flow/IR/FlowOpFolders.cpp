@@ -1219,7 +1219,7 @@ struct ElideIntermediateTransfer final : OpRewritePattern<TensorTransferOp> {
 
 void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
-  results.add<ElideRedundantTransfer, ElideIntermediateTranfers>(context);
+  results.add<ElideRedundantTransfer, ElideIntermediateTransfer>(context);
 }
 
 //===----------------------------------------------------------------------===//
