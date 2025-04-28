@@ -131,13 +131,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not push down collapse shape across consumer if it is a bit-extend
-        // op. The bit-extend ops get cloned into producer dispatches, and the
-        // `collapse_shape` op going past dequant, prevents this clong.
-        if (IREE::LinalgExt::isBitExtendOp(consumer)) {
-          return false;
-        }
-
+        // If producer generic op is elementwise op, bubble up the expand shape
+        // past this operation.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
           // If producer generic op is elementwise op, bubble up the expand
           // shape past this operation.
