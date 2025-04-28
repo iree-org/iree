@@ -409,6 +409,31 @@ util.func public @cloneDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim: index) 
 
 // -----
 
+// CHECK-LABEL: @ElideRedundantBarrier
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf32>)
+util.func public @ElideRedundantBarrier(%operand: tensor<1xf32>) -> tensor<1xf32> {
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[OPERAND]] : tensor<1xf32> on "target"
+  %barriered = flow.tensor.barrier %operand : tensor<1xf32> on "target"
+  %redundant = flow.tensor.barrier %barriered : tensor<1xf32> on "target"
+  // CHECK-NEXT: util.return %[[BARRIERED]]
+  util.return %redundant : tensor<1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @DontElideIntermediateBarriersTwoBarriers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf32>)
+util.func public @DontElideIntermediateBarriersTwoBarriers(%operand: tensor<1xf32>) -> tensor<1xf32> {
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[OPERAND]] : tensor<1xf32> on "target1"
+  %barriered = flow.tensor.barrier %operand : tensor<1xf32> on "target1"
+  // CHECK: %[[BARRIERED2:.+]] = flow.tensor.barrier %[[BARRIERED]] : tensor<1xf32> on "target2"
+  %barriered2 = flow.tensor.barrier %barriered : tensor<1xf32> on "target2"
+  // CHECK-NEXT: util.return %[[BARRIERED2]]
+  util.return %barriered2 : tensor<1xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @ElideRedundantTransfer
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x?xf32>, %[[DIM:.+]]: index)
 util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index) -> tensor<4x?xi32> {
@@ -420,6 +445,47 @@ util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index)
   %redundant = flow.tensor.transfer %bitcast : tensor<4x?xi32>{%dim} to "target"
   // CHECK-NEXT: util.return %[[BITCAST]]
   util.return %redundant : tensor<4x?xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateTranfersTwoTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTranfersTwoTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @DontElideIntermediateTranfersBetweenBarrier
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @DontElideIntermediateTranfersBetweenBarrier(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  // CHECK: %[[TRANSFERED:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target0"
+  %transfered = flow.tensor.transfer %operand : tensor<1xf16> to "target0"
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[TRANSFERED]] : tensor<1xf16> on "target0"
+  %barriered = flow.tensor.barrier %transfered : tensor<1xf16> on "target0"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[BARRIERED]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %barriered : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateTranfersFourTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTranfersFourTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
+  %redundant2 = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
+  %redundant3 = flow.tensor.transfer %redundant2 : tensor<1xf16> to "target3"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target4"
+  %result = flow.tensor.transfer %redundant3 : tensor<1xf16> to "target4"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
 }
 
 // -----
