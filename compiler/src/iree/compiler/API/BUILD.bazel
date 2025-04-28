@@ -29,7 +29,9 @@ iree_compiler_cc_library(
     name = "StaticImpl",
     deps = [
         "//compiler/src/iree/compiler/API/Internal:CompilerDriver",
+        "//compiler/src/iree/compiler/API/Internal:IREECodegenDialectCAPI",
         "//compiler/src/iree/compiler/API/Internal:IREECompileToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:IREEGPUDialectCAPI",
         "//compiler/src/iree/compiler/API/Internal:IREEMLIRLSPServerToolEntryPoint",
         "//compiler/src/iree/compiler/API/Internal:IREEOptToolEntryPoint",
         "//compiler/src/iree/compiler/API/Internal:IREEReduceToolEntryPoint",
