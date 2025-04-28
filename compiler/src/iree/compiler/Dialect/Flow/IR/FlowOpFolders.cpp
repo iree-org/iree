@@ -1207,7 +1207,7 @@ struct ElideIntermediateTransfer final : OpRewritePattern<TensorTransferOp> {
     if (sourceTransferOp.getTarget() == targetTransferOp.getTarget()) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<TensorTransferOp>(
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorTransferOp>(
         targetTransferOp, targetTransferOp->getResultTypes(),
         sourceTransferOp.getOperand(), targetTransferOp.getOperandDims(),
         targetTransferOp.getTarget());
