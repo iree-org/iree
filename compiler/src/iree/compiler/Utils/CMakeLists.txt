@@ -45,7 +45,9 @@ iree_cc_library(
     "ToolUtils.cpp"
     "TracingUtils.cpp"
   DEPS
+    LLVMPasses
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
