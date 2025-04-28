@@ -436,7 +436,7 @@ util.func public @ElideIntermediateTransferTwoTransfers(%operand: tensor<1xf16>)
 
 // -----
 
-// CHECK-LABEL: @DontElideIntermediateTranfersBetweenBarrier
+// CHECK-LABEL: @DontElideIntermediateTransferBetweenBarrier
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
 util.func public @DontElideIntermediateTranfersBetweenBarrier(%operand: tensor<1xf16>) -> tensor<1xf16> {
   // CHECK: %[[TRANSFERED:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target0"
