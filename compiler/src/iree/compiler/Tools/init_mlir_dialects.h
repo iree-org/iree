@@ -53,6 +53,7 @@
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/LoopExtension/LoopExtension.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 
@@ -92,6 +93,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   arm_sme::ArmSMEDialect,
                   func::FuncDialect,
                   mlir::arith::ArithDialect,
+                  mlir::ub::UBDialect,
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   transform::TransformDialect,

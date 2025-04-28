@@ -668,15 +668,6 @@ def TensorToVectorVectorizePadPass :
                 "control flows";
 }
 
-def TestExecutablePreprocessingPass :
-    Pass<"iree-codegen-test-executable-preprocessing", ""> {
-  let summary = "Tests iree-hal-preprocess-executables-with behavior.";
-}
-
-def TestPartitionableLoopsInterfacePass :
-    Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
-  let summary = "Test the PartitionableLoopsInterface";
-}
 
 def TileAndDistributeToWorkgroupsPass :
     InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups", "mlir::FunctionOpInterface"> {
@@ -787,5 +778,25 @@ def VerifyWorkgroupDistributionPass :
     side effects are contained within a workgroup distributed loop.
   }];
 }
+
+//------------------------------------------------------------------------------
+// Test Passes
+//------------------------------------------------------------------------------
+
+def TestExecutablePreprocessingPass :
+    Pass<"iree-codegen-test-executable-preprocessing", ""> {
+  let summary = "Tests iree-hal-preprocess-executables-with behavior.";
+}
+
+def TestPartitionableLoopsInterfacePass :
+    Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
+  let summary = "Test the PartitionableLoopsInterface";
+}
+
+def TestFlattenVectorExtractInsertPass :
+ Pass<"iree-codegen-test-flatten-vector-extract-insert", ""> {
+  let summary = "Pass to test patterns that flatten vector dialect extract and insert ops";
+}
+
 
 #endif // IREE_CODEGEN_COMMON_PASSES
