@@ -1152,9 +1152,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass([&]() {
-        return createExpandGPUOpsPass(forROCDL);
-      })
+      .addPass([&]() { return createExpandGPUOpsPass(forROCDL); })
       // Barrier elimination before we reach unstructured control flow.
       .addPass(createGpuEliminateBarriers);
 
