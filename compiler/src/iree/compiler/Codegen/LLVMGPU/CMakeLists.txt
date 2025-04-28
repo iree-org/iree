@@ -93,6 +93,7 @@ iree_cc_library(
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
     "ROCDLAnnotateKernelForTranslation.cpp"
+    "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
     "ROCDLKernelConfig.cpp"
     "ROCDLLowerExecutableTarget.cpp"
@@ -190,8 +191,6 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::LinalgExt::IR

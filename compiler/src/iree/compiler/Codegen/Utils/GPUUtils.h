@@ -147,6 +147,10 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 /// Helper function to return native size for MMA.SYNC-based operations.
 std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 
+/// Rerutn true if memref has #amdgpu.address_space<fat_raw_buffer> address
+/// space.
+bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType);
+
 /// Return true if the given memref has one of the global address spaces - no
 /// adress space, explicit integer 0, #gpu.address_space<global>, or
 /// #amdgpu.address_space<fat_raw_buffer>

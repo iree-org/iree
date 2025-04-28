@@ -1809,4 +1809,15 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   return result;
 }
 
+std::optional<int64_t> getConstantIndex(Value value) {
+  if (!isa<IndexType>(value.getType()))
+    return std::nullopt;
+
+  APInt val;
+  if (!matchPattern(value, m_ConstantInt(&val)))
+    return std::nullopt;
+
+  return val.getSExtValue();
+}
+
 } // namespace mlir::iree_compiler

@@ -17,7 +17,7 @@ iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
     srcs = ["encoding.mlir"],
     compiler_flags = [
-        "--iree-global-opt-experimental-rocm-data-tiling",
+        "--iree-global-opt-enable-early-materialization=false",
         "--iree-hip-encoding-layout-resolver=data-tiling",
     ],
     driver = "hip",

@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -79,7 +78,7 @@ class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
+    registry.insert<tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -106,7 +105,6 @@ public:
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 gpu::GPUDialect,
-                IREE::Flow::FlowDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
                 linalg::LinalgDialect,

@@ -424,6 +424,47 @@ util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index)
 
 // -----
 
+// CHECK-LABEL: @ElideIntermediateTransferTwoTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTransferTwoTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @DontElideIntermediateTransferBetweenBarrier
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @DontElideIntermediateTransferBetweenBarrier(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  // CHECK: %[[TRANSFERED:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target0"
+  %transfered = flow.tensor.transfer %operand : tensor<1xf16> to "target0"
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[TRANSFERED]] : tensor<1xf16> on "target0"
+  %barriered = flow.tensor.barrier %transfered : tensor<1xf16> on "target0"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[BARRIERED]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %barriered : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateTransferFourTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTransferFourTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
+  %redundant2 = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
+  %redundant3 = flow.tensor.transfer %redundant2 : tensor<1xf16> to "target3"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target4"
+  %result = flow.tensor.transfer %redundant3 : tensor<1xf16> to "target4"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
 // CHECK-LABEL: @sliceConst0D
 util.func public @sliceConst0D() -> tensor<i32> {
   %0 = arith.constant dense<0> : tensor<i32>

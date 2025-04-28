@@ -34,13 +34,6 @@ class DispatchRegionOp;
 void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context);
 
-// Patterns to fold tensor.extract_slice/insert_slice with
-// iree_tensor_ext.dispatch.tensor.load/store. These patterns may not be
-// canonicalizers, since they might change the parallelism semantics in
-// non-obvious ways.
-void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-    RewritePatternSet &results, MLIRContext *context);
-
 // Verifies the flow.dispatch.workgroup.size/id/count operations.
 LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension);
 
