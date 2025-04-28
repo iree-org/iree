@@ -1193,7 +1193,7 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
 };
 
 // Attempts to identify trivial case of chained transfer ops (A -> B -> C) and
-// rewrite it as (A -> C) Writes it as A -> B and A -> C relying on dead code
+// rewrite it as (A -> C). Writes it as A -> B and A -> C relying on dead code
 // elimination to remove the unused A -> B transfer.
 struct ElideIntermediateTranfers final : OpRewritePattern<TensorTransferOp> {
   using OpRewritePattern::OpRewritePattern;
