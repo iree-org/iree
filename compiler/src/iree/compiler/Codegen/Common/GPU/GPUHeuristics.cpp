@@ -11,6 +11,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -27,10 +28,7 @@ constexpr int64_t kVerySkinnyDimThreshold = 4;
 template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const llvm::SmallVectorImpl<T> &vector) {
-  os << "[";
-  llvm::interleaveComma(vector, os);
-  os << "]";
-  return os;
+  return os << llvm::interleaved_array(vector);
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

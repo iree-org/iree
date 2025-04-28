@@ -32,6 +32,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -980,13 +981,8 @@ debugPrintContractionInfo(StringRef label, unsigned numLoops,
       if (llvm::is_contained(dim, idx))
         val = letter;
   }
-  DBGS() << "Contraction dims: [";
-  llvm::interleaveComma(dimSymbols, llvm::dbgs());
-  llvm::dbgs() << "]\n";
-
-  DBGS() << label << ": [";
-  llvm::interleaveComma(sizes, llvm::dbgs());
-  llvm::dbgs() << "]\n";
+  DBGS() << "Contraction dims: " << llvm::interleaved_array(dimSymbols) << "\n";
+  DBGS() << label << ": " << llvm::interleaved_array(sizes) << "\n";
 }
 
 static LogicalResult
@@ -1695,35 +1691,18 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG("QK Basis");
   LDBG("Thread Basis");
-  LLVM_DEBUG({
-    llvm::interleaveComma(qkThreadBasis.counts, llvm::dbgs());
-    llvm::dbgs() << "\n";
-    llvm::interleaveComma(qkThreadBasis.mapping, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LDBG(llvm::interleaved(qkThreadBasis.counts));
+  LDBG(llvm::interleaved(qkThreadBasis.mapping));
   LDBG("Subgroup Basis");
-  LLVM_DEBUG({
-    llvm::interleaveComma(subgroupBasis.counts, llvm::dbgs());
-    llvm::dbgs() << "\n";
-    llvm::interleaveComma(subgroupBasis.mapping, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
-
+  LDBG(llvm::interleaved(subgroupBasis.counts));
+  LDBG(llvm::interleaved(subgroupBasis.mapping));
   LDBG("PV Basis");
   LDBG("Thread Basis");
-  LLVM_DEBUG({
-    llvm::interleaveComma(pvThreadBasis.counts, llvm::dbgs());
-    llvm::dbgs() << "\n";
-    llvm::interleaveComma(pvThreadBasis.mapping, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LDBG(llvm::interleaved(pvThreadBasis.counts));
+  LDBG(llvm::interleaved(pvThreadBasis.mapping));
   LDBG("Subgroup Basis");
-  LLVM_DEBUG({
-    llvm::interleaveComma(subgroupBasis.counts, llvm::dbgs());
-    llvm::dbgs() << "\n";
-    llvm::interleaveComma(subgroupBasis.mapping, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LDBG(llvm::interleaved(subgroupBasis.counts));
+  LDBG(llvm::interleaved(subgroupBasis.mapping));
 
   // Tile N parallel dimensions if they are to big to workgroups.
   for (int64_t dim : opInfo.getNDims()) {
