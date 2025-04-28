@@ -22,7 +22,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-class ExpandGPUOpsPass final : public impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
+class ExpandGPUOpsPass final
+    : public impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
 private:
   // Apply AMD GPU targetting patterns
   bool forROCDL = false;
