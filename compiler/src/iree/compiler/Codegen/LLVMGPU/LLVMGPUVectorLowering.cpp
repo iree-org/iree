@@ -202,6 +202,12 @@ struct LLVMGPUVectorLoweringPass final
       populateVectorToSCFConversionPatterns(patterns, vectorToSCFOptions);
       memref::populateFoldMemRefAliasOpPatterns(patterns);
       amdgpu::populateAmdgpuTransferReadToLoadPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+    {
+      RewritePatternSet patterns(context);
       vector::populateVectorTransferLoweringPatterns(patterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -254,12 +260,12 @@ struct LLVMGPUVectorLoweringPass final
       }
     }
 
-    // bool shapesRemain = false;
-    // funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true;
-    // }); if (shapesRemain) {
-    //   llvm::errs() << "\n\nfuncOp at this point is \n\n" << funcOp << "\n\n";
-    //   return signalPassFailure();
-    // }
+    bool shapesRemain = false;
+    funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true; });
+    if (shapesRemain) {
+      llvm::errs() << "\n\nfuncOp at this point is \n\n" << funcOp << "\n\n";
+      return signalPassFailure();
+    }
 
     // Less desirable unrolls, delayed till here in case previous
     // canonicalization can eliminate them.
