@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
-
 # iree_redirect_llvm_dylib_deps(DEPS_VAR)
 #
 # Filters a list of CC dependencies, making alterations as needed to
