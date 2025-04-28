@@ -1,15 +1,15 @@
-// RUN: iree-opt --split-input-file --iree-stream-clone-to-consumers %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-clone-to-consumers=print-iterations=true %s | FileCheck %s
 
 // Tests that splats (which are cloneable ops) are cloned for every user.
 
 // CHECK-LABEL: @splatOp
 util.func private @splatOp() -> (tensor<1xi32>, tensor<1xi32>) {
   %splat_value = arith.constant 123 : i32
-  //      CHECK: %[[SPLAT_A:.+]] = flow.tensor.splat
+  //      CHECK: %[[SPLAT_B:.+]] = flow.tensor.splat
+  // CHECK-NEXT: %[[SPLAT_A:.+]] = flow.tensor.splat
   %splat = flow.tensor.splat %splat_value : tensor<1xi32>
   // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[SPLAT_A]]
   %transfer_a = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_a>
-  // CHECK-NEXT: %[[SPLAT_B:.+]] = flow.tensor.splat
   // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[SPLAT_B]]
   %transfer_b = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK-NEXT: util.return %[[TRANSFER_A]], %[[TRANSFER_B]]
@@ -49,13 +49,13 @@ util.func private @selectOp(%cond: i1) -> (tensor<1xi32>, tensor<1xi32>) {
   %splat0 = flow.tensor.splat %splat0_value : tensor<1xi32>
   // CHECK-DAG: %[[SPLAT1_A:.+]] = flow.tensor.splat %[[SPLAT1_VALUE]]
   %splat1 = flow.tensor.splat %splat1_value : tensor<1xi32>
-  // CHECK-DAG: %[[SELECT_A:.+]] = arith.select {{.+}}, %[[SPLAT0_A]], %[[SPLAT1_A]]
-  %select = arith.select %cond, %splat0, %splat1 : tensor<1xi32>
-  // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[SELECT_A]]
-  %transfer_a = flow.tensor.transfer %select : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK-DAG: %[[SPLAT0_B:.+]] = flow.tensor.splat %[[SPLAT0_VALUE]]
   // CHECK-DAG: %[[SPLAT1_B:.+]] = flow.tensor.splat %[[SPLAT1_VALUE]]
+  // CHECK-DAG: %[[SELECT_A:.+]] = arith.select {{.+}}, %[[SPLAT0_A]], %[[SPLAT1_A]]
+  %select = arith.select %cond, %splat0, %splat1 : tensor<1xi32>
   // CHECK-DAG: %[[SELECT_B:.+]] = arith.select {{.+}}, %[[SPLAT0_B]], %[[SPLAT1_B]]
+  // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[SELECT_A]]
+  %transfer_a = flow.tensor.transfer %select : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[SELECT_B]]
   %transfer_b = flow.tensor.transfer %select : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK-NEXT: util.return %[[TRANSFER_A]], %[[TRANSFER_B]]
@@ -71,11 +71,11 @@ util.func private @selectOp(%cond: i1) -> (tensor<1xi32>, tensor<1xi32>) {
 // CHECK-LABEL: @splatLikeDispatchOp
 util.func private @splatLikeDispatchOp() -> (tensor<1xi32>, tensor<1xi32>) {
   %splat_value = arith.constant 123 : i32
-  //      CHECK: %[[DISPATCH_A:.+]] = flow.dispatch
+  //      CHECK: %[[DISPATCH_B:.+]] = flow.dispatch
+  // CHECK-NEXT: %[[DISPATCH_A:.+]] = flow.dispatch
   %dispatch = flow.dispatch @some::@splat_like(%splat_value) : (i32) -> tensor<1xi32>
   // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[DISPATCH_A]]
   %transfer_a = flow.tensor.transfer %dispatch : tensor<1xi32> to #hal.device.promise<@dev_a>
-  // CHECK-NEXT: %[[DISPATCH_B:.+]] = flow.dispatch
   // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[DISPATCH_B]]
   %transfer_b = flow.tensor.transfer %dispatch : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK-NEXT: util.return %[[TRANSFER_A]], %[[TRANSFER_B]]
@@ -92,13 +92,13 @@ util.func private @splatLikeDispatchOp() -> (tensor<1xi32>, tensor<1xi32>) {
 util.func private @reshapedDispatchOp() -> (tensor<1x4xi32>, tensor<1x4xi32>) {
   %splat_value = arith.constant 123 : i32
   //      CHECK: %[[DISPATCH_A:.+]] = flow.dispatch
+  // CHECK-NEXT: %[[DISPATCH_B:.+]] = flow.dispatch
   %splat = flow.dispatch @some::@splat_like(%splat_value) : (i32) -> tensor<4x1xi32>
+  // CHECK-NEXT: %[[RESHAPE_B:.+]] = flow.tensor.reshape %[[DISPATCH_B]]
   // CHECK-NEXT: %[[RESHAPE_A:.+]] = flow.tensor.reshape %[[DISPATCH_A]]
   %reshape = flow.tensor.reshape %splat : tensor<4x1xi32> -> tensor<1x4xi32>
   // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[RESHAPE_A]]
   %transfer_a = flow.tensor.transfer %reshape : tensor<1x4xi32> to #hal.device.promise<@dev_a>
-  // CHECK-NEXT: %[[DISPATCH_B:.+]] = flow.dispatch
-  // CHECK-NEXT: %[[RESHAPE_B:.+]] = flow.tensor.reshape %[[DISPATCH_B]]
   // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[RESHAPE_B]]
   %transfer_b = flow.tensor.transfer %reshape : tensor<1x4xi32> to #hal.device.promise<@dev_b>
   // CHECK-NEXT: util.return %[[TRANSFER_A]], %[[TRANSFER_B]]
@@ -116,15 +116,14 @@ util.func private @reshapedDispatchOp() -> (tensor<1x4xi32>, tensor<1x4xi32>) {
 // CHECK-LABEL: @uniformMultiResultDispatchOp
 util.func private @uniformMultiResultDispatchOp() -> (tensor<1xi32>, tensor<1xi32>, tensor<1xi32>) {
   %dispatch_value = arith.constant 123 : i32
-  //      CHECK: %[[DISPATCH_A:.+]]:2 = flow.dispatch
+  //      CHECK: %[[DISPATCH_B:.+]]:2 = flow.dispatch
+  // CHECK-NEXT: %[[DISPATCH_A:.+]]:2 = flow.dispatch
   %dispatch:2 = flow.dispatch @some::@multi_splat_like(%dispatch_value) : (i32) -> (tensor<1xi32>, tensor<1xi32>)
   // CHECK-NEXT: %[[TRANSFER0_A:.+]] = flow.tensor.transfer %[[DISPATCH_A]]#0
   %transfer0_a = flow.tensor.transfer %dispatch#0 : tensor<1xi32> to #hal.device.promise<@dev_a>
-  // CHECK-NEXT: %[[DISPATCH0_B:.+]]:2 = flow.dispatch
-  // CHECK-NEXT: %[[TRANSFER0_B:.+]] = flow.tensor.transfer %[[DISPATCH0_B]]#0
+  // CHECK-NEXT: %[[TRANSFER0_B:.+]] = flow.tensor.transfer %[[DISPATCH_B]]#0
   %transfer0_b = flow.tensor.transfer %dispatch#0 : tensor<1xi32> to #hal.device.promise<@dev_b>
-  // CHECK-NEXT: %[[DISPATCH1_B:.+]]:2 = flow.dispatch
-  // CHECK-NEXT: %[[TRANSFER1_B:.+]] = flow.tensor.transfer %[[DISPATCH1_B]]#1
+  // CHECK-NEXT: %[[TRANSFER1_B:.+]] = flow.tensor.transfer %[[DISPATCH_B]]#1
   %transfer1_b = flow.tensor.transfer %dispatch#1 : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK-NEXT: util.return %[[TRANSFER0_A]], %[[TRANSFER0_B]], %[[TRANSFER1_B]]
   util.return %transfer0_a, %transfer0_b, %transfer1_b : tensor<1xi32>, tensor<1xi32>, tensor<1xi32>
@@ -138,15 +137,34 @@ util.func private @uniformMultiResultDispatchOp() -> (tensor<1xi32>, tensor<1xi3
 // CHECK-LABEL: @multipleUses
 util.func private @multipleUses() -> (tensor<1xi32>, tensor<1xi32>) {
   %splat_value = arith.constant 123 : i32
-  //      CHECK: %[[SPLAT_A:.+]] = flow.tensor.splat
+  //      CHECK: %[[SPLAT_B:.+]] = flow.tensor.splat
+  // CHECK-NEXT: %[[SPLAT_A:.+]] = flow.tensor.splat
   %splat = flow.tensor.splat %splat_value : tensor<1xi32>
   // CHECK-NEXT: %[[DISPATCH_A:.+]] = flow.dispatch @ex::@a(%[[SPLAT_A]], %[[SPLAT_A]])
   %dispatch = flow.dispatch @ex::@a(%splat, %splat) {stream.affinity = #hal.device.promise<@dev_a>} : (tensor<1xi32>, tensor<1xi32>) -> tensor<1xi32>
   // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[DISPATCH_A]]
   %transfer_a = flow.tensor.transfer %dispatch : tensor<1xi32> to #hal.device.promise<@dev_a>
-  // CHECK-NEXT: %[[SPLAT_B:.+]] = flow.tensor.splat
   // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[SPLAT_B]]
   %transfer_b = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK-NEXT: util.return %[[TRANSFER_A]], %[[TRANSFER_B]]
   util.return %transfer_a, %transfer_b : tensor<1xi32>, tensor<1xi32>
+}
+
+// -----
+
+// Tests that splats with only one use are never cloned.
+
+// CHECK:       iterationCount: 0
+// CHECK-LABEL: @single_user_multi_device
+module {
+  util.global private @param_dev0 {stream.affinity = #hal.device.affinity<@__device_0>} : tensor<1xi32>
+  util.global private @param_dev1 {stream.affinity = #hal.device.affinity<@__device_1>} : tensor<1xi32>
+  util.func private @single_user_multi_device() -> tensor<1xi32> {
+    %weight1 = util.global.load immutable @param_dev0 : tensor<1xi32>
+    %weight2 = util.global.load immutable @param_dev1 : tensor<1xi32>
+    %splat_value = arith.constant 123 : i32
+    %splat = flow.tensor.splat %splat_value : tensor<i32>
+    %16 = flow.dispatch @test::@test(%weight1, %weight2, %splat) : (tensor<1xi32>, tensor<1xi32>, tensor<i32>) -> tensor<1xi32>
+    util.return %16 : tensor<1xi32>
+  }
 }

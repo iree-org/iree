@@ -67,6 +67,12 @@ static bool tryCloneToConsumersInRegion(Region &region,
       // running analysis again with the mutated IR.
       clonedOps.clear();
       for (auto &operand : op.getOpOperands()) {
+        // If this is the only use, we can avoid cloning the producer and just
+        // continue.
+        if (operand.get().hasOneUse()) {
+          continue;
+        }
+
         // This simple analysis is block local and is not be able to look across
         // branches or function calls.
         auto *definingOp = operand.get().getDefiningOp();
@@ -111,8 +117,11 @@ static bool tryCloneToConsumersInRegion(Region &region,
 struct CloneToConsumersPass
     : public IREE::Stream::impl::CloneToConsumersPassBase<
           CloneToConsumersPass> {
+  using Base::Base;
   GreedyRewriteConfig config;
   std::shared_ptr<const FrozenRewritePatternSet> patterns;
+
+  CloneToConsumersPass(CloneToConsumersPassOptions options) : Base(options) {}
 
   LogicalResult initialize(MLIRContext *context) override {
     // Inherit the same config defaults from the upstream canonicalizer pass.
@@ -176,6 +185,10 @@ struct CloneToConsumersPass
       if (!didChange) {
         break;
       }
+    }
+    // Used to check iteration count for testing purposes.
+    if (printIterations) {
+      llvm::outs() << "iterationCount: " << iterationCount << "\n";
     }
     if (iterationCount == maxIterationCount) {
       // If you find yourself hitting this we can evaluate increasing the
