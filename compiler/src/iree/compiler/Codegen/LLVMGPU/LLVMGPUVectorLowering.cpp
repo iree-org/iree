@@ -208,17 +208,18 @@ struct LLVMGPUVectorLoweringPass final
       populateVectorToSCFConversionPatterns(patterns, vectorToSCFOptions);
       memref::populateFoldMemRefAliasOpPatterns(patterns);
       amdgpu::populateAmdgpuTransferReadToLoadPatterns(patterns);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-    {
-      RewritePatternSet patterns(context);
       vector::populateVectorTransferLoweringPatterns(patterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
+   //  {
+   //    RewritePatternSet patterns(context);
+   //    vector::populateVectorTransferLoweringPatterns(patterns);
+   //    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+   //      return signalPassFailure();
+   //    }
+   //  }
 
     // Canonicalize.
     {
