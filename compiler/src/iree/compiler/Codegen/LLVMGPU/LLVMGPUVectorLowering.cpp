@@ -194,6 +194,11 @@ struct LLVMGPUVectorLoweringPass final
       }
     }
 
+    llvm::errs() << "\n\n==================================\nState just before "
+                    "the start of the lowering of the transfer ops"
+                 << "\n==================================\n";
+    llvm::errs() << funcOp << "\n";
+
     // transfer_read -> load and transfer_write -> store.
     {
       RewritePatternSet patterns(context);
@@ -223,6 +228,11 @@ struct LLVMGPUVectorLoweringPass final
         return signalPassFailure();
       }
     }
+
+    llvm::errs() << "\n\n==================================\nState just before "
+                    "the start of flattening process"
+                 << "\n==================================\n";
+    llvm::errs() << funcOp << "\n";
 
     // Flatten!
     {
