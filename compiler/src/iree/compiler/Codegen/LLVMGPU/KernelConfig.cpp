@@ -698,7 +698,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
-      numDynamicReductionDims++;
+      ++numDynamicReductionDims;
     }
   }
 
@@ -728,10 +728,10 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       maxLoadBits.has_value() ? *maxLoadBits : 128;
 
   unsigned vectorSize = largestLoadSizeInBits / *bitWidth;
-  unsigned threadLoads = vectorSize;
-  while (numDynamicReductionDims == 0 &&
-         (reductionSize / vectorSize) % subgroupSize != 0) {
-    vectorSize /= 2;
+  if (numDynamicReductionDims == 0) {
+    while ((reductionSize / vectorSize) % subgroupSize != 0) {
+      vectorSize /= 2;
+    }
   }
   // Deduce the workgroup size we should use for reduction. Currently a
   // workgroup processes all elements in reduction dimensions. Need to make sure
@@ -773,7 +773,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // the root operation and ignores other operation within a dispatch.
   // Extend it to use per operation within a dispatch.
   if (failed(populateConfigInfo(*computeOps, target, workgroupSize,
-                                subgroupSize, threadLoads))) {
+                                subgroupSize, vectorSize))) {
     return failure();
   }
 
