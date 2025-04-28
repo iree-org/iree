@@ -296,8 +296,30 @@ struct LoadFromMemrefOpInterface
           LoadFromMemrefOpInterface, IREE::Codegen::LoadFromMemrefOp> {
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
-    auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
-    return !loadOp.getReadOnly();
+    // Walk memref Value producers until a hal.interface.binding.subspan op is
+    // found, and check if the subspan is read only.
+    SmallVector<Operation *> worklist = {op};
+    while (!worklist.empty()) {
+      Operation *currentOp = worklist.pop_back_val();
+      if (!currentOp)
+        continue;
+      auto subspanOp =
+          dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp);
+      if (subspanOp) {
+        std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+            subspanOp.getDescriptorFlags();
+        return !descriptorFlags.has_value() ||
+               descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
+      }
+      for (Value operand : currentOp->getOperands()) {
+        // Only add memref types, since we are looking for a buffer source.
+        if (isa<MemRefType>(operand.getType()))
+          worklist.push_back(operand.getDefiningOp());
+      }
+    }
+    // Conservatively default to not writable if the source of the buffer is
+    // not found.
+    return false;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
