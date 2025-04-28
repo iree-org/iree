@@ -199,6 +199,7 @@ struct LLVMGPUVectorLoweringPass final
                  << "\n==================================\n";
     llvm::errs() << funcOp << "\n";
 
+
     // transfer_read -> load and transfer_write -> store.
     {
       RewritePatternSet patterns(context);
