@@ -186,6 +186,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
         if (size <= 1)
           continue;
         --size;
+        //--size;
         return success();
       }
       return failure();
@@ -396,6 +397,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
     bestKTileCountPerSubgroup /= kTileSizes[kDim];
     --kDim;
   }
+  mTileSizes = {2};
 
   return GPUMMASchedule{
       intrinsicIndex,      intrinsic.mSizes[0], intrinsic.nSizes[0],

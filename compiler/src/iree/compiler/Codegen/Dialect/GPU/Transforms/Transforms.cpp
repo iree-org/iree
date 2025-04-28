@@ -196,6 +196,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     for (auto [inductionVar, workerCount] :
          llvm::zip_equal(getAsOpFoldResult(loop.getInductionVars()),
                          loop.getMixedUpperBound())) {
+      // This created a dynamic loop initializer
       linearId = affine::makeComposedFoldedAffineApply(
           rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
       consumerWorkerCount = affine::makeComposedFoldedAffineApply(
@@ -206,6 +207,8 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   // Compute the total producer loop worker count (P0 * ... * Pn).
   Value linearConsumerIdVal =
       getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
+  //LLVM_DEBUG(llvm::dbgs() << "linear consumer id: " << linearConsumerIdVal
+  //                        << "\n");
   SmallVector<OpFoldResult> producerRanges;
   OpFoldResult producerWorkerCount = rewriter.getIndexAttr(1);
   for (auto workerCount : producer.getMixedUpperBound()) {
@@ -233,6 +236,9 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
       getValueOrCreateConstantIndexOp(rewriter, loc, consumerWorkerCount);
   auto newProducer = rewriter.create<scf::ForOp>(
       loc, lb, ub, step, barrierOp.getBody()->getArgument(0));
+  // debug message on newProducer
+  //LLVM_DEBUG(llvm::dbgs() << "Created new producer loop: " << newProducer
+  //                        << "\n");
   setLoopUnrollMarker(newProducer);
   Block *loopBody = newProducer.getBody();
 

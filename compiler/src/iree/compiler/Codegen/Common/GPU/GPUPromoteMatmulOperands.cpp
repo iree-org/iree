@@ -43,6 +43,8 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v) {
 /// Helper to promote results. If the target value is consumed only by a
 /// `tensor.extract_slice`, this will promote the result of the slice instead.
 void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
+  llvm::dbgs() << "Promoting result of " << *op << "\n";
+
   IRRewriter rewriter(builder);
   Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);

@@ -136,6 +136,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
   };
 
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
