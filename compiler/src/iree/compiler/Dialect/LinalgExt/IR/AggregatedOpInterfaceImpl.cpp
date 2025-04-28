@@ -685,7 +685,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   unsigned innerDim = getInputRank() - 1;
   // Currently only a single batch dim is supported for tiling along batch dim.
   // TODO: generalize to support multi-batch dimensions.
-  OpFoldResult vectorizedTileSize = getBatchPos().front() == innerDim
+  bool maybeVectorizeBatch =
+      getBatchPos().size() == 1 && getBatchPos().front() == innerDim;
+  OpFoldResult vectorizedTileSize = maybeVectorizeBatch
                                         ? iterationDomain.front().size
                                         : iterationDomain.back().size;
   auto constTileSize = getConstantIntValue(vectorizedTileSize);
@@ -695,16 +697,24 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
 
   SmallVector<OpFoldResult> inputSizes =
       tensor::getMixedSizes(b, loc, getInput());
-  OpFoldResult innerSliceSize = inputSizes[innerDim];
-  // If the innermost dimension is an `m_pos` dimension, then use the
-  // corresponding kernel_size instead of the input tensor size. This is
-  // because the slice will be of size `kernel_size` at some offset
-  // `i * kernel_size` in this case.
-  for (auto [mPos, kernelSize] :
-       llvm::zip_equal(getMPos(), getMixedKernelSize())) {
-    if (mPos == innerDim) {
-      innerSliceSize = kernelSize;
+  SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
+  OpFoldResult innerSliceSize;
+  for (int idx = inputSizes.size() - 1; idx >= 0; --idx) {
+    if (!maybeVectorizeBatch && batchPosSet.contains(idx)) {
+      continue;
     }
+    innerSliceSize = inputSizes[idx];
+    // If the innermost non-batch dimension is an m_pos dimension, then use the
+    // corresponding kernel_size instead of the input tensor size. This is
+    // because the slice will be of size `kernel_size` at some offset
+    // `i * kernel_size` in this case.
+    for (auto [mPos, kernelSize] :
+         llvm::zip_equal(getMPos(), getMixedKernelSize())) {
+      if (mPos == idx) {
+        innerSliceSize = kernelSize;
+      }
+    }
+    break;
   }
 
   // Check if the input slice is contiguous and can be vectorized along the
@@ -774,7 +784,6 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   for (auto [idx, mPos] : enumerate(getMPos())) {
     mKernelIdx[mPos] = idx;
   }
-  SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
   for (auto [idx, size] : enumerate(inputSizes)) {
     if (batchPosSet.contains(idx))
       continue;
