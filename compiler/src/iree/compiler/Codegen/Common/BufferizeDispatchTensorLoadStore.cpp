@@ -56,11 +56,8 @@ bufferizeDispatchTensorLoad(RewriterBase &rewriter,
       rewriter, loadOp->getLoc(), subspanOp, loadOp.getType(),
       loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
       loadOp.getMixedStrides());
-
-  bool readOnly = loadOp.getSourceType().getAccess() ==
-                  IREE::TensorExt::TensorAccess::ReadOnly;
   rewriter.replaceOpWithNewOp<IREE::Codegen::LoadFromMemrefOp>(
-      loadOp, loadOp.getType(), sourceBuffer, readOnly);
+      loadOp, loadOp.getType(), sourceBuffer);
 }
 
 static void
