@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -282,6 +284,90 @@ struct DispatchTensorStoreOpInterface
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp->getLoc(), srcMemref,
                                     target)))
+      return failure();
+
+    rewriter.eraseOp(storeOp);
+    return success();
+  }
+};
+
+struct LoadFromMemrefOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          LoadFromMemrefOpInterface, IREE::Codegen::LoadFromMemrefOp> {
+  bool isWritable(Operation *op, Value value,
+                  const AnalysisState &state) const {
+    // Walk memref Value producers until a hal.interface.binding.subspan op is
+    // found, and check if the subspan is read only.
+    Operation *currentOp = op;
+    while (currentOp) {
+      if (auto subspanOp =
+              dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
+        std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+            subspanOp.getDescriptorFlags();
+        return !descriptorFlags.has_value() ||
+               descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
+      }
+      // There is expected to be only a single memref source for a given memref
+      // OpResult, because producers of memref Values are expected to be
+      // view-like or cast-like operations. If multiple operands have a memref
+      // type, then conservatively return not writable.
+      if (llvm::count_if(currentOp->getOperandTypes(),
+                         llvm::IsaPred<MemRefType>) != 1) {
+        return false;
+      }
+      // Otherwise, follow the memref operand to find the source buffer.
+      for (Value operand : currentOp->getOperands()) {
+        if (isa<MemRefType>(operand.getType())) {
+          currentOp = operand.getDefiningOp();
+          break;
+        }
+      }
+    }
+    // Conservatively default to not writable if the source of the buffer is
+    // not found.
+    return false;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
+    replaceOpWithBufferizedValues(rewriter, op, loadOp.getSource());
+    return success();
+  }
+};
+
+struct StoreToMemrefOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          StoreToMemrefOpInterface, IREE::Codegen::StoreToMemrefOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    FailureOr<Value> maybeBuffer =
+        getBuffer(rewriter, storeOp.getValue(), options);
+    if (failed(maybeBuffer))
+      return failure();
+    Value srcMemref = *maybeBuffer;
+
+    // If everything bufferized inplace, no copy is needed. We wrote to the
+    // target buffer already. The copy folds away in that case.
+    if (failed(options.createMemCpy(rewriter, storeOp.getLoc(), srcMemref,
+                                    storeOp.getTarget())))
       return failure();
 
     rewriter.eraseOp(storeOp);
@@ -610,6 +696,87 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
   }
 };
 
+struct LoadFromMemrefOpSubsetInterface
+    : public SubsetOpInterface::ExternalModel<LoadFromMemrefOpSubsetInterface,
+                                              IREE::Codegen::LoadFromMemrefOp> {
+  bool operatesOnEquivalentSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
+    Operation *otherOp = candidate.getOperation();
+    if (auto storeOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(otherOp)) {
+      return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
+    }
+    if (auto otherLoadOp = dyn_cast<IREE::Codegen::LoadFromMemrefOp>(otherOp)) {
+      return equivalenceFn(loadOp.getSource(), otherLoadOp.getSource());
+    }
+    return false;
+  }
+
+  bool operatesOnDisjointSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // TODO: This is a new entry point and not clear it is correct.
+    return false;
+  }
+};
+
+struct StoreToMemrefOpSubsetInterface
+    : public SubsetOpInterface::ExternalModel<StoreToMemrefOpSubsetInterface,
+                                              IREE::Codegen::StoreToMemrefOp> {
+
+  bool operatesOnEquivalentSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // Returns true if the value of a `storeOp` bufferizes to an equivalent
+    // DispatchTensorLoadOp result that bufferizes inplace.
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    Operation *otherOp = candidate.getOperation();
+    if (auto otherStoreOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(otherOp)) {
+      return equivalenceFn(storeOp.getTarget(), otherStoreOp.getTarget());
+    }
+    if (auto loadOp = dyn_cast<IREE::Codegen::LoadFromMemrefOp>(otherOp)) {
+      return equivalenceFn(storeOp.getTarget(), loadOp.getSource());
+    }
+    return false;
+  }
+
+  bool operatesOnDisjointSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // TODO: This is a new entry point and not clear it is correct.
+    return false;
+  }
+};
+
+struct StoreToMemrefOpSubsetInsertionInterface
+    : public SubsetInsertionOpInterface::ExternalModel<
+          StoreToMemrefOpSubsetInsertionInterface,
+          IREE::Codegen::StoreToMemrefOp> {
+
+  OpOperand &getSourceOperand(Operation *op) const {
+    return cast<IREE::Codegen::StoreToMemrefOp>(op).getValueMutable();
+  }
+
+  OpOperand &getDestinationOperand(Operation *op) const {
+    return cast<IREE::Codegen::StoreToMemrefOp>(op).getTargetMutable();
+  }
+
+  Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
+                              Location loc) const {
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    auto loadOp = builder.create<IREE::Codegen::LoadFromMemrefOp>(
+        loc, storeOp.getValue().getType(), storeOp.getTarget());
+    return loadOp.getResult();
+  }
+
+  SmallVector<Value>
+  getValuesNeededToBuildSubsetExtraction(Operation *op) const {
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    return {storeOp.getTarget()};
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE specific post analysis transformations.
 //===----------------------------------------------------------------------===//
@@ -639,6 +806,14 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             DispatchTensorStoreOpSubsetInterface>(*ctx);
         IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInsertionInterface>(*ctx);
+      });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
+        IREE::Codegen::LoadFromMemrefOp::attachInterface<
+            LoadFromMemrefOpInterface, LoadFromMemrefOpSubsetInterface>(*ctx);
+        IREE::Codegen::StoreToMemrefOp::attachInterface<
+            StoreToMemrefOpInterface, StoreToMemrefOpSubsetInterface,
+            StoreToMemrefOpSubsetInsertionInterface>(*ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
