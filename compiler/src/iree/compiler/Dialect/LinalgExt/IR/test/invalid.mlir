@@ -1,5 +1,15 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
+func.func @linalg_ext_op_interface_mixed_semantics(
+    %input: memref<256xf32>, %output: tensor<8x32xf32>
+) -> tensor<8x32xf32> {
+  // expected-error@+1 {{expected operation that implements LinalgExtInterface to have either pure buffer semantics or pure tensor semantics}}
+  %0 = iree_linalg_ext.pack %input inner_dims_pos = [0] inner_tiles = [32] into %output : (memref<256xf32> tensor<8x32xf32>) -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
 func.func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   // expected-error @+1 {{dimension must be within (0, 1]}}
   %0 = iree_linalg_ext.sort dimension(1)
