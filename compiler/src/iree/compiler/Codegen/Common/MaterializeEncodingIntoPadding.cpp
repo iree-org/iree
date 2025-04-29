@@ -70,7 +70,7 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
 static RankedTensorType getPaddedType(Attribute layoutAttr,
                                       RankedTensorType type) {
   PadEncodingLayoutAttr layout = getPadLayout(layoutAttr, type);
-  if (!isNonZeroPadding(layout)) {
+  if (layout.isIdentityLayout()) {
     return type.dropEncoding();
   }
 

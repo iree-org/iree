@@ -118,13 +118,4 @@ getEncodingInfoFromLayouts(RankedTensorType type) {
   return std::nullopt;
 }
 
-bool isNonZeroPadding(IREE::Encoding::PadEncodingLayoutAttr padLayout) {
-  if (!padLayout) {
-    return false;
-  }
-
-  return !llvm::all_of(padLayout.getPadding().asArrayRef(),
-                       [](int32_t padValue) { return padValue == 0; });
-}
-
 } // namespace mlir::iree_compiler
