@@ -70,8 +70,8 @@ jobs:
           - name: windows-2022
             runs-on: windows-2022
             driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
-          - name: macos-14
-            runs-on: macos-14
+          - name: macos-15
+            runs-on: macos-15
             driver-options: -DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF
     env:
       BUILD_DIR: build-runtime
@@ -169,7 +169,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, macos-14]
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, macos-15]
         provider: [tracy, console]
     env:
       BUILD_DIR: build-tracing
