@@ -321,16 +321,17 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
 
 def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     [LinalgExtInterface, DestinationStyleOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
   let summary = "Scatter with a mapping from source indices to result indices";
   let description = [{
-    Takes two inputs, `input` and `output`, and stores every element of `input`
-    to a unique location in `output`. If the operands are tensors, the op will
-    also return a Value for the result. For an element of the `input`, the index
-    to store into the `output` is determined by index computation mapping the
-    index in the `input` value to an index in the `output` value. This
-    computation is contained in the `transformation_region`, which contains a
-    single block, with one argument for each dimension in the `input` value.
+    Takes two operands, `input` and `output`, and stores every element of
+    `input` to a unique location in `output`. If the operands are tensors, the
+    op will also return a Value for the result. For an element of the `input`,
+    the index to store into the `output` is determined by index computation
+    mapping the index in the `input` value to an index in the `output` value.
+    This computation is contained in the `transformation_region`, which contains
+    a single block, with one argument for each dimension in the `input` value.
     The block arguments represent the index of a given element along the
     corresponding dimension (i.e., block arg `i` represents the index along
     dimension `i` of the `input` value). The block is terminated by an

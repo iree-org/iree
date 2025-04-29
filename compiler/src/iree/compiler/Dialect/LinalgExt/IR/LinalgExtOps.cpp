@@ -332,13 +332,7 @@ LogicalResult MapScatterOp::verify() {
   if (hasPureBufferSemantics() && getNumResults() != 0) {
     return emitOpError("expected no result for memref output");
   }
-  if (hasPureTensorSemantics() && getNumResults() != 1) {
-    return emitOpError("expected one result for tensor output");
-  }
   Region &transformRegion = getTransformationRegion();
-  if (!transformRegion.hasOneBlock()) {
-    return emitOpError("expected a single block in the transform_region");
-  }
   Block &transformBody = transformRegion.getBlocks().front();
   if (transformBody.getNumArguments() != getInputRank()) {
     return emitOpError("expected number of block arguments to be equal "

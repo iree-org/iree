@@ -523,20 +523,6 @@ func.func @map_scatter_memref_with_result(
 
 // -----
 
-func.func @map_scatter_tensor_without_result(
-    %input: tensor<4xf32>, %output: tensor<4xf32>
-) {
-  // expected-error@+1 {{expected one result for tensor output}}
-  iree_linalg_ext.map_scatter %input into %output {
-    ^bb0(%idx0: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %mask : index, i1
-  } : tensor<4xf32> into tensor<4xf32>
-  return
-}
-
-// -----
-
 func.func @map_scatter_mixed_element_types(
     %input: memref<4xf16>, %output: memref<4xf32>
 ) {
@@ -546,22 +532,6 @@ func.func @map_scatter_mixed_element_types(
       %mask = arith.constant true
       iree_linalg_ext.yield %idx0, %mask : index, i1
   } : memref<4xf16> into memref<4xf32>
-  return
-}
-
-// -----
-
-func.func @map_scatter_multi_block_region(
-    %input: memref<4xf32>, %output: memref<4xf32>
-) {
-  // expected-error@+1 {{expected a single block in the transform_region}}
-  iree_linalg_ext.map_scatter %input into %output {
-    ^bb0(%idx0: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %mask : index, i1
-    ^bb1:
-      iree_linalg_ext.yield %idx0, %mask : index, i1
-  } : memref<4xf32> into memref<4xf32>
   return
 }
 
