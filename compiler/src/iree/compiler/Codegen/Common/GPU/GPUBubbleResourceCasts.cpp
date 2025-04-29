@@ -58,6 +58,8 @@ struct BubbleResourceCastPattern
     // Skip ops with cache swizzle strides because the stride could be
     // rendered invalid by the swap.
     // TODO: Support bubbling swizzled casts in cases where it makes sense.
+    // e.g. iree_gpu.buffer_resource_cast(tensor.extract_slice) if the cache
+    // swizzle stride does not depend on the extract_slice.
     if (castOp.getCacheSwizzleStride()) {
       return failure();
     }
