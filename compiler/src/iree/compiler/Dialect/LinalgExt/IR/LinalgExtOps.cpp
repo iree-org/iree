@@ -318,6 +318,42 @@ GatherOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// MapScatterOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult MapScatterOp::verify() {
+  if (getInputType().getElementType() != getOutputType().getElementType()) {
+    return emitOpError("expected input and output element types to match");
+  }
+  Region &transformRegion = getTransformationRegion();
+  Block &transformBody = transformRegion.getBlocks().front();
+  if (transformBody.getNumArguments() != getInputRank()) {
+    return emitOpError("expected number of block arguments to be equal "
+                       "to the input rank");
+  }
+  if (!llvm::all_of(transformBody.getArgumentTypes(),
+                    llvm::IsaPred<IndexType>)) {
+    return emitOpError("expected block arguments to be index types");
+  }
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  if (yieldOp->getNumOperands() != getOutputRank() + 1) {
+    return yieldOp.emitOpError("expected transformation_region to yield a "
+                               "value for each output dimension and a mask");
+  }
+  for (int operandIdx = 0; operandIdx < getOutputRank(); ++operandIdx) {
+    if (!isa<IndexType>(yieldOp.getOperandTypes()[operandIdx])) {
+      return yieldOp.emitOpError("expected yielded indices to be index types");
+    }
+  }
+  auto maskType =
+      dyn_cast<IntegerType>(yieldOp.getOperandTypes()[getOutputRank()]);
+  if (!maskType || maskType.getIntOrFloatBitWidth() != 1) {
+    return yieldOp.emitOpError("expected yielded mask to be i1 type");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
 
@@ -2005,6 +2041,7 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
+DEFINE_OP_GET_EFFECTS(MapScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
