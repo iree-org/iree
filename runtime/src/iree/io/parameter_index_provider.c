@@ -7,11 +7,81 @@
 #include "iree/io/parameter_index_provider.h"
 
 #include "iree/hal/utils/file_cache.h"
+#include "iree/io/uthash.h"
 
 // Limit concurrent operations to avoid blowing the stack. This is arbitrary and
 // if we wanted to support more we could switch to using heap allocations or
 // a growable stack scratchpad.
 #define IREE_IO_PARAMETER_OP_BATCH_MAX_CONCURRENCY 8
+
+// Key struct for device memory sharing
+typedef struct {
+    iree_string_view_t parameter_name;
+    void *file_ptr;
+} KeyStruct;
+
+// Map entry
+typedef struct {
+    KeyStruct key;     // composite key
+    void *value;       // value is a pointer
+    UT_hash_handle hh; // uthash handle
+} MapEntry;
+
+MapEntry *device_memory_map = NULL;
+
+// Custom hash function
+unsigned key_hash(const void *key_ptr, size_t len) {
+    const KeyStruct *k = key_ptr;
+    unsigned hash = 0;
+    iree_string_view_t s = k->parameter_name;
+    for (iree_host_size_t i = 0; i < s.size; ++i) {
+      hash = hash * 31 + s.data[i];
+    }
+    hash ^= (uintptr_t)(k->file_ptr);
+    return hash;
+}
+
+// Custom comparator function
+int key_equal(const void *a, const void *b, size_t len) {
+    const KeyStruct *ka = a;
+    const KeyStruct *kb = b;
+    return iree_string_view_equal(ka->parameter_name, kb->parameter_name) == 0 && ka->file_ptr == kb->file_ptr;
+}
+
+// Add or update entry
+void map_put(iree_string_view_t parameter_name, void *file_ptr, void *value) {
+    KeyStruct lookup_key = { parameter_name, file_ptr };
+
+    MapEntry *entry = NULL;
+    HASH_FIND(hh, device_memory_map, &lookup_key, sizeof(KeyStruct), entry);
+    if (!entry) {
+        entry = malloc(sizeof(MapEntry));
+        // TODO: We might need to create deep copy of the string_view or can keep const char * instead using strdup
+        entry->key.parameter_name = parameter_name;
+        entry->key.file_ptr = file_ptr;
+        HASH_ADD_KEYPTR(hh, device_memory_map, &entry->key, sizeof(KeyStruct), entry);
+    }
+    entry->value = value;
+}
+
+// Get value
+void *map_get(iree_string_view_t parameter_name, void *file_ptr) {
+    KeyStruct lookup_key = { parameter_name, file_ptr };
+    MapEntry *entry = NULL;
+    HASH_FIND(hh, device_memory_map, &lookup_key, sizeof(KeyStruct), entry);
+    return entry ? entry->value : NULL;
+}
+
+// Cleanup
+void map_free() {
+    MapEntry *entry, *tmp;
+    HASH_ITER(hh, device_memory_map, entry, tmp) {
+        HASH_DEL(device_memory_map, entry);
+        // TODO: If strdup(), then free up the memory
+        // free((char *)entry->key.parameter_name); // free strdup'd name
+        free(entry);
+    }
+}
 
 typedef struct iree_io_parameter_index_provider_t {
   iree_io_parameter_provider_t base;
@@ -775,39 +845,44 @@ static iree_status_t iree_io_parameter_index_provider_load(
 
     // When the import path above fails we fall back to alloca + fill/read.
     if (iree_status_is_ok(status) && !target_buffer) {
-      // Enqueue an allocation of the target buffer on a timeline.
-      // The next operation we enqueue will go on the same timeline.
-      status = iree_io_parameter_op_batch_enqueue_alloca(
-          &batch, IREE_HAL_ALLOCATOR_POOL_DEFAULT, target_params, span.length,
-          &target_buffer);
+      target_buffer = map_get(source_entry->key, source_file);
+      if (!target_buffer) {
+        // Enqueue an allocation of the target buffer on a timeline.
+        // The next operation we enqueue will go on the same timeline.
+        status = iree_io_parameter_op_batch_enqueue_alloca(
+            &batch, IREE_HAL_ALLOCATOR_POOL_DEFAULT, target_params, span.length,
+            &target_buffer);
 
-      // Enqueue the operation on the same timeline as the allocation.
-      if (iree_status_is_ok(status)) {
-        switch (source_entry->type) {
-          case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT: {
-            IREE_ASSERT(!source_file);
-            status = iree_io_parameter_op_batch_enqueue_splat(
-                &batch, target_buffer, span.buffer_offset, span.length,
-                source_entry->storage.splat.pattern,
-                source_entry->storage.splat.pattern_length);
-            break;
-          }
-          case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE: {
-            IREE_ASSERT(source_file);
-            status = iree_io_parameter_op_batch_enqueue_file_read(
-                &batch, source_file,
-                source_entry->storage.file.offset + span.parameter_offset,
-                target_buffer, span.buffer_offset, span.length, 0);
-            break;
-          }
-          default: {
-            status = iree_make_status(
-                IREE_STATUS_FAILED_PRECONDITION,
-                "load not supported with parameters of type %d",
-                (int)source_entry->type);
-            break;
+        // Enqueue the operation on the same timeline as the allocation.
+        if (iree_status_is_ok(status)) {
+          switch (source_entry->type) {
+            case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT: {
+              IREE_ASSERT(!source_file);
+              status = iree_io_parameter_op_batch_enqueue_splat(
+                  &batch, target_buffer, span.buffer_offset, span.length,
+                  source_entry->storage.splat.pattern,
+                  source_entry->storage.splat.pattern_length);
+              break;
+            }
+            case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE: {
+              IREE_ASSERT(source_file);
+              status = iree_io_parameter_op_batch_enqueue_file_read(
+                  &batch, source_file,
+                  source_entry->storage.file.offset + span.parameter_offset,
+                  target_buffer, span.buffer_offset, span.length, 0);
+              break;
+            }
+            default: {
+              status = iree_make_status(
+                  IREE_STATUS_FAILED_PRECONDITION,
+                  "load not supported with parameters of type %d",
+                  (int)source_entry->type);
+              break;
+            }
           }
         }
+
+        map_put(source_entry->key, source_file, target_buffer);
       }
     }
 
