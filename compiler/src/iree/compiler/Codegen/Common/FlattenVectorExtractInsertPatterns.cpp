@@ -250,6 +250,8 @@ LogicalResult
 insertStridedSliceToRankOneShuffle(vector::InsertStridedSliceOp insertOp,
                                    PatternRewriter &rewriter) {
 
+  // return failure();
+
   if (!stridesAllOne(insertOp))
     return failure();
 
@@ -298,6 +300,8 @@ insertStridedSliceToRankOneShuffle(vector::InsertStridedSliceOp insertOp,
 LogicalResult
 extractStridedSliceToRankOneShuffle(vector::ExtractStridedSliceOp extractOp,
                                     PatternRewriter &rewriter) {
+
+  return failure();
 
   if (!stridesAllOne(extractOp))
     return failure();

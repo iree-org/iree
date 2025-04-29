@@ -95,12 +95,23 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     if (auto vectorType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       int64_t rank = vectorType.getRank();
       ArrayRef<int64_t> shape = vectorType.getShape();
+      // auto bitWidth  = vectorType.getElementTypeBitWidth();
+      // int factor = 1;
+      // if (bitWidth == 32) factor = 2; 
+      // else if (bitWidth == 16) factor = 4;
+      // else if (bitWidth == 8) factor = 8;
+
       auto iter = std::find_if_not(shape.rbegin(), shape.rend(),
                                    [](int64_t dim) { return dim == 1; });
       SmallVector<int64_t> nativeSize(rank, 1);
       if (iter != shape.rend()) {
         // Found a non-1 dimension, so we can keep it.
-        nativeSize[rank - 1 - std::distance(shape.rbegin(), iter)] = *iter;
+        auto val = *iter;
+        val = 1;
+        zzzz
+        // if (val % factor == 0) val = factor;
+        // else val = 1;
+        nativeSize[rank - 1 - std::distance(shape.rbegin(), iter)] = val;
       }
       return nativeSize;
     }
@@ -147,6 +158,7 @@ struct LLVMGPUVectorLoweringPass final
       vector::InsertStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::TransposeOp::getCanonicalizationPatterns(patterns, ctx);
+      populateConvertToShapeCastPatterns(patterns);
     };
 
     MLIRContext *context = funcOp.getContext();
@@ -236,32 +248,34 @@ struct LLVMGPUVectorLoweringPass final
                  << "\n==================================\n";
     llvm::errs() << funcOp << "\n";
 
-    // Flatten!
-    {
-      RewritePatternSet patterns(context);
-      GreedyRewriteConfig config;
-      config.fold = false;
 
-      // TODO(newling) this is very clearly defined set of patterns --
-
-      // energy function that the patterns try to minimize is
-      // sum(operations in vector and arith dialects of) energy(op)
-      // - energy(shape_cast) = 0
-      // - energy(other_op) = sum of ranks of vector operands.
-
-      // IREE uses this as a late stage canonicaliazation before lowering to
-      // LLVM, only after unrolling of single-threaded code. Any pattern which
-      // decreases this object should be added. Any pattern that increases this
-      // objective should definitely not be added to avoid cycles. Any pattern
-      // that leaves the energy unchanged -- the energy function can be extended
-      // (lexicographically).
-
-      populateFlattenVectorExtractInsertPatterns(patterns);
-      populateForOpInductionVarShapePatterns(patterns);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
-        return signalPassFailure();
-      }
-    }
+    // TODO(newling) it's the flattening which is causing the increase in memory. 
+     // Flatten!
+     {
+       RewritePatternSet patterns(context);
+       GreedyRewriteConfig config;
+       config.fold = false;
+ 
+       // TODO(newling) this is very clearly defined set of patterns --
+ 
+       // energy function that the patterns try to minimize is
+       // sum(operations in vector and arith dialects of) energy(op)
+       // - energy(shape_cast) = 0
+       // - energy(other_op) = sum of ranks of vector operands.
+ 
+       // IREE uses this as a late stage canonicaliazation before lowering to
+       // LLVM, only after unrolling of single-threaded code. Any pattern which
+       // decreases this object should be added. Any pattern that increases this
+       // objective should definitely not be added to avoid cycles. Any pattern
+       // that leaves the energy unchanged -- the energy function can be extended
+       // (lexicographically).
+ 
+       populateFlattenVectorExtractInsertPatterns(patterns);
+       populateForOpInductionVarShapePatterns(patterns);
+       if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
+         return signalPassFailure();
+       }
+     }
 
     // Canonicalize.
     {
@@ -272,12 +286,12 @@ struct LLVMGPUVectorLoweringPass final
       }
     }
 
-    bool shapesRemain = false;
-    funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true; });
-    if (shapesRemain) {
-      llvm::errs() << "\n\nfuncOp at this point is \n\n" << funcOp << "\n\n";
-      return signalPassFailure();
-    }
+  //   bool shapesRemain = false;
+  //   funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true; });
+  //   if (shapesRemain) {
+  //     llvm::errs() << "\n\nfuncOp at this point is \n\n" << funcOp << "\n\n";
+  //     return signalPassFailure();
+  //   }
 
     // Less desirable unrolls, delayed till here in case previous
     // canonicalization can eliminate them.
