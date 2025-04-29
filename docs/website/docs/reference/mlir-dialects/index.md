@@ -30,6 +30,7 @@ Dialect                     | Description
 [IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 [LinalgExt](./LinalgExt.md) | Extensions to the Linalg dialect for specific operations
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
+[TensorExt](./TensorExt.md) | Extensions to the Tensor dialect for specific operations
 [Util](./Util.md)           | Types and ops common across IREE subdialects
 [VM](./VM.md)               | Represents operations against an abstract virtual machine
 [VMVX](./VMVX.md)           | Virtual Machine Vector Extensions

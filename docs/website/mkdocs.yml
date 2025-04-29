@@ -182,6 +182,7 @@ nav:
               - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
               - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
+              - TensorExt: "reference/mlir-dialects/TensorExt.md"
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
               - VMVX: "reference/mlir-dialects/VMVX.md"
