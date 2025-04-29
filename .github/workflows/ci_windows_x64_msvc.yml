@@ -24,7 +24,7 @@ jobs:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: azure-windows-scale
     env:
-      BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
+      BASE_BUILD_DIR_POWERSHELL: B:\tmpbuild
       SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
       SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
       SCCACHE_CCACHE_ZSTD_LEVEL: 10
@@ -36,12 +36,11 @@ jobs:
           submodules: true
       - name: "Create build dir"
         run: |
-          $currentTime = (Get-Date).ToString('HHmmss')
-          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currentTime"
+          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\"
           echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
           mkdir "$buildDir"
           Write-Host "Generated Build Directory: $buildDir"
-          $bashBuildDir = $buildDir -replace '\\', '/' -replace '^C:', '/c'
+          $bashBuildDir = $buildDir -replace '\\', '/' -replace '^B:', '/b'
           echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
           Write-Host "Converted Build Directory For Bash: $bashBuildDir"
       - name: "Setting up Python"
