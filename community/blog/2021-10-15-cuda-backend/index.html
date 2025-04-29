@@ -3926,7 +3926,7 @@ distribute the work onto threads within the block.</p>
           memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;,
           memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;)
       outs(%12 : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;) {
-    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
       %13 = addf %arg1, %arg2 : f32
       linalg.yield %13 : f32
     }

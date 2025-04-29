@@ -10766,6 +10766,14 @@ runtime-derived parameters.</p>
 <p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutableexport-halexecutableexportop"><code>hal.executable.export</code> (HAL::ExecutableExportOp)<a class="headerlink" href="#halexecutableexport-halexecutableexportop" title="Permanent link">link</a></h4>
 <p><em>Executable entry point declaration</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.executable.export` custom&lt;SymbolVisibility&gt;($sym_visibility)
+              $sym_name
+              (`ordinal` `(` $ordinal^ `)`)?
+              `layout` `(` qualified($layout) `)`
+              custom&lt;OptionalWorkgroupCountRegion&gt;($workgroup_count)
+              attr-dict-with-keyword
+</code></pre></div>
 <p>An entry point exported by the executable with statically-available
 information describing the IO interface it uses and other dispatch metadata.</p>
 <p>The <code>workgroup_count</code> region represents the computation that
