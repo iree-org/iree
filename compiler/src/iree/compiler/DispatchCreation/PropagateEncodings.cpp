@@ -52,13 +52,17 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
           encodingOp.getResultType().getEncoding());
   if (!propagationAttrInterface ||
       !propagationAttrInterface.isPropagable(target)) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        encodingOp, "the propagation attribute interface isn't defined or the "
+                    "target isn't propagable");
   }
   // Get the encoding attributes for the operands and results of the operation.
   FailureOr<IREE::Encoding::PropagationEncoding> propagationEncodings =
       propagationAttrInterface.generateEncodings(target);
   if (failed(propagationEncodings)) {
-    return failure();
+    return rewriter.notifyMatchFailure(encodingOp,
+                                       "not able to determine propagation "
+                                       "attributes for operands and results");
   }
   auto collapseOp =
       encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
@@ -75,7 +79,8 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
       dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(
           collapseOp.getOperation());
   if (!propagationResult) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        encodingOp, "encoding propagation op interface isn't defined");
   }
   // Propagate the set encoding and generate the new encoding operations.
   FailureOr<IREE::Encoding::PropagationResult> maybeResult =
@@ -83,7 +88,8 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
           rewriter, *propagationEncodings,
           cast<OpResult>(encodingOp.getSource()));
   if (failed(maybeResult)) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        encodingOp, "not able to propagate encodings and find replacement");
   }
   rewriter.replaceOp(encodingOp, maybeResult->replacement);
   return success();
