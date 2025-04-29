@@ -298,23 +298,29 @@ struct LoadFromMemrefOpInterface
                   const AnalysisState &state) const {
     // Walk memref Value producers until a hal.interface.binding.subspan op is
     // found, and check if the subspan is read only.
-    SmallVector<Operation *> worklist = {op};
-    while (!worklist.empty()) {
-      Operation *currentOp = worklist.pop_back_val();
-      if (!currentOp)
-        continue;
-      auto subspanOp =
-          dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp);
-      if (subspanOp) {
+    Operation *currentOp = op;
+    while (currentOp) {
+      if (auto subspanOp =
+              dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
         std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
             subspanOp.getDescriptorFlags();
         return !descriptorFlags.has_value() ||
                descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
       }
+      // There is expected to be only a single memref source for a given memref
+      // OpResult, because producers of memref Values are expected to be
+      // view-like or cast-like operations. If multiple operands have a memref
+      // type, then conservatively return not writable.
+      if (llvm::count_if(currentOp->getOperandTypes(),
+                         llvm::IsaPred<MemRefType>) != 1) {
+        return false;
+      }
+      // Otherwise, follow the memref operand to find the source buffer.
       for (Value operand : currentOp->getOperands()) {
-        // Only add memref types, since we are looking for a buffer source.
-        if (isa<MemRefType>(operand.getType()))
-          worklist.push_back(operand.getDefiningOp());
+        if (isa<MemRefType>(operand.getType())) {
+          currentOp = operand.getDefiningOp();
+          break;
+        }
       }
     }
     // Conservatively default to not writable if the source of the buffer is

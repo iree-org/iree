@@ -3011,9 +3011,10 @@ func.func @load_from_memref_store_to_memref_in_place() {
 ]>
 func.func @load_from_memref_read_only_copy() {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<2x64xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
+  %collapse = memref.collapse_shape %0 [[0, 1]] : memref<2x64xf32, #hal.descriptor_type<storage_buffer>> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %2 = iree_codegen.load_from_memref %collapse : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
   %copy = linalg.copy ins(%2 : tensor<128xf32>) outs(%2 : tensor<128xf32>) -> tensor<128xf32>
   iree_codegen.store_to_memref %copy, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
   return
@@ -3021,10 +3022,11 @@ func.func @load_from_memref_read_only_copy() {
 
 // CHECK-LABEL: func.func @load_from_memref_read_only_copy()
 //   CHECK-DAG:   %[[READ_ONLY_BUFFER:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[COLLAPSED:.+]] = memref.collapse_shape %[[READ_ONLY_BUFFER]]
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<128xf32>
 //       CHECK:   linalg.copy
-//  CHECK-SAME:       ins(%[[READ_ONLY_BUFFER]] :
+//  CHECK-SAME:       ins(%[[COLLAPSED]] :
 //  CHECK-SAME:       outs(%[[ALLOC]] :
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       ins(%[[ALLOC]] :
