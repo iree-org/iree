@@ -245,6 +245,80 @@ getFlattenedStridedSliceIndices(ArrayRef<int64_t> small,
   return indices;
 }
 
+
+FailureOr<int> getOffsetFromRankOne(vector::InsertStridedSliceOp insertSlice){
+    auto offsets = insertSlice.getOffsets();
+    if (offsets.size() != 1)
+      return {};
+    mlir::Attribute offsetAttr = *offsets.begin();
+    auto intAttr = dyn_cast<IntegerAttr>(offsetAttr);
+    if (!intAttr) {
+      return {};
+    }
+    int offset = intAttr.getInt();
+    return offset;
+}
+
+class TreeifyInsertStridedSlice final
+    : public OpRewritePattern<vector::InsertStridedSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::InsertStridedSliceOp insertOp,
+                                PatternRewriter &rewriter) const override {
+
+    VectorType outType = insertOp.getType();
+    if (outType.getRank() != 1)
+      return failure();
+
+    TypedValue<VectorType> input = insertOp.getValueToStore();
+    VectorType inType = input.getType();
+    int64_t nInElements = inType.getNumElements();
+    if (inType.getRank() != 1)
+      return failure();
+
+    auto maybeOffset = getOffsetFromRankOne(insertOp);
+    if (failed(maybeOffset))
+      return failure();
+    int offset = maybeOffset.value();
+
+    // Check if there is just one user of the result, and check that it is also
+    // an insert_strided_slice:
+    if (!insertOp.getResult().hasOneUse())
+      return failure();
+
+    auto parentSlice = dyn_cast_or_null<vector::InsertStridedSliceOp>(
+        insertOp.getDest().getDefiningOp());
+    if (!parentSlice)
+      return failure();
+
+    auto maybeParentOffset = getOffsetFromRankOne(parentSlice);
+    if (failed(maybeParentOffset))
+      return failure();
+    if (parentSlice.getSourceVectorType().getNumElements() != nInElements)
+      return failure();
+
+    auto parentOffset = maybeParentOffset.value();
+    if (parentOffset % (2 * nInElements) != 0)
+      return failure();
+    if (parentOffset + nInElements != offset)
+      return failure();
+
+    auto shuffleOutType =
+        VectorType::get({2 * nInElements}, inType.getElementType());
+    SmallVector<int64_t> indices(2 * nInElements, 0);
+    std::iota(indices.begin(), indices.end(), 0);
+    auto replacement = rewriter.create<vector::ShuffleOp>(
+        insertOp.getLoc(), shuffleOutType, parentSlice.getValueToStore(),
+        insertOp.getValueToStore(), indices);
+    auto newDoubleInsertStridedSlice =
+        rewriter.create<vector::InsertStridedSliceOp>(
+            insertOp.getLoc(), replacement, parentSlice.getDest(),
+            SmallVector<int64_t>{parentOffset}, SmallVector<int64_t>{1});
+
+    rewriter.replaceOp(insertOp, newDoubleInsertStridedSlice.getResult());
+    return success();
+  }
+};
+
 /// Convert a vector.insert_strided_slice op into a vector.shuffle op.
 LogicalResult
 insertStridedSliceToRankOneShuffle(vector::InsertStridedSliceOp insertOp,
@@ -301,7 +375,7 @@ LogicalResult
 extractStridedSliceToRankOneShuffle(vector::ExtractStridedSliceOp extractOp,
                                     PatternRewriter &rewriter) {
 
-  return failure();
+  // return failure();
 
   if (!stridesAllOne(extractOp))
     return failure();
@@ -548,6 +622,7 @@ class InsertStridedSliceToRankOneShuffle final
   }
 };
 
+
 /// This pattern converts a vector.extract_strided_slice into a new
 /// vector.extract_strided_slice where the operand and result of the new
 /// vector.extract_strided_slice have ranks that are as low as possible.
@@ -629,6 +704,9 @@ public:
     VectorType outType = extractOp.getType();
     VectorType inType = extractOp.getSourceVectorType();
 
+    // llvm::errs() << "out type is " << outType << "\n";
+    // llvm::errs() << "in type is " << inType << "\n";
+
     if (!convertAllToShuffle && outType.getRank() == 1 &&
         inType.getRank() == 1) {
       return failure();
@@ -640,6 +718,8 @@ public:
       return failure();
     }
     auto intOffsets = maybeIntOffsets.value();
+
+    // llvm::errs() << "int offsets obtained" << "\n";
     auto [collapsedOutShape, collapsedInShape, collapsedOffsets] =
         getCollapsedStridedSliceShape(outType.getShape(), inType.getShape(),
                                       intOffsets);
@@ -647,8 +727,13 @@ public:
     bool rankUnchanged = (collapsedInShape.size() == inType.getRank()) &&
                          (collapsedOutShape.size() == outType.getRank());
 
-    if (rankUnchanged)
+
+    if (rankUnchanged){
+    // llvm::errs() << "rank is unchanged " << rankUnchanged << "\n";
       return extractStridedSliceToRankOneShuffle(extractOp, rewriter);
+    }
+
+    // llvm::errs() << "rank is changed \n";
 
     VectorType flatInType =
         VectorType::get(collapsedInShape, inType.getElementType());
@@ -884,7 +969,8 @@ void populateFlattenVectorExtractInsertPatterns(RewritePatternSet &patterns,
       patterns.getContext(), allToShuffle, benefit);
 
   patterns.insert<ExtractOpToRankOne, InsertOpToRankOne, ShapeCastOpFold,
-                  ElementwiseToRankOne>(patterns.getContext(), benefit);
+                  TreeifyInsertStridedSlice, ElementwiseToRankOne>(
+      patterns.getContext(), benefit);
 }
 
 } // namespace mlir::iree_compiler

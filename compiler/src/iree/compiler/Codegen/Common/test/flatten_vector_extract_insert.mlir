@@ -175,6 +175,23 @@ func.func @extract_strided_slice_r2_to_r2_v1(%arg0 : vector<6x6xf32>) -> vector<
   return %0 : vector<2x4xf32>
 }
 
+// -----
+
+func.func @foo(%arg0 : vector<8xf16>)  -> vector<64xf16> {
+  %poison8x8 = ub.poison : vector<8x8xf16>
+  %inserted = vector.insert %arg0, %poison8x8 [0] : vector<8xf16> into vector<8x8xf16>
+  %downed = vector.shape_cast %inserted : vector<8x8xf16> to vector<64xf16>
+  return %downed : vector<64xf16>
+}
+
+// ----- 
+
+func.func @bar(%615 : vector<8x8xf16>) -> vector<4x1xf16> {
+  %616 = vector.extract_strided_slice %615 {offsets = [0, 0], sizes = [4, 1], strides = [1, 1]} : vector<8x8xf16> to vector<4x1xf16>
+  return %616 : vector<4x1xf16>
+}
+
+
 // // func.func @extract_strided_slice_r2_to_r2_v0(%arg0 : vector<6x6xf32>) -> vector<2x6xf32> {
 // //   %0 = vector.extract_strided_slice %arg0 {offsets = [2, 0], sizes = [2, 6], strides = [1, 1]} : vector<6x6xf32> to vector<2x6xf32>
 // //   return %0 : vector<2x6xf32>
