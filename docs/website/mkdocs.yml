@@ -181,6 +181,7 @@ nav:
               - IREEGPU: "reference/mlir-dialects/IREEGPU.md"
               - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
               - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
+              - TensorExt: "reference/mlir-dialects/TensorExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
