@@ -79,11 +79,9 @@ struct ContractionOpPropagationInterface
   propagateEncoding(Operation *op, RewriterBase &builder,
                     IREE::Encoding::PropagationEncoding encodings,
                     OpResult opResult) const {
-
     Location loc = op->getLoc();
     auto operandEncodings = encodings.operandEncodings;
     auto resultEncodings = encodings.resultEncodings;
-
     return TypeSwitch<Operation *,
                       FailureOr<IREE::Encoding::PropagationResult>>(
                opResult.getOwner())

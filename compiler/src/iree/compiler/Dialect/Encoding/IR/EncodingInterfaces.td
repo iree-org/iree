@@ -268,10 +268,9 @@ def IREEEncoding_EncodingTypeInterface :
 // Encoding Propagation Attribute & Op Interfaces
 //===----------------------------------------------------------------------===//
 
-def IREEEncoding_PropagationAttrInterface
-    : AttrInterface<"EncodingPropagationAttrInterface"> {
+def IREEEncoding_PropagationAttrInterface :
+  AttrInterface<"EncodingPropagationAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
-
   let description = [{
     Interface used to query new encoding attributes that can be propagated to
     the operands and result of the operation.
@@ -311,10 +310,9 @@ def IREEEncoding_PropagationAttrInterface
   ];
 }
 
-def IREEEncoding_PropagationOpInterface
-    : OpInterface<"EncodingPropagationOpInterface"> {
+def IREEEncoding_PropagationOpInterface :
+  OpInterface<"EncodingPropagationOpInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
-
   let description = [{
       Interface used to generate new operations with new encodings.
   }];
