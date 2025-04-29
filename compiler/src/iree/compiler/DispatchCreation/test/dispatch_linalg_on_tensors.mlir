@@ -559,7 +559,7 @@ util.func public @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
       ins(%254 : tensor<9xi32>) outs(%255 : tensor<9xi1>) {
-        ^bb0(%arg20: i32, %arg21: i1):  // no predecessors
+        ^bb0(%arg20: i32, %arg21: i1):
           %849 = arith.cmpi eq, %arg20, %c5_i32 : i32
           linalg.yield %849 : i1
       } -> tensor<9xi1>
@@ -608,7 +608,7 @@ util.func public @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tens
 ^bb1:  // pred: ^bb0
   %7 = tensor.empty() : tensor<i16>
   %8 = linalg.generic {indexing_maps = [#map, #map], iterator_types = []} ins(%6 : tensor<i32>) outs(%7 : tensor<i16>) {
-  ^bb0(%arg2: i32, %arg3: i16):  // no predecessors
+  ^bb0(%arg2: i32, %arg3: i16):
     %9 = arith.trunci %arg2 : i32 to i16
     linalg.yield %9 : i16
   } -> tensor<i16>
@@ -660,7 +660,7 @@ util.func public @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -
       iterator_types = ["parallel", "reduction"]}
       ins(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xi32>)
       outs(%1, %2 : tensor<?xi32>, tensor<?xi32>) {
-  ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):  // no predecessors
+  ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
     %5 = arith.cmpi sge, %arg2, %arg4 : i32
     %6 = arith.select %5, %arg2, %arg4 : i32
     %7 = arith.cmpi eq, %arg2, %arg4 : i32
@@ -809,7 +809,7 @@ util.func public @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
     -> (tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
   %0, %1 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
-      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %2 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %2 : i1
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
@@ -867,7 +867,7 @@ util.func public @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>,
       unique_indices(true)
       ins(%arg0, %arg1 : tensor<4xi32>, tensor<4x1xi32>)
       outs(%arg2 : tensor<8xi32>)  {
-    ^bb0(%arg3: i32, %arg4: i32):  // no predecessors
+    ^bb0(%arg3: i32, %arg4: i32):
       iree_linalg_ext.yield %arg3 : i32
     } -> tensor<8xi32>
   util.return %0 : tensor<8xi32>

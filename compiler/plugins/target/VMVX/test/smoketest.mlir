@@ -23,7 +23,7 @@ stream.executable public @add_dispatch_0 {
       %1 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[128], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
       %2 = iree_tensor_ext.dispatch.tensor.load %arg1, offsets=[0], sizes=[128], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
       %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%1, %2 : tensor<128xf32>, tensor<128xf32>) outs(%0 : tensor<128xf32>) {
-      ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+      ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
         %4 = arith.addf %arg3, %arg4 : f32
         linalg.yield %4 : f32
       } -> tensor<128xf32>

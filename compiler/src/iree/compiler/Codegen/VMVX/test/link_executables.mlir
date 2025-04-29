@@ -12,8 +12,7 @@ hal.executable private @dispatch_0 {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
     }
-    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -33,8 +32,7 @@ hal.executable private @dispatch_1 {
       %c2 = arith.constant 2 : i32
       hal.return %c2 : i32
     }
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -50,8 +48,7 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @vmvx target(#vmvx_target) {
-    hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_2 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -180,8 +177,7 @@ util.initializer {
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx target(#vmvx_target) {
-    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -208,8 +204,7 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx target(#vmvx_target) {
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }

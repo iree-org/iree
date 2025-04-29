@@ -4,7 +4,7 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   %0 = iree_linalg_ext.sort
     dimension(0)
     outs(%arg0 : tensor<128xi32>) {
-  ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
+  ^bb0(%arg1: i32, %arg2: i32):
     %1 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %1 : i1
   } -> tensor<128xi32>
@@ -21,7 +21,7 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
-  ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
+  ^bb0(%arg1: i32, %arg2: i32):
     %0 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %0 : i1
   }
@@ -40,7 +40,7 @@ func.func @sort_multi_result_tensor(
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
   %0:2 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
-      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
       } -> tensor<?x?xi32>, tensor<?x?xf32>
@@ -59,7 +59,7 @@ func.func @sort_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort dimension(0)
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
-     ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+     ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
        %1 = arith.cmpf ogt, %arg4, %arg5 : f32
        iree_linalg_ext.yield %1 : i1
      }
@@ -361,7 +361,7 @@ func.func @scatter_update_scalar_1D(
     unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3xi32>)
     outs(%original : tensor<8xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -388,7 +388,7 @@ func.func @scatter_update_i64_scalar_1D(
     unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3x1xi64>)
     outs(%original : tensor<8xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -415,7 +415,7 @@ func.func @scatter_update_scalar_2D(
     unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3x2xi32>)
     outs(%original : tensor<4x3xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
@@ -442,7 +442,7 @@ func.func @scatter_update_slice_2D(
     unique_indices(true)
     ins(%updates, %indices : tensor<1x3xi32>, tensor<1x1xi32>)
     outs(%original : tensor<4x3xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
@@ -573,7 +573,7 @@ func.func @scatter_update_slice_2D(
     unique_indices(true)
     ins(%updates, %indices : tensor<1x?xi32>, tensor<1x1xi32>)
     outs(%original : tensor<4x?xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<4x?xi32>
   return %0 : tensor<4x?xi32>
@@ -807,7 +807,7 @@ func.func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: ten
         dimension(2)
         ins(%input_values, %input_indices : tensor<20x10x8x4xf32> , tensor<20x10x8x4xi32>)
         outs(%out_values, %out_indices : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>
@@ -832,7 +832,7 @@ func.func @topk_memref(%input_values: memref<4x10xf32>, %input_indices: memref<4
         dimension(1)
         ins(%input_values, %input_indices : memref<4x10xf32> , memref<4x10xi32>)
         outs(%out_values, %out_indices : memref<4x3xf32>, memref<4x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         }
@@ -856,7 +856,7 @@ func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: t
         dimension(1)
         ins(%input_values, %input_indices : tensor<?x?xf32> , tensor<?x?xi32>)
         outs(%out_values, %out_indices : tensor<?x?xf32>, tensor<?x?xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<?x?xf32>, tensor<?x?xi32>
@@ -883,7 +883,7 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
         dimension(2)
         ins(%input_values : tensor<20x10x8x4xf32>)
         outs(%out_values, %out_indices : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>

@@ -8,7 +8,7 @@
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
+    hal.executable.export public @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
@@ -47,7 +47,7 @@ hal.executable @abs_ex_dispatch_0 {
 ]>
 hal.executable @abs_dynamic {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @abs_dynamic layout(#pipeline_layout)
+    hal.executable.export public @abs_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @abs_dynamic() {
         %c0 = arith.constant 0 : index
@@ -104,7 +104,7 @@ hal.executable @abs_dynamic {
 ]>
 hal.executable @dead_symbol {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @dead_symbol layout(#pipeline_layout)
+    hal.executable.export public @dead_symbol layout(#pipeline_layout)
     builtin.module {
       func.func @dead_symbol() {
         %c0 = arith.constant 0 : index
@@ -140,7 +140,7 @@ hal.executable @dead_symbol {
 ]>
 hal.executable @mixed_type {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @mixed_type layout(#pipeline_layout)
+    hal.executable.export public @mixed_type layout(#pipeline_layout)
     builtin.module {
       func.func @mixed_type() {
         %c0 = arith.constant 0 : index
@@ -183,7 +183,7 @@ hal.executable @mixed_type {
 ]>
 hal.executable @shared_memory_lowering {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_lowering layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_lowering layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering() {
         %c0 = arith.constant 0 : index
@@ -221,7 +221,7 @@ hal.executable @shared_memory_lowering {
 ]>
 hal.executable @shared_memory_dealloc_elision {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_dealloc_elision layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_dealloc_elision layout(#pipeline_layout)
     builtin.module {
 // CHECK-LABEL: llvm.func @shared_memory_dealloc_elision() {
       func.func @shared_memory_dealloc_elision() {
@@ -245,7 +245,7 @@ hal.executable @shared_memory_dealloc_elision {
 ]>
 hal.executable @shared_memory_lowering_aligned_alloc {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_lowering_aligned_alloc layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_lowering_aligned_alloc layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering_aligned_alloc() {
         %c0 = arith.constant 0 : index
@@ -281,7 +281,7 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 ]>
 hal.executable @check_not_readonly {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @check_not_readonly layout(#pipeline_layout)
+    hal.executable.export public @check_not_readonly layout(#pipeline_layout)
     builtin.module {
       func.func @check_not_readonly() {
         %c0 = arith.constant 0 : index
@@ -319,7 +319,7 @@ hal.executable @check_not_readonly {
 ]>
 hal.executable @complex {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @complex layout(#pipeline_layout)
+    hal.executable.export public @complex layout(#pipeline_layout)
     builtin.module {
       func.func @complex() {
         %c0 = arith.constant 0 : index
@@ -353,7 +353,7 @@ hal.executable @complex {
 ]>
 hal.executable @shared_memory_lowering_index {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_lowering_index layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_lowering_index layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering_index() {
         %c0 = arith.constant 0 : index
@@ -379,7 +379,7 @@ hal.executable @shared_memory_lowering_index {
 ]>
 hal.executable @masked_load_store {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @masked_load_store layout(#pipeline_layout)
+    hal.executable.export public @masked_load_store layout(#pipeline_layout)
     builtin.module {
       func.func @masked_load_store() {
         %c0 = arith.constant 0 : index
@@ -409,7 +409,7 @@ hal.executable @masked_load_store {
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @rocm target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @interface_wg_size layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_size layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module attributes {} {

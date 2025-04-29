@@ -9,8 +9,7 @@
 
 hal.executable @scalar_dispatch {
   hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-    hal.executable.export public @scalar_dispatch ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @scalar_dispatch ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }

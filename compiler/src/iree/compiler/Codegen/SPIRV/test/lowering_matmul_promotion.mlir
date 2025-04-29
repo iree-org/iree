@@ -18,8 +18,7 @@
 #map = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable @matmul_f32_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -104,8 +103,7 @@ hal.executable @matmul_f32_128x256x64 {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable @matmul_f32_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -202,8 +200,7 @@ hal.executable @matmul_f32_128x256x64 {
     translation_info = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1, store_stage = 1}>>
 hal.executable @matmul_f16_4096x512x512 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matmul_f16_4096x512x512 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    hal.executable.export public @matmul_f16_4096x512x512 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }

@@ -66,7 +66,7 @@ stream.executable private @func_a_ex_0 {
         %7 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi32>> -> tensor<?xi32>
         %8 = tensor.empty(%5) : tensor<?xi32>
         %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xi32>, tensor<?xi32>) outs(%8 : tensor<?xi32>) {
-        ^bb0(%arg4: i32, %arg5: i32, %arg6: i32):  // no predecessors
+        ^bb0(%arg4: i32, %arg5: i32, %arg6: i32):
           %10 = arith.maxsi %arg4, %arg5 : i32
           linalg.yield %10 : i32
         } -> tensor<?xi32>
@@ -97,7 +97,7 @@ stream.executable private @func_a_ex_1 {
         %7 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3xi32>> -> tensor<?xi32>
         %8 = tensor.empty(%5) : tensor<?xi32>
         %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xi32>, tensor<?xi32>) outs(%8 : tensor<?xi32>) {
-        ^bb0(%arg4: i32, %arg5: i32, %arg6: i32):  // no predecessors
+        ^bb0(%arg4: i32, %arg5: i32, %arg6: i32):
           %10 = arith.maxsi %arg4, %arg5 : i32
           linalg.yield %10 : i32
         } -> tensor<?xi32>

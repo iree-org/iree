@@ -3,7 +3,7 @@ func.func @reduce_sum_1x10xi32() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<1x10xi32>, tensor<i32>) -> tensor<1xi32>
@@ -16,7 +16,7 @@ func.func @reduce_max_1x10xi32() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<1x10xi32>, tensor<i32>) -> tensor<1xi32>
@@ -29,7 +29,7 @@ func.func @reduce_min_5x1x1xi32() {
   %0 = util.unfoldable_constant dense<[[[1]],[[2]],[[3]],[[4]],[[5]]]> : tensor<5x1x1xi32>
   %1 = util.unfoldable_constant dense<999> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.minimum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 1, 2>} : (tensor<5x1x1xi32>, tensor<i32>) -> tensor<5xi32>
@@ -47,7 +47,7 @@ func.func @reduce_sum_2x3xi32_dim0() {
       [4, 5, 6]]> : tensor<2x3xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 0>} : (tensor<2x3xi32>, tensor<i32>) -> tensor<3xi32>
@@ -61,7 +61,7 @@ func.func @reduce_sum_2x3xi32_dim1() {
       [4, 5, 6]]> : tensor<2x3xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<2x3xi32>, tensor<i32>) -> tensor<2xi32>
@@ -77,7 +77,7 @@ func.func @reduce_sum_4x2x3xi32_dim0() {
       [[1, 2, 3], [4, 5, 6]]]> : tensor<4x2x3xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 0>} : (tensor<4x2x3xi32>, tensor<i32>) -> tensor<2x3xi32>
@@ -93,7 +93,7 @@ func.func @reduce_sum_4x2x3xi32_dim2() {
     [[1, 2, 3], [4, 5, 6]]]> : tensor<4x2x3xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 2>} : (tensor<4x2x3xi32>, tensor<i32>) -> tensor<4x2xi32>
@@ -109,7 +109,7 @@ func.func @reduce_sum_4x2x3xi32_dims_0_1() {
       [[1, 2, 3], [4, 5, 6]]]> : tensor<4x2x3xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 0, 1>} : (tensor<4x2x3xi32>, tensor<i32>) -> tensor<3xi32>
@@ -125,7 +125,7 @@ func.func @reduce_sum_4x2x3xi32_dims_0_1_2() {
       [[1, 2, 3], [4, 5, 6]]]> : tensor<4x2x3xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
+  ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%3) : (tensor<i32>) -> ()
   }) {dimensions = array<i64: 0, 1, 2>} : (tensor<4x2x3xi32>, tensor<i32>) -> tensor<i32>
@@ -138,7 +138,7 @@ func.func @reduce_sum_1x10xf32() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]]> : tensor<1x10xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
@@ -152,7 +152,7 @@ func.func @reduce_max_1x10xf32() {
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1)
   ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
       %3 = "stablehlo.maximum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
       "stablehlo.return"(%3) : (tensor<f32>) -> ()
   })
@@ -166,7 +166,7 @@ func.func @reduce_min_5x1x1xf32() {
   %0 = util.unfoldable_constant dense<[[[1.0]],[[2.0]],[[3.0]],[[4.0]],[[5.0]]]> : tensor<5x1x1xf32>
   %1 = util.unfoldable_constant dense<999.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
       %3 = "stablehlo.minimum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
       "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1, 2>} : (tensor<5x1x1xf32>, tensor<f32>) -> tensor<5xf32>
@@ -181,7 +181,7 @@ func.func @reduce_sum_2x3xf32_dim0() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0>} : (tensor<2x3xf32>, tensor<f32>) -> tensor<3xf32>
@@ -193,7 +193,7 @@ func.func @reduce_sum_2x3xf32_dim1() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<2x3xf32>, tensor<f32>) -> tensor<2xf32>
@@ -209,7 +209,7 @@ func.func @reduce_sum_4x2x3xf32_dim0() {
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<4x2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<2x3xf32>
@@ -225,7 +225,7 @@ func.func @reduce_sum_4x2x3xf32_dim1() {
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<4x2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 1>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<4x3xf32>
@@ -245,7 +245,7 @@ func.func @reduce_sum_4x2x3xf32_dim2() {
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<4x2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 2>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<4x2xf32>
@@ -265,7 +265,7 @@ func.func @reduce_sum_4x2x3xf32_dims_0_1() {
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<4x2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0, 1>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<3xf32>
@@ -281,7 +281,7 @@ func.func @reduce_sum_4x2x3xf32_dims_0_1_2() {
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<4x2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "stablehlo.reduce"(%0, %1) ( {
-  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = array<i64: 0, 1, 2>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<f32>
@@ -295,7 +295,7 @@ func.func @reducemulti_result() {
   %arg0 = util.unfoldable_constant dense<[[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16], [17, 18]]> : tensor<9x2xi32>
   %arg1 = util.unfoldable_constant dense<[[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15], [16, 17]]> : tensor<9x2xi32>
   %res0, %res1 = "stablehlo.reduce"(%arg0, %arg1, %cst0, %cst1) ( {
-  ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>, %arg4: tensor<i32>, %arg5: tensor<i32>):  // no predecessors
+  ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>, %arg4: tensor<i32>, %arg5: tensor<i32>):
     %0 = "stablehlo.compare"(%arg2, %arg4) {comparison_direction = #stablehlo<comparison_direction GE>} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     %1 = "stablehlo.select"(%0, %arg2, %arg4) : (tensor<i1>, tensor<i32>, tensor<i32>) -> tensor<i32>
     %2 = "stablehlo.compare"(%arg2, %arg4) {comparison_direction = #stablehlo<comparison_direction EQ>} : (tensor<i32>, tensor<i32>) -> tensor<i1>

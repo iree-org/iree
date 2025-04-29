@@ -21,8 +21,7 @@ hal.executable.source public @executable {
   // Exported functions are declared with the layout they use and may optionally
   // contain other information - though when hand-authoring that's usually
   // omitted.
-  hal.executable.export public @mul layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+  hal.executable.export public @mul layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
   }

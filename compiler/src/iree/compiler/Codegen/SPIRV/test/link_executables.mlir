@@ -19,8 +19,7 @@ hal.executable private @dispatch_0 {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
     }
-    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -39,12 +38,11 @@ hal.executable private @dispatch_1 {
       %c2 = arith.constant 2 : i32
       hal.return %c2 : i32
     }
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) attributes {
-      workgroup_size = [64: index, 1: index, 1: index], subgroup_size = 64: index
-    } {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
+    } attributes {
+      workgroup_size = [64: index, 1: index, 1: index], subgroup_size = 64: index
     }
     builtin.module {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []> {
@@ -57,8 +55,7 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @spirv target(#vulkan_target) {
-    hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_2 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %c4 = arith.constant 4 : index
       hal.return %c4, %c4, %c1 : index, index, index
@@ -128,8 +125,8 @@ util.initializer {
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
 // CHECK-NEXT:       = arith.constant 2
 //      CHECK:     hal.executable.export public @dispatch_1 ordinal(1)
-// CHECK-SAME:       {subgroup_size = 64 : index, workgroup_size = [64 : index, 1 : index, 1 : index]}
 //      CHECK:       hal.return %c1, %c1, %c1
+//      CHECK:       attributes {subgroup_size = 64 : index, workgroup_size = [64 : index, 1 : index, 1 : index]}
 //      CHECK:     hal.executable.export public @dispatch_2 ordinal(2)
 //      CHECK:       hal.return %c4, %c4, %c1
 //      CHECK:     builtin.module {
@@ -202,8 +199,7 @@ hal.executable private @dispatch_0 {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
     }
-    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -231,8 +227,7 @@ hal.executable private @dispatch_1 {
       %c2 = arith.constant 2 : i32
       hal.return %c2 : i32
     }
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -247,8 +242,7 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @spirv target(#vulkan_target_0) {
-    hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_2 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -272,8 +266,7 @@ hal.executable private @dispatch_3 {
       %2 = arith.andi %ok, %1 : i1
       hal.return %2 : i1
     }
-    hal.executable.export @dispatch_3 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_3 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -394,8 +387,7 @@ hal.executable private @dispatch_0 {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
     }
-    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -421,8 +413,7 @@ hal.executable private @dispatch_0 {
       %c2 = arith.constant 2 : i32
       hal.return %c2 : i32
     }
-    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c2 = arith.constant 2 : index
       hal.return %c2, %c2, %c2 : index, index, index
     }
@@ -443,8 +434,7 @@ hal.executable private @dispatch_1 {
       %c3 = arith.constant 3 : i32
       hal.return %c3 : i32
     }
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c3 = arith.constant 3 : index
       hal.return %c3, %c3, %c3 : index, index, index
     }
@@ -470,8 +460,7 @@ hal.executable private @dispatch_1 {
       %c4 = arith.constant 4 : i32
       hal.return %c4 : i32
     }
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c4 = arith.constant 4 : index
       hal.return %c4, %c4, %c4 : index, index, index
     }
@@ -488,8 +477,7 @@ hal.executable private @dispatch_1 {
 // dispatch_1, so it can link with neither.
 hal.executable private @dispatch_2 {
   hal.executable.variant @spirv target(#vulkan_target_0) {
-    hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_2 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -506,8 +494,7 @@ hal.executable private @dispatch_2 {
 // requirement. So cannot link either.
 hal.executable private @dispatch_3 {
   hal.executable.variant @spirv_0 target(#vulkan_target_0) {
-    hal.executable.export @dispatch_3 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_3 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -529,8 +516,7 @@ hal.executable private @dispatch_3 {
       %2 = arith.andi %ok, %1 : i1
       hal.return %2 : i1
     }
-    hal.executable.export @dispatch_3 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_3 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }

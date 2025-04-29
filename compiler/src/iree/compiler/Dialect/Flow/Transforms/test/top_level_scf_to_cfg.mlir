@@ -19,7 +19,7 @@ util.func public @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?
   // CHECK: linalg.yield
   %0 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     ins(%arg0, %arg1 : tensor<?x?x?x?xi32>, tensor<?x?x?x?xi32>) outs(%out0 : tensor<?x?x?x?xi32>) {
-  ^bb0(%arg2: i32, %arg3: i32, %arg4: i32):  // no predecessors
+  ^bb0(%arg2: i32, %arg3: i32, %arg4: i32):
     %18:3 = scf.for %arg5 = %c0 to %c6 step %c1 iter_args(%arg6 = %c1_i32, %arg7 = %arg2, %arg8 = %arg3) -> (i32, i32, i32) {
       %28 = arith.andi %arg8, %c1_i32 : i32
       %29 = arith.cmpi eq, %28, %c1_i32 : i32

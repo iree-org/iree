@@ -3,7 +3,7 @@ func.func @scatter_update_scalar_1D() {
   %arg1 = util.unfoldable_constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
   %arg2 = util.unfoldable_constant dense<[9, 10, 11, 12]> : tensor<4xi32>
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     "stablehlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
@@ -23,7 +23,7 @@ func.func @scatter_repeated_update_scalar_1D() {
   %arg1 = util.unfoldable_constant dense<[[1], [1], [7], [7]]> : tensor<4x1xi32>
   %arg2 = util.unfoldable_constant dense<[9, 10, 11, 12]> : tensor<4xi32>
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     "stablehlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
@@ -43,7 +43,7 @@ func.func @scatter_update_scalar_2D() {
   %arg1 = util.unfoldable_constant dense<[[0, 0], [1, 1], [2, 2]]> : tensor<3x2xi32>
   %arg2 = util.unfoldable_constant dense<[1, 2, 3]> : tensor<3xi32>
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     "stablehlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {indices_are_sorted = false,
       scatter_dimension_numbers = #stablehlo.scatter<
@@ -66,7 +66,7 @@ func.func @scatter_update_slice_2D() {
   %arg2 = util.unfoldable_constant dense<[[1, 2, 3],
                                           [4, 5, 6]]> : tensor<2x3xi32>
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     "stablehlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
@@ -93,7 +93,7 @@ func.func @scatter_add_slice_2D() {
   %arg2 = util.unfoldable_constant dense<[[1, 2, 3],
                                           [4, 5, 6]]> : tensor<2x3xi32>
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     %1 = stablehlo.add %arg3, %arg4 : tensor<i32>
     "stablehlo.return"(%1) : (tensor<i32>) -> ()
   }) {

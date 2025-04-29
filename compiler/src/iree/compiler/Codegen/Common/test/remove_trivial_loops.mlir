@@ -8,8 +8,7 @@
 // CHECK-LABEL: func.func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @dispatch_0 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -55,8 +54,7 @@ hal.executable private @dispatch_0  {
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [32, 1, 1]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @workgroup_tile_loop layout(#pipeline_layout) {
-    ^bb0(%arg0 : !hal.device, %arg1 : index):
+    hal.executable.export public @workgroup_tile_loop layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %c64 = arith.constant 64 : index
       hal.return %c64, %c1, %c1 : index, index, index
@@ -90,8 +88,7 @@ hal.executable private @workgroup_tile_loop  {
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @workgroup_tile_loop_negative layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1 : index):
+    hal.executable.export public @workgroup_tile_loop_negative layout(#pipeline_layout) count(%arg0: !hal.device, %arg1 : index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 16)>(%arg1)
       hal.return %0, %c1, %c1 : index, index, index
@@ -127,8 +124,7 @@ hal.executable private @workgroup_tile_loop_negative  {
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [8, 2, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @both_workgroup_and_workitem layout(#pipeline_layout) {
-    ^bb0(%arg0 : !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+    hal.executable.export public @both_workgroup_and_workitem layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %c14 = arith.constant 14 : index
       %c112 = arith.constant 112: index
@@ -194,8 +190,7 @@ hal.executable private @both_workgroup_and_workitem  {
 #map3 = affine_map<(d0)[s0] -> (d0 + s0)>
 hal.executable private @simple_mul {
   hal.executable.variant public @variant target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map0()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
@@ -254,8 +249,7 @@ hal.executable private @simple_mul {
 // CHECK-LABEL: func.func @delinearize_linearize()
 hal.executable private @delinearize_linearize {
   hal.executable.variant @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export @delinearize_linearize layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @delinearize_linearize layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -312,8 +306,7 @@ hal.executable private @delinearize_linearize {
 // CHECK-LABEL: func.func @workgroup_id
 hal.executable private @workgroup_id {
   hal.executable.variant @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export @workgroup_id layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @workgroup_id layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c8 = arith.constant 8 : index
       hal.return %c8, %c8, %c8 : index, index, index
     }
@@ -343,8 +336,7 @@ hal.executable private @workgroup_id {
 // CHECK-LABEL: func.func @argument_with_assume
 hal.executable private @argument_with_assume {
   hal.executable.variant @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export @workgroup_id layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device) :
+    hal.executable.export public @workgroup_id layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }

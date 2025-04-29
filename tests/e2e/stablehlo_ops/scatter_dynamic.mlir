@@ -4,7 +4,7 @@ func.func @scatter_add_slice_2D_dynamic_num_updates() {
   %arg2 = flow.tensor.dynamic_constant dense<[[1, 2, 3],
                                              [4, 5, 6]]> : tensor<2x3xi32> -> tensor<?x3xi32>
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
-  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     %1 = stablehlo.add %arg3, %arg4 : tensor<i32>
     "stablehlo.return"(%1) : (tensor<i32>) -> ()
   }) {

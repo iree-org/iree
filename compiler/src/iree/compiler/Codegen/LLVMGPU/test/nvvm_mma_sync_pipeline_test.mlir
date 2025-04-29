@@ -12,8 +12,7 @@
 ]>
 hal.executable @mma_fused_fp16 {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#pipeline_layout) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
     %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
@@ -41,7 +40,7 @@ hal.executable @mma_fused_fp16 {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel"]}
           ins(%m, %d : tensor<2048x512xf16>, tensor<2048x512xf16>) outs(%init2 : tensor<2048x512xf16>) {
-        ^bb0(%arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
+        ^bb0(%arg3: f16, %arg4: f16, %arg5: f16):
           %19 = arith.addf %arg3, %arg4 : f16
           linalg.yield %19 : f16
         } -> (tensor<2048x512xf16>)
@@ -57,8 +56,8 @@ hal.executable @mma_fused_fp16 {
 //    CHECK-LABEL: hal.executable public @mma_fused_fp16
 //          CHECK:   hal.executable.variant public @cuda
 //    CHECK-LABEL:     hal.executable.export public @_large_aligned_dispatch_0
-//     CHECK-SAME:       subgroup_size = 32
-//     CHECK-SAME:       workgroup_size = [64 : index, 2 : index, 1 : index]
+//          CHECK:       subgroup_size = 32
+//          CHECK:       workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK-NOT:   llvm.store
 //  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //          CHECK:   nvvm.cp.async.commit.group
@@ -92,8 +91,7 @@ hal.executable @mma_fused_fp16 {
 ]>
 hal.executable @mma_fused_f32 {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#pipeline_layout) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
     %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
@@ -121,7 +119,7 @@ hal.executable @mma_fused_f32 {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel"]}
           ins(%m, %d : tensor<2048x512xf32>, tensor<2048x512xf32>) outs(%init2 : tensor<2048x512xf32>) {
-        ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+        ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
           %19 = arith.addf %arg3, %arg4 : f32
           linalg.yield %19 : f32
         } -> (tensor<2048x512xf32>)

@@ -18,8 +18,7 @@
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @matmul_256x256x256_f16_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -64,8 +63,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_256x256x256_f16_f16 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @matmul_256x256x256_f16_f16 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -108,8 +106,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @expanded_matmul_transpose_b_executable {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+  hal.executable.export public @expanded_matmul_transpose_b layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -174,8 +171,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 hal.executable @matmul_multiple_k {
   hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @matmul_multiple_k layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @matmul_multiple_k layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -227,8 +223,7 @@ hal.executable @matmul_multiple_k {
 ]>
 hal.executable @matmul_256x256x256_16x16x32_f8_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_256x256x256_16x16x32_f8_f32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @matmul_256x256x256_16x16x32_f8_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -273,8 +268,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @matmul_256x256x256_i8_i32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_256x256x256_i8_i32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @matmul_256x256x256_i8_i32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -319,8 +313,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @matmul_256x256x256_32x32x16_f8_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_256x256x256_32x32x16_f8_f32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @matmul_256x256x256_32x32x16_f8_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -365,8 +358,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @matmul_transpose_b_256x256x256_i8_i32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @matmul_transpose_b_256x256x256_i8_i32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @matmul_transpose_b_256x256x256_i8_i32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -409,8 +401,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @conv_nhwc_dispatch_0 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @conv_nhwc layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+  hal.executable.export public @conv_nhwc layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -456,8 +447,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 hal.executable public @main_dispatch_expanded_matmul {
   hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-    hal.executable.export public @generic_2x1024x20x64x1280_f16 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @generic_2x1024x20x64x1280_f16 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -518,8 +508,7 @@ hal.executable public @main_dispatch_expanded_matmul {
 ]>
 hal.executable @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -593,8 +582,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 hal.executable public @pad_batch_matmul {
   hal.executable.variant public @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @pad_batch_matmul ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @pad_batch_matmul ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -660,8 +648,7 @@ hal.executable public @pad_batch_matmul {
 ]>
 hal.executable public @contract_schedule_considering_read_layout {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @contract_schedule_considering_read_layout ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @contract_schedule_considering_read_layout ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -715,8 +702,7 @@ hal.executable public @contract_schedule_considering_read_layout {
 ]>
 hal.executable @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -779,8 +765,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @virtual_intrinsic_256x256x256_32x32x16_f8E4M3FNUZ_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -827,8 +812,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+  hal.executable.export public @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -899,8 +883,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 hal.executable public @matmul_gather_rhs {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @matmul_gather_rhs ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @matmul_gather_rhs ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -967,8 +950,7 @@ hal.executable public @matmul_gather_rhs {
 ]>
 hal.executable private @attention_20x4096x64x4096x64 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @attention_20x4096x64x4096x64 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @attention_20x4096x64x4096x64 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -1040,8 +1022,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 ]>
 hal.executable private @attention_multiple_m_transpose {
   hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @attention_multiple_m_transpose ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @attention_multiple_m_transpose ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -1108,8 +1089,7 @@ hal.executable private @attention_multiple_m_transpose {
 ]>
 hal.executable private @attention_mfma_32x32x8 {
   hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @attention_mfma_32x32x8 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @attention_mfma_32x32x8 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -1184,8 +1164,7 @@ hal.executable private @attention_mfma_32x32x8 {
 ]>
 hal.executable private @online_attention_split_k2 {
   hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @online_attention_split_k2 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @online_attention_split_k2 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -1261,8 +1240,7 @@ hal.executable private @online_attention_split_k2 {
 module {
   hal.executable public @attention_gather_k {
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @attention_gather_k ordinal(0) layout(#pipeline_layout) {
-      ^bb0(%arg0: !hal.device):
+      hal.executable.export public @attention_gather_k ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
         %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }

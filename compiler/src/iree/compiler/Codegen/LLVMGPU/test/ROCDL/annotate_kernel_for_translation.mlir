@@ -16,14 +16,12 @@
 builtin.module {
   hal.executable public @test {
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test ordinal(0) layout(#pipeline_layout)
-        attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]} {
-      ^bb0(%arg0: !hal.device):
+      hal.executable.export public @test ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
         %c128 = arith.constant 128 : index
         %c2 = arith.constant 2 : index
         %c1 = arith.constant 1 : index
         hal.return %c128, %c2, %c1 : index, index, index
-      }
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         llvm.func @test() {
           llvm.return
@@ -62,14 +60,12 @@ builtin.module {
 builtin.module {
   hal.executable public @test_kern_arg {
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout)
-        attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]} {
-      ^bb0(%arg0: !hal.device):
+      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
         %c128 = arith.constant 128 : index
         %c2 = arith.constant 2 : index
         %c1 = arith.constant 1 : index
         hal.return %c128, %c2, %c1 : index, index, index
-      }
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         llvm.func @test_kern_arg(%arg0: i32) {
           llvm.return
@@ -101,14 +97,12 @@ builtin.module {
 builtin.module {
   hal.executable public @test_no_kern_arg {
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
-      hal.executable.export public @test_no_kern_arg ordinal(0) layout(#pipeline_layout)
-        attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]} {
-      ^bb0(%arg0: !hal.device):
+      hal.executable.export public @test_no_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
         %c128 = arith.constant 128 : index
         %c2 = arith.constant 2 : index
         %c1 = arith.constant 1 : index
         hal.return %c128, %c2, %c1 : index, index, index
-      }
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         llvm.func @test_no_kern_arg(%arg0: i32) {
           llvm.return

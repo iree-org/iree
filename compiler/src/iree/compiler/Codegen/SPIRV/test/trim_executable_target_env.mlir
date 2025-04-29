@@ -19,8 +19,7 @@ hal.executable private @predict_dispatch_0 {
   // CHECK-LABEL: hal.executable.variant public @vulkan_spirv_fb0
   //  CHECK-SAME: target(#[[$TARGET0]])
   hal.executable.variant public @vulkan_spirv_fb0 target(#executable_target_vulkan_spirv_fb) {
-    hal.executable.export public @predict_dispatch_0_vecmat_128x784_f32 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @predict_dispatch_0_vecmat_128x784_f32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c2 = arith.constant 2 : index
       %c1 = arith.constant 1 : index
       hal.return %c2, %c1, %c1 : index, index, index
@@ -47,8 +46,7 @@ hal.executable private @predict_dispatch_1 {
   // CHECK-LABEL: hal.executable.variant public @vulkan_spirv_fb1
   //  CHECK-SAME: target(#[[$TARGET1]])
   hal.executable.variant public @vulkan_spirv_fb1 target(#executable_target_vulkan_spirv_fb) {
-    hal.executable.export public @predict_dispatch_1_vecmat_10x128_f32 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @predict_dispatch_1_vecmat_10x128_f32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c10 = arith.constant 10 : index
       %c1 = arith.constant 1 : index
       hal.return %c10, %c1, %c1 : index, index, index

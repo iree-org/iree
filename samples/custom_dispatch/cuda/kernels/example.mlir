@@ -83,8 +83,7 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
       // Certain backends (like CUDA) require a workgroup size (aka block
       // size) to be defined ahead of time.
       workgroup_size = [64 : index, 1 : index, 1 : index]
-    } {
-    ^bb0(%device: !hal.device, %workload: index):
+    } count(%device: !hal.device, %workload: index) -> (index, index, index) {
       // This host function is used to compute the XYZ workgroup count
       // dispatched at runtime. It can query the %device for capabilities
       // and limits (shared memory size, etc). The other arguments are the
@@ -102,8 +101,7 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
           #hal.pipeline.binding<storage_buffer>
         ]>) attributes {
       workgroup_size = [64 : index, 1 : index, 1 : index]
-    } {
-    ^bb0(%device: !hal.device, %workload: index):
+    } count(%device: !hal.device, %workload: index) -> (index, index, index) {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index

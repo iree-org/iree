@@ -6,8 +6,7 @@
 ]>
 hal.executable public @generic_static {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @generic_static ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    hal.executable.export public @generic_static ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
       %c128 = arith.constant 128 : index
       %c1 = arith.constant 1 : index
       hal.return %c128, %c128, %c1 : index, index, index

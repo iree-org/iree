@@ -9,7 +9,7 @@
 ]>
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb-ptr">) {
-    hal.executable.export @interface_binding layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_binding layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module attributes {

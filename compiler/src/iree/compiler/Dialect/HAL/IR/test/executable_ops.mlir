@@ -11,9 +11,9 @@ hal.executable @ex {
     #hal.executable.object<{path = "foo.bin"}>,
     #hal.executable.object<{path = "bar.bin"}>
   ]) {
-    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
-    // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout)
+    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>) attributes {
@@ -37,18 +37,17 @@ hal.executable @ex {
 hal.executable @ex_with_workgroup_count_region {
   // CHECK: hal.executable.variant public @backend target(#executable_target_format
   hal.executable.variant @backend target(#executable_target_format) {
-    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
-    // CHECK-SAME:     subgroup_size = 64 : index
-    // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout)
+    // CHECK:     subgroup_size = 64 : index
+    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
-    ]>) attributes {
+    ]>) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+      hal.return %arg0, %arg1, %arg2 : index, index, index
+    } attributes {
       subgroup_size = 64 : index,
       workgroup_size = [4 : index, 1 : index, 1 : index]
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
-      hal.return %arg0, %arg1, %arg2 : index, index, index
     }
   }
   // CHECK: hal.executable.binary
@@ -76,18 +75,17 @@ hal.executable @ex_with_condition {
       hal.return %ok : i1
     }
 
-    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
-    // CHECK-SAME:     subgroup_size = 64 : index
-    // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout)
+    // CHECK:     subgroup_size = 64 : index
+    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
-    ]>) attributes {
+    ]>) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+      hal.return %arg0, %arg1, %arg2 : index, index, index
+    } attributes {
       subgroup_size = 64 : index,
       workgroup_size = [4 : index, 1 : index, 1 : index]
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
-      hal.return %arg0, %arg1, %arg2 : index, index, index
     }
   }
   // CHECK: hal.executable.binary
@@ -158,8 +156,7 @@ hal.executable @unresolved_workload_ex {
     hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
-    ]>) {
-    ^bb0(%device: !hal.device, %arg0: index):
+    ]>) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
       hal.return %arg0, %arg0, %arg0 : index, index, index
     }
   }

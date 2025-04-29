@@ -43,13 +43,12 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable.source public @executable {
-  hal.executable.export public @elementwise_mul ordinal(0) layout(#pipeline_layout) attributes {
-    workgroup_size = [1 : index, 1 : index, 1 : index]
-  } {
-  ^bb0(%device: !hal.device):
+  hal.executable.export public @elementwise_mul ordinal(0) layout(#pipeline_layout) count(%device: !hal.device) -> (index, index, index) {
     // Unused - the workgroup count is provided to the tool.
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
+  } attributes {
+    workgroup_size = [1 : index, 1 : index, 1 : index]
   }
   builtin.module {
     func.func @elementwise_mul() {
