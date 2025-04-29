@@ -293,8 +293,8 @@ def IREEEncoding_PropagationAttrInterface :
     >,
     InterfaceMethod<
         [{
-          Returns the new encodings for operand and result types
-          for the given operation.
+          Returns the new encodings for operand and result types for the given
+          operation.
         }],
         /*retTy=*/
         "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
@@ -320,16 +320,15 @@ def IREEEncoding_PropagationOpInterface :
   let methods = [
     InterfaceMethod<
         [{
-          Transforms the op with given encodings. If succeeded, it replaces
-          the uses of the op except the opResult.
+          Returns a list of transformed operations, set_encoding/unset_encoding
+          operations and the transformed result for further transformation.
         }],
         /*retTy=*/
         "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationResult>",
         /*methodName=*/"propagateEncoding",
         /*args=*/(ins
           "::mlir::RewriterBase &":$builder,
-          "::mlir::iree_compiler::IREE::Encoding::"
-          "PropagationEncoding":$encodings,
+          "::mlir::iree_compiler::IREE::Encoding::PropagationEncoding":$encodings,
           "::mlir::OpResult":$opResult
         ),
         /*methodBody=*/"",
