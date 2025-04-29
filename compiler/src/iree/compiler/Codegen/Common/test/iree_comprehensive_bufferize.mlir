@@ -2399,7 +2399,7 @@ func.func @topk() {
         dimension(1)
         ins(%input_values, %input_indices : tensor<200x8xf32> , tensor<200x8xi32>)
         outs(%out_values, %out_indices : tensor<200x3xf32>, tensor<200x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %2 : i1
         } -> tensor<200x3xf32>, tensor<200x3xi32>

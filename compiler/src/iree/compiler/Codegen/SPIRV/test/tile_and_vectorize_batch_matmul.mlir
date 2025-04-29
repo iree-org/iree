@@ -11,7 +11,7 @@
 ]>
 hal.executable private @fused_fill_batch_matmul {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @fused_fill_batch_matmul layout(#pipeline_layout) attributes {
+    hal.executable.export public @fused_fill_batch_matmul layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 1: index, 1: index],
       translation_info = #translation
     }

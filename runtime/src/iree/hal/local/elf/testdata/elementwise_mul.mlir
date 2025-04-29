@@ -34,8 +34,7 @@ hal.executable.source public @ex {
   //
   // The ordinal is used to specify the entry point on command line tools and
   // must be unique across all entry points within the same executable.
-  hal.executable.export public @elementwise_mul ordinal(0) layout(#pipeline_layout) {
-  ^bb0(%arg0: !hal.device):
+  hal.executable.export public @elementwise_mul ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   }
