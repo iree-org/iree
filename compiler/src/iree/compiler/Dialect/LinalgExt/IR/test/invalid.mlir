@@ -495,34 +495,6 @@ func.func @gather_dim_map_mismatch(
 
 // -----
 
-func.func @map_scatter_mixed_tensor_memref(
-    %input: memref<4xf32>, %output: tensor<4xf32>
-) -> tensor<4xf32> {
-  // expected-error@+1 {{expected input and output to be both tensor or both memref}}
-  %0 = iree_linalg_ext.map_scatter %input into %output {
-    ^bb0(%idx0: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %mask : index, i1
-  } : memref<4xf32> into tensor<4xf32> -> tensor<4xf32>
-  return %0 : tensor<4xf32>
-}
-
-// -----
-
-func.func @map_scatter_memref_with_result(
-    %input: memref<4xf32>, %output: memref<4xf32>
-) -> tensor<4xf32> {
-  // expected-error@+1 {{expected no result for memref output}}
-  %0 = iree_linalg_ext.map_scatter %input into %output {
-    ^bb0(%idx0: index):
-      %mask = arith.constant true
-      iree_linalg_ext.yield %idx0, %mask : index, i1
-  } : memref<4xf32> into memref<4xf32> -> tensor<4xf32>
-  return %0 : tensor<4xf32>
-}
-
-// -----
-
 func.func @map_scatter_mixed_element_types(
     %input: memref<4xf16>, %output: memref<4xf32>
 ) {

@@ -325,13 +325,6 @@ LogicalResult MapScatterOp::verify() {
   if (getInputType().getElementType() != getOutputType().getElementType()) {
     return emitOpError("expected input and output element types to match");
   }
-  if (!hasPureBufferSemantics() && !hasPureTensorSemantics()) {
-    return emitOpError("expected input and output to be both tensor or both "
-                       "memref");
-  }
-  if (hasPureBufferSemantics() && getNumResults() != 0) {
-    return emitOpError("expected no result for memref output");
-  }
   Region &transformRegion = getTransformationRegion();
   Block &transformBody = transformRegion.getBlocks().front();
   if (transformBody.getNumArguments() != getInputRank()) {
