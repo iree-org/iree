@@ -76,10 +76,15 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
 //   lhs == rhs || (isfinite(rhs) && abs(lhs - rhs) <= atol + rtol * abs(rhs)).
 // Note that the `lhs == rhs` part is needed for the case (lhs=+inf, rhs+inf)
 // to return true. Indeed, in that case, lhs-rhs is NaN.
+// Finally, unlike the above NumPy code, we also tolerate the case where both
+// lhs and rhs are NaN. That avoids nonsensical test failures whenever a NaN
+// is the legitimate result.
 template <typename T>
 bool NumpyFuzzyCompare(T lhs, T rhs, float atol, float rtol) {
-  return lhs == rhs || (std::isfinite(rhs) &&
-                        std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs));
+  return lhs == rhs ||
+         (std::isfinite(rhs) &&
+          std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs)) ||
+         (std::isnan(lhs) && std::isnan(rhs));
 }
 
 // Records information about some LHS/RHS scalars that failed a fuzzy comparison
