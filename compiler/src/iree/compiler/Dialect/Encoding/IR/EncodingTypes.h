@@ -17,6 +17,7 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+// The structs defined here because they are used by encoding_interfaces.td.
 struct PropagationEncoding {
   SmallVector<Attribute> operandEncodings;
   SmallVector<Attribute> resultEncodings;
@@ -34,7 +35,7 @@ struct PropagationResult {
   // The new corresponding result that is created by the propagation. It is
   // returned to the caller for further transformation or replacement.
   Value replacement;
-}; //
+};
 
 } // namespace mlir::iree_compiler::IREE::Encoding
 

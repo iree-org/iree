@@ -57,7 +57,6 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   // Get the encoding attributes for the operands and results of the operation.
   FailureOr<IREE::Encoding::PropagationEncoding> propagationEncodings =
       propagationAttrInterface.generateEncodings(target);
-
   if (failed(propagationEncodings)) {
     return failure();
   }
@@ -75,7 +74,6 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   auto propagationResult =
       dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(
           collapseOp.getOperation());
-
   if (!propagationResult) {
     return failure();
   }
