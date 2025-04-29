@@ -336,9 +336,30 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
   } else if (src_exp == 0 && src_mantissa == 0) {
     // Zero. Leave f32_exp and f32_mantissa as zero.
   } else {
-    f32_exp = ((src_exp >> src_exp_shift) + f32_exp_bias - src_exp_bias)
-              << f32_exp_shift;
-    f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
+    if (src_exp == 0) {
+      // Source is denormal.
+
+      // Case when the source and destination types have the same exponent
+      // range (bfloat16/f32).
+      if (src_exp_bits == f32_exp_bits) {
+        f32_exp = src_exp << (f32_exp_shift - src_exp_shift);
+        f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
+      } else {
+        // Source is denormal, destination is normal.
+        int src_arithmetic_exp = 1 - src_exp_bias;
+        int f32_arithmetic_exp = -src_exp_bias;
+        f32_exp = (f32_arithmetic_exp + f32_exp_bias) << f32_exp_shift;
+        f32_mantissa =
+            (src_mantissa << -(-f32_mantissa_bits + src_mantissa_bits +
+                               f32_arithmetic_exp - src_arithmetic_exp)) -
+            (1 << f32_mantissa_bits);
+      }
+    } else {
+      // Source is normal.
+      int src_arithmetic_exp = (src_exp >> src_exp_shift) - src_exp_bias;
+      f32_exp = (src_arithmetic_exp + f32_exp_bias) << f32_exp_shift;
+      f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
+    }
   }
   const uint32_t u32_value = f32_sign | f32_exp | f32_mantissa;
   float f32_value;
@@ -400,16 +421,23 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     } else if (arithmetic_exp + dst_exp_bias <= 0) {
       // Underflow. Generate a subnormal or zero.
       dst_exp = 0;
+      // Arithmetic exponent of destination type subnormals.
+      int dst_arithmetic_exp = 1 - dst_exp_bias;
       // The exponent has to be clamped to 0 when the value
       // (arithmetic_exp + dst_exp_bias) is negative. This has to be compensated
       // by right-shifting the subnormal mantissa.
-      int exp_to_encode_as_bitshift = -(arithmetic_exp + dst_exp_bias);
-      int shift_amount =
-          f32_mantissa_bits - dst_mantissa_bits + exp_to_encode_as_bitshift;
-      if (shift_amount >= f32_mantissa_bits) {
+      int shift_amount = f32_mantissa_bits - dst_mantissa_bits -
+                         arithmetic_exp + dst_arithmetic_exp;
+      if (shift_amount < 0 || shift_amount >= f32_mantissa_bits) {
         dst_mantissa = 0;
       } else {
-        dst_mantissa = f32_mantissa >> shift_amount;
+        // Source f32 value is normal so has an implied 1... leading bit.
+        int effective_f32_mantissa = (1 << f32_mantissa_bits) + f32_mantissa;
+        // Add this term to achieve rounding to nearest instead of truncation
+        // towards zero.
+        int rounding_term = 1 << (shift_amount - 1);
+        // Finally compute the destination mantissa as a rounded right shift.
+        dst_mantissa = (effective_f32_mantissa + rounding_term) >> shift_amount;
       }
     } else {
       // Normal case.
