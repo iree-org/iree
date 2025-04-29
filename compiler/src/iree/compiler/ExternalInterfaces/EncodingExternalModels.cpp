@@ -25,8 +25,7 @@ struct ContractionAttrPropagationInterface
       return false;
     }
     return TypeSwitch<Operation *, bool>(attachedToOperation)
-        .Case<tensor::CollapseShapeOp>([&](auto op) {
-          auto collapseOp = cast<tensor::CollapseShapeOp>(op);
+        .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
           ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
           // TODO: Relax the check to allow transforming innermost reduction
           // dimensions. We need to revisit the matmul_k encoding semantic.
@@ -48,8 +47,7 @@ struct ContractionAttrPropagationInterface
     return TypeSwitch<Operation *,
                       FailureOr<IREE::Encoding::PropagationEncoding>>(
                target.getDefiningOp())
-        .Case<tensor::CollapseShapeOp>([&](auto op) {
-          auto collapseOp = cast<tensor::CollapseShapeOp>(op);
+        .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
           ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
           SmallVector<ReassociationIndices, 4> reassociationMaps =
               collapseOp.getReassociationIndices();
@@ -63,7 +61,6 @@ struct ContractionAttrPropagationInterface
           MLIRContext *ctx = collapseOp.getContext();
           auto resultEncodingAttr =
               IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
-
           IREE::Encoding::PropagationEncoding propEncoding;
           propEncoding.operandEncodings.push_back(resultEncodingAttr);
           // The result encoding will be the same as the encoding
@@ -90,23 +87,18 @@ struct ContractionOpPropagationInterface
     return TypeSwitch<Operation *,
                       FailureOr<IREE::Encoding::PropagationResult>>(
                opResult.getOwner())
-        .Case<tensor::CollapseShapeOp>([&](auto op) {
-          auto collapseShapeOp = cast<tensor::CollapseShapeOp>(op);
+        .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
           RankedTensorType operandEncodingType =
-              collapseShapeOp.getSrcType().cloneWithEncoding(
+              collapseOp.getSrcType().cloneWithEncoding(
                   operandEncodings.front());
-
           Value newEncodingOp = builder.create<IREE::Encoding::SetEncodingOp>(
-              loc, operandEncodingType, collapseShapeOp.getSrc());
-
+              loc, operandEncodingType, collapseOp.getSrc());
           auto resultEncodingType =
               dyn_cast<RankedTensorType>(opResult.getType())
                   .cloneWithEncoding(resultEncodings.front());
-
           Value newCollapseOp = builder.create<tensor::CollapseShapeOp>(
               loc, resultEncodingType, newEncodingOp,
-              collapseShapeOp.getReassociationIndices());
-
+              collapseOp.getReassociationIndices());
           IREE::Encoding::PropagationResult result;
           result.replacement = newCollapseOp;
           result.generatedEncodingOps.push_back(newEncodingOp.getDefiningOp());
