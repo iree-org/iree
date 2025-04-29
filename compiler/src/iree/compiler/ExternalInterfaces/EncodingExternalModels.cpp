@@ -59,10 +59,10 @@ struct ContractionAttrPropagationInterface
                             reassociationMaps[kDim].end());
           }
           MLIRContext *ctx = collapseOp.getContext();
-          auto resultEncodingAttr =
+          auto operandEncodingAttr =
               IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
           IREE::Encoding::PropagationEncoding propEncoding;
-          propEncoding.operandEncodings.push_back(resultEncodingAttr);
+          propEncoding.operandEncodings.push_back(operandEncodingAttr);
           // The result encoding will be the same as the encoding
           // present in the set encoding operation.
           propEncoding.resultEncodings.push_back(encoding);
