@@ -76,6 +76,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRVectorTransforms
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::BufferizationInterfaces
     iree::compiler::Codegen::Utils
