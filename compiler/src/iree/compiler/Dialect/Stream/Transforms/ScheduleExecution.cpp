@@ -163,6 +163,10 @@ struct ExecutePartitionBuilder {
         affinityOp.setAffinityAttr(nullptr);
       }
 
+      // Any op that prefers being cloned to consumers doesn't need to specify
+      // an affinity as it can be no more specialized than any valid consumer
+      // of it. Clearing the affinity here may allow the target a greater
+      // ability to optimize the operation.
       auto streamableOp =
           dyn_cast<IREE::Stream::StreamableOpInterface>(clonedOp);
       if (streamableOp && streamableOp.preferCloneToConsumers()) {
