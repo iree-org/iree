@@ -97,7 +97,6 @@ struct RegisterUsage {
     maxRefRegisterOrdinal = -1;
   }
 
-  // Returns the index
   std::optional<int> findFirstUnsetIntOrdinalSpan(size_t byteWidth) {
     unsigned int requiredAlignment = byteWidth / 4;
     unsigned int ordinalStart = intRegisters.find_first_unset();
