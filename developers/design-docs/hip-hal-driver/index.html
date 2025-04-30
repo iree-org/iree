@@ -4005,7 +4005,7 @@
 
 
 <h1 id="hip-hal-driver">HIP HAL driver<a class="headerlink" href="#hip-hal-driver" title="Permanent link">link</a></h1>
-<p>This document lists technical details regarding the HIP implemenation of
+<p>This document lists technical details regarding the HIP implementation of
 IREE's Hardware Abstraction Layer, called a HIP HAL driver.</p>
 <p>IREE provides a <a href="https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal">Hardware Abstraction Layer (HAL)</a> as a common
 interface to different compute accelerators. IREE HAL's design draws inspiration
@@ -4150,7 +4150,7 @@ Though, per the documentation of <code>hipLaunchHostFunc()</code>, "the host fun
 not make any HIP API calls." So we cannot do that directly inside
 <code>hipLaunchHostFunc()</code>; we need to notify another separate thread to call HIP
 APIs to push more work to the GPU. So the deferred/pending action queue should
-have an associcated thread.</p>
+have an associated thread.</p>
 <p>For GPU waits, we can also leverage the same logic--using CPU signaling to
 unblock deferred GPU queue actions. Though this is performant, given that
 the CPU is involved for GPU internal synchronization. We want to use <code>hipEvent_t</code>
