@@ -74,7 +74,7 @@ static RankedTensorType getPaddedType(Attribute layoutAttr,
     return type.dropEncoding();
   }
 
-  ArrayRef<int32_t> padding = layout.getPadding().asArrayRef();
+  ArrayRef<int64_t> padding = layout.getPadding().asArrayRef();
   auto newShape = llvm::to_vector_of<int64_t>(type.getShape());
   for (auto [newDim, padValue] : llvm::zip_equal(newShape, padding)) {
     assert((padValue == 0 || !ShapedType::isDynamic(newDim)) &&

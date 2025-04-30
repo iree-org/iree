@@ -61,7 +61,7 @@ TEST_F(EncodingAttrsTest, PadEncodingLayoutAttr) {
   EXPECT_TRUE(cast<SerializableEncodingAttrInterface>(zeroPaddingAttr)
                   .isIdentityLayout());
 
-  SmallVector<int32_t> paddings = {4, 2};
+  SmallVector<int64_t> paddings = {4, 2};
   auto nonZeroPaddingAttr = PadEncodingLayoutAttr::get(ctx, paddings);
   EXPECT_FALSE(cast<SerializableEncodingAttrInterface>(nonZeroPaddingAttr)
                    .isIdentityLayout());

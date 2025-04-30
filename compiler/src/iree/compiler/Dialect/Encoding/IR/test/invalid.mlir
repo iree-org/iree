@@ -183,3 +183,11 @@ func.func @illegal_layout_encoding_without_any_layout(%arg0: tensor<?x?xf32, #en
 func.func @illegal_layout_encoding_with_invalid_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
+
+// -----
+
+// expected-error @+1 {{expected all padding values need to be non-negative or dynamic}}
+#encoding = #iree_encoding.pad_encoding_layout<[0, ?, -1]>
+func.func @negative_layout_encoding(%arg0: tensor<?x?x?xf32, #encoding>) -> tensor<?x?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?x?xf32, #encoding>
+}

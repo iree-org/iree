@@ -194,41 +194,57 @@ parseStruct(AsmParser &p, AsmParser::Delimiter delimiter,
       "parse struct");
 }
 
-/// Utility to parse an array of integer and/or dynamic values (`?`).
-static FailureOr<ArrayAttr> parseDynamicI64ArrayAttr(AsmParser &p) {
-  SmallVector<Attribute> integerVals;
-  if (failed(p.parseLSquare()))
-    return failure();
-  if (failed(p.parseCommaSeparatedList([&] {
+/// Parse a list of integer values and/or dynamic values ('?')
+static FailureOr<SmallVector<int64_t>>
+parseDynamicI64IntegerList(AsmParser &parser) {
+  SmallVector<int64_t> integerVals;
+  if (failed(parser.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&] {
         int64_t value = ShapedType::kDynamic;
-        if (failed(p.parseOptionalQuestion()) &&
-            failed(p.parseInteger(value))) {
+        if (failed(parser.parseOptionalQuestion()) &&
+            failed(parser.parseInteger(value))) {
           return failure();
         }
-        integerVals.push_back(
-            IntegerAttr::get(IntegerType::get(p.getContext(), 64), value));
+        integerVals.push_back(value);
         return success();
       }))) {
     return failure();
   }
-  if (failed(p.parseRSquare()))
+  return integerVals;
+}
+
+/// Utility to parse an array of integer and/or dynamic values (`?`).
+static FailureOr<ArrayAttr> parseDynamicI64ArrayAttr(AsmParser &p) {
+  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(p);
+  if (failed(integerVals)) {
     return failure();
-  return ArrayAttr::get(p.getContext(), integerVals);
+  }
+  auto integerValsAttr =
+      llvm::map_to_vector(integerVals.value(), [&](int64_t val) -> Attribute {
+        return IntegerAttr::get(IntegerType::get(p.getContext(), 64), val);
+      });
+  return ArrayAttr::get(p.getContext(), integerValsAttr);
+}
+
+/// Print a list of integer values and/or dynamic values ('?')
+static void printDynamicI64IntegerList(AsmPrinter &printer,
+                                       ArrayRef<int64_t> vals) {
+  printer << "[";
+  llvm::interleaveComma(vals, printer, [&](int64_t val) {
+    if (ShapedType::isDynamic(val)) {
+      printer << "?";
+    } else {
+      printer << val;
+    }
+  });
+  printer << "]";
 }
 
 /// Utility to print an array of integer and/or dynamic values. Dynamic values
 /// are printed as `?`.
 static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
-  p << "[";
-  llvm::interleaveComma(attrs.getValue(), p, [&](Attribute attr) {
-    const int64_t value = llvm::cast<IntegerAttr>(attr).getInt();
-    if (ShapedType::isDynamic(value)) {
-      p << "?";
-    } else {
-      p << value;
-    }
-  });
-  p << "]";
+  SmallVector<int64_t> intVals = llvm::map_to_vector(
+      attrs, [&](Attribute attr) { return cast<IntegerAttr>(attr).getInt(); });
+  return printDynamicI64IntegerList(p, intVals);
 }
 
 Attribute EncodingAttr::parse(AsmParser &p, Type type) {
@@ -515,8 +531,23 @@ Attribute MatmulKAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 // iree_encoding.pad_encoding_layout
 //===---------------------------------------------------------------------===//
 
-/// Returns the bit-width of the scalar type. If the type is complex, it returns
-/// the type of individual elements * 2 (1 for real and 1 for complex).
+/// Custom printer/parser methods to handle dynamic shapes.
+ParseResult parsePadding(AsmParser &parser, DenseI64ArrayAttr &padding) {
+  FailureOr<SmallVector<int64_t>> integerVals =
+      parseDynamicI64IntegerList(parser);
+  if (failed(integerVals)) {
+    return failure();
+  }
+  padding = DenseI64ArrayAttr::get(parser.getContext(), integerVals.value());
+  return success();
+}
+void printPadding(AsmPrinter &printer, DenseI64ArrayAttr padding) {
+  return printDynamicI64IntegerList(printer, padding.asArrayRef());
+}
+
+/// Returns the bit-width of the scalar type. If the type is complex, it
+/// returns the type of individual elements * 2 (1 for real and 1 for
+/// complex).
 static unsigned getTypeBitWidth(Type type) {
   if (auto complexType = dyn_cast<ComplexType>(type)) {
     return 2 * complexType.getElementType().getIntOrFloatBitWidth();
@@ -524,9 +555,9 @@ static unsigned getTypeBitWidth(Type type) {
   return type.getIntOrFloatBitWidth();
 }
 
-/// Returns the number of bytes an element of the given type occupies in memory.
-/// This is in the default dense conversion to machine words where sizes must be
-/// powers of two aligned to bytes.
+/// Returns the number of bytes an element of the given type occupies in
+/// memory. This is in the default dense conversion to machine words where
+/// sizes must be powers of two aligned to bytes.
 ///
 /// Examples:
 ///   getRoundedElementByteWidth(i1) = 1
@@ -545,27 +576,27 @@ static int32_t getRoundedElementByteWidth(Type type) {
 }
 
 PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
-                                                 ArrayRef<int32_t> padding) {
-  return get(ctx, DenseI32ArrayAttr::get(ctx, padding));
+                                                 ArrayRef<int64_t> padding) {
+  return get(ctx, DenseI64ArrayAttr::get(ctx, padding));
 }
 
 PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
                                                              int rank) {
-  SmallVector<int32_t> zeros(rank, 0);
+  SmallVector<int64_t> zeros(rank, 0);
   return get(ctx, zeros);
 }
 
 bool PadEncodingLayoutAttr::isIdentityLayout() const {
-  ArrayRef<int32_t> padding = getPadding().asArrayRef();
-  return llvm::all_of(padding, [](int32_t val) { return val == 0; });
+  ArrayRef<int64_t> padding = getPadding().asArrayRef();
+  return llvm::all_of(padding, [](int64_t val) { return val == 0; });
 }
 
 Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
-  ArrayRef<int32_t> padding = getPadding().asArrayRef();
+  ArrayRef<int64_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
-  LLVM_DEBUG(if (llvm::any_of(padding, [](int32_t x) { return x != 0; })) {
+  LLVM_DEBUG(if (llvm::any_of(padding, [](int64_t x) { return x != 0; })) {
     llvm::dbgs() << "Non-zero padding: " << type << "\n";
   });
 
@@ -598,6 +629,19 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
+LogicalResult
+PadEncodingLayoutAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                              DenseI64ArrayAttr padding) {
+  // You can only verify that the value is non-negative or dynamic.
+  if (!llvm::all_of(padding.asArrayRef(), [](int64_t val) {
+        return val == ShapedType::kDynamic || val >= 0;
+      })) {
+    return emitError() << "expected all padding values need to be "
+                          "non-negative or dynamic";
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.identity_encoding
 //===---------------------------------------------------------------------===//
@@ -609,9 +653,9 @@ IdentityEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
 
 Attribute IdentityEncodingAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  SmallVector<int32_t> zeros(type.getRank(), 0);
+  SmallVector<int64_t> zeros(type.getRank(), 0);
   return Encoding::PadEncodingLayoutAttr::get(
-      ctx, DenseI32ArrayAttr::get(ctx, zeros));
+      ctx, DenseI64ArrayAttr::get(ctx, zeros));
 }
 
 //===---------------------------------------------------------------------===//
