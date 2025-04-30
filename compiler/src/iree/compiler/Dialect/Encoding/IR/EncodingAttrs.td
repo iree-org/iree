@@ -251,13 +251,21 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
         ]>
     ]> {
   let mnemonic = "pad_encoding_layout";
-  let assemblyFormat = "`<` $padding `>`";
+  let assemblyFormat = "`<` custom<Padding>($padding) `>`";
 
   let summary = "An attribute that encodes padding values of tensor dimensions";
   let description = [{
     Associates tensor dimensions with pad values (numbers of appended elements).
     The logical dimensions of the tensors do not change, and the elements in the
     padded regions are left uninitialized.
+
+    It is expected that the number of pad values specified is same as the rank of
+    the associated tensor.
+    - If the value is `0` no padding is done along that dimension
+    - If the value is positive static value, the tensor dimension is padded to that value
+    - If the value is `?`, the tensor dimension is padded to a value determined by the
+      backend, usually for better cache behavior.
+    Negative values for padding is illegal.
 
     This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
     to provide a hook for tensor sizeof lowering. The implementation of this
@@ -267,17 +275,19 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 
   let parameters = (ins
     // How many padding elements to add along each tensor dimension.
-    "DenseI32ArrayAttr":$padding
+    "DenseI64ArrayAttr":$padding
   );
 
   let builders = [
-    AttrBuilder<(ins "ArrayRef<int32_t>":$padding)>
+    AttrBuilder<(ins "ArrayRef<int64_t>":$padding)>
   ];
 
   let extraClassDeclaration = [{
     /// Returns a PadEncodingLayoutAttr attribute that pads zero elements.
     static PadEncodingLayoutAttr getIdentityAttr(MLIRContext *ctx, int rank);
   }];
+
+  let genVerifyDecl = 1;
 }
 
 //===---------------------------------------------------------------------===//
