@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     ExternalModels
   HDRS
+    "EncodingExternalModels.h"
     "HALExternalModels.h"
     "Interfaces.h"
     "LinalgExtExternalModels.h"
@@ -21,6 +22,7 @@ iree_cc_library(
     "TensorExtExternalModels.h"
     "UtilExternalModels.h"
   SRCS
+    "EncodingExternalModels.cpp"
     "HALExternalModels.cpp"
     "Interfaces.cpp"
     "LinalgExtExternalModels.cpp"
@@ -28,6 +30,7 @@ iree_cc_library(
     "TensorExtExternalModels.cpp"
     "UtilExternalModels.cpp"
   DEPS
+    LLVMSupport
     MLIRArithDialect
     MLIRGPUDialect
     MLIRIR
