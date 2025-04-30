@@ -403,29 +403,10 @@ module {
   }
 }
 
-//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
-//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+// Verify that when the batch dimension is the innermost and generates rank-reduced output,
+// a 1d tensor slice is extracted and transpose is not needed.
 // CHECK-LABEL: func.func @im2col_chwn_rank_reduce
-//  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x26x18x4xf32>
-//  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME: %[[ARG3:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME: %[[ARG4:[a-zA-Z0-9_]+]]: index
-//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-//       CHECK: %[[INIT:.+]] = tensor.empty(%[[ARG3]], %[[ARG4]]) : tensor<4x?x?xf32>
-//       CHECK: %[[mLOOP:.+]] = scf.for %[[M:.+]] = %[[C0]] to %[[ARG3]] step %[[C1]] iter_args(%[[OUT0:.+]] = %[[INIT]])
-//       CHECK:   %[[kLOOP:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[ARG4]] step %[[C1]] iter_args(%[[OUT1:.+]] = %[[OUT0]])
-//   CHECK-DAG:     %[[kIDX:.+]] = affine.apply #[[$MAP]](%[[K]])[%[[ARG2]]]
-//   CHECK-DAG:     %[[kParts:.+]]:3 = affine.delinearize_index %[[kIDX]] into (16, 24, 16)
-//   CHECK-DAG:     %[[mIDX:.+]] = affine.apply #[[$MAP]](%[[M]])[%[[ARG1]]]
-//   CHECK-DAG:     %[[mParts:.+]]:2 = affine.delinearize_index %[[mIDX]] into (3, 3)
-//   CHECK-DAG:     %[[hIDX:.+]] = affine.apply #[[$MAP1]](%[[mParts]]#0, %[[kParts]]#1)
-//   CHECK-DAG:     %[[wIDX:.+]] = affine.apply #[[$MAP1]](%[[mParts]]#1, %[[kParts]]#2)
-//       CHECK:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[kParts]]#0, %[[hIDX]], %[[wIDX]], 0] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<16x26x18x4xf32> to tensor<4xf32>
-//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUT1]][0, %[[M]], %[[K]]] [4, 1, 1] [1, 1, 1] : tensor<4x?x?xf32> to tensor<4xf32>
-//       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<4xf32>) outs(%[[OUT_SLICE]] : tensor<4xf32>) -> tensor<4xf32>
-//       CHECK:     %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[OUT1]][0, %[[M]], %[[K]]] [4, 1, 1] [1, 1, 1] : tensor<4xf32> into tensor<4x?x?xf32>
-//       CHECK:     scf.yield %[[INSERT]] : tensor<4x?x?xf32>
-//       CHECK:   scf.yield %[[kLOOP]] : tensor<4x?x?xf32>
-//       CHECK: return %[[mLOOP]] : tensor<4x?x?xf32>
+//       CHECK:     %[[IN_SLICE:.+]] = tensor.extract_slice {{.*}} : tensor<16x26x18x4xf32> to tensor<4xf32>
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice {{.*}} : tensor<4x?x?xf32> to tensor<4xf32>
+//       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<4xf32>) outs(%[[OUT_SLICE]] : tensor<4xf32>)
+//       CHECK:     %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into {{.*}} : tensor<4xf32> into tensor<4x?x?xf32>

@@ -613,12 +613,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
 /// Decomposition implementation for iree_linalg_ext.im2col op.
 /// The im2col op is decomposed into serial loops of `insert->extract->copy`.
-/// The decomposition supports vectorization along either the `batch` or `K`
-/// dimension, depending on which one corresponds to a contiguous slice in the
-/// input tensor. When the full `K` dimension is a contiguous slice of the input
-/// tensor, the `K` dim can be left un-tiled so it can be vectorized. Similarly,
-/// if the `batch` dimension is contiguous, then vectorization is applied along
-/// `batch`. Any dimension that cannot be vectorized is always tiled to 1.
+/// The decomposition supports leaving either the `batch` or `K` dimension
+/// untiled when the corresponding slice in the input tensor is contiguous.
+/// If the entire `K` dimension maps to a contiguous slice, the loop over `K`
+/// is left untiled to enable more efficient data transfer. Likewise, if the
+/// `batch` dimension is contiguous, it is left untiled instead. All other
+/// dimensions, including any non-contiguous `batch` or `K`, are tiled to 1.
 /// TODO(Max191): Fallback to larger tile sizes instead of immediately tiling K
 ///               dimension to 1 when non-contiguous.
 ///
@@ -907,8 +907,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   int64_t inputRank = getInputRank();
   int64_t outputRank = getOutputRank();
 
-  // For now, only extract 1d slice when the rank changes for vectorization
-  // along the batch dimension.
+  // For now, only extract a 1D slice when the batch dimension corresponds to a
+  // contiguous slice and produces a rank reduced/expanded result.
   // TODO: check if 1d slice extraction can be used for all cases and thus
   // simplify the codes.
   SmallVector<OpFoldResult> inputTileSizes;
@@ -937,7 +937,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   if (contiguousAlongB) {
     sliceSizes.front() = innerInputTileSize;
     for (auto [idx, iv] : llvm::enumerate(ivs)) {
-      sliceOffsets[++idx] = iv;
+      sliceOffsets[idx + 1] = iv;
     }
   } else {
     sliceSizes.back() = innerInputTileSize;
@@ -947,8 +947,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   }
 
   Value inputForInsert;
-  // If the im2col input tensor has the batch dim at last and can be vectorized,
-  // transpose the dimensions to match the output order (Batch, M, K).
+  // If the batch dimension is untiled in the loop nest, transpose the
+  // dimensions to match the output order (Batch, M, K).
   if (contiguousAlongB && inputRank == outputRank) {
     SmallVector<int64_t> transposePerm;
     transposePerm.append(getBatchPos().begin(), getBatchPos().end());
