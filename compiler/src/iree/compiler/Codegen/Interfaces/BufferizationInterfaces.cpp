@@ -328,7 +328,8 @@ struct LinalgExtOpInterface
                               const AnalysisState &state) const {
     // TODO: Revisit this for ScatterOp. We can then get rid of
     //       `bufferizesToMemoryRead` completely.
-    return !isa<IREE::LinalgExt::ScatterOp>(op);
+    return !isa<IREE::LinalgExt::ScatterOp>(op) &&
+           !isa<IREE::LinalgExt::MapScatterOp>(op);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -700,6 +701,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
     IREE::LinalgExt::GatherOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::GatherOp>>(*ctx);
+    IREE::LinalgExt::MapScatterOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::MapScatterOp>>(*ctx);
     IREE::LinalgExt::SortOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
     IREE::LinalgExt::TopkOp::attachInterface<
