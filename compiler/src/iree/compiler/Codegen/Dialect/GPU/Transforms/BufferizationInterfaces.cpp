@@ -8,6 +8,8 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
@@ -161,7 +163,7 @@ struct BarrierRegionOpBufferizationInterface
   }
 };
 
-/// Bufferization of iree_gpu.tensor_barrier. Always just bufferizes in place
+/// Bufferization of iree_gpu.value_barrier. Always just bufferizes in place
 /// and replaces with a barrier.
 struct ValueBarrierOpBufferizationInterface
     : public BufferizableOpInterface::ExternalModel<
@@ -281,6 +283,111 @@ struct YieldOpBufferizationInterface
   }
 };
 
+/// AMD Specific Ops
+
+static bool hasStorageBufferMemSpace(BaseMemRefType m) {
+  Attribute maybeMemorySpace = m.getMemorySpace();
+  Builder b(m.getContext());
+  Attribute storageBufferMemSpace = b.getAttr<IREE::HAL::DescriptorTypeAttr>(
+      IREE::HAL::DescriptorType::StorageBuffer);
+  return maybeMemorySpace && maybeMemorySpace == storageBufferMemSpace;
+}
+
+/// Bufferization of iree_gpu.buffer_resource_cast. Bufferizes to
+/// amdgpu.fat_raw_buffer_cast if the source memref is of memory space
+/// `storage_buffer`, else just forwards the input. This op never
+/// reads or writes.
+struct BufferResourceCastOpBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<
+          BufferResourceCastOpBufferizationInterface,
+          IREE::GPU::BufferResourceCastOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    // This op never needs to bufferize to a copy.
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
+    SmallVector<bufferization::AliasingValue> alist;
+    if (opOperand.get() == castOp.getInput()) {
+      alist.push_back({castOp.getResult(), BufferRelation::Equivalent});
+    }
+    return alist;
+  }
+
+  FailureOr<BaseMemRefType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                SmallVector<Value> &invocationStack) const {
+    auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
+    assert(value.getDefiningOp() == castOp && "invalid value");
+    auto srcMemrefType = bufferization::getBufferType(castOp.getInput(),
+                                                      options, invocationStack);
+    if (failed(srcMemrefType))
+      return failure();
+
+    if (!hasStorageBufferMemSpace(srcMemrefType.value())) {
+      return srcMemrefType;
+    }
+
+    auto rankedSrcType = cast<MemRefType>(srcMemrefType.value());
+
+    // Sad AMDGPU dep.
+    Attribute bufferMemSpace = amdgpu::AddressSpaceAttr::get(
+        op->getContext(), amdgpu::AddressSpace::FatRawBuffer);
+    return MemRefType::get(rankedSrcType.getShape(),
+                           rankedSrcType.getElementType(),
+                           rankedSrcType.getLayout(), bufferMemSpace);
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
+
+    FailureOr<Value> buffer = getBuffer(rewriter, castOp.getInput(), options);
+    if (failed(buffer)) {
+      return failure();
+    }
+
+    // This operation either bufferizes in place or with a cast.
+    if (hasStorageBufferMemSpace(cast<MemRefType>(buffer.value().getType()))) {
+      Location loc = castOp.getLoc();
+      Value cacheSwizzleStride = Value{};
+      if (auto maybeIndexCacheSwizzle = castOp.getCacheSwizzleStride()) {
+        // Cache swizzle supports only upto 8k stride. Also simply swizzling the
+        // largest available stride (8k) doesn't help those unsupported large
+        // stride. Especially better to avoid using the stride which is 2^N when
+        // N>13, e.g. by add padding to the buffer.
+        //
+        // stride[13:0] = swizzling stride
+        // stride[14] = swizzle enabling bit
+        // FatRawBufferCast's lowering handles this for us. Just truncate to 14
+        // bits.
+        Type i14Type = rewriter.getIntegerType(14);
+        cacheSwizzleStride = rewriter.create<arith::IndexCastOp>(
+            loc, i14Type, maybeIndexCacheSwizzle);
+      }
+      buffer = rewriter
+                   .create<amdgpu::FatRawBufferCastOp>(
+                       loc, buffer.value(), /*validBytes=*/Value{},
+                       /*cacheSwizzleStride=*/cacheSwizzleStride,
+                       /*boundsCheck=*/true,
+                       /*resetOffset=*/true)
+                   .getResult();
+    }
+
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer.value());
+    return success();
+  }
+};
+
 } // namespace
 
 void registerIREEGPUBufferizationInterfaces(DialectRegistry &registry) {
@@ -292,6 +399,9 @@ void registerIREEGPUBufferizationInterfaces(DialectRegistry &registry) {
             ValueBarrierOpBufferizationInterface>(*context);
         IREE::GPU::YieldOp::attachInterface<YieldOpBufferizationInterface>(
             *context);
+
+        IREE::GPU::BufferResourceCastOp::attachInterface<
+            BufferResourceCastOpBufferizationInterface>(*context);
       });
 }
 
