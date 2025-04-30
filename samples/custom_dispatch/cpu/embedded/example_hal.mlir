@@ -92,8 +92,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
       // The ordinal must be assigned by the user and unique for the executable.
       // The layout defines the required bindings and push constants and can be
       // thought of as the function signature.
-      hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout_0) {
-      ^bb0(%device: !hal.device, %workload: index):
+      hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout_0) count(%device: !hal.device, %workload: index) -> (index, index, index) {
         // This host function is used to compute the XYZ workgroup count
         // dispatched at runtime. It can query the %device for capabilities
         // and limits (last-level cache sizes, etc). The other arguments are the
@@ -105,8 +104,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
       }
 
       // Similar to the above but in-place by using a read/write binding.
-      hal.executable.export public @simple_mul_inplace ordinal(1) layout(#pipeline_layout_1) {
-      ^bb0(%device: !hal.device, %workload: index):
+      hal.executable.export public @simple_mul_inplace ordinal(1) layout(#pipeline_layout_1) count(%device: !hal.device, %workload: index) -> (index, index, index) {
         %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
         %c1 = arith.constant 1 : index
         hal.return %x, %c1, %c1 : index, index, index

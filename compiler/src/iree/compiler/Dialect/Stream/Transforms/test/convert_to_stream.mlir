@@ -6,17 +6,17 @@ flow.executable private @executable {
   flow.executable.export public @dispatch
   builtin.module {
     // CHECK:  util.func public @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %[[ARG0_DIM0:.+]]: index, %[[ARG1_DIM1:.+]]: index)
-     util.func public @dispatch(%arg0: !flow.dispatch.tensor<readonly:tensor<?x4xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>,
+     util.func public @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4xf32>>, %arg1: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>,
                    %arg0_dim0: index, %arg1_dim1: index) {
-      // CHECK: %[[ARG0_TENSOR:.+]] = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<?x4xf32>>{%[[ARG0_DIM0]]}
-      %arg0_tied = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x4xf32>>{%arg0_dim0}
-      // CHECK: %[[ARG1_TENSOR:.+]] = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%[[ARG1_DIM1]]}
-      %arg1_tied = flow.dispatch.tie_shape %arg1 : !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1_dim1}
+      // CHECK: %[[ARG0_TENSOR:.+]] = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4xf32>>{%[[ARG0_DIM0]]}
+      %arg0_tied = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4xf32>>{%arg0_dim0}
+      // CHECK: %[[ARG1_TENSOR:.+]] = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>{%[[ARG1_DIM1]]}
+      %arg1_tied = flow.dispatch.tie_shape %arg1 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1_dim1}
 
-      // CHECK: %[[TILE:.+]] = flow.dispatch.tensor.load %[[ARG0_TENSOR]], offsets = [0, 0], sizes = [%[[ARG0_DIM0]], 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x4xf32>>{%[[ARG0_DIM0]]} -> tensor<?x4xf32>
-      %0 = flow.dispatch.tensor.load %arg0_tied, offsets = [0, 0], sizes = [%arg0_dim0, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x4xf32>>{%arg0_dim0} -> tensor<?x4xf32>
-      // CHECK: flow.dispatch.tensor.store %[[TILE]], %[[ARG1_TENSOR]], offsets = [0, 0], sizes = [%[[ARG0_DIM0]], 4], strides = [1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%[[ARG1_DIM1]]}
-      flow.dispatch.tensor.store %0, %arg1_tied, offsets = [0, 0], sizes = [%arg0_dim0, 4], strides = [1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1_dim1}
+      // CHECK: %[[TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG0_TENSOR]], offsets = [0, 0], sizes = [%[[ARG0_DIM0]], 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4xf32>>{%[[ARG0_DIM0]]} -> tensor<?x4xf32>
+      %0 = iree_tensor_ext.dispatch.tensor.load %arg0_tied, offsets = [0, 0], sizes = [%arg0_dim0, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4xf32>>{%arg0_dim0} -> tensor<?x4xf32>
+      // CHECK: iree_tensor_ext.dispatch.tensor.store %[[TILE]], %[[ARG1_TENSOR]], offsets = [0, 0], sizes = [%[[ARG0_DIM0]], 4], strides = [1, 1] : tensor<?x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>{%[[ARG1_DIM1]]}
+      iree_tensor_ext.dispatch.tensor.store %0, %arg1_tied, offsets = [0, 0], sizes = [%arg0_dim0, 4], strides = [1, 1] : tensor<?x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?xf32>>{%arg1_dim1}
 
       util.return
     }
@@ -38,7 +38,7 @@ util.func public @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attrib
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   // CHECK: %[[RET0_SIZE:.+]] = stream.tensor.sizeof tensor<?xf32>{%[[DIM0]]} : index
-  // CHECK: %[[RET0:.+]] = stream.async.dispatch @executable::@dispatch[%c2, %c1, %c1](%[[ARG0_T]][%c0 to %[[ARG0_SIZE]] for %[[ARG0_SIZE]]]) : (!stream.resource<*>{%[[ARG0_SIZE]]}) -> !stream.resource<*>{%[[RET0_SIZE]]}
+  // CHECK: %[[RET0:.+]] = stream.tensor.dispatch @executable::@dispatch[%c2, %c1, %c1](%[[ARG0_T]]) : (tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<*>{%[[ARG0_SIZE]]}) -> tensor<?xf32>{%[[DIM0]]} in !stream.resource<*>{%[[RET0_SIZE]]}
   %1 = flow.dispatch @executable::@dispatch[%c2, %c1, %c1](%0) : (tensor<?x4xf32>{%dim0}) -> tensor<?xf32>{%dim0}
 
   // CHECK: %[[RET0_T:.+]] = stream.async.transfer %[[RET0]] : !stream.resource<*>{%[[RET0_SIZE]]} -> !stream.resource<external>{%[[RET0_SIZE]]}
@@ -60,7 +60,7 @@ util.func public @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
   // CHECK: %[[RET_TENSOR:.+]] = "some.op"(%[[ARG_TENSOR]]) : (tensor<4x8xf32>) -> tensor<8x4xf32>
   %0 = "some.op"(%arg0) : (tensor<4x8xf32>) -> tensor<8x4xf32>
   // CHECK: %[[RET_SIZE:.+]] = stream.tensor.sizeof tensor<8x4xf32>
-  // CHECK: %[[RET_EXTERNAL:.+]] = stream.tensor.import %[[RET_TENSOR]]
+  // CHECK: %[[RET_EXTERNAL:.+]] = stream.tensor.import consume %[[RET_TENSOR]]
   // CHECK: %[[RET:.+]] = stream.async.transfer %[[RET_EXTERNAL]]
   // CHECK: util.return %[[RET]], %[[RET_SIZE]] : !stream.resource<*>, index
   util.return %0 : tensor<8x4xf32>
@@ -80,12 +80,12 @@ flow.executable private @while_test_dispatch_0 {
   // CHECK: builtin.module
   builtin.module {
     // CHECK:  util.func public @dispatch(%[[BINDING0:.+]]: !stream.binding, %[[BINDING1:.+]]: !stream.binding)
-     util.func public @dispatch(%arg0: !flow.dispatch.tensor<readonly:tensor<i32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<i1>>) {
+     util.func public @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<i32>>, %arg1: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i1>>) {
       %c3_i32 = arith.constant 3 : i32
-      // CHECK: %[[ARG0:.+]] = stream.binding.subspan %[[BINDING0]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<i32>>
-      // CHECK: %[[ARG1:.+]] = stream.binding.subspan %[[BINDING1]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<i1>>
-      // CHECK: = flow.dispatch.tensor.load %[[ARG0]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i32>> -> tensor<i32>
-      %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i32>> -> tensor<i32>
+      // CHECK: %[[ARG0:.+]] = stream.binding.subspan %[[BINDING0]][%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<i32>>
+      // CHECK: %[[ARG1:.+]] = stream.binding.subspan %[[BINDING1]][%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i1>>
+      // CHECK: = iree_tensor_ext.dispatch.tensor.load %[[ARG0]], offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<i32>> -> tensor<i32>
+      %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<i32>> -> tensor<i32>
       %1 = tensor.empty() : tensor<i1>
       // CHECK: linalg.generic
       %2 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%0 : tensor<i32>) outs(%1 : tensor<i1>) {
@@ -93,8 +93,8 @@ flow.executable private @while_test_dispatch_0 {
         %3 = arith.cmpi sge, %c3_i32, %arg2 : i32
         linalg.yield %3 : i1
       } -> tensor<i1>
-      // CHECK: flow.dispatch.tensor.store %{{.+}}, %[[ARG1]], offsets = [], sizes = [], strides = [] : tensor<i1> -> !flow.dispatch.tensor<writeonly:tensor<i1>>
-      flow.dispatch.tensor.store %2, %arg1, offsets = [], sizes = [], strides = [] : tensor<i1> -> !flow.dispatch.tensor<writeonly:tensor<i1>>
+      // CHECK: iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[ARG1]], offsets = [], sizes = [], strides = [] : tensor<i1> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i1>>
+      iree_tensor_ext.dispatch.tensor.store %2, %arg1, offsets = [], sizes = [], strides = [] : tensor<i1> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i1>>
       util.return
     }
   }
@@ -104,16 +104,16 @@ flow.executable private @while_test_dispatch_0 {
 flow.executable private @while_test_dispatch_1 {
   flow.executable.export public @dispatch
   builtin.module  {
-     util.func public @dispatch(%arg0: !flow.dispatch.tensor<readonly:tensor<i32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<i32>>) {
+     util.func public @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<i32>>, %arg1: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i32>>) {
       %c2_i32 = arith.constant 2 : i32
-      %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i32>> -> tensor<i32>
+      %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<i32>> -> tensor<i32>
       %1 = tensor.empty() : tensor<i32>
       %2 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%0 : tensor<i32>) outs(%1 : tensor<i32>) {
       ^bb0(%arg2: i32, %arg3: i32):
         %3 = arith.addi %arg2, %c2_i32 : i32
         linalg.yield %3 : i32
       } -> tensor<i32>
-      flow.dispatch.tensor.store %2, %arg1, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:tensor<i32>>
+      iree_tensor_ext.dispatch.tensor.store %2, %arg1, offsets = [], sizes = [], strides = [] : tensor<i32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i32>>
       util.return
     }
   }
@@ -136,7 +136,7 @@ util.func public @while_test() {
 // CHECK: ^bb1(%[[BB1_ARG:.+]]: !stream.resource<*>, %[[BB1_ARG_SIZE:.+]]: index):
 ^bb1(%1: tensor<i32>):
   // CHECK: %[[COND_SIZE:.+]] = stream.tensor.sizeof tensor<i1> : index
-  // CHECK: %[[COND_RESOURCE:.+]] = stream.async.dispatch @while_test_dispatch_0::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]][%c0{{[_0-9]*}} to %[[BB1_ARG_SIZE]] for %[[BB1_ARG_SIZE]]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[COND_SIZE]]}
+  // CHECK: %[[COND_RESOURCE:.+]] = stream.tensor.dispatch @while_test_dispatch_0::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]]) : (tensor<i32> in !stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> tensor<i1> in !stream.resource<*>{%[[COND_SIZE]]}
   %2 = flow.dispatch @while_test_dispatch_0::@dispatch[%c1, %c1, %c1](%1) : (tensor<i32>) -> tensor<i1>
 
   // CHECK: %[[READBACK:.+]] = stream.async.transfer %[[COND_RESOURCE]] : !stream.resource<*>{%[[COND_SIZE]]} -> !stream.resource<staging>{%[[COND_SIZE]]}
@@ -149,7 +149,7 @@ util.func public @while_test() {
 // CHECK: ^bb2:
 ^bb2:
   // CHECK: %[[BB2_VAR_SIZE:.+]] = stream.tensor.sizeof tensor<i32> : index
-  // CHECK: %[[BB2_VAR:.+]] = stream.async.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]][%c0{{[_0-9]*}} to %[[BB1_ARG_SIZE]] for %[[BB1_ARG_SIZE]]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[BB2_VAR_SIZE]]}
+  // CHECK: %[[BB2_VAR:.+]] = stream.tensor.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]]) : (tensor<i32> in !stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> tensor<i32> in !stream.resource<*>{%[[BB2_VAR_SIZE]]}
   %4 = flow.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%1) : (tensor<i32>) -> tensor<i32>
 
   // CHECK: cf.br ^bb1(%[[BB2_VAR]], %[[BB2_VAR_SIZE]] : !stream.resource<*>, index)

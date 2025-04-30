@@ -21,6 +21,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -37,6 +38,7 @@ namespace {
 
 struct BubbleUpExpandShapesPass final
     : public impl::BubbleUpExpandShapesPassBase<BubbleUpExpandShapesPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 
@@ -122,31 +124,32 @@ void BubbleUpExpandShapesPass::runOnOperation() {
 
   RewritePatternSet bubbleExpandShapePatterns(context);
   linalg::ControlFusionFn bubbleUpExpansionControlFn =
-      [](OpOperand *fusedOperand) {
+      [&](OpOperand *fusedOperand) {
         Operation *producer = fusedOperand->get().getDefiningOp();
         Operation *consumer = fusedOperand->getOwner();
         if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
           return false;
         }
 
-        // Do not fuse by expand if consumer is dequant.
-        if (IREE::LinalgExt::isBitExtendOp(consumer)) {
-          return false;
-        }
-
-        // Do not fuse producer generic op if it has more than one user
-        // or any reduction iterators.
+        // If producer generic op is elementwise op, bubble up the expand shape
+        // past this operation.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
-          return llvm::all_of(producerGenericOp.getIteratorTypesArray(),
-                              linalg::isParallelIterator);
+          // If producer generic op is elementwise op, bubble up the expand
+          // shape past this operation.
+          // If bubbling across reduction ops is enabled, allow all generic ops.
+          return (enableBubbleUpExpandShapesAcrossReductionOps ||
+                  llvm::all_of(producerGenericOp.getIteratorTypesArray(),
+                               linalg::isParallelIterator));
         }
 
-        // Do not fuse with any producer linalg named ops for now.
+        // Do not bubble up expand shapes across named ops for now.
         if (isa<linalg::LinalgOp>(producer)) {
           return false;
         }
 
-        // Do not fuse with consumer linalg named ops or reductions.
+        // Do not push expand shapes down across operations with reduction
+        // iterator types.
+        // TODO: This condition should be removed.
         if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
           return isa<linalg::GenericOp>(consumerLinalgOp) &&
                  llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
@@ -158,46 +161,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                     bubbleUpExpansionControlFn);
 
-  // TODO(#19263): Temporary fix to prevent compilation failures when the k2
-  // dims get expanded to unit dimensions. This adds the constraint to
-  // `bubbleUpExpansionControlFn` that the k2 dimensions cannot be expanded by
-  // the reshape fusion.
-  linalg::ControlFusionFn linalgExtExpansionFn = [&](OpOperand *fusedOperand) {
-    if (!bubbleUpExpansionControlFn(fusedOperand)) {
-      return false;
-    }
-
-    // There is no need to handle `expand_shape` ops because they would be the
-    // producer and therefore are unable to expand the k2 dims.
-    auto collapseOp =
-        dyn_cast<tensor::CollapseShapeOp>(fusedOperand->get().getDefiningOp());
-    auto attentionOp =
-        dyn_cast<IREE::LinalgExt::AttentionOp>(fusedOperand->getOwner());
-    if (!collapseOp || !attentionOp) {
-      return true;
-    }
-
-    SmallVector<ReassociationIndices> reassoc =
-        collapseOp.getReassociationIndices();
-    auto opDetail = IREE::LinalgExt::AttentionOpDetail::get(
-        attentionOp.getQueryMap(), attentionOp.getKeyMap(),
-        attentionOp.getValueMap(), attentionOp.getOutputMap());
-
-    // Don't sink the `collapse_shape` op if it is collapsing into any of the k2
-    // dimensions.
-    AffineMap operandMap = attentionOp.getMatchingIndexingMap(fusedOperand);
-    for (auto dim : opDetail->getK2Dims()) {
-      auto dimExpr = getAffineDimExpr(dim, operandMap.getContext());
-      if (std::optional<int64_t> maybeDim =
-              operandMap.getResultPosition(dimExpr);
-          maybeDim && reassoc[maybeDim.value()].size() > 1) {
-        return false;
-      }
-    }
-    return true;
-  };
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
-      bubbleExpandShapePatterns, linalgExtExpansionFn);
+      bubbleExpandShapePatterns, bubbleUpExpansionControlFn);
 
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
@@ -205,6 +170,10 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(
+      bubbleExpandShapePatterns, context);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(
+      bubbleExpandShapePatterns);
 
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;

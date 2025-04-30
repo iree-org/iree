@@ -27,10 +27,6 @@ namespace mlir::iree_compiler {
 /// `Value` not directly supported as a value type by this class.
 class BufferizationPlan {
 public:
-  llvm::EquivalenceClasses<void *>::iterator findValue(Value v) const {
-    return mappedTensors.findValue(getPointer(v));
-  }
-
   llvm::EquivalenceClasses<void *>::iterator end() const {
     return mappedTensors.end();
   }
@@ -57,8 +53,8 @@ public:
 
   /// Sets the equivalance class that contains `v` as the set that contains the
   /// result tensor of the dispatch region (i.e. a tensor that is the `value`
-  /// operand of a flow.dispatch.tensor.store` op). All operations in this
-  /// equivalence class can use the result buffer of the dispatch region to
+  /// operand of a iree_tensor_ext.dispatch.tensor.store` op). All operations in
+  /// this equivalence class can use the result buffer of the dispatch region to
   /// compute their values in place.
   void storeSet(Value v) { storeLeaders.insert(getLeaderValue(v)); }
 
@@ -91,7 +87,7 @@ private:
 
   /// Leaders of the sets that contain the result tensor of the dispatch
   /// region, i.e. a tensor that is the `value` operand of a
-  /// flow.dispatch.tensor.store` op
+  /// iree_tensor_ext.dispatch.tensor.store` op
   llvm::DenseSet<Value> storeLeaders;
 };
 

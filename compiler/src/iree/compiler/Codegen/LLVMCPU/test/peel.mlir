@@ -14,9 +14,9 @@ func.func @peel_static_matmul() {
   %c512 = arith.constant 512 : index
   %c128 = arith.constant 128 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x49xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<49x512xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x49xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<49x512xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -27,11 +27,11 @@ func.func @peel_static_matmul() {
   %6 = affine.apply affine_map<()[s0] -> (s0 * 65)>()[%workgroup_count_x]
   scf.for %arg0 = %3 to %c128 step %4 {
     %7 = affine.min affine_map<(d0) -> (-d0 + 128, 65)>(%arg0)
-    %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x49xf32>> -> tensor<?x49xf32>
+    %8 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 49], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x49xf32>> -> tensor<?x49xf32>
     scf.for %arg1 = %5 to %c512 step %6 {
       %9 = affine.min affine_map<(d0) -> (-d0 + 512, 65)>(%arg1)
-      %10 = flow.dispatch.tensor.load %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>> -> tensor<?x?xf32>
-      %11 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [49, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<49x512xf32>> -> tensor<49x?xf32>
+      %10 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>> -> tensor<?x?xf32>
+      %11 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [49, %9], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<49x512xf32>> -> tensor<49x?xf32>
       %12 = scf.for %arg2 = %c0 to %7 step %c8 iter_args(%arg3 = %10) -> (tensor<?x?xf32>) {
         %13 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 8)>(%arg2)[%7]
         %extracted_slice = tensor.extract_slice %8[%arg2, 0] [%13, 49] [1, 1] : tensor<?x49xf32> to tensor<?x49xf32>
@@ -55,7 +55,7 @@ func.func @peel_static_matmul() {
         }
         scf.yield %14 : tensor<?x?xf32>
       }
-      flow.dispatch.tensor.store %12, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+      iree_tensor_ext.dispatch.tensor.store %12, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>>
     }
   }
   return
@@ -96,7 +96,7 @@ module {
         %3 = affine.apply #map1(%arg2)
         %extracted_slice = tensor.extract_slice %arg0[%3, %arg4] [16, %2] [1, 1] : tensor<?x?xf32> to tensor<16x?xf32>
         %extracted_slice_1 = tensor.extract_slice %arg5[%arg2, %arg4, 0, 0] [1, %2, 16, 1] [1, 1, 1, 1] : tensor<?x?x16x1xf32> to tensor<1x?x16x1xf32>
-        %pack = tensor.pack %extracted_slice inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %extracted_slice_1 {lowering_config = #config} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
+        %pack = linalg.pack %extracted_slice inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %extracted_slice_1 {lowering_config = #config} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
         %inserted_slice = tensor.insert_slice %pack into %arg5[%arg2, %arg4, 0, 0] [1, %2, 16, 1] [1, 1, 1, 1] : tensor<1x?x16x1xf32> into tensor<?x?x16x1xf32>
         scf.yield %inserted_slice : tensor<?x?x16x1xf32>
       }
@@ -108,6 +108,6 @@ module {
 // CHECK-LABEL: func.func @peel_pack
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             tensor.pack {{.*}} : tensor<16x16xf32> -> tensor<1x16x16x1xf32>
+// CHECK:             linalg.pack {{.*}} : tensor<16x16xf32> -> tensor<1x16x16x1xf32>
 // CHECK:           scf.for
-// CHECK:             tensor.pack {{.*}} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
+// CHECK:             linalg.pack {{.*}} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>

@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
-
 # iree_bitcode_library()
 #
 # Builds an LLVM bitcode library from an input file via clang
@@ -277,6 +275,9 @@ function(iree_amdgpu_bitcode_library)
 
     # Avoid ABI issues.
     "-fno-short-wchar"  # Shouldn't matter to us, but doesn't hurt.
+
+    # Pin the bitcode version, matching IREE.
+    "-mcode-object-version=5"
 
     # Target architecture/machine.
     "-target"

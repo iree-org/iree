@@ -23,7 +23,7 @@ module {
       ins(%m0 : memref<64x16xf32>)
       outs(%sm0 : memref<64x16xf32, 3>)
       attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
-      ^bb0(%arg4: f32, %s: f32):  // no predecessors
+      ^bb0(%arg4: f32, %s: f32):
         linalg.yield %arg4 : f32
     }
 
@@ -32,7 +32,7 @@ module {
       ins(%m1 : memref<256x4xf32>)
       outs(%sm1 : memref<256x4xf32, 3>)
       attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
-      ^bb0(%arg4: f32, %s: f32):  // no predecessors
+      ^bb0(%arg4: f32, %s: f32):
         linalg.yield %arg4 : f32
     }
 
@@ -41,7 +41,7 @@ module {
       ins(%m2 : memref<3x512xf32>)
       outs(%sm2 : memref<3x512xf32, 3>)
       attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
-      ^bb0(%arg4: f32, %s: f32):  // no predecessors
+      ^bb0(%arg4: f32, %s: f32):
         linalg.yield %arg4 : f32
     }
     gpu.barrier

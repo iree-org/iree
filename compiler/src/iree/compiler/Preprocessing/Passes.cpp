@@ -64,19 +64,17 @@ void extendWithTextPipeline(OpPassManager &passManager,
 
 } // namespace
 
-void buildPreprocessingPassPipeline(
+/// Adds passes to `passManager` based on command line options.
+/// Returns `true` if passes were added, `false` otherwise.
+static void buildPreprocessingPassPipelineFromCommandLine(
     OpPassManager &passManager,
-    const PreprocessingOptions &preprocessingOptions,
-    PipelineExtensions *pipelineExtensions) {
+    const PreprocessingOptions &preprocessingOptions) {
   auto pipelineStr = preprocessingOptions.preprocessingPassPipeline;
+  // First preference is explicit pass pipeline.
   if (!pipelineStr.empty()) {
     extendWithTextPipeline(passManager, pipelineStr);
   }
-
-  if (pipelineExtensions) {
-    pipelineExtensions->extendPreprocessingPassPipeline(passManager);
-  }
-
+  // Second preference is for transform spec file as a preprocessing recipe.
   if (!preprocessingOptions.preprocessingTransformSpecFilename.empty()) {
     Preprocessing::InterpreterPassOptions interpreterOptions;
     interpreterOptions.transformSpecPath =
@@ -84,7 +82,7 @@ void buildPreprocessingPassPipeline(
     passManager.addPass(
         Preprocessing::createInterpreterPass(interpreterOptions));
   }
-
+  // Third preference is for PDL spec file as a preprocessing recipe.
   if (!preprocessingOptions.preprocessingPDLSpecFilename.empty()) {
     Preprocessing::ApplyPDLPatternsPassOptions applyPDLPatternsOptions;
     applyPDLPatternsOptions.patternsFile =
@@ -96,6 +94,26 @@ void buildPreprocessingPassPipeline(
   }
 }
 
+void buildPreprocessingPassPipeline(
+    OpPassManager &passManager,
+    const PreprocessingOptions &preprocessingOptions,
+    PipelineExtensions *pipelineExtensions) {
+
+  // 1. Highest priority given to command line options.
+  buildPreprocessingPassPipelineFromCommandLine(passManager,
+                                                preprocessingOptions);
+
+  // 2. Run pre-processing pipelines specified through plugin extensions
+  // (when provided).
+  if (pipelineExtensions) {
+    pipelineExtensions->extendPreprocessingPassPipeline(passManager);
+  }
+
+  // 3. Run any pass pipelines specified through the use of
+  //    `preprocessing_pipeline` attribute.
+  FunctionLikeNest(passManager).addPass(createAttrBasedPipelinePass);
+}
+
 static void
 buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
                                       const TransformOptions &options) {
@@ -103,17 +121,51 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
       .addPass(GlobalOptimization::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
-      .addPass(createConvertConvToChannelsLastPass);
+      .addPass(createConvertConvToChannelsLastPass)
+      .addPass(createConvertConvFilterToChannelsLastPass);
   passManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+}
+
+/// Pass pipeline to make the computation within a function a single dispatch.
+/// Note that this expects a `OpPassManager` nested on `FunctionOpInterface`
+/// ops.
+static void
+buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
+                                    const TransformOptions &options) {
+  // We generalize certain named ops immediately before folding unit extent
+  // dims as the unit dim folding pass updates indexing maps and is better
+  // at working with generics.
+  passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
+  passManager.addPass(DispatchCreation::createFoldUnitExtentDimsForFuncPass());
+  GlobalOptimization::PropagateLinalgTransposePassOptions transposeOptions;
+  transposeOptions.enableConvolutionPropagation = true;
+  transposeOptions.enableAggressivePropagation = true;
+  passManager.addPass(
+      GlobalOptimization::createPropagateLinalgTransposePass(transposeOptions));
+  // Generalize transposes and any other remaining named linalg ops that can
+  // now be represented as generics.
+  passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
+  passManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
+  passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
+  passManager.addPass(mlir::createCSEPass());
+  DispatchCreation::BubbleUpExpandShapesPassOptions bubbleOptions;
+  bubbleOptions.enableBubbleUpExpandShapesAcrossReductionOps = true;
+  passManager.addPass(
+      DispatchCreation::createBubbleUpExpandShapesPass(bubbleOptions));
+  passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
+      DispatchCreation::ElementwiseOpFusionPassOptions{
+          /*enableElementWiseFuseMultiReduction=*/true}));
+  passManager.addPass(createMakeSingleDispatchForFunctionPass());
 }
 
 void registerPreprocessingPasses() {
   registerCommonPreprocessingPasses();
 
   PassPipelineRegistration<TransformOptions>
-      globalOptimizationTransformPassPipeline(
+      preprocessingTransposeConvolutionPassPipeline(
           "iree-preprocessing-transpose-convolution-pipeline",
           "Runs a pass pipeline for transposing and canonicalizing "
           "convolutions",
@@ -121,6 +173,15 @@ void registerPreprocessingPasses() {
              const TransformOptions &transformOptions) {
             buildTransposeConvolutionPassPipeline(passManager,
                                                   transformOptions);
+          });
+
+  PassPipelineRegistration<TransformOptions>
+      preprocessingMakeSingleDispatchPassPipeline(
+          "iree-preprocessing-make-single-dispatch",
+          "Runs passes to get a single dispatch for a function",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            buildMakeSingleDispatchPassPipeline(passManager, transformOptions);
           });
 }
 

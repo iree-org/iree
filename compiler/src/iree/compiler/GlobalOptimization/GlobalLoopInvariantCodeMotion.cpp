@@ -6,6 +6,7 @@
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -30,7 +31,7 @@ static bool isHoistableOp(LoopLikeOpInterface loopOp, Operation *op,
   }
 
   // Check if the op type is hoistable.
-  if (!isa<tensor::EmptyOp, tensor::PackOp>(op)) {
+  if (!isa<tensor::EmptyOp, linalg::PackOp>(op)) {
     return false;
   }
 

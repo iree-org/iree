@@ -449,7 +449,8 @@ iree_status_t BufferInstance::AsyncDeallocate() {
       device().device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(done_fence()),
       /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
-      iree_hal_buffer_view_buffer(buffer_view_.get()));
+      iree_hal_buffer_view_buffer(buffer_view_.get()),
+      IREE_HAL_DEALLOCA_FLAG_NONE);
 }
 
 iree_status_t BufferInstance::Delete() {
@@ -827,7 +828,8 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
       {1, &transfer_timeline_, &wait_transfer_start},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length, &buffer));
+      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
 
   // Queue up the buffer fill for splatting:
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
@@ -904,7 +906,8 @@ iree_status_t DeviceInstance::HostBufferToDeviceZeroDim(
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
       IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-      iree_hal_element_dense_byte_count(element_type), &buffer));
+      iree_hal_element_dense_byte_count(element_type),
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
 
   // Wrap in a buffer view and return.
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;
@@ -955,17 +958,17 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
 
   auto arrayBuilder = [](const int64_t* vals, int64_t sz) {
     std::stringstream ss;
-    ss << " {permutation = dense<[" << vals[0];
+    ss << " {permutation = array<i64: " << vals[0];
     for (int i = 1; i < sz; ++i) ss << ", " << vals[i];
-    ss << "]> : tensor<" << sz << "xi64>}";
+    ss << ">}";
     return ss.str();
   };
 
   auto broadcastBuilder = [](int64_t sz) {
     std::stringstream ss;
-    ss << "{broadcast_dimensions = dense<[0";
+    ss << "{broadcast_dimensions = array<i64: 0";
     for (int i = 1; i < sz; ++i) ss << ", " << i;
-    ss << "]> : tensor<" << sz << "xi64>}";
+    ss << ">}";
     return ss.str();
   };
 
@@ -1168,7 +1171,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
       {1, &transfer_timeline_, &wait_transfer_start},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length, &buffer));
+      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length,
+      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
 
   // Queue up the transfer command.
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;

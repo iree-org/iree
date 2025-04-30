@@ -22,7 +22,6 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -964,14 +963,6 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return listener.checkAndResetError();
   }
 
-  //   3. Post-bufferization passes are fine.
-  PassManager pm(getContext());
-  addIREEPostBufferizationPasses(pm);
-  if (failed(pm.run(target))) {
-    return mlir::emitDefiniteFailure(target)
-           << "post-bufferization passes failed";
-  }
-
   results.set(getOperation()->getOpResult(0), {target});
   return listener.checkAndResetError();
 }
@@ -1201,6 +1192,7 @@ template <typename Range>
 static LogicalResult
 applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
                   Range &&payloadOps,
+                  MutableArrayRef<LoopLikeOpInterface> loops,
                   transform::TransformResults &transformResults) {
   SmallVector<Operation *> originalConsumerOps;
   SmallVector<Operation *> fusedConsumerOps;
@@ -1209,7 +1201,7 @@ applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
     rewriter.setInsertionPoint(target);
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, target);
+        scf::tileAndFuseConsumerOfSlice(rewriter, target, loops);
 
     if (failed(fuseConsumerResults))
       return failure();
@@ -1230,9 +1222,18 @@ DiagnosedSilenceableFailure transform_dialect::FuseConsumerOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  LogicalResult result =
-      applyFuseConsumer(rewriter, getOperation(),
-                        state.getPayloadOps(getTarget()), transformResults);
+  SmallVector<LoopLikeOpInterface> loops;
+  for (auto op : getLoops()) {
+    auto loopOp =
+        dyn_cast<LoopLikeOpInterface>(*state.getPayloadOps(op).begin());
+    if (!loopOp) {
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    loops.push_back(loopOp);
+  }
+  LogicalResult result = applyFuseConsumer(rewriter, getOperation(),
+                                           state.getPayloadOps(getTarget()),
+                                           loops, transformResults);
   return failed(result) ? DiagnosedSilenceableFailure::definiteFailure()
                         : DiagnosedSilenceableFailure::success();
 }

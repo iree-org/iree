@@ -15,14 +15,14 @@ module @compute_hoisted {
     // A non-leaf broadcast.
     %0 = tensor.empty() : tensor<5x6xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
-    ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
+    ^bb0(%arg1: f32, %arg2: f32):
       linalg.yield %arg1 : f32
     } -> tensor<5x6xf32>
 
     // A leaf-compute.
     %2 = tensor.empty() : tensor<5x6xf32>
     %3 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%1, %1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%2 : tensor<5x6xf32>) {
-    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
       %42 = arith.mulf %arg1, %arg2 : f32
       linalg.yield %42 : f32
     } -> tensor<5x6xf32>
@@ -53,7 +53,7 @@ module @broadcast_treated_as_leaf {
     // A broadcast.
     // CHECK: linalg.generic
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
-    ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
+    ^bb0(%arg1: f32, %arg2: f32):
       linalg.yield %arg1 : f32
     } -> tensor<5x6xf32>
     // CHECK: util.return
@@ -99,5 +99,32 @@ module @nested_consumer {
     } -> tensor<2xf32>
     %reshaped = tensor.expand_shape %loaded [[0, 1]] output_shape[1, 2]: tensor<2xf32> into tensor<1x2xf32>
     util.return %reshaped : tensor<1x2xf32>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_sequence
+module @do_not_hoist_sequence {
+  // CHECK-NOT: util.initializer
+  //     CHECK: util.func public @main
+  //     CHECK:   linalg.generic
+  //     CHECK:   linalg.generic
+  util.func @main(%arg0 : tensor<128xf64>) -> (tensor<128xf64>){
+    %0 = arith.constant dense<0> : tensor<128xi64>
+    %1 = tensor.empty() : tensor<128xf64>
+    %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%0 : tensor<128xi64>) {
+    ^bb0(%out: i64):
+      %1870 = linalg.index 0 : index
+      %1871 = arith.index_cast %1870 : index to i64
+      linalg.yield %1871 : i64
+    } -> tensor<128xi64>
+    %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%2 : tensor<128xi64>) outs(%1 : tensor<128xf64>) {
+    ^bb0(%ins: i64 , %outs: f64):
+      %4 = arith.index_cast %ins : i64 to index
+      %5 = tensor.extract %arg0 [%4] : tensor<128xf64>
+      linalg.yield %5 : f64
+    } -> tensor<128xf64>
+    util.return %3 : tensor<128xf64>
   }
 }

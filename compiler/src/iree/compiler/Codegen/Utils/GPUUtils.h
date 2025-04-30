@@ -21,6 +21,7 @@ namespace mlir::iree_compiler {
 
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
+static constexpr char kGPUTargetAttrName[] = "iree.gpu.target";
 
 //===----------------------------------------------------------------------===//
 // GPU processor IDs and sizes
@@ -146,6 +147,15 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 /// Helper function to return native size for MMA.SYNC-based operations.
 std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 
+/// Rerutn true if memref has #amdgpu.address_space<fat_raw_buffer> address
+/// space.
+bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType);
+
+/// Return true if the given memref has one of the global address spaces - no
+/// adress space, explicit integer 0, #gpu.address_space<global>, or
+/// #amdgpu.address_space<fat_raw_buffer>
+bool hasGlobalMemoryAddressSpace(MemRefType memrefType);
+
 /// Return true if the given memref has workgroup memory space.
 bool hasSharedMemoryAddressSpace(MemRefType memrefType);
 
@@ -182,14 +192,15 @@ FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config);
 FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 
 /// Returns the GPU target attribute from `iree-gpu-test-target` if provided.
-/// Returns null TargetAttr othersise.
+/// Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context);
 
-/// Returns the GPU target attribute from executable |target| if found.
-/// Returns null TargetAttr othersise.
-IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target);
+/// Returns the GPU target attribute from attribute `attr` if found. The `attr`
+/// can be either IREE::HAL::ExecutableTargetAttr or DictionaryAttr.
+/// Returns null TargetAttr otherwise.
+IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr);
 /// Returns the GPU target attribute from the executable target wrapping |op|
-/// if found. Returns null TargetAttr othersise.
+/// if found. Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
@@ -197,9 +208,8 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Returns std::nullopt if none found.
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
-/// Returns all `IREE::HAL::ExecutableVariantOp` operations from the
-/// given `mlir::ModuleOp`, ensuring they are returned in their original IR
-/// order.
+/// Returns the top-level `IREE::HAL::ExecutableVariantOp` operations from the
+/// given `moduleOp`, ensuring they are returned in their original IR order.
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
 
@@ -207,6 +217,10 @@ getExecutableVariantOps(mlir::ModuleOp moduleOp);
 // `IREE::HAL::ExecutableVariantOp`.
 SmallVector<IREE::GPU::MMAIntrinsic>
 queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
+
+// Returns all operations within the given module that are marked with the
+// tuner root op attribute (i.e., have the `root_op` UnitAttr).
+SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);
 
 } // namespace mlir::iree_compiler
 

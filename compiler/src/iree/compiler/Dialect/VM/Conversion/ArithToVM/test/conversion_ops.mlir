@@ -312,6 +312,18 @@ module @uitofp_i32_f32 {
 
 // -----
 
+// CHECK-LABEL: @uitofp_i64_f32
+module @uitofp_i64_f32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i64)
+  func.func @fn(%arg0: i64) -> f32 {
+    // CHECK: vm.cast.ui64.f32 %[[ARG0]] : i64 -> f32
+    %0 = arith.uitofp %arg0 : i64 to f32
+    return %0 : f32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @fptosi_fp32_i8
 module @fptosi_fp32_i8 {
   // CHECK: vm.func private @fn(%[[ARG0:.+]]: f32)
@@ -378,6 +390,18 @@ module @fptoui_fp32_i64 {
     // CHECK: vm.cast.f32.ui64 %[[ARG0]] : f32 -> i64
     %0 = arith.fptoui %arg0 : f32 to i64
     return %0 : i64
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @extf_f32_f64
+module @extf_f32_f64 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: f32)
+  func.func @fn(%arg0: f32) -> f64 {
+    // CHECK: ext.f32.f64 %[[ARG0]] : f32 -> f64
+    %0 = arith.extf %arg0 : f32 to f64
+    return %0 : f64
   }
 }
 

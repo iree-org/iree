@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -51,9 +52,7 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
+    auto configAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
@@ -87,13 +86,9 @@ public:
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-    auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
-    };
-
+    SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getWebGPUTargetDetails(context)) {
-      addConfig("iree.gpu.target", target);
+      configItems.emplace_back(kGPUTargetAttrName, target);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

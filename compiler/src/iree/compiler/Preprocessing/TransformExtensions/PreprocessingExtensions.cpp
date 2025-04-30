@@ -14,6 +14,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -177,7 +178,7 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
           return emitDefiniteFailure() << "Invalid block argument in target";
         }
         int64_t argIdx = targetBlockArg.getArgNumber();
-        if (inputs[argIdx] && inputs[argIdx] != targetOperand) {
+        if (inputs[argIdx] && inputs[argIdx] != payloadOperand) {
           return emitSilenceableError()
                  << "input operand with conflicting uses";
         }
@@ -272,11 +273,11 @@ IREE::transform_dialect::MatchCastCompatibleTypesOp::matchValue(
 }
 
 //===----------------------------------------------------------------------===//
-// MatchDimIsMultipleOfOp
+// MatchDimBoundsOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
+IREE::transform_dialect::MatchDimBoundsOp::matchValue(
     Value current, transform::TransformResults &results,
     transform::TransformState &state) {
   auto shapedType = dyn_cast<ShapedType>(current.getType());
@@ -285,12 +286,73 @@ IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
            << "type " << current.getType() << " is not a shaped type";
   }
   int64_t dim = getDim();
-  if (dim > shapedType.getRank()) {
+  if (dim >= shapedType.getRank()) {
+    return emitSilenceableError()
+           << "dim " << dim << " out of range for shaped type " << shapedType;
+  }
+  if (std::optional<int64_t> lb = getLowerBound()) {
+    auto constantLb = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::LB, {current, /*dim=*/dim},
+        /*stopCondition=*/nullptr, /*closedLB=*/true);
+    if (failed(constantLb)) {
+      return emitSilenceableError()
+             << "failed to compute constant lower bound for dim " << dim;
+    }
+    if (lb.value() > constantLb.value()) {
+      return emitSilenceableError()
+             << "dim " << dim << " is not >= " << lb.value();
+    }
+  }
+  if (std::optional<int64_t> ub = getUpperBound()) {
+    auto constantUb = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB, {current, /*dim=*/dim},
+        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(constantUb)) {
+      return emitSilenceableError()
+             << "failed to compute constant upper bound for dim " << dim;
+    }
+    if (ub.value() < constantUb.value()) {
+      return emitSilenceableError()
+             << "dim " << dim << " is not <= " << ub.value();
+    }
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchDimIsMultipleOfOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
+    Value current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  MLIRContext *ctx = current.getContext();
+  auto shapedType = dyn_cast<ShapedType>(current.getType());
+  if (!shapedType) {
+    return emitSilenceableError()
+           << "type " << current.getType() << " is not a shaped type";
+  }
+  int64_t dim = getDim();
+  if (dim >= shapedType.getRank()) {
     return emitSilenceableError()
            << "dim " << dim << " out of range for shaped type " << shapedType;
   }
   int64_t size = getSize();
-  if (shapedType.getShape()[dim] % size != 0) {
+  ValueBoundsConstraintSet::Variable dimVar(current, dim);
+
+  // Check if current[dim] % size == 0. There are a couple of options for how
+  // to do this (e.g. mul(floordiv)). Affine map canonicalizations are good
+  // at dropping terms that statically divide the mod RHS so we go with this
+  // one.
+  AffineMap modMap = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/1,
+                                    getAffineSymbolExpr(0, ctx) %
+                                        getAffineConstantExpr(size, ctx));
+  ValueBoundsConstraintSet::Variable modVar(modMap, {dimVar});
+  Builder b(ctx);
+  FailureOr<bool> maybeFailed = ValueBoundsConstraintSet::areEqual(
+      modVar, OpFoldResult{b.getIndexAttr(0)});
+  if (failed(maybeFailed) || !maybeFailed.value()) {
     return emitSilenceableError()
            << "dim " << dim << " of shaped type " << shapedType
            << " is not a multiple of " << size;

@@ -235,7 +235,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
     iree_status_t status = iree_hal_device_queue_execute(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores,
-        signal_semaphores, command_buffer, binding_table);
+        signal_semaphores, command_buffer, binding_table,
+        IREE_HAL_EXECUTE_FLAG_NONE);
     if (iree_status_is_ok(status)) {
       status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
                                        iree_infinite_timeout());

@@ -160,7 +160,7 @@ struct FusionPreprocessingPass final
     // operand shapes.
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     memref::populateResolveShapedTypeResultDimsPatterns(patterns);
-    tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
+    linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

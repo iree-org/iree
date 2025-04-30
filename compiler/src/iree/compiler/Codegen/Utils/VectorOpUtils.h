@@ -8,13 +8,14 @@
 #define IREE_COMPILER_CODEGEN_UTILS_VECTORUTILS_H_
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir::iree_compiler {
 
 /// A class for querying information about a contract op.
 class VectorContractOpInfo {
 public:
-  static FailureOr<VectorContractOpInfo>
+  static llvm::FailureOr<VectorContractOpInfo>
   inferFromIndexingMaps(ArrayRef<AffineMap> maps);
 
   // Returns the (LHS M, RHS N) dimension index pair.

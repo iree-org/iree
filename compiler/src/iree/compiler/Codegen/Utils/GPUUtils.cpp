@@ -16,6 +16,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -82,10 +84,11 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
     mlir::Value subgroupId =
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
     if (i == 0) {
-      mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
-      subgroupId = mlir::affine::makeComposedAffineApply(
-          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
-          {subgroupId});
+      subgroupId =
+          builder
+              .create<affine::AffineDelinearizeIndexOp>(
+                  loc, subgroupId, ArrayRef<int64_t>{numSubgroups[i], warpSize})
+              .getResult(0);
     }
     procInfo[numDims - 1 - i] = {
         subgroupId,
@@ -779,10 +782,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     // to 1.
     SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
-    LLVM_DEBUG({
-      llvm::interleaveComma(mmaShape, DBGS() << "shape for vector.contract: ");
-      llvm::dbgs() << "\n";
-    });
+    LDBG("shape for vector.contract: " << llvm::interleaved(mmaShape));
     return mmaShape;
   }
 
@@ -792,11 +792,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       return std::nullopt;
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
-    LLVM_DEBUG({
-      llvm::interleaveComma(outputShape,
-                            DBGS() << "shape for vector.xfer_write: ");
-      llvm::dbgs() << "\n";
-    });
+    LDBG("shape for vector.xfer_write: " << llvm::interleaved(outputShape));
     return outputShape;
   }
 
@@ -809,10 +805,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     std::optional<int> operandId =
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      LLVM_DEBUG({
-        DBGS() << "Failed to get operandId for vector::xfer_read: " << *op
-               << "\n";
-      });
+      LDBG("Failed to get operandId for vector::xfer_read: " << *op);
       return std::nullopt;
     }
 
@@ -864,22 +857,14 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
-        LLVM_DEBUG({
-          llvm::interleaveComma(readShape,
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
-        LLVM_DEBUG({
-          llvm::interleaveComma(readShape,
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
         return readShape;
       }
       // For matrixB.
@@ -898,17 +883,45 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
             return std::nullopt;
           sliceType = vecType;
         }
-        LLVM_DEBUG({
-          llvm::interleaveComma(sliceType.getShape(),
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: "
+             << llvm::interleaved(sliceType.getShape()));
         return llvm::to_vector(sliceType.getShape());
       }
     }
   }
   LDBG("unsupported shape for " << op->getName().getStringRef());
   return std::nullopt;
+}
+
+bool hasGlobalMemoryAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace)
+    return true;
+  auto intAttr = llvm::dyn_cast<IntegerAttr>(addrSpace);
+  // Accept both default numeric address space and HAL descriptor type address
+  // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
+  if (intAttr && intAttr.getInt() == 0)
+    return true;
+  auto gpuAttr = llvm::dyn_cast<gpu::AddressSpaceAttr>(addrSpace);
+  if (gpuAttr && gpuAttr.getValue() == gpu::AddressSpace::Global)
+    return true;
+  auto amdgpuAttr = llvm::dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr && amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer)
+    return true;
+  return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
+}
+
+bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace) {
+    return false;
+  }
+  auto amdgpuAttr = dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr &&
+      amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer) {
+    return true;
+  }
+  return false;
 }
 
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
@@ -966,12 +979,25 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
   return IREE::GPU::getFullTarget(backend, arch, features, context);
 }
 
-IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
-  if (auto config = target.getConfiguration()) {
-    if (auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target"))
-      return attr;
+IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr) {
+  if (!attr) {
+    return {};
   }
-  return getCLGPUTarget(target.getContext());
+  DictionaryAttr config;
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
+  if (targetAttr) {
+    config = targetAttr.getConfiguration();
+  } else {
+    config = dyn_cast<DictionaryAttr>(attr);
+  }
+  if (!config) {
+    return getCLGPUTarget(attr.getContext());
+  }
+  auto gpuAttr = config.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
+  if (!gpuAttr) {
+    return getCLGPUTarget(attr.getContext());
+  }
+  return gpuAttr;
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
@@ -994,10 +1020,14 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
 
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp) {
+  // The variant ops must have a ExecutableOp parent. Thus we iterate on the
+  // ExecutableOp using `getOps()` for efficiency. We do not need to walk
+  // through all the ops in the `moduleOp` in a nested fashion.
   SmallVector<IREE::HAL::ExecutableVariantOp> executableVariantOps;
-  moduleOp.walk([&](IREE::HAL::ExecutableVariantOp executableOp) {
-    executableVariantOps.push_back(executableOp);
-  });
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    auto iter = executableOp.getOps<IREE::HAL::ExecutableVariantOp>();
+    executableVariantOps.append(iter.begin(), iter.end());
+  }
   return executableVariantOps;
 }
 
@@ -1007,9 +1037,21 @@ queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
   if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
     mmaIntrinsics = llvm::map_to_vector(
         target.getWgp().getMma(),
-        [](IREE::GPU::MMAAttr attr) { return attr.getIntrinsic().getValue(); });
+        [](IREE::GPU::MMAAttr attr) { return attr.getIntrinsic(); });
   }
   return mmaIntrinsics;
+}
+
+SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
+  SmallVector<Operation *> rootOps;
+
+  moduleOp.walk([&](Operation *op) {
+    if (hasRootOpInfo(op)) {
+      rootOps.push_back(op);
+    }
+  });
+
+  return rootOps;
 }
 
 } // namespace mlir::iree_compiler

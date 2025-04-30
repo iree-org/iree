@@ -69,11 +69,8 @@ ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
   return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
 }
 
-// Finds the operand index in |operands| that |tiedResult| references.
-// Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t
-findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
-                ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
+int64_t findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
+                        ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name &&
@@ -1627,7 +1624,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
     assert(type.getNumResults() == resAttrs.size());
-    function_interface_impl::addArgAndResultAttrs(
+    call_interface_impl::addArgAndResultAttrs(
         builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
         builder.getStringAttr("res_attrs"));
   }
@@ -1719,7 +1716,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   result.attributes.append(parsedAttributes);
 
   assert(resultAttrs.size() == resultTypes.size());
-  function_interface_impl::addArgAndResultAttrs(
+  call_interface_impl::addArgAndResultAttrs(
       builder, result, arguments, resultAttrs,
       builder.getStringAttr("arg_attrs"), builder.getStringAttr("res_attrs"));
 
@@ -1916,7 +1913,8 @@ IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
 
   return builder.create<IREE::Util::CallOp>(
       getLoc(), newResultTypes, getCallee(), newOperands,
-      builder.getIndexArrayAttr(newTiedOperands));
+      builder.getIndexArrayAttr(newTiedOperands), getArgAttrsAttr(),
+      getResAttrsAttr());
 }
 
 //===----------------------------------------------------------------------===//

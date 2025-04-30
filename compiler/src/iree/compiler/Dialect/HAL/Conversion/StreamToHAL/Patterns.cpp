@@ -128,6 +128,12 @@ struct ResourceAllocaOpPattern
       return failure();
     }
 
+    // Behavior flags.
+    IREE::HAL::AllocaFlagBitfield flags = IREE::HAL::AllocaFlagBitfield::None;
+    if (allocaOp.getIndeterminateLifetime()) {
+      flags = flags | IREE::HAL::AllocaFlagBitfield::IndeterminateLifetime;
+    }
+
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
@@ -138,7 +144,7 @@ struct ResourceAllocaOpPattern
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
         loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
-        memoryTypes, bufferUsage, adaptor.getStorageSize());
+        memoryTypes, bufferUsage, adaptor.getStorageSize(), flags);
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
@@ -162,12 +168,55 @@ struct ResourceDeallocaOpPattern
     Value signalFence = getOrCreateSignalFence(
         loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
-    // Queue allocation.
+    // Route to the origin of the allocation (if available).
+    IREE::HAL::DeallocaFlagBitfield flags =
+        IREE::HAL::DeallocaFlagBitfield::None;
+    if (deallocaOp.getPreferOrigin()) {
+      flags = flags | IREE::HAL::DeallocaFlagBitfield::PreferOrigin;
+    }
+
+    // Queue deallocation.
     rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
         loc, device, queueAffinity, waitFence, signalFence,
-        adaptor.getOperand());
+        adaptor.getOperand(), flags);
 
     rewriter.replaceOp(deallocaOp, {signalFence});
+    return success();
+  }
+};
+
+struct ResourceRetainOpPattern
+    : public StreamConversionPattern<IREE::Stream::ResourceRetainOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceRetainOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferAllocationPreserveOp>(
+        op, adaptor.getOperand());
+    return success();
+  }
+};
+
+struct ResourceReleaseOpPattern
+    : public StreamConversionPattern<IREE::Stream::ResourceReleaseOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceReleaseOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferAllocationDiscardOp>(
+        op, rewriter.getI1Type(), adaptor.getOperand());
+    return success();
+  }
+};
+
+struct ResourceIsTerminalOpPattern
+    : public StreamConversionPattern<IREE::Stream::ResourceIsTerminalOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ResourceIsTerminalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferAllocationIsTerminalOp>(
+        op, rewriter.getI1Type(), adaptor.getOperand());
     return success();
   }
 };
@@ -321,7 +370,8 @@ struct FileReadOpPattern
         loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
         adaptor.getSourceOffset(), adaptor.getTarget(),
         adaptor.getTargetOffset(), adaptor.getLength(),
-        /*flags=*/0);
+        rewriter.getAttr<IREE::HAL::ReadFlagBitfieldAttr>(
+            IREE::HAL::ReadFlagBitfield::None));
 
     rewriter.replaceOp(readOp, {signalFence});
     return success();
@@ -349,7 +399,8 @@ struct FileWriteOpPattern
         loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
         adaptor.getSourceOffset(), adaptor.getTarget(),
         adaptor.getTargetOffset(), adaptor.getLength(),
-        /*flags=*/0);
+        rewriter.getAttr<IREE::HAL::WriteFlagBitfieldAttr>(
+            IREE::HAL::WriteFlagBitfield::None));
 
     rewriter.replaceOp(writeOp, {signalFence});
     return success();
@@ -582,7 +633,8 @@ struct CmdFillOpPattern
         adaptor.getTargetOffset(), adaptor.getTargetLength(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferFillBufferOp>(
         fillOp, commandBufferMapping.getHandle(), targetBinding.buffer,
-        targetBinding.byteOffset, targetBinding.byteLength, adaptor.getValue());
+        targetBinding.byteOffset, targetBinding.byteLength, adaptor.getValue(),
+        IREE::HAL::FillFlagBitfield::None);
     return success();
   }
 };
@@ -603,7 +655,8 @@ struct CmdCopyOpPattern
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCopyBufferOp>(
         op, commandBufferMapping.getHandle(), sourceBinding.buffer,
         sourceBinding.byteOffset, targetBinding.buffer,
-        targetBinding.byteOffset, adaptor.getLength());
+        targetBinding.byteOffset, adaptor.getLength(),
+        IREE::HAL::CopyFlagBitfield::None);
     return success();
   }
 };
@@ -924,7 +977,8 @@ struct CmdCallOpPattern
 
     rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         callOp, resultTypes, callOp.getCallee(), operands,
-        /*tied_operands=*/ArrayAttr{});
+        /*tied_operands=*/ArrayAttr{}, callOp.getArgAttrsAttr(),
+        callOp.getResAttrsAttr());
     return success();
   }
 };
@@ -1076,7 +1130,7 @@ struct CmdExecuteOpPattern
             loc, device, queueAffinity, waitFence, signalFence,
             fillTargetBuffer, fillOp.getTargetOffset(),
             fillOp.getTargetLength(), fillOp.getValue(),
-            /*flags=*/0);
+            IREE::HAL::FillFlagBitfield::None);
       } else if (auto copyOp =
                      dyn_cast<IREE::Stream::CmdCopyOp>(*singleTransferOp)) {
         auto copySourceBuffer = rewriter.getRemappedValue(
@@ -1087,7 +1141,7 @@ struct CmdExecuteOpPattern
             loc, device, queueAffinity, waitFence, signalFence,
             copySourceBuffer, copyOp.getSourceOffset(), copyTargetBuffer,
             copyOp.getTargetOffset(), copyOp.getLength(),
-            /*flags=*/0);
+            IREE::HAL::CopyFlagBitfield::None);
       }
 
       rewriter.replaceOp(executeOp, signalFence);
@@ -1195,14 +1249,15 @@ struct CmdExecuteOpPattern
         loc, device, executeOp.getResultTimepoint(), rewriter);
 
     // Queue execution.
+    IREE::HAL::ExecuteFlagBitfield flags = IREE::HAL::ExecuteFlagBitfield::None;
     if (bindingTableValues.empty()) {
       rewriter.create<IREE::HAL::DeviceQueueExecuteOp>(
-          loc, device, queueAffinity, waitFence, signalFence,
-          ValueRange{commandBuffer});
+          loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
+          flags);
     } else {
       rewriter.create<IREE::HAL::DeviceQueueExecuteIndirectOp>(
           loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
-          bindingTableValues);
+          bindingTableValues, flags);
     }
 
     rewriter.replaceOp(executeOp, signalFence);
@@ -1311,10 +1366,11 @@ struct TimepointChainExternalOpPattern
     }
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(exportOp, rewriter);
-    rewriter.replaceOpWithNewOp<IREE::HAL::DeviceQueueExecuteOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::DeviceQueueBarrierOp>(
         exportOp, device, queueAffinity,
         /*wait_fence=*/adaptor.getAwaitTimepoint(),
-        /*signal_fence=*/externalValues[0], /*command_buffers=*/ValueRange{});
+        /*signal_fence=*/externalValues[0],
+        IREE::HAL::ExecuteFlagBitfield::None);
     return success();
   }
 };
@@ -1327,7 +1383,7 @@ struct TimepointJoinOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::FenceJoinOp>(
         joinOp, rewriter.getType<IREE::HAL::FenceType>(),
-        adaptor.getAwaitTimepoints());
+        IREE::HAL::FenceFlagBitfield::None, adaptor.getAwaitTimepoints());
     return success();
   }
 };
@@ -1360,7 +1416,8 @@ struct TimepointAwaitOpPattern
     // Perform the blocking wait.
     Value timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
     auto fenceOp = rewriter.create<IREE::HAL::FenceAwaitOp>(
-        loc, rewriter.getI32Type(), timeoutMillis, adaptor.getAwaitTimepoint());
+        loc, rewriter.getI32Type(), timeoutMillis,
+        IREE::HAL::WaitFlagBitfield::None, adaptor.getAwaitTimepoint());
     rewriter.create<IREE::Util::StatusCheckOkOp>(loc, fenceOp.getStatus(),
                                                  "failed to wait on timepoint");
 
@@ -1416,7 +1473,7 @@ struct ChannelCreateOpPattern
             : getDefault();
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
         createOp, rewriter.getType<IREE::HAL::ChannelType>(), device,
-        queueAffinity, /*flags=*/rewriter.getI32IntegerAttr(0), id, group, rank,
+        queueAffinity, IREE::HAL::ChannelFlagBitfield::None, id, group, rank,
         count);
     return success();
   }
@@ -1434,8 +1491,7 @@ struct ChannelSplitOpPattern
         splitOp.getLoc(), rewriter.getI32Type(), adaptor.getKey());
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelSplitOp>(
         splitOp, rewriter.getType<IREE::HAL::ChannelType>(),
-        adaptor.getChannel(), color, key,
-        /*flags=*/rewriter.getI32IntegerAttr(0));
+        adaptor.getChannel(), color, key, IREE::HAL::ChannelFlagBitfield::None);
     return success();
   }
 };
@@ -1543,10 +1599,11 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns.insert<ContextResolveOpPattern>(mapping, typeConverter, context);
 
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
-                  ResourceDeallocaOpPattern, ResourceSizeOpPattern,
-                  ResourceTryMapOpPattern, ResourceLoadOpPattern,
-                  ResourceStoreOpPattern, ResourceSubviewOpPattern>(
-      mapping, typeConverter, context);
+                  ResourceDeallocaOpPattern, ResourceRetainOpPattern,
+                  ResourceReleaseOpPattern, ResourceIsTerminalOpPattern,
+                  ResourceSizeOpPattern, ResourceTryMapOpPattern,
+                  ResourceLoadOpPattern, ResourceStoreOpPattern,
+                  ResourceSubviewOpPattern>(mapping, typeConverter, context);
 
   patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
       mapping, typeConverter, context);

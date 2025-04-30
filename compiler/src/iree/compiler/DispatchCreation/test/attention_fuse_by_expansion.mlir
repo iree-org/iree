@@ -197,18 +197,17 @@ util.func public @attention_dynamic(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?x
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
 //  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG2]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divui %[[D0]]
-//  CHECK-DAG:   %[[VAL:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[D0]]]
-//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[VAL]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
+//  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divsi %[[D0]]
+//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[SPLIT0]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
 //  CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D1]], %[[D2]]]
 //  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[D6:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG1]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT1:.+]] = arith.divui %[[D5]], %[[C2]]
+//  CHECK-DAG:   %[[SPLIT1:.+]] = arith.divsi %[[D5]], %[[C2]]
 //  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT1]], %[[D6]], %[[D7]]]
 //  CHECK-DAG:   %[[D8:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D9:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divui %[[D8]], %[[C2]]
+//  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divsi %[[D8]], %[[C2]]
 //  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT2]], %[[D9]], %[[D4]]]
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:       indexing_maps =
@@ -263,23 +262,22 @@ util.func public @attention_dynamic_masked(%arg0: tensor<?x?x?xf16>, %arg1: tens
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
 //  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG2]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divui %[[D0]]
-//  CHECK-DAG:   %[[VAL:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[D0]]]
-//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[VAL]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
+//  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divsi %[[D0]]
+//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[SPLIT0]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
 //  CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D1]], %[[D2]]]
 //  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[D6:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG1]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT1:.+]] = arith.divui %[[D5]], %[[C2]]
+//  CHECK-DAG:   %[[SPLIT1:.+]] = arith.divsi %[[D5]], %[[C2]]
 //  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT1]], %[[D6]], %[[D7]]]
 //  CHECK-DAG:   %[[D8:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //  CHECK-DAG:   %[[D9:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divui %[[D8]], %[[C2]]
+//  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divsi %[[D8]], %[[C2]]
 //  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT2]], %[[D9]], %[[D4]]]
 //  CHECK-DAG:   %[[D10:.+]] = tensor.dim %[[ARG4]], %[[C0]]
 //  CHECK-DAG:   %[[D11:.+]] = tensor.dim %[[ARG4]], %[[C1]]
 //  CHECK-DAG:   %[[D12:.+]] = tensor.dim %[[ARG4]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT3:.+]] = arith.divui %[[D10]], %[[C2]]
+//  CHECK-DAG:   %[[SPLIT3:.+]] = arith.divsi %[[D10]], %[[C2]]
 //  CHECK-DAG:   %[[MASK:.+]] = tensor.expand_shape %[[ARG4]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT3]], %[[D11]], %[[D12]]]
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:       indexing_maps =
@@ -455,7 +453,7 @@ util.func public @sink_single_collapse_masked(%0 : tensor<4x32x64x128xf16>, %1 :
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
 
-util.func public @dont_sink_through_k2(%0 : tensor<128x64x1x1x128xf16>, %1 : tensor<128x64x128xf16>, %2 : tensor<128x64x128xf16>, %cst : f16) -> (tensor<128x64x128xf16>) {
+util.func public @sink_through_k2(%0 : tensor<128x64x1x1x128xf16>, %1 : tensor<128x64x128xf16>, %2 : tensor<128x64x128xf16>, %cst : f16) -> (tensor<128x64x128xf16>) {
   %13 = tensor.empty() : tensor<4x32x64x128xf16>
   %collapsed_12 = tensor.collapse_shape %0 [[0], [1, 2, 3], [4]] : tensor<128x64x1x1x128xf16> into tensor<128x64x128xf16>
   %17 = tensor.empty() : tensor<128x64x128xf16>
@@ -466,20 +464,20 @@ util.func public @dont_sink_through_k2(%0 : tensor<128x64x1x1x128xf16>, %1 : ten
   util.return %18 : tensor<128x64x128xf16>
 }
 
-// CHECK-LABEL: util.func public @dont_sink_through_k2
+// CHECK-LABEL: util.func public @sink_through_k2
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
 //  CHECK-SAME:     %[[ARG3:.+]]: f16
-//   CHECK-DAG:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//   CHECK-DAG:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG1]]
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:       indexing_maps =
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> ()>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
-//  CHECK-SAME:       ins(%[[ARG2]], %[[ARG1]], %[[COLLAPSED]], %[[ARG3]] :
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d3, d4, d5, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d3, d4, d5, d6)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d6)>
+//  CHECK-SAME:       ins(%[[ARG2]], %[[EXPANDED]], %[[ARG0]], %[[ARG3]] :
 //       CHECK:   util.return %[[ATTENTION]]
 
 // -----

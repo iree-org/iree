@@ -19,6 +19,11 @@ def Convert1X1FilterConv2DToMatmulPass:
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
 }
 
+def ConvertStridedContractionToContractionPass:
+    Pass<"iree-global-opt-convert-strided-contraction-to-contraction", ""> {
+  let summary = "Factors out an extract_slice from contraction-like ops with strided inputs.";
+}
+
 def DecomposeConcatPass :
     Pass<"iree-global-opt-decompose-concat", ""> {
   let summary = "Decomposes concatenations into a destination and a sequence of slice inserts.";
@@ -115,6 +120,10 @@ def PropagateLinalgTransposePass :
            "Flag used for lit-testing sinking patterns only. Not for general usage">,
     Option<"testBubblingOnly", "test-bubbling-only", "bool", /*default=*/"false",
            "Flag used for lit-testing bubbling patterns only. Not for general usage">,
+    Option<"enableAttentionVTranspose", "enable-attention-v-transpose", "bool",
+            /*default=*/"true", "Enable transposition of attention v operand">,
+    Option<"enableConvolutionPropagation", "enable-aggressive-propagation-through-conv", "bool",
+            /*default=*/"false", "enable propagation through convolutions">,
   ];
 }
 
@@ -148,6 +157,10 @@ def GlobalLoopInvariantCodeMotionPass : InterfacePass<"iree-global-opt-loop-inva
 
 def DataLayoutPropagationPass : InterfacePass<"iree-global-opt-data-layout-propagation", "mlir::FunctionOpInterface"> {
   let summary = "Propagate pack/unpack ops across other ops to improve fusion";
+}
+
+def WarnOnUninitializedValuesPass : InterfacePass<"iree-global-opt-warn-on-uninitialized-values", "mlir::FunctionOpInterface"> {
+  let summary = "Catch some uses of uninitialized values";
 }
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

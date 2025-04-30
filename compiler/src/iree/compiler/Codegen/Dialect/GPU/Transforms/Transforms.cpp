@@ -12,18 +12,15 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
-#include "llvm/Support/LogicalResult.h"
-#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -356,6 +353,43 @@ collapsibleSlicePrecondition(RewriterBase &rewriter,
   return success();
 }
 
+/// Given a tensor.parallel_insert_slice op, find all values that are needed to
+/// build an equivalent subset extract_slice, and set the insertion point to the
+/// last of these values. This helper is useful in cases where additional index
+/// computation must be composed with the current indexing operations for the
+/// slice, since we want all index operations for the slice to retain the same
+/// level of dominance after composing the new computation.
+static Operation *
+setInsertionPointAfterLastIndexOperand(RewriterBase &rewriter,
+                                       tensor::ParallelInsertSliceOp op) {
+  DominanceInfo domInfo;
+  auto subsetOp = cast<SubsetInsertionOpInterface>(op.getOperation());
+  SmallVector<Value> values = subsetOp.getValuesNeededToBuildSubsetExtraction();
+  Operation *lastOp = nullptr;
+  bool setInsertionPointBefore = false;
+  for (auto val : values) {
+    auto definingOp = val.getDefiningOp();
+    if (!definingOp) {
+      definingOp =
+          &cast<BlockArgument>(val).getOwner()->getOperations().front();
+    }
+    if (!definingOp || (lastOp && domInfo.dominates(definingOp, lastOp)))
+      continue;
+    lastOp = definingOp;
+
+    // For block arguments we want the insertion point to be at the start of
+    // the block, so we need to set the insertion point before the first op
+    // in the block.
+    setInsertionPointBefore = isa<BlockArgument>(val);
+  }
+  if (setInsertionPointBefore) {
+    rewriter.setInsertionPoint(lastOp);
+  } else {
+    rewriter.setInsertionPointAfter(lastOp);
+  }
+  return lastOp;
+}
+
 /// Collapse all `ops` with the given `reassociations`. All `ops` are expected
 /// to have equivalent offsets, sizes, and strides. All strides are expected to
 /// be 1. This function assumes that the parallelInsertOp passes the
@@ -365,8 +399,9 @@ collapseParallelInsertOp(RewriterBase &rewriter,
                          tensor::ParallelInsertSliceOp parallelInsertOp,
                          SmallVector<ReassociationIndices> reassociations) {
   // Compute the collapsed offsets, sizes, and strides.
-  rewriter.setInsertionPoint(parallelInsertOp.getParallelCombiningParent());
-  Location loc = parallelInsertOp->getLoc();
+  Operation *lastOp =
+      setInsertionPointAfterLastIndexOperand(rewriter, parallelInsertOp);
+  Location loc = lastOp->getLoc();
   int64_t resultIdx = parallelInsertOp.getTiedOpResult().getResultNumber();
   auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
   Value loopInit = forallOp.getOutputs()[resultIdx];
@@ -515,6 +550,259 @@ fuseCollapseShapeIntoProducerForall(RewriterBase &rewriter,
     forallOp->getResult(idx).replaceAllUsesWith(newForallOp->getResult(idx));
   }
   rewriter.eraseOp(forallOp);
+  return newForallOp;
+}
+
+/// Return whether the `parallelInsertOp` can be clamped along the sliced
+/// dimensions of `extractSliceOp`. The dimensions of the extractSliceOp source
+/// are expected to match the dimensions of the parallelInsertOp destination.
+/// This function checks that the parallelInsertOp is not rank reducing along
+/// any of the sliced dimensions of the extractSliceOp.
+static LogicalResult canClampParallelInsertSlice(
+    RewriterBase &rewriter, tensor::ParallelInsertSliceOp parallelInsertOp,
+    tensor::ExtractSliceOp extractSliceOp,
+    llvm::SmallDenseSet<unsigned int> insertRankReductionMask) {
+  // Find the dimensions that are sliced by the extractSliceOp
+  llvm::SmallDenseSet<unsigned int> slicedDims;
+  ArrayRef<int64_t> sliceStaticSizes = extractSliceOp.getStaticSizes();
+  ArrayRef<int64_t> sliceSourceSizes =
+      extractSliceOp.getSourceType().getShape();
+  for (int dim = 0; dim < sliceStaticSizes.size(); ++dim) {
+    if (ShapedType::isDynamic(sliceStaticSizes[dim]) ||
+        sliceStaticSizes[dim] != sliceSourceSizes[dim]) {
+      slicedDims.insert(dim);
+    }
+  }
+  for (int dim = 0; dim < parallelInsertOp.getDestType().getRank(); ++dim) {
+    if (insertRankReductionMask.contains(dim) && slicedDims.contains(dim)) {
+      return rewriter.notifyMatchFailure(
+          parallelInsertOp, "parallel insert reduces sliced dimensions");
+    }
+  }
+  return success();
+}
+
+/// Clamps the source of a parallel_insert_slice op to fit within the
+/// `upperBoundSizes`. This function computes the upper bound sizes, and creates
+/// an extract slice op on the parallel insert source, which is then used in a
+/// new parallel insert slice to replace the old one. This function assumes that
+/// the parallel insert op passes `canClampParallelInsertSlice` precondition.
+static FailureOr<tensor::ParallelInsertSliceOp>
+clampParallelInsertSliceOp(RewriterBase &rewriter,
+                           tensor::ParallelInsertSliceOp parallelInsertOp,
+                           SmallVector<OpFoldResult> upperBoundSizes) {
+  OpBuilder::InsertionGuard g(rewriter);
+  Operation *lastOp =
+      setInsertionPointAfterLastIndexOperand(rewriter, parallelInsertOp);
+  Location loc = lastOp->getLoc();
+
+  // Clamp the parallel_insert_slice sizes to fit within the full result tensor.
+  SmallVector<OpFoldResult> offsets = parallelInsertOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = parallelInsertOp.getMixedSizes();
+  SmallVector<OpFoldResult> clampedSizes;
+  for (auto [offset, size, ub] :
+       llvm::zip_equal(offsets, sizes, upperBoundSizes)) {
+    AffineExpr d0, d1, d2;
+    MLIRContext *ctx = rewriter.getContext();
+    bindDims(ctx, d0, d1, d2);
+    auto lbClampMap = AffineMap::get(3, 0, {d0 - d1, d2}, ctx);
+    auto ubClampMap = rewriter.getMultiDimIdentityMap(2);
+    OpFoldResult lbClamped = affine::makeComposedFoldedAffineMax(
+        rewriter, loc, lbClampMap, {ub, offset, rewriter.getIndexAttr(0)});
+    OpFoldResult ubClamped = affine::makeComposedFoldedAffineMin(
+        rewriter, loc, ubClampMap, {lbClamped, size});
+    clampedSizes.push_back(ubClamped);
+  }
+
+  // Compute the clamped type. This could be rank reduced, but rank reduced
+  // dimensions will never be potentially zero by construction. The earlier
+  // matchers ensure that all sliceable users are not rank reduced along a
+  // dimensions that is being sliced by the loop consumer.
+  llvm::SmallDenseSet<unsigned int> rankReductionMask =
+      computeRankReductionMask(parallelInsertOp.getStaticSizes(),
+                               parallelInsertOp.getSourceType().getShape(),
+                               /*matchDynamic=*/true)
+          .value();
+  SmallVector<int64_t> clampedShape;
+  SmallVector<OpFoldResult> rankReducedClampedSizes;
+  SmallVector<Value> d;
+  for (auto [idx, clampedSize] : llvm::enumerate(clampedSizes)) {
+    if (rankReductionMask.contains(idx)) {
+      continue;
+    }
+    dispatchIndexOpFoldResult(clampedSize, d, clampedShape);
+    rankReducedClampedSizes.push_back(clampedSize);
+  }
+  RankedTensorType clampedType =
+      parallelInsertOp.getSourceType().clone(clampedShape);
+  // Create an extract_slice to extract the correct size from the parallel
+  // insert source.
+  SmallVector<OpFoldResult> zeros(clampedType.getRank(),
+                                  rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> ones(clampedType.getRank(),
+                                 rewriter.getIndexAttr(1));
+  Operation *combiningOp =
+      parallelInsertOp.getParallelCombiningParent().getOperation();
+  rewriter.setInsertionPoint(combiningOp);
+  loc = combiningOp->getLoc();
+  auto extractOp = rewriter.create<tensor::ExtractSliceOp>(
+      loc, clampedType, parallelInsertOp.getSource(), zeros,
+      rankReducedClampedSizes, ones);
+
+  // Replace the parallel insert op with the clamped version, and return the
+  // new parallel insert slice.
+  rewriter.setInsertionPoint(parallelInsertOp);
+  loc = parallelInsertOp->getLoc();
+  return rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+      parallelInsertOp, extractOp.getResult(), parallelInsertOp.getDest(),
+      parallelInsertOp.getMixedOffsets(), clampedSizes,
+      parallelInsertOp.getMixedStrides());
+}
+
+FailureOr<scf::ForallOp>
+fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
+                                   scf::ForallOp forallOp,
+                                   tensor::ExtractSliceOp extractSliceOp) {
+  auto forallResult = cast<OpResult>(extractSliceOp.getSource());
+  if (!forallResult.hasOneUse()) {
+    return rewriter.notifyMatchFailure(forallOp,
+                                       "forall result has multiple uses");
+  }
+  BlockArgument initBbarg =
+      forallOp.getRegionIterArgs()[forallResult.getResultNumber()];
+  SmallVector<Operation *> parallelInsertOps =
+      forallOp.getCombiningOps(initBbarg);
+  if (parallelInsertOps.size() != 1) {
+    return rewriter.notifyMatchFailure(
+        forallOp, "Expected a single parallel_insert_slice");
+  }
+
+  auto parallelInsertOp =
+      dyn_cast<tensor::ParallelInsertSliceOp>(parallelInsertOps.front());
+  if (!parallelInsertOp) {
+    return rewriter.notifyMatchFailure(
+        forallOp, "Expected parallel_insert_slice combining op");
+  }
+
+  // Only zero offset extract_slice ops are supported.
+  if (!areAllConstantIntValue(extractSliceOp.getMixedOffsets(), 0)) {
+    return rewriter.notifyMatchFailure(forallOp,
+                                       "extract_slice has non-zero offsets");
+  }
+
+  // The extract_slice index operands must dominate the forall loop in order
+  // to extract a slice of the init operand later.
+  DominanceInfo domInfo;
+  int64_t indexOperandStartIdx =
+      extractSliceOp.getOffsetSizeAndStrideStartOperandIndex();
+  SmallVector<Value> indexOperands(extractSliceOp->getOperands().begin() +
+                                       indexOperandStartIdx,
+                                   extractSliceOp->getOperands().end());
+  if (!llvm::all_of(indexOperands,
+                    [&](Value v) { return domInfo.dominates(v, forallOp); })) {
+    return rewriter.notifyMatchFailure(
+        extractSliceOp,
+        "Extract slice index operands do not dominate the forall op");
+  }
+
+  // Compute the rank reduction mask of the extract_slice for resolving rank
+  // reduction at the end. For rank reducing slices, the extract_slice is
+  // fused into the loop as a non rank reducing slice, and then a collapse
+  // shape is added on the result of the loop. This simplifies the logic in
+  // this pattern, and other patterns for collapse shape fusion can then fuse
+  // this collapse shape into the loop if needed.
+  auto maybeRankReductionMask = computeRankReductionMask(
+      extractSliceOp.getStaticSizes(), extractSliceOp.getType().getShape(),
+      /*matchDynamic=*/true);
+  if (!maybeRankReductionMask) {
+    return rewriter.notifyMatchFailure(extractSliceOp,
+                                       "Could not compute rank reduction mask");
+  }
+
+  std::optional<llvm::SmallDenseSet<unsigned int>>
+      maybeInsertRankReductionMask =
+          computeRankReductionMask(parallelInsertOp.getStaticSizes(),
+                                   parallelInsertOp.getSourceType().getShape(),
+                                   /*matchDynamic=*/true);
+  if (!maybeInsertRankReductionMask) {
+    return rewriter.notifyMatchFailure(parallelInsertOp,
+                                       "Could not compute rank reduction mask");
+  }
+  llvm::SmallDenseSet<unsigned int> insertRankReductionMask =
+      maybeInsertRankReductionMask.value();
+
+  // Verify that the parallelInsertOp can be clamped to the sizes of the
+  // extractSliceOp.
+  if (failed(canClampParallelInsertSlice(rewriter, parallelInsertOp,
+                                         extractSliceOp,
+                                         insertRankReductionMask))) {
+    return failure();
+  }
+  int64_t resultIdx = forallResult.getResultNumber();
+
+  // Clamp the parallel insert slice source to fit within the extracted slice.
+  SmallVector<OpFoldResult> newInitSizes = extractSliceOp.getMixedSizes();
+  FailureOr<tensor::ParallelInsertSliceOp> maybeClampedParallelInsertSliceOp =
+      clampParallelInsertSliceOp(rewriter, parallelInsertOp, newInitSizes);
+  if (failed(maybeClampedParallelInsertSliceOp)) {
+    return failure();
+  }
+  tensor::ParallelInsertSliceOp clampedParallelInsertSliceOp =
+      maybeClampedParallelInsertSliceOp.value();
+
+  // Now replace users of the forall loop init argument with the output operand
+  // from outside the loop. Do not replace the clamped parallel insert dest.
+  Value forallOutput = forallOp.getOutputs()[forallResult.getResultNumber()];
+  rewriter.replaceUsesWithIf(initBbarg, forallOutput, [&](OpOperand &operand) {
+    return operand != clampedParallelInsertSliceOp.getDestMutable();
+  });
+
+  // Clone the extract_slice, and replace the source with the forall init
+  // operand.
+  Value forallInit = forallOp.getOutputs()[resultIdx];
+  rewriter.setInsertionPoint(forallOp);
+  auto extractedInit = rewriter.create<tensor::ExtractSliceOp>(
+      forallOp->getLoc(), forallInit, extractSliceOp.getMixedOffsets(),
+      extractSliceOp.getMixedSizes(), extractSliceOp.getMixedStrides());
+
+  // Clone the forall op with the extracted init operand to replace the
+  // original forall op.
+  Location loc = forallOp->getLoc();
+  rewriter.setInsertionPoint(forallOp);
+  SmallVector<Value> newForallOutputs(forallOp.getOutputs());
+  newForallOutputs[resultIdx] = extractedInit.getResult();
+
+  scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
+      loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
+      forallOp.getMixedStep(), newForallOutputs, forallOp.getMappingAttr());
+
+  SmallVector<Value> argReplacements(newForallOp.getInductionVars());
+  argReplacements.append(newForallOp.getRegionIterArgs().begin(),
+                         newForallOp.getRegionIterArgs().end());
+  newForallOp.getTerminator()->erase();
+  rewriter.mergeBlocks(forallOp.getBody(), newForallOp.getBody(),
+                       argReplacements);
+
+  // Create a collapse_shape to handle rank reduction.
+  Value extractedResult = newForallOp->getResult(resultIdx);
+  auto forallResultType = cast<ShapedType>(extractedResult.getType());
+  SmallVector<ReassociationIndices> reassociations;
+  ReassociationIndices reassociation;
+  for (int i = 0; i < forallResultType.getRank(); ++i) {
+    if (maybeRankReductionMask->contains(i)) {
+      reassociation.push_back(i);
+      continue;
+    }
+    reassociation.push_back(i);
+    reassociations.push_back(reassociation);
+    reassociation = {};
+  }
+  auto collapseShape = rewriter.create<tensor::CollapseShapeOp>(
+      extractSliceOp->getLoc(), extractedResult, reassociations);
+
+  // Replace forall and extract_slice ops with the new operations.
+  rewriter.replaceAllOpUsesWith(extractSliceOp, collapseShape);
+  rewriter.replaceOp(forallOp, newForallOp);
   return newForallOp;
 }
 
@@ -1181,7 +1469,15 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
   Location loc = forallOp->getLoc();
   assert(isLaneMappableForall(forallOp) && "mapping non-lane forall op");
 
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, /*upperBound=*/nullptr);
+  auto upperBounds = forallOp.getLoopUpperBounds();
+  std::optional<IntegerAttr> upperBound;
+  if (upperBounds && upperBounds->size() > 0) {
+    if (auto upperBoundAttr = (*upperBounds)[0].dyn_cast<Attribute>()) {
+      upperBound = dyn_cast<IntegerAttr>(upperBoundAttr);
+    }
+  }
+  Value laneId = rewriter.create<gpu::LaneIdOp>(
+      loc, upperBound ? rewriter.getIndexAttr(upperBound->getInt()) : nullptr);
   rewriter.eraseOp(forallOp.getTerminator());
   rewriter.setInsertionPoint(forallOp);
   rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});

@@ -281,11 +281,11 @@ class BindSymbolicShapesPass final
         case AffineExprKind::Mul:
           return builder.create<arith::MulIOp>(loc, lhs, rhs);
         case AffineExprKind::Mod:
-          return builder.create<arith::RemUIOp>(loc, lhs, rhs);
+          return builder.create<arith::RemSIOp>(loc, lhs, rhs);
         case AffineExprKind::FloorDiv:
-          return builder.create<arith::DivUIOp>(loc, lhs, rhs);
+          return builder.create<arith::DivSIOp>(loc, lhs, rhs);
         case AffineExprKind::CeilDiv:
-          return builder.create<arith::CeilDivUIOp>(loc, lhs, rhs);
+          return builder.create<arith::CeilDivSIOp>(loc, lhs, rhs);
         default:
           break;
         }

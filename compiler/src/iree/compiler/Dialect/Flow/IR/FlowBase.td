@@ -95,59 +95,6 @@ def FLOW_GlobalPtr : Util_AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 // Dispatch types
 //===----------------------------------------------------------------------===//
 
-def FLOW_TensorAccessCanReadPred : CPred<[{
-  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
-      IREE::Flow::TensorAccess::ReadOnly ||
-  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
-      IREE::Flow::TensorAccess::ReadWrite
-}]>;
-
-def FLOW_TensorAccessCanWritePred : CPred<[{
-  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
-      IREE::Flow::TensorAccess::WriteOnly ||
-  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
-      IREE::Flow::TensorAccess::ReadWrite
-}]>;
-
-def FLOW_DispatchTensor : DialectType<
-    Flow_Dialect,
-    CPred<"isa<IREE::Flow::DispatchTensorType>($_self)">,
-    "dispatch.tensor"> {
-  let description = [{
-    A placeholder for a dispatch region input/output operand. This can be used
-    to query the metadata about the tensor (such as its shape) as well as both
-    load and store from the backing tensor representation.
-  }];
-}
-
-def FLOW_ReadableDispatchTensor : DialectType<
-    Flow_Dialect,
-    And<[
-      CPred<"isa<IREE::Flow::DispatchTensorType>($_self)">,
-      FLOW_TensorAccessCanReadPred,
-    ]>,
-    "dispatch.tensor"> {
-  let description = [{
-    A placeholder for a dispatch region input operand. This can be used
-    to query the metadata about the tensor (such as its shape) as well as load
-    from the backing tensor representation.
-  }];
-}
-
-def FLOW_WritableDispatchTensor : DialectType<
-    Flow_Dialect,
-    And<[
-      CPred<"isa<IREE::Flow::DispatchTensorType>($_self)">,
-      FLOW_TensorAccessCanWritePred,
-    ]>,
-    "dispatch.tensor"> {
-  let description = [{
-    A placeholder for a dispatch region output operand. This can be used
-    to query the metadata about the tensor (such as its shape) as well as store
-    to the backing tensor representation.
-  }];
-}
-
 // TODO(benvanik): remove when we have real types using this.
 def FLOW_Dummy0 : TypeDef<Flow_Dialect, "Dummy", []> {
   let mnemonic = "dummy";

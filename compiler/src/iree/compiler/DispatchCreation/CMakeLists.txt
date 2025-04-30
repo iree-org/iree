@@ -23,6 +23,7 @@ iree_cc_library(
     "CollapseDimensions.cpp"
     "CollapseReductionDimensions.cpp"
     "ConvertDispatchRegionsToWorkgroups.cpp"
+    "ConvertEncodingToFlow.cpp"
     "ConvertTensorToFlow.cpp"
     "ElementwiseOpFusion.cpp"
     "FoldUnitExtentDims.cpp"
@@ -36,6 +37,7 @@ iree_cc_library(
     "HoistEncodingOps.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
+    "PropagateEncodings.cpp"
     "SetEncoding.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
@@ -87,6 +89,8 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::DFX

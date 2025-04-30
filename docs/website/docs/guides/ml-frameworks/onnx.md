@@ -10,14 +10,6 @@ icon: simple/onnx
 
 # ONNX support
 
-!!! caution "Caution - under development"
-
-    Support for a broad set of [ONNX operators](https://onnx.ai/onnx/operators/)
-    and [data types](https://onnx.ai/onnx/intro/concepts.html#supported-types)
-    is an active investment area. See the
-    [ONNX Op Support tracking issue](https://github.com/nod-ai/SHARK-ModelDev/issues/215)
-    for the latest status.
-
 ## :octicons-book-16: Overview
 
 Machine learning models using the
@@ -46,39 +38,33 @@ graph LR
 
 ## :octicons-download-16: Prerequisites
 
-1. Install ONNX:
+Install IREE packages, either by
+[building from source](../../building-from-source/getting-started.md#python-bindings)
+or from pip:
+
+=== ":octicons-package-16: Stable releases"
+
+    Stable release packages are [published to PyPI](https://pypi.org/).
 
     ``` shell
-    python -m pip install onnx
+    python -m pip install \
+      iree-base-compiler[onnx] \
+      iree-base-runtime
     ```
 
-2. Install IREE packages, either by
-    [building from source](../../building-from-source/getting-started.md#python-bindings)
-    or from pip:
+=== ":octicons-beaker-16: Nightly releases"
 
-    === ":octicons-package-16: Stable releases"
+    Nightly pre-releases are published on
+    [GitHub releases](https://github.com/iree-org/iree/releases).
 
-        Stable release packages are [published to PyPI](https://pypi.org/).
-
-        ``` shell
-        python -m pip install \
-          iree-base-compiler[onnx] \
-          iree-base-runtime
-        ```
-
-    === ":octicons-beaker-16: Nightly releases"
-
-        Nightly pre-releases are published on
-        [GitHub releases](https://github.com/iree-org/iree/releases).
-
-        ``` shell
-        python -m pip install \
-          --find-links https://iree.dev/pip-release-links.html \
-          --upgrade \
-          --pre \
-          iree-base-compiler[onnx] \
-          iree-base-runtime
-        ```
+    ``` shell
+    python -m pip install \
+      --find-links https://iree.dev/pip-release-links.html \
+      --upgrade \
+      --pre \
+      iree-base-compiler[onnx] \
+      iree-base-runtime
+    ```
 
 ## :octicons-rocket-16: Quickstart
 
@@ -88,11 +74,15 @@ graph LR
 2. Convert the `.onnx` file into MLIR using the `iree-import-onnx` tool:
 
     ```shell
-    iree-import-onnx [model.onnx] -o [model.mlir]
+    iree-import-onnx \
+      [model.onnx] \
+      --opset-version 17 \
+      -o [model.mlir]
     ```
 
     This tool produces a MLIR file with the help of the
-    [torch-mlir](https://github.com/llvm/torch-mlir) project.
+    [torch-mlir](https://github.com/llvm/torch-mlir) project. Run
+    `iree-import-onnx --help` for a full list of options.
 
 3. Once imported, the standard set of tools and APIs available for any of
    IREE's [deployment configurations](../deployment-configurations/index.md) and
@@ -101,7 +91,9 @@ graph LR
     ```shell
     iree-compile \
       model.mlir \
-      --iree-hal-target-backends=llvm-cpu \
+      --iree-hal-target-device=local \
+      --iree-hal-local-target-device-backends=llvm-cpu \
+      --iree-llvmcpu-target-cpu=host \
       -o model_cpu.vmfb
 
     iree-run-module \
@@ -123,12 +115,18 @@ Importer tests | [torch-mlir `test/python/onnx_importer`](https://github.com/llv
 
 ## :octicons-question-16: Troubleshooting
 
+Support for a broad set of [ONNX operators](https://onnx.ai/onnx/operators/)
+and [data types](https://onnx.ai/onnx/intro/concepts.html#supported-types)
+is an active investment area. See the
+[ONNX Op Support tracking issue](https://github.com/nod-ai/SHARK-ModelDev/issues/215)
+for the latest status.
+
 ### Failed to legalize operation that was explicitly marked illegal
 
 If you see an error compiling a converted .mlir file like this:
 
 ```console
-$ iree-compile model.mlir --iree-hal-target-backends=llvm-cpu -o model.vmfb
+$ iree-compile model.mlir --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu -o model.vmfb
 
 model.mlir:507:12: error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
     %503 = torch.operator "onnx.Identity"(%arg0) : (!torch.vtensor<[?],si64>) -> !torch.vtensor<[?],si64>

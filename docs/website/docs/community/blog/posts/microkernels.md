@@ -26,7 +26,8 @@ Basic compilation command line:
 
 ```bash
 $ iree-compile matmul.mlir -o /tmp/matmul.vmfb \
-  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-llvmcpu-target-cpu=znver4 \
   --iree-llvmcpu-enable-ukernels=all
 ```
@@ -382,17 +383,17 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
     %8 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<?x?xf32>{%6, %7}
     %9 = affine.apply #map()[%0]
     %10 = tensor.empty(%9, %1) : tensor<?x?x16x1xf32>
-    %pack = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %10 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
+    %pack = linalg.pack %2 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %10 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
     %11 = affine.apply #map()[%4]
     %12 = tensor.empty(%11, %3) : tensor<?x?x16x1xf32>
-    %pack_0 = tensor.pack %5 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %12 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
+    %pack_0 = linalg.pack %5 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %12 : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
     %13 = affine.apply #map()[%6]
     %14 = affine.apply #map()[%7]
     %15 = tensor.empty(%13, %14) : tensor<?x?x16x16xf32>
-    %pack_1 = tensor.pack %8 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %15 : tensor<?x?xf32> -> tensor<?x?x16x16xf32>
+    %pack_1 = linalg.pack %8 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %15 : tensor<?x?xf32> -> tensor<?x?x16x16xf32>
     %16 = linalg.mmt4d ins(%pack, %pack_0 : tensor<?x?x16x1xf32>, tensor<?x?x16x1xf32>) outs(%pack_1 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32>
     %17 = tensor.empty(%6, %7) : tensor<?x?xf32>
-    %unpack = tensor.unpack %16 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %17 : tensor<?x?x16x16xf32> -> tensor<?x?xf32>
+    %unpack = linalg.unpack %16 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %17 : tensor<?x?x16x16xf32> -> tensor<?x?xf32>
     %18 = hal.tensor.export %unpack "output0" : tensor<?x?xf32>{%6, %7} -> !hal.buffer_view
     return %18 : !hal.buffer_view
   }
@@ -467,21 +468,21 @@ module {
     %53 = arith.shli %52, %c32_i64 : i64
     %54 = arith.ori %51, %53 : i64
     %55 = arith.index_castui %54 : i64 to index
-    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35}
-    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45}
-    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
+    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35}
+    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45}
+    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %workgroup_count_y = hal.interface.workgroup.count[1] : index
     scf.for %arg0 = %workgroup_id_y to %30 step %workgroup_count_y {
       scf.for %arg1 = %workgroup_id_x to %40 step %workgroup_count_x {
-        %59 = flow.dispatch.tensor.load %56, offsets = [%arg0, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35} -> tensor<1x?x16x1xf32>
-        %60 = flow.dispatch.tensor.load %57, offsets = [%arg1, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45} -> tensor<1x?x16x1xf32>
-        %61 = flow.dispatch.tensor.load %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55} -> tensor<1x1x16x16xf32>
+        %59 = iree_tensor_ext.dispatch.tensor.load %56, offsets = [%arg0, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35} -> tensor<1x?x16x1xf32>
+        %60 = iree_tensor_ext.dispatch.tensor.load %57, offsets = [%arg1, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45} -> tensor<1x?x16x1xf32>
+        %61 = iree_tensor_ext.dispatch.tensor.load %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55} -> tensor<1x1x16x16xf32>
         %dim = tensor.dim %60, %c1 : tensor<1x?x16x1xf32>
         %62 = iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%59, %60 : tensor<1x?x16x1xf32>, tensor<1x?x16x1xf32>) outs(%61 : tensor<1x1x16x16xf32>) (%c1, %c1, %dim, %c16_i32, %c16_i32, %c1_i32, %c1281_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"]} strided_outer_dims(1) -> tensor<1x1x16x16xf32>
-        flow.dispatch.tensor.store %62, %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : tensor<1x1x16x16xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
+        iree_tensor_ext.dispatch.tensor.store %62, %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : tensor<1x1x16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
       }
     }
     return

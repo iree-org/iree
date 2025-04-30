@@ -24,7 +24,7 @@ util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
   %8 = tensor.empty(%6, %7) : tensor<?x?x8x32xf32>
   // TODO(#12746) : The inner_tiles could be dynamic here. It is disabled
   // due to unrelated codegen issue.
-  %9 = tensor.pack %5 padding_value(%cst : f32)
+  %9 = linalg.pack %5 padding_value(%cst : f32)
       inner_dims_pos = [0, 1] inner_tiles = [8, 32]
       into %8 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
   util.return %9 : tensor<?x?x8x32xf32>
@@ -39,7 +39,7 @@ util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //  CHECK-SAME:         ins(%[[ARG1]], %[[ARG0]] :
-//       CHECK:     %[[PACK:.+]] = tensor.pack %[[GENERIC]]
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[GENERIC]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[RETURN]]
 
@@ -80,7 +80,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
   %8 = tensor.empty(%6, %7) : tensor<?x?x8x32xf32>
   // TODO(#12746) : The inner_tiles could be dynamic here. It is disabled
   // due to unrelated codegen issue.
-  %9 = tensor.pack %5 padding_value(%cst : f32)
+  %9 = linalg.pack %5 padding_value(%cst : f32)
       inner_dims_pos = [0, 1] inner_tiles = [8, 32]
       into %8 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
   util.return %9 : tensor<?x?x8x32xf32>
@@ -95,7 +95,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]] :
-//       CHECK:     %[[PACK:.+]] = tensor.pack %[[GENERIC]]
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[GENERIC]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[RETURN]]
 
@@ -105,7 +105,7 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<()[s0] -> (s0 ceildiv 8)>
 #map3 = affine_map<()[s0] -> (s0 ceildiv 32)>
-util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
+util.func public @transpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -119,25 +119,25 @@ util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x3
   %2 = affine.apply #map2()[%dim]
   %3 = affine.apply #map3()[%dim_0]
   %4 = tensor.empty(%2, %3) : tensor<?x?x8x32xf32>
-  %pack = tensor.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
   util.return %pack : tensor<?x?x8x32xf32>
 }
 // No fusion as the CPU backend currently can't handle fusion with transpose
 // between ops.
-// CHECK-LABEL: util.func public @tranpose_pack_fusion(
+// CHECK-LABEL: util.func public @transpose_pack_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.region
-//       CHECK:     %[[PACK:.+]] = tensor.pack %[[DISPATCH1]]
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[DISPATCH1]]
 //       CHECK:     flow.return %[[PACK]]
 //       CHECK:   util.return %[[DISPATCH2]]
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #encoding> {
   %cst = arith.constant 0.0 : f32
@@ -188,7 +188,7 @@ util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
     %arg1 : index, %arg2 : index) -> tensor<?x?xf32, #encoding> {
   %cst = arith.constant 0.0 : f32
@@ -210,63 +210,24 @@ util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
-util.func public @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #encoding> {
-  %cst = arith.constant 0.0 : f32
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
-  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
-  %0 = tensor.empty(%d0) : tensor<?xf32>
-  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?xf32>) -> tensor<?xf32>
-  %2 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>],
-      iterator_types = ["parallel", "reduction"]}
-      ins(%arg0 : tensor<?x?xf32>) outs(%1 : tensor<?xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32) :
-      %3 = arith.addf %b0, %b1 : f32
-      linalg.yield %3 : f32
-  } -> tensor<?xf32>
-  %4 = tensor.empty(%d0, %d1) : tensor<?x?xf32>
-  %5 = linalg.generic  {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0)>,
-                       affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      ins(%arg1, %2 : tensor<?x?xf32>, tensor<?xf32>)
-      outs(%4 : tensor<?x?xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32, %b2 :f32) :
-      %6 = arith.addf %b0, %b1 : f32
-      linalg.yield %6 : f32
-  } -> tensor<?x?xf32>
-  %6 = tensor.pad %5 low[0, 0] high[%arg2, %arg3] {
-    ^bb0(%b0 : index, %b1 : index):
-      tensor.yield %cst : f32
-  } : tensor<?x?xf32> to tensor<?x?xf32>
-  %7 = iree_encoding.set_encoding %6
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
+    -> tensor<?x?xf32, #encoding> {
+  %encode = iree_encoding.set_encoding %arg0
       : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  util.return %7 : tensor<?x?xf32, #encoding>
+  util.return %encode : tensor<?x?xf32, #encoding>
 }
-// CHECK-LABEL: util.func public @set_encoding_pad_elementwise_fusion(
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
-//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
-//  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
-//  CHECK-SAME:         ins(%[[ARG0]] :
-//       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
-//  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]] :
-//       CHECK:     %[[PAD:.+]] = tensor.pad %[[GENERIC]]
-//       CHECK:     %[[PACK:.+]] = iree_encoding.set_encoding %[[PAD]]
-//       CHECK:     flow.return %[[PACK]]
-//       CHECK:   util.return %[[RETURN]]
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding
+//      CHECK: util.func public @set_encoding_op
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//  CHECK-NOT:   flow.dispatch.region
+//      CHECK:   %[[ENCODE:.+]] = iree_encoding.set_encoding %[[ARG0]]  : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+// CHECK: util.return %[[ENCODE]]
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1: tensor<?xf32>,
@@ -290,12 +251,12 @@ util.func public @unset_encoding_elementwise_fusion(
     } -> tensor<?x?xf32>
   util.return %2 : tensor<?x?xf32>
 }
-//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
+//       CHECK:   %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNSET_ENCODING]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
@@ -303,14 +264,14 @@ util.func public @unset_encoding_elementwise_fusion(
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1: tensor<?xf32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>{%arg2, %arg3}
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%arg2, %arg3}
   %1 = tensor.empty(%arg2, %arg3) : tensor<?x?xf32>
   %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -325,12 +286,12 @@ util.func public @unset_encoding_elementwise_fusion(
     } -> tensor<?x?xf32>
   util.return %2 : tensor<?x?xf32>
 }
-//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>
+//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
+//       CHECK:   %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:   %[[RESULT0:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[UNSET_ENCODING]]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   util.return %[[RESULT0]]
@@ -351,7 +312,7 @@ util.func public @unpack_elementwise_fusion(
   %folded_dim0 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d0, %d2]
   %folded_dim1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d1, %d3]
   %dest = tensor.empty(%folded_dim0, %folded_dim1) : tensor<?x?xf32>
-  %0 = tensor.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [%d2, %d3]
+  %0 = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [%d2, %d3]
       into %dest : tensor<?x?x?x?xf32> -> tensor<?x?xf32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -370,7 +331,7 @@ util.func public @unpack_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?x?xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNPACK:.+]] = tensor.unpack %[[ARG0]]
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
@@ -378,7 +339,7 @@ util.func public @unpack_elementwise_fusion(
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.testing_encoding<>
 util.func public @unset_encoding_slice(%arg0: tensor<1x50x384xf32, #encoding>) -> tensor<384xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<1x50x384xf32, #encoding> -> tensor<1x50x384xf32>
   %extracted_slice = tensor.extract_slice %0[0, 0, 0] [1, 1, 384] [1, 1, 1] : tensor<1x50x384xf32> to tensor<384xf32>
@@ -386,10 +347,8 @@ util.func public @unset_encoding_slice(%arg0: tensor<1x50x384xf32, #encoding>) -
 }
 // CHECK-LABEL: util.func public @unset_encoding_slice
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:         %[[RESULT:.+]] = flow.dispatch.region
-// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding
-// CHECK:           flow.return %[[UNSET_ENCODING]]
-// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[RESULT]]
+// CHECK:         %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding
+// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[UNSET_ENCODING]]
 // CHECK:         util.return %[[SLICE]]
 
 // -----
@@ -406,7 +365,7 @@ util.func public @unpack_non_intersecting_reduction(
   %folded_dim = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d1, %d2]
   %dest0 = tensor.empty(%d0, %folded_dim) : tensor<?x?xf32>
   %dest1 = tensor.empty(%folded_dim) : tensor<?xf32>
-  %0 = tensor.unpack %arg0 inner_dims_pos = [1] inner_tiles = [%d2]
+  %0 = linalg.unpack %arg0 inner_dims_pos = [1] inner_tiles = [%d2]
       into %dest0 : tensor<?x?x?xf32> -> tensor<?x?xf32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
@@ -426,7 +385,7 @@ util.func public @unpack_non_intersecting_reduction(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[UNPACK:.+]] = tensor.unpack %[[ARG0]]
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
@@ -467,7 +426,7 @@ util.func public @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32
 // CHECK-SAME:       %[[D1]]
 //      CHECK:   flow.dispatch.region[%[[WL0]], %[[WL1]]]
 //      CHECK:     count(%[[B0:.+]]: index, %[[B1:.+]]: index)
-//      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
+//      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
 //      CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
 
 // -----
@@ -922,3 +881,453 @@ util.func @custom_op_no_producer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<
 //  CHECK-SAME:         ins(%[[DISPATCH1]],
 //       CHECK:     flow.return %[[CUSTOM_OP]]
 //       CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+// Do not form seperate dispatches for mask generators for attention. These
+// will clone into the dispatch.
+
+util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: tensor<?x?xf16>) -> tensor<?x?xf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %M = tensor.dim %Q, %c0 : tensor<?x?xf16>
+  %K2 = tensor.dim %K, %c1 : tensor<?x?xf16>
+  %N = tensor.dim %V, %c1 : tensor<?x?xf16>
+
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+
+  %scale = arith.constant 1.0 : f16
+
+  %mask_e = tensor.empty(%M, %K2) : tensor<?x?xi1>
+  %out_e = tensor.empty(%M, %N) : tensor<?x?xf16>
+
+  %causalmask = linalg.generic {indexing_maps = [affine_map<(M, K2) -> (M, K2)>], iterator_types = ["parallel", "parallel"]} outs(%mask_e : tensor<?x?xi1>) {
+  ^bb0(%out: i1):
+    %i = linalg.index 0 : index
+    %j = linalg.index 1 : index
+    %dec = arith.cmpi sge, %i, %j : index
+    %mask = arith.select %dec, %false, %true : i1
+    linalg.yield %mask : i1
+  } -> tensor<?x?xi1>
+
+  %out = iree_linalg_ext.attention {
+    indexing_maps = [
+      affine_map<(M, N, K2, K1) -> (M, K1)>,
+      affine_map<(M, N, K2, K1) -> (K2, K1)>,
+      affine_map<(M, N, K2, K1) -> (K2, N)>,
+      affine_map<(M, N, K2, K1) -> ()>,
+      affine_map<(M, N, K2, K1) -> (K2, K1)>,
+      affine_map<(M, N, K2, K1) -> (M, N)>
+    ]
+  } ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
+  outs(%out_e : tensor<?x?xf16>) {
+  ^bb0(%score : f32):
+      iree_linalg_ext.yield %score : f32
+  }-> tensor<?x?xf16>
+
+  util.return %out : tensor<?x?xf16>
+}
+
+// CHECK-LABEL: @attention_clone_mask
+// CHECK-NOT: flow.dispatch.region
+// CHECK:     linalg.generic
+// CHECK:     flow.dispatch.region
+// CHECK:       iree_linalg_ext.attention
+// CHECK:       flow.return
+
+// -----
+
+util.func @scatter_no_index_producer_fusion(%arg0 : tensor<?x1xi64>,
+    %arg1 : index, %arg2 : tensor<?x1x32x8x128xf16>,
+    %arg3 : tensor<?x32x8x128xf16>) -> tensor<?x32x8x128xf16> {
+  %empty = tensor.empty(%arg1) : tensor<?x1xi32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<?x1xi64>) outs(%empty : tensor<?x1xi32>) {
+  ^bb0(%in: i64, %out: i32):
+    %1 = arith.trunci %in : i64 to i32
+    linalg.yield %1 : i32
+  } -> tensor<?x1xi32>
+  %1 = iree_linalg_ext.scatter
+      dimension_map = [0] unique_indices(true)
+      ins(%arg2, %0 : tensor<?x1x32x8x128xf16>, tensor<?x1xi32>)
+      outs(%arg3 : tensor<?x32x8x128xf16>) {
+  ^bb0(%arg6: f16, %arg7: f16):
+    iree_linalg_ext.yield %arg6 : f16
+  } -> tensor<?x32x8x128xf16>
+  util.return %1 : tensor<?x32x8x128xf16>
+}
+// Indices operand should be cloned.
+//
+// CHECK-LABEL: func public @scatter_no_index_producer_fusion
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC]] :
+//       CHECK:     flow.return %[[SCATTER]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @move_captured_from_above_ops(%arg0 : tensor<1x1x2x4xi32>,
+    %arg1 : f64, %arg2 : f64) -> tensor<2x3xi8> {
+  %empty = tensor.empty() : tensor<2x3xi32>
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1]
+      inner_dims_pos = [0, 1] inner_tiles = [2, 4] into %empty : tensor<1x1x2x4xi32> -> tensor<2x3xi32>
+  %0 = arith.mulf %arg1, %arg2 : f64
+  %1 = tensor.empty() : tensor<2x3xi8>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%unpack : tensor<2x3xi32>) outs(%1 : tensor<2x3xi8>) {
+  ^bb0(%in: i32, %out: i8):
+    %3 = arith.sitofp %in : i32 to f32
+    %4 = arith.truncf %0 : f64 to f32
+    %5 = arith.mulf %3, %4 : f32
+    %48 = arith.fptosi %5 : f32 to i8
+    linalg.yield %48 : i8
+  } -> tensor<2x3xi8>
+  util.return %2 : tensor<2x3xi8>
+}
+// CHECK-LABEL: func public @move_captured_from_above_ops
+//       CHECK:   %[[OP:.+]] = arith.mulf
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[UNPACK]] :
+//       CHECK:       %[[TRUNCF:.+]] = arith.truncf %[[OP]]
+//       CHECK:       linalg.yield
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @horizontal_fusion1(%lhs : tensor<2x4096x640xf16>,
+    %rhs0 : tensor<10x64x640xf16>, %rhs1 : tensor<10x64x640xf16>,
+    %rhs2 : tensor<10x64x640xf16>) ->
+    (tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>,
+     tensor<2x10x4096x64xf16>) {
+  %4 = tensor.empty() : tensor<2x10x4096x64xf32>
+  %cst = arith.constant 0.0 : f32
+  %5 = linalg.fill ins(%cst : f32)
+      outs(%4 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+  %6:3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs0, %rhs1, %rhs2
+          : tensor<2x4096x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>,
+            tensor<10x64x640xf16>)
+      outs(%5, %5, %5
+          : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %in_1: f16, %in_2: f16, %out: f32, %out_3: f32, %out_4: f32):
+    %14 = arith.extf %in : f16 to f32
+    %15 = arith.extf %in_0 : f16 to f32
+    %16 = arith.mulf %14, %15 : f32
+    %17 = arith.addf %out, %16 : f32
+    %18 = arith.extf %in_1 : f16 to f32
+    %19 = arith.mulf %14, %18 : f32
+    %20 = arith.addf %out_3, %19 : f32
+    %21 = arith.extf %in_2 : f16 to f32
+    %22 = arith.mulf %14, %21 : f32
+    %23 = arith.addf %out_4, %22 : f32
+    linalg.yield %17, %20, %23 : f32, f32, f32
+  } -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
+  %7 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %8 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        ins(%6#0 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %9 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%6#1 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%6#2 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  util.return %8, %9, %10 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>
+}
+// CHECK-LABEL: func public @horizontal_fusion1
+//       CHECK:   %[[DISPATCH:.+]]:3 = flow.dispatch.region
+//       CHECK:     %[[GENERIC:.+]]:3 = linalg.generic
+//       CHECK:     %[[TRUNC0:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC]]#0 :
+//       CHECK:     %[[TRUNC1:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC]]#1 :
+//       CHECK:     %[[TRUNC2:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC]]#2 :
+//       CHECK:     flow.return %[[TRUNC0]], %[[TRUNC1]], %[[TRUNC2]]
+//       CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1, %[[DISPATCH]]#2
+
+// -----
+
+util.func @horizontal_fusion2(%lhs : tensor<2x4096x640xi8>,
+    %rhs0 : tensor<2x640x640xi8>, %rhs1 : tensor<2x640x640xi8>)
+    -> tensor<2x4096x640xf16> {
+  %c0_i32 = arith.constant 32 : i32
+  %0 = tensor.empty() : tensor<2x4096x640xf16>
+  %1 = tensor.empty() : tensor<2x4096x640xi32>
+  %2 = linalg.fill ins(%c0_i32 : i32)
+      outs(%1 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %3:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs0, %rhs1
+          : tensor<2x4096x640xi8>, tensor<2x640x640xi8>, tensor<2x640x640xi8>)
+      outs(%2, %2 : tensor<2x4096x640xi32>, tensor<2x4096x640xi32>) {
+    ^bb0(%in: i8, %in_0: i8, %in_1: i8, %out: i32, %out_2: i32):
+      %4 = arith.extsi %in : i8 to i32
+      %5 = arith.extsi %in_0 : i8 to i32
+      %6 = arith.muli %4, %5 : i32
+      %7 = arith.addi %out, %6 : i32
+      %8 = arith.extsi %in_1 : i8 to i32
+      %9 = arith.muli %7, %8 : i32
+      %10 = arith.addi %out_2, %9 : i32
+      linalg.yield %7, %10 : i32, i32
+  } -> (tensor<2x4096x640xi32>, tensor<2x4096x640xi32>)
+  %4 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%3#1, %3#0 : tensor<2x4096x640xi32>, tensor<2x4096x640xi32>)
+      outs(%0 : tensor<2x4096x640xf16>) {
+  ^bb0(%in: i32, %in_0: i32, %out: f16):
+    %5 = arith.sitofp %in : i32 to f32
+    %6 = arith.truncf %5 : f32 to f16
+    %7 = arith.sitofp %in_0 : i32 to f32
+    %8 = arith.truncf %7 : f32 to f16
+    %9 = arith.addf %6, %8 : f16
+    linalg.yield %9 : f16
+  } -> tensor<2x4096x640xf16>
+  util.return %4 : tensor<2x4096x640xf16>
+}
+// CHECK-LABEL: func public @horizontal_fusion2
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
+//       CHECK:     %[[TRUNC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC]]#1, %[[GENERIC]]#0 :
+//       CHECK:     flow.return %[[TRUNC]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @avoid_use_def_violation_on_consumer_fusion(%arg0 : tensor<?xf32>,
+    %arg1 : tensor<f32>) -> tensor<f32> {
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
+      iterator_types = ["reduction"]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<f32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %1 = arith.addf %b0, %b1 : f32
+      linalg.yield %1 : f32
+    } -> tensor<f32>
+  %1 = util.optimization_barrier %0 : tensor<f32>
+  %2 = tensor.empty() : tensor<f32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>],
+      iterator_types = []}
+      ins(%0, %1 : tensor<f32>, tensor<f32>) outs(%2 : tensor<f32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %4 = arith.mulf %b0, %b1 : f32
+      linalg.yield %4 : f32
+  } -> tensor<f32>
+  util.return %3 : tensor<f32>
+}
+// CHECK-LABEL: func public @avoid_use_def_violation_on_consumer_fusion
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//       CHECK:     flow.return %[[GENERIC1]]
+//       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[DISPATCH1]]
+//       CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.region
+//       CHECK:     %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[DISPATCH1]], %[[BARRIER]] :
+//       CHECK:     flow.return %[[GENERIC2]]
+//       CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+util.func @horizontal_fusion3(%lhs : tensor<2x4096x640xf16>,
+    %rhs0 : tensor<10x64x640xf16>, %rhs1 : tensor<10x64x640xf16>,
+    %rhs2 : tensor<10x64x640xf16>) ->
+    (tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>,
+     tensor<2x10x64x4096xf16>) {
+  %0 = tensor.empty() : tensor<2x10x64x4096xf32>
+  %4 = tensor.empty() : tensor<2x10x4096x64xf32>
+  %cst = arith.constant 0.0 : f32
+  %1 = linalg.fill ins(%cst : f32)
+      outs(%0 : tensor<2x10x64x4096xf32>) -> tensor<2x10x64x4096xf32>
+  %5 = linalg.fill ins(%cst : f32)
+      outs(%4 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+  %6:3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs0, %rhs1, %rhs2
+          : tensor<2x4096x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>,
+            tensor<10x64x640xf16>)
+      outs(%5, %5, %1
+          : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x64x4096xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %in_1: f16, %in_2: f16, %out: f32, %out_3: f32, %out_4: f32):
+    %14 = arith.extf %in : f16 to f32
+    %15 = arith.extf %in_0 : f16 to f32
+    %16 = arith.mulf %14, %15 : f32
+    %17 = arith.addf %out, %16 : f32
+    %18 = arith.extf %in_1 : f16 to f32
+    %19 = arith.mulf %14, %18 : f32
+    %20 = arith.addf %out_3, %19 : f32
+    %21 = arith.extf %in_2 : f16 to f32
+    %22 = arith.mulf %14, %21 : f32
+    %23 = arith.addf %out_4, %22 : f32
+    linalg.yield %17, %20, %23 : f32, f32, f32
+  } -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x64x4096xf32>)
+  %7 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %8 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        ins(%6#0 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %9 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%6#1 : tensor<2x10x4096x64xf32>) outs(%7 : tensor<2x10x4096x64xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x4096x64xf16>
+  %2 = tensor.empty() : tensor<2x10x64x4096xf16>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%6#2 : tensor<2x10x64x4096xf32>) outs(%2 : tensor<2x10x64x4096xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %14 = arith.truncf %in : f32 to f16
+    linalg.yield %14 : f16
+  } -> tensor<2x10x64x4096xf16>
+  util.return %8, %9, %10 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>
+}
+//      CHECK: #[[INTERCHANGED_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>
+//      CHECK: func public @horizontal_fusion3
+//      CHECK:   %[[DISPATCH:.+]]:3 = flow.dispatch.region
+//      CHECK:     %[[GENERIC:.+]]:3 = linalg.generic
+//      CHECK:     %[[TRUNC0:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[GENERIC]]#0 :
+//      CHECK:     %[[TRUNC1:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[GENERIC]]#1 :
+//      CHECK:     %[[TRUNC2:.+]] = linalg.generic
+// CHECK-SANE:         indexing_maps = [#[[INTERCHANGED_MAP]], #[[INTERCHANGED_MAP]]]
+// CHECK-SAME:         ins(%[[GENERIC]]#2 :
+//      CHECK:     flow.return %[[TRUNC0]], %[[TRUNC1]], %[[TRUNC2]]
+//      CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1, %[[DISPATCH]]#2
+
+// -----
+
+// Fuse rope computation only with query and not key/value
+util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
+    %arg1: tensor<10x20x40x50xbf16>, %arg2: tensor<10x20x40x50xbf16>,
+    %cst : bf16) -> tensor<10x20x30x40xbf16> {
+  %query_empty = tensor.empty() : tensor<10x20x30x50xbf16>
+  %query = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      outs(%query_empty : tensor<10x20x30x50xbf16>) {
+    ^bb0(%b0: bf16) :
+      %idx0 = linalg.index 0 : index
+      %idx1 = linalg.index 1 : index
+      %idx2 = linalg.index 2 : index
+      %idx3 = linalg.index 3 : index
+      %val = tensor.extract %arg0[%idx0, %idx1, %idx2, %idx3] : tensor<10x20x30x50xbf16>
+      linalg.yield %val : bf16
+  } -> tensor<10x20x30x50xbf16>
+  %key_empty = tensor.empty() : tensor<10x20x40x50xbf16>
+  %key = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      outs(%key_empty : tensor<10x20x40x50xbf16>) {
+    ^bb0(%b0: bf16) :
+      %idx0 = linalg.index 0 : index
+      %idx1 = linalg.index 1 : index
+      %idx2 = linalg.index 2 : index
+      %idx3 = linalg.index 3 : index
+      %val = tensor.extract %arg1[%idx0, %idx1, %idx2, %idx3] : tensor<10x20x40x50xbf16>
+      linalg.yield %val : bf16
+  } -> tensor<10x20x40x50xbf16>
+  %value_empty = tensor.empty() : tensor<10x20x40x50xbf16>
+  %value = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      outs(%value_empty : tensor<10x20x40x50xbf16>) {
+    ^bb0(%b0: bf16) :
+      %idx0 = linalg.index 0 : index
+      %idx1 = linalg.index 1 : index
+      %idx2 = linalg.index 2 : index
+      %idx3 = linalg.index 3 : index
+      %val = tensor.extract %arg2[%idx0, %idx1, %idx2, %idx3] : tensor<10x20x40x50xbf16>
+      linalg.yield %val : bf16
+  } -> tensor<10x20x40x50xbf16>
+  %empty = tensor.empty() : tensor<10x20x30x40xbf16>
+  %attention = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+      ins(%query, %key, %value, %cst
+          : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
+      outs(%empty : tensor<10x20x30x40xbf16>) {
+    ^bb0(%arg6: f32):
+      iree_linalg_ext.yield %arg6 : f32
+  } -> tensor<10x20x30x40xbf16>
+  util.return %attention : tensor<10x20x30x40xbf16>
+}
+// CHECK-LABEL: func public @attention_rope_fusion
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20x30x50xbf16>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x20x40x50xbf16>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x20x40x50xbf16>
+//       CHECK:   %[[Q:.+]] = linalg.generic
+//       CHECK:   %[[K:.+]] = linalg.generic
+//       CHECK:   %[[V:.+]] = linalg.generic
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
+//       CHECK:     flow.return %[[ATTENTION]]
+//       CHECK:   util.return %[[DISPATCH]]

@@ -66,6 +66,9 @@ class TargetConverter:
                 "@llvm-project//mlir:GPUDialect": ["MLIRGPUDialect"],
                 "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
                 "@llvm-project//mlir:InliningUtils": [""],
+                "@llvm-project//mlir:LinalgInterfaces": [
+                    "MLIRLinalgInterfacesIncGenLib"
+                ],
                 "@llvm-project//mlir:LinalgOpsIncGen": ["MLIRLinalgOpsIncGenLib"],
                 "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
                     "MLIRLinalgStructuredOpsIncGenLib"
@@ -89,6 +92,9 @@ class TargetConverter:
                 ],
                 "@stablehlo//:stablehlo_passes": [
                     "StablehloPasses",
+                ],
+                "@stablehlo//:linalg_passes": [
+                    "StablehloLinalgTransforms",
                 ],
                 "@stablehlo//:vhlo_ops": [
                     "VhloOps",

@@ -9,31 +9,16 @@
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/Diagnostics.h"
 #include "mlir-c/RegisterEverything.h"
-#include "mlir/Bindings/Python/PybindAdaptors.h"
+#include "mlir/Bindings/Python/NanobindAdaptors.h"
 
-namespace py = pybind11;
-using namespace mlir::python::adaptors;
+namespace py = nanobind;
+using namespace mlir::python::nanobind_adaptors;
 
-PYBIND11_MODULE(_ireeDialects, m, py::mod_gil_not_used()) {
+NB_MODULE(_ireeDialects, m) {
   m.doc() = "iree-dialects main python extension";
 
-  auto irModule = py::module::import(MAKE_MLIR_PYTHON_QUALNAME("ir"));
+  auto irModule = py::module_::import_(MAKE_MLIR_PYTHON_QUALNAME("ir"));
   auto typeClass = irModule.attr("Type");
-
-  //===--------------------------------------------------------------------===//
-  // IREEDialect
-  //===--------------------------------------------------------------------===//
-  auto iree_m = m.def_submodule("iree_input");
-  iree_m.def(
-      "register_dialect",
-      [](MlirContext context, bool load) {
-        MlirDialectHandle handle = mlirGetDialectHandle__iree_input__();
-        mlirDialectHandleRegisterDialect(handle, context);
-        if (load) {
-          mlirDialectHandleLoadDialect(handle, context);
-        }
-      },
-      py::arg("context") = py::none(), py::arg("load") = true);
 
   //===--------------------------------------------------------------------===//
   // TransformDialect

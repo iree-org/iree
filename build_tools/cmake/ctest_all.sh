@@ -42,6 +42,8 @@ export IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}"
 export IREE_NVIDIA_SM80_TESTS_DISABLE="${IREE_NVIDIA_SM80_TESTS_DISABLE:-1}"
 # Respect the user setting, but default to skipping tests that require RDNA3 AMD GPU.
 export IREE_AMD_RDNA3_TESTS_DISABLE="${IREE_AMD_RDNA3_TESTS_DISABLE:-1}"
+# Respect the user setting, but default to skipping tests that require RDNA4 AMD GPU.
+export IREE_AMD_RDNA4_TESTS_DISABLE="${IREE_AMD_RDNA4_TESTS_DISABLE:-1}"
 # Respect the user setting, but default to skipping tests that require more than one device(GPU).
 export IREE_MULTI_DEVICE_TESTS_DISABLE="${IREE_MULTI_DEVICE_TESTS_DISABLE:-1}"
 # Respect the user setting, default to no --repeat-until-fail.
@@ -97,6 +99,9 @@ fi
 if (( IREE_AMD_RDNA3_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-gpu-rdna3$")
 fi
+if (( IREE_AMD_RDNA4_TESTS_DISABLE == 1 )); then
+  label_exclude_args+=("^requires-gpu-rdna4$")
+fi
 if (( IREE_MULTI_DEVICE_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-multiple-devices$")
 fi
@@ -122,8 +127,12 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     # TODO: Fix equality mismatch
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
-    "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
+    # Flaky on CI opening the .safetensors testdata for unknown reasons, skip.
+    "iree/tools/test/iree-convert-parameters.txt.test"
+    "iree/tools/test/iree-dump-parameters.txt.test"
+    "iree/tools/test/parameters_scoped.mlir.test"
+    "iree/tools/test/parameters_unscoped.mlir.test"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
@@ -177,6 +186,7 @@ if (( ${#excluded_tests[@]} )); then
 fi
 
 echo "*************** Running CTest ***************"
+echo "  Using CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL}"
 
 set -x
 ctest ${ctest_args[@]}

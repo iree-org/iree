@@ -14,6 +14,56 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/RegionKindInterface.td"
 include "mlir/IR/OpBase.td"
 
+def CreateSerializedModuleOp : Op<Transform_Dialect, "util.create_serialized_module",
+    [DeclareOpInterfaceMethods<TransformOpInterface>,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     FunctionalStyleTransformOpTrait,
+     ReportTrackingListenerFailuresOpTrait,
+    ] # GraphRegionNoTerminator.traits> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+  let summary = "Creates a serialized module op using the transform region";
+  let description = [{
+    This op creates an owning op reference to a module op and executes the
+    transforms contained within this operations body on it. Then the serialized
+    module is returned.
+
+    The body of this op provides a single block argument providing the temporary
+    module for modification. No transform on the module is allowed to consume
+    it.
+  }];
+
+  let arguments = (ins);
+  let results = (outs TransformParamTypeInterface:$result);
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = "attr-dict-with-keyword regions `->` type($result)";
+  let hasVerifier = 1;
+}
+
+def DeserializeModuleOp : Op<Transform_Dialect, "util.deserialize_module", [
+  FunctionalStyleTransformOpTrait,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<TransformOpInterface>,
+  ReportTrackingListenerFailuresOpTrait,
+]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+
+  let description = [{
+    Deserializes |module| to a ModuleOp and inserts it at the end of
+    |container|. This operation is currently only used for testing purposes.
+  }];
+
+  let arguments = (ins
+    TransformParamTypeInterface:$module,
+    TransformHandleTypeInterface:$container
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $module `into` $container attr-dict `:` type($module) `,` type($container)
+  }];
+}
+
 def GetNearestSymbolTableOp : Op<Transform_Dialect, "util.get_nearest_symbol_table", [
   FunctionalStyleTransformOpTrait,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -119,6 +169,10 @@ def CastAndCallOp : Op<Transform_Dialect, "util.cast_and_call", [
     The target function can be specified by a symbol name or by a handle to the
     operation.
 
+    If |inline_call| is set, the function body will be inlined at the insertion
+    point instead of called. This will lead to a definite failure if the
+    function exists but does not contain a single basic block (0 or > 1).
+
     This transform only reads the operand handles and only replaces the users of
     the outputs with the results of the call. No handles are consumed and no
     operations are removed. Users are expected to run cleanup separately if
@@ -147,19 +201,21 @@ def CastAndCallOp : Op<Transform_Dialect, "util.cast_and_call", [
   let arguments = (ins
     TransformHandleTypeInterface:$insertion_point,
     UnitAttr:$insert_after,
+    UnitAttr:$inline_call,
     Optional<TransformValueHandleTypeInterface>:$inputs,
     Optional<TransformValueHandleTypeInterface>:$outputs,
     OptionalAttr<SymbolRefAttr>:$function_name,
     Optional<TransformHandleTypeInterface>:$function
   );
   let results = (outs
-    TransformHandleTypeInterface:$result
+    Variadic<TransformHandleTypeInterface>:$result
   );
   let regions = (region
     MaxSizedRegion<1>:$conversions
   );
 
   let assemblyFormat = [{
+    (`inline_call` $inline_call^)?
     ($function_name^)? ($function^)?
     ( `(` $inputs^ `)` )?
     ( `->` $outputs^ )?
@@ -168,6 +224,35 @@ def CastAndCallOp : Op<Transform_Dialect, "util.cast_and_call", [
   }];
 
   let hasVerifier = 1;
+}
+
+def LookupNearestSymbolFromSelfOp : Op<Transform_Dialect, "util.lookup_nearest_symbol_from_self", [
+  FunctionalStyleTransformOpTrait,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<TransformOpInterface>,
+  ReportTrackingListenerFailuresOpTrait,
+]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+
+  let description = [{
+    Returns a reference to the symbol with the specified name within the nearest
+    symbol table to this operation.
+
+    #### Return modes
+
+    This operation produces the `target_symbol` handle based on `symbol` and
+    the nearest symbol table. This operation emits a definite failure if the
+    symbol does not exist.
+  }];
+
+  let arguments = (ins SymbolRefAttr:$symbol);
+  let results = (outs
+    TransformHandleTypeInterface:$target_symbol
+  );
+
+  let assemblyFormat = [{
+    $symbol attr-dict `:` type($target_symbol)
+  }];
 }
 
 #endif // IREE_COMPILER_DIALECT_UTIL_TRANSFORMOPS_UTILTRANSFORM_OPS

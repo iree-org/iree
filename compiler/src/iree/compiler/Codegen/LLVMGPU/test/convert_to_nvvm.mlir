@@ -8,12 +8,12 @@
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
+    hal.executable.export public @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32>
         %3 = gpu.block_id x
@@ -21,7 +21,7 @@ hal.executable @abs_ex_dispatch_0 {
         %5 = gpu.thread_id x
         %6 = arith.muli %3, %4 : index
         %7 = arith.addi %6, %5 : index
-        %9 = memref.load %0[%7] : memref<16xf32, strided<[1], offset: 32>>
+        %9 = memref.load %0[%7] : memref<16xf32, strided<[1], offset: ?>>
         %10 = memref.load %1[%7] : memref<16xi32>
         %11 = arith.sitofp %10 : i32 to f32
         %12 = arith.addf %9, %11 : f32
@@ -47,7 +47,7 @@ hal.executable @abs_ex_dispatch_0 {
 ]>
 hal.executable @abs_dynamic {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @abs_dynamic layout(#pipeline_layout)
+    hal.executable.export public @abs_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @abs_dynamic() {
         %c0 = arith.constant 0 : index
@@ -104,7 +104,7 @@ hal.executable @abs_dynamic {
 ]>
 hal.executable @dead_symbol {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @dead_symbol layout(#pipeline_layout)
+    hal.executable.export public @dead_symbol layout(#pipeline_layout)
     builtin.module {
       func.func @dead_symbol() {
         %c0 = arith.constant 0 : index
@@ -140,12 +140,12 @@ hal.executable @dead_symbol {
 ]>
 hal.executable @mixed_type {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @mixed_type layout(#pipeline_layout)
+    hal.executable.export public @mixed_type layout(#pipeline_layout)
     builtin.module {
       func.func @mixed_type() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) : memref<16xf32, strided<[1], offset: 4>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) : memref<16xf32, strided<[1], offset: ?>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c0) : memref<16xi32>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
         %3 = gpu.block_id x
@@ -153,7 +153,7 @@ hal.executable @mixed_type {
         %5 = gpu.thread_id x
         %6 = arith.muli %3, %4 : index
         %7 = arith.addi %6, %5 : index
-        %9 = memref.load %0[%7] : memref<16xf32, strided<[1], offset: 4>>
+        %9 = memref.load %0[%7] : memref<16xf32, strided<[1], offset: ?>>
         %10 = memref.load %1[%7] : memref<16xi32>
         %11 = arith.sitofp %10 : i32 to f32
         %12 = arith.addf %9, %11 : f32
@@ -167,8 +167,13 @@ hal.executable @mixed_type {
 // CHECK-LABEL: llvm.func @mixed_type
 //  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //  CHECK-SAME:  %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
+//       CHECK:   %[[BYTES_PER_BIT:.+]] = llvm.mlir.constant(8 : i64) : i64
+//       CHECK:   %[[BITS_PER_ELEM:.+]] = llvm.mlir.constant(32 : i64) : i64
+//       CHECK:   %[[BYTE_OFFSET:.+]] = llvm.mlir.constant(128 : index) : i64
+//       CHECK:   %[[OFFSET_BITS:.+]] = llvm.mul %[[BYTE_OFFSET]], %[[BYTES_PER_BIT]]
+//       CHECK:   %[[OFFSET_ELEMS:.+]] = llvm.udiv %[[OFFSET_BITS]], %[[BITS_PER_ELEM]]
 //       CHECK:   nvvm.read.ptx.sreg.tid.x
-//       CHECK:   llvm.getelementptr %[[ARG0]][4] : (!llvm.ptr) -> !llvm.ptr, f32
+//       CHECK:   llvm.getelementptr %[[ARG0]][%[[OFFSET_ELEMS]]] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //       CHECK:   llvm.fadd
 
 // -----
@@ -178,7 +183,7 @@ hal.executable @mixed_type {
 ]>
 hal.executable @shared_memory_lowering {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_lowering layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_lowering layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering() {
         %c0 = arith.constant 0 : index
@@ -216,7 +221,7 @@ hal.executable @shared_memory_lowering {
 ]>
 hal.executable @shared_memory_dealloc_elision {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_dealloc_elision layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_dealloc_elision layout(#pipeline_layout)
     builtin.module {
 // CHECK-LABEL: llvm.func @shared_memory_dealloc_elision() {
       func.func @shared_memory_dealloc_elision() {
@@ -240,7 +245,7 @@ hal.executable @shared_memory_dealloc_elision {
 ]>
 hal.executable @shared_memory_lowering_aligned_alloc {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_lowering_aligned_alloc layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_lowering_aligned_alloc layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering_aligned_alloc() {
         %c0 = arith.constant 0 : index
@@ -276,24 +281,24 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 ]>
 hal.executable @check_not_readonly {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @check_not_readonly layout(#pipeline_layout)
+    hal.executable.export public @check_not_readonly layout(#pipeline_layout)
     builtin.module {
       func.func @check_not_readonly() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
         %b11 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) flags(ReadOnly) : memref<16xi32>
-        %b12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) : memref<16xf32, strided<[1], offset: 32>>
+        %b12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) : memref<16xf32, strided<[1], offset: ?>>
         %b21 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) flags(ReadOnly) : memref<16xi32>
-        %b22 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
+        %b22 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
         %6 = arith.muli %3, %4 : index
         %7 = arith.addi %6, %5 : index
-        %9 = memref.load %0[%7] : memref<16xf32, strided<[1], offset: 32>>
+        %9 = memref.load %0[%7] : memref<16xf32, strided<[1], offset: ?>>
         %10 = memref.load %1[%7] : memref<16xi32>
         %11 = arith.sitofp %10 : i32 to f32
         %12 = arith.addf %9, %11 : f32
@@ -314,7 +319,7 @@ hal.executable @check_not_readonly {
 ]>
 hal.executable @complex {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @complex layout(#pipeline_layout)
+    hal.executable.export public @complex layout(#pipeline_layout)
     builtin.module {
       func.func @complex() {
         %c0 = arith.constant 0 : index
@@ -348,7 +353,7 @@ hal.executable @complex {
 ]>
 hal.executable @shared_memory_lowering_index {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @shared_memory_lowering_index layout(#pipeline_layout)
+    hal.executable.export public @shared_memory_lowering_index layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering_index() {
         %c0 = arith.constant 0 : index
@@ -374,7 +379,7 @@ hal.executable @shared_memory_lowering_index {
 ]>
 hal.executable @masked_load_store {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @masked_load_store layout(#pipeline_layout)
+    hal.executable.export public @masked_load_store layout(#pipeline_layout)
     builtin.module {
       func.func @masked_load_store() {
         %c0 = arith.constant 0 : index
@@ -404,7 +409,7 @@ hal.executable @masked_load_store {
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @rocm target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @interface_wg_size layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_size layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module attributes {} {

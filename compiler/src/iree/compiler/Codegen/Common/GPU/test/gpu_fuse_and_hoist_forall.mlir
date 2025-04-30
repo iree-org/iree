@@ -527,7 +527,7 @@ func.func @fuse_imperfectly_aligned_unpack(%arg0: tensor<5x31xf16>, %arg1: index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
   %0 = tensor.empty() : tensor<128xf16>
-  %unpack = tensor.unpack %arg0 inner_dims_pos = [0] inner_tiles = [31] into %0 : tensor<5x31xf16> -> tensor<128xf16>
+  %unpack = linalg.unpack %arg0 inner_dims_pos = [0] inner_tiles = [31] into %0 : tensor<5x31xf16> -> tensor<128xf16>
   %1 = scf.forall (%arg2) in (2) shared_outs(%arg3 = %0) -> (tensor<128xf16>) {
     %2 = affine.apply #map(%arg2)
     %extracted_slice = tensor.extract_slice %unpack[%2] [64] [1] : tensor<128xf16> to tensor<64xf16>
@@ -542,7 +542,7 @@ func.func @fuse_imperfectly_aligned_unpack(%arg0: tensor<5x31xf16>, %arg1: index
 
 // CHECK-LABEL: func @fuse_imperfectly_aligned_unpack
 //       CHECK:   scf.forall
-//       CHECK:     tensor.unpack
+//       CHECK:     linalg.unpack
 //       CHECK:     linalg.copy
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
@@ -600,3 +600,30 @@ func.func @no_fuse_collapse_shape_rank_reduced(%arg0: tensor<8x8xf32>) -> tensor
 //       CHECK:   } {mapping = [#gpu.thread<x>]}
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[FORALL_RESULT]]
 //       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 2)>
+func.func @no_fuse_extract_slice_rank_reduced(%arg0: tensor<4x8xf32>, %size1: index) -> tensor<?xf32> {
+  %0 = tensor.empty() : tensor<4x8xf32>
+  %1 = scf.forall (%arg2) in (4) shared_outs(%arg3 = %0) -> (tensor<4x8xf32>) {
+    %2 = affine.apply #map(%arg2)
+    %extracted_slice_0 = tensor.extract_slice %arg0[0, %2] [1, 2] [1, 1] : tensor<4x8xf32> to tensor<2xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg3[0, %2] [1, 2] [1, 1] : tensor<4x8xf32> to tensor<2xf32>
+    %3 = linalg.copy ins(%extracted_slice_0 : tensor<2xf32>) outs(%extracted_slice_1 : tensor<2xf32>) -> tensor<2xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %3 into %arg3[0, %2] [1, 2] [1, 1] : tensor<2xf32> into tensor<4x8xf32>
+    }
+  } {mapping = [#gpu.thread<x>]}
+  %extracted_slice = tensor.extract_slice %1[0, 0] [1, %size1] [1, 1] : tensor<4x8xf32> to tensor<?xf32>
+  return %extracted_slice : tensor<?xf32>
+}
+
+// CHECK-LABEL: func @no_fuse_extract_slice_rank_reduced
+//       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall {{.*}} -> (tensor<4x8xf32>) {
+//       CHECK:     scf.forall.in_parallel {
+//   CHECK-DAG:       tensor.parallel_insert_slice {{.*}} : tensor<2xf32> into tensor<4x8xf32>
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<x>]}
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[FORALL_RESULT]]
+//       CHECK:   return %[[EXTRACT]]

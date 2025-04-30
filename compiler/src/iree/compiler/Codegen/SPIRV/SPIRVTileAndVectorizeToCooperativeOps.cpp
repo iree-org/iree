@@ -25,6 +25,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -116,11 +117,8 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
     subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
-  LLVM_DEBUG({
-    llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = [";
-    llvm::interleaveComma(subgroupCounts, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = "
+                          << llvm::interleaved_array(subgroupCounts) << "\n");
   return subgroupCounts;
 }
 
@@ -295,20 +293,20 @@ public:
     SmallVector<Value> newSources;
     for (auto [srcIdx, source] : llvm::enumerate(sources)) {
       auto map = op.getIndexingMapsArray()[srcIdx];
-      auto tranposeOp = source.getDefiningOp<vector::TransposeOp>();
-      if (!tranposeOp) {
+      auto transposeOp = source.getDefiningOp<vector::TransposeOp>();
+      if (!transposeOp) {
         newSources.push_back(source);
         newMaps.push_back(map);
         continue;
       }
-      ArrayRef<int64_t> perm = tranposeOp.getPermutation();
+      ArrayRef<int64_t> perm = transposeOp.getPermutation();
       SmallVector<AffineExpr> exprs(perm.size());
       for (auto [remapIdx, remap] : llvm::enumerate(perm)) {
         exprs[remap] = map.getResult(remapIdx);
       }
       newMaps.push_back(
           AffineMap::get(map.getNumDims(), map.getNumSymbols(), exprs, ctx));
-      newSources.push_back(tranposeOp.getVector());
+      newSources.push_back(transposeOp.getVector());
       foundTranspose = true;
     }
     if (!foundTranspose)

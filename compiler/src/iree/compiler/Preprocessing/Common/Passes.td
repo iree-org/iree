@@ -27,9 +27,35 @@ def ApplyPDLPatternsPass : Pass<"iree-preprocessing-apply-pdl-patterns", "Module
   ];
 }
 
+def AttrBasedPipelinePass : Pass<"iree-preprocessing-attr-based-pipeline", ""> {
+  let summary = "Run a pass pipeline specified as an attribute on any function-like operation";
+  let description = [{
+    The textual representation of the pass pipeline specified in the attribute
+    `preprocessing_pipeline=#util.preprocessing_pipeline<...>` is to be run on the
+    function-like operation.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::Flow::FlowDialect",
+    "iree_compiler::IREE::Util::UtilDialect",
+  ];
+}
+
 def ConvertConv2DToImg2ColPass :
     Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
+def ConvertConvFilterToChannelsLastPass:
+    Pass<"iree-preprocessing-convert-conv-filter-to-channels-last", ""> {
+  let summary = "Convert linalg convolutions filter from hwcf to channel last layout.";
+  let options = [
+    Option<"filterLayout", "filter-layout", "std::string",
+      /*default=*/"\"fhwc\"", "Filter layout of convolution.">,
+  ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",

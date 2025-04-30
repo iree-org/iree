@@ -111,6 +111,18 @@ getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
   return *maybeTransformLibrary;
 }
 
+static std::optional<StringRef> fetchDefaultTuningSpec(StringRef identifier) {
+  std::string tuningSpecName =
+      llvm::formatv("iree_default_tuning_spec_{}.mlir", identifier);
+  std::optional<StringRef> tuningSpecSource;
+
+  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+    tuningSpecSource = dir.getFile(tuningSpecName);
+  });
+
+  return tuningSpecSource;
+}
+
 static FailureOr<ModuleOp>
 getDefaultTuningSpec(ModuleOp module,
                      IREE::Codegen::IREECodegenDialect &dialect) {
@@ -123,14 +135,29 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-  // Try to look up the default tuning spec for this architecture, if any.
-  StringRef arch = gpuTarget.getArch();
-  std::string defaultTuningSpecName =
-      llvm::formatv("iree_default_tuning_spec_{}.mlir", arch);
+  std::optional<StringRef> sku;
+  if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
+    if (StringAttr chipSku = chip.getSku()) {
+      sku = chipSku.getValue();
+    }
+  }
+
+  std::string defaultTuningSpecName;
   std::optional<StringRef> defaultTuningSpecSource;
-  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
-    defaultTuningSpecSource = dir.getFile(defaultTuningSpecName);
-  });
+  if (sku) {
+    // GPUs with the same ISA may have different hardware characteristics such
+    // as the number of workgroup processors and power limits, Look up
+    // SKU-specific tuning spec for optimal performance.
+    defaultTuningSpecSource = fetchDefaultTuningSpec(*sku);
+  }
+
+  if (!defaultTuningSpecSource) {
+    // If SKU-specific spec is not found, fall back to the default
+    // architecture-based tuning spec to ensure broader compatibility.
+    StringRef arch = gpuTarget.getArch();
+    defaultTuningSpecSource = fetchDefaultTuningSpec(arch);
+  }
+
   if (!defaultTuningSpecSource) {
     // Not all architectures are expected to provide default tuning specs, so
     // this shouldn't be considered a hard error (but that's up to the caller).
@@ -242,11 +269,6 @@ struct MaterializeTuningSpecsPass final
         UnitAttr::get(ctx));
     for (auto [idx, spec] : llvm::enumerate(allSpecs)) {
       ModuleOp clonedSpec = spec.clone();
-      // Drop the module-level attribute due to renamed entrypoints during
-      // linking.
-      if (clonedSpec->hasAttr(kTuningSpecDefaultEntrypointAttrName)) {
-        clonedSpec->removeAttr(kTuningSpecDefaultEntrypointAttrName);
-      }
       // Make sure there are no symbol name collisions.
       clonedSpec.setSymName(
           llvm::formatv("{}_{}", clonedSpec.getSymName().value(), idx).str());

@@ -30,6 +30,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
@@ -179,10 +180,8 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
   funcPassManager.addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createConvertComplexToStandardPass)
-
-      // Math dialect elementry functions -> polynomial form.
-      .addPass(createPolynomialApproximationPass)
-
+      // Math dialect ops rewrites, approximations, casts.
+      .addPass(createMathTransformPass)
       .addPass(createPadDynamicAllocPass);
 
   // TODO: query this from the target.
@@ -240,8 +239,8 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
       // Lower ApplyScale before the i64 Emulation Pass so that new 64-bit ops
       // are also emulated if not supported by the target.
       .addPass([&]() {
-        return tosa::createTosaToArith(/*includeApplyRescale=*/true,
-                                       /*use32BitApplyRescale=*/true);
+        return createTosaToArithPass({/*includeApplyRescale=*/true,
+                                      /*use32BitApplyRescale=*/true});
       })
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
@@ -646,6 +645,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createSPIRVLowerExecutableTargetPass)
         .addPass(createVerifyWorkgroupDistributionPass);
     addMemRefLoweringPasses(modulePassManager);
+    FunctionLikeNest(modulePassManager).addPass(createGpuEliminateBarriers);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());

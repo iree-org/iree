@@ -8,7 +8,7 @@ func.func @multiple_dim_distribute(%s0 : index, %s1 : index, %s2 : index, %s3 : 
       <bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
                    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
       binding(0) alignment(64) offset(%c0) flags(Indirect)
-      : !flow.dispatch.tensor<writeonly:tensor<?x2x?x3x?x4x?x5xf32>>{%s0, %s1, %s2, %s3}
+      : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2x?x3x?x4x?x5xf32>>{%s0, %s1, %s2, %s3}
   %35 = tensor.empty(%s0, %s1, %s2, %s3) : tensor<?x2x?x3x?x4x?x5xf32>
   %36 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d1, d3, d5, d7)>,
@@ -19,8 +19,8 @@ func.func @multiple_dim_distribute(%s0 : index, %s1 : index, %s2 : index, %s3 : 
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
   } -> tensor<?x2x?x3x?x4x?x5xf32>
-  flow.dispatch.tensor.store %36, %result, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [%s0, 2, %s1, 3, %s2, 4, %s3, 5], strides = [1, 1, 1, 1, 1, 1, 1, 1]
-      : tensor<?x2x?x3x?x4x?x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x2x?x3x?x4x?x5xf32>>{%s0, %s1, %s2, %s3}
+  iree_tensor_ext.dispatch.tensor.store %36, %result, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [%s0, 2, %s1, 3, %s2, 4, %s3, 5], strides = [1, 1, 1, 1, 1, 1, 1, 1]
+      : tensor<?x2x?x3x?x4x?x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2x?x3x?x4x?x5xf32>>{%s0, %s1, %s2, %s3}
   return
 }
 // CHECK-LABEL: func @multiple_dim_distribute(
@@ -32,14 +32,12 @@ func.func @multiple_dim_distribute(%s0 : index, %s1 : index, %s2 : index, %s3 : 
 //   CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //   CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //   CHECK-DAG:   %[[WG_ID_Z:.+]] = hal.interface.workgroup.id[2]
+//   CHECK-DAG:   %[[WG_IDS_Z:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (%[[S0]], %[[S1]], %[[S2]])
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x2x1x3x1x4x1x1xf32>
 //   CHECK-DAG:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[INPUT]][0, 0, 0, %[[WG_ID_X]]] [2, 3, 4, 1]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[IN_SLICE]] :
 //  CHECK-SAME:       outs(%[[EMPTY]] :
-//   CHECK-DAG:   %[[WG_ID_Z_0:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((s1 floordiv s2) floordiv s0)>()[%[[S1]], %[[WG_ID_Z]], %[[S2]]]
-//   CHECK-DAG:   %[[WG_ID_Z_1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((s1 floordiv s2) mod s0)>()[%[[S1]], %[[WG_ID_Z]], %[[S2]]]
-//   CHECK-DAG:   %[[WG_ID_Z_2:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 mod s1)>()[%[[WG_ID_Z]], %[[S2]]]
-//       CHECK:   flow.dispatch.tensor.store %[[GENERIC]],
-//  CHECK-SAME:       offsets = [%[[WG_ID_Z_0]], 0, %[[WG_ID_Z_1]], 0, %[[WG_ID_Z_2]], 0, %[[WG_ID_Y]], %[[WG_ID_X]]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]],
+//  CHECK-SAME:       offsets = [%[[WG_IDS_Z]]#0, 0, %[[WG_IDS_Z]]#1, 0, %[[WG_IDS_Z]]#2, 0, %[[WG_ID_Y]], %[[WG_ID_X]]]
 //  CHECK-SAME:       sizes = [1, 2, 1, 3, 1, 4, 1, 1]

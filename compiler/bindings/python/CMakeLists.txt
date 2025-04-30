@@ -159,7 +159,7 @@ if(IREE_INPUT_TORCH)
 
   declare_mlir_python_sources(IREEPythonSources.Torch.Importers
     ADD_TO_PARENT IREEPythonSources
-    ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir/python/torch_mlir"
+    ROOT_DIR "${TORCH_MLIR_ROOT_DIR}/python/torch_mlir"
     SOURCES
       extras/fx_importer.py
       extras/onnx_importer.py
@@ -176,6 +176,7 @@ declare_mlir_python_sources(IREECompilerPythonExtensions)
 declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
   MODULE_NAME _site_initialize_0
   ADD_TO_PARENT IREECompilerPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREECompilerRegistration.cpp
   EMBED_CAPI_LINK_LIBS
@@ -187,6 +188,7 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
 declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects
   MODULE_NAME _ireeCompilerDialects
   ADD_TO_PARENT IREECompilerPythonExtensions
+  PYTHON_BINDINGS_LIBRARY nanobind
   SOURCES
     IREECompilerDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
@@ -208,6 +210,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Core
 
   # Core dialects.
+  MLIRPythonSources.Dialects.affine
   MLIRPythonSources.Dialects.amdgpu
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
@@ -230,6 +233,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.extras
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
+  MLIRPythonSources.Dialects.vector_transform
 
   # iree-dialects project.
   IREEDialectsPythonSources

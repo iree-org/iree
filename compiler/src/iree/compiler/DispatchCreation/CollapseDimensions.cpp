@@ -18,12 +18,12 @@
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -177,10 +177,11 @@ static bool isEligibleForCollapse(Operation *op) {
     return false;
   }
 
-  // TODO(guray) There is no mechanism to tell the collapsed indexes to
-  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
-  // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) {
+  auto hasEncoding = [](Type type) -> bool {
+    auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+    return rankedTensorType && rankedTensorType.getEncoding();
+  };
+  if (llvm::any_of(op->getOperandTypes(), hasEncoding)) {
     return false;
   }
 
@@ -192,30 +193,6 @@ static bool isEligibleForCollapse(Operation *op) {
   if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
         return !map.isProjectedPermutation();
       })) {
-    return false;
-  }
-
-  // TODO(guray) Collapsing caused performance regression in a cpu
-  // benchmark, so we disable it.
-  if (genericOp.hasIndexSemantics()) {
-    return false;
-  }
-
-  // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
-  auto isPossiblySoftmax = [&](OpOperand *operand) -> bool {
-    auto genericOperand = operand->get().getDefiningOp<linalg::GenericOp>();
-    if (!genericOperand) {
-      return false;
-    }
-
-    if (genericOperand.getNumReductionLoops() == 0) {
-      return false;
-    }
-
-    auto map = genericOp.getMatchingIndexingMap(operand);
-    return !map.isPermutation() && map.isProjectedPermutation();
-  };
-  if (llvm::any_of(genericOp.getDpsInputOperands(), isPossiblySoftmax)) {
     return false;
   }
 
@@ -562,7 +539,11 @@ bool CollapseInfo::updateFromOther(FailureOr<AffineMap> otherToThisMap,
       newReassociation.push_back(newIndicies);
     }
   }
-  reassociation = std::move(newReassociation);
+
+  if (didChange) {
+    reassociation = std::move(newReassociation);
+    collapsableLoops = getCollapsedFromReassociation(reassociation);
+  }
   return didChange;
 }
 
@@ -631,9 +612,9 @@ findRootOp(IREE::Flow::DispatchRegionOp regionOp) {
 // Reshape Hoisting
 //===---------------------------------------------------------------------===//
 
-/// Hoist `tensor.collapse_shape` ops at the beginning of the `dispatchOp`
-/// and `tensor.expand_shape` ops at the end of the `dispatchOp`, out of the
-/// dispatch.
+/// Hoist `tensor.collapse_shape` and `tensor.expand_shape` ops at the beginning
+/// of the `dispatchOp` and `tensor.expand_shape` ops at the end of the
+/// `dispatchOp`, out of the dispatch.
 static FailureOr<IREE::Flow::DispatchRegionOp>
 hoistTensorReshapesOutOfDispatchRegion(
     RewriterBase &rewriter, IREE::Flow::DispatchRegionOp dispatchOp) {
@@ -650,26 +631,27 @@ hoistTensorReshapesOutOfDispatchRegion(
   SetVector<Operation *> slice;
   getBackwardSlice(returnOp, &slice, sliceOptions);
 
-  // 2. Get the leaf operations that are tensor.collapse_shape ops.
-  SmallVector<tensor::CollapseShapeOp> leafs;
+  // 2. Get the leaf operations that are `tensor.collapse_shape` and
+  // `tensor_expand_shape` ops.
+  SmallVector<Operation *> reshapeLeafs;
   for (Operation *op : slice) {
-    auto collapseShapeOp = dyn_cast<tensor::CollapseShapeOp>(op);
-    if (!collapseShapeOp) {
+    if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(op)) {
       continue;
     }
     if (llvm::all_of(op->getOperands(), [&](Value operand) {
           Operation *definingOp = operand.getDefiningOp();
           return !definingOp || slice.count(definingOp) == 0;
         })) {
-      leafs.push_back(collapseShapeOp);
+      reshapeLeafs.push_back(op);
     }
   }
 
-  // 3. Clone the leaf `tensor.collapse_shape` ops outside the dispatch.
+  // 3. Clone the leaf `tensor.collapse_shape` and `tensor_expand_shape`  ops
+  // outside the dispatch.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(dispatchOp);
-  for (auto reshapeOp : leafs) {
-    Operation *clonedOp = rewriter.clone(*reshapeOp.getOperation());
+  for (auto reshapeOp : reshapeLeafs) {
+    Operation *clonedOp = rewriter.clone(*reshapeOp);
     rewriter.replaceOp(reshapeOp, clonedOp->getResults());
   }
 
@@ -684,12 +666,15 @@ hoistTensorReshapesOutOfDispatchRegion(
   SmallVector<SmallVector<ReassociationIndices>> allReassociationIndices;
   ValueRange dynamicDimsList = dispatchOp.getResultDims();
   Location loc = dispatchOp.getLoc();
-  for (Value yieldedValue : returnOp->getOperands()) {
+  for (auto [resultIndex, yieldedValue] :
+       llvm::enumerate(returnOp->getOperands())) {
     auto expandShapeOp = yieldedValue.getDefiningOp<tensor::ExpandShapeOp>();
     if (!expandShapeOp) {
       // 4a. Keep the same yield value if the producer is not a
       // `tensor.expand_shape` op.
       newReturnTypes.push_back(yieldedValue.getType());
+      ValueRange resultDims = dispatchOp.getResultDynamicDims(resultIndex);
+      newDynamicDims.append(resultDims.begin(), resultDims.end());
       newYieldVals.push_back(yieldedValue);
       continue;
     }
@@ -774,9 +759,17 @@ hoistTensorReshapesOutOfDispatchRegion(
       rewriter.replaceAllUsesWith(origResult, returnValue);
       continue;
     }
+
+    auto shapedType = dyn_cast<ShapedType>(origResult.getType());
+    assert(shapedType && "result should be shaped type");
+
+    ValueRange dynamicDims = dispatchOp.getResultDynamicDims(index);
+    SmallVector<OpFoldResult> outputShape =
+        mlir::getMixedValues(shapedType.getShape(), dynamicDims, rewriter);
+
     auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
         loc, origResult.getType(), returnValue,
-        allReassociationIndicesRef.front());
+        allReassociationIndicesRef.front(), outputShape);
     allReassociationIndicesRef = allReassociationIndicesRef.drop_front();
     rewriter.replaceAllUsesWith(origResult, newExpandShapeOp.getResult());
   }
@@ -1014,11 +1007,23 @@ void CollapseDimensionsPass::runOnOperation() {
   IRRewriter rewriter(context);
 
   SmallVector<IREE::Flow::DispatchRegionOp> modifiedDispatchOps;
-  funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
-    if (collapseDimensionsForDispatch(rewriter, dispatchOp, maxIterations)) {
-      modifiedDispatchOps.push_back(dispatchOp);
+  auto walkRes = funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
+    FailureOr<IREE::Flow::DispatchRegionOp> newDispatchOp =
+        hoistTensorReshapesOutOfDispatchRegion(
+            rewriter, cast<IREE::Flow::DispatchRegionOp>(dispatchOp));
+    if (failed(newDispatchOp)) {
+      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
+      return WalkResult::interrupt();
     }
+    if (collapseDimensionsForDispatch(rewriter, newDispatchOp.value(),
+                                      maxIterations)) {
+      modifiedDispatchOps.push_back(newDispatchOp.value());
+    }
+    return WalkResult::advance();
   });
+  if (walkRes.wasInterrupted()) {
+    return signalPassFailure();
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "[CollapseDims] : After collapsing ops: \n";
@@ -1048,17 +1053,25 @@ void CollapseDimensionsPass::runOnOperation() {
     memref::populateResolveRankedShapedTypeResultDimsPatterns(moveReshapeOps);
     tensor::populateFoldTensorEmptyPatterns(moveReshapeOps);
     SmallVector<Operation *> candidateOps;
-    block.walk([&](Operation *op) {
-      if (isa<tensor::CollapseShapeOp>(op)) {
-        candidateOps.push_back(op);
-      }
-    });
+    block.walk([&](Operation *op) { candidateOps.push_back(op); });
     if (failed(
             applyOpPatternsGreedily(candidateOps, std::move(moveReshapeOps)))) {
       funcOp.emitOpError(
           "failed to propagate reshape ops introduced during collapse");
       return signalPassFailure();
     }
+
+    // Expand affine.apply ops from dynamic dims
+    newDispatchOp->walk([&](affine::AffineApplyOp op) {
+      rewriter.setInsertionPoint(op);
+      auto maybeExpanded = mlir::affine::expandAffineMap(
+          rewriter, op.getLoc(), op.getAffineMap(),
+          llvm::to_vector<4>(op.getOperands()));
+      if (!maybeExpanded) {
+        return;
+      }
+      rewriter.replaceOp(op, *maybeExpanded);
+    });
   }
 }
 

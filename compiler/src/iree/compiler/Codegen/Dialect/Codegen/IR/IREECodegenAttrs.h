@@ -134,6 +134,8 @@ void setLoweringConfig(Operation *op, Attribute config);
 /// tuner use.
 void setRootOpInfo(Operation *op);
 
+bool hasRootOpInfo(Operation *op);
+
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(

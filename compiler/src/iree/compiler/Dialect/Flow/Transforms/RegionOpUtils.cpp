@@ -8,7 +8,9 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -20,7 +22,6 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -214,8 +215,8 @@ static void createWorkgroupCountFromDagRootRegion(
   rewriter.setInsertionPointToStart(body);
   Location loc = regionOp.getLoc();
   auto countOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(loc,
-                                                                       args);
+      rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(
+          loc, args);
   rewriter.create<IREE::Flow::ReturnOp>(loc, countOp->getResults());
 }
 
@@ -265,24 +266,23 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
   // Value is an OpResult.
   Operation *op = value.getDefiningOp();
   OpResult opResult = llvm::cast<OpResult>(value);
-  b.setInsertionPoint(op);
 
-  // Case 3: Value is tied. Reify the dimensions of the tied operand.
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
-  if (tiedOp) {
-    Value tiedOperand = tiedOp.getTiedResultOperand(value);
-    if (tiedOperand && tiedOperand.getType() == value.getType())
-      return reifyDynamicResultDimsImpl(b, tiedOperand, dynamicDims,
-                                        createTensorDimOps);
-  }
-
-  // Case 4: Query ShapeAwareOpInterface.
+  // Case 3: Query ShapeAwareOpInterface.
   auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(op);
   if (shapeAwareOp) {
     ValueRange dims =
         shapeAwareOp.getResultDynamicDims(opResult.getResultNumber());
     dynamicDims.append(dims.begin(), dims.end());
     return success();
+  }
+
+  // Case 4: Value is tied. Reify the dimensions of the tied operand.
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+  if (tiedOp) {
+    Value tiedOperand = tiedOp.getTiedResultOperand(value);
+    if (tiedOperand && tiedOperand.getType() == value.getType())
+      return reifyDynamicResultDimsImpl(b, tiedOperand, dynamicDims,
+                                        /*createTensorDimOps=*/true);
   }
 
   // Case 5: Query ReifyRankedShapedTypeOpInterface.
@@ -307,8 +307,14 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
 }
 
 /// Reify the dynamic dimensions of the given value.
+/// Deprecated. Use `getOptimizedDynamicResultDims` instead.
 LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
                                      SmallVectorImpl<Value> &dynamicDims) {
+
+  OpBuilder::InsertionGuard g(b);
+  if (auto op = value.getDefiningOp()) {
+    b.setInsertionPoint(op);
+  }
   return reifyDynamicResultDimsImpl(b, value, dynamicDims,
                                     /*createTensorDimOps=*/true);
 }
@@ -472,7 +478,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
         rewriter.setInsertionPoint(target);
         SmallVector<Value> &dims =
             dispatchOpNewResultsDynamicDims.emplace_back();
-        if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+        if (failed(getOptimizedDynamicResultDims(rewriter, result, dims))) {
           return target->emitOpError(
               "failed to reify dynamic dims of result to be yielded from "
               "dispatch region");
@@ -553,9 +559,10 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   for (auto [index, result] : llvm::enumerate(target->getResults())) {
     replacedValues.push_back(result);
     yieldedResults.push_back(clonedTarget->getResult(index));
-    rewriter.setInsertionPoint(target);
+    OpBuilder::InsertionGuard g1(rewriter);
+    rewriter.setInsertionPoint(regionOp);
     SmallVector<Value> &dims = dispatchOpNewResultsDynamicDims.emplace_back();
-    if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+    if (failed(getOptimizedDynamicResultDims(rewriter, result, dims))) {
       return target->emitOpError(
           "failed to reify dynamic dims of result to be yielded from "
           "dispatch region");
@@ -790,15 +797,43 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
+static bool isAttentionMaskGenerator(Operation *op) {
+  for (OpOperand &use : op->getUses()) {
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::AttentionOp>(use.getOwner())) {
+      if (attention.getMask() == use.get()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool isScatterIndicesGenerator(Operation *op) {
+  for (OpOperand &use : op->getUses()) {
+    if (auto scatter = dyn_cast<IREE::LinalgExt::ScatterOp>(use.getOwner())) {
+      if (scatter.getIndices() == use.get()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op) {
+bool isClonableIntoDispatchOp(Operation *op,
+                              ClonableIntoDispatchOptions options) {
+  if (isa<Flow::FlowDialect>(op->getDialect())) {
+    return false;
+  }
+
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          complex::CreateOp>(op)) {
+          complex::CreateOp, IREE::Encoding::UnsetEncodingOp>(op)) {
     return true;
   }
   if (LinalgExt::isBitExtendOp(op)) {
@@ -807,6 +842,19 @@ bool isClonableIntoDispatchOp(Operation *op) {
   if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
     return true;
   }
+  // If the operation is used for masking an AttentionOp, then we always
+  // clone it. The Attention mask is usually big, and is always generated
+  // from a small tensor, so it's always good to clone it.
+  if (options.aggressive && isAttentionMaskGenerator(op)) {
+    return true;
+  }
+
+  // If the operation is used for the indices computation of a scatter op, it
+  // should be cloned into the dispatch.
+  if (options.aggressive && isScatterIndicesGenerator(op)) {
+    return true;
+  }
+
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
     if (clInlineConstantByteLength == 0)
       return false;
@@ -870,12 +918,23 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
       if (insertSliceUser.getDest() == v)
         return true;
     }
+
+    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
+      // Only clone if used by Query, Mask, or scale.
+      if (!LinalgExt::isBitExtendOp(v.getDefiningOp()) &&
+          !llvm::is_contained<Value>(
+              {attentionOp.getQuery(), attentionOp.getMask(),
+               attentionOp.getScale(), attentionOp.getOutput()},
+              v)) {
+        return true;
+      }
+    }
   }
   return false;
 }
 
-SmallVector<Operation *>
-getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
+SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
+                                         ClonableIntoDispatchOptions options) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;
@@ -897,7 +956,8 @@ getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
     visited.insert(outsideValue);
 
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !IREE::Flow::isClonableIntoDispatchOp(definingOp) ||
+    if (!definingOp ||
+        !IREE::Flow::isClonableIntoDispatchOp(definingOp, options) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
@@ -914,10 +974,11 @@ getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
 
 /// Clone producers into the dispatch region.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
-                                     IREE::Flow::DispatchRegionOp regionOp) {
+                                     IREE::Flow::DispatchRegionOp regionOp,
+                                     ClonableIntoDispatchOptions options) {
   SmallVector<Operation *> cloneableOps;
   do {
-    cloneableOps = getCloneableOps(regionOp);
+    cloneableOps = getCloneableOps(regionOp, options);
     bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
     (void)sortResult;
     assert(sortResult && "could not compute topological sorting");

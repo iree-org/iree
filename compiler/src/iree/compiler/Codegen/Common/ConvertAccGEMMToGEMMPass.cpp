@@ -11,10 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -53,7 +52,7 @@ struct ConvertAccGEMMtoGEMM final
     Value outputOperand = outputOperands.front()->get();
 
     auto outsDefiningOp =
-        outputOperand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+        outputOperand.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
     if (!outsDefiningOp) {
       // If not DispatchTensorLoadOp then do nothing.
       return failure();

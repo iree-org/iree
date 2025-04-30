@@ -40,11 +40,16 @@ public:
   }
 
   // Return const-expr info for an operation (or nullptr if unknown). Presently,
-  // an operation's results will either all be const-expr or not, so we just
-  // check the first. 0-result ops cannot be const-expr.
+  // an operation's results are expected to either be all initialized or all
+  // uninitialized. If they are all initialized, then they will either be all
+  // const-expr or all non const-expr, so just return the first result's info.
   const ConstValueInfo *lookup(Operation *queryOp) const {
     if (queryOp->getNumResults() == 0)
       return nullptr;
+    if (llvm::any_of(queryOp->getResults(),
+                     [&](Value v) { return !lookup(v); })) {
+      return nullptr;
+    }
     return lookup(queryOp->getResult(0));
   }
 
@@ -152,6 +157,11 @@ private:
   void expandToOp(Operation *op);
   void expandToOpStep(Operation *op,
                       SmallVectorImpl<Operation *> &expandWorklist);
+
+  // Try to expand to `useOp` if it is in the same scope as `definingOp`.
+  // Otherwise, expand to the parent of `useOp` if it is in the same scope
+  // as `definingOp`.
+  void tryExpandToUseOrUseParent(Operation *definingOp, Operation *useOp);
 
   // Add a new info record for a value to analyze for const-ness.
   ConstValueInfo *addInfo(Value constValue);

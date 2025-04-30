@@ -23,7 +23,7 @@ concurrency:
 jobs:
   macos_arm64_clang:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       BUILD_DIR: build-macos
     defaults:
@@ -42,7 +42,7 @@ jobs:
           xcrun metal --version
           xcrun metallib --version
       - name: "Setting up Python"
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
           cache: "pip"
@@ -54,13 +54,10 @@ jobs:
         # features we use in scripts.
         run: brew install ninja ccache coreutils bash
       - name: "Building IREE"
-        env:
-          # TODO(#19664): Enable building test deps when build errors are fixed.
-          IREE_BUILD_TEST_DEPS: 0
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@8aa2e3c0e53de9c2d03c1ad676f570f2073bca60 # v1.15.2
+        uses: sarisia/actions-status-discord@5ddd3b114a98457dd80a39b2f00b6a998cd69008 # v1.15.3
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

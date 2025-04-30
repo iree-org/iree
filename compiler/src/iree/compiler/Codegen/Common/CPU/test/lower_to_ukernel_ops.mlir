@@ -287,7 +287,7 @@ func.func @mmt4d_bf16bf16f32(%arg0 : tensor<?x?x16x2xbf16>, %arg1 : tensor<?x?x1
 func.func @pack_i8i8_x86(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %arg2 : i8) -> tensor<?x?x7x8xi8> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
 } {
-  %result = tensor.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+  %result = linalg.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xi8> -> tensor<?x?x7x8xi8>
   func.return %result : tensor<?x?x7x8xi8>
 }
@@ -315,7 +315,7 @@ func.func @pack_i8i8_x86(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %ar
 func.func @pack_i8i8(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %arg2 : i8) -> tensor<?x?x7x8xi8> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+  %result = linalg.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xi8> -> tensor<?x?x7x8xi8>
   func.return %result : tensor<?x?x7x8xi8>
 }
@@ -344,7 +344,7 @@ func.func @pack_i8i8(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %arg2 :
 func.func @pack_f16f16(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?x7x8xf16>, %arg2 : f16) -> tensor<?x?x7x8xf16> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.pack %arg0 padding_value(%arg2 : f16) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+  %result = linalg.pack %arg0 padding_value(%arg2 : f16) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xf16> -> tensor<?x?x7x8xf16>
   func.return %result : tensor<?x?x7x8xf16>
 }
@@ -373,7 +373,7 @@ func.func @pack_f16f16(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?x7x8xf16>, %ar
 func.func @pack_bf16bf16(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?x7x8xbf16>, %arg2 : bf16) -> tensor<?x?x7x8xbf16> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.pack %arg0 padding_value(%arg2 : bf16) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+  %result = linalg.pack %arg0 padding_value(%arg2 : bf16) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xbf16> -> tensor<?x?x7x8xbf16>
   func.return %result : tensor<?x?x7x8xbf16>
 }
@@ -401,7 +401,7 @@ func.func @pack_bf16bf16(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?x7x8xbf16>,
 func.func @pack_i32i32_transpose_inner(%arg0 : tensor<?x?xi32>, %arg1 : tensor<?x?x7x8xi32>, %arg2 : i32) -> tensor<?x?x7x8xi32> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.pack %arg0 padding_value(%arg2 : i32) inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+  %result = linalg.pack %arg0 padding_value(%arg2 : i32) inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xi32> -> tensor<?x?x7x8xi32>
   func.return %result : tensor<?x?x7x8xi32>
 }
@@ -430,19 +430,19 @@ func.func @pack_i32i32_transpose_inner(%arg0 : tensor<?x?xi32>, %arg1 : tensor<?
 func.func @pack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?x7x8xf32>, %arg2 : f32) -> tensor<?x?x7x8xf32> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.pack %arg0 padding_value(%arg2 : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+  %result = linalg.pack %arg0 padding_value(%arg2 : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xf32> -> tensor<?x?x7x8xf32>
   func.return %result : tensor<?x?x7x8xf32>
 }
 
 // -----
 
-// Check that tensor.pack is not lowered to a microkernel by default - it should
+// Check that linalg.pack is not lowered to a microkernel by default - it should
 // only be on VMVX.
 // CHECK: func @unpack_f16f16_default
-// CHECK: tensor.unpack
+// CHECK: linalg.unpack
 func.func @unpack_f16f16_default(%arg0 : tensor<?x?x7x8xf16>, %arg1 : tensor<?x?xf16>) -> tensor<?x?xf16> {
-  %result = tensor.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+  %result = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?x7x8xf16> -> tensor<?x?xf16>
   func.return %result : tensor<?x?xf16>
 }
@@ -468,7 +468,7 @@ func.func @unpack_f16f16_default(%arg0 : tensor<?x?x7x8xf16>, %arg1 : tensor<?x?
 func.func @unpack_f16f16(%arg0 : tensor<?x?x7x8xf16>, %arg1 : tensor<?x?xf16>) -> tensor<?x?xf16> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+  %result = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?x7x8xf16> -> tensor<?x?xf16>
   func.return %result : tensor<?x?xf16>
 }
@@ -494,7 +494,7 @@ func.func @unpack_f16f16(%arg0 : tensor<?x?x7x8xf16>, %arg1 : tensor<?x?xf16>) -
 func.func @unpack_i32i32_transpose_inner(%arg0 : tensor<?x?x7x8xi32>, %arg1 : tensor<?x?xi32>) -> tensor<?x?xi32> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.unpack %arg0 inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+  %result = linalg.unpack %arg0 inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
       : tensor<?x?x7x8xi32> -> tensor<?x?xi32>
   func.return %result : tensor<?x?xi32>
 }
@@ -520,7 +520,7 @@ func.func @unpack_i32i32_transpose_inner(%arg0 : tensor<?x?x7x8xi32>, %arg1 : te
 func.func @unpack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?x7x8xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
-  %result = tensor.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+  %result = linalg.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
       : tensor<?x?x7x8xf32> -> tensor<?x?xf32>
   func.return %result : tensor<?x?xf32>
 }
@@ -540,6 +540,26 @@ func.func @query_tile_sizes_2d() -> (index, index)  attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
   %result:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  return %result#0, %result#1 : index, index
+}
+
+// -----
+
+//     CHECK: func @query_tile_sizes_2d_with_layouts(
+// CHECK-DAG: %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
+// CHECK-DAG: %[[FLAGS:.+]] = arith.constant {{[0-9]+}} : i32
+// CHECK:     %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
+// CHECK-SAME: ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
+// CHECK:     return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_attr = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32]>
+#encoding = #iree_encoding.layout<[#iree_cpu.vmvx_encoding_layout<configuration = {encoding_attr = #encoding_attr, encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [-9223372036854775808, -9223372036854775808], outerDimsPerm = [0, 1]}}>]>
+func.func @query_tile_sizes_2d_with_layouts() -> (index, index)  attributes {
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
+} {
+  %result:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #encoding> -> index, index
   return %result#0, %result#1 : index, index
 }
 

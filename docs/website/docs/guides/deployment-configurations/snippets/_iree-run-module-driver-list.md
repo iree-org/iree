@@ -1,4 +1,10 @@
+<!-- markdownlint-disable -->
 $ iree-run-module --list_drivers
+
+# ============================================================================
+# Available HAL drivers
+# ============================================================================
+# Use --list_devices={driver name} to enumerate available devices.
 
         cuda: NVIDIA CUDA HAL driver (via dylib)
          hip: HIP HAL driver (via dylib)

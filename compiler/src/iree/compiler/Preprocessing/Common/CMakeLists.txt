@@ -27,7 +27,9 @@ iree_cc_library(
     "Passes.h.inc"
   SRCS
     "ApplyPDLPatterns.cpp"
+    "AttrBasedPipelinePass.cpp"
     "ConvertConv2DToImg2Col.cpp"
+    "ConvertConvFilterToChannelsLast.cpp"
     "ConvertConvToChannelsLast.cpp"
     "FoldAttentionWithTranspose.cpp"
     "GeneralizeLinalgMatMul.cpp"
@@ -41,6 +43,7 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces

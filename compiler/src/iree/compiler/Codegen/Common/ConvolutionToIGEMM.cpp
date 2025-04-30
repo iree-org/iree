@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -102,8 +101,8 @@ convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
   MLIRContext *context = funcOp->getContext();
   {
     RewritePatternSet patterns(context);
-    iree_compiler::IREE::LinalgExt::populateConv2DToIm2colOpPatterns(patterns,
-                                                                     controlFn);
+    iree_compiler::IREE::LinalgExt::populateConvToIm2colOpPatterns(patterns,
+                                                                   controlFn);
     if (configFn.has_value()) {
       patterns.add<SetIGEMMConfiguration>(context, configFn.value());
     }

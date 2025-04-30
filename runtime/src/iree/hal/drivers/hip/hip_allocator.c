@@ -13,6 +13,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/hip_device.h"
 #include "iree/hal/drivers/hip/per_device_information.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/util/queue.h"
@@ -418,6 +419,9 @@ static void iree_hal_hip_buffer_free(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static void iree_hal_hip_buffer_release_callback(void* user_data,
+                                                 iree_hal_buffer_t* buffer);
+
 static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
@@ -528,13 +532,15 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
                                                  : IREE_HAL_QUEUE_AFFINITY_ANY,
         .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
     };
+    iree_hal_buffer_release_callback_t callback = {
+        .fn = iree_hal_hip_buffer_release_callback,
+        .user_data = (void*)base_allocator};
     status = iree_hal_hip_buffer_wrap(
         placement, compat_params.type, compat_params.access,
         compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
-        iree_hal_buffer_release_callback_null(),
-        iree_hal_allocator_host_allocator(base_allocator), &buffer);
+        callback, iree_hal_allocator_host_allocator(base_allocator), &buffer);
   }
 
   if (iree_status_is_ok(status)) {
@@ -561,33 +567,70 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
 static void iree_hal_hip_allocator_deallocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
-  iree_hal_hip_allocator_t* allocator =
-      iree_hal_hip_allocator_cast(base_allocator);
+  iree_hal_buffer_destroy(base_buffer);
+}
 
-  const iree_hal_hip_buffer_type_t buffer_type =
-      iree_hal_hip_buffer_type(base_buffer);
+typedef struct iree_hal_hip_release_async_data_t {
+  iree_hal_hip_allocator_t* allocator;
+  iree_hal_hip_buffer_type_t buffer_type;
+  hipDeviceptr_t device_pointer;
+  void* host_pointer;
+  IREE_STATISTICS(iree_hal_memory_type_t memory_type;
+                  iree_device_size_t allocation_size;)
+} iree_hal_hip_release_async_data_t;
 
-  iree_hal_hip_buffer_free(allocator->symbols, buffer_type,
-                           iree_hal_hip_buffer_device_pointer(base_buffer),
-                           iree_hal_hip_buffer_host_pointer(base_buffer));
+static iree_status_t iree_hal_hip_buffer_release_callback_async(
+    void* user_data, iree_hal_hip_event_t* event, iree_status_t status) {
+  iree_hal_hip_release_async_data_t* async_data =
+      (iree_hal_hip_release_async_data_t*)user_data;
 
-  switch (buffer_type) {
+  iree_hal_hip_buffer_free(async_data->allocator->symbols,
+                           async_data->buffer_type, async_data->device_pointer,
+                           async_data->host_pointer);
+
+  switch (async_data->buffer_type) {
     case IREE_HAL_HIP_BUFFER_TYPE_DEVICE:
     case IREE_HAL_HIP_BUFFER_TYPE_HOST: {
-      IREE_TRACE_FREE_NAMED(
-          IREE_HAL_HIP_ALLOCATOR_ID,
-          (void*)iree_hal_hip_buffer_device_pointer(base_buffer));
+      IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID,
+                            (void*)async_data->device_pointer);
       IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-          &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
-          iree_hal_buffer_allocation_size(base_buffer)));
+          &async_data->allocator->statistics, async_data->memory_type,
+          async_data->allocation_size));
       break;
     }
     default:
       // Buffer type not tracked.
       break;
   }
+  iree_allocator_free(async_data->allocator->host_allocator, async_data);
+  return status;
+}
 
-  iree_hal_buffer_destroy(base_buffer);
+static void iree_hal_hip_buffer_release_callback(void* user_data,
+                                                 iree_hal_buffer_t* buffer) {
+  iree_hal_hip_allocator_t* allocator = (iree_hal_hip_allocator_t*)user_data;
+
+  iree_hal_hip_release_async_data_t* release_async_data = NULL;
+
+  iree_status_t status = iree_allocator_malloc(allocator->host_allocator,
+                                               sizeof(*release_async_data),
+                                               (void**)&release_async_data);
+  if (iree_status_is_ok(status)) {
+    release_async_data->allocator = allocator;
+    release_async_data->device_pointer =
+        iree_hal_hip_buffer_device_pointer(buffer);
+    release_async_data->host_pointer = iree_hal_hip_buffer_host_pointer(buffer);
+    release_async_data->buffer_type = iree_hal_hip_buffer_type(buffer);
+    IREE_STATISTICS({
+      release_async_data->memory_type = iree_hal_buffer_memory_type(buffer);
+      release_async_data->allocation_size =
+          iree_hal_buffer_allocation_size(buffer);
+    })
+    status = iree_hal_hip_device_add_asynchronous_cleanup(
+        allocator->parent_device, &iree_hal_hip_buffer_release_callback_async,
+        (void*)release_async_data);
+  }
+  iree_status_ignore(status);
 }
 
 static iree_status_t iree_hal_hip_allocator_import_buffer(
@@ -729,6 +772,7 @@ static iree_status_t iree_hal_hip_allocator_export_buffer(
       switch (buffer_type) {
         case IREE_HAL_HIP_BUFFER_TYPE_DEVICE:
         case IREE_HAL_HIP_BUFFER_TYPE_EXTERNAL:
+        case IREE_HAL_HIP_BUFFER_TYPE_ASYNC:
           out_external_buffer->flags = requested_flags;
           out_external_buffer->type = requested_type;
           out_external_buffer->handle.device_allocation.ptr =
@@ -760,6 +804,7 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
                             iree_hal_buffer_allocation_size(buffer),
                             IREE_HOST_SIZE_MAX);
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   int device_ordinal = 0;
   device_ordinal =
@@ -831,6 +876,8 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
     iree_hal_hip_buffer_set_allocation_empty(buffer);
   }
 
+  IREE_TRACE_ZONE_END(z0);
+
   return status;
 }
 
@@ -843,6 +890,7 @@ iree_status_t iree_hal_hip_allocator_free_async(
     return iree_ok_status();
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)device_ptr);
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, iree_hal_buffer_memory_type(buffer),
@@ -882,6 +930,7 @@ iree_status_t iree_hal_hip_allocator_free_async(
   if (iree_status_is_ok(status)) {
     iree_hal_hip_buffer_set_allocation_empty(buffer);
   }
+  IREE_TRACE_ZONE_END(z0);
 
   return status;
 }

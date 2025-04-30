@@ -27,8 +27,8 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
-    "ConvertConv2DToIm2ColOp.cpp"
     "ConvertConv2DToWinograd.cpp"
+    "ConvertConvToIm2ColOp.cpp"
     "ConvertToLoops.cpp"
     "DecomposeAttention.cpp"
     "DecomposeIm2col.cpp"
@@ -36,12 +36,12 @@ iree_cc_library(
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"
+    "RewriteFft.cpp"
     "SplitReduction.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
   DEPS
     ::PassesIncGen
-    IREEInputDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -72,6 +72,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

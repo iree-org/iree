@@ -2,6 +2,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation=true}))" --split-input-file %s | FileCheck %s --check-prefix=APROP
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-bubbling-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=BUBBLE
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation-through-conv=true}))" --split-input-file %s | FileCheck %s --check-prefix=CONV
 
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
@@ -253,6 +254,38 @@ util.func public @do_not_propagate_to_conv(%transposed_lhs: tensor<18x2x18x8xf32
 
 // APROP-LABEL: util.func public @do_not_propagate_to_conv
 //       APROP:   linalg.conv_2d_nhwc_hwcf
+
+// CONV-LABEL:   util.func public @do_not_propagate_to_conv
+//  CONV-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<18x2x18x8xf32>
+//       CONV:   linalg.generic {{.*}} ins(%[[ARG0]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+module {
+  util.func public @do_not_propagate_to_conv_generic(%arg0: tensor<18x2x18x8xf32>, %arg1: tensor<3x3x8x32xf32>) -> tensor<2x16x16x32xf32> {
+    %0 = tensor.empty() : tensor<2x18x18x8xf32>
+    %transposed = linalg.transpose ins(%arg0 : tensor<18x2x18x8xf32>) outs(%0 : tensor<2x18x18x8xf32>) permutation = [1, 0, 2, 3]
+    %1 = tensor.empty() : tensor<2x16x16x32xf32>
+    %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%transposed, %arg1 : tensor<2x18x18x8xf32>, tensor<3x3x8x32xf32>) outs(%1 : tensor<2x16x16x32xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %3 = arith.mulf %in, %in_0 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+    } -> tensor<2x16x16x32xf32>
+    util.return %2 : tensor<2x16x16x32xf32>
+  }
+}
+
+// APROP-LABEL: util.func public @do_not_propagate_to_conv_generic
+//       APROP:   linalg.transpose
+//       APROP:   linalg.generic
+
+// CONV-LABEL:   util.func public @do_not_propagate_to_conv_generic
+//  CONV-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<18x2x18x8xf32>
+//       CONV:   linalg.generic {{.*}} ins(%[[ARG0]]
 
 // -----
 
@@ -709,3 +742,22 @@ util.func public @bubble_transpose_v_from_attention(%q: tensor<2x10x4096x64xf16>
 // CHECK-SAME:    ins(%[[ARG0]], %[[ARG1]], %[[TRANS_V]], %[[ARG5]] : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>, f16)
 // CHECK-SAME:    outs(%[[EMPTY]] : tensor<2x10x4096x64xf16>)
 // CHECK:         util.return %[[ATTN]] : tensor<2x10x4096x64xf16>
+
+// -----
+
+util.func public @dont_reshape_reduction(%arg0: tensor<16x4x4xf32>, %arg1: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %empty1 = tensor.empty(): tensor<16x4x4xf32>
+  %0 = linalg.transpose ins(%arg0 : tensor<16x4x4xf32>)
+      outs(%empty1 : tensor<16x4x4xf32>) permutation = [0, 2, 1]
+  %collapse = tensor.collapse_shape %0 [[0], [1, 2]] : tensor<16x4x4xf32> into tensor<16x16xf32>
+  %empty2 = tensor.empty(): tensor<16x16xf32>
+  %1 = linalg.matmul ins(%collapse, %arg1: tensor<16x16xf32>, tensor<16x16xf32>)
+                            outs(%empty2 : tensor<16x16xf32>) -> tensor<16x16xf32>
+
+  util.return %1 : tensor<16x16xf32>
+}
+// APROP-LABEL: util.func public @dont_reshape_reduction
+//       APROP:   %[[V0:.+]] = linalg.transpose
+//       APROP:   %[[V1:.+]] = tensor.collapse_shape %[[V0]]
+//       APROP:   %[[V2:.+]] = linalg.matmul ins(%[[V1]]
+//       APROP:   util.return %[[V2]]

@@ -553,11 +553,12 @@ class Scheduler:
         # torch import -> compile build of 1000 models (about 1m9s for all of it
         # on the tested configuration).
         concurrency = int(max(1, math.ceil((os.cpu_count() or 1) * 0.40)))
+        mp_context = os.environ.get("IREE_BUILD_MP_CONTEXT", "spawn")
         self.thread_pool_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=concurrency, thread_name_prefix="iree.build"
         )
         self.process_pool_executor = concurrent.futures.ProcessPoolExecutor(
-            max_workers=concurrency, mp_context=multiprocessing.get_context("spawn")
+            max_workers=concurrency, mp_context=multiprocessing.get_context(mp_context)
         )
 
     def shutdown(self):
@@ -676,6 +677,8 @@ class Scheduler:
             self.reporter.start_dep(dep)
             if dep.concurrency == ActionConcurrency.NONE:
                 invoke()
+                dep.start(concurrent.futures.Future())
+                dep.finish()
             elif (
                 dep.concurrency == ActionConcurrency.THREAD
                 or dep.concurrency == ActionConcurrency.PROCESS

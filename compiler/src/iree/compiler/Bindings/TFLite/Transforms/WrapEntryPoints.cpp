@@ -227,7 +227,8 @@ private:
       auto dynamicDims = inputDynamicDims.loadDynamicDims(recalculateBuilder);
       auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
           loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
-          dynamicDims, /*wait_fence=*/Value{}, /*name=*/nullptr,
+          dynamicDims, /*consume=*/false, /*wait_fence=*/Value{},
+          /*name=*/nullptr,
           /*affinity=*/nullptr);
       inputValue.replaceAllUsesWith(castOp.getTarget());
     }
@@ -526,7 +527,9 @@ private:
       callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), inputDynamicDims.tensorType, arg,
           TypeAttr::get(inputDynamicDims.tensorType), dynamicDims,
-          /*wait_fence=*/Value{}, /*name=*/nullptr,
+          /*consume=*/UnitAttr{},
+          /*wait_fence=*/Value{},
+          /*name=*/nullptr,
           /*affinity=*/nullptr));
     }
     auto callOp = entryBuilder.create<IREE::Util::CallOp>(
@@ -605,7 +608,7 @@ private:
   // IO tensor names and quantization information.
   void populateReflectionAttrs(IREE::Util::FuncOp entryFuncOp,
                                IREE::Util::FuncOp wrapperFuncOp) {
-    SmallVector<NamedAttribute> attrs;
+    SmallVector<NamedAttribute, 1> attrs;
     attrs.push_back(buildIONamesAttr(entryFuncOp));
     // TODO(#3972): tfl.io.quant: quantization information.
     // TODO(#3978): tfl.io.types: tensor types (complex/strings/etc).
@@ -636,7 +639,7 @@ private:
       }
     }
     return NamedAttribute{
-        StringAttr::get(&getContext(), "tfl.io.names"),
+        "tfl.io.names",
         StringAttr::get(&getContext(), llvm::join(pieces, ";"))};
   }
 };

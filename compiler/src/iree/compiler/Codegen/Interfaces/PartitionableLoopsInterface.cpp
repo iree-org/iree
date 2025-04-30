@@ -227,6 +227,10 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
 
 #define GET_OP_LIST
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::PackOp::attachInterface<
+        OuterParallelAsPartitionableLoops<linalg::PackOp>>(*ctx);
+    linalg::UnPackOp::attachInterface<
+        OuterParallelAsPartitionableLoops<linalg::UnPackOp>>(*ctx);
     registerInterfaceForLinalgOps<
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
         >(ctx);
@@ -241,6 +245,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
     IREE::LinalgExt::ScatterOp::attachInterface<
         OuterParallelAsPartitionableLoops<IREE::LinalgExt::ScatterOp>>(*ctx);
+    IREE::LinalgExt::GatherOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::GatherOp>>(*ctx);
     IREE::LinalgExt::SortOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
     IREE::LinalgExt::TopkOp::attachInterface<
@@ -263,12 +269,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         *ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
-    tensor::PackOp::attachInterface<
-        OuterParallelAsPartitionableLoops<tensor::PackOp>>(*ctx);
     tensor::PadOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::PadOp>>(*ctx);
-    tensor::UnPackOp::attachInterface<
-        OuterParallelAsPartitionableLoops<tensor::UnPackOp>>(*ctx);
   });
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {

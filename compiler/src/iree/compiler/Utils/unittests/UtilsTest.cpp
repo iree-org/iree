@@ -9,9 +9,12 @@
 #include <thread>
 
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
+#include "iree/compiler/Utils/Indexing.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/Support/FormatVariadic.h"
 
+using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace testing;
 
@@ -65,4 +68,147 @@ TEST(EmbeddedDataDirectory, GetMap) {
     keys.push_back(iter.str());
   }
   EXPECT_THAT(keys, UnorderedElementsAre("filename1", "filename2"));
+}
+
+TEST(BasisFromSizeStrides, SimpleCase) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_TRUE(
+      succeeded(basisFromSizesStrides({4, 16}, {1, 4}, basis, dimToResult)));
+  EXPECT_THAT(basis, ElementsAre(16, 4));
+  EXPECT_THAT(dimToResult, ElementsAre(2, 1));
+}
+
+TEST(BasisFromSizeStrides, ZeroStride) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_TRUE(succeeded(
+      basisFromSizesStrides({16, 4, 4}, {1, 0, 16}, basis, dimToResult)));
+  EXPECT_THAT(basis, ElementsAre(4, 16, 1));
+  EXPECT_THAT(dimToResult, ElementsAre(2, 3, 1));
+}
+
+TEST(BasisFromSizeStrides, JumpsInStrides) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_TRUE(
+      succeeded(basisFromSizesStrides({8, 4}, {8, 1}, basis, dimToResult)));
+  EXPECT_THAT(basis, ElementsAre(8, 2, 4));
+  EXPECT_THAT(dimToResult, ElementsAre(1, 3));
+}
+
+TEST(BasisFromSizeStrides, OverlappingStrides) {
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+
+  EXPECT_FALSE(
+      succeeded(basisFromSizesStrides({8, 4}, {6, 1}, basis, dimToResult)));
+}
+
+//=------------------------------------------------------------------------------=//
+// OptionUtils tests
+//=------------------------------------------------------------------------------=//
+
+namespace {
+struct TestOptions {
+  llvm::OptimizationLevel rootOption = llvm::OptimizationLevel::O0;
+  llvm::OptimizationLevel parentOption = llvm::OptimizationLevel::O0;
+  bool childOption = false;
+  static constexpr llvm::StringRef kRootOptFlag = "root-option";
+
+  void bindOptions(OptionsBinder &binder) {
+    binder.topLevelOpt(kRootOptFlag, rootOption);
+    auto init_at_opt = binder.optimizationLevel("parent-option", parentOption);
+    binder.opt<bool>("child-option", childOption,
+                     {init_at_opt(llvm::OptimizationLevel::O3, true)},
+                     llvm::cl::desc("test desc."));
+  }
+};
+} // namespace
+
+TEST(OptionUtils, DefaultTest) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, false);
+
+  opts.bindOptions(binder);
+  LogicalResult parseResult = binder.parseArguments(0, nullptr);
+
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, false);
+}
+
+TEST(OptionUtils, OverrideParent) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  opts.bindOptions(binder);
+
+  int argc = 1;
+  const char *argv[] = {"--parent-option=O3"};
+  LogicalResult parseResult = binder.parseArguments(argc, argv);
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, false);
+
+  binder.applyOptimizationDefaults();
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.restoreOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, false);
+}
+
+TEST(OptionUtils, OverrideRoot) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  opts.bindOptions(binder);
+
+  int argc = 1;
+  const char *argv[] = {"--root-option=O3"};
+  LogicalResult parseResult = binder.parseArguments(argc, argv);
+
+  binder.applyOptimizationDefaults();
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.restoreOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, false);
+}
+
+TEST(OptionUtils, OverrideRootAndSetChild) {
+  auto binder = OptionsBinder::local();
+  TestOptions opts;
+  opts.bindOptions(binder);
+
+  int argc = 2;
+  const char *argv[] = {"--root-option=O3", "--child-option=true"};
+  LogicalResult parseResult = binder.parseArguments(argc, argv);
+  EXPECT_TRUE(succeeded(parseResult));
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.applyOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.childOption, true);
+
+  binder.restoreOptimizationDefaults();
+  EXPECT_EQ(opts.rootOption, llvm::OptimizationLevel::O3);
+  EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
+  EXPECT_EQ(opts.childOption, true);
 }

@@ -1,11 +1,12 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-hoist-encoding-ops))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-hoist-encoding-ops{hoist-encodings-for-constexpr=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-CONST
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#lhs_encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
-#rhs_encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
-#result_encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
+#lhs_encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3]>
+#rhs_encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3]>
+#result_encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map1, #map2, #map3]>
 module {
   util.func public @hoist_matmul_encodings(%arg0: tensor<2x128x64xf32>, %arg1: tensor<2x11008x128xf32>) -> tensor<2x11008x64xf32> {
     %cst = arith.constant 0.000000e+00 : f32
@@ -34,9 +35,9 @@ module {
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[$LHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$RHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$LHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]>
+// CHECK-DAG:   #[[$RHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]>
+// CHECK-DAG:   #[[$OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]>
 // CHECK-LABEL: @hoist_matmul_encodings
 // CHECK-SAME:    (%[[ARG0:.+]]: tensor<2x128x64xf32>, %[[ARG1:.+]]: tensor<2x11008x128xf32>)
 // CHECK-DAG:   %[[SET_ENCODING0:.+]] = iree_encoding.set_encoding %[[ARG0]] : tensor<2x128x64xf32> -> tensor<2x128x64xf32, #[[$LHS_ENCODING]]>
@@ -55,7 +56,7 @@ module {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 32, 32, 32>>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map2, #map3, #map4]>
 util.func public @bubble_through_dequant(
     %arg0: tensor<2x11008x128xi8>, %arg1: tensor<2x11008xf32>, %arg2: tensor<2x11008xf32>) -> tensor<2x11008x128xf32, #encoding> {
   %6 = flow.dispatch.region -> (tensor<2x11008x128xf32, #encoding>) {
@@ -83,9 +84,9 @@ util.func public @bubble_through_dequant(
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP3]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP4]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP4]]], #[[MAP2]]]>
 // CHECK-LABEL: @bubble_through_dequant
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xi8>,
 // CHECK-SAME:    %[[ARG1:.+]]: tensor<2x11008xf32>, %[[ARG2:.+]]: tensor<2x11008xf32>
@@ -103,7 +104,7 @@ util.func public @bubble_through_dequant(
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], round_dims_to = array<i64: 32, 32, 32>>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]>
 util.func public @bubble_through_broadcast(
     %arg0: tensor<11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
   %6 = flow.dispatch.region -> (tensor<2x11008x128xf32, #encoding>) {
@@ -127,8 +128,8 @@ util.func public @bubble_through_broadcast(
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
-// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], bcast_map = #[[MAP3]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]]>
 // CHECK-LABEL: @bubble_through_broadcast
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<11008x128xf32>
 // CHECK-DAG:   %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ARG0]] : tensor<11008x128xf32> -> tensor<11008x128xf32, #[[$ENCODING_BMAP]]>
@@ -145,7 +146,7 @@ util.func public @bubble_through_broadcast(
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
 module {
   util.func public @hoist_below(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %0 = flow.dispatch.region -> (tensor<2x11008x128xf32, #encoding>) {
@@ -178,7 +179,7 @@ module {
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
 module {
   util.func public @hoist_dynamic(%arg0: tensor<?x?x?xf32>, %d0: index, %d1: index, %d2: index) -> (tensor<?x?x?xf32>, tensor<?x?x?xf32, #encoding>) {
     %0:2 = flow.dispatch.region -> (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<?x?x?xf32, #encoding>{%d0, %d1, %d2}) {
@@ -198,7 +199,7 @@ module {
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 32, 32>>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>
 // CHECK-LABEL: @hoist_dynamic
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
 // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32>{%[[D0]], %[[D1]], %[[D2]]})
@@ -208,3 +209,47 @@ module {
 // CHECK:       }
 // CHECK:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #[[$ENCODING]]>
 // CHECK:       util.return %[[DISPATCH]], %[[SET_ENCODING]]
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func private @get_tensor(tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+util.func public @hoist_both_src_and_encoding() -> tensor<640x320xf32> {
+  %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
+    %cst = arith.constant dense<1.0> : tensor<640x320xf32>
+    %1 = iree_encoding.set_encoding %cst : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
+    %2 = util.call @get_tensor(%1) : (tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+    flow.return %2 : tensor<640x320xf32>
+  }
+  util.return %0 : tensor<640x320xf32>
+}
+// CHECK-LABEL: util.func public @hoist_both_src_and_encoding(
+// CHECK:         %[[CST:.+]] = arith.constant
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+// CHECK:         flow.dispatch.region
+
+// -----
+
+// It tests that the constant-like source is already outside the region, and the
+// hoisting does not happen to it. Otherwise, it crashes.
+
+#encoding = #iree_encoding.testing_encoding<>
+util.func private @get_tensor(tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+util.func public @hoist_encoding_only() -> tensor<640x320xf32> {
+  %cst = arith.constant dense<1.0> : tensor<640x320xf32>
+  %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
+    %1 = iree_encoding.set_encoding %cst : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
+    %2 = util.call @get_tensor(%1) : (tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+    flow.return %2 : tensor<640x320xf32>
+  }
+  util.return %0 : tensor<640x320xf32>
+}
+// CHECK-LABEL: util.func public @hoist_encoding_only(
+// CHECK:         %[[CST:.+]] = arith.constant
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+// CHECK:         flow.dispatch.region
+
+// NO-CONST-LABEL: util.func public @hoist_encoding_only(
+// NO-CONST:         %[[CST:.+]] = arith.constant
+// NO-CONST:         flow.dispatch.region
+// NO-CONST:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]

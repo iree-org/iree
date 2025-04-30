@@ -12,6 +12,18 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+constexpr char kNoEncodingLayoutResolverName[] = "none";
+constexpr char kPadEncodingLayoutResolverName[] = "pad";
+constexpr char kDataTilingEncodingLayoutResolverName[] = "data-tiling";
+
+struct L1CacheInfo {
+  uint32_t cacheLineBytes;
+  uint32_t cacheSets;
+};
+
+// Returns the L1 cache information for the `target`.
+std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target);
+
 // Returns a TargetAttr to target Metal via SPIR-V CodeGen.
 TargetAttr getMetalTargetDetails(MLIRContext *context);
 
@@ -35,6 +47,11 @@ StringRef normalizeCUDATarget(StringRef target);
 // recognized.
 TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
                                MLIRContext *context);
+
+// Returns an attribute implementing `EncodingLayoutAttributeInterface` if
+// |target| is able to support it. The `resolver` specifies which type of
+// layout resolver to use.
+Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target, StringRef resolver);
 
 // Normalizes the given HIP |target| to the gfx target commonly used for
 // compiling towards HIP. For example, "gfx90a" for "cnda2", "gfx1100" for

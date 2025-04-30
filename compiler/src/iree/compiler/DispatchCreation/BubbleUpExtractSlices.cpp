@@ -8,7 +8,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -57,11 +56,6 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
       return rewriter.notifyMatchFailure(
           genericOp,
           "expected generic op to have all projected permutation maps");
-    }
-
-    if (genericOp.hasIndexSemantics()) {
-      return rewriter.notifyMatchFailure(
-          genericOp, "pattern doesn't support index semantics");
     }
 
     Value replacement;

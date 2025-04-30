@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
@@ -45,6 +46,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -66,6 +68,7 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
+  std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
 
@@ -105,6 +108,14 @@ struct ROCMOptions {
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+    binder.opt<std::string>(
+        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
+        cl::cat(category),
+        cl::desc("Selects the way that encodings will be "
+                 "resolved. Options are: `none` (resolve to "
+                 "identity layout), `pad` (additional padding "
+                 "on allocations to maximize cache bandwidth), "
+                 "and `data-tiling` (enable data tiled layouts)"));
 
     binder.list<std::string>(
         "iree-hip-pass-plugin-path", passPlugins,
@@ -228,9 +239,9 @@ public:
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(StringRef deviceID, MLIRContext *context) const {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
+    SmallVector<NamedAttribute, 4> configItems;
     auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
+      configItems.emplace_back(name, value);
     };
 
     if (failed(options.verify(b))) {
@@ -247,7 +258,14 @@ public:
 
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
-      addConfig("iree.gpu.target", target);
+      addConfig(kGPUTargetAttrName, target);
+      if (options.encodingLayoutResolver !=
+          GPU::kNoEncodingLayoutResolverName) {
+        if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(
+                target, options.encodingLayoutResolver)) {
+          addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
+        }
+      }
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
@@ -426,6 +444,12 @@ public:
                << "object file could not be loaded: " << objectAttr;
       }
     } else {
+      auto maybeChipset = amdgpu::Chipset::parse(targetArch);
+      if (failed(maybeChipset)) {
+        return variantOp.emitOpError()
+               << "could not parse AMDGPU chipset name '" << targetArch << "'";
+      }
+      amdgpu::Chipset chipset = *maybeChipset;
       // Perform the translation in a separate context to avoid any
       // multi-threading issues.
       llvm::LLVMContext context;
@@ -458,6 +482,7 @@ public:
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
+      bool isWave64 = true;
       {
         llvm::Triple triple("amdgcn-amd-amdhsa");
         std::string error;
@@ -486,10 +511,10 @@ public:
                                   ? llvm::GlobalISelAbortMode::Enable
                                   : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
-        if (targetArch.starts_with("gfx10") ||
-            targetArch.starts_with("gfx11")) {
+        if (chipset.majorVersion >= 10 && chipset.majorVersion <= 12) {
           switch (subgroupSize.value_or(64)) {
           case 32:
+            isWave64 = false;
             features.emplace_back("+wavefrontsize32");
             break;
           default:
@@ -514,7 +539,7 @@ public:
         std::string featureStr = llvm::join(features, ",");
 
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, featureStr, opt, llvm::Reloc::Model::PIC_,
+            triple, targetArch, featureStr, opt, llvm::Reloc::Model::PIC_,
             std::nullopt, llvm::CodeGenOptLevel::Aggressive));
 
         if (!targetMachine) {
@@ -524,6 +549,13 @@ public:
 
       llvmModule->setDataLayout(targetMachine->createDataLayout());
 
+      // Code object version * 100.
+      constexpr uint32_t abiVersion = 500;
+      // Let the backend know what code object version we're compiling for. This
+      // insulates us from changes to the default code object version that our
+      // CI or users may not be prepared for.
+      llvmModule->addModuleFlag(llvm::Module::Error,
+                                "amdhsa_code_object_version", abiVersion);
       for (llvm::Function &f : llvmModule->functions())
         f.addFnAttr(llvm::Attribute::AlwaysInline);
 
@@ -569,8 +601,8 @@ public:
       }
 
       // Sets HIP platform globals based on the target architecture.
-      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(),
-                               targetArch))) {
+      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
+                               isWave64, abiVersion))) {
         return failure();
       }
 
@@ -840,12 +872,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
@@ -870,12 +898,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.

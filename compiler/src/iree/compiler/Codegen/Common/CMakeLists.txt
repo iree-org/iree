@@ -74,6 +74,7 @@ iree_cc_library(
     "PassUtils.h"
     "Passes.h"
     "TensorDynamicDimAnalysis.h"
+    "TileInferenceUtils.h"
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
@@ -90,6 +91,7 @@ iree_cc_library(
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
+    "ConvertUnsupportedFloatArithPass.cpp"
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
@@ -103,6 +105,7 @@ iree_cc_library(
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
     "FlattenMemRefSubspanPass.cpp"
+    "FlattenMemRefs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
@@ -118,10 +121,13 @@ iree_cc_library(
     "LinkTuningSpecsPass.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
     "LowerUKernelsToCalls.cpp"
+    "LoweringConfigInterpreter.cpp"
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
+    "MaterializeEncodingIntoPadding.cpp"
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecsPass.cpp"
+    "MathTransformPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
@@ -129,13 +135,13 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "PassUtils.cpp"
     "Passes.cpp"
-    "PolynomialApproximationPass.cpp"
     "PropagateDispatchSizeBounds.cpp"
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
     "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
+    "ResolveSwizzleHints.cpp"
     "SplitFullPartialTransferPass.cpp"
     "StripCompilationInfoPass.cpp"
     "TensorDynamicDimAnalysis.cpp"
@@ -145,12 +151,14 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TileInferenceUtils.cpp"
     "TileLargeTensors.cpp"
     "TileSizeSelection.cpp"
     "Transforms.cpp"
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
+    "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
     "VerifyWorkgroupDistribution.cpp"
   DEPS
@@ -158,6 +166,9 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgTransformDialect
     LLVMSupport
+    MLIRAMDGPUDialect
+    MLIRAMDGPUTransforms
+    MLIRAMDGPUUtils
     MLIRAffineAnalysis
     MLIRAffineDialect
     MLIRAffineTransforms
@@ -200,10 +211,12 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
+    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
+    MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
@@ -211,19 +224,22 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
+    iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Stream::Analysis
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
@@ -295,10 +311,9 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
   PUBLIC
 )

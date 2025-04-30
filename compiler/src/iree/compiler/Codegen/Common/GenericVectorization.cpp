@@ -6,9 +6,10 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -56,7 +57,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           scalableFlags = result->vectorScalableFlags;
         }
       })
-      .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+      .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
         std::optional<VectorizationTileSizes> result = inferSizesFromIR(op);
         if (result) {
           vectorSizes = result->vectorSizes;
@@ -100,8 +101,9 @@ public:
       GenericVectorizationPass>::GenericVectorizationPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tensor::TensorDialect, linalg::LinalgDialect,
-                    vector::VectorDialect>();
+    registry
+        .insert<tensor::TensorDialect, linalg::LinalgDialect,
+                vector::VectorDialect, IREE::VectorExt::IREEVectorExtDialect>();
   }
   void runOnOperation() override;
 };
@@ -122,7 +124,7 @@ void GenericVectorizationPass::runOnOperation() {
                isa<tensor::PadOp>(op)) {
       candidates.push_back(op);
     } else if (enableVectorMasking &&
-               isa<tensor::PackOp, tensor::UnPackOp>(op)) {
+               isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
     }
   });
@@ -157,8 +159,16 @@ void GenericVectorizationPass::runOnOperation() {
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
-    (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                            vectorizeGatherAccesses);
+
+    // Try to vectorize to transfer_gather, if possible.
+    if (isa<linalg::GenericOp>(op) && vectorizeToTransferGather) {
+      (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
+          rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
+          vectorizeGatherAccesses);
+    } else {
+      (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                              vectorizeGatherAccesses);
+    }
   };
 
   {

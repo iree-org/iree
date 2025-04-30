@@ -31,7 +31,9 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "ApplyPDLPatterns.cpp",
+        "AttrBasedPipelinePass.cpp",
         "ConvertConv2DToImg2Col.cpp",
+        "ConvertConvFilterToChannelsLast.cpp",
         "ConvertConvToChannelsLast.cpp",
         "FoldAttentionWithTranspose.cpp",
         "GeneralizeLinalgMatMul.cpp",
@@ -62,6 +64,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",

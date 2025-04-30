@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -26,11 +27,13 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct PromoteContractOperands final
-    : public OpRewritePattern<vector::ContractionOp> {
-  using OpRewritePattern::OpRewritePattern;
+    : public vector::MaskableOpRewritePattern<vector::ContractionOp> {
+  using MaskableOpRewritePattern::MaskableOpRewritePattern;
 
-  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
-                                PatternRewriter &rewriter) const override {
+  FailureOr<Value>
+  matchAndRewriteMaskableOp(vector::ContractionOp contractOp,
+                            vector::MaskingOpInterface maskOp,
+                            PatternRewriter &rewriter) const override {
     Type operandElType = getElementTypeOrSelf(contractOp.getLhsType());
     Type resultElType = getElementTypeOrSelf(contractOp.getResultType());
 
@@ -44,11 +47,16 @@ struct PromoteContractOperands final
     Value rhs =
         promoteToElementType(loc, rewriter, contractOp.getRhs(), resultElType);
 
-    rewriter.replaceOpWithNewOp<vector::ContractionOp>(
-        contractOp, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
+    auto replacement = rewriter.create<vector::ContractionOp>(
+        loc, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
         contractOp.getIteratorTypes());
 
-    return success();
+    if (!maskOp) {
+      return replacement.getResult();
+    }
+    auto maskedOp = vector::maskOperation(
+        rewriter, replacement, maskOp.getMask(), maskOp.getPassthru());
+    return maskedOp->getResult(0);
   }
 
   Value promoteToElementType(Location loc, RewriterBase &rewriter, Value v,
@@ -89,17 +97,19 @@ struct LLVMGPUVectorLoweringPass final
       // Lower high level vector operations like contract or multidim reduce ops
       // to lower level vector ops.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      auto options =
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           contractLoweringPatterns);
       vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
                                                        funcOp.getContext());
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
+          contractLoweringPatterns, options.vectorContractLowering);
       contractLoweringPatterns.add<PromoteContractOperands>(
           funcOp->getContext());
+      vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMultiReductionLoweringPatterns(
@@ -117,6 +127,7 @@ struct LLVMGPUVectorLoweringPass final
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
+    amdgpu::populateAmdgpuTransferReadToLoadPatterns(vectorToLoopsPatterns);
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
     if (failed(
             applyPatternsGreedily(funcOp, std::move(vectorToLoopsPatterns)))) {

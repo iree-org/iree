@@ -7,9 +7,9 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -64,6 +64,7 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 bool isLLVMCPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
@@ -210,6 +211,11 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               OpFoldResult byteOffset,
                                               Type elementType);
 
+/// Clone an operation and drop all encodings.
+Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                  ValueRange convertedInputOperands,
+                                  ValueRange convertedOutputOperands);
+
 /// Check if a linalg.generic is representing an argmax operation.
 LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
 
@@ -249,7 +255,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 // Utility to make sure we are storing the full incoming subspan. Otherwise we
 // cannot simply adjust the subspan's resultant type later.
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::Flow::DispatchTensorType tensorType,
+                 IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
 
 //===----------------------------------------------------------------------===//
@@ -267,21 +273,24 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
-/// Returns the result sizes and vector input sizes of the tensor.unpack op. The
+/// Returns the result sizes and vector input sizes of the linalg.unpack op. The
 /// inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op);
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op);
 
-/// Returns the result sizes and vector input sizes of the tensor.pack op. The
+/// Returns the result sizes and vector input sizes of the linalg.pack op. The
 /// inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op);
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis. If
 /// `opResult` is provided, it stores the bounded result shapes to destShape.
 /// Returns std::nullopt if vector sizes can't be inferred.
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
+
+/// Returns the underlying index if the given value is a constant index.
+std::optional<int64_t> getConstantIndex(Value value);
 
 } // namespace mlir::iree_compiler
 

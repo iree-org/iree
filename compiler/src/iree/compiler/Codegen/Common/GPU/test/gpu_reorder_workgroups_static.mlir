@@ -25,27 +25,26 @@
 ]>
 hal.executable private @main_dispatch_0 {
 hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16 ordinal(0) layout(#pipeline_layout) attributes {subgroup_size = 64 : index, translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>, workgroup_size = [64 : index, 16 : index, 1 : index]} {
-  ^bb0(%arg0: !hal.device):
+  hal.executable.export public @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c250 = arith.constant 250 : index
     %c500 = arith.constant 500 : index
     %c1 = arith.constant 1 : index
     hal.return %c250, %c500, %c1 : index, index, index
-  }
+  } attributes {subgroup_size = 64 : index, translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>, workgroup_size = [64 : index, 16 : index, 1 : index]}
   builtin.module {
     func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16() {
       %c128 = arith.constant 128 : index
       %c64 = arith.constant 64 : index
       %cst = arith.constant 0.000000e+00 : f16
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>>
-      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32000x32000xf16>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000x32000xf16>>
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_id_y = hal.interface.workgroup.id[1] : index
       %2 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-      %3 = flow.dispatch.tensor.load %0, offsets = [%2, 0], sizes = [%c64, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<?x4096xf16>
+      %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%2, 0], sizes = [%c64, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<?x4096xf16>
       %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
-      %5 = flow.dispatch.tensor.load %0, offsets = [%4, 0], sizes = [%c128, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<?x4096xf16>
+      %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%4, 0], sizes = [%c128, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<?x4096xf16>
       %6 = tensor.empty() : tensor<64x128xf16>
       %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 128, 64]]>} ins(%cst : f16) outs(%6 : tensor<64x128xf16>) -> tensor<64x128xf16>
       %cast = tensor.cast %5 : tensor<?x4096xf16> to tensor<128x4096xf16>
@@ -59,7 +58,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
       %cast_1 = tensor.cast %8 : tensor<64x128xf16> to tensor<?x?xf16>
       %9 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
       %10 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
-      flow.dispatch.tensor.store %cast_1, %1, offsets = [%9, %10], sizes = [%c64, %c128], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<32000x32000xf16>>
+      iree_tensor_ext.dispatch.tensor.store %cast_1, %1, offsets = [%9, %10], sizes = [%c64, %c128], strides = [1, 1] : tensor<?x?xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000x32000xf16>>
       return
     }
   }

@@ -41,30 +41,30 @@ namespace mlir::iree_compiler::IREE::HAL {
 //   [[-iree-hal-materialize-interfaces]]
 //   -> hal.executable @my_exe
 //      + hal.executable.variant @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
-//          hal.executable.export @my_entry
+//          hal.executable.export public @my_entry
 //          module { ... }
 //      + hal.executable.variant @spirv-v1.1-desktop
 //      filter="spirv-v1.1-desktop*"
-//          hal.executable.export @my_entry
+//          hal.executable.export public @my_entry
 //          module { ... }
 //      + hal.executable.variant @spirv-v1.2-desktop
 //      filter="spirv-v1.2-desktop*"
-//          hal.executable.export @my_entry
+//          hal.executable.export public @my_entry
 //          module { ... }
 //   [[-iree-hal-translate-all-executables]]
 //   -> hal.executable @my_exe
 //      + hal.executable.variant @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
-//          hal.executable.export @my_entry_1
-//          hal.executable.export @my_entry_2
-//          hal.executable.export @my_entry_3
+//          hal.executable.export public @my_entry_1
+//          hal.executable.export public @my_entry_2
+//          hal.executable.export public @my_entry_3
 //          module { spirv.module { ... } }
 //      + hal.executable.variant @spirv-v1.1-desktop
 //      filter="spirv-v1.1-desktop*"
-//          hal.executable.export @my_entry
+//          hal.executable.export public @my_entry
 //          module { spirv.module { ... } }
 //      + hal.executable.variant @spirv-v1.2-desktop
 //      filter="spirv-v1.2-desktop*"
-//          hal.executable.export @my_entry
+//          hal.executable.export public @my_entry
 //          module { spirv.module { ... } }
 //   [[-iree-hal-link-all-executables]]
 //   -> TODO(benvanik): linkage rules.
@@ -101,6 +101,41 @@ public:
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const {}
 
+  // Provides a list of supported element types by the target compilation
+  // backend. Supported element types vary by target-dependent information like
+  // specific ISA and compilation modes available on an executable target
+  // configuration. Compilation backends should use their information directly
+  // but higher layers of the compiler may use the coarse queries provided here
+  // to select targets.
+  class SupportedTypes {
+  public:
+    void addScalarType(Type type) { scalarTypes.insert(type); }
+    bool supportsScalarType(Type type) const {
+      return scalarTypes.contains(type);
+    }
+
+    void addElementType(Type type) { elementTypes.insert(type); }
+    bool supportsElementType(Type type) const {
+      return elementTypes.contains(type);
+    }
+
+    bool supportsType(Type type) const {
+      if (auto tensorType = llvm::dyn_cast<TensorType>(type)) {
+        return supportsElementType(tensorType.getElementType());
+      } else {
+        return supportsScalarType(type);
+      }
+    }
+
+  private:
+    llvm::DenseSet<Type> scalarTypes;
+    llvm::DenseSet<Type> elementTypes;
+  };
+
+  // Returns a set of types that are supported as compilation input based on
+  // the target configuration.
+  virtual SupportedTypes getSupportedTypes(MLIRContext *context) const;
+
   // Registers dependent dialects for the TargetBackend.
   // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
   // expected to register the dialects it will create entities for (Operations,
@@ -125,7 +160,7 @@ public:
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.export @main interface(@main_io) {
+  //       hal.executable.export public @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
   //       module {
@@ -141,7 +176,7 @@ public:
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.export @main interface(@main_io)
+  //       hal.executable.export public @main interface(@main_io)
   //         {attrs = #target_specific_translation_attr<...>} {
   //         ordinal = 0 : index
   //       }
@@ -170,7 +205,7 @@ public:
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.export @main interface(@main_io) {
+  //       hal.executable.export public @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
   //       module { ... (annotated for translation) }
@@ -181,7 +216,7 @@ public:
   //   hal.executable @some_executable {
   //     hal.interface @main_io ...
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.export @main ...
+  //       hal.executable.export public @main ...
   //       module { spirv.module { ... } }
   //     }
   //   }

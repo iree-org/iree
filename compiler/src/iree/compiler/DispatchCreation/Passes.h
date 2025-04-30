@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Pipelines/Options.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -17,13 +18,17 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
+enum class EncodingOptions { MatmulK, Generic };
+
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
 
 /// This is a placeholder for future. We should pass all the options through the
 /// struct.
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+  DispatchCreationOptions options;
+};
 
 void buildDispatchCreationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions);

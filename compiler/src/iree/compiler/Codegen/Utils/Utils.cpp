@@ -9,10 +9,10 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -22,7 +22,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -173,6 +172,10 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("rocm");
 }
 
+bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
+}
+
 static const char *getDefaultEnabledUkernels(Attribute attr) {
   const char *kNone = "none";
   if (!attr) {
@@ -186,10 +189,6 @@ static const char *getDefaultEnabledUkernels(Attribute attr) {
     return "mmt4d";
   }
   if (isAArch64(targetAttr)) {
-    if (hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2") ||
-        hasFeature(targetAttr, "+sme")) {
-      return kNone;
-    }
     return "mmt4d";
   }
   return kNone;
@@ -297,11 +296,11 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
           [&](auto op) { return isReadOnly(op.getSource()); })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return llvm::cast<IREE::Flow::DispatchTensorType>(
+      .Case<IREE::TensorExt::DispatchTensorLoadOp>(
+          [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+            return llvm::cast<IREE::TensorExt::DispatchTensorType>(
                        loadOp.getSource().getType())
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+                       .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
 }
@@ -1013,7 +1012,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     auto numParallelDims = parallelLoopRanges.size();
 
     SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-    std::optional<OpFoldResult> splitDim;
+    std::optional<Value> splitDim;
+    SmallVector<OpFoldResult> splitNumTiles;
     for (size_t dim = 0; dim < numParallelDims; ++dim) {
       if (numParallelDims > maxWorkgroupParallelDims &&
           dim >= maxWorkgroupParallelDims - 1) {
@@ -1030,19 +1030,7 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         bindSymbols(builder.getContext(), d0, d1, d2);
         OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
             builder, loc, (d1 - d0).ceilDiv(d2), {offset, size, step});
-        OpFoldResult dimValue;
-        if (dim == numParallelDims - 1)
-          dimValue = splitDim.value();
-        else {
-          dimValue = affine::makeComposedFoldedAffineApply(
-              builder, loc, (d0 % d1), {splitDim.value(), numTiles});
-          splitDim = affine::makeComposedFoldedAffineApply(
-              builder, loc, (d0).floorDiv(d1), {splitDim.value(), numTiles});
-        }
-        procInfo[numParallelDims - dim - 1] = {
-            getValueOrCreateConstantIndexOp(builder, loc, dimValue),
-            getValueOrCreateConstantIndexOp(builder, loc, numTiles),
-            distributionMethod};
+        splitNumTiles.push_back(numTiles);
         continue;
       }
       procInfo[numParallelDims - dim - 1] = {
@@ -1051,6 +1039,20 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
           buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(builder,
                                                                         dim),
           distributionMethod};
+    }
+    if (splitDim) {
+      std::reverse(splitNumTiles.begin(), splitNumTiles.end());
+      auto delinearized = builder.create<affine::AffineDelinearizeIndexOp>(
+          loc, *splitDim, splitNumTiles, /*hasOuterBound=*/true);
+      for (auto [i, id, numTiles] :
+           llvm::enumerate(delinearized.getResults(), splitNumTiles)) {
+        // We iterate the delinearize results from slowest up to fastest, and
+        // we know that these are all the highest values of dimension. That is,
+        // `i = 0` corresponds to the `numParallelDims - 1`-th dimension.
+        procInfo[i] = {id,
+                       getValueOrCreateConstantIndexOp(builder, loc, numTiles),
+                       distributionMethod};
+      }
     }
     return procInfo;
   }};
@@ -1154,6 +1156,20 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
     return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
                                                  {byteOffset, elementByteSize});
   }
+}
+
+Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                  ValueRange convertedInputOperands,
+                                  ValueRange convertedOutputOperands) {
+  SmallVector<Value> operands;
+  operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
+  operands.append(convertedOutputOperands.begin(),
+                  convertedOutputOperands.end());
+  return mlir::clone(
+      builder, op,
+      {cast<RankedTensorType>(convertedOutputOperands[0].getType())
+           .dropEncoding()},
+      operands);
 }
 
 LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
@@ -1569,7 +1585,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
                         ArrayRef<OpFoldResult> mixedSizes,
                         ArrayRef<OpFoldResult> mixedStrides,
-                        IREE::Flow::DispatchTensorType tensorType,
+                        IREE::TensorExt::DispatchTensorType tensorType,
                         ValueRange dynamicDims) {
   OpBuilder builder(tensorType.getContext());
   SmallVector<int64_t> tensorShape = llvm::to_vector(tensorType.getShape());
@@ -1581,7 +1597,7 @@ static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
 }
 
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::Flow::DispatchTensorType tensorType,
+                 IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims) {
   return isFullSlice(
       sliceLoadStoreOp.getMixedOffsets(), sliceLoadStoreOp.getMixedSizes(),
@@ -1606,7 +1622,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
   std::optional<vector::VscaleRange> vscaleRange;
   if (!opResult) {
     // Note: Inferring scalable sizes is not supported is `opResult` is set
-    // (which is used to compute sizes for tensor.pack/unpack).
+    // (which is used to compute sizes for linalg.pack/unpack).
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
     vscaleRange = getDefaultVscaleRange(targetAttr);
   }
@@ -1673,7 +1689,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
   return result;
 }
 
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op) {
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
@@ -1716,7 +1732,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::PackOp op) {
   return result;
 }
 
-std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op) {
+std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
@@ -1760,11 +1776,14 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(tensor::UnPackOp op) {
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
+  if (!val.getDefiningOp())
+    return std::nullopt;
+
   std::optional<VectorizationTileSizes> result;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
-      .Case<tensor::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
+      .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
@@ -1788,6 +1807,17 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       })
       .Default([&](Operation *) {});
   return result;
+}
+
+std::optional<int64_t> getConstantIndex(Value value) {
+  if (!isa<IndexType>(value.getType()))
+    return std::nullopt;
+
+  APInt val;
+  if (!matchPattern(value, m_ConstantInt(&val)))
+    return std::nullopt;
+
+  return val.getSExtValue();
 }
 
 } // namespace mlir::iree_compiler

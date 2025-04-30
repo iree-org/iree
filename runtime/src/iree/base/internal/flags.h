@@ -318,7 +318,7 @@ void iree_flags_set_usage(const char* program_name, const char* usage);
 // Returns <0 if parsing fails.
 //
 // Usage:
-//   extern "C" int main(int argc, char** argv) {
+//   int main(int argc, char** argv) {
 //     iree_status_t status = iree_flags_parse(&argc, &argv);
 //     if (!iree_status_is_ok(status)) { exit(1); }
 //     consume_positional_args(argc, argv);

@@ -203,7 +203,8 @@ struct ExpandDestinationForallOp final
     // We only want this pattern if the forall op result is being written to a
     // full slice. Otherwise the hoisted collapse op is not foldable.
     for (Operation *foralluser : tiedResult.getUsers()) {
-      auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(foralluser);
+      auto storeOp =
+          dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(foralluser);
       if (!storeOp)
         return failure();
       if (!isFullSlice(storeOp, storeOp.getTargetType(),

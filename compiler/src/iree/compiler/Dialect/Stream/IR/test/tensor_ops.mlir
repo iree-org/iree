@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: @tensorImport
 util.func private @tensorImport(%arg0: !hal.buffer_view, %arg1: index) -> !stream.resource<external> {
@@ -60,6 +60,30 @@ util.func private @tensorSplat(%arg0: f32, %arg1: index, %arg2: index) -> !strea
 util.func private @tensorClone(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
   // CHECK: = stream.tensor.clone %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2}
   %0 = stream.tensor.clone %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+#unserialized_encoding = #iree_encoding.testing_encoding<>
+#serialized_encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
+// CHECK-DAG:   #[[$ENC_0:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENC_1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
+// CHECK-LABEL: @tensorCloneWithEncoding(
+util.func private @tensorCloneWithEncoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK: = stream.tensor.clone %arg0 : tensor<?x4xf32, #[[$ENC_0]]>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #[[$ENC_1]]>{%arg1} in !stream.resource<*>{%arg2}
+  %0 = stream.tensor.clone %arg0 : tensor<?x4xf32, #unserialized_encoding>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #serialized_encoding>{%arg1} in !stream.resource<*>{%arg2}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-LABEL: @tensorEncode
+util.func private @tensorEncode(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> !stream.resource<*> {
+  // CHECK: = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #[[$ENC]]>{%arg3} in !stream.resource<*>{%arg4}
+  %0 = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #encoding>{%arg3} in !stream.resource<*>{%arg4}
   util.return %0 : !stream.resource<*>
 }
 
@@ -150,4 +174,32 @@ util.func private @tensorTrace(%tensor0: !stream.resource<staging>, %tensor0_siz
     %tensor1 : tensor<?x3x?xi32>{%tensor1_dim0, %tensor1_dim2} in !stream.resource<staging>{%tensor1_size}
   ]
   util.return
+}
+
+// -----
+
+// CHECK-LABEL: @tensorDispatch
+util.func private @tensorDispatch(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) :
+  // CHECK-SAME: (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32>{%arg2} in %arg0{%arg1}
+  %0 = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32>{%arg2} in %arg0{%arg1}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+util.func private @tensorDispatchMismatch(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  // expected-error @+1 {{the 0-th operandEncoding (tensor<4x?xf32>) does not match the resultEncoding (tensor<?x4xf32>)}}
+  %0 = stream.tensor.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (tensor<4x?xf32>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<?x4xf32>{%arg2} in %arg0{%arg1}
+  util.return %0 : !stream.resource<*>
 }

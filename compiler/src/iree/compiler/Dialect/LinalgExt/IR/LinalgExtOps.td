@@ -211,35 +211,6 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       return getOriginalType().getRank() - getIndexDepth();
     }
 
-    /// Utility to get the shape of the portion of `updates` that
-    /// is scattered into `original`.
-    ArrayRef<int64_t> getUpdateSliceShape() {
-      return getUpdateType().getShape().slice(getBatchRank(),
-                                              getUpdateSliceRank());
-    }
-
-    /// Utility to get the dimension in `updates` the corresponds
-    /// to the given dimension in `original`
-    int64_t convertOriginalDimToUpdatesDim(uint64_t dim) {
-      assert(dim >= 0 && dim < getOriginalType().getRank() &&
-             "expected dimension to be within original rank");
-      int64_t updateDim =
-          getUpdateType().getRank() - getOriginalType().getRank() + dim;
-      assert(updateDim >= getBatchRank() &&
-             "dim doesn't map to a dim in updates");
-      return updateDim;
-    }
-
-    /// Get the dimension in `original` that corresponds to the given
-    /// dimension in `original`.
-    int64_t convertUpdatesDimToOriginalDim(uint64_t dim) {
-      assert(dim >= getBatchRank() &&
-             "update batch dim doesn't map to original");
-      assert(dim < getUpdateType().getRank() &&
-             "expected dimension to be within updates rank");
-      return getOriginalType().getRank() - getUpdateType().getRank() + dim;
-    }
-
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
     }
@@ -248,6 +219,158 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
+    }
+  }];
+}
+
+def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+        ["generateScalarImplementation",
+         "getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "generateResultTileValue"]>]> {
+  let summary = "Gather operator";
+  let description = [{
+    Takes two inputs (`source` and `indices`) and outputs value (`output`).
+    The operation returns the value at the slices specified by `indices` by
+    combining the gathered value from `source` with the value in `output`
+    using the computation specified in `region`. The `region` specifies a binary
+    operation of signature `(T, T) -> T`, where `T` is the element-type of
+    `source` & `output`. The first argument is from `source` and the second is
+    from `output`.
+
+    The size of the `dimension_map` attribute is used to determine how many
+    indices are used to index into `source`, i.e. `index_depth`. The
+    `dimension_map` attribute describes which index value maps to which dimension
+    in the destination.
+
+    This operation preforms the opposite operation of `iree_linalg_ext.scatter`.
+    Instead of scattering `updates` into `original`, it gathers the values from
+    `source` into `output` using the indices in `indices`. See the documentation
+    on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
+    semantics.
+  }];
+  let arguments = (ins
+      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
+      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      DenseI64ArrayAttr:$dimension_map
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict `dimension_map` `=` $dimension_map
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    static constexpr unsigned kSourceOpNum = 0;
+    static constexpr unsigned kIndicesOpNum = 1;
+    static constexpr unsigned kResultOpNum = 2;
+
+    /// Utility to get the number of indices used to index into `source`.
+    int64_t getIndexDepth() {
+      return getDimensionMap().size();
+    }
+
+    /// Utility to get rank of the portion of `output` that is contiguous.
+    int64_t getOutputSliceRank() {
+      return getSourceType().getRank() - getIndexDepth();
+    }
+
+    /// Utility to get the rank of the portion of `indices` that represents the
+    /// batch dimensions.
+    int64_t getBatchRank() {
+      return getOutputType().getRank() - getOutputSliceRank();
+    }
+
+    Value getSource(){
+      return getOperand(kSourceOpNum);
+    }
+
+    ShapedType getSourceType(){
+      return cast<ShapedType>(getSource().getType());
+    }
+
+    Value getIndices(){
+      return getOperand(kIndicesOpNum);
+    }
+
+    ShapedType getIndicesType(){
+      return cast<ShapedType>(getIndices().getType());
+    }
+
+    Value getOutput(){
+      return getOperand(kResultOpNum);
+    }
+
+    ShapedType getOutputType(){
+      return cast<ShapedType>(getOutput().getType());
+    }
+
+    /// For DPS interface.
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
+def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
+    [LinalgExtInterface, DestinationStyleOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
+  let summary = "Scatter with a mapping from source indices to result indices";
+  let description = [{
+    Takes two operands, `input` and `output`, and stores every element of
+    `input` to a unique location in `output`. If the operands are tensors, the
+    op will also return a Value for the result. For an element of the `input`,
+    the index to store into the `output` is determined by index computation
+    mapping the index in the `input` value to an index in the `output` value.
+    This computation is contained in the `transformation_region`, which contains
+    a single block, with one argument for each dimension in the `input` value.
+    The block arguments represent the index of a given element along the
+    corresponding dimension (i.e., block arg `i` represents the index along
+    dimension `i` of the `input` value). The block is terminated by an
+    iree_linalg_ext.yield op, which yields one index for each dimension in
+    the `output`, and an additional `i1` Value, which represents a mask on
+    whether or not to write to the `output` at the yielded set of indices. Iff
+    the mask value is true, the input value will be written.
+  }];
+  let arguments = (ins
+      AnyRankedTensorOrMemRefType:$input,
+      AnyRankedTensorOrMemRefType:$output
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$transformation_region);
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict $input `into` $output
+    $transformation_region
+    `:` type($input) `into` type($output) (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = [{
+    ShapedType getInputType() {
+      return cast<ShapedType>(getInput().getType());
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputMutable();
     }
   }];
 }
@@ -823,6 +946,17 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     would be 4 for `K0`, and 1 for `K1`, meaning as `K0` increases by 1, the
     index into the flat `K` increases by 4. The strides in M from `m_strides`
     are orthogonal to the strides in `K` from `k_strides`.
+
+    The `input_k_perm` attribute defines the permutation needed to align the
+    reduction dimensions of the input layout with those of the filter layout
+    when computing the K dimension of the im2col output. This is useful when the
+    layout of the filter (e.g., `CHW`) differs from that of the input (e.g., `HWC`).
+    For instance, an `input_k_perm = [2, 0, 1]` indicates the input indices needs
+    to be transposed from `HWC` to `CHW` layout before extracting slices during
+    decomposition. The identity permutation (e.g., input_k_perm = [0, 1, 2])
+    indicates that the input layout is already aligned with the filter layout
+    in terms of reduction dimensions, so no transposition of indices is necessary
+    before slice extraction.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -840,7 +974,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$static_k_strides,
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
-                       DenseI64ArrayAttr:$k_pos);
+                       DenseI64ArrayAttr:$k_pos,
+                       DenseI64ArrayAttr:$input_k_perm);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -859,6 +994,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `batch_pos` `=` $batch_pos
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
+    `input_k_perm` `=` $input_k_perm
     `ins` `(` $input `:` type($input) `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
@@ -875,7 +1011,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<OpFoldResult>":$k_strides,
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
-      "ArrayRef<int64_t>":$k_dimensions)>
+      "ArrayRef<int64_t>":$k_dimensions,
+      "ArrayRef<int64_t>":$input_k_perm)>
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
@@ -1242,7 +1379,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
   let description = [{
     This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
-    this operator computes matmul(tranpose(B), matmul(I, B)).
+    this operator computes matmul(transpose(B), matmul(I, B)).
     The input tile is assumed to be square with each side of size m + r - 1,
     where the convolutional kernel is m x m and the output tile size is r x r.
     B is a constant 2-d square matrix of the same shape as the input tile I.

@@ -50,7 +50,6 @@ iree_cc_library(
     iree::compiler::Codegen::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
   PUBLIC
 )
@@ -63,6 +62,7 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
   DEPS
+    MLIRAMDGPUDialect
     MLIRArithTransforms
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
@@ -76,11 +76,13 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRVectorTransforms
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::BufferizationInterfaces
     iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 

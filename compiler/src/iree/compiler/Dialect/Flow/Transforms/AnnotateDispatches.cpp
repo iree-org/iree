@@ -7,11 +7,12 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -290,6 +291,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
       prefix = "matmul_like";
     } else if (linalg::isaContractionOpInterface(op)) {
       prefix = "contract";
+    } else if (IREE::LinalgExt::isaHorizontallyFusedContraction(op)) {
+      prefix = "horizontal_multi_contract";
     } else if (succeeded(linalg::inferConvolutionDims(op))) {
       prefix = "conv";
     }
@@ -381,7 +384,7 @@ static std::string summarizeDispatchRegion(Region &region) {
                                   << "', cost: " << bestEstimatedCost << "\n");
         })
         .Case<IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
-              tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+              linalg::PackOp, linalg::UnPackOp>([&](auto op) {
           // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
           // there are no other operations.
           int64_t estimatedCost = kMinEstimatedCost + 1;
@@ -409,12 +412,13 @@ static std::string summarizeDispatchRegion(Region &region) {
   if (!bestOp) {
     std::string bestSummary = "";
     // Check if there is a possible slow memory copy as a dispatch. The current
-    // heuristic is to check if a dispatch.tensor.store stores a tensor that is
-    // directly loaded from a dispatch.tensor.load.
-    region.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+    // heuristic is to check if a iree_tensor_ext.dispatch.tensor.store stores a
+    // tensor that is directly loaded from a
+    // iree_tensor_ext.dispatch.tensor.load.
+    region.walk([&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
       Value input = storeOp.getValue();
       if (auto loadOp =
-              input.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+              input.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>()) {
         bestSummary = "slow_memcpy";
         return WalkResult::interrupt();
       }
@@ -429,7 +433,7 @@ static std::string summarizeDispatchRegion(Region &region) {
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
-      .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+      .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         bestSummary = opName + "_" + operandTypeToString(op.getSource());
       })
@@ -462,12 +466,12 @@ static std::string summarizeDispatchRegion(Region &region) {
   // Add heuristic hint to dispatch name if the unpack op is the first op and
   // the pack op is the last op.
   if (!tileableOps.empty()) {
-    if (!isa<tensor::UnPackOp>(bestOp) &&
-        isa<tensor::UnPackOp>(tileableOps.front())) {
+    if (!isa<linalg::UnPackOp>(bestOp) &&
+        isa<linalg::UnPackOp>(tileableOps.front())) {
       bestSummary = "unpack_" + bestSummary;
     }
-    if (!isa<tensor::PackOp>(bestOp) &&
-        isa<tensor::PackOp>(tileableOps.back())) {
+    if (!isa<linalg::PackOp>(bestOp) &&
+        isa<linalg::PackOp>(tileableOps.back())) {
       bestSummary = bestSummary + "_pack";
     }
   }

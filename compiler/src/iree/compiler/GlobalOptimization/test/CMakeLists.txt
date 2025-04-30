@@ -32,8 +32,10 @@ iree_lit_test_suite(
     "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
+    "strided_contraction_to_contraction.mlir"
     "transformation_pipeline.mlir"
     "transpose_and_decompose_concat.mlir"
+    "warn_on_uninitialized_values.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions), cse, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions{aggressive=true}), cse, canonicalize, cse)" %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
@@ -37,9 +37,9 @@ util.func public @linalgext_scatter_dispatch() -> tensor<8192x16x8x128xf32> {
 }
 
 // CHECK-LABEL:     util.func public @linalgext_scatter_dispatch
-//   CHECK-DAG:       %[[INDICES:.+]] = flow.dispatch.region
-//   CHECK-DAG:       %[[UPDATE:.+]] = flow.dispatch.region
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:         %[[INDICES:.+]] = linalg.generic
+//       CHECK:         %[[UPDATE:.+]] = linalg.generic
 //       CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:           ins(%[[UPDATE]], %[[INDICES]] : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
 //       CHECK:         flow.return %[[SCATTER_RESULT]]

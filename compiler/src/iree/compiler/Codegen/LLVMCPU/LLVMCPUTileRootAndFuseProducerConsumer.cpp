@@ -24,6 +24,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile-root-and-fuse-producers-consumers"
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -56,7 +57,7 @@ static void collectTiledAndFusedOps(Operation *rootOp,
 /// Tile the root operation and fuse the producers of the root operation.
 /// If `onlyFuseProducerInputOperands` is set, only fuse producer input
 /// operands. Returns the tiled operation to be used for fusing consumers.
-FailureOr<Operation *>
+static FailureOr<scf::SCFTileAndFuseResult>
 tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
                          int64_t tilingLevel,
                          bool onlyFuseProducerInputOperands) {
@@ -81,9 +82,8 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
   auto zero = rewriter.getIndexAttr(0);
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   if (tileSizes.size() > numLoops) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "tile sizes size " << tileSizes.size()
-               << " exceeds the number of loops " << numLoops << "\n");
+    LDBG("tile sizes size " << tileSizes.size()
+                            << " exceeds the number of loops " << numLoops);
     return failure();
   }
   tileSizes.resize(numLoops, zero);
@@ -136,10 +136,11 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
     }
   }
 
-  return tiledResults->tiledAndFusedOps.front();
+  return tiledResults;
 }
 
-static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
+static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
+                          MutableArrayRef<LoopLikeOpInterface> loops) {
 
   //  Typically, the consumers of the tiled operation are slices of the
   //  results of the tiled operation. These are expressed in IR using
@@ -169,10 +170,10 @@ static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp);
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
+                                              loops);
     if (failed(fusedResult)) {
-      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
-                              << candidateSliceOp << "\n");
+      LDBG("failed to fuse consumer of slice: " << candidateSliceOp);
       continue;
     }
 
@@ -196,14 +197,17 @@ static LogicalResult tileRootAndFuse(IRRewriter &rewriter,
                                      int64_t tilingLevel,
                                      bool onlyFuseProducerInputOperands) {
 
-  FailureOr<Operation *> tiledOp = tileRootAndFuseProducers(
-      rewriter, rootOp, tilingLevel, onlyFuseProducerInputOperands);
+  FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+      tileRootAndFuseProducers(rewriter, rootOp, tilingLevel,
+                               onlyFuseProducerInputOperands);
 
-  if (failed(tiledOp))
+  if (failed(tileAndFuseResult))
     return failure();
 
-  if (!onlyFuseProducerInputOperands)
-    fuseConsumers(rewriter, tiledOp.value());
+  if (!onlyFuseProducerInputOperands) {
+    fuseConsumers(rewriter, tileAndFuseResult->tiledAndFusedOps.front(),
+                  tileAndFuseResult->loops);
+  }
 
   return success();
 }
@@ -244,7 +248,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
 
   if (failed(rootOp) || !rootOp.value()) {
-    LLVM_DEBUG(llvm::dbgs() << "unable to find the root operation\n");
+    LDBG("unable to find the root operation");
     return;
   }
 
@@ -252,13 +256,12 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
       getLoweringConfig(rootOp.value());
 
   if (!loweringConfig) {
-    LLVM_DEBUG(llvm::dbgs() << "unable to find the attached lowering config\n");
+    LDBG("unable to find the attached lowering config");
     return;
   }
 
   if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "unable to find the lowering config with the tiling level\n");
+    LDBG("unable to find the lowering config with the tiling level");
     return;
   }
 
@@ -280,7 +283,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
+    LDBG("----- cleanup failed -----");
     return signalPassFailure();
   }
 }

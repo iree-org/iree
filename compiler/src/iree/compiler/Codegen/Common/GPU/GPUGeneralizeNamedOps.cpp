@@ -14,7 +14,6 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -55,7 +54,8 @@ struct GPUGeneralizeNamedOpsPass final
     SmallVector<linalg::LinalgOp> namedOpCandidates;
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
-              linalg::VecmatOp, linalg::MatvecOp>(linalgOp))
+              linalg::VecmatOp, linalg::MatvecOp, linalg::TransposeOp>(
+              linalgOp))
         namedOpCandidates.push_back(linalgOp);
     });
 

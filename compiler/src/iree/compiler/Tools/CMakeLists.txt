@@ -24,7 +24,6 @@ iree_cc_library(
     "init_iree_dialects.h"
     "init_iree_passes.h"
   DEPS
-    IREEInputDialect
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     MLIRIR
@@ -121,6 +120,7 @@ iree_cc_library(
     MLIRTensorTransformOps
     MLIRVectorTransformOps
     MLIRTransformLoopExtension
+    MLIRComplexToStandard
   PUBLIC
 )
 

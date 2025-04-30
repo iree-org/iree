@@ -19,9 +19,11 @@ iree_cc_library(
     "AnnotateAffinities.cpp"
     "AnnotateDispatchArguments.cpp"
     "AnnotateDispatchAssumptions.cpp"
+    "CloneToConsumers.cpp"
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
+    "ElideAsyncTransfers.cpp"
     "ElideTimepoints.cpp"
     "EmplaceAllocations.cpp"
     "EncodeTensors.cpp"
@@ -30,6 +32,7 @@ iree_cc_library(
     "LayoutSlices.cpp"
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
+    "MaterializeEncodings.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
     "Passes.cpp"
@@ -41,6 +44,7 @@ iree_cc_library(
     "ScheduleExecution.cpp"
     "SpecializeDispatches.cpp"
     "SpecializeEncodings.cpp"
+    "SyncInitializers.cpp"
     "VerifyAffinities.cpp"
     "VerifyAsyncAccessRanges.cpp"
     "VerifyLowerings.cpp"
@@ -77,6 +81,7 @@ iree_cc_library(
     iree::compiler::Dialect::Stream::Conversion::StandardToStream
     iree::compiler::Dialect::Stream::Conversion::UtilToStream
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::Conversion

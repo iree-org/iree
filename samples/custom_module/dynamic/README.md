@@ -27,7 +27,7 @@ dynamic modules should be carefully considered.
 
 1. Build or install the `iree-base-compiler` binary:
 
-    ```
+    ```sh
     python -m pip install iree-base-compiler
     ```
 
@@ -36,21 +36,26 @@ dynamic modules should be carefully considered.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
 
-    ```
+    ```sh
     # This simple sample doesn't use tensors and can be compiled in host-only
     # mode to avoid the need for the HAL.
-    iree-compile --iree-hal-target-backends=vmvx samples/custom_module/dynamic/test/example.mlir -o=/tmp/example.vmfb
+    iree-compile \
+        --iree-hal-target-device=local \
+        --iree-hal-local-target-device-backends=vmvx \
+        samples/custom_module/dynamic/test/example.mlir \
+        -o=/tmp/example.vmfb
     ```
 
 3. Build the `iree_samples_custom_module_dynamic_module` CMake target :
 
-    ```
+    ```sh
     cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
         -DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1
     cmake --build ../iree-build/ \
         --target iree-run-module \
         --target iree_samples_custom_module_dynamic_module
     ```
+
     (here we force runtime execution tracing for demonstration purposes)
 
     [See here](https://iree.dev/building-from-source/getting-started/)
@@ -58,7 +63,7 @@ dynamic modules should be carefully considered.
 
 4. Run the example program using the main `iree-run-module` tool:
 
-   ```
+   ```sh
    ../iree-build/tools/iree-run-module \
       --module=../iree-build/samples/custom_module/dynamic/module.so@create_custom_module \
       --module=/tmp/example.vmfb \

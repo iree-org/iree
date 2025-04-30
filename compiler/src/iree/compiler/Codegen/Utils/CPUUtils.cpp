@@ -34,7 +34,7 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
     }
 
     if (isa<TilingInterface>(op) &&
-        !isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+        !isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
       // All other operations that implement this interface are root ops.
       rootOperation = op;
       break;
@@ -54,7 +54,7 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   if (!rootOperation) {
     // Check for pad/pack/unpack ops by themselves.
     for (auto op : llvm::reverse(computeOps)) {
-      if (isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+      if (isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
         rootOperation = op;
         break;
       }

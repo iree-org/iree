@@ -32,40 +32,10 @@ namespace mlir::iree_compiler {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-/// Helper to linearize the given |ids| with maximum values given as |sizes|.
-/// Gets the element ID in terms of |elementCount| and adds the element
-/// |offset|. For example,
-///
-/// IDs = [d0, d1, d2, d3]
-/// sizes = [s0, s1, s2, s3]
-/// linear_index = d0 * (s1 * s2 * s3)
-///              + d1 * (s2 * s3)
-///              + d2 * (s3)
-///              + d3
-/// return element_index = linear_index * |elementCount| + |offset|;
-static Value linearizeIndex(OpBuilder &builder, Value offset,
-                            ArrayRef<OpFoldResult> ids, ArrayRef<int64_t> sizes,
-                            int64_t elementCount) {
-  SmallVector<AffineExpr> exprs(ids.size() + 1);
-  bindSymbolsList(builder.getContext(), MutableArrayRef{exprs});
-  AffineExpr idExpr = builder.getAffineConstantExpr(0);
-
-  for (int i = 0, e = ids.size(); i < e; ++i) {
-    if (sizes[i] > 1) {
-      // Multiply by the residual threads along this dimension (which must be
-      // faster changing than all previous dimensions) and add the id for this
-      // dimension.
-      idExpr = idExpr * builder.getAffineConstantExpr(sizes[i]) + exprs[i];
-    }
-  }
-  idExpr = idExpr * builder.getAffineConstantExpr(elementCount);
-  idExpr = idExpr + exprs.back();
-  SmallVector<OpFoldResult> mapArgs(ids);
-  mapArgs.push_back(offset);
-  return affine::makeComposedAffineApply(
-             builder, offset.getLoc(),
-             AffineMap::get(0, mapArgs.size(), idExpr), mapArgs)
-      .getResult();
+static bool isBroadcast(AffineExpr expr) {
+  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
+    return constExpr.getValue() == 0;
+  return false;
 }
 
 /// Given a set of base transfer |indices|, |offsets| for the batch/outer
@@ -75,11 +45,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
     OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
     NestedLayoutAttr vectorLayout, AffineMap permutationMap,
     ArrayRef<Value> warpIndices, ArrayRef<Value> threadIndices) {
-  auto isBroadcast = [](AffineExpr expr) {
-    if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
-      return constExpr.getValue() == 0;
-    return false;
-  };
+
   int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
@@ -94,18 +60,50 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
       continue;
     }
     unsigned pos = cast<AffineDimExpr>(dim).getPosition();
-    SmallVector<OpFoldResult> ids = {
-        warpIndices[i], b.getIndexAttr(batchOffsets[i]),
-        b.getIndexAttr(outerVectorOffsets[i]), threadIndices[i]};
+    Value offset = indices[pos];
+    int64_t elementCount = vectorLayout.getElementTile()[i];
+    Location loc = offset.getLoc();
+    SmallVector<Value> ids = {
+        warpIndices[i], b.create<arith::ConstantIndexOp>(loc, batchOffsets[i]),
+        b.create<arith::ConstantIndexOp>(loc, outerVectorOffsets[i]),
+        threadIndices[i], offset};
     // The order in which a vector dimension is "tiled" is
     // subgroups -> batches -> outer vectors -> threads -> elements
     SmallVector<int64_t> sizes = {
         vectorLayout.getSubgroupTile()[i], vectorLayout.getBatchTile()[i],
-        vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i]};
-    slicedIndices[pos] = linearizeIndex(b, indices[pos], ids, sizes,
-                                        vectorLayout.getElementTile()[i]);
+        vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i],
+        elementCount};
+    // The offset is often not an offset within `elementCount`, so, in general,
+    // we can't mark this `disjoint`. However, if `offset` is known to be
+    // a constant less than `elementCount`, we can do this, unlocking
+    // potential optimizations.
+    bool disjoint = false;
+    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset))
+      disjoint = *offsetConst < elementCount;
+    slicedIndices[pos] =
+        b.create<affine::AffineLinearizeIndexOp>(loc, ids, sizes, disjoint);
   }
   return slicedIndices;
+}
+
+static SmallVector<int64_t>
+getDistributedTransferOffsetsFromNestedLayout(ArrayRef<int64_t> offsets,
+                                              NestedLayoutAttr vectorLayout) {
+
+  int64_t rank = vectorLayout.getRank();
+  ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
+  ArrayRef<int64_t> outerOffsets(offsets.begin() + rank, rank);
+  ArrayRef<int64_t> outerSizes = vectorLayout.getOuterTile();
+  ArrayRef<int64_t> elementSizes = vectorLayout.getElementTile();
+
+  SmallVector<int64_t> slicedOffsets;
+  slicedOffsets.reserve(rank);
+  for (auto [batchOffset, outerOffset, outerSize, elementSize] :
+       llvm::zip(batchOffsets, outerOffsets, outerSizes, elementSizes)) {
+    slicedOffsets.push_back(batchOffset * outerSize * elementSize +
+                            outerOffset * elementSize);
+  }
+  return slicedOffsets;
 }
 
 static SmallVector<int64_t>
@@ -121,21 +119,154 @@ getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
   return tileShape;
 }
 
+/// Given a distributed vector that has B1XB2xO1XO2xE1XE2,
+/// convert that to B1XO1xE1xB2xO2xE2 form.
+static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
+                                              VectorValue val,
+                                              NestedLayoutAttr layout) {
+  Location loc = val.getDefiningOp()->getLoc();
+  SmallVector<int64_t> interleavedPackedShape(layout.getRank() * 3, 0);
+  for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+    SmallVector<int64_t> packedShapePerDim =
+        layout.getPackedShapeForUndistributedDim(undistributedDim);
+    interleavedPackedShape[layout.getRank() * 0 + undistributedDim] =
+        packedShapePerDim[1];
+    interleavedPackedShape[layout.getRank() * 1 + undistributedDim] =
+        packedShapePerDim[2];
+    interleavedPackedShape[layout.getRank() * 2 + undistributedDim] =
+        packedShapePerDim[4];
+  }
+  VectorType interleavedPackedType =
+      VectorType::get(interleavedPackedShape, val.getType().getElementType());
+  VectorValue interleavedPackedShaped =
+      rewriter.create<vector::ShapeCastOp>(loc, interleavedPackedType, val);
+
+  // 0 1 2 3 4 5 ---> 0 2 4 1 3 5
+  SmallVector<int64_t> perm;
+  perm.reserve(layout.getRank() * 3);
+  for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+    for (int64_t tileGroupIdx : llvm::seq<int64_t>(3)) {
+      perm.push_back(tileGroupIdx * layout.getRank() + undistributedDim);
+    }
+  }
+  return rewriter.create<vector::TransposeOp>(loc, interleavedPackedShaped,
+                                              perm);
+}
+
+/// Given a distributed vector that has B1XB2xO1XO2xE1XE2,
+/// convert that to [B1XO1xE1]x[B2xO2xE2] form.
+static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
+                                                VectorValue val,
+                                                NestedLayoutAttr layout) {
+  Location loc = val.getDefiningOp()->getLoc();
+  VectorValue deinterleavedPacked =
+      getDeinterleavedPackedForm(rewriter, val, layout);
+  ArrayRef<int64_t> deinterleavedPackedShape =
+      deinterleavedPacked.getType().getShape();
+  SmallVector<int64_t> unpackedShape;
+  unpackedShape.reserve(layout.getRank() * 3);
+  for (int64_t unDistrDim : llvm::seq<int64_t>(layout.getRank())) {
+    int64_t collapsedDimLen = deinterleavedPackedShape[unDistrDim * 3 + 0] *
+                              deinterleavedPackedShape[unDistrDim * 3 + 1] *
+                              deinterleavedPackedShape[unDistrDim * 3 + 2];
+    unpackedShape.push_back(collapsedDimLen);
+  }
+  VectorType unpackedType = VectorType::get(
+      unpackedShape, deinterleavedPacked.getType().getElementType());
+  return rewriter.create<vector::ShapeCastOp>(loc, unpackedType,
+                                              deinterleavedPacked);
+}
+
+/// Given a distributed vector that has [B1xO1xE1]x[B2xO2xE2],
+/// convert that to B1 x B2 x O1 X O2 x E1 x E2 form.
+static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
+                                            VectorValue val,
+                                            NestedLayoutAttr layout) {
+  Location loc = val.getDefiningOp()->getLoc();
+  SmallVector<int64_t> nonInterleavedPackedShape;
+  nonInterleavedPackedShape.reserve(layout.getRank() * 3);
+  for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+    SmallVector<int64_t> packedShapePerDim =
+        layout.getPackedShapeForUndistributedDim(undistributedDim);
+    nonInterleavedPackedShape.push_back(packedShapePerDim[1]);
+    nonInterleavedPackedShape.push_back(packedShapePerDim[2]);
+    nonInterleavedPackedShape.push_back(packedShapePerDim[4]);
+  }
+  VectorType nonInterleavedPackedType = VectorType::get(
+      nonInterleavedPackedShape, val.getType().getElementType());
+  VectorValue nonInterleavedPackedShaped =
+      rewriter.create<vector::ShapeCastOp>(loc, nonInterleavedPackedType, val);
+  // 0 1 2 3 4 5 ---> 0 3 1 4 2 5
+  SmallVector<int64_t> perm;
+  perm.reserve(layout.getRank() * 3);
+  for (int64_t tileGroupIdx : llvm::seq<int64_t>(3)) {
+    for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
+      perm.push_back(tileGroupIdx + 3 * undistributedDim);
+    }
+  }
+  return rewriter.create<vector::TransposeOp>(loc, nonInterleavedPackedShaped,
+                                              perm);
+}
+
 /// Computes the warp and thread indices for the given vector layout from a
 /// single linearized thread ID.
-static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
-                                         int64_t subgroupSize,
-                                         NestedLayoutAttr vectorLayout,
-                                         SmallVector<Value> &warpIndices,
-                                         SmallVector<Value> &threadIndices) {
+static LogicalResult populateWarpAndThreadIndices(
+    RewriterBase &rewriter, Value threadId, int64_t subgroupSize,
+    NestedLayoutAttr vectorLayout, SmallVector<Value> &warpIndices,
+    SmallVector<Value> &threadIndices) {
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
   int64_t rank = vectorLayout.getRank();
   SmallVector<Value> threadIds =
       vectorLayout.computeThreadIds(threadId, subgroupSize, rewriter);
+  if (threadIds.empty() && rank != 0)
+    return failure();
   warpIndices = SmallVector<Value>(threadIds.begin(), threadIds.begin() + rank);
   threadIndices = SmallVector<Value>(threadIds.begin() + rank,
                                      threadIds.begin() + 2 * rank);
+  return success();
+}
+
+static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
+                                         Location loc, AffineMap permMap,
+                                         ArrayRef<int64_t> offsets,
+                                         NestedLayoutAttr vectorLayout,
+                                         VectorValue mask) {
+  SmallVector<int64_t> sliceMaskOffsets =
+      getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
+  SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
+  VectorValue slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
+      loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
+  return slicedMask;
+}
+
+/// Project a vector based on a provided projection map.
+/// Firstly, this will transpose the vector in a way sliced out
+/// dims become outermost. Then it performs a vector.extract
+/// remove the dims that are not present in the results of the map.
+/// Note that the implementation is similiar to vector.extract_stride_slice
+/// but with projecting out the indexed/sliced dimensions from the result.
+static VectorValue projectVector(RewriterBase &rewriter, Location loc,
+                                 VectorValue val, AffineMap projectionMap) {
+  SmallVector<int64_t> remaningDims;
+  auto allDims =
+      llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
+  llvm::SmallDenseSet<int64_t> slicedDims(allDims.begin(), allDims.end());
+  for (int64_t resultIdx : llvm::seq<int64_t>(projectionMap.getNumResults())) {
+    int64_t iterSpacePos = projectionMap.getDimPosition(resultIdx);
+    remaningDims.push_back(iterSpacePos);
+    slicedDims.erase(iterSpacePos);
+  }
+
+  SmallVector<int64_t> transposePerm(slicedDims.begin(), slicedDims.end());
+  transposePerm.append(remaningDims);
+  auto transposed =
+      rewriter.create<vector::TransposeOp>(loc, val, transposePerm);
+
+  SmallVector<int64_t> extractedPos(slicedDims.size(), 0);
+  auto sliced =
+      rewriter.create<vector::ExtractOp>(loc, transposed, extractedPos);
+  return cast<VectorValue>(sliced.getResult());
 }
 
 namespace {
@@ -153,15 +284,24 @@ struct DistributeTransferRead final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    // TODO: Support masking.
-    if (readOp.getMask()) {
-      return rewriter.notifyMatchFailure(readOp, "unimplemented: masked read");
-    }
+
     NestedLayoutAttr vectorLayout =
         dyn_cast<NestedLayoutAttr>(signature[readOp.getResult()]);
     if (!vectorLayout) {
       return rewriter.notifyMatchFailure(readOp,
                                          "non-nested transfer_read layout");
+    }
+
+    VectorValue mask = readOp.getMask();
+    NestedLayoutAttr maskLayout;
+    if (mask) {
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(readOp,
+                                           "non-nested mask vector layout");
+      }
+      mask = getDistributed(rewriter, mask, maskLayout);
+      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
     }
 
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
@@ -189,20 +329,45 @@ struct DistributeTransferRead final
     VectorValue acc = cast<VectorValue>(zero);
 
     SmallVector<Value> warpIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, vectorLayout,
-                                 warpIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          readOp, "warp or thread tiles have overlapping strides");
+    }
 
     ValueRange indices = readOp.getIndices();
+    AffineMap permMap = readOp.getPermutationMap();
     SmallVector<int64_t> strides(rank, 1);
-    for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, tileShape)) {
+
+    SmallVector<SmallVector<int64_t>> allMaskOffsets;
+    if (mask) {
+      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+      SmallVector<int64_t> maskTileShape =
+          getElementVectorTileShape(maskLayout);
+      allMaskOffsets =
+          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+    }
+
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
-          rewriter, indices, offsets, vectorLayout, readOp.getPermutationMap(),
-          warpIndices, threadIndices);
+          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
+          threadIndices);
+
+      VectorValue slicedMask = nullptr;
+      if (mask) {
+        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+        SmallVector<int64_t> maskTileShape =
+            getElementVectorTileShape(maskLayout);
+        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
+        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(), permMap,
+                                           maskOffsets, maskLayout, mask);
+      }
 
       VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
           readOp.getLoc(), innerVectorType, readOp.getSource(), slicedIndices,
-          readOp.getPermutationMapAttr(), readOp.getPadding(), readOp.getMask(),
+          readOp.getPermutationMapAttr(), readOp.getPadding(), slicedMask,
           readOp.getInBoundsAttr());
 
       if (acc.getType().getRank() == 0) {
@@ -237,13 +402,8 @@ struct DistributeTransferWrite final
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    // TODO: Support masking.
-    if (writeOp.getMask()) {
-      return rewriter.notifyMatchFailure(writeOp,
-                                         "unimplemented: masked write");
-    }
     NestedLayoutAttr vectorLayout =
-        dyn_cast<NestedLayoutAttr>(signature[writeOp.getVector()]);
+        dyn_cast<NestedLayoutAttr>(signature[writeOp.getValueToStore()]);
     if (!vectorLayout) {
       return rewriter.notifyMatchFailure(writeOp,
                                          "non-nested transfer_write layout");
@@ -254,23 +414,50 @@ struct DistributeTransferWrite final
                                          "distribution expects memrefs");
     }
 
+    VectorValue mask = writeOp.getMask();
+    NestedLayoutAttr maskLayout;
+    if (mask) {
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(writeOp,
+                                           "non-nested mask vector layout");
+      }
+      mask = getDistributed(rewriter, mask, maskLayout);
+      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+    }
+
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, vectorLayout,
-                                 warpIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          writeOp, "warp or thread tiles have overlapping strides");
+    }
 
     Value distributedVector =
-        getDistributed(rewriter, writeOp.getVector(), vectorLayout);
+        getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
 
     ValueRange indices = writeOp.getIndices();
-    for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, tileShape)) {
+    AffineMap permMap = writeOp.getPermutationMap();
+
+    SmallVector<SmallVector<int64_t>> allMaskOffsets;
+    if (mask) {
+      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+      SmallVector<int64_t> maskTileShape =
+          getElementVectorTileShape(maskLayout);
+      allMaskOffsets =
+          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+    }
+
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
-          rewriter, indices, offsets, vectorLayout, writeOp.getPermutationMap(),
-          warpIndices, threadIndices);
+          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
+          threadIndices);
 
       // Extract the "element vector" from the inner most dimensions. All outer
       // dimensions are either unrolled or distributed such that this is a
@@ -286,9 +473,20 @@ struct DistributeTransferWrite final
         slicedVector = rewriter.create<vector::BroadcastOp>(
             writeOp.getLoc(), promotedType, slicedVector);
       }
+
+      VectorValue slicedMask = nullptr;
+      if (mask) {
+        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+        SmallVector<int64_t> maskTileShape =
+            getElementVectorTileShape(maskLayout);
+        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
+        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(), permMap,
+                                           maskOffsets, maskLayout, mask);
+      }
+
       rewriter.create<vector::TransferWriteOp>(
           writeOp.getLoc(), slicedVector, writeOp.getSource(), slicedIndices,
-          writeOp.getPermutationMapAttr(), writeOp.getMask(),
+          writeOp.getPermutationMapAttr(), slicedMask,
           writeOp.getInBoundsAttr());
     }
 
@@ -418,17 +616,20 @@ static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
 ///      to shared memory and will be reloaded into a layout where partial
 ///      reductions will be placed inside threads.
 struct DistributeMultiReduction final
-    : OpDistributionPattern<vector::MultiDimReductionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+    : MaskedOpDistributionPattern<vector::MultiDimReductionOp> {
+  using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
                            int64_t maxBitsPerShuffle, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
-        maxBitsPerShuffle(maxBitsPerShuffle) {}
+      : MaskedOpDistributionPattern(context, benefit),
+        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
-  LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
+                  DistributionSignature &signature, vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const {
+    Location loc = multiReduceOp.getLoc();
     VectorValue srcVector = multiReduceOp.getSource();
     Value acc = multiReduceOp.getAcc();
     Value res = multiReduceOp.getResult();
@@ -442,6 +643,14 @@ struct DistributeMultiReduction final
     }
 
     Type elemTy = srcVector.getType().getElementType();
+    unsigned elemBitwidth = elemTy.getIntOrFloatBitWidth();
+    if (elemBitwidth > maxBitsPerShuffle) {
+      return rewriter.notifyMatchFailure(
+          multiReduceOp,
+          llvm::formatv("element bitwidth greater than maxBitsPerShuffle",
+                        elemBitwidth, maxBitsPerShuffle));
+    }
+
     VectorValue disSrc =
         getDistributed(rewriter, srcVector, signature[srcVector]);
 
@@ -453,7 +662,23 @@ struct DistributeMultiReduction final
       disAcc = multiReduceOp.getAcc();
     }
 
-    Location loc = multiReduceOp.getLoc();
+    VectorValue mask = nullptr;
+    if (maskOp) {
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+          maskSignature.value()[maskOp.getMask()]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "expected nested layout attr");
+      }
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+      Value passThruSrc = getCombiningIdentityValue(
+          loc, rewriter, multiReduceOp.getKind(), disSrc.getType());
+
+      disSrc = cast<VectorValue>(
+          rewriter.create<arith::SelectOp>(loc, mask, disSrc, passThruSrc)
+              .getResult());
+    }
+
     SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
     int64_t rank = srcVector.getType().getRank();
 
@@ -468,18 +693,24 @@ struct DistributeMultiReduction final
     }
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, multiReduceOp.getKind(), disAcc.getType());
-    auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
+    Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
 
+    // TODO: As per current upstream lowering implementations, there is no point
+    // in doing this because it does a select much later in a finer granularity
+    // rather than supporting predication. Moreover, since we are doing a select
+    // to cater reductions accross the distribution, we can choose not to mask
+    // the op post-distribution.
+
     VectorValue locallyReduced;
     if (accVector) {
-      locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+      locallyReduced = dyn_cast<VectorValue>(localReduction);
     } else {
       // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
-      locallyReduced = rewriter.create<vector::BroadcastOp>(
-          loc, vecType, localReduction.getResult());
+      locallyReduced =
+          rewriter.create<vector::BroadcastOp>(loc, vecType, localReduction);
     }
 
     assert(locallyReduced && "result should have been a vector");
@@ -562,7 +793,6 @@ struct DistributeMultiReduction final
 
     for (unsigned i = 0; i < numElements; ++i) {
       Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
-
       // Reduce across all reduction dimensions 1-by-1.
       for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
         if (reductionMask[i]) {
@@ -691,8 +921,8 @@ struct DistributeMultiReduction final
     }
     // Insert gpu.barrier
     rewriter.create<gpu::BarrierOp>(write.getLoc());
-    auto read = rewriter.create<vector::TransferReadOp>(loc, unDistributedType,
-                                                        alloc, indices);
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc, unDistributedType, alloc, indices, inBounds);
     // Create new layout where subgroup dims are squashed to
     // element tile
     IREE::VectorExt::NestedLayoutAttr intraSubGroupLayout;
@@ -770,15 +1000,19 @@ struct DistributeMultiReduction final
 /// performed only thread locally. Therefore, a to-be-distributed
 /// vector.multi_reduce
 ////is added to complete the contraction.
-struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+struct DistributeContract final
+    : MaskedOpDistributionPattern<vector::ContractionOp> {
+  using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeContract(MLIRContext *context, int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit) {}
+      : MaskedOpDistributionPattern(context, benefit) {}
 
-  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(vector::ContractionOp contractOp,
+                  DistributionSignature &signature, vector::MaskOp maskOp,
+                  std::optional<DistributionSignature> &maskSignature,
+                  PatternRewriter &rewriter) const override {
+    Location loc = contractOp.getLoc();
     FailureOr<VectorContractOpInfo> maybeOpInfo =
         VectorContractOpInfo::inferFromIndexingMaps(
             contractOp.getIndexingMapsArray());
@@ -818,6 +1052,44 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Value disLhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
     Value disRhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
 
+    VectorValue mask = nullptr;
+    if (maskOp) {
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+          maskSignature.value()[maskOp.getMask()]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(maskOp,
+                                           "expected nested layout attr");
+      }
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+      Value passThruLhs = getCombiningIdentityValue(
+          loc, rewriter, contractOp.getKind(), disLhs.getType());
+      Value passThruRhs = getCombiningIdentityValue(
+          loc, rewriter, contractOp.getKind(), disRhs.getType());
+
+      VectorValue deInterleavedMask =
+          getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+      VectorValue maskLhs = projectVector(rewriter, loc, deInterleavedMask,
+                                          contractOp.getIndexingMapsArray()[0]);
+      VectorValue interleavedMaskLhs =
+          getInterleavedPackedForm(rewriter, maskLhs, lhsLayout);
+
+      VectorValue maskRhs = projectVector(rewriter, loc, deInterleavedMask,
+                                          contractOp.getIndexingMapsArray()[1]);
+      VectorValue interleavedMaskRhs =
+          getInterleavedPackedForm(rewriter, maskRhs, rhsLayout);
+
+      disLhs = cast<VectorValue>(
+          rewriter
+              .create<arith::SelectOp>(loc, interleavedMaskLhs, disLhs,
+                                       passThruLhs)
+              .getResult());
+      disRhs = cast<VectorValue>(
+          rewriter
+              .create<arith::SelectOp>(loc, interleavedMaskRhs, disRhs,
+                                       passThruRhs)
+              .getResult());
+    }
+
     Value acc = contractOp.getAcc();
     Value res = contractOp.getResult();
     auto accVector = dyn_cast<VectorValue>(acc);
@@ -832,21 +1104,26 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Type accElemTy = getElementTypeOrSelf(acc.getType());
 
     MLIRContext *ctx = contractOp.getContext();
-    Location loc = contractOp.getLoc();
 
     // Step 1: local contraction
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, contractOp.getKind(), disAcc.getType());
-    vector::ContractionOp localContractOp = doDistributedContraction(
+    Value localContract = doDistributedContraction(
         rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
+
+    // TODO: As per current upstream lowering implementations, there is no point
+    // in doing this because it does a select much later in a finer granularity
+    // rather than supporting predication. Moreover, since we are doing a select
+    // to cater reductions accross the distribution, we can choose not to mask
+    // the op post-distribution.
 
     VectorValue localContractValue;
     if (accVector) {
-      localContractValue = dyn_cast<VectorValue>(localContractOp.getResult());
+      localContractValue = dyn_cast<VectorValue>(localContract);
     } else {
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, accElemTy);
-      localContractValue = rewriter.create<vector::BroadcastOp>(
-          loc, vecType, localContractOp.getResult());
+      localContractValue =
+          rewriter.create<vector::BroadcastOp>(loc, vecType, localContract);
     }
 
     assert(localContractValue && "result should have been a vector");
@@ -1116,6 +1393,19 @@ struct DistributeBatchOuterToLayoutConversions final
   }
 };
 
+// This is a helper to extract strides from a given shape
+// E.g. : a shape of 2x3x4 will return strides [12, 4, 1]
+static SmallVector<int64_t> getStrides(ArrayRef<int64_t> shape) {
+  int64_t elementCount = ShapedType::getNumElements(shape);
+  SmallVector<int64_t> strides;
+  int64_t currStride = elementCount;
+  for (int64_t len : shape) {
+    currStride = currStride / len;
+    strides.push_back(currStride);
+  }
+  return strides;
+}
+
 struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
@@ -1167,19 +1457,6 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
       lens.push_back(dInfo.dimLen);
     }
     return lens;
-  }
-
-  // This is a helper to extract strides from a given shape
-  // E.g. : a shape of 2x3x4 will return strides [12, 4, 1]
-  SmallVector<int64_t> getStrides(ArrayRef<int64_t> shape) const {
-    int64_t elementCount = ShapedType::getNumElements(shape);
-    SmallVector<int64_t> strides;
-    int64_t currStride = elementCount;
-    for (int64_t len : shape) {
-      currStride = currStride / len;
-      strides.push_back(currStride);
-    }
-    return strides;
   }
 
   // Once we are in the realm of remaining dimensions,
@@ -1274,8 +1551,12 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
           stepOp, "missing nested layout for step op result");
     }
     SmallVector<Value> subgroupIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, resultLayout,
-                                 subgroupIndices, threadIndices);
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            resultLayout, subgroupIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          stepOp, "warp or thread tiles have overlapping strides");
+    }
 
     SmallVector<int64_t> undistributedShape =
         resultLayout.getUndistributedPackedShape();
@@ -1312,6 +1593,171 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   int64_t subgroupSize;
 };
 
+struct DistributeCreateMask final
+    : OpDistributionPattern<vector::CreateMaskOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+  DistributeCreateMask(MLIRContext *context, Value threadId,
+                       int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  SmallVector<Value>
+  createDistributedBounds(PatternRewriter &rewriter, Location loc,
+                          OperandRange upperBounds, NestedLayoutAttr layout,
+                          ArrayRef<Value> subgroupIndices,
+                          ArrayRef<Value> threadIndices) const {
+    constexpr int64_t subgroupIdx = 0;
+    constexpr int64_t batchIdx = 1;
+    constexpr int64_t outerIdx = 2;
+    constexpr int64_t threadIdx = 3;
+    constexpr int64_t elementIdx = 4;
+    SmallVector<Value> bounds;
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+
+    for (auto [unDistributedDim, upperBound] : llvm::enumerate(upperBounds)) {
+      SmallVector<int64_t> undistributedShape =
+          layout.getPackedShapeForUndistributedDim(unDistributedDim);
+      SmallVector<int64_t> distrShape{undistributedShape[batchIdx],
+                                      undistributedShape[outerIdx],
+                                      undistributedShape[elementIdx]};
+      int64_t elementPerThread = ShapedType::getNumElements(distrShape);
+      auto allValid =
+          rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread);
+      int64_t elementTileSize = distrShape.back();
+      auto elementTileLastIdx =
+          rewriter.create<arith::ConstantIndexOp>(loc, elementTileSize - 1);
+
+      // A special condition if the pre-distribution bounds match
+      // the mask dimension length, then the distributed bounds
+      // should exhibit the same property.
+      if (auto constUpperBound = dyn_cast_or_null<arith::ConstantIndexOp>(
+              upperBound.getDefiningOp())) {
+        int64_t undistributedDimLen =
+            ShapedType::getNumElements(undistributedShape);
+        if (constUpperBound.value() == undistributedDimLen) {
+          bounds.push_back(allValid);
+          continue;
+        }
+      }
+      auto lastValidIdx = rewriter.create<arith::SubIOp>(loc, upperBound, one);
+      auto delineraizedLastValidIdx =
+          rewriter.create<affine::AffineDelinearizeIndexOp>(loc, lastValidIdx,
+                                                            undistributedShape);
+      SmallVector<Value> packedLastValidIdx =
+          delineraizedLastValidIdx.getResults();
+
+      // When subgroup id is equal to the subgroup that encounters the bound,
+      // Every [vtid] less than [vtid that encounters last valid element] should
+      // have a all valid element tile
+      auto linearizedLastValidIdxPreThreads =
+          rewriter.create<affine::AffineLinearizeIndexOp>(
+              loc,
+              ValueRange{packedLastValidIdx[batchIdx],
+                         packedLastValidIdx[outerIdx], elementTileLastIdx},
+              distrShape);
+      // Bound is defined as lastIdx + 1;
+      auto distrUpperBoundPreThreads = rewriter.create<arith::AddIOp>(
+          loc, linearizedLastValidIdxPreThreads, one);
+
+      auto linearizedLastValidIdx =
+          rewriter.create<affine::AffineLinearizeIndexOp>(
+              loc,
+              ValueRange{packedLastValidIdx[batchIdx],
+                         packedLastValidIdx[outerIdx],
+                         packedLastValidIdx[elementIdx]},
+              distrShape);
+      auto distrUpperBound =
+          rewriter.create<arith::AddIOp>(loc, linearizedLastValidIdx, one);
+
+      // The following code constructs a selection tree
+      // that in effect follows the code:
+      // * upperbound --> delinearize --> u0, u1, u2, u3, u4
+      //
+      // if sg < u0,
+      //   all valid.
+      // elif sg > u0,
+      //   all invalid.
+      // elif sg == u0,
+      //   if tid < u3:
+      //     [u1][u2][max]
+      //   if tid > u3:
+      //     all invalid.
+      //   if tid == u3:
+      //     [u1][u2][u4]
+
+      // tid == u3
+      auto cmpBoundTidEq = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, threadIndices[unDistributedDim],
+          packedLastValidIdx[threadIdx]);
+      // tid < u3
+      auto cmpBoundTidSlt = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, threadIndices[unDistributedDim],
+          packedLastValidIdx[threadIdx]);
+      // sg == u0
+      auto cmpBoundSgEq = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, subgroupIndices[unDistributedDim],
+          packedLastValidIdx[subgroupIdx]);
+      // sg < u0
+      auto cmpBoundSgSlt = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, subgroupIndices[unDistributedDim],
+          packedLastValidIdx[subgroupIdx]);
+
+      // selectTid0 = tid < u3 ? [u1][u2][max] : all invalid
+      auto selectTid0 = rewriter.create<arith::SelectOp>(
+          loc, cmpBoundTidSlt, distrUpperBoundPreThreads, zero);
+      // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
+      auto selectTid1 = rewriter.create<arith::SelectOp>(
+          loc, cmpBoundTidEq, distrUpperBound, selectTid0);
+      // selectSg0 = sg < u0 ? all valid : all invalid
+      auto selectSg0 =
+          rewriter.create<arith::SelectOp>(loc, cmpBoundSgSlt, allValid, zero);
+      // selectSg1 = sg == u0 ? selectTid1 : selectSg0
+      auto selectSg1 = rewriter.create<arith::SelectOp>(loc, cmpBoundSgEq,
+                                                        selectTid1, selectSg0);
+      bounds.push_back(selectSg1);
+    }
+    return bounds;
+  }
+
+  LogicalResult matchAndRewrite(vector::CreateMaskOp creatMaskOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    Location loc = creatMaskOp.getLoc();
+    VectorValue result = creatMaskOp.getResult();
+    NestedLayoutAttr resultLayout =
+        dyn_cast<NestedLayoutAttr>(signature[result]);
+    if (!resultLayout) {
+      return rewriter.notifyMatchFailure(
+          creatMaskOp, "missing nested layout for step op result");
+    }
+    SmallVector<Value> subgroupIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            resultLayout, subgroupIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          creatMaskOp, "warp or thread tiles have overlapping strides");
+    }
+
+    SmallVector<Value> distributedBounds =
+        createDistributedBounds(rewriter, loc, creatMaskOp.getOperands(),
+                                resultLayout, subgroupIndices, threadIndices);
+
+    Type elemType = creatMaskOp.getType().getElementType();
+    auto distrUnpackedType =
+        VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
+    auto distrMask = rewriter.create<vector::CreateMaskOp>(
+        loc, distrUnpackedType, distributedBounds);
+    VectorValue interleavedDistrMask =
+        getInterleavedPackedForm(rewriter, distrMask, resultLayout);
+    replaceOpWithDistributedValues(rewriter, creatMaskOp,
+                                   {interleavedDistrMask});
+    return success();
+  }
+  Value threadId;
+  int64_t subgroupSize;
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
@@ -1326,6 +1772,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
   patterns.add<DistributeContract>(patterns.getContext());
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
+  patterns.add<DistributeCreateMask>(patterns.getContext(), threadId,
+                                     subgroupSize);
 }
 
 }; // namespace mlir::iree_compiler

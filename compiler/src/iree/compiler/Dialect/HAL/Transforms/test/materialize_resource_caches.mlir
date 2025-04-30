@@ -19,9 +19,9 @@ hal.executable private @exe {
       %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
       hal.return %selected : i1
     }
-    hal.executable.export @entry0 ordinal(0) layout(#pipeline_layout_0)
-    hal.executable.export @entry0_alias ordinal(0) layout(#pipeline_layout_0)
-    hal.executable.export @entry1 ordinal(1) layout(#pipeline_layout_1)
+    hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout_0)
+    hal.executable.export public @entry0_alias ordinal(0) layout(#pipeline_layout_0)
+    hal.executable.export public @entry1 ordinal(1) layout(#pipeline_layout_1)
     // CHECK-NOT: hal.executable.constant.block
     hal.executable.constant.block() -> (i32, i32) as ("foo", "bar") {
       %c123 = arith.constant 123 : i32
@@ -123,7 +123,7 @@ hal.executable private @exe {
       %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
       hal.return %selected : i1
     }
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>)
@@ -187,7 +187,7 @@ util.func public @fallbackLookup() -> (!hal.executable, !hal.executable) {
 
 hal.executable private @exe {
   hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
     ]>)
   }
@@ -259,13 +259,14 @@ util.global private @device : !hal.device
 util.global private @_executable_exe : !hal.executable
 util.initializer {
   %c0 = arith.constant 0 : index
+  %affinity = arith.constant -1 : i64
   %device = hal.devices.get %c0 : !hal.device
   %format_ok, %format_supported = hal.device.query<%device : !hal.device> key("hal.executable.format" :: "some-format") : i1, i1
   %c-1 = arith.constant -1 : index
   %variant = arith.select %format_supported, %c0, %c-1 : index
   %selected = scf.index_switch %variant -> !hal.executable
   case 0 {
-    %exe = hal.executable.create device(%device : !hal.device) target(@exe0::@vmvx) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) affinity(%affinity) target(@exe0::@vmvx) : !hal.executable
     scf.yield %exe : !hal.executable
   }
   default {
@@ -278,7 +279,7 @@ util.initializer {
 
 hal.executable @exe {
   hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry ordinal(0) layout(#pipeline_layout_0) attributes {
+    hal.executable.export public @entry ordinal(0) layout(#pipeline_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

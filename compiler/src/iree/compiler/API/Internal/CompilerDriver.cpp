@@ -53,6 +53,7 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -64,6 +65,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/TargetParser/Host.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Wrap.h"
@@ -234,11 +236,13 @@ struct GlobalInit {
   // Our session options can optionally be bound to the global command-line
   // environment. If that is not the case, then these will be nullptr, and
   // they should be default initialized at the session level.
+  GlobalPipelineOptions *clGlobalPipelineOptions = nullptr;
   PluginManagerOptions *clPluginManagerOptions = nullptr;
   BindingOptions *clBindingOptions = nullptr;
   InputDialectOptions *clInputOptions = nullptr;
   PreprocessingOptions *clPreprocessingOptions = nullptr;
   GlobalOptimizationOptions *clGlobalOptimizationOptions = nullptr;
+  DispatchCreationOptions *clDispatchCreationOptions = nullptr;
   SchedulingOptions *clSchedulingOptions = nullptr;
   IREE::HAL::TargetOptions *clHalTargetOptions = nullptr;
   IREE::VM::TargetOptions *clVmTargetOptions = nullptr;
@@ -278,11 +282,13 @@ void GlobalInit::registerCommandLineOptions() {
   mlir::tracing::DebugConfig::registerCLOptions();
 
   // Bind session options to the command line environment.
+  clGlobalPipelineOptions = &GlobalPipelineOptions::FromFlags::get();
   clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
   clBindingOptions = &BindingOptions::FromFlags::get();
   clInputOptions = &InputDialectOptions::FromFlags::get();
   clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
   clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
+  clDispatchCreationOptions = &DispatchCreationOptions::FromFlags::get();
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
@@ -323,6 +329,7 @@ struct Session {
     if (failed(binder.parseArguments(argc, argv, callback))) {
       return new Error(std::move(errorMessage));
     }
+
     return nullptr;
   }
 
@@ -387,10 +394,12 @@ struct Session {
   bool pluginsActivated = false;
   LogicalResult pluginActivationStatus{failure()};
 
+  GlobalPipelineOptions pipelineOptions;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
   GlobalOptimizationOptions highLevelOptimizationOptions;
+  DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions halTargetOptions;
   IREE::VM::TargetOptions vmTargetOptions;
@@ -409,12 +418,16 @@ Session::Session(GlobalInit &globalInit)
 
   // Bootstrap session options from the cl environment, if enabled.
   if (globalInit.usesCommandLine) {
+    auto binder = OptionsBinder::global();
+    binder.applyOptimizationDefaults();
     debugConfig = mlir::tracing::DebugConfig::createFromCLOptions();
+    pipelineOptions = *globalInit.clGlobalPipelineOptions;
     pluginManagerOptions = *globalInit.clPluginManagerOptions;
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
     preprocessingOptions = *globalInit.clPreprocessingOptions;
     highLevelOptimizationOptions = *globalInit.clGlobalOptimizationOptions;
+    dispatchCreationOptions = *globalInit.clDispatchCreationOptions;
     schedulingOptions = *globalInit.clSchedulingOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
     vmTargetOptions = *globalInit.clVmTargetOptions;
@@ -430,10 +443,12 @@ Session::Session(GlobalInit &globalInit)
 
   // Register each options struct with the binder so we can manipulate
   // mnemonically via the API.
+  pipelineOptions.bindOptions(binder);
   bindingOptions.bindOptions(binder);
   preprocessingOptions.bindOptions(binder);
   inputOptions.bindOptions(binder);
   highLevelOptimizationOptions.bindOptions(binder);
+  dispatchCreationOptions.bindOptions(binder);
   schedulingOptions.bindOptions(binder);
   halTargetOptions.bindOptions(binder);
   vmTargetOptions.bindOptions(binder);
@@ -938,6 +953,16 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
 
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
+
+  if (!session.globalInit.usesCommandLine) {
+    session.binder.applyOptimizationDefaults();
+  }
+  auto resetDefaults = llvm::make_scope_exit([&]() {
+    if (!session.globalInit.usesCommandLine) {
+      session.binder.restoreOptimizationDefaults();
+    }
+  });
+
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
     IREEVMPipelinePhase compileFrom;
@@ -963,9 +988,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     buildIREEVMTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
-        session.schedulingOptions, session.halTargetOptions,
-        session.vmTargetOptions, pipelineHooks, *passManager, compileFrom,
-        compileTo);
+        session.dispatchCreationOptions, session.schedulingOptions,
+        session.halTargetOptions, session.vmTargetOptions, pipelineHooks,
+        *passManager, compileFrom, compileTo);
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
@@ -996,8 +1021,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     buildIREEPrecompileTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
-        session.schedulingOptions, session.halTargetOptions, pipelineHooks,
-        *passManager, compileFrom, compileTo);
+        session.dispatchCreationOptions, session.schedulingOptions,
+        session.halTargetOptions, pipelineHooks, *passManager, compileFrom,
+        compileTo);
     break;
   }
   default:
@@ -1009,7 +1035,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
   // Done with the pipeline, mark the start of a new 'frame'.
-  IREE_TRACE_FRAME_MARK();
+  IREE_COMPILER_TRACE_FRAME_MARK();
   return true;
 }
 
@@ -1136,11 +1162,11 @@ void llvmVersionPrinter(llvm::raw_ostream &os) {
   os << " with assertions";
 #endif
 #if LLVM_VERSION_PRINTER_SHOW_HOST_TARGET_INFO
-  std::string CPU = std::string(sys::getHostCPUName());
+  std::string CPU = std::string(llvm::sys::getHostCPUName());
   if (CPU == "generic")
     CPU = "(unknown)";
   os << ".\n"
-     << "  Default target: " << sys::getDefaultTargetTriple() << '\n'
+     << "  Default target: " << llvm::sys::getDefaultTargetTriple() << '\n'
      << "  Host CPU: " << CPU;
 #endif
   os << '\n';

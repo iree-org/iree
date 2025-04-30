@@ -56,17 +56,8 @@ iree_cc_library(
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
     "StableHLOCustomCalls.cpp"
-    "StableHLOToArith.cpp"
     "StableHLOToIREEInputDialects.cpp"
-    "StableHLOToLinalg.cpp"
-    "StableHLOToLinalgConvolution.cpp"
-    "StableHLOToLinalgDotProd.cpp"
     "StableHLOToLinalgExt.cpp"
-    "StableHLOToLinalgPointwise.cpp"
-    "StableHLOToLinalgRandom.cpp"
-    "StableHLOToLinalgReduce.cpp"
-    "TypeConversion.cpp"
-    "TypeConversion.h"
     "VerifyCompilerInputLegality.cpp"
   DEPS
     ::CHLODecompositionPatterns
@@ -99,10 +90,13 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     StablehloBroadcastUtils
+    StablehloLinalgTransforms
     StablehloOps
     VhloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

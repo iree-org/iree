@@ -137,25 +137,44 @@ def CHECK_ExpectAlmostEqOp :
     Op<CHECK_Dialect, "expect_almost_eq", [AllTypesMatch<["lhs", "rhs"]>]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{
-    Verifies that the buffer view or tensor operands with float elements are
-    almost equal to within an implementation-defined "reasonable" tolerance.
+    Verifies that the buffer view or tensor operands with float elements satisfy
+    the Numpy-style fuzzy-comparision condition with parameters `atol`,
+    `rtol`, defined exactly as in NumPy isclose():
+    https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449
+
+    The condition being verified on each lhs and rhs value is:
+      lhs == rhs || (isfinite(rhs) && abs(lhs - rhs) <= atol + rtol * abs(rhs)).
+    Note that the `lhs == rhs` part is needed for the case (lhs=+inf, rhs+inf)
+    to return true. Indeed, in that case, lhs-rhs is NaN.
 
     Issues a non-fatal failure if the verification fails.
 
+    The `atol`, `rtol` parameters may be omitted, in which case some default
+    value is used. The default `atol` is nonzero, while the default `rtol` is
+    zero, which makes these comparision behave closer to exact comparisons as
+    the values being compared get large.
+
+    This default behavior is supported for legacy compatibility and to support
+    some use cases that legitimately don't care, but the majority of use cases
+    should care and so should provide explicit `atol`, `rtol` values.
+
     ```mlir
-    check.expect_almost_eq(%arg0, %arg1) : tensor<5xf32>
+    check.expect_almost_eq(%arg0, %arg1, atol 1.0e-2, rtol 1.0e-3) : tensor<5xf32>
     ```
   }];
 
   let arguments = (ins
     Optional<HAL_Device>:$device,
     AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
-    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs
+    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs,
+    DefaultValuedAttr<F32Attr, "1.e-4f">:$atol,
+    DefaultValuedAttr<F32Attr, "0.f">:$rtol
   );
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+    `` `(` $lhs `,` $rhs (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
+    attr-dict `:` type($lhs)
   }];
 }
 
@@ -164,29 +183,33 @@ def CHECK_ExpectAlmostEqConstOp :
        "expect_almost_eq_const", [AllTypesMatch<["lhs", "value"]>]> {
   let summary = [{Checks that the tensor operand is almost equal to some constant}];
   let description =  [{
-    Verifies that the tensor operand with float elements is almost equal to the
-    constant attribute within an implementation-defined "reasonable" tolerance.
+    This op is just a convenience wrapper around the expect_almost_eq op.
+
+    Verifies that the buffer view or tensor operands with float elements satisfy
+    the Numpy-style fuzzy-comparision condition with pararameters `atol`,
+    `rtol`. More details in the description of `expect_almost_eq`.
 
     Issues a non-fatal failure if the verification fails.
 
-    This op is just a convenience wrapper around the expect_almost_eq op.
-
     ```mlir
-    check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : tensor<5xf32>
+    check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>, atol 1.0e-2, rtol 1.0e-3) : tensor<5xf32>
     ```
   }];
 
   let arguments = (ins
     Optional<HAL_Device>:$device,
     TensorOf<[AnyFloat]>:$lhs,
-    ElementsAttr:$value
+    ElementsAttr:$value,
+    DefaultValuedAttr<F32Attr, "1.e-4f">:$atol,
+    DefaultValuedAttr<F32Attr, "0.f">:$rtol
   );
 
   let hasCanonicalizer = 1;
 
   let assemblyFormat = [{
     (`` `<` $device^ `>`)?
-    `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+    `` `(` $lhs `,` $value (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
+    attr-dict `:` type($lhs)
   }];
 }
 

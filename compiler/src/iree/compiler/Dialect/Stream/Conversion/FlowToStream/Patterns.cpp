@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -229,10 +230,34 @@ struct ConvertTensorCloneOp
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto cloneOp = rewriter.create<IREE::Stream::TensorCloneOp>(
         op.getLoc(), unknownType, operand.resource, op.getOperand().getType(),
-        op.getArgumentDims(), operand.resourceSize, op.getResult().getType(),
-        flattenValues(adaptor.getArgumentDims()), operand.resourceSize,
+        op.getOperandDims(), operand.resourceSize, op.getResult().getType(),
+        flattenValues(adaptor.getOperandDims()), operand.resourceSize,
         executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{cloneOp, operand.resourceSize}});
+    return success();
+  }
+};
+
+struct ConvertTensorEncodeOp
+    : public AffinityOpConversionPattern<IREE::Flow::TensorEncodeOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  LogicalResult matchAndRewriteOnAffinity(
+      IREE::Flow::TensorEncodeOp op, OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const override {
+    auto operand = transferTensorOperands(op.getLoc(), op.getOperand(),
+                                          adaptor.getOperand(),
+                                          executionAffinityAttr, rewriter);
+    auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getOperandDims(),
+                          executionAffinityAttr, rewriter);
+    auto encodeOp = rewriter.create<IREE::Stream::TensorEncodeOp>(
+        op.getLoc(), unknownType, operand.resource, op.getOperand().getType(),
+        op.getOperandDims(), operand.resourceSize, op.getResult().getType(),
+        flattenValues(adaptor.getResultDims()), resultSize,
+        executionAffinityAttr);
+    rewriter.replaceOpWithMultiple(op, {{encodeOp, resultSize}});
     return success();
   }
 };
@@ -249,7 +274,7 @@ struct ConvertTensorBarrierOp
     auto barrierOp = rewriter.create<IREE::Stream::AsyncBarrierOp>(
         op.getLoc(), operand.resource.getType(), operand.resource,
         operand.resourceSize,
-        /*affinity=*/operand.affinity);
+        /*affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{barrierOp, operand.resourceSize}});
     return success();
   }
@@ -782,17 +807,11 @@ struct ConvertDispatchOp
       IREE::Flow::DispatchOp op, OneToNOpAdaptor adaptor,
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
-    // Zero is going to be used for each operand to start.
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-
     // Query and resolve all operands and their sizes.
-    SmallVector<Value> dispatchOperands;
-    SmallVector<Value> dispatchOperandSizes;
-    SmallVector<Value> dispatchOperandOffsets;
-    SmallVector<Value> dispatchOperandEnds;
-    SmallVector<Value> dispatchOperandLengths;
+    SmallVector<Value> operands;
     SmallVector<Value> operandSizes;
-
+    SmallVector<Value> allOperandSizes;
+    SmallVector<Type> operandEncodings;
     for (auto [oldOperand, convertedOperands] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       Value newOperand;
@@ -801,34 +820,36 @@ struct ConvertDispatchOp
             transferTensorOperands(op.getLoc(), oldOperand, convertedOperands,
                                    executionAffinityAttr, rewriter);
         newOperand = newOperandCast.resource;
-        dispatchOperandSizes.push_back(newOperandCast.resourceSize);
         operandSizes.push_back(newOperandCast.resourceSize);
-        dispatchOperandOffsets.push_back(zeroOffset);
-        dispatchOperandEnds.push_back(newOperandCast.resourceSize);
-        dispatchOperandLengths.push_back(newOperandCast.resourceSize);
+        allOperandSizes.push_back(newOperandCast.resourceSize);
+        operandEncodings.push_back(oldOperand.getType());
       } else {
-        operandSizes.push_back({});
+        allOperandSizes.push_back({});
+        operandEncodings.push_back(rewriter.getType<IREE::Util::UnusedType>());
         newOperand = convertedOperands.front();
       }
-      dispatchOperands.push_back(newOperand);
+      operands.push_back(newOperand);
     }
 
     // Construct result sizes or reuse tied operand sizes from above.
     SmallVector<Value> resultSizes;
     SmallVector<Type> resultTypes;
+    SmallVector<Type> resultEncodings;
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
       if (!llvm::isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
+        resultEncodings.push_back(rewriter.getType<IREE::Util::UnusedType>());
         continue;
       }
       auto tiedOperand = op.getTiedResultOperandIndex(result.index());
       if (tiedOperand.has_value()) {
         auto operandIndex = tiedOperand.value() - tiedOperandBase;
-        resultSizes.push_back(operandSizes[operandIndex]);
-        resultTypes.push_back(dispatchOperands[operandIndex].getType());
+        resultSizes.push_back(allOperandSizes[operandIndex]);
+        resultTypes.push_back(operands[operandIndex].getType());
+        resultEncodings.push_back(operandEncodings[operandIndex]);
       } else {
         auto resultDynamicDims = IREE::Util::buildDynamicDimsForValue(
             op.getLoc(), result.value(), rewriter);
@@ -836,15 +857,21 @@ struct ConvertDispatchOp
             buildResultSizeOf(op.getLoc(), result.value(), resultDynamicDims,
                               executionAffinityAttr, rewriter));
         resultTypes.push_back(unknownType);
+        resultEncodings.push_back(oldResultType);
       }
     }
 
-    auto newOp = rewriter.create<IREE::Stream::AsyncDispatchOp>(
+    auto newOp = rewriter.create<IREE::Stream::TensorDispatchOp>(
         op.getLoc(), resultTypes, flattenValues(adaptor.getWorkload()),
-        adaptor.getEntryPointsAttr(), dispatchOperands, dispatchOperandSizes,
-        dispatchOperandOffsets, dispatchOperandEnds, dispatchOperandLengths,
-        resultSizes, adaptor.getTiedOperandsAttr(), executionAffinityAttr);
-    newOp->setDialectAttrs(op->getDialectAttrs());
+        adaptor.getEntryPointsAttr(), operands, operandSizes,
+        rewriter.getTypeArrayAttr(operandEncodings), op.getArgumentDims(),
+        resultSizes, rewriter.getTypeArrayAttr(resultEncodings),
+        op.getResultDims(), adaptor.getTiedOperandsAttr(),
+        executionAffinityAttr);
+    newOp->setDialectAttrs(
+        llvm::make_filter_range(op->getDialectAttrs(), [](NamedAttribute attr) {
+          return attr.getName() != "stream.affinity";
+        }));
     SmallVector<SmallVector<Value>> replacementsVec = llvm::map_to_vector(
         llvm::zip_equal(newOp->getResults(), resultSizes), [](auto it) {
           return SmallVector<Value>{std::get<0>(it), std::get<1>(it)};
@@ -958,7 +985,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
         op.getLoc(), resultTypes, adaptor.getCalleeAttr(), callOperands,
         callOperandSizes, callOperandOffsets, callOperandEnds,
         callOperandLengths, resultSizes, adaptor.getTiedOperandsAttr(),
-        executionAffinityAttr);
+        op.getArgAttrsAttr(), op.getResAttrsAttr(), executionAffinityAttr);
     newOp->setDialectAttrs(op->getDialectAttrs());
     replaceOpWithMultiple(op, newOp->getResults(), resultSizes, rewriter);
     return success();
@@ -971,7 +998,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
 // insertion point is set to the first use of the |arg| where all required
 // dynamic dimension SSA values are present.
 static bool insertBindingOp(BlockArgument arg,
-                            IREE::Flow::DispatchTensorType tensorType,
+                            IREE::TensorExt::DispatchTensorType tensorType,
                             Value zero, OpBuilder &builder) {
   // No uses: don't need a binding op.
   if (arg.use_empty())
@@ -1109,7 +1136,8 @@ struct ConvertExecutableOp
         for (auto arg : funcOp.front().getArguments()) {
           auto oldType = arg.getType();
           if (auto tensorType =
-                  llvm::dyn_cast<IREE::Flow::DispatchTensorType>(oldType)) {
+                  llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+                      oldType)) {
             // Now a binding - insert the stream.binding.subspan op to slice it.
             auto newType = rewriter.getType<IREE::Stream::BindingType>();
             newTypes.push_back(newType);
@@ -1185,10 +1213,10 @@ void populateFlowToStreamConversionPatterns(
       ConvertTensorCastLikeOp<IREE::Flow::TensorReshapeOp>,
       ConvertTensorCastLikeOp<IREE::Flow::TensorBitCastOp>,
       ConvertTensorAllocaOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
-      ConvertTensorCloneOp, ConvertTensorBarrierOp, ConvertTensorTransferOp,
-      ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
-      ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter, context,
-                                                  affinityAnalysis);
+      ConvertTensorCloneOp, ConvertTensorEncodeOp, ConvertTensorBarrierOp,
+      ConvertTensorTransferOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
+      ConvertTensorLoadOp, ConvertTensorStoreOp, ConvertTensorTraceOp>(
+      typeConverter, context, affinityAnalysis);
   patterns.insert<ConvertChannelDefaultOp>(typeConverter, context,
                                            affinityAnalysis);
   patterns.insert<ConvertChannelSplitOp, ConvertChannelRankOp,

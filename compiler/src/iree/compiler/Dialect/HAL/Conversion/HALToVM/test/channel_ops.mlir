@@ -3,11 +3,11 @@
 // CHECK-LABEL: @channel_create
 //  CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !vm.buffer, %[[GROUP:.+]]: !vm.buffer, %[[RANK:.+]]: i32, %[[COUNT:.+]]: i32) -> !vm.ref<!hal.channel>
 util.func public @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer, %rank: i32, %count: i32) -> !hal.channel {
-  // CHECK: %[[FLAGS:.+]] = vm.const.i32.zero
+  // CHECK: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %[[CHANNEL:.+]] = vm.call @hal.channel.create(%[[DEVICE]], %[[AFFINITY]], %[[FLAGS]], %[[ID]], %[[GROUP]], %[[RANK]], %[[COUNT]])
   %channel = hal.channel.create device(%device : !hal.device)
                               affinity(%affinity)
-                                 flags(0)
+                                 flags("None")
                                     id(%id)
                                  group(%group)
                                   rank(%rank)
@@ -21,12 +21,12 @@ util.func public @channel_create(%device: !hal.device, %affinity: i64, %id: !uti
 // CHECK-LABEL: @channel_split
 //  CHECK-SAME: (%[[BASE_CHANNEL:.+]]: !vm.ref<!hal.channel>, %[[COLOR:.+]]: i32, %[[KEY:.+]]: i32)
 util.func public @channel_split(%base_channel: !hal.channel, %color: i32, %key: i32) -> !hal.channel {
-  // CHECK: %[[FLAGS:.+]] = vm.const.i32.zero
+  // CHECK: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %[[SPLIT_CHANNEL:.+]] = vm.call @hal.channel.split(%[[BASE_CHANNEL]], %[[COLOR]], %[[KEY]], %[[FLAGS]])
   %split_channel = hal.channel.split<%base_channel : !hal.channel>
                                color(%color)
                                  key(%key)
-                               flags(0) : !hal.channel
+                               flags("None") : !hal.channel
   // CHECK: vm.return %[[SPLIT_CHANNEL]]
   util.return %split_channel : !hal.channel
 }

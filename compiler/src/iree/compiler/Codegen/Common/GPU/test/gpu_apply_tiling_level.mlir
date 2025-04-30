@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{allow-zero-slices=true}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NOZERO
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{allow-zero-slices=false}, canonicalize, cse))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s --check-prefix=NOZERO
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=partial_reduction}, canonicalize, cse))" %s | FileCheck %s --check-prefix=PARTRED
@@ -532,6 +532,7 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 //       PARTRED:     linalg.generic
 //  PARTRED-SAME:       iterator_types = ["parallel", "parallel"]
 //  PARTRED-SAME:       ins(%{{.*}}  : tensor<?x?xf32>) outs(%{{.*}} : tensor<?x?xf32>)
+//  PARTRED-SAME:       attrs = {lowering_config =
 //       PARTRED:   scf.yield
 //       PARTRED:   linalg.reduce ins(%[[OUT]] : tensor<?x8xf32>)
 //  PARTRED-SAME:                 outs(%[[FULL]] : tensor<?xf32>)

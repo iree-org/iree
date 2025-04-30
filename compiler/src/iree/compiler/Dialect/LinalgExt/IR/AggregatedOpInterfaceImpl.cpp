@@ -777,6 +777,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     }
     kBasis.push_back(size);
   }
+
+  // Transpose the order of (P, Q, C) according to `inputKPerm` encoded in
+  // im2col metadata.
+  ArrayRef<int64_t> inputKPerm = getInputKPerm();
+  applyPermutationToVector(kBasis, inputKPerm);
+
   OpFoldResult kIndex = kOffset;
   for (auto [i, ivIdx, stride] :
        llvm::enumerate(getKOutputDims(), getMixedKStrides())) {
@@ -786,25 +792,24 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     OpFoldResult ivOffset = mulOfrs(b, nestedLoc, stride, ivs[ivIdx]);
     kIndex = addOfrs(b, nestedLoc, kIndex, ivOffset);
   }
-  FailureOr<SmallVector<Value>> maybeDelinKOffset = affine::delinearizeIndex(
-      b, nestedLoc, getValueOrCreateConstantIndexOp(b, loc, kIndex),
-      getValueOrCreateConstantIndexOp(b, loc, (kBasis)));
-  if (failed(maybeDelinKOffset)) {
-    return failure();
-  }
-  SmallVector<Value> delinKOffset = maybeDelinKOffset.value();
+  ValueRange delinKOffset =
+      b.create<affine::AffineDelinearizeIndexOp>(
+           nestedLoc, getValueOrCreateConstantIndexOp(b, loc, kIndex), kBasis,
+           /*hasOuterBound=*/true)
+          .getResults();
   // Split the delinearized offsets into the window offsets (for M offsets)
-  // and the K offsets for the input tensor.
+  // and the K offsets for the input tensor based on the layout.
   SmallVector<Value> windowOffset, inputKOffset;
   int delinKIdx = 0;
+  SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
   for (int i = 0; i < getInputRank(); ++i) {
     if (batchPosSet.contains(i))
       continue;
     if (mPosSet.contains(i)) {
-      windowOffset.push_back(delinKOffset[delinKIdx++]);
+      windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
       continue;
     }
-    inputKOffset.push_back(delinKOffset[delinKIdx++]);
+    inputKOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
   }
 
   // Compute offsets for extract. The linearized im2col result M offset is
@@ -823,13 +828,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // Delinearize the m_offset * m_strides into the convolution output space.
   // `mBasis` contains the basis for the iteration space of result of the
   // convolution op (i.e., basis for result H and W dims).
-  FailureOr<SmallVector<Value>> maybeDelinMOffset = affine::delinearizeIndex(
-      b, nestedLoc,
-      getValueOrCreateConstantIndexOp(b, nestedLoc, linearMOffset), mBasis);
-  if (failed(maybeDelinMOffset)) {
-    return failure();
-  }
-  SmallVector<Value> delinMOffset = maybeDelinMOffset.value();
+  ValueRange delinMOffset =
+      b.create<affine::AffineDelinearizeIndexOp>(
+           nestedLoc, getValueOrCreateConstantIndexOp(b, loc, linearMOffset),
+           mBasis,
+           /*hasOuterBound=*/true)
+          .getResults();
 
   // Compute the final offsets into the input tensor.
   OpFoldResult zero = b.getIndexAttr(0);

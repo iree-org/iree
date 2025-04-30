@@ -1,8 +1,10 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-pack-unpack-ops))" --split-input-file %s | FileCheck %s -check-prefixes=CHECK-ALL,CHECK
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-pack-unpack-ops{use-only-reshapes=true}))" --split-input-file %s | FileCheck %s -check-prefixes=CHECK-ALL,CHECK-RESHAPE
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-pack-unpack-ops))" \
+// RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s -check-prefixes=CHECK-ALL,CHECK
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-pack-unpack-ops{use-only-reshapes=true}))" \
+// RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s -check-prefixes=CHECK-ALL,CHECK-RESHAPE
 
 func.func @simple_KCRS_to_KCRSsr(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<1x1x1x1x8x32xf32>) -> tensor<1x1x1x1x8x32xf32> {
-  %0 = tensor.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x32x8xf32> -> tensor<1x1x1x1x8x32xf32>
+  %0 = linalg.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x32x8xf32> -> tensor<1x1x1x1x8x32xf32>
   return %0 : tensor<1x1x1x1x8x32xf32>
 }
 // CHECK-ALL-LABEL: func.func @simple_KCRS_to_KCRSsr
@@ -21,7 +23,7 @@ func.func @simple_KCRS_to_KCRSsr(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<1x1x
 // -----
 
 func.func @simple_pad_and_pack(%input: tensor<5x1xf32>, %output: tensor<1x1x8x2xf32>, %pad: f32) -> tensor<1x1x8x2xf32> {
-  %0 = tensor.pack %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : tensor<5x1xf32> -> tensor<1x1x8x2xf32>
+  %0 = linalg.pack %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : tensor<5x1xf32> -> tensor<1x1x8x2xf32>
   return %0 : tensor<1x1x8x2xf32>
 }
 // CHECK-ALL-LABEL: func.func @simple_pad_and_pack
@@ -41,7 +43,7 @@ func.func @simple_pad_and_pack(%input: tensor<5x1xf32>, %output: tensor<1x1x8x2x
 // -----
 
 func.func @simple_NC_to_CNnc(%arg0: tensor<32x8xf32>, %arg1: tensor<1x1x32x8xf32>) -> tensor<1x1x32x8xf32>{
-  %0 = tensor.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<32x8xf32> -> tensor<1x1x32x8xf32>
+  %0 = linalg.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<32x8xf32> -> tensor<1x1x32x8xf32>
   return %0 : tensor<1x1x32x8xf32>
 }
 // CHECK-ALL-LABEL: func.func @simple_NC_to_CNnc
@@ -58,7 +60,7 @@ func.func @simple_NC_to_CNnc(%arg0: tensor<32x8xf32>, %arg1: tensor<1x1x32x8xf32
 // -----
 
 func.func @KCRS_to_KCRSsr(%arg0: tensor<1x1x128x64xf32>, %arg1: tensor<1x1x4x8x8x32xf32>) -> tensor<1x1x4x8x8x32xf32> {
-  %0 = tensor.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x128x64xf32> -> tensor<1x1x4x8x8x32xf32>
+  %0 = linalg.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x128x64xf32> -> tensor<1x1x4x8x8x32xf32>
   return %0 : tensor<1x1x4x8x8x32xf32>
 }
 // CHECK-ALL:       func.func @KCRS_to_KCRSsr
@@ -74,7 +76,7 @@ func.func @KCRS_to_KCRSsr(%arg0: tensor<1x1x128x64xf32>, %arg1: tensor<1x1x4x8x8
 // -----
 
 func.func @pad_and_pack(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %arg2: f32) -> tensor<2x8x8x2xf32> {
-  %0 = tensor.pack %arg0 padding_value(%arg2 : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1 : tensor<13x15xf32> -> tensor<2x8x8x2xf32>
+  %0 = linalg.pack %arg0 padding_value(%arg2 : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1 : tensor<13x15xf32> -> tensor<2x8x8x2xf32>
   return %0 : tensor<2x8x8x2xf32>
 }
 // CHECK-ALL:       func.func @pad_and_pack
@@ -94,7 +96,7 @@ func.func @pad_and_pack(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %a
 // -----
 
 func.func @KC_to_CKck(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) -> tensor<32x4x32x8xf32> {
-  %0 = tensor.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<128x256xf32> -> tensor<32x4x32x8xf32>
+  %0 = linalg.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<128x256xf32> -> tensor<32x4x32x8xf32>
   return %0 : tensor<32x4x32x8xf32>
 }
 // CHECK-ALL:       func.func @KC_to_CKck
@@ -110,7 +112,7 @@ func.func @KC_to_CKck(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) 
 // -----
 
 func.func @simple_KCRSsr_to_KCRS(%arg0: tensor<1x1x1x1x8x32xf32>, %arg1: tensor<1x1x32x8xf32>) -> tensor<1x1x32x8xf32> {
-  %0 = tensor.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x1x1x8x32xf32> -> tensor<1x1x32x8xf32>
+  %0 = linalg.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x1x1x8x32xf32> -> tensor<1x1x32x8xf32>
   return %0 : tensor<1x1x32x8xf32>
 }
 // CHECK-ALL-LABEL: func.func @simple_KCRSsr_to_KCRS
@@ -132,7 +134,7 @@ func.func @simple_KCRSsr_to_KCRS(%arg0: tensor<1x1x1x1x8x32xf32>, %arg1: tensor<
 // -----
 
 func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output: tensor<5x1xf32>) -> tensor<5x1xf32> {
-  %0 = tensor.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : tensor<1x1x8x2xf32> -> tensor<5x1xf32>
+  %0 = linalg.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : tensor<1x1x8x2xf32> -> tensor<5x1xf32>
   return %0 : tensor<5x1xf32>
 }
 // CHECK-ALL-LABEL: func.func @simple_unpack_and_extract_slice
@@ -152,7 +154,7 @@ func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output:
 // -----
 
 func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32>) -> tensor<32x8xf32>{
-  %0 = tensor.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<1x1x32x8xf32> -> tensor<32x8xf32>
+  %0 = linalg.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<1x1x32x8xf32> -> tensor<32x8xf32>
   return %0 : tensor<32x8xf32>
 }
 // CHECK-ALL-LABEL: func.func @simple_CNnc_to_NC
@@ -169,7 +171,7 @@ func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32
 // -----
 
 func.func @KCRSsr_to_KCRS(%arg0: tensor<13x12x4x8x8x32xf32>, %arg1: tensor<13x12x128x64xf32>) -> tensor<13x12x128x64xf32> {
-  %0 = tensor.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<13x12x4x8x8x32xf32> -> tensor<13x12x128x64xf32>
+  %0 = linalg.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<13x12x4x8x8x32xf32> -> tensor<13x12x128x64xf32>
   return %0 : tensor<13x12x128x64xf32>
 }
 // CHECK-ALL:       func.func @KCRSsr_to_KCRS
@@ -189,7 +191,7 @@ func.func @KCRSsr_to_KCRS(%arg0: tensor<13x12x4x8x8x32xf32>, %arg1: tensor<13x12
 // -----
 
 func.func @unpack_and_extract_slice(%arg0: tensor<2x8x8x2xf32>, %arg1: tensor<13x15xf32>) -> tensor<13x15xf32> {
-  %0 = tensor.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1 : tensor<2x8x8x2xf32> -> tensor<13x15xf32>
+  %0 = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1 : tensor<2x8x8x2xf32> -> tensor<13x15xf32>
   return %0 : tensor<13x15xf32>
 }
 // CHECK-ALL:      func.func @unpack_and_extract_slice
@@ -210,7 +212,7 @@ func.func @unpack_and_extract_slice(%arg0: tensor<2x8x8x2xf32>, %arg1: tensor<13
 // -----
 
 func.func @CKck_to_KC(%arg0: tensor<32x4x32x8xf32>, %arg1: tensor<128x256xf32>) -> tensor<128x256xf32> {
-  %0 = tensor.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<32x4x32x8xf32> -> tensor<128x256xf32>
+  %0 = linalg.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<32x4x32x8xf32> -> tensor<128x256xf32>
   return %0 : tensor<128x256xf32>
 }
 // CHECK-ALL:      func.func @CKck_to_KC
@@ -224,18 +226,16 @@ func.func @CKck_to_KC(%arg0: tensor<32x4x32x8xf32>, %arg1: tensor<128x256xf32>) 
 // -----
 
 func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32>) -> tensor<?x?x16x1xf32> {
-  %pack = tensor.pack %src inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
+  %pack = linalg.pack %src inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
   return %pack : tensor<?x?x16x1xf32>
 }
-// CHECK-ALL-DAG:  #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * 16 - s1)>
-// CHECK-ALL-DAG:  #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK-ALL:      func.func @pack_matmul_DYN_LHS
 // CHECK-ALL-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-ALL-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-ALL-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-ALL-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %c0 : tensor<?x?xf32>
-// CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply #[[MAP0]]
-// CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply #[[MAP1]]
+// CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * 16 - s1)>
+// CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK-ALL:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK-ALL:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
 // CHECK-ALL-SAME:     {{\[}}[0, 1], [2, 3]]
@@ -248,17 +248,15 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // -----
 
 func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32>) -> tensor<?x?x16x1xf32> {
-  %pack = tensor.pack %src outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
+  %pack = linalg.pack %src outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
   return %pack : tensor<?x?x16x1xf32>
 }
-// CHECK-ALL-DAG:  #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * 16 - s1)>
-// CHECK-ALL-DAG:  #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK-ALL:      func.func @pack_matmul_DYN_RHS
 // CHECK-ALL-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-ALL-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-ALL-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply #[[MAP1]]
-// CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply #[[MAP0]]
+// CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>
+// CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * 16 - s1)>
 // CHECK-ALL:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK-ALL:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
 // CHECK-ALL-SAME:     {{\[}}[0, 1], [2, 3]]
@@ -266,3 +264,16 @@ func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-ALL-SAME:     ins(%[[EXPANDED]] : tensor<?x1x?x16xf32>)
 // CHECK-ALL-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
 // CHECK-ALL-SAME:     permutation = [2, 0, 3, 1]
+
+// -----
+
+func.func @pack_with_lowering_config(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %arg2: f32) -> tensor<2x8x8x2xf32> {
+  %0 = linalg.pack %arg0 padding_value(%arg2 : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1
+      {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 8, 2]]>} : tensor<13x15xf32> -> tensor<2x8x8x2xf32>
+  return %0 : tensor<2x8x8x2xf32>
+}
+// CHECK-ALL-LABEL: func.func @pack_with_lowering_config
+// CHECK-ALL:         tensor.pad
+// CHECK-ALL:         tensor.expand_shape
+// CHECK-ALL:         linalg.transpose
+// CHECK-ALL-SAME:      lowering_config = #iree_codegen.lowering_config<tile_sizes = [{{\[}}1, 1, 8, 2]]>

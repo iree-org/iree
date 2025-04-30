@@ -53,7 +53,7 @@ typedef struct iree_hal_module_debug_sink_t {
 IREE_API_EXPORT iree_hal_module_debug_sink_t
 iree_hal_module_debug_sink_null(void);
 
-#if defined(IREE_FILE_IO_ENABLE)
+#if IREE_FILE_IO_ENABLE
 
 // Returns a default debug sink that routes to an stdio stream in textual form.
 IREE_API_EXPORT iree_hal_module_debug_sink_t

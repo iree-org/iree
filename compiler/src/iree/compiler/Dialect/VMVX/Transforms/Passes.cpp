@@ -86,12 +86,13 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
       .addPass(memref::createExpandOpsPass);
 
   // Handle tensor-type constants.
-  addConstantBufferizePasses(modulePassManager);
+  modulePassManager.addPass(createIREEBufferizeConstantsPass());
   FunctionLikeNest(modulePassManager)
       .addPass(createFoldTensorExtractOpPass)
 
       // Resolve get_buffer_descriptor ops. All structural buffer manipulations
       // must conclude before this point.
+      .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createResolveBufferDescriptorsPass)
       .addPass(createCleanupBufferAllocViewPass)

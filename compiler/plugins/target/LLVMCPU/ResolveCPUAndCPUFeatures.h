@@ -14,6 +14,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 enum class ResolveCPUAndCPUFeaturesStatus {
   OK,
+  UnknownCPU,
   InconsistentHost,
   UnimplementedMapping,
   ImplicitGenericFallback

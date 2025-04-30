@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -36,6 +37,7 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
+#include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -969,11 +971,13 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateBubbleVectorBitCastOpPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
+    vector::populateVectorGatherToConditionalLoadPatterns(patterns);
     vector::populateVectorInterleaveLoweringPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use outerproduct.
+    vector::VectorTransformsOptions defaultOptions;
     vector::populateVectorContractLoweringPatterns(
-        patterns, vector::VectorTransformsOptions());
+        patterns, defaultOptions.vectorContractLowering);
     vector::populateVectorMaskMaterializationPatterns(
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
@@ -981,7 +985,7 @@ void ConvertToLLVMPass::runOnOperation() {
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use shuffle.
     vector::populateVectorTransposeLoweringPatterns(
-        patterns, vector::VectorTransformsOptions());
+        patterns, defaultOptions.vectorTransposeLowering);
     populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
@@ -1039,7 +1043,9 @@ void ConvertToLLVMPass::runOnOperation() {
 
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);
+  // Note: workaround needed due to `memref.subview` returnd from an `if`.
   memref::populateExpandStridedMetadataPatterns(patterns);
+  iree_compiler::populateIREEResolveExtractStridedMetadataPatterns(patterns);
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
@@ -1055,9 +1061,9 @@ void ConvertToLLVMPass::runOnOperation() {
   vector::populateVectorStepLoweringPatterns(patterns);
   populateVectorToLLVMConversionPatterns(typeConverter, patterns,
                                          reassociateFpReductions);
+  ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
-
   if (isAArch64(targetAttr) &&
       (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
     populateArmSVELegalizeForLLVMExportPatterns(typeConverter, patterns);

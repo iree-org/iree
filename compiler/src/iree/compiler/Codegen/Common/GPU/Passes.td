@@ -13,6 +13,17 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+def DecomposeHorizontallyFusedGemmsPass :
+    InterfacePass<"iree-codegen-gpu-decompose-horizontally-fused-gemms",
+                  "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes a horizontally fused GEMM back into its constituent GEMMs";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::linalg::LinalgDialect",
+  ];
+}
+
 def GPUCheckResourceUsagePass :
     InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";
@@ -120,6 +131,8 @@ def GPULowerToUKernelsPass :
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
     "::mlir::arith::ArithDialect",
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::gpu::GPUDialect",
     "::mlir::tensor::TensorDialect",
   ];
 }
@@ -249,7 +262,7 @@ def GPUApplyTilingLevelPass :
                          "Tile and fuse all annotated ops to threads")
            )}]>,
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
-           /*default=*/"false",
+           /*default=*/"true",
            "Allow pad fusion to generate zero size slices">
   ];
 }

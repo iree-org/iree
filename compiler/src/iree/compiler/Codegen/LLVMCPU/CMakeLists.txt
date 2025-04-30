@@ -69,7 +69,6 @@ iree_cc_library(
     "LLVMCPUTileRootAndFuseProducerConsumer.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
-    "LLVMCPUVectorTransferLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
     "LLVMCPUVerifyVectorSizeLegality.cpp"
     "LLVMCPUVirtualVectorLowering.cpp"
@@ -139,6 +138,8 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
+    MLIRUBToLLVM
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToArmSME
@@ -153,7 +154,6 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::LinalgExt::IR

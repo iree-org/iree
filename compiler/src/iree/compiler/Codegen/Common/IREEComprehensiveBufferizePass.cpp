@@ -13,10 +13,10 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -46,6 +46,7 @@ using mlir::bufferization::OneShotBufferizationOptions;
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_ELIMINATEEMPTYTENSORSPASS
+#define GEN_PASS_DEF_IREEBUFFERIZECONSTANTSPASS
 #define GEN_PASS_DEF_IREECOMPREHENSIVEBUFFERIZEPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
@@ -77,7 +78,7 @@ class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
+    registry.insert<tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -99,11 +100,11 @@ public:
     // clang-format off
     registry
         .insert<affine::AffineDialect,
+                amdgpu::AMDGPUDialect,
                 arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 gpu::GPUDialect,
-                IREE::Flow::FlowDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
                 linalg::LinalgDialect,
@@ -119,6 +120,20 @@ public:
 private:
   const BufferizationOptions::AllocationFn allocationFn = defaultAllocationFn;
   const BufferizationOptions::MemCpyFn memCpyFn = defaultMemCpyFn;
+};
+
+/// Pass to convert from tensor based constants to memref.
+class IREEBufferizeConstantsPass final
+    : public impl::IREEBufferizeConstantsPassBase<IREEBufferizeConstantsPass> {
+public:
+  using impl::IREEBufferizeConstantsPassBase<
+      IREEBufferizeConstantsPass>::IREEBufferizeConstantsPassBase;
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
+                    memref::MemRefDialect>();
+  }
+
+  void runOnOperation() override;
 };
 } // namespace
 
@@ -241,6 +256,18 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   }
 }
 
+void IREEBufferizeConstantsPass::runOnOperation() {
+  mlir::bufferization::OneShotBufferizationOptions opt;
+  opt.copyBeforeWrite = true;
+  opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+  if (failed(
+          mlir::bufferization::runOneShotBufferize(getOperation(), opt,
+                                                   /*statistics=*/nullptr))) {
+    signalPassFailure();
+    return;
+  }
+}
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
@@ -273,14 +300,6 @@ void addIREEComprehensiveBufferizePasses(
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
   addIREEPostBufferizationPasses(funcPassManager);
-}
-
-void addConstantBufferizePasses(OpPassManager &funcPassManager) {
-  OneShotBufferizationOptions options;
-  options.copyBeforeWrite = true;
-  options.enforceAliasingInvariants = false;
-  options.opFilter.allowOperation(arith::ConstantOp::getOperationName());
-  funcPassManager.addPass(bufferization::createOneShotBufferizePass(options));
 }
 
 } // namespace mlir::iree_compiler

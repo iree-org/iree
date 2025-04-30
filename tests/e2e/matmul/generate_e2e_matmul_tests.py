@@ -30,7 +30,7 @@ class MatrixElemTypeId(enum.Enum):
     F16 = "f16"
     BF16 = "bf16"
     F8E5M2 = "f8E5M2"
-    F8E4M3 = "f8E4M3"
+    F8E4M3FN = "f8E4M3FN"
     F8E5M2FNUZ = "f8E5M2FNUZ"
     F8E4M3FNUZ = "f8E4M3FNUZ"
 
@@ -53,7 +53,8 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
     LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
-    LLVMGPUVectorDistributeWMMA = "LLVMGPUVectorDistributeWMMA"
+    LLVMGPUVectorDistributeWMMAR3 = "LLVMGPUVectorDistributeWMMAR3"
+    LLVMGPUVectorDistributeWMMAR4 = "LLVMGPUVectorDistributeWMMAR4"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
@@ -310,8 +311,10 @@ def get_rocm_test_compilation_infos(
     intrinsic = ""
     if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
         intrinsic = "MFMA"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMA:
-        intrinsic = "WMMA"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR3:
+        intrinsic = "WMMAR3"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR4:
+        intrinsic = "WMMAR4"
     else:
         raise ValueError("Unknown pipeline for rocm")
 
@@ -357,22 +360,46 @@ def get_rocm_test_compilation_infos(
             MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 1, 1, 1, 1, 1),
             MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 4, 1, 4, 1, 1),
         ]
-    elif intrinsic == "WMMA":
+    elif intrinsic == "WMMAR3":
         schedules = [
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 2),
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 2, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 2, 1, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
-            MMASchedule("WMMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
-            MMASchedule("WMMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 1, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 1, 2),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 2, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 2, 1, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 2, 2, 1, 1, 1),
-            MMASchedule("WMMA_I32_16x16x16_I8", 2, 4, 2, 1, 2),
-            MMASchedule("WMMA_I32_16x16x16_I8", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR3_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR3_I32_16x16x16_I8", 4, 2, 4, 2, 2),
+        ]
+    elif intrinsic == "WMMAR4":
+        schedules = [
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 4, 2, 4, 2, 2),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 2),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 2, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 2, 1, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 2, 1, 1, 1),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 4, 2, 1, 2),
+            MMASchedule("WMMAR4_I32_16x16x16_I8", 4, 2, 4, 2, 2),
         ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
@@ -418,11 +445,13 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMA_F32_16x16x16_F16":
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMA_I32_16x16x16_I8":
+        elif schedule.intrinsic in (
+            "WMMAR3_F32_16x16x16_F16",
+            "WMMAR3_I32_16x16x16_I8",
+            "WMMAR4_F32_16x16x16_F16",
+            "WMMAR4_F32_16x16x16_F8E4M3FN",
+            "WMMAR4_I32_16x16x16_I8",
+        ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
@@ -454,7 +483,8 @@ def get_test_compilation_infos(
 
     if compilation_info_id in [
         CompilationInfoId.LLVMGPUVectorDistributeMFMA,
-        CompilationInfoId.LLVMGPUVectorDistributeWMMA,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMAR3,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMAR4,
     ]:
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 
@@ -544,7 +574,7 @@ def int_or_question_mark(s: DimSize):
 
 
 # Stringification used for generating alphanumeric identifiers, e.g.
-# func.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
+# util.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
 def int_or_DYN(s: DimSize):
     return s.value or "DYN"
 
@@ -671,20 +701,20 @@ def generate_function(
     compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
     if shape.accumulate:
         signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
-        import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
+        import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
         func_definition = func_definition + (
-            f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
+            f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
             f"{compute}\n"
-            f"  return %result: {acc_tensor_type}\n"
+            f"  util.return %result: {acc_tensor_type}\n"
             f"}}\n"
         )
     else:
         literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
         if acc_r == "?":
             signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
+            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
             func_definition = func_definition + (
-                f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
                 f"  %c0 = arith.constant 0 : index\n"
                 f"  %c1 = arith.constant 1 : index\n"
                 f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
@@ -693,19 +723,19 @@ def generate_function(
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
                 f"{compute}"
-                f"  return %result: {acc_tensor_type}\n"
+                f"  util.return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
         else:
             signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
+            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
             func_definition = func_definition + (
-                f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
                 f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
                 f"{compute}"
-                f"  return %result: {acc_tensor_type}\n"
+                f"  util.return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
     return MLIRFunction(
@@ -758,7 +788,7 @@ def generate_random_matrix(
         f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
         f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
         f"  %{name}_seed = arith.constant {pseudorandom_generator_seed} : i32\n"
-        f"  %{name} = call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
+        f"  %{name} = util.call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
     )
 
 
@@ -783,7 +813,7 @@ def generate_call(
 
     description = f"Matmul shape (MxKxN): {shape.m}x{shape.k}x{shape.n}"
     op = (
-        f"func.func @{func_name}() attributes {{\n"
+        f"util.func @{func_name}() attributes {{\n"
         f'  iree.reflection = {{description = "{description}"}}\n'
         "} {\n"
         "  %device_index = arith.constant 0 : index\n"
@@ -808,12 +838,12 @@ def generate_call(
         pseudorandom_generator_seed = pseudorandom_generator_seed - 1
         op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
         op = op + (
-            f"  %result = call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
+            f"  %result = util.call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
         )
     else:
         op = op + (
             f"  %acc = util.null : !hal.buffer_view\n"
-            f"  %result = call @module.{function.name}(%lhs, %rhs) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
+            f"  %result = util.call @module.{function.name}(%lhs, %rhs) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
         )
 
     op = op + (
@@ -821,10 +851,10 @@ def generate_call(
         f"  %k = arith.constant {shape.k} : i64\n"
         f"  %n = arith.constant {shape.n} : i64\n"
         f"  %transpose_rhs = arith.constant {transpose_rhs} : i32\n"
-        f"  call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
-    op = op + "  return\n"
+    op = op + "  util.return\n"
     op = op + "}\n"
 
     return TestCall(function=function, op=op)
@@ -895,7 +925,7 @@ def parse_arguments():
             "f16",
             "bf16",
             "f8E5M2",
-            "f8E4M3",
+            "f8E4M3FN",
             "f8E5M2FNUZ",
             "f8E4M3FNUZ",
         ],
@@ -964,8 +994,8 @@ def write_calls_file(functions, calls, filename, requirements):
 
     # Declare the custom module that generates arguments.
     module_definition = module_definition + (
-        "func.func private @matmul_test.generate_random_matrix(%device: !hal.device, %dim0: i64, %dim1: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
-        "func.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %transpose_rhs: i32, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
+        "util.func private @matmul_test.generate_random_matrix(%device: !hal.device, %dim0: i64, %dim1: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
+        "util.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %transpose_rhs: i32, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
         "\n"
     )
 

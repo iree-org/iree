@@ -155,8 +155,8 @@ nav:
           - CPU: "guides/deployment-configurations/cpu.md"
           - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
           - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
-          - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
           - GPU - ROCm: "guides/deployment-configurations/gpu-rocm.md"
+          - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
       - "General topics":
           - "guides/parameters.md"
@@ -182,12 +182,10 @@ nav:
               - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
               - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
+              - TensorExt: "reference/mlir-dialects/TensorExt.md"
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
               - VMVX: "reference/mlir-dialects/VMVX.md"
-          # Dialects from llvm-external-projects/iree-dialects/
-          - "Public dialects":
-              - IREEInput: "reference/mlir-dialects/IREEInput.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
@@ -199,10 +197,10 @@ nav:
           - "developers/general/contributing.md"
           - "developers/general/developer-overview.md"
           - "developers/general/developer-tips.md"
+          - "developers/general/testing-guide.md"
           - "developers/general/github-actions.md"
           - "developers/general/release-management.md"
           - "developers/general/versioning-scheme.md"
-          - "developers/general/testing-guide.md"
       - "Building":
           - "developers/building/bazel.md"
           - "developers/building/emscripten.md"

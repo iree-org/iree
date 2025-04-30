@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
-
 # flatbuffer_c_library()
 #
 # CMake function to invoke the flatcc compiler.

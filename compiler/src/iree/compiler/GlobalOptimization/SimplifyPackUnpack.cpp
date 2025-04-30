@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -25,7 +25,7 @@ struct SimplifyPackUnpackPass
 void SimplifyPackUnpackPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  tensor::populateSimplifyPackAndUnpackPatterns(patterns);
+  linalg::populateSimplifyPackAndUnpackPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }

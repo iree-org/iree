@@ -22,6 +22,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -29,6 +30,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -71,20 +73,102 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
 }
 
+/// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
+/// This is needed for ping-pong scheduling patterns to prevent off
+/// waves from interrupting the MFMA region of the high priority wave.
+/// The IR is rewritten as follows:
+///
+/// rocdl.s.setprio {iree_gpu.swap_mfma = n}
+/// amdgpu.mfma // 1
+/// ...
+/// amdgpu.mfma // n
+/// amdgpu.mfma // n + 1
+///
+/// to
+///
+/// amdgpu.mfma // 1
+/// ...
+/// amdgpu.mfma // n
+/// rocdl.s.setprio
+/// amdgpu.mfma // n + 1
+///
+/// This only looks at successor mfmas within the same block and is best
+/// effort.
+constexpr StringLiteral kSwapName = "iree_gpu.swap_mfma";
+struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
+  using OpRewritePattern<ROCDL::SetPrioOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(ROCDL::SetPrioOp setPrio,
+                                PatternRewriter &rewriter) const override {
+    if (!setPrio->hasAttr(kSwapName)) {
+      return failure();
+    }
+
+    auto count = setPrio->getAttrOfType<IntegerAttr>(kSwapName);
+    if (!count) {
+      return failure();
+    }
+
+    // Remove the swap attribute no matter what to avoid reapplying this
+    // pattern.
+    rewriter.startOpModification(setPrio);
+    setPrio->removeDiscardableAttr(kSwapName);
+
+    Operation *current = setPrio->getNextNode();
+    Operation *mfmaToSwap = nullptr;
+
+    for (int64_t remainingToSwap = count.getInt();
+         remainingToSwap > 0 && current; current = current->getNextNode()) {
+      if (isa<mlir::amdgpu::MFMAOp>(current)) {
+        --remainingToSwap;
+        mfmaToSwap = current;
+      }
+    }
+    if (mfmaToSwap) {
+      rewriter.moveOpAfter(setPrio, mfmaToSwap);
+    }
+    rewriter.finalizeOpModification(setPrio);
+    return success();
+  }
+};
+
+static void populateSwapSetPrioWithMFMAPatterns(RewritePatternSet &patterns) {
+  patterns.add<SwapSetPrioWithMFMA>(patterns.getContext());
+}
+
 } // namespace
 
+template <typename... Floats>
+static bool containsAPred(Type type) {
+  type = getElementTypeOrSelf(type);
+  return llvm::isa<Floats...>(type);
+}
+
 // Function to check valid data types on the ROCm backend.
-static LogicalResult validateDataTypes(Operation *op) {
-  auto operandTypes = llvm::to_vector(op->getOperandTypes());
-  auto resultTypes = llvm::to_vector(op->getResultTypes());
-  if (llvm::any_of(llvm::concat<Type>(operandTypes, resultTypes),
-                   llvm::IsaPred<Float8E4M3FNType, Float8E5M2Type>)) {
-    op->emitOpError()
-        << "F8E5M2 and F8E4M3FN types are not supported on "
-           "the ROCm backend; try F8E5M2FNUZ or F8E4M3FNUZ instead.";
-    return failure();
+// Note to readers: different chips take different FP8 formats but re-use the
+// same instruction and intrinsic names, so we must filter out the "wrong" FP8
+// here.
+static LogicalResult validateDataTypes(Operation *op,
+                                       const amdgpu::Chipset &chipset) {
+  constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
+  if (!amdgpu::hasOcpFp8(chipset)) {
+    auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError("F8E5M2 and F8E4M3FN types are not supported on "
+                             "gfx942 (MI-300) or older chipsets; try "
+                             "F8E5M2FNUZ or F8E4M3FNUZ instead.");
+    }
   }
 
+  if (chipset != kGfx942) {
+    auto pred = containsAPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError(
+          "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
+          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead.");
+    }
+  }
   return success();
 }
 
@@ -99,17 +183,12 @@ struct ConvertToROCDLPass final
       ConvertToROCDLPass>::ConvertToROCDLPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
-                ROCDL::ROCDLDialect, amdgpu::AMDGPUDialect, gpu::GPUDialect>();
+    registry.insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
+                    ROCDL::ROCDLDialect, amdgpu::AMDGPUDialect, gpu::GPUDialect,
+                    ub::UBDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
-
-    m.walk([&](Operation *op) {
-      if (failed(validateDataTypes(op)))
-        return signalPassFailure();
-    });
 
     if (clROCMIndexingBits != 32 && clROCMIndexingBits != 64) {
       m.emitOpError() << "unsupported: ROCm index bit widths must either be "
@@ -142,6 +221,9 @@ struct ConvertToROCDLPass final
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      auto options =
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct);
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
       StringRef chipset = getGPUTargetAttr(m).getArch();
@@ -150,10 +232,21 @@ struct ConvertToROCDLPass final
         m.emitOpError() << "Invalid chipset name: " << chipset;
         return signalPassFailure();
       }
+      WalkResult allTypesValid = m.walk([&](Operation *op) {
+        if (failed(validateDataTypes(op, *maybeChipset))) {
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+      if (allTypesValid.wasInterrupted()) {
+        return signalPassFailure();
+      }
+
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
+      populateSwapSetPrioWithMFMAPatterns(patterns);
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
@@ -164,9 +257,8 @@ struct ConvertToROCDLPass final
       vector::populateVectorInterleaveLoweringPatterns(patterns);
       vector::populateVectorInterleaveToShufflePatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
-          patterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
+          patterns, options.vectorContractLowering);
+      vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
@@ -176,7 +268,7 @@ struct ConvertToROCDLPass final
       // TODO: doubtful that the "default" does what one want here, it is likely
       // better to use something else.
       vector::populateVectorTransposeLoweringPatterns(
-          patterns, vector::VectorTransformsOptions());
+          patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
@@ -216,15 +308,16 @@ struct ConvertToROCDLPass final
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateComplexToLLVMConversionPatterns(converter, llvmPatterns);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
-      memref::populateExpandStridedMetadataPatterns(llvmPatterns);
+      iree_compiler::populateIREEResolveExtractStridedMetadataPatterns(
+          llvmPatterns);
       populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      StringRef chipset = getGPUTargetAttr(m).getArch();
-      FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
-      populateAMDGPUToROCDLConversionPatterns(
-          converter, llvmPatterns, maybeChipset.value_or(amdgpu::Chipset()));
+      StringRef targetArch = getGPUTargetAttr(m).getArch();
+      amdgpu::Chipset chipset =
+          amdgpu::Chipset::parse(targetArch).value_or(amdgpu::Chipset());
+      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns, chipset);
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
@@ -233,10 +326,12 @@ struct ConvertToROCDLPass final
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
-                                           gpu::amd::Runtime::Unknown);
+                                           gpu::amd::Runtime::Unknown, chipset);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
+      ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
+
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
     }

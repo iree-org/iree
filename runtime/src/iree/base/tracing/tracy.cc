@@ -92,6 +92,9 @@ static char* iree_tracing_tracy_source_file_callback(void* user_data,
 }
 
 void iree_tracing_tracy_initialize() {
+#ifdef TRACY_MANUAL_LIFETIME
+  tracy::StartupProfiler();
+#endif  // TRACY_MANUAL_LIFETIME
   // Register a single source provider callback with Tracy. Tracy only supports
   // one at a time and the callback must remain valid until program exit.
   tracy::Profiler::SourceCallbackRegister(
@@ -111,6 +114,9 @@ void iree_tracing_tracy_deinitialize() {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 #endif  // IREE_PLATFORM_*
+#ifdef TRACY_MANUAL_LIFETIME
+  tracy::ShutdownProfiler();
+#endif  // TRACY_MANUAL_LIFETIME
 }
 
 void iree_tracing_publish_source_file(const void* filename,
@@ -407,6 +413,12 @@ void iree_tracing_gpu_zone_begin_external(
     uint8_t context_id, uint16_t query_id, const char* file_name,
     size_t file_name_length, uint32_t line, const char* function_name,
     size_t function_name_length, const char* name, size_t name_length) {
+  // If name is NULL or empty, use function_name as the zone name.
+  if (!name || name_length == 0) {
+    name = function_name;
+    name_length = function_name_length;
+  }
+
   const auto src_loc = tracy::Profiler::AllocSourceLocation(
       line, file_name, file_name_length, function_name, function_name_length,
       name, name_length);

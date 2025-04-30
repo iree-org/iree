@@ -27,29 +27,62 @@ else()
 
   # Deps slightly differ by platform but some are common.
   pkg_check_modules(TRACY_DEPS
-    tbb
     libzstd
-  )
-  pkg_check_modules(TRACY_CAPSTONE_DEPS
-    capstone
   )
 
   if(NOT TRACY_DEPS_FOUND)
     message(STATUS "Could not find Tracy dependencies (Tracy server will not be built).")
-    message(STATUS "To build Tracy, install packages libzstd, and tbb:")
-    message(STATUS "  Ubuntu/Debian: `apt install libcapstone-dev libtbb-dev libzstd-dev`")
-    message(STATUS "  MacOS: `brew install capstone tbb zstd`")
-    return()
-  endif()
-
-  if(NOT TRACY_CAPSTONE_DEPS_FOUND)
-    message(STATUS "Could not find capstone, a Tracy dependency (Tracy server will not be built).")
-    message(STATUS "To build Tracy, install capstone or build from source:")
-    message(STATUS "  Ubuntu/Debian: `apt install libcapstone-dev`")
-    message(STATUS "  MacOS: `brew install capstone`")
+    message(STATUS "To build Tracy, install libzstd:")
+    message(STATUS "  Ubuntu/Debian: `apt install libzstd-dev`")
+    message(STATUS "  MacOS: `brew install zstd`")
     return()
   endif()
 endif()
+
+#-------------------------------------------------------------------------------
+# Source dependencies
+# See https://github.com/wolfpld/tracy/blob/master/cmake/vendor.cmake
+#-------------------------------------------------------------------------------
+
+include(FetchContent)
+
+FetchContent_Declare(
+  capstone
+  GIT_REPOSITORY https://github.com/capstone-engine/capstone.git
+  GIT_TAG        97db712c91e964718f9cc300e81b9cf76b31a22e # 6.0.0-Alpha1
+  EXCLUDE_FROM_ALL
+)
+set(CAPSTONE_X86_ATT_DISABLE ON CACHE BOOL "" FORCE)
+set(CAPSTONE_ALPHA_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_HPPA_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_LOONGARCH_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_M680X_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_M68K_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_MIPS_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_MOS65XX_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_PPC_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_SPARC_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_SYSTEMZ_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_XCORE_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_TRICORE_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_TMS320C64X_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_M680X_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_EVM_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_WASM_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_BPF_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_RISCV_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_SH_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_XTENSA_SUPPORT OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_BUILD_MACOS_THIN ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(capstone)
+
+FetchContent_Declare(
+  PPQSort
+  GIT_REPOSITORY https://github.com/GabTux/PPQSort.git
+  GIT_TAG        4b964020d67b435dae7ebac7b8f5ecea1f421c58 # v1.0.3
+  EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(PPQSort)
 
 #-------------------------------------------------------------------------------
 # Configuration
@@ -58,7 +91,7 @@ endif()
 function(setup_cxx_options name)
   set_target_properties(${name}
     PROPERTIES
-      CXX_STANDARD 17
+      CXX_STANDARD 20
   )
   target_compile_options(${name}
     PRIVATE
@@ -68,22 +101,19 @@ function(setup_cxx_options name)
     PUBLIC
       ${TRACY_SOURCE_DIR}/imgui
       ${TRACY_DEPS_INCLUDE_DIRS}
-      ${TRACY_CAPSTONE_DEPS_INCLUDE_DIRS}
-      # capstone-next moved capstone.h to a capstone/ subdirectory, but the
-      # pkg-config isn't updated yet as of April 2022.
-      ${TRACY_CAPSTONE_DEPS_INCLUDE_DIRS}/capstone
+      ${capstone_SOURCE_DIR}/include/capstone
   )
   target_link_libraries(${name}
     PRIVATE
       ${TRACY_DEPS_LIBRARIES}
-      ${TRACY_CAPSTONE_DEPS_LIBRARIES}
       ${CMAKE_DL_LIBS}
       ${CMAKE_THREAD_LIBS_INIT}
+      capstone
+      PPQSort
   )
   target_link_directories(${name}
     PRIVATE
       ${TRACY_DEPS_LIBRARY_DIRS}
-      ${TRACY_CAPSTONE_DEPS_LIBRARY_DIRS}
   )
 endfunction()
 

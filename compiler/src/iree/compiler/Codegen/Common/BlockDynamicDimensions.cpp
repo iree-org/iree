@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -233,9 +234,18 @@ static LogicalResult blockDynamicDimensions(
         blockDynamicDimensionsOfValue(rewriter, resultDivisibilityInfo, result);
     if (reshapes) {
       llvm::SmallPtrSet<Operation *, 1> ignoreUses;
-      ignoreUses.insert(reshapes->expandShapeOp);
-      rewriter.replaceAllUsesExcept(
-          result, reshapes->collapseShapeOp.getResult(), ignoreUses);
+      auto replaceIf = [&](OpOperand &use) {
+        Operation *user = use.getOwner();
+        if (user == reshapes->expandShapeOp) {
+          return false;
+        }
+        if (isa<tensor::DimOp>(user)) {
+          return false;
+        }
+        return true;
+      };
+      rewriter.replaceUsesWithIf(result, reshapes->collapseShapeOp.getResult(),
+                                 replaceIf);
     }
   }
   return success();
@@ -265,6 +275,10 @@ static LogicalResult
 blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        linalg::LinalgOp linalgOp) {
+  if (isa<linalg::GenericOp>(linalgOp) && linalgOp.isAllParallelLoops()) {
+    return blockDynamicDimensionsOfAllTensorOperandsAndResults(
+        rewriter, dynamicDimAnalysis, linalgOp);
+  }
   if (linalg::isaContractionOpInterface(linalgOp)) {
     return blockDynamicDimensionsOfAllTensorOperandsAndResults(
         rewriter, dynamicDimAnalysis, linalgOp);
@@ -346,6 +360,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+    tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
     linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                 context);
     // Add some additional patterns that can simplify the IR and remove dead
@@ -375,6 +390,9 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
+    // Add patterns to fold the remaining reshape operation with their interface
+    // bindings or `tensor.empty` operations.
+    populateReshapeToInterfaceTensorPatterns(removeBarrierOpsPatterns);
     tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
     linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                 context);

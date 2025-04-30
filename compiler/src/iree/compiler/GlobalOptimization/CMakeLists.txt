@@ -42,6 +42,7 @@ iree_cc_library(
   SRCS
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
+    "ConvertStridedContractionToContraction.cpp"
     "DataLayoutPropagation.cpp"
     "DecomposeConcat.cpp"
     "DemoteContractionInputsToBF16.cpp"
@@ -63,6 +64,7 @@ iree_cc_library(
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
     "Utils.cpp"
+    "WarnOnUninitializedValues.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

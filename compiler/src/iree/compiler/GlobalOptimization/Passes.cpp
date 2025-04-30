@@ -34,6 +34,10 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
     llvm::cl::desc(
         "Enables propagation of transpose ops to improve fusion chances."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableAttentionVTranspose(
+    "iree-global-opt-enable-attention-v-transpose",
+    llvm::cl::desc("Enables transposition of v operand of attention ops,"),
+    llvm::cl::init(true));
 
 // TODO(hanchung): Remove the flag. We don't want to do early materialization by
 // default. Because it won't work for heterogeneous computing. This is not the
@@ -57,12 +61,21 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
         clEnumValN(DemotionOption::None, "none", "Demote no contraction ops.")),
     llvm::cl::init(DemotionOption::None));
 
-static llvm::cl::opt<int> clPadFactor(
-    "iree-global-opt-pad-factor",
-    llvm::cl::desc("provides padding size hints that will be attached to "
-                   "encodings."),
-    llvm::cl::init(32));
+static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
+    "iree-global-opt-set-encoding-strategy",
+    llvm::cl::desc("Set the encoding strategy for operations."),
+    llvm::cl::values(
+        clEnumValN(
+            DispatchCreation::EncodingOptions::Generic, "generic",
+            "Using EncodingAttr which encodes as much information as possible"),
+        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
+                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
+static llvm::cl::opt<bool> clWarnOnUninitializedValues(
+    "iree-global-opt-enable-warn-on-uninitialized-values",
+    llvm::cl::desc("Warn on some classes of uses of uninitialized values."),
+    llvm::cl::init(true));
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -90,6 +103,11 @@ void buildGlobalOptimizationPassPipeline(
         transformOptions.options.parameterImportMaximumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
         importParametersOptions));
+  }
+
+  if (clWarnOnUninitializedValues) {
+    FunctionLikeNest(mainPassManager)
+        .addPass(createWarnOnUninitializedValuesPass);
   }
 
   // Preprocessing passes to get the program into a canonical state.
@@ -137,6 +155,8 @@ void buildGlobalOptimizationPassPipeline(
       });
 
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
+  mainPassManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
@@ -157,8 +177,11 @@ void buildGlobalOptimizationPassPipeline(
       .addPredicatedPass(
           clEnableTransposePropagation,
           [&]() {
-            return createPropagateLinalgTransposePass(
-                transformOptions.options.aggressiveTransposePropagation);
+            PropagateLinalgTransposePassOptions options;
+            options.enableAggressivePropagation =
+                transformOptions.options.aggressiveTransposePropagation;
+            options.enableAttentionVTranspose = clEnableAttentionVTranspose;
+            return createPropagateLinalgTransposePass(options);
           })
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
@@ -167,7 +190,7 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     FunctionLikeNest(mainPassManager).addPass([&]() {
       return DispatchCreation::createSetEncodingPass(
-          DispatchCreation::SetEncodingPassOptions{clPadFactor});
+          DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
     });
     // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
     // we can use `FunctionLikNest` here.

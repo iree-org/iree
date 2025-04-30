@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "./SetBlockIdsRangePass.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
@@ -33,6 +32,7 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/TargetSelect.h"
@@ -290,7 +290,7 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   // Ensure consistent target information.
   const llvm::Triple &targetTriple = targetMachine.getTargetTriple();
   module.setDataLayout(targetMachine.createDataLayout());
-  module.setTargetTriple(targetTriple.str());
+  module.setTargetTriple(targetTriple);
 
   auto specializationCallback = [&](llvm::Module &userModule) {
     // TODO(thomasraoux): inject __nvvm_reflect-style functions/globals for
@@ -369,7 +369,6 @@ static void optimizeModule(llvm::Module &module,
 
   mpm.addPass(llvm::VerifierPass());
   llvm::FunctionPassManager fpm;
-  fpm.addPass(llvm::SetBlockIdsRangePass(maxWorkgroupSize));
   mpm.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
   mpm.addPass(llvm::VerifierPass());
@@ -385,12 +384,8 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-
-    SmallVector<NamedAttribute> deviceConfigAttrs;
-    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
-
-    SmallVector<NamedAttribute> executableConfigAttrs;
-    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
+    auto deviceConfigAttr = b.getDictionaryAttr({});
+    auto executableConfigAttr = b.getDictionaryAttr({});
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
@@ -424,16 +419,13 @@ public:
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-    auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(b.getStringAttr(name), value);
-    };
-
     if (failed(options.verify(b)))
       return nullptr;
 
     if (auto target = GPU::getCUDATargetDetails(
-            options.clTarget, options.clTargetFeatures, context))
-      addConfig("iree.gpu.target", target);
+            options.clTarget, options.clTargetFeatures, context)) {
+      configItems.emplace_back(kGPUTargetAttrName, target);
+    }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("cuda"), b.getStringAttr("cuda-nvptx-fb"),
@@ -539,20 +531,8 @@ public:
         // Sanitize the function name as PTX has strict requirements.
         llvmFunc->setName(sanitizeSymbolName(funcOp.getName()));
 
-        auto *annotations =
-            llvmModule->getOrInsertNamedMetadata("nvvm.annotations");
-        auto setMetadataValueI32 = [&](StringRef name, int value) {
-          llvm::Metadata *llvmMetadata[] = {
-              llvm::ValueAsMetadata::get(llvmFunc),
-              llvm::MDString::get(llvmModule->getContext(), name),
-              llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
-                  llvm::Type::getInt32Ty(llvmModule->getContext()), value))};
-          annotations->addOperand(
-              llvm::MDNode::get(llvmModule->getContext(), llvmMetadata));
-        };
-
         // Mark the entry point as a kernel.
-        setMetadataValueI32("kernel", 1);
+        llvmFunc->setCallingConv(llvm::CallingConv::PTX_Kernel);
 
         // Set the maximum number of threads in the thread block (CTA).
         auto exportOp = exportOpMap[funcOp.getName()];
@@ -569,9 +549,10 @@ public:
           maxWorkgroupSize[0] = std::max(maxWorkgroupSize[0], workgroupSize[0]);
           maxWorkgroupSize[1] = std::max(maxWorkgroupSize[1], workgroupSize[1]);
           maxWorkgroupSize[2] = std::max(maxWorkgroupSize[2], workgroupSize[2]);
-          setMetadataValueI32("maxntidx", workgroupSize[0]);
-          setMetadataValueI32("maxntidy", workgroupSize[1]);
-          setMetadataValueI32("maxntidz", workgroupSize[2]);
+          std::string maxntid = llvm::formatv(
+              "{0},{1},{2}", llvm::utostr(workgroupSize[0]),
+              llvm::utostr(workgroupSize[1]), llvm::utostr(workgroupSize[2]));
+          llvmFunc->addFnAttr("nvvm.maxntid", maxntid);
         }
       }
 
@@ -585,7 +566,7 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, targetFeatures, {}, {}));
+            triple, targetArch, targetFeatures, {}, {}));
         if (targetMachine == nullptr) {
           return variantOp.emitError() << "cannot initialize target machine";
         }

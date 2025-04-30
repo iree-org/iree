@@ -237,7 +237,7 @@ util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%arg4)
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
-  // CHECK-SAME: commands([%[[CMD]]])
+  // CHECK-SAME: commands(%[[CMD]])
   // CHECK: util.return %[[SIGNAL_FENCE]]
   util.return %0 : !stream.timepoint
 }
@@ -256,26 +256,24 @@ hal.executable private @ex {
       %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
       hal.return %selected : i1
     }
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       // Opaque at this point (in some target-specific dialects).
     }
   }
   hal.executable.variant public @x86_64 target(#executable_target_x86_64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       // Opaque at this point (in some target-specific dialects).

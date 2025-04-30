@@ -13,6 +13,11 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
 
+// clang-format off
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h.inc" // IWYU pragma: export
+// clang-format on
+
 namespace mlir::iree_compiler::IREE::Codegen {
 //===----------------------------------------------------------------------===//
 // Layout Struct Types.
@@ -79,7 +84,7 @@ struct TileSwizzle {
 
 /// Container of information needed to materialize the layout transformations.
 struct MaterializeEncodingInfo {
-  // The next 3 fields are used to create a `tensor.pack` or `tensor.unpack` op,
+  // The next 3 fields are used to create a `linalg.pack` or `linalg.unpack` op,
   // changing the overall layout between row-major and tiled (where each tile is
   // row-major).
   SmallVector<int64_t> innerDimsPos;
