@@ -345,10 +345,27 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
         f32_exp = src_exp << (f32_exp_shift - src_exp_shift);
         f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
       } else {
-        // Source is denormal, destination is normal.
+        // Source is denormal, destination is normal. Careful with the
+        // arithmetic exponents, as denormals are a special case:
+        // The source being denormal means that the arithmetic exponent is one
+        // plus what is normally encoded in the exponent bits.
         int src_arithmetic_exp = 1 - src_exp_bias;
+        // The f32 destination being normal means it doesn't that adjustment by
+        // one.
         int f32_arithmetic_exp = -src_exp_bias;
+        // Compute the final f32 exponent bits.
         f32_exp = (f32_arithmetic_exp + f32_exp_bias) << f32_exp_shift;
+        // Now the hard part: compute the final f32 mantissa. Unlike the source,
+        // the f32 result is a normal value, which means that it is encoded as
+        //   (1 + mantissa_value) * 2^dst_arithmetic_exponent
+        // Where mantissa_value is a number in the half-open interval [0, 1).
+        // Scaling this to the actual integer encoded in the mantissa bits, that
+        // value is:
+        //    ((1 << f32_mantissa_bits) + f32_mantissa) * 2^f32_arithmetic_exp
+        // Now we plug that into an equation of that value with the source
+        // value which is a denormal and hence does not have the corresponding
+        // "1 + " term. After some algebra isolating f32_mantissa on the left
+        // hand side of the equantion:
         f32_mantissa =
             (src_mantissa << -(-f32_mantissa_bits + src_mantissa_bits +
                                f32_arithmetic_exp - src_arithmetic_exp)) -
@@ -399,9 +416,10 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     if (dst_exp_bits == f32_exp_bits) {
       // When the destination type still has as many exponent bits, denormals
       // can remain nonzero. This happens only with the bf16 type.
-      // Just truncate the mantissa. Not worth bothering with round-to-nearest
-      // for denormals for bf16 only.
-      dst_mantissa = f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
+      // Just divide the mantissa (rounding shift).
+      int shift_amount = f32_mantissa_bits - dst_mantissa_bits;
+      uint32_t rounding_term = 1 << (shift_amount - 1);
+      dst_mantissa = (f32_mantissa + rounding_term) >> shift_amount;
     }
     // The destination type has fewer exponent bits, so f32 subnormal values
     // become exactly zero. Leave the mantissa zero.

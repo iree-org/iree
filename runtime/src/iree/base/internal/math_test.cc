@@ -280,7 +280,9 @@ TEST(BF16ConversionTest, F32ToBF16) {
   EXPECT_EQ(0x7f80, iree_math_f32_to_bf16(FLT_MAX));
   EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-FLT_MAX));
   // No underflow, as bfloat16 has the same smallest normal value as float32.
-  EXPECT_EQ(0x80, iree_math_f32_to_bf16(FLT_MIN));
+  EXPECT_EQ(0x007F, iree_math_f32_to_bf16(1.1663108e-38));  // Largest denormal.
+  EXPECT_EQ(0x0080, iree_math_f32_to_bf16(1.1754942e-38));  // Rounds to normal.
+  EXPECT_EQ(0x0080, iree_math_f32_to_bf16(FLT_MIN));
   EXPECT_EQ(0x8080, iree_math_f32_to_bf16(-FLT_MIN));
 }
 
