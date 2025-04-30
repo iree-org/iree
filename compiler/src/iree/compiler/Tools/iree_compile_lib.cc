@@ -142,7 +142,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   llvm::cl::opt<std::string> dumpCrashReproducersTo(
       "dump-crash-reproducers-to",
       llvm::cl::desc("Generate a .mlir reproducer file at the given output "
-                     "path if the pass manager crashes or fails"),
+                     "path if the pass manager crashes or fails."),
       llvm::cl::init(""));
   llvm::cl::opt<bool> dumpLocalCrashReproducers(
       "dump-local-crash-reproducers",
