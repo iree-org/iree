@@ -17,7 +17,7 @@
 
 namespace mlir::iree_compiler::TorchInput {
 
-#define GEN_PASS_DEF_BITCASTQUANTTENSORPASS
+#define GEN_PASS_DEF_BITCASTTENSORPASS
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
 namespace {
@@ -84,8 +84,44 @@ public:
   }
 };
 
-class BitCastQuantizedMatmul
-    : public OpRewritePattern<torch::Torch::OperatorOp> {
+template <typename BitcastOp>
+class BitCastViewComplex : public OpRewritePattern<BitcastOp> {
+public:
+  using OpRewritePattern<BitcastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(BitcastOp op,
+                                PatternRewriter &rewriter) const override {
+
+    Value in = op.getSelf();
+    auto loc = op.getLoc();
+    auto inType = cast<torch::Torch::ValueTensorType>(in.getType());
+    auto resultType = cast<torch::Torch::ValueTensorType>(op.getType());
+    auto bType = inType.toBuiltinTensor();
+
+    Value builtinCast =
+        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, bType,
+                                                                   in);
+    auto rType = resultType.toBuiltinTensor();
+
+    // Cast to the builtin tensor type.
+    llvm::SmallVector<Value> dynDims;
+    for (int i = 0, s = bType.getRank(); i < s; ++i) {
+      if (bType.isDynamicDim(i)) {
+        dynDims.push_back(rewriter.create<tensor::DimOp>(loc, builtinCast, i));
+      }
+    }
+
+    Value flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
+        loc, rType, builtinCast, dynDims, dynDims);
+
+    auto torchCast =
+        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
+            loc, resultType, flowBitcast);
+    rewriter.replaceOp(op, torchCast);
+    return success();
+  }
+};
+
+class BitCastMatmul : public OpRewritePattern<torch::Torch::OperatorOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(torch::Torch::OperatorOp op,
@@ -170,8 +206,8 @@ public:
 } // namespace
 
 namespace {
-class BitCastQuantTensorPass final
-    : public impl::BitCastQuantTensorPassBase<BitCastQuantTensorPass> {
+class BitCastTensorPass final
+    : public impl::BitCastTensorPassBase<BitCastTensorPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<torch::Torch::TorchDialect>();
@@ -181,7 +217,9 @@ class BitCastQuantTensorPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<BitCastQuantizedMatmul, BitCastViewDtype>(context);
+    patterns.add<BitCastMatmul, BitCastViewDtype>(context);
+    patterns.add<BitCastViewComplex<torch::Torch::AtenViewAsComplexOp>,
+                 BitCastViewComplex<torch::Torch::AtenViewAsRealOp>>(context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
   }

@@ -7,7 +7,7 @@ iree_lit_test_suite(
     "auto_input_conversion.mlir"
     "attention.mlir"
     "bind_symbolic_shapes.mlir"
-    "bitcast_quant_tensor.mlir"
+    "bitcast_tensor.mlir"
     "func_conversion.mlir"
     "func_conversion_invalid.mlir"
     "scan.mlir"
