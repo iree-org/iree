@@ -122,28 +122,55 @@ struct RegisterUsage {
     return std::nullopt;
   }
 
+  std::optional<int> findLastUnsetIntOrdinalSpan(size_t byteWidth) {
+    unsigned int requiredAlignment = byteWidth / 4;
+    unsigned int ordinalStart =
+        llvm::alignTo(intRegisters.find_last() + 1, requiredAlignment);
+    unsigned int ordinalEnd = ordinalStart + (byteWidth / 4) - 1;
+    if (ordinalEnd >= Register::kInt32RegisterCount) {
+      return std::nullopt;
+    }
+    return static_cast<int>(ordinalStart);
+  }
+
+  // Allocates a register of the given |type|.
+  // The register will be marked as used.
   std::optional<Register> allocateRegister(Type type) {
+    Register reg;
     if (type.isIntOrFloat()) {
       size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
       auto ordinalStartOr = findFirstUnsetIntOrdinalSpan(byteWidth);
       if (!ordinalStartOr.has_value()) {
         return std::nullopt;
       }
-      int ordinalStart = ordinalStartOr.value();
-      unsigned int ordinalEnd = ordinalStart + (byteWidth / 4) - 1;
-      intRegisters.set(ordinalStart, ordinalEnd + 1);
-      maxI32RegisterOrdinal =
-          std::max(static_cast<int>(ordinalEnd), maxI32RegisterOrdinal);
-      return Register::getValue(type, ordinalStart);
+      reg = Register::getValue(type, ordinalStartOr.value());
     } else {
       int ordinal = refRegisters.find_first_unset();
       if (ordinal >= Register::kRefRegisterCount || ordinal == -1) {
         return std::nullopt;
       }
-      refRegisters.set(ordinal);
-      maxRefRegisterOrdinal = std::max(ordinal, maxRefRegisterOrdinal);
-      return Register::getRef(type, ordinal, /*isMove=*/false);
+      reg = Register::getRef(type, ordinal, /*isMove=*/false);
     }
+    markRegisterUsed(reg);
+    return reg;
+  }
+
+  // Allocates a |block| argument register of the given |type|.
+  // Entry block registers are allocated as monotonically increasing while all
+  // internal blocks are assigned as dense as possible.
+  std::optional<Register> allocateBlockArgRegister(Block *block, Type type) {
+    if (!block->isEntryBlock() || !type.isIntOrFloat()) {
+      return allocateRegister(type);
+    }
+    assert(type.isIntOrFloat()); // special handling only for primitives
+    size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
+    auto ordinalStartOr = findLastUnsetIntOrdinalSpan(byteWidth);
+    if (!ordinalStartOr.has_value()) {
+      return std::nullopt;
+    }
+    auto reg = Register::getValue(type, ordinalStartOr.value());
+    markRegisterUsed(reg);
+    return reg;
   }
 
   void markRegisterUsed(Register reg) {
@@ -240,7 +267,8 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
 
     // Allocate arguments first from left-to-right.
     for (auto blockArg : block->getArguments()) {
-      auto reg = registerUsage.allocateRegister(blockArg.getType());
+      auto reg =
+          registerUsage.allocateBlockArgRegister(block, blockArg.getType());
       if (!reg.has_value()) {
         return funcOp.emitError() << "register allocation failed for block arg "
                                   << blockArg.getArgNumber();

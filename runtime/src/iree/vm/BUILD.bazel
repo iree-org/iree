@@ -108,6 +108,18 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "module_test",
+    srcs = ["module_test.cc"],
+    deps = [
+        ":cc",
+        ":impl",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "native_module_test",
     srcs = ["native_module_test.cc"],
     deps = [

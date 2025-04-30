@@ -98,6 +98,19 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    module_test
+  SRCS
+    "module_test.cc"
+  DEPS
+    ::cc
+    ::impl
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     native_module_test
   SRCS
     "native_module_test.cc"
