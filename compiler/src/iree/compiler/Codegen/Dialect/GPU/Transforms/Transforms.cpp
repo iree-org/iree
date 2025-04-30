@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -353,43 +354,6 @@ collapsibleSlicePrecondition(RewriterBase &rewriter,
   return success();
 }
 
-/// Given a tensor.parallel_insert_slice op, find all values that are needed to
-/// build an equivalent subset extract_slice, and set the insertion point to the
-/// last of these values. This helper is useful in cases where additional index
-/// computation must be composed with the current indexing operations for the
-/// slice, since we want all index operations for the slice to retain the same
-/// level of dominance after composing the new computation.
-static Operation *
-setInsertionPointAfterLastIndexOperand(RewriterBase &rewriter,
-                                       tensor::ParallelInsertSliceOp op) {
-  DominanceInfo domInfo;
-  auto subsetOp = cast<SubsetInsertionOpInterface>(op.getOperation());
-  SmallVector<Value> values = subsetOp.getValuesNeededToBuildSubsetExtraction();
-  Operation *lastOp = nullptr;
-  bool setInsertionPointBefore = false;
-  for (auto val : values) {
-    auto definingOp = val.getDefiningOp();
-    if (!definingOp) {
-      definingOp =
-          &cast<BlockArgument>(val).getOwner()->getOperations().front();
-    }
-    if (!definingOp || (lastOp && domInfo.dominates(definingOp, lastOp)))
-      continue;
-    lastOp = definingOp;
-
-    // For block arguments we want the insertion point to be at the start of
-    // the block, so we need to set the insertion point before the first op
-    // in the block.
-    setInsertionPointBefore = isa<BlockArgument>(val);
-  }
-  if (setInsertionPointBefore) {
-    rewriter.setInsertionPoint(lastOp);
-  } else {
-    rewriter.setInsertionPointAfter(lastOp);
-  }
-  return lastOp;
-}
-
 /// Collapse all `ops` with the given `reassociations`. All `ops` are expected
 /// to have equivalent offsets, sizes, and strides. All strides are expected to
 /// be 1. This function assumes that the parallelInsertOp passes the
@@ -399,8 +363,9 @@ collapseParallelInsertOp(RewriterBase &rewriter,
                          tensor::ParallelInsertSliceOp parallelInsertOp,
                          SmallVector<ReassociationIndices> reassociations) {
   // Compute the collapsed offsets, sizes, and strides.
-  Operation *lastOp =
-      setInsertionPointAfterLastIndexOperand(rewriter, parallelInsertOp);
+  auto subsetOp =
+      cast<SubsetInsertionOpInterface>(parallelInsertOp.getOperation());
+  Operation *lastOp = setInsertionPointAfterLastNeededValue(rewriter, subsetOp);
   Location loc = lastOp->getLoc();
   int64_t resultIdx = parallelInsertOp.getTiedOpResult().getResultNumber();
   auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
@@ -592,8 +557,9 @@ clampParallelInsertSliceOp(RewriterBase &rewriter,
                            tensor::ParallelInsertSliceOp parallelInsertOp,
                            SmallVector<OpFoldResult> upperBoundSizes) {
   OpBuilder::InsertionGuard g(rewriter);
-  Operation *lastOp =
-      setInsertionPointAfterLastIndexOperand(rewriter, parallelInsertOp);
+  auto subsetOp =
+      cast<SubsetInsertionOpInterface>(parallelInsertOp.getOperation());
+  Operation *lastOp = setInsertionPointAfterLastNeededValue(rewriter, subsetOp);
   Location loc = lastOp->getLoc();
 
   // Clamp the parallel_insert_slice sizes to fit within the full result tensor.

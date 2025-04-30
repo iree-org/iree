@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "block_dynamic_dims.mlir"
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
+    "bufferize_dispatch_tensor_load_store.mlir"
     "canonicalize_interface_load_store.mlir"
     "convert_accgemm_to_gemm.mlir"
     "convert_bf16_arith_to_f32.mlir"

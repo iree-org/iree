@@ -21,6 +21,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -201,8 +202,30 @@ int getReductionTilingFactor(int64_t dimSize);
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
 
 //===---------------------------------------------------------------------===//
+// Bufferization utility functions
+//===---------------------------------------------------------------------===//
+
+/// Find the memref version of the given InterfaceBindingSubspanOp. If no such
+/// op exists in the same block (before the given op), create a new op.
+Value findOrCreateSubspanBuffer(RewriterBase &rewriter,
+                                IREE::HAL::InterfaceBindingSubspanOp subspanOp);
+
+//===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//
+
+/// Given a SubsetInsertionOpInterface, find all values that are needed to
+/// build an equivalent subset extraction, and set the insertion point to the
+/// last of these values.
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp);
+
+/// Check if the two tensor types (with their respective dynamic dimension
+/// values) have the same shape.
+bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
+                      IREE::TensorExt::DispatchTensorType dispatchTensorType,
+                      ValueRange dispatchTensorDynSizes);
 
 /// Convert byte offset into offsets in terms of number of elements based
 /// on `elementType`

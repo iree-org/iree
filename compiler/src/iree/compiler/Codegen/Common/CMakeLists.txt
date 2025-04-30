@@ -84,6 +84,7 @@ iree_cc_library(
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
+    "BufferizeDispatchTensorLoadStore.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"

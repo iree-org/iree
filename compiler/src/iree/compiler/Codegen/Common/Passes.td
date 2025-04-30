@@ -45,6 +45,21 @@ def BufferizeCopyOnlyDispatchesPass :
   }];
 }
 
+def BufferizeDispatchTensorLoadStorePass :
+  InterfacePass<"iree-codegen-bufferize-dispatch-tensor-load-store", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Bufferize the iree_tensor_ext.dispatch.tensor.load/store ops at dispatch boundaries";
+  let description = [{
+    Pass to bufferize the edges of dispatch regions, converting
+    iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_memref, and
+    iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_memref.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "memref::MemRefDialect"
+  ];
+}
+
 def ConfigTrackingCanonicalizerPass :
     Pass<"iree-codegen-config-tracking-canonicalize", ""> {
   let summary = "Codegen specific canonicalization pass that tracks lowering configs";
