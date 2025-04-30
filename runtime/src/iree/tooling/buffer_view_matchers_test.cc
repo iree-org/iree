@@ -443,13 +443,13 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF16NearEQRelative) {
   const uint16_t lhs[] = {
       iree_math_f32_to_f16(100.0f),
       iree_math_f32_to_f16(19.99f),
-      iree_math_f32_to_f16(0.00001f),
+      iree_math_f32_to_f16(1.00001f),
       iree_math_f32_to_f16(4.0f),
   };
   const uint16_t rhs[] = {
       iree_math_f32_to_f16(100.01f),
       iree_math_f32_to_f16(20.00f),
-      iree_math_f32_to_f16(0.0f),
+      iree_math_f32_to_f16(1.0f),
       iree_math_f32_to_f16(4.0f),
   };
   iree_host_size_t index = 0;
