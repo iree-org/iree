@@ -456,4 +456,44 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
       [{  attr-dict ($values^ `:` type($values))? }];
 }
 
+//===----------------------------------------------------------------------===//
+//
+// AMD Specific Operations
+//
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// BufferResourceCastOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
+  Pure,
+  AllTypesMatch<["input", "result"]>]> {
+  let summary = "Represents a cast to addr_space<7> (buffer resource) before bufferization";
+  let description = [{
+    Nominal cast of a tensor to AMDGPU buffer resource memory space before
+    bufferization. This op takes the parameters with which to perform the cast
+    if |input| bufferizes to `storage_buffer` memory space. If |input| resolves
+    to any other memory space this op is silently dropped and has no effect.
+
+    If |cache_swizzle_stride| is present, there is verification before
+    bufferization that all producers of |input| are view-like and single source
+    and user (i.e. trivially no alias). In all other cases this op is best
+    effort and has no verification or failure modes.
+
+    // TODO: Add other parameters for casting as needed.
+  }];
+
+  let arguments = (ins  AnyRankedTensor:$input,
+                        Optional<Index>:$cache_swizzle_stride);
+  let results   = (outs AnyRankedTensor:$result);
+
+  let assemblyFormat = [{
+    $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
+    attr-dict `:` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
