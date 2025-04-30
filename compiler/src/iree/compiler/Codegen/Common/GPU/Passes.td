@@ -90,6 +90,14 @@ def GPUDistributeScfForPass :
   ];
 }
 
+def GPUBubbleResourceCastsPass :
+    Pass<"iree-codegen-gpu-bubble-resource-casts", ""> {
+  let summary = "Bubbles iree_gpu.buffer_resource_cast ops upwards.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUFuseAndHoistParallelLoopsPass :
     InterfacePass<"iree-codegen-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
   let summary = "Greedily fuses and hoists parallel loops.";

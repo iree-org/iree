@@ -370,4 +370,79 @@ LogicalResult ValueBarrierOp::verify() {
   return success();
 }
 
+// AMD Specific Operations
+
+//===----------------------------------------------------------------------===//
+// BufferResourceCastOp
+//===----------------------------------------------------------------------===//
+
+static RankedTensorType getMaximumStaticType(tensor::CastOp castOp) {
+  auto inputType = dyn_cast<RankedTensorType>(castOp.getSource().getType());
+  auto resultType = dyn_cast<RankedTensorType>(castOp.getType());
+  if (!inputType || !resultType) {
+    return RankedTensorType();
+  }
+
+  assert(inputType.getRank() == resultType.getRank() &&
+         "Rank must match for ranked -> ranked cast");
+
+  SmallVector<int64_t> join;
+  join.reserve(inputType.getRank());
+  for (int64_t i = 0; i < inputType.getRank(); ++i) {
+    if (inputType.isDynamicDim(i)) {
+      join.push_back(resultType.getDimSize(i));
+      continue;
+    }
+    if (resultType.isDynamicDim(i)) {
+      join.push_back(inputType.getDimSize(i));
+      continue;
+    }
+
+    // Cast verifier requires that static sizes match.
+    join.push_back(inputType.getDimSize(i));
+  }
+  return RankedTensorType::get(join, inputType.getElementType());
+}
+
+struct FoldBufferCastOfTensorCast final
+    : OpRewritePattern<BufferResourceCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferResourceCastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    // Check whether the cast increases the amount of available static info.
+    auto tensorCast = castOp.getInput().getDefiningOp<tensor::CastOp>();
+    if (!tensorCast) {
+      return failure();
+    }
+
+    RankedTensorType maxStaticType = getMaximumStaticType(tensorCast);
+    if (!maxStaticType || maxStaticType == castOp.getInput().getType()) {
+      return failure();
+    }
+
+    Value newSource = tensorCast.getSource();
+    if (newSource.getType() != maxStaticType) {
+      // Cast to the type with maximum static information if the input and
+      // result types contain different static info.
+      newSource = rewriter.create<tensor::CastOp>(castOp.getLoc(),
+                                                  maxStaticType, newSource);
+    }
+    auto newBufferCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
+        castOp.getLoc(), maxStaticType, newSource,
+        castOp.getCacheSwizzleStride());
+    newBufferCast->setDiscardableAttrs(castOp->getDiscardableAttrDictionary());
+
+    // Cast back to the original result type.
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(
+        castOp, castOp.getResult().getType(), newBufferCast);
+    return success();
+  };
+};
+
+void BufferResourceCastOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *ctx) {
+  results.add<FoldBufferCastOfTensorCast>(ctx);
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU
