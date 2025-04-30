@@ -108,6 +108,10 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     packingCandidates.push_back(linalgOp);
   });
 
+  if (packingCandidates.empty()) {
+    return;
+  }
+
   for (auto candidate : packingCandidates) {
     rewriter.setInsertionPoint(candidate);
     if (failed(packToIntrinsic(candidate, rewriter))) {
