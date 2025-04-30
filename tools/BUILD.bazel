@@ -14,6 +14,7 @@
 # Programs with a dependency on the compiler are not designed to run on device
 # platforms (e.g. Android), so they are tagged "hostonly".
 
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_runtime_cc_binary")
 
 package(
@@ -171,6 +172,7 @@ iree_compiler_cc_binary(
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:Impl",
+        "//runtime/src/iree/base",
     ],
 )
 
@@ -241,6 +243,7 @@ iree_compiler_cc_binary(
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:Impl",
+        "//runtime/src/iree/base",
     ],
 )
 
@@ -251,5 +254,6 @@ iree_compiler_cc_binary(
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:Impl",
+        "//runtime/src/iree/base",
     ],
 )
