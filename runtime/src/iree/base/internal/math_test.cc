@@ -254,6 +254,7 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   // Denormals
   EXPECT_EQ(3.05175781e-05f,
             iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min / 2)));
+  EXPECT_EQ(3.05175781e-05f, iree_math_f16_to_f32(0x0001));
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(INFINITY)));
   EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-INFINITY)));
@@ -327,6 +328,8 @@ TEST(BF16ConversionTest, F32ToBF16ToF32) {
   // Denormals
   EXPECT_EQ(1.83670992e-40f,
             iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
+  EXPECT_EQ(9.18354962e-41f, iree_math_bf16_to_f32(0x0001));
+
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(INFINITY)));
   EXPECT_EQ(-INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-INFINITY)));
@@ -420,6 +423,7 @@ TEST(F8E5M2ConversionTest, F32ToF8E5M2ToF32) {
   // Denormals
   EXPECT_EQ(1.f / 32768.f,
             iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(kF8E5M2Min / 2)));
+  EXPECT_EQ(3.05175781e-05f, iree_math_f8e5m2_to_f32(0x0001));
   // Inf and Nan
   EXPECT_EQ(INFINITY,
             iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(INFINITY)));

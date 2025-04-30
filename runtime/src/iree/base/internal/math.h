@@ -337,7 +337,7 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
     // Zero. Leave f32_exp and f32_mantissa as zero.
   } else {
     if (src_exp == 0) {
-      // Source is denormal.
+      // Source is denormal, nonzero.
 
       // Case when the source and destination types have the same exponent
       // range (bfloat16/f32).
@@ -348,8 +348,9 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
         // Source is denormal, destination is normal. Careful with the
         // arithmetic exponents, as denormals are a special case:
         // The source being denormal means that the arithmetic exponent is one
-        // plus what is normally encoded in the exponent bits.
-        int src_arithmetic_exp = 1 - src_exp_bias;
+        // plus what is normally encoded in the exponent bits. We won't need
+        // this, but we will refer to this in comments:
+        //     int src_arithmetic_exp = 1 - src_exp_bias;
         // The f32 destination being normal means it doesn't have that
         // adjustment by one.
         int f32_arithmetic_exp = -src_exp_bias;
@@ -366,11 +367,23 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
         // Now we plug that into an equation of that value with the source
         // value which is a denormal and hence does not have the corresponding
         // "1 + " term. After some algebra isolating f32_mantissa on the left
-        // hand side of the equantion:
-        f32_mantissa =
-            (src_mantissa << (f32_mantissa_bits - src_mantissa_bits -
-                              f32_arithmetic_exp + src_arithmetic_exp)) -
+        // hand side of the equantion, and since per the above we have
+        //   -f32_arithmetic_exp + src_arithmetic_exp == 1
+        // we arrive at this:
+        int32_t unclamped_f32_mantissa =
+            (src_mantissa << (f32_mantissa_bits - src_mantissa_bits + 1)) -
             (1 << f32_mantissa_bits);
+        // It's a bit hard to reason about the edge cases with that subtraction
+        // of 1 << f32_mantissa_bits... at least we know we don't want the
+        // f32_mantissa to run outside the range [0, 2^23 - 1]... we just clamp.
+        // This should be correct as long as we picked the correct f32_exp above
+        // and if that's not the case, that is if some rounding case requires
+        // incrementing/decrementing f32_exp, then we were already wrong above.
+        // Maybe it's OK to be slightly incorrect in a few denormal-only edge
+        // cases when the error is only a rounding error.
+        f32_mantissa = unclamped_f32_mantissa < 0
+                           ? 0
+                           : (unclamped_f32_mantissa & f32_mantissa_mask);
       }
     } else {
       // Source is normal.
