@@ -373,14 +373,13 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
         int32_t unclamped_f32_mantissa =
             (src_mantissa << (f32_mantissa_bits - src_mantissa_bits + 1)) -
             (1 << f32_mantissa_bits);
-        // It's a bit hard to reason about the edge cases with that subtraction
-        // of 1 << f32_mantissa_bits... at least we know we don't want the
-        // f32_mantissa to run outside the range [0, 2^23 - 1]... we just clamp.
-        // This should be correct as long as we picked the correct f32_exp above
-        // and if that's not the case, that is if some rounding case requires
-        // incrementing/decrementing f32_exp, then we were already wrong above.
-        // Maybe it's OK to be slightly incorrect in a few denormal-only edge
-        // cases when the error is only a rounding error.
+        // We don't want the f32_mantissa to run outside the range [0, 2^23 - 1]
+        // so we just clamp. I *think* that is correct. The reasoning is that
+        // first, there is no question of rounding here since we are expanding
+        // from a narrow to a wider type, and so the only question really is:
+        // did we pick the correct exponent above? As long as f32_exp is correct
+        // it forces a range of representable values and that means that
+        // clamping to the mantissa range is the correct rounding to do.
         f32_mantissa = unclamped_f32_mantissa < 0
                            ? 0
                            : (unclamped_f32_mantissa & f32_mantissa_mask);
