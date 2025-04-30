@@ -8,12 +8,6 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
-#include "iree/base/api.h"
 #include "iree/compiler/tool_entry_points_api.h"
 
-int main(int argc, char **argv) {
-  IREE_TRACE_APP_ENTER();
-  int exit_code = ireeOptRunMain(argc, argv);
-  IREE_TRACE_APP_EXIT(exit_code);
-  return exit_code;
-}
+int main(int argc, char **argv) { return ireeOptRunMain(argc, argv); }
