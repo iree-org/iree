@@ -106,18 +106,14 @@ inferWorkgroupTileMultiplesFromPackUnPack(
   }
 
   SmallVector<int64_t> srcMultiples =
-      (std::is_same<PackOrUnPackOpTy, linalg::PackOp>::value)
-          ? unPackedMultiples
-          : packedMultiples;
+      std::is_same_v<PackOrUnPackOpTy, linalg::PackOp> ? unPackedMultiples
+                                                       : packedMultiples;
   SmallVector<int64_t> destMultiples =
-      (std::is_same<PackOrUnPackOpTy, linalg::PackOp>::value)
-          ? packedMultiples
-          : unPackedMultiples;
-  LLVM_DEBUG({
-    DBGS() << "\nInferred " << op->getName()
-           << " multiples:\nsrc: " << llvm::interleaved_array(srcMultiples)
-           << "\nresult: " << llvm::interleaved_array(destMultiples) << "\n\n";
-  });
+      std::is_same_v<PackOrUnPackOpTy, linalg::PackOp> ? packedMultiples
+                                                       : unPackedMultiples;
+  LDBG("Inferred " << op->getName() << " multiples");
+  LDBG("src: " << llvm::interleaved_array(srcMultiples));
+  LDBG("result: " << llvm::interleaved_array(destMultiples));
   return {srcMultiples, destMultiples};
 }
 
