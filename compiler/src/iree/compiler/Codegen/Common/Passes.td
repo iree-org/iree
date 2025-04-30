@@ -48,11 +48,11 @@ def BufferizeCopyOnlyDispatchesPass :
 def BufferizeDispatchTensorLoadStorePass :
   InterfacePass<"iree-codegen-bufferize-dispatch-tensor-load-store", "mlir::FunctionOpInterface"> {
   let summary =
-      "Bufferize the flow.dispatch.tensor.load/store ops at dispatch boundaries";
+      "Bufferize the iree_tensor_ext.dispatch.tensor.load/store ops at dispatch boundaries";
   let description = [{
     Pass to bufferize the edges of dispatch regions, converting
-    flow.dispatch.tensor.load ops to iree_codegen.load_from_memref, and
-    flow.dispatch.tensor.store ops to iree_codegen.store_to_memref.
+    iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_memref, and
+    iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_memref.
   }];
   let dependentDialects = [
     "IREE::Codegen::IREECodegenDialect",

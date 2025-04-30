@@ -1152,20 +1152,12 @@ static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   return strides;
 }
 
-static MemRefType
-getMemrefTypeForTensor(IREE::TensorExt::DispatchTensorType tensorType,
-                       MemRefLayoutAttrInterface layout = {},
-                       Attribute memorySpace = {}) {
-  return MemRefType::get(tensorType.getShape(),
-                         tensorType.getBoundElementType(), layout, memorySpace);
-}
-
 Value findOrCreateSubspanBuffer(
     RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-  // Ensure that this a tensor subspan op.
   auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
       subspanOp.getResult().getType());
-  assert(shapedType && shapedType.hasRank());
+  assert((shapedType && shapedType.hasRank()) &&
+         "expected the result of subspanOp is DispatchTensorType");
 
   Value byteOffset = subspanOp.getByteOffset();
   MemRefLayoutAttrInterface layoutAttr = {};
@@ -1188,7 +1180,9 @@ Value findOrCreateSubspanBuffer(
   }
   Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
       subspanOp.getDescriptorType());
-  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr, memorySpace);
+  auto memRefType =
+      MemRefType::get(shapedType.getShape(), shapedType.getBoundElementType(),
+                      layoutAttr, memorySpace);
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();

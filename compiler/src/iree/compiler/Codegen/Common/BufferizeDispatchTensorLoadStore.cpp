@@ -53,7 +53,7 @@ bufferizeDispatchTensorLoad(RewriterBase &rewriter,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(loadOp);
   Value sourceBuffer = getBufferizedSubspanOrSubview(
-      rewriter, loadOp->getLoc(), subspanOp, loadOp.getType(),
+      rewriter, loadOp.getLoc(), subspanOp, loadOp.getType(),
       loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
       loadOp.getMixedStrides());
   rewriter.replaceOpWithNewOp<IREE::Codegen::LoadFromMemrefOp>(
@@ -77,7 +77,7 @@ bufferizeDispatchTensorStore(RewriterBase &rewriter,
   (void)setInsertionPointAfterLastNeededValue(
       rewriter, cast<SubsetInsertionOpInterface>(storeOp.getOperation()));
   Value outputBuffer = getBufferizedSubspanOrSubview(
-      rewriter, storeOp->getLoc(), subspanOp, storeOp.getValueType(),
+      rewriter, storeOp.getLoc(), subspanOp, storeOp.getValueType(),
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides());
 
@@ -98,16 +98,12 @@ struct BufferizeDispatchTensorLoadStorePass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();
-    SmallVector<IREE::TensorExt::DispatchTensorLoadOp> loadOps;
-    SmallVector<IREE::TensorExt::DispatchTensorStoreOp> storeOps;
-    funcOp.walk([&](Operation *op) {
-      if (auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
-        loadOps.push_back(loadOp);
-      }
-      if (auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
-        storeOps.push_back(storeOp);
-      }
-    });
+    SmallVector<IREE::TensorExt::DispatchTensorLoadOp> loadOps(
+        funcOp.getFunctionBody()
+            .getOps<IREE::TensorExt::DispatchTensorLoadOp>());
+    SmallVector<IREE::TensorExt::DispatchTensorStoreOp> storeOps(
+        funcOp.getFunctionBody()
+            .getOps<IREE::TensorExt::DispatchTensorStoreOp>());
 
     IRRewriter rewriter(context);
     for (IREE::TensorExt::DispatchTensorLoadOp loadOp : loadOps) {
