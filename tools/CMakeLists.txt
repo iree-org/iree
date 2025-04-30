@@ -304,7 +304,6 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-compile-main.cc"
     DEPS
-      iree::base
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
     DATA
@@ -320,7 +319,6 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-reduce.cc"
     DEPS
-      iree::base
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
     DATA
@@ -354,7 +352,6 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-opt-main.cc"
     DEPS
-      iree::base
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
     DATA
