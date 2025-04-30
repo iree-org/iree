@@ -16,8 +16,11 @@ python. This allows easy benchmarking results from within python.
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
 from collections import namedtuple
+from typing import Union
+from os import PathLike
 
 import iree.runtime
+from . import VmModule
 import numpy
 import os
 import subprocess
@@ -63,19 +66,36 @@ def benchmark_exe():
     )
 
 
-def benchmark_module(module, entry_function=None, inputs=[], timeout=None, **kwargs):
-    funcs = [a for a in module.function_names if a != "__init"]
-    if entry_function is None:
-        if len(funcs) > 1:
-            raise ValueError(f"No function specified with multiple options {funcs}")
-        entry_function = funcs[0]
-    if entry_function not in funcs:
-        raise ValueError(
-            f"Attempted to benchmark unknown function {entry_function} of options {funcs}"
-        )
-
-    flatbuffer = module.stashed_flatbuffer_blob
+def benchmark_module(
+    module: Union[VmModule, PathLike],
+    entry_function=None,
+    inputs=[],
+    timeout=None,
+    **kwargs,
+):
     args = [iree.runtime.benchmark_exe()]
+
+    if isinstance(module, VmModule):
+        funcs = [a for a in module.function_names if a != "__init"]
+        if entry_function is None:
+            if len(funcs) > 1:
+                raise ValueError(f"No function specified with multiple options {funcs}")
+            entry_function = funcs[0]
+        if entry_function not in funcs:
+            raise ValueError(
+                f"Attempted to benchmark unknown function {entry_function} of options {funcs}"
+            )
+
+        flatbuffer = module.stashed_flatbuffer_blob
+        args.append("--module=-")
+    else:
+        flatbuffer = None
+        args.append(f"--module={module}")
+        if entry_function is None:
+            raise ValueError(
+                f"When specifying the module as a filepath the entry function must be specified."
+            )
+
     args.append(f"--function={entry_function}")
 
     for k in kwargs:
@@ -95,7 +115,6 @@ def benchmark_module(module, entry_function=None, inputs=[], timeout=None, **kwa
             values = ",".join([str(v) for v in values])
 
         args.append(f"--input={shape}x{abitype}={values}")
-    args.append(f"--module=-")
 
     try:
         benchmark_process = subprocess.run(
@@ -107,20 +126,22 @@ def benchmark_module(module, entry_function=None, inputs=[], timeout=None, **kwa
         )
     except subprocess.TimeoutExpired:
         raise BenchmarkTimeoutError(f"Benchmark timed out after {timeout} seconds")
-    out = benchmark_process.stdout
-    err = benchmark_process.stderr
+    out = benchmark_process.stdout.decode()
+    err = benchmark_process.stderr.decode()
 
-    err = err.decode()
+    if benchmark_process.returncode != 0:
+        raise BenchmarkToolError(f"stderr:\n{err}\nstdout:\n{out}")
+
     if "INVALID_ARGUMENT;" in err:
         raise ValueError("Invalid inputs specified for benchmarking")
 
     # In the event benchmarking runs but encounteres an internal error,
     # return the internal error instead of benchmark results.
-    if "INTERNAL; CUDA driver error" in str(out):
-        raise BenchmarkToolError(str(out))
+    if "INTERNAL; CUDA driver error" in out:
+        raise BenchmarkToolError(out)
 
     # Grab individual results by line (skip header lines)
-    bench_lines = out.decode().split("\n")[3:]
+    bench_lines = out.split("\n")[3:]
     benchmark_results = []
     for line in bench_lines:
         split = line.split()
