@@ -368,8 +368,8 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
         // "1 + " term. After some algebra isolating f32_mantissa on the left
         // hand side of the equantion:
         f32_mantissa =
-            (src_mantissa << -(-f32_mantissa_bits + src_mantissa_bits +
-                               f32_arithmetic_exp - src_arithmetic_exp)) -
+            (src_mantissa << (f32_mantissa_bits - src_mantissa_bits -
+                              f32_arithmetic_exp + src_arithmetic_exp)) -
             (1 << f32_mantissa_bits);
       }
     } else {
