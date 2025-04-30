@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
   DEPS
+    MLIRAMDGPUDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRGPUDialect
