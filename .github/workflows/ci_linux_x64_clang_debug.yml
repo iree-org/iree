@@ -28,7 +28,7 @@ jobs:
   # so run on self-hosted CPU build runners instead.
   linux_x64_clang_debug:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
-    runs-on: ${{ github.repository_owner == 'iree-org' && 'azure-linux-scale' ||  'ubuntu-24.04'  }}
+    runs-on: ${{ github.repository_owner == 'iree-org' && 'azure-linux-scale-test' ||  'ubuntu-24.04'  }}
     container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
     defaults:
       run:
