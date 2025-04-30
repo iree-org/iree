@@ -1685,6 +1685,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpumulti_mma-gpumultimmaop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.multi_mma (GPU::MultiMmaOp)
@@ -4188,6 +4197,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpumulti_mma-gpumultimmaop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.multi_mma (GPU::MultiMmaOp)
@@ -4771,6 +4789,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#iree_gpu-dialect">'iree_gpu' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_gpubarrier_region-gpubarrierregionop">iree_gpu.barrier_region (GPU::BarrierRegionOp)</a></li>
+<li><a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop">iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)</a></li>
 <li><a href="#iree_gpumulti_mma-gpumultimmaop">iree_gpu.multi_mma (GPU::MultiMmaOp)</a><ul>
 <li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
 </ul>
@@ -4948,6 +4967,58 @@ and flexible.
 </tr>
 </tbody>
 </table>
+<h3 id="iree_gpubuffer_resource_cast-gpubufferresourcecastop"><code>iree_gpu.buffer_resource_cast</code> (GPU::BufferResourceCastOp)<a class="headerlink" href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" title="Permanent link">link</a></h3>
+<p><em>Represents a cast to addr_space&lt;7&gt; (buffer resource) before bufferization</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.buffer_resource_cast` $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
+              attr-dict `:` type($result)
+</code></pre></div>
+<p>Nominal cast of a tensor to AMDGPU buffer resource memory space before
+bufferization. This op takes the parameters with which to perform the cast
+if |input| bufferizes to <code>storage_buffer</code> memory space. If |input| resolves
+to any other memory space this op is silently dropped and has no effect.</p>
+<p>If |cache_swizzle_stride| is present, there is verification before
+bufferization that all producers of |input| are view-like and single source
+and user (i.e. trivially no alias). In all other cases this op is best
+effort and has no verification or failure modes.</p>
+<p>// TODO: Add other parameters for casting as needed.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>input</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>cache_swizzle_stride</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_gpumulti_mma-gpumultimmaop"><code>iree_gpu.multi_mma</code> (GPU::MultiMmaOp)<a class="headerlink" href="#iree_gpumulti_mma-gpumultimmaop" title="Permanent link">link</a></h3>
 <p><em>Models a contraction of multiple mma operations</em></p>
 <p>Syntax:</p>
@@ -5073,7 +5144,7 @@ implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
 <tr><td><code>acc_permutation</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5096,7 +5167,7 @@ implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5128,7 +5199,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5143,7 +5214,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5167,7 +5238,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
