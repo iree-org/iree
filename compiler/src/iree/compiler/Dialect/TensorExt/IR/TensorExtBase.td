@@ -25,7 +25,11 @@ def IREETensorExt_Dialect : Dialect {
     A dialect designed for experimenting with tensor operations
     beyond what is currently available in the Tensor Dialect.
   }];
+  let dependentDialects = [
+    "arith::ArithDialect" // For materializeConstant()
+  ];
   let useDefaultTypePrinterParser = 1;
+  let hasConstantMaterializer = 1;
 }
 
 //===----------------------------------------------------------------------===//
