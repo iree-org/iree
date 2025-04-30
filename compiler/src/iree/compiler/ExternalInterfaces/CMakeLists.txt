@@ -30,6 +30,7 @@ iree_cc_library(
     "TensorExtExternalModels.cpp"
     "UtilExternalModels.cpp"
   DEPS
+    LLVMSupport
     MLIRArithDialect
     MLIRGPUDialect
     MLIRIR
