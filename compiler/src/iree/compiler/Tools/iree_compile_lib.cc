@@ -257,15 +257,17 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     };
     InvState r(s);
 
-    auto onCrashCallback = [](iree_compiler_output_t **output,
-                              void *userData) -> iree_compiler_error_t * {
-      iree_compiler_output_t *reproOutput =
-          static_cast<iree_compiler_output_t *>(userData);
-      *output = reproOutput;
-      return nullptr;
-    };
-    ireeCompilerInvocationSetCrashHandler(r.inv, dumpLocalCrashReproducers,
-                                          onCrashCallback, reproducer);
+    if (reproducer) {
+      auto onCrashCallback = [](iree_compiler_output_t **output,
+                                void *userData) -> iree_compiler_error_t * {
+        iree_compiler_output_t *reproOutput =
+            static_cast<iree_compiler_output_t *>(userData);
+        *output = reproOutput;
+        return nullptr;
+      };
+      ireeCompilerInvocationSetCrashHandler(r.inv, dumpLocalCrashReproducers,
+                                            onCrashCallback, reproducer);
+    }
 
     ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
     ireeCompilerInvocationSetCompileFromPhase(
