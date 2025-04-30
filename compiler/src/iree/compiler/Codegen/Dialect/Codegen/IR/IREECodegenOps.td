@@ -180,15 +180,11 @@ def IREECodegen_LoadFromMemrefOp : Op<IREECodegen_Dialect, "load_from_memref",
   let summary = [{loads a tensor from a memref}];
   let description = [{
     Loads a tensor from a memref with a compatible shape and the same element
-    type. The read_only attribute indicates that the source buffer from which
-    the tensor is read is a read only buffer. This hint can be used by
-    bufferization to determine whether or not the buffer that this op reads
-    from may be written.
+    type.
   }];
 
   let arguments = (ins
-    AnyStridedMemRef:$source,
-    UnitAttr:$read_only
+    AnyStridedMemRef:$source
   );
   let results = (outs
     AnyRankedTensor:$result
