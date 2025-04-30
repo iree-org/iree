@@ -325,7 +325,7 @@ def IREETensorExt_DispatchWorkloadOrdinalOp :
   }];
   let description = [{
     The arguments that represent the captured/returned values of the
-    `flow.dispatch.workgroups, i.e. the signature of the body of the op is not
+    `flow.dispatch.workgroups`, i.e. the signature of the body of the op is not
     preserved during IREEs compilation. Since the workloads are derived from
     the operands captured by the operation, this op denotes the values captured
     as workloads. This can be used in the backends to map back to the workload

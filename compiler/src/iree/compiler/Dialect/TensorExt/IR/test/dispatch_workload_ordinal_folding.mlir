@@ -103,3 +103,15 @@ util.func public @dedup_workload(
   }
   util.return %result :tensor<?x?x?x?x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: util.func public @constant_fold_workload_ordinal()
+util.func public @constant_fold_workload_ordinal() -> (index) {
+  // CHECK: %[[C2:.+]] = arith.constant 2 : index
+  %c2 = arith.constant 2: index
+  // CHECK-NOT: iree_tensor_ext.dispatch.workload.ordinal
+  %0 = iree_tensor_ext.dispatch.workload.ordinal %c2, 0 : index
+  // CHECK: util.return %[[C2]]
+  util.return %0 : index
+}
