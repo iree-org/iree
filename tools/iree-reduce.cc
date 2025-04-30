@@ -14,12 +14,6 @@
 // the first arguement. The script should return 0 if the input file produces
 // the required error as the original file and 1 otherwise.
 
-#include "iree/base/api.h"
 #include "iree/compiler/tool_entry_points_api.h"
 
-int main(int argc, char **argv) {
-  IREE_TRACE_APP_ENTER();
-  int exit_code = ireeReduceRunMain(argc, argv);
-  IREE_TRACE_APP_EXIT(exit_code);
-  return exit_code;
-}
+int main(int argc, char **argv) { return ireeReduceRunMain(argc, argv); }
