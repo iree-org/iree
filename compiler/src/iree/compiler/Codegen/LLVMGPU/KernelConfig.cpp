@@ -3131,7 +3131,8 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp,
-             linalg::PackOp, linalg::UnPackOp>(op)) {
+             IREE::LinalgExt::MapScatterOp, linalg::PackOp, linalg::UnPackOp>(
+            op)) {
       rootOperation = op;
       break;
     }
@@ -3181,7 +3182,8 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<IREE::LinalgExt::ScatterOp, linalg::FillOp>(op)) {
+      if (isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapScatterOp,
+              linalg::FillOp>(op)) {
         rootOperation = op;
         break;
       }

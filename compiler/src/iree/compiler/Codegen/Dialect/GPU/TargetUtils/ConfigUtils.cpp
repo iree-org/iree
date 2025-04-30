@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
@@ -579,6 +580,19 @@ struct DistributionInfo {
 
 static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   DistributionInfo distInfo;
+  // MapScatterOp doesn't fit the LinalgOp interface, so use special case logic
+  // to get the distribution info.
+  if (auto mapScatterOp = dyn_cast<IREE::LinalgExt::MapScatterOp>(op)) {
+    distInfo.partitionableLoops =
+        llvm::to_vector(llvm::seq<unsigned int>(mapScatterOp.getInputRank()));
+    distInfo.vectorizable = false;
+    distInfo.minBitwidth = mapScatterOp.getInputType().getElementTypeBitWidth();
+    distInfo.representativeBitWidth = distInfo.minBitwidth;
+    distInfo.loopBounds =
+        SmallVector<int64_t>(mapScatterOp.getInputType().getShape());
+    return distInfo;
+  }
+
   // PackOp doesn't fit the LinalgOp interface, since it is a RelayoutOp, so
   // we have to use special case logic to get the distribution info.
   if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
