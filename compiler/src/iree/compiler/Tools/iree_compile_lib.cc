@@ -147,7 +147,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   llvm::cl::opt<bool> dumpLocalCrashReproducers(
       "dump-local-crash-reproducers",
       llvm::cl::desc("When generating a crash reproducer, generate the "
-                     "smallest possible pass pipeline possible."),
+                     "smallest pass pipeline possible."),
       llvm::cl::init(false));
 
   llvm::cl::opt<bool> emitMLIRBytecode(
