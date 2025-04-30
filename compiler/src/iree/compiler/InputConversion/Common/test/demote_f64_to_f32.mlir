@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-input-conversion-demote-f64-to-f32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-input-conversion-demote-f64-to-f32 --verify-diagnostics %s | FileCheck %s
 
 // NOTE: for more comprehensive tests see demote_i64_to_i32.mlir.
 
@@ -55,6 +55,18 @@ util.func public @nested_region_f64() -> (tensor<?xf64>) {
 
 // -----
 
+// External functions with converted types are unsupported. Don't use the
+// pass if you have them.
+
+// expected-error @+1 {{not allowed}}
+util.func private @extern_func(f64) -> f64
+util.func public @caller(%arg: f64) -> f64 {
+  %result = util.call @extern_func(%arg) : (f64) -> f64
+  util.return %result : f64
+}
+
+// -----
+
 // Check handling of width-sensitive arith casts.
 
 // CHECK-LABEL: util.func public @arith.truncf(
@@ -64,6 +76,8 @@ util.func public @arith.truncf(%arg0: f64) -> f32 {
   %0 = arith.truncf %arg0 : f64 to f32
   util.return %0 : f32
 }
+
+// -----
 
 // CHECK-LABEL: util.func public @arith.extf(
 // CHECK-SAME:      %[[ARG0:.*]]: f32) -> f32 {
