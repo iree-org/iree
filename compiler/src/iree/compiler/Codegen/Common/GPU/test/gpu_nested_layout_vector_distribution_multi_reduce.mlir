@@ -150,13 +150,12 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @inter_subgroup_reduction
-// CHECK-DAG: %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<2x1x1x1x1x2xf32>
 // CHECK-DAG: %[[CST1:.+]] = arith.constant dense<0.000000e+00> : vector<2xf32>
 // Local reduction
 // CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<2x1x1x1x1x4xf32> to vector<2x1x1xf32>
 // Thread reduction
 // CHECK: %[[THREAD_RED0:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
-// CHECK: %[[THREAD_RED1:.+]] = vector.insert %[[THREAD_RED0]], %cst_1 [0] : f32 into vector<2xf32>
+// CHECK: %[[THREAD_RED1:.+]] = vector.insert %[[THREAD_RED0]], %[[CST1]] [0] : f32 into vector<2xf32>
 // CHECK: %[[THREAD_RED2:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
 // CHECK: %[[THREAD_RED3:.+]] = vector.insert %[[THREAD_RED2]], %[[THREAD_RED1]] [1] : f32 into vector<2xf32>
 // CHECK: %[[THREAD_RED4:.+]] = vector.shape_cast %[[THREAD_RED3]] : vector<2xf32> to vector<2x1x1xf32>
@@ -171,10 +170,16 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: vector.transfer_write %[[EXTRACT0]], %[[ALLOC]][%[[TIDX]]#1, %[[SGID]]#1]
 // CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGID]]#1]
 // CHECK: gpu.barrier
-// CHECK-DAG: %[[READ0:.+]] = vector.transfer_read %alloc[%[[TIDX]]#1, %c0], {{.*}} {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
-// CHECK-DAG: %[[GATHER0:.+]] = vector.insert_strided_slice %[[READ0]], %[[CST]] {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf32> into vector<2x1x1x1x1x2xf32>
-// CHECK-DAG: %[[READ1:.+]] = vector.transfer_read %alloc[%[[TIDX1]], %c0], %cst_0 {in_bounds = [true, true]} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x2xf32>
-// CHECK-DAG: %[[GATHER1:.+]] = vector.insert_strided_slice %[[READ1]], %[[GATHER0]] {offsets = [1, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf32> into vector<2x1x1x1x1x2xf32>
-// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_simt %arg1 : vector<32xf32> -> vector<2x1x1xf32>
-// CHECK-DAG: %[[SGRED:.+]] = vector.multi_reduction <maximumf>, %[[GATHER1]], {{.*}} [1, 3, 5] : vector<2x1x1x1x1x2xf32> to vector<2x1x1xf32>
-// CHECK-DAG: arith.maximumf %[[SGRED]], %[[ACC]] : vector<2x1x1xf32>
+// CHECK-DAG: %[[BATCH0:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 16) : index, index, index
+// CHECK-DAG: %[[SG_READ0:.+]] = vector.transfer_read %alloc[%[[BATCH0]]#2, %[[BATCH0]]#1], %cst : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
+// CHECK-DAG: %[[BATCH1:.+]] = affine.linearize_index disjoint [%c1, %[[BATCH0]]#2] by (2, 16) : index
+// CHECK-DAG: %[[SG_READ1:.+]] = vector.transfer_read %alloc[%[[BATCH1]], %[[BATCH0]]#1], %cst : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
+// CHECK-DAG: %[[DISTR0:.+]] = vector.extract %[[SG_READ0]][0, 0] : f32 from vector<1x1xf32>
+// CHECK-DAG: %[[RED0:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR0]] cluster(size = 2, stride = 16) : (f32) -> f32
+// CHECK-DAG: %[[INS0:.+]] = vector.insert %[[RED0]], %[[CST1]] [0] : f32 into vector<2xf32>
+// CHECK-DAG: %[[DISTR1:.+]] = vector.extract %[[SG_READ1]][0, 0] : f32 from vector<1x1xf32>
+// CHECK-DAG: %[[RED1:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR1]] cluster(size = 2, stride = 16) : (f32) -> f32
+// CHECK-DAG: %[[INS1:.+]] = vector.insert %[[RED1]], %[[INS0]] [1] : f32 into vector<2xf32>
+// CHECK-DAG: %[[CAST:.+]] = vector.shape_cast %[[INS1]] : vector<2xf32> to vector<2x1x1xf32>
+// CHECK-DAG: arith.maximumf %[[CAST]], %[[ACC]] : vector<2x1x1xf32>

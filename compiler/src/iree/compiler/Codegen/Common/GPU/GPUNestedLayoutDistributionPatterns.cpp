@@ -874,7 +874,7 @@ struct DistributeMultiReduction final
         loc, unDistributedType, isoRankThreadReduced);
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> indices(unDistributedType.getRank(), c0);
-    SmallVector<bool> inBounds(unDistributedType.getRank(), true);
+    SmallVector<bool> inBounds(unDistributedType.getRank(), false);
     // Insert gpu.barrier to make sure previuos iteration
     // of batch loop has fully read the subgroup partial
     // reductions.
@@ -919,13 +919,18 @@ struct DistributeMultiReduction final
       setSignatureForRedistribution(rewriter, write.getOperation(),
                                     writeOperandsAttr, writeResultsAttr);
     }
+
+    auto ceilToPowerOf2 = [](uint32_t x) {
+      return llvm::isPowerOf2_32(x) ? x : llvm::NextPowerOf2(x);
+    };
+
     // Insert gpu.barrier
     rewriter.create<gpu::BarrierOp>(write.getLoc());
     auto read = rewriter.create<vector::TransferReadOp>(
         loc, unDistributedType, alloc, indices, inBounds);
-    // Create new layout where subgroup dims are squashed to
-    // element tile
-    IREE::VectorExt::NestedLayoutAttr intraSubGroupLayout;
+    // Create new layout where the elements of a subgroup are
+    // distributed to every threads.
+    IREE::VectorExt::NestedLayoutAttr subgroupToThreadsLayout;
     {
       // We intentionally make the subgroup tile to be 1
       SmallVector<int64_t> subgroupTileLens =
@@ -942,39 +947,39 @@ struct DistributeMultiReduction final
           llvm::to_vector(srcLayout.getSubgroupStrides());
       SmallVector<int64_t> threadStrides =
           llvm::to_vector(srcLayout.getThreadStrides());
+
       for (int64_t rDim : reductionDims) {
-        subgroupTileLens[rDim] = 1;
         batchTileLens[rDim] = 1;
         outerTileLens[rDim] = 1;
-        threadTileLens[rDim] = 1;
-        // the partial reductions that was across subgroups will
-        // will be loaded as element tile. We can revisit if this
-        // need to be something else such as thread tile.
-        elementTileLens[rDim] = srcLayout.getSubgroupTile()[rDim];
-        subgroupStrides[rDim] = 0;
-        threadStrides[rDim] = 0;
+        elementTileLens[rDim] = 1;
+        threadStrides[rDim] *= subgroupStrides[rDim];
+        // The size or #lanes needs to be a power of 2.
+        threadTileLens[rDim] = ceilToPowerOf2(subgroupTileLens[rDim]);
+        subgroupStrides[rDim] = 1;
+        subgroupTileLens[rDim] = 1;
       }
-      intraSubGroupLayout = IREE::VectorExt::NestedLayoutAttr::get(
+      subgroupToThreadsLayout = IREE::VectorExt::NestedLayoutAttr::get(
           rewriter.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
           threadTileLens, elementTileLens, subgroupStrides, threadStrides);
       auto readAttrs = SmallVector<Attribute>(read->getNumOperands(), unitAttr);
       ArrayAttr readOperandsAttr =
           ArrayAttr::get(rewriter.getContext(), readAttrs);
       ArrayAttr readResultsAttr =
-          ArrayAttr::get(rewriter.getContext(), {intraSubGroupLayout});
+          ArrayAttr::get(rewriter.getContext(), {subgroupToThreadsLayout});
       setSignatureForRedistribution(rewriter, read.getOperation(),
                                     readOperandsAttr, readResultsAttr);
     }
-
     // A newly created reduction to complete the reduction
     // that reduces the data that was otherwise was on
     // different subgroups.
+    // Since the data was distributed to every thread, it will
+    // form a gpu.subgroup_reduce operation later.
     auto secondReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, kind, read, acc, reductionDims);
     {
       auto reduceAttrs =
           SmallVector<Attribute>(secondReduction->getNumOperands(), unitAttr);
-      reduceAttrs[0] = intraSubGroupLayout;
+      reduceAttrs[0] = subgroupToThreadsLayout;
       ArrayAttr reduceResultsAttr =
           ArrayAttr::get(rewriter.getContext(), {unitAttr});
       if (auto dstLayout = dyn_cast_or_null<NestedLayoutAttr>(resLayout)) {
