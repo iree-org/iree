@@ -11,17 +11,6 @@ func.func @load_from_memref(%arg0: memref<4xf32>) -> tensor<4xf32> {
 
 // -----
 
-func.func @load_from_memref_read_only(%arg0: memref<4xf32>) -> tensor<4xf32> {
-  %value = iree_codegen.load_from_memref %arg0 {read_only} : memref<4xf32> -> tensor<4xf32>
-  return %value : tensor<4xf32>
-}
-// CHECK-LABEL: func.func @load_from_memref_read_only(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
-// CHECK:         iree_codegen.load_from_memref %[[ARG0]] {read_only}
-// CHECK-SAME:      : memref<4xf32> -> tensor<4xf32>
-
-// -----
-
 func.func @load_from_memref_mixed_static_dynamic(%arg0: memref<?x4xf32>) -> tensor<4x?xf32> {
   %value = iree_codegen.load_from_memref %arg0 : memref<?x4xf32> -> tensor<4x?xf32>
   return %value : tensor<4x?xf32>
