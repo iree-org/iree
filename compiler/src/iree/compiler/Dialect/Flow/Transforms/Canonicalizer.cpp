@@ -112,6 +112,7 @@ struct CanonicalizerPass
   }
   void runOnOperation() override {
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
+    config.cseConstants = cseConstants;
     LogicalResult didConverge =
         applyPatternsGreedily(getOperation(), *patterns, config);
     if (this->testConvergence && failed(didConverge)) {

@@ -324,6 +324,9 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
         "Select the type of encoding options to add.",
         [{::llvm::cl::values(
             clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
                 "matmulk", "Only encodes reduction dimensions in the encoding."),
             clEnumValN(
