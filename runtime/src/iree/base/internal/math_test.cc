@@ -204,6 +204,36 @@ TEST(F16ConversionTest, F32ToF16) {
   EXPECT_EQ(0x8200, iree_math_f32_to_f16(-kF16Min / 2));
 }
 
+template <typename UintType>
+static void CheckDenormals(
+    int exp_bits, int mantissa_bits, int bias_tweak, bool have_neg_zero,
+    std::function<UintType(float)> convert_f32_to_small,
+    std::function<float(UintType)> convert_small_to_f32) {
+  IREE_MATH_FP_FORMAT_CONSTANTS(small_, exp_bits, mantissa_bits, bias_tweak)
+  for (UintType m = 0; m <= small_mantissa_mask; ++m) {
+    float value = std::ldexp(m, 1 - small_exp_bias - small_mantissa_bits);
+    EXPECT_EQ(value, convert_small_to_f32(m));
+    EXPECT_EQ(m, convert_f32_to_small(value));
+    const float half = std::ldexp(0.5f, -small_exp_bias - mantissa_bits);
+    const UintType denormal_plus_half = convert_f32_to_small(value + half);
+    EXPECT_TRUE(denormal_plus_half == m || denormal_plus_half == m + 1);
+    if (m == 0 && !have_neg_zero) {
+      continue;
+    }
+    EXPECT_EQ(-value, convert_small_to_f32(m | small_sign_mask));
+    EXPECT_EQ(m | small_sign_mask, convert_f32_to_small(-value));
+    const UintType negative_denormal_minus_half =
+        convert_f32_to_small(-value - half);
+    EXPECT_TRUE(negative_denormal_minus_half == (m | small_sign_mask) ||
+                negative_denormal_minus_half == ((m + 1) | small_sign_mask));
+  }
+}
+
+TEST(F16ConversionTest, Denormals) {
+  CheckDenormals<uint16_t>(5, 10, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                           iree_math_f32_to_f16, iree_math_f16_to_f32);
+}
+
 TEST(F16ConversionTest, F32ToF16ToF32) {
   constexpr float kF16Max = 65504.f;
   constexpr float kF16Min = 1.f / 16384.f;
@@ -251,10 +281,6 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   // Underflow
   EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MIN)));
   EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MIN)));
-  // Denormals
-  EXPECT_EQ(3.05175781e-05f,
-            iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min / 2)));
-  EXPECT_EQ(3.05175781e-05f, iree_math_f16_to_f32(0x0001));
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(INFINITY)));
   EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-INFINITY)));
@@ -276,15 +302,17 @@ TEST(BF16ConversionTest, F32ToBF16) {
   // Infinity
   EXPECT_EQ(0x7f80, iree_math_f32_to_bf16(INFINITY));
   EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-INFINITY));
-  // No overflow, just rounding, as bfloat16 has nearly the same range as
-  // float32
+  // No overflow or underflow, just rounding, as bfloat16 has nearly the same
+  // range as float32.
   EXPECT_EQ(0x7f80, iree_math_f32_to_bf16(FLT_MAX));
   EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-FLT_MAX));
-  // No underflow, as bfloat16 has the same smallest normal value as float32.
-  EXPECT_EQ(0x007F, iree_math_f32_to_bf16(1.1663108e-38));  // Largest denormal.
-  EXPECT_EQ(0x0080, iree_math_f32_to_bf16(1.1754942e-38));  // Rounds to normal.
   EXPECT_EQ(0x0080, iree_math_f32_to_bf16(FLT_MIN));
   EXPECT_EQ(0x8080, iree_math_f32_to_bf16(-FLT_MIN));
+}
+
+TEST(BF16ConversionTest, Denormals) {
+  CheckDenormals<uint16_t>(8, 7, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                           iree_math_f32_to_bf16, iree_math_bf16_to_f32);
 }
 
 TEST(BF16ConversionTest, F32ToBF16ToF32) {
@@ -325,10 +353,6 @@ TEST(BF16ConversionTest, F32ToBF16ToF32) {
   // Smallest normal values.
   EXPECT_EQ(FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(FLT_MIN)));
   EXPECT_EQ(-FLT_MIN, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-FLT_MIN)));
-  // Denormals
-  EXPECT_EQ(1.83670992e-40f,
-            iree_math_bf16_to_f32(iree_math_f32_to_bf16(2.0e-40f)));
-  EXPECT_EQ(9.18354962e-41f, iree_math_bf16_to_f32(0x0001));
 
   // Inf and Nan
   EXPECT_EQ(INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(INFINITY)));
@@ -378,10 +402,11 @@ TEST(F8E5M2ConversionTest, F32ToF8E5M2) {
   EXPECT_EQ(0x82, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.5f));
   EXPECT_EQ(0x03, iree_math_f32_to_f8e5m2(kF8E5M2Min * 0.75f));
   EXPECT_EQ(0x83, iree_math_f32_to_f8e5m2(-kF8E5M2Min * 0.75f));
+}
 
-  // Denormals
-  EXPECT_EQ(0x02, iree_math_f32_to_f8e5m2(kF8E5M2Min / 2));
-  EXPECT_EQ(0x82, iree_math_f32_to_f8e5m2(-kF8E5M2Min / 2));
+TEST(F8E5M2ConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(5, 2, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                          iree_math_f32_to_f8e5m2, iree_math_f8e5m2_to_f32);
 }
 
 TEST(F8E5M2ConversionTest, F32ToF8E5M2ToF32) {
@@ -420,10 +445,6 @@ TEST(F8E5M2ConversionTest, F32ToF8E5M2ToF32) {
   // Underflow
   EXPECT_EQ(0.0f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(FLT_MIN)));
   EXPECT_EQ(0.0f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-FLT_MIN)));
-  // Denormals
-  EXPECT_EQ(1.f / 32768.f,
-            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(kF8E5M2Min / 2)));
-  EXPECT_EQ(3.05175781e-05f, iree_math_f8e5m2_to_f32(0x0001));
   // Inf and Nan
   EXPECT_EQ(INFINITY,
             iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(INFINITY)));
@@ -489,9 +510,11 @@ TEST(F8E4M3FNConversionTest, F32ToF8E4M3FN) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f8e4m3fn(FLT_MIN));
   EXPECT_EQ(0x80, iree_math_f32_to_f8e4m3fn(-FLT_MIN));
-  // Denormals
-  EXPECT_EQ(0x04, iree_math_f32_to_f8e4m3fn(kF8E4M3FNMin / 2));
-  EXPECT_EQ(0x84, iree_math_f32_to_f8e4m3fn(-kF8E4M3FNMin / 2));
+}
+
+TEST(F8E4M3FNConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(4, 3, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                          iree_math_f32_to_f8e4m3fn, iree_math_f8e4m3fn_to_f32);
 }
 
 TEST(F8E4M3FNConversionTest, F32ToF8E4M3FNToF32) {
@@ -540,9 +563,6 @@ TEST(F8E4M3FNConversionTest, F32ToF8E4M3FNToF32) {
             iree_math_f8e4m3fn_to_f32(iree_math_f32_to_f8e4m3fn(FLT_MIN)));
   EXPECT_EQ(0.0f,
             iree_math_f8e4m3fn_to_f32(iree_math_f32_to_f8e4m3fn(-FLT_MIN)));
-  // Denormals
-  EXPECT_EQ(0.0078125f, iree_math_f8e4m3fn_to_f32(
-                            iree_math_f32_to_f8e4m3fn(kF8E4M3FNMin / 2)));
   // Inf and Nan
   EXPECT_TRUE(std::isnan(
       iree_math_f8e4m3fn_to_f32(iree_math_f32_to_f8e4m3fn(INFINITY))));
@@ -580,9 +600,12 @@ TEST(F8E5M2FNUZConversionTest, F32ToF8E5M2FNUZ) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f8e5m2fnuz(FLT_MIN));
   EXPECT_EQ(0, iree_math_f32_to_f8e5m2fnuz(-FLT_MIN));  // No negative zero.
-  // Denormals
-  EXPECT_EQ(0x02, iree_math_f32_to_f8e5m2fnuz(kF8E5M2FNUZMin / 2));
-  EXPECT_EQ(0x82, iree_math_f32_to_f8e5m2fnuz(-kF8E5M2FNUZMin / 2));
+}
+
+TEST(F8E5M2FNUZConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(5, 2, /*bias_tweak=*/1, /*have_neg_zero=*/false,
+                          iree_math_f32_to_f8e5m2fnuz,
+                          iree_math_f8e5m2fnuz_to_f32);
 }
 
 TEST(F8E5M2FNUZConversionTest, F32ToF8E5M2ToF32FNUZ) {
@@ -631,10 +654,6 @@ TEST(F8E5M2FNUZConversionTest, F32ToF8E5M2ToF32FNUZ) {
             iree_math_f8e5m2fnuz_to_f32(iree_math_f32_to_f8e5m2fnuz(FLT_MIN)));
   EXPECT_EQ(0.0f,
             iree_math_f8e5m2fnuz_to_f32(iree_math_f32_to_f8e5m2fnuz(-FLT_MIN)));
-  // Denormals
-  EXPECT_EQ(1.f / 65536.f,
-            iree_math_f8e5m2fnuz_to_f32(
-                iree_math_f32_to_f8e5m2fnuz(kF8E5M2FNUZMin / 2)));
   // Inf and NaN. No infinities, so we get NaN.
   EXPECT_TRUE(std::isnan(
       iree_math_f8e5m2fnuz_to_f32(iree_math_f32_to_f8e5m2fnuz(INFINITY))));
@@ -684,9 +703,12 @@ TEST(F8E4M3FNUZConversionTest, F32ToF8E4M3FNUZ) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f8e4m3fnuz(FLT_MIN));
   EXPECT_EQ(0, iree_math_f32_to_f8e4m3fnuz(-FLT_MIN));
-  // Denormals
-  EXPECT_EQ(0x04, iree_math_f32_to_f8e4m3fnuz(kF8E4M3FNUZMin / 2));
-  EXPECT_EQ(0x84, iree_math_f32_to_f8e4m3fnuz(-kF8E4M3FNUZMin / 2));
+}
+
+TEST(F8E4M3FNUZConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(4, 3, /*bias_tweak=*/1, /*have_neg_zero=*/false,
+                          iree_math_f32_to_f8e4m3fnuz,
+                          iree_math_f8e4m3fnuz_to_f32);
 }
 
 TEST(F8E4M3FNUZConversionTest, F32ToF8E4M3FNUZToF32) {
@@ -738,9 +760,6 @@ TEST(F8E4M3FNUZConversionTest, F32ToF8E4M3FNUZToF32) {
             iree_math_f8e4m3fnuz_to_f32(iree_math_f32_to_f8e4m3fnuz(FLT_MIN)));
   EXPECT_EQ(0.0f,
             iree_math_f8e4m3fnuz_to_f32(iree_math_f32_to_f8e4m3fnuz(-FLT_MIN)));
-  // Denormals
-  EXPECT_EQ(1.f / 256.f, iree_math_f8e4m3fnuz_to_f32(
-                             iree_math_f32_to_f8e4m3fnuz(kF8E4M3FNUZMin / 2)));
   // Inf and Nan
   EXPECT_TRUE(std::isnan(
       iree_math_f8e4m3fnuz_to_f32(iree_math_f32_to_f8e4m3fnuz(INFINITY))));
