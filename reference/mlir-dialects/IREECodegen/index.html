@@ -3938,17 +3938,8 @@ This makes lowering more progressive and brings the following benefits:
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_memref` $source attr-dict `:` type($source) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a tensor from a memref with a compatible shape and the same element
-type. The read_only attribute indicates that the source buffer from which
-the tensor is read is a read only buffer. This hint can be used by
-bufferization to determine whether or not the buffer that this op reads
-from may be written.</p>
+type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>read_only</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
-</table>
-
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4012,7 +4003,7 @@ from may be written.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>tensor_type</code></td><td>::mlir::TypeAttr</td><td>Tensor type attribute</td></tr>
@@ -4099,7 +4090,7 @@ is otherwise perfectly legal.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>swizzle</code></td><td>IREE::Codegen::SwizzleAttrInterface</td><td>swizzling descriptor attributes</td></tr>
