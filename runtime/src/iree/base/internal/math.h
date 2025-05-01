@@ -7,6 +7,7 @@
 #ifndef IREE_BASE_INTERNAL_MATH_H_
 #define IREE_BASE_INTERNAL_MATH_H_
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -299,51 +300,38 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
                                                  int bias_tweak,
                                                  bool nan_as_neg_zero) {
   IREE_MATH_FP_FORMAT_CONSTANTS(src_, exp_bits, mantissa_bits, bias_tweak)
-  IREE_MATH_FP_FORMAT_CONSTANTS(f32_, 8, 23, 0)
-  const uint32_t src_sign = src & src_sign_mask;
-  const uint32_t f32_sign = src_sign << (f32_sign_shift - src_sign_shift);
+  const float float_sign = (src & src_sign_mask) ? -1.f : 1.f;
   const uint32_t src_exp = src & src_exp_mask;
   const uint32_t src_mantissa = src & src_mantissa_mask;
-  uint32_t f32_exp = 0;
-  uint32_t f32_mantissa = 0;
   if (src_exp == src_exp_mask) {
     // Top exponent value normally means infinity or NaN.
     if (have_infinity) {
       // NaN or Inf case.
-      f32_exp = f32_exp_mask;
       if (src_mantissa) {
-        f32_mantissa = f32_mantissa_mask;  // Quiet NaN.
+        return NAN;
       } else {
-        f32_mantissa = 0;  // Inf.
+        return float_sign * INFINITY;
       }
     } else {
       // No infinities => more large finite values, unless this is a NaN.
-      bool is_finite = src_mantissa != src_mantissa_mask || nan_as_neg_zero;
-      if (is_finite) {
-        f32_exp = ((src_exp >> src_exp_shift) + f32_exp_bias - src_exp_bias)
-                  << f32_exp_shift;
-        f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
-      } else {
-        // NaN. Generate a quiet NaN.
-        f32_exp = f32_exp_mask;
-        f32_mantissa = f32_mantissa_mask;
+      if (src_mantissa == src_mantissa_mask && !nan_as_neg_zero) {
+        return NAN;
       }
     }
   } else if (nan_as_neg_zero && src == src_sign_mask) {
-    // Source is NaN encoded as negative zero. Generate NaN.
-    f32_exp = f32_exp_mask;
-    f32_mantissa = f32_mantissa_mask;
-  } else if (src_exp == 0 && src_mantissa == 0) {
-    // Zero. Leave f32_exp and f32_mantissa as zero.
-  } else {
-    f32_exp = ((src_exp >> src_exp_shift) + f32_exp_bias - src_exp_bias)
-              << f32_exp_shift;
-    f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
+    // Case of small FP types using the negative-0 encoding for NaN.
+    return NAN;
+  } else if (src_exp == 0) {
+    // Denormals. In that case, the exponent is interpreted as 1 instead of the
+    // encoded 0, and the result is proportional to src_mantissa instead of
+    // having an implied leading 1.
+    return float_sign *
+           ldexpf(src_mantissa, 1 - src_exp_bias - src_mantissa_bits);
   }
-  const uint32_t u32_value = f32_sign | f32_exp | f32_mantissa;
-  float f32_value;
-  memcpy(&f32_value, &u32_value, sizeof f32_value);
-  return f32_value;
+  // Normal value.
+  return float_sign *
+         ldexpf(src_mantissa + (1 << src_mantissa_bits),
+                (src_exp >> src_exp_shift) - src_exp_bias - src_mantissa_bits);
 }
 
 // Generic conversion from f32 to any less-than-32-bit floating-point format,
@@ -378,9 +366,10 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     if (dst_exp_bits == f32_exp_bits) {
       // When the destination type still has as many exponent bits, denormals
       // can remain nonzero. This happens only with the bf16 type.
-      // Just truncate the mantissa. Not worth bothering with round-to-nearest
-      // for denormals for bf16 only.
-      dst_mantissa = f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
+      // Just divide the mantissa (rounding shift).
+      int shift_amount = f32_mantissa_bits - dst_mantissa_bits;
+      uint32_t rounding_term = 1 << (shift_amount - 1);
+      dst_mantissa = (f32_mantissa + rounding_term) >> shift_amount;
     }
     // The destination type has fewer exponent bits, so f32 subnormal values
     // become exactly zero. Leave the mantissa zero.
@@ -400,16 +389,23 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     } else if (arithmetic_exp + dst_exp_bias <= 0) {
       // Underflow. Generate a subnormal or zero.
       dst_exp = 0;
+      // Arithmetic exponent of destination type subnormals.
+      int dst_arithmetic_exp = 1 - dst_exp_bias;
       // The exponent has to be clamped to 0 when the value
       // (arithmetic_exp + dst_exp_bias) is negative. This has to be compensated
       // by right-shifting the subnormal mantissa.
-      int exp_to_encode_as_bitshift = -(arithmetic_exp + dst_exp_bias);
-      int shift_amount =
-          f32_mantissa_bits - dst_mantissa_bits + exp_to_encode_as_bitshift;
-      if (shift_amount >= f32_mantissa_bits) {
+      int shift_amount = f32_mantissa_bits - dst_mantissa_bits -
+                         arithmetic_exp + dst_arithmetic_exp;
+      if (shift_amount < 0 || shift_amount > f32_mantissa_bits) {
         dst_mantissa = 0;
       } else {
-        dst_mantissa = f32_mantissa >> shift_amount;
+        // Source f32 value is normal so has an implied 1... leading bit.
+        int effective_f32_mantissa = (1 << f32_mantissa_bits) + f32_mantissa;
+        // Add this term to achieve rounding to nearest instead of truncation
+        // towards zero.
+        int rounding_term = 1 << (shift_amount - 1);
+        // Finally compute the destination mantissa as a rounded right shift.
+        dst_mantissa = (effective_f32_mantissa + rounding_term) >> shift_amount;
       }
     } else {
       // Normal case.
