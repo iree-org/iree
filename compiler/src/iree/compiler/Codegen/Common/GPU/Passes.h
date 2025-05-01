@@ -104,9 +104,6 @@ createReorderWorkgroups(
     ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn = nullptr);
 
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createExpandGPUOpsPass(bool forROCDL);
-
 #define GEN_PASS_DECL
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc" // IWYU pragma: keep
 
