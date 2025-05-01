@@ -7,12 +7,15 @@ languages.
 
 * [Index page](./bindings/index.md)
 
-## MLIR dialects
+## [MLIR dialects](./mlir-dialects/index.md)
 
 Automatically generated documentation for the MLIR dialects defined in the IREE
 repository.
 
-* [Index page](./mlir-dialects/index.md)
+## [MLIR passes](./mlir-passes/index.md)
+
+Automatically generated documentation for the MLIR passes defined in the IREE
+repository.
 
 ## Other topics
 

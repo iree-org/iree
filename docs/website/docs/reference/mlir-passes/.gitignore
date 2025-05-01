@@ -1,0 +1,5 @@
+# Default to excluding the generated dialect .md files
+*.md
+
+# Include the hand-authored index page.
+!index.md
