@@ -60,13 +60,13 @@ static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
   }
 
   // If the number of loop trips are indivisible by the number of threads then
-  // also default to just the vector size.
+  // also default to just the vector size (e.g., [1, ..., 1, vector_size] when
+  // `targetDim` is the innermost).
   int64_t flatNumTrips = std::accumulate(loopRanges.begin(), loopRanges.end(),
                                          1, std::multiplies<int64_t>());
   if (flatNumTrips % numThreads != 0) {
     return getVectorSizeTileSizes(rank, targetDim, targetRange, vectorSize);
   }
-  SmallVector<int64_t> tileSizes(rank, 1);
 
   // Let the maximum possible vector size be the minimum between:
   //   - The requested vector size
@@ -75,37 +75,30 @@ static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
 
   // Bail out to unit vector sizes if the target loop range is not divisible
   // by the vector size or vice-versa.
+  SmallVector<int64_t> tileSizes(rank, 1);
   if (targetRange % maxVectorSize != 0 && maxVectorSize % targetRange != 0) {
     return tileSizes;
   }
 
-  // Let the tile size for the target (inner/outer most) dim be the smaller of
-  // the vector size and the target loop range. If `allowMultiDimCollapse` is
-  // false, return here.
+  // Let the tile size for the target dim be the smaller of the vector size and
+  // the target loop range. If `allowMultiDimCollapse` is false, or
+  // `vectorizeOutermost` is true, return here.
   tileSizes[targetDim] = std::min(targetRange, maxVectorSize);
-  if (targetRange >= maxVectorSize || !allowMultiDimCollapse) {
+  if (targetRange >= maxVectorSize || !allowMultiDimCollapse ||
+      vectorizeOutermost) {
     return tileSizes;
   }
 
-  // Only increase the tile size if the remaining vector size is divisible
-  // by the loop range (and thus range <= remaining vector size).
-  maxVectorSize /= targetRange;
-  if (vectorizeOutermost) {
-    for (int64_t i = 1; i < rank; ++i) {
-      int64_t range = loopRanges[i];
-      if (maxVectorSize % range != 0)
-        break;
-      tileSizes[i] = range;
-      maxVectorSize /= range;
+  maxVectorSize = maxVectorSize / targetRange;
+  for (int64_t i = loopRanges.size() - 2, e = 0; i >= e; --i) {
+    // Only increase the tile size if the remaining vector size is divisible
+    // by the loop range (and thus range <= remaining vector size).
+    int64_t range = loopRanges[i];
+    if (maxVectorSize % range != 0) {
+      break;
     }
-  } else {
-    for (int64_t i = rank - 2; i >= 0; --i) {
-      int64_t range = loopRanges[i];
-      if (maxVectorSize % range != 0)
-        break;
-      tileSizes[i] = range;
-      maxVectorSize /= range;
-    }
+    tileSizes[i] = range;
+    maxVectorSize = maxVectorSize / range;
   }
 
   return tileSizes;
