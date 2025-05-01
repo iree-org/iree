@@ -216,16 +216,21 @@ static void CheckDenormals(
     EXPECT_EQ(m, convert_f32_to_small(value));
     const float half = std::ldexp(0.5f, -small_exp_bias - mantissa_bits);
     const UintType denormal_plus_half = convert_f32_to_small(value + half);
+    // m + 1 is the next representable value after the denormal, even if m was
+    // the largest denormal, as in that case the mantissa overflows into the
+    // exponent, resulting in the smallest normal value.
+    // Tolerate both m and m + 1 here, meaning that we tolerate any tie-break
+    // behavior for conversions of f32 to denormal small floats.
     EXPECT_TRUE(denormal_plus_half == m || denormal_plus_half == m + 1);
-    if (m == 0 && !have_neg_zero) {
-      continue;
+    if (m != 0 || have_neg_zero) {
+      // Test negative values, similar to the above code for positive values.
+      EXPECT_EQ(-value, convert_small_to_f32(m | small_sign_mask));
+      EXPECT_EQ(m | small_sign_mask, convert_f32_to_small(-value));
+      const UintType negative_denormal_minus_half =
+          convert_f32_to_small(-value - half);
+      EXPECT_TRUE(negative_denormal_minus_half == (m | small_sign_mask) ||
+                  negative_denormal_minus_half == ((m + 1) | small_sign_mask));
     }
-    EXPECT_EQ(-value, convert_small_to_f32(m | small_sign_mask));
-    EXPECT_EQ(m | small_sign_mask, convert_f32_to_small(-value));
-    const UintType negative_denormal_minus_half =
-        convert_f32_to_small(-value - half);
-    EXPECT_TRUE(negative_denormal_minus_half == (m | small_sign_mask) ||
-                negative_denormal_minus_half == ((m + 1) | small_sign_mask));
   }
 }
 
