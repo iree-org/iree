@@ -34,82 +34,14 @@ namespace mlir::iree_compiler::IREE::VM {
 void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions);
 
-void registerVMTransformPassPipeline();
-
-//===----------------------------------------------------------------------===//
-// Conversion
-//===----------------------------------------------------------------------===//
-
-// Converts from various dialects (standard, HAL, etc) to the VM dialect.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createConversionPass(TargetOptions targetOptions);
-
-//===----------------------------------------------------------------------===//
-// Module layout
-//===----------------------------------------------------------------------===//
-
-// Reifies and pads vm.rodata.table.inline ops as two vm.rodata.inline ops.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createReifyRodataTablesPass();
-
-// Hoists inline vm.rodata.inline values to module-level constant storage.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createHoistInlinedRodataPass();
-
-// Deduplicates vm.rodata ops in the module.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createDeduplicateRodataPass();
-
-// Resolves global loads of rodata ops to direct rodata references.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createResolveRodataLoadsPass();
-
-//===----------------------------------------------------------------------===//
-// Module analysis and ordinal assignment
-//===----------------------------------------------------------------------===//
-
-// Gathers all module-level global init/deinit functions into single locations
-// such that the runtime can init/deinit everything at once.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createGlobalInitializationPass();
-
-// Assigns module-unique ordinals to function/global/etc symbols within the
-// module.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createOrdinalAllocationPass();
-
-//===----------------------------------------------------------------------===//
-// Optimization passes
-//===----------------------------------------------------------------------===//
-
-// Drops __init/__deinit functions that have no ops.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createDropEmptyModuleInitializersPass();
-
-// Drops unused calls to functions marked as having no side effects.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createDropUnusedCallsPass();
-
-// Sinks defining ops with few uses to their use-sites to reduce the total
-// number of live registers at the cost of additional storage requirements.
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createSinkDefiningOpsPass();
-
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerVMPasses() {
-  auto targetOptions = TargetOptions::FromFlags::get();
-  registerVMTransformPassPipeline();
-  createConversionPass(targetOptions);
-  createHoistInlinedRodataPass();
-  createDeduplicateRodataPass();
-  createDropEmptyModuleInitializersPass();
-  createDropUnusedCallsPass();
-  createGlobalInitializationPass();
-  createOrdinalAllocationPass();
-  createResolveRodataLoadsPass();
-  createSinkDefiningOpsPass();
-}
+#define GEN_PASS_DECL
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc" // IWYU pragma: keep
+
+void registerVMPasses();
 
 } // namespace mlir::iree_compiler::IREE::VM
 

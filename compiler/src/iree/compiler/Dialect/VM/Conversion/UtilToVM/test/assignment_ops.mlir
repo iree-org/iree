@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion --cse --iree-vm-target-index-bits=64 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=64},cse)' %s | FileCheck %s
 
 // CHECK-LABEL: @switch_index
 //  CHECK-SAME: (%[[INDEX_I64:.+]]: i64)

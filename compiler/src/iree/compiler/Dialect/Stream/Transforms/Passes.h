@@ -134,8 +134,6 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
 void buildStreamOptimizationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions);
 
-void registerStreamTransformPassPipelines();
-
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//

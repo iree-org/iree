@@ -16,6 +16,9 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_DROPUNUSEDCALLSPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 namespace {
 
 /// Removes vm.call ops to functions that are marked as having no side-effects
@@ -54,15 +57,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
 } // namespace
 
 class DropUnusedCallsPass
-    : public PassWrapper<DropUnusedCallsPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  StringRef getArgument() const override { return "iree-vm-drop-unused-calls"; }
-
-  StringRef getDescription() const override {
-    return "Drops vm.call ops that have no side effects and are unused.";
-  }
-
+    : public IREE::VM::impl::DropUnusedCallsPassBase<DropUnusedCallsPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
@@ -92,11 +87,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createDropUnusedCallsPass() {
-  return std::make_unique<DropUnusedCallsPass>();
-}
-
-static PassRegistration<DropUnusedCallsPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

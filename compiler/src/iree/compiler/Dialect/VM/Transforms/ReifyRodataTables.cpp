@@ -18,6 +18,9 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_REIFYRODATATABLESPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 // Replaces a vm.rodata.table.inline op with two vm.rodata.inline ops, one for
 // the indexing table, and the second for the padded data.
 template <typename IntTy>
@@ -86,23 +89,7 @@ static void reifyRodataTable(RewriterBase &rewriter,
 }
 
 class ReifyRodataTablesPass
-    : public PassWrapper<ReifyRodataTablesPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-vm-reify-rodata-tables";
-  }
-
-  StringRef getDescription() const override {
-    return "Converts vm.rodata.table.inline into two rodata, one for the flat "
-           "data and"
-           "the other for a newly constructed table for the element subviews.";
-  }
-
+    : public IREE::VM::impl::ReifyRodataTablesPassBase<ReifyRodataTablesPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -121,12 +108,5 @@ public:
     });
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createReifyRodataTablesPass() {
-  return std::make_unique<ReifyRodataTablesPass>();
-}
-
-static PassRegistration<ReifyRodataTablesPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM
