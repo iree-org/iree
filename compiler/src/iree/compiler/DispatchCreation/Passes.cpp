@@ -251,6 +251,12 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
   // separated from compiler fusion decisions.
   if (clEnableDataTiling) {
     FunctionLikeNest(passManager)
+        // Run canonicalizer first to make propagation easier.
+        .addPass([&]() {
+          IREE::Flow::CanonicalizerPassOptions options;
+          options.cseConstants = false;
+          return IREE::Flow::createCanonicalizerPass(options);
+        })
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
