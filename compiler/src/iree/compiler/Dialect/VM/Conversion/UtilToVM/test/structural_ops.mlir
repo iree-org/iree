@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion --iree-vm-target-index-bits=32 --allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=32})' --allow-unregistered-dialect %s | FileCheck %s
 
 //      CHECK: vm.initializer {
 // CHECK-NEXT:  vm.return
