@@ -15,6 +15,7 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
+    "Passes.h.inc"
   SRCS
     "Conversion.cpp"
     "DeduplicateRodata.cpp"
@@ -28,6 +29,7 @@ iree_cc_library(
     "ResolveRodataLoads.cpp"
     "SinkDefiningOps.cpp"
   DEPS
+    ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineToStandard
@@ -59,6 +61,15 @@ iree_cc_library(
     iree::compiler::Dialect::VM::IR
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

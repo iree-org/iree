@@ -18,6 +18,9 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_ORDINALALLOCATIONPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 // Returns the size in bytes of the global when stored in memory.
 // Valid only for globals using primitive storage.
 static size_t getGlobalStorageSize(IREE::Util::GlobalOpInterface globalOp) {
@@ -38,16 +41,7 @@ static size_t getGlobalStorageSize(IREE::Util::GlobalOpInterface globalOp) {
 // related to each other and global data accessed in proximity should be
 // clustered together to make use of paging in memory mapped files.
 class OrdinalAllocationPass
-    : public PassWrapper<OrdinalAllocationPass, OperationPass<ModuleOp>> {
-public:
-  StringRef getArgument() const override {
-    return "iree-vm-ordinal-allocation";
-  }
-
-  StringRef getDescription() const override {
-    return "Assigns ordinals to function and global symbols";
-  }
-
+    : public IREE::VM::impl::OrdinalAllocationPassBase<OrdinalAllocationPass> {
   void runOnOperation() override {
     Builder builder(&getContext());
 
@@ -131,11 +125,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>> createOrdinalAllocationPass() {
-  return std::make_unique<OrdinalAllocationPass>();
-}
-
-static PassRegistration<OrdinalAllocationPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM
