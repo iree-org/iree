@@ -42,6 +42,10 @@ Value createI1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
 // %masked_read
 //   = arith.select %0 && ... && %n ? %read : %padding : index,vector<1x ... x1x8xbf16>
 // clang-format on
+// Note we currently dont support cases where muliple masks are ANDed or ORed
+// together to form the final mask to a read but such support can be added where
+// we track a set of valid masks and add that an AND or OR of valid masks is
+// valid
 
 void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
   Location loc = maskOp.getLoc();
