@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -22,16 +23,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-class ExpandGPUOpsPass final
-    : public impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
-private:
+struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
   // Apply AMD GPU targetting patterns
-  bool forROCDL = false;
-
-public:
-  using impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass>::ExpandGPUOpsPassBase;
-  ExpandGPUOpsPass(bool forROCDL) : forROCDL(forROCDL) {}
-
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -43,10 +36,11 @@ public:
     }
 
     RewritePatternSet patterns(ctx);
+    auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     StringRef targetArch = target.getArch();
     auto maybeChipset = amdgpu::Chipset::parse(targetArch);
-    if (succeeded(maybeChipset) && forROCDL) {
+    if (succeeded(maybeChipset) && isROCMBackend(execTarget)) {
       populateGpuLowerSubgroupReduceToDPPPatterns(
           patterns, *subgroupSize, *maybeChipset, PatternBenefit(2));
       populateGpuLowerClusteredSubgroupReduceToDPPPatterns(
@@ -64,10 +58,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createExpandGPUOpsPass(bool forROCDL) {
-  return std::make_unique<ExpandGPUOpsPass>(forROCDL);
-}
 
 } // namespace mlir::iree_compiler
