@@ -446,8 +446,7 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   // and then pass numLaneToReduce as cluster size to the subgroup_reduce op?
   if (numLaneToReduce == warpSize) {
     auto gpuReduceKind = combiningKindToAllReduce(kind);
-    Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-    return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, gpuReduceKind,
+    return builder.create<gpu::SubgroupReduceOp>(loc, input, gpuReduceKind,
                                                  /*uniform=*/false);
   }
   // Always perform the shuffles over the supported scalar type. For inputs of
