@@ -119,8 +119,9 @@ struct ROCDLBufferInstructionsOptimizationPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();
-    SmallVector<vector::CreateMaskOp> maskOps(
-        funcOp.getFunctionBody().getOps<vector::CreateMaskOp>());
+    SmallVector<vector::CreateMaskOp> maskOps;
+    funcOp.walk(
+        [&](vector::CreateMaskOp maskOp) { maskOps.push_back(maskOp); });
 
     IRRewriter rewriter(context);
     for (vector::CreateMaskOp maskOp : maskOps) {
