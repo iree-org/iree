@@ -74,6 +74,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     IOParametersDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "IOParametersOps.td"
   OUTS

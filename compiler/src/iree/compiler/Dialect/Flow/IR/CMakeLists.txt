@@ -111,6 +111,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     FlowDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "FlowOps.td"
   OUTS

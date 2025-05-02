@@ -137,6 +137,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     IREECodegenDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "IREECodegenOps.td"
   OUTS
