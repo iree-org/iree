@@ -162,6 +162,11 @@ nav:
           - "guides/parameters.md"
   - "Reference":
       - "reference/index.md"
+      - "General topics":
+          - Glossary: "reference/glossary.md"
+          - Optimization options: "reference/optimization-options.md"
+          - Tuning: "reference/tuning.md"
+          - Extensions: "reference/extensions.md"
       - "API bindings":
           - "reference/bindings/index.md"
           - C API: "reference/bindings/c-api.md"
@@ -216,11 +221,6 @@ nav:
               - LLVMGPU: "reference/mlir-passes/CodegenLLVMGPU.md"
               - SPIRV: "reference/mlir-passes/CodegenSPIRV.md"
               - VMVX: "reference/mlir-passes/CodegenVMVX.md"
-      - "Other topics":
-          - Glossary: "reference/glossary.md"
-          - Optimization options: "reference/optimization-options.md"
-          - Tuning: "reference/tuning.md"
-          - Extensions: "reference/extensions.md"
   - "Developers":
       - "developers/index.md"
       - "General development topics":

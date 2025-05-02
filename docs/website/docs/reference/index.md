@@ -1,5 +1,12 @@
 # Reference pages
 
+## General topics
+
+* [Glossary](./glossary.md)
+* [Optimization options](./optimization-options.md)
+* [Tuning](./tuning.md)
+* [Extensions](./extensions.md)
+
 ## API bindings
 
 IREE offers API bindings for compiling and running programs from various
@@ -16,10 +23,3 @@ repository.
 
 Automatically generated documentation for the MLIR passes defined in the IREE
 repository.
-
-## Other topics
-
-* [Glossary](./glossary.md)
-* [Optimization options](./optimization-options.md)
-* [Tuning](./tuning.md)
-* [Extensions](./extensions.md)
