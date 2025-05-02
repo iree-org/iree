@@ -195,6 +195,31 @@ module {
 // -----
 
 #config = #iree_gpu.derived_thread_config
+module {
+  func.func @inferred_im2col_batch_last(%2: tensor<16x26x18x32xbf16>, %3: tensor<32x1x1x32xbf16>) -> tensor<32x1x1x32xbf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
+      } {
+    %4 = iree_linalg_ext.im2col {lowering_config = #config}
+      strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
+      m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
+      batch_pos = [3] m_pos = [1, 2] k_pos = [0]
+      input_k_perm = [0, 1, 2]
+      ins(%2 : tensor<16x26x18x32xbf16>)
+      outs(%3 : tensor<32x1x1x32xbf16>) -> tensor<32x1x1x32xbf16>
+    return %4 : tensor<32x1x1x32xbf16>
+  }
+}
+
+// CHECK-LABEL: func.func @inferred_im2col_batch_last
+//       CHECK:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (32, 1, 1, 32) step (4, 1, 1, 1)
+//       CHECK:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<16x26x18x4xbf16>) outs({{.*}}: tensor<4x1x1x1xbf16>)
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   mapping = [#gpu.thread<linear_dim_3>, #gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
 func.func @scatter(%arg0: tensor<3x32x16xf32>, %arg1: tensor<3x1xi32>) -> tensor<3x32x16xf32>
       attributes {
         translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
