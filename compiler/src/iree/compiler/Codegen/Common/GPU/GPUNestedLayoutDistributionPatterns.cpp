@@ -498,13 +498,44 @@ struct DistributeTransferWrite final
   int64_t subgroupSize;
 };
 
+static VectorValue broadcastToShape(RewriterBase &rewriter, Value source,
+                                    ArrayRef<int64_t> shape,
+                                    ArrayRef<bool> broadcastedDims) {
+  // Since vector dialect does not have a broadcastToShape operation, we first
+  // broadcast and then transpose the vector to get the desired broadcast.
+  assert(shape.size() == broadcastedDims.size());
+  // Move all broadcastedDims as leading dimensions and perform the broadcast.
+  SmallVector<int64_t> broadcastedIndices;
+  SmallVector<int64_t> unbroadcastedIndices;
+  for (auto [i, isBroadcasted] : llvm::enumerate(broadcastedDims)) {
+    if (isBroadcasted) {
+      broadcastedIndices.push_back(i);
+    } else {
+      unbroadcastedIndices.push_back(i);
+    }
+  }
+
+  SmallVector<int64_t> perm = llvm::to_vector(
+      llvm::concat<int64_t>(broadcastedIndices, unbroadcastedIndices));
+  SmallVector<int64_t> leadingBroadcastShape = applyPermutation(shape, perm);
+
+  VectorType broadcastedVecType =
+      VectorType::get(leadingBroadcastShape, getElementTypeOrSelf(source));
+  Value broadcasted = rewriter.create<vector::BroadcastOp>(
+      source.getLoc(), broadcastedVecType, source);
+
+  // Transpose the broadcasted dims to the right place.
+  SmallVector<int64_t> inversePerm = invertPermutationVector(perm);
+  return rewriter.create<vector::TransposeOp>(source.getLoc(), broadcasted,
+                                              inversePerm);
+}
+
 struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    Location loc = broadcastOp.getLoc();
     VectorValue dstVector = broadcastOp.getVector();
     auto vectorLayout = dyn_cast<NestedLayoutAttr>(signature[dstVector]);
     if (!vectorLayout) {
@@ -512,87 +543,44 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
                                          "non-nested result vector layout");
     }
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
-    Type elementType =
-        llvm::cast<ShapedType>(dstVector.getType()).getElementType();
-    auto vectorType = VectorType::get(distShape, elementType);
 
+    // The way nested layout distribution works, there is no partial
+    // thread distribution, so a broadcast is always thread local. So we need to
+    // broadcast the shape:
+    //
+    // [o_batch, o_outer, o_element] to
+    // [b_batch, o_batch, b_outer, o_outer, b_element, o_element]
+    //
+    // where b_... is broadcasted dimensions and o_... is old dimensions.
+    SmallVector<bool> broadcastedDims(distShape.size(), false);
+
+    // Get a layout for the broadcasted dimensions.
     VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
-    // If the srcVector is a scalar (like f32) we proceed with the scalar
-    // distribution branch.
-    if (!srcVector) {
-      // The way distribution currently works, there is no partial thread
-      // distribution, so a scalar is available to all threads. Scalar
-      // distribution is simply a broadcast from scalar to the distributed
-      // result shape.
-      Value source = broadcastOp.getSource();
-      VectorValue accumulator =
-          rewriter.create<vector::BroadcastOp>(loc, vectorType, source);
-      replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
-      return success();
+    int64_t broadcastRank = vectorLayout.getRank();
+    if (srcVector) {
+      broadcastRank -= srcVector.getType().getRank();
     }
 
-    auto sourceLayout = dyn_cast<NestedLayoutAttr>(signature[srcVector]);
-    if (!sourceLayout) {
-      return rewriter.notifyMatchFailure(broadcastOp,
-                                         "non-nested source vector layout");
-    }
-
-    Value accumulator = rewriter.create<arith::ConstantOp>(
-        loc, vectorType, rewriter.getZeroAttr(vectorType));
-
+    // Mark the first `broadcastRank` dims in each tile to be broadcasted.
     int64_t rank = vectorLayout.getRank();
-    // We unroll along both the batch and outer dimensions for a similar reason
-    // to the transfer ops. `vector.broadcast` can only broadcast along outer
-    // dims, so mixing broadcasted and un-broadcasted element/outer dims can't
-    // be represented with a single `vector.broadcast`.
-    SmallVector<int64_t> resultVectorUnrollShape =
-        getElementVectorTileShape(vectorLayout);
-
-    Value distributedSource = getDistributed(rewriter, srcVector, sourceLayout);
-
-    VectorType broadcastTargetType =
-        VectorType::get(vectorLayout.getElementTile(), elementType);
-
-    int64_t sourceRank = sourceLayout.getRank();
-
-    for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, resultVectorUnrollShape)) {
-      ArrayRef<int64_t> offsetsRef(offsets);
-
-      // Slice out the last |sourceRank| dimensions which is the inner
-      // broadcasted shape.
-      ArrayRef<int64_t> batchSourceOffsets =
-          offsetsRef.slice(rank - sourceRank, sourceRank);
-      ArrayRef<int64_t> outerSourceOffsets =
-          offsetsRef.slice(2 * rank - sourceRank, sourceRank);
-
-      // Construct the list of source offsets based on the batch/outer order of
-      // the broadcasted vector. This is because we need to compute the offsets
-      // into the distributed source vector with the distributed permutation.
-      SmallVector<int64_t> sourceOffsets;
-      sourceOffsets.append(batchSourceOffsets.begin(),
-                           batchSourceOffsets.end());
-      sourceOffsets.append(outerSourceOffsets.begin(),
-                           outerSourceOffsets.end());
-
-      // Extract a slice of the input to be broadcasted.
-      Value slice = rewriter.create<vector::ExtractOp>(loc, distributedSource,
-                                                       sourceOffsets);
-      // TODO: Support non-trivial element orders.
-      if (vector::isBroadcastableTo(slice.getType(), broadcastTargetType) !=
-          vector::BroadcastableToResult::Success) {
-        return rewriter.notifyMatchFailure(
-            broadcastOp,
-            "unimplemented: non-trivial broadcast source element order");
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < broadcastRank; ++j) {
+        broadcastedDims[j + (i * rank)] = true;
       }
-      Value broadcastedSlice =
-          rewriter.create<vector::BroadcastOp>(loc, broadcastTargetType, slice);
-      // Insert into the broadcasted destination vector.
-      accumulator = rewriter.create<vector::InsertOp>(
-          loc, broadcastedSlice, accumulator, offsetsRef.take_front(rank * 2));
     }
 
-    replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
+    Value distSource = broadcastOp.getSource();
+    if (srcVector) {
+      auto sourceLayout = dyn_cast<NestedLayoutAttr>(signature[srcVector]);
+      if (!sourceLayout) {
+        return rewriter.notifyMatchFailure(broadcastOp,
+                                           "non-nested source vector layout");
+      }
+      distSource = getDistributed(rewriter, srcVector, sourceLayout);
+    }
+    VectorValue broadcasted =
+        broadcastToShape(rewriter, distSource, distShape, broadcastedDims);
+    replaceOpWithDistributedValues(rewriter, broadcastOp, broadcasted);
     return success();
   }
 };
