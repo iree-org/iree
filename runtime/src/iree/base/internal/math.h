@@ -351,11 +351,10 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
   const uint32_t f32_mantissa = u32_value & f32_mantissa_mask;
   uint32_t dst_exp = 0;
   uint32_t dst_mantissa = 0;
-  // Flags that we set when we determine that we need to generate a NaN, an Inf,
-  // or a max finite value, deferring to handlers are the end of this function.
+  // Flags that we set when we determine that we need to generate a NaN / an Inf
+  // deferring to handlers are the end of this function.
   bool convert_nan = false;
   bool convert_inf = false;
-  bool generate_max_finite = false;
   if (f32_exp >= f32_exp_mask) {
     // NaN or Inf case.
     dst_exp = dst_exp_mask;
@@ -445,16 +444,27 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     }
   }
 
-  // Handler for convert Inf values. Needs to be before handlers for Nan or
-  // max finite values as it may fall through to either when the destination
-  // type does not have Inf.
+  // Handler for converting Inf values. Needs to be before handler for Nan as it
+  // may fall through to either when the destination type does not have Inf.
   if (convert_inf) {
     if (have_infinity) {
       return dst_sign | dst_exp_mask;
     } else if (have_nan) {
       convert_nan = true;
     } else {
-      generate_max_finite = true;
+      // Generate the max finite value.
+      if (nan_as_neg_zero || !have_nan) {
+        // When either NaN is encoded as negative zero, or there is no NaN,
+        // the max finite value is encoded with all mantissa bits set.
+        dst_mantissa = dst_mantissa_mask;
+      } else {
+        // When there is a NaN encoded in the top exponent and the type has
+        // no infinities, NaN encodings are restricted to all mantissa bits
+        // set. The max finite value is then the value with the bottom
+        // mantissa bit unset.
+        dst_mantissa = dst_mantissa_mask ^ 1;
+      }
+      return dst_sign | dst_exp_mask | dst_mantissa;
     }
   }
 
@@ -469,22 +479,6 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     } else {
       return dst_sign | dst_exp_mask | dst_mantissa_mask;
     }
-  }
-
-  // Handler for generating the max finite values.
-  if (generate_max_finite) {
-    if (nan_as_neg_zero || !have_nan) {
-      // When either NaN is encoded as negative zero, or there is no NaN,
-      // the max finite value is encoded with all mantissa bits set.
-      dst_mantissa = dst_mantissa_mask;
-    } else {
-      // When there is a NaN encoded in the top exponent and the type has
-      // no infinities, NaN encodings are restricted to all mantissa bits
-      // set. The max finite value is then the value with the bottom
-      // mantissa bit unset.
-      dst_mantissa = dst_mantissa_mask ^ 1;
-    }
-    return dst_sign | dst_exp_mask | dst_mantissa;
   }
 
   // Normal case.
