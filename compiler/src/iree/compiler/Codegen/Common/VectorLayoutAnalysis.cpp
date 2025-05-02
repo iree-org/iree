@@ -213,7 +213,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // layouts by creating a copy of constOp for other users.
   if (!opOperand.get().hasOneUse() &&
       llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp,
-                            vector::CreateMaskOp>(
+                            vector::CreateMaskOp, vector::ConstantMaskOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
