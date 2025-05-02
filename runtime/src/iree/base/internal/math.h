@@ -570,4 +570,22 @@ IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f6e3m2fn, uint8_t, 3, 2,
                                   /*bias_tweak=*/0,
                                   /*nan_as_neg_zero=*/false)
 
+// F6E2M3FN type. Quoting LLVM's APFloat.h:
+//   6-bit floating point number with bit layout S1E2M3. Unlike IEEE-754
+//   types, there are no infinity or NaN values. The format is detailed in
+//   https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f6e2m3fn, uint8_t, 2, 3,
+                                  /*have_infinity=*/false, /*have_nan=*/false,
+                                  /*bias_tweak=*/0,
+                                  /*nan_as_neg_zero=*/false)
+
+// F4E2M1FN type. Quoting LLVM's APFloat.h:
+//   4-bit floating point number with bit layout S1E2M1. Unlike IEEE-754
+//   types, there are no infinity or NaN values. The format is detailed in
+//   https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f4e2m1fn, uint8_t, 2, 1,
+                                  /*have_infinity=*/false, /*have_nan=*/false,
+                                  /*bias_tweak=*/0,
+                                  /*nan_as_neg_zero=*/false)
+
 #endif  // IREE_BASE_INTERNAL_MATH_H_
