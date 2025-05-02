@@ -371,12 +371,9 @@ struct HoistableLinalgOpInterface
       return !isa<linalg::FillOp>(op);
     }
 
-    // Don't hoist ops with no inputs, their result is defined by `linalg.index`
-    // ops and should be fused with their consumers.
-    if (genericOp.getNumDpsInputs() == 0) {
-      return false;
-    }
-
+    // Don't hoist ops with no tensor inputs, they can be fused with their
+    // consumers. Additionally, fusing these operations preserves information
+    // (e.g. contiguous indexing).
     if (IREE::LinalgExt::isFillLikeOp(genericOp)) {
       return false;
     }
