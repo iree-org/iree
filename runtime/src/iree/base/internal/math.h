@@ -265,7 +265,7 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
 }
 
 //==============================================================================
-// FP16, BFloat16 and FP8 support
+// Floating point types conversion support.
 //==============================================================================
 
 // NOTE: We used to have code here using built-in _Float16 type support.
@@ -587,5 +587,34 @@ IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f4e2m1fn, uint8_t, 2, 1,
                                   /*have_infinity=*/false, /*have_nan=*/false,
                                   /*bias_tweak=*/0,
                                   /*nan_as_neg_zero=*/false)
+
+// The scale type E8M0FNU is unique in multiple ways: no mantissa, no sign, and
+// no zero. Retrofitting it into the above shared conversion code would be
+// tricky and not worth it, so here are stand-alone conversion routines:
+static inline float iree_math_f8e8m0fnu_to_f32(uint8_t src) {
+  if (src == 0xFF) {
+    return NAN;
+  } else {
+    return ldexpf(1.0f, src - 127);
+  }
+}
+static inline uint8_t iree_math_f32_to_f8e8m0fnu(float value) {
+  if (!isfinite(value)) {
+    return 0xFF;
+  }
+  if (value <= 0.f) {
+    return 0;
+  }
+  int exp = 0;
+  // Normalized is in the interval [0.5, 1.0).
+  float normalized = frexpf(value, &exp);
+  // If the normalized value is closer to 0.5 than to 1.0, decrement the
+  // exponent.
+  int rounded = exp - (normalized < 0.75f);
+  int biased = rounded + 127;
+  // The clamping below is to 0xFF, mapping to NaN any value that is larger than
+  // the max finite value.
+  return biased < 0 ? 0 : biased > 0xFF ? 0xFF : biased;
+}
 
 #endif  // IREE_BASE_INTERNAL_MATH_H_

@@ -957,7 +957,7 @@ TEST(F6E2M3FNConversionTest, F6E2M3FNToF32) {
 
 // See
 // https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
-// Paragraph 5.3.2.
+// Paragraph 5.3.3.
 
 TEST(F4E2M1FNConversionTest, F32ToF4E2M1FN) {
   constexpr float kF4E2M1FNMax = 6.0f;
@@ -1013,6 +1013,39 @@ TEST(F4E2M1FNConversionTest, F4E2M1FNToF32) {
     EXPECT_EQ(sign * 0x1.0p+2f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x06));
     EXPECT_EQ(sign * 0x1.8p+2f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x07));
   }
+}
+
+//==============================================================================
+// F8E8M0FNU support
+//==============================================================================
+
+// See
+// https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+// Paragraph 5.4.1.
+
+TEST(F8E8M0FNUConversionTest, F32ToF8E8M0FNU) {
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
+  for (int exp = -127; exp <= 127; ++exp) {
+    EXPECT_EQ(127 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.0f, exp)));
+    // 1.5 Should get rounded to the next exponent value or to NaN if that
+    // overflows.
+    EXPECT_EQ(128 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.5f, exp)));
+  }
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(+INFINITY));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(-INFINITY));
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(-1.0f));
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(0.0f));
+  EXPECT_EQ(0x01, iree_math_f32_to_f8e8m0fnu(FLT_MIN));
+  // Overflow to NaN
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(FLT_MAX));
+}
+
+TEST(F8E8M0FNUConversionTest, F8E8M0FNUToF32) {
+  for (int value = 0; value <= 0xFE; ++value) {
+    EXPECT_EQ(ldexpf(1.0f, value - 127), iree_math_f8e8m0fnu_to_f32(value));
+  }
+  EXPECT_TRUE(isnan(iree_math_f8e8m0fnu_to_f32(0xFF)));
 }
 
 }  // namespace
