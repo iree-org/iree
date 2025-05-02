@@ -85,17 +85,12 @@ struct PromoteContractOperands final
   }
 };
 
-
-void processBlock(Block *block, IRRewriter & rewriter){
-
-  llvm::errs() << "Processing block" << "\n";
-
+void processBlock(Block *block, IRRewriter &rewriter) {
 
   // A map from vectors in the values that are inserted into them.
   DenseMap<Value, SmallVector<std::pair<Value, int>>> values;
 
   auto processSlice = [&](vector::InsertStridedSliceOp insertSlice) {
-    llvm::errs() << "Processing slice " << insertSlice << "\n";
     VectorType smallType = insertSlice.getSourceVectorType();
     VectorType largeType = insertSlice.getDestVectorType();
     if (smallType.getRank() != 1 || largeType.getRank() != 1)
@@ -129,16 +124,13 @@ void processBlock(Block *block, IRRewriter & rewriter){
           {res, SmallVector<std::pair<Value, int>>(nElmsLarge, {nullptr, -1})});
     }
 
-    auto & vec = values[res];
+    auto &vec = values[res];
     for (int i = 0; i < nElmsSmall; ++i) {
       vec[i + offset] = {src, i};
     }
-
-    llvm::errs() << "processed\n";
   };
 
   auto processShuffle = [&](vector::ShuffleOp shuffleOp) {
-    llvm::errs() << "Processing shuffle " << shuffleOp << "\n";
     VectorType outType = shuffleOp.getType();
     VectorType lhsType = shuffleOp.getV1VectorType();
     if (outType.getRank() != 1 || lhsType.getRank() != 1)
@@ -162,8 +154,6 @@ void processBlock(Block *block, IRRewriter & rewriter){
     SmallVector<Value> fromElms;
     fromElms.reserve(indices.size());
 
-    llvm::errs() << "fromElms, reserved " << indices.size() << "\n";
-
     for (auto index : indices) {
       auto backtracked = vec[index];
       Value backtracedSrc = backtracked.first;
@@ -174,24 +164,19 @@ void processBlock(Block *block, IRRewriter & rewriter){
       auto scalar = rewriter.create<vector::ExtractOp>(
           shuffleOp.getLoc(), backtracedSrc, SmallVector<int64_t>{localIndex});
 
-      llvm::errs() << "extract created : " << scalar << "\n";
       fromElms.push_back(scalar);
     }
 
-    auto replacement = rewriter.create<vector::FromElementsOp>(shuffleOp.getLoc(), outType,
-                                            fromElms);
+    auto replacement = rewriter.create<vector::FromElementsOp>(
+        shuffleOp.getLoc(), outType, fromElms);
 
-    llvm::errs() << "replacement is " << replacement << "\n";
     rewriter.replaceOp(shuffleOp, replacement.getResult());
-
-    llvm::errs() << "shuffle processed" << "\n";
   };
-
 
   SmallVector<Operation *> toProcess;
 
   for (const Operation &op : block->getOperations()) {
-    if (isa<vector::InsertStridedSliceOp, vector::ShuffleOp>(op)){
+    if (isa<vector::InsertStridedSliceOp, vector::ShuffleOp>(op)) {
       toProcess.push_back(const_cast<Operation *>(&op));
     }
   }
@@ -205,67 +190,20 @@ void processBlock(Block *block, IRRewriter & rewriter){
   }
 }
 
-
-// clang-format off
-//       %511 = vector.insert_strided_slice %480, %cst {offsets = [0], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %512 = vector.insert_strided_slice %482, %511 {offsets = [4], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %513 = vector.insert_strided_slice %484, %512 {offsets = [8], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %514 = vector.insert_strided_slice %486, %513 {offsets = [12], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %515 = vector.insert_strided_slice %488, %514 {offsets = [16], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %516 = vector.insert_strided_slice %490, %515 {offsets = [20], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %517 = vector.insert_strided_slice %492, %516 {offsets = [24], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %518 = vector.insert_strided_slice %494, %517 {offsets = [28], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %519 = vector.insert_strided_slice %496, %518 {offsets = [32], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %520 = vector.insert_strided_slice %498, %519 {offsets = [36], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %521 = vector.insert_strided_slice %500, %520 {offsets = [40], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %522 = vector.insert_strided_slice %502, %521 {offsets = [44], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %523 = vector.insert_strided_slice %504, %522 {offsets = [48], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %524 = vector.insert_strided_slice %506, %523 {offsets = [52], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %525 = vector.insert_strided_slice %508, %524 {offsets = [56], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %526 = vector.insert_strided_slice %510, %525 {offsets = [60], strides = [1]} : vector<4xf32> into vector<64xf32>
-// clang-format on
-//
-// replace 
-//       %511 = vector.insert_strided_slice %480, %cst {offsets = [0], strides = [1]} : vector<4xf32> into vector<64xf32>
-//       %512 = vector.insert_strided_slice %482, %511 {offsets = [4], strides = [1]} : vector<4xf32> into vector<64xf32>
-//
-// with 
-//       %511 = vector.shuffle %480, %482 [0, ... 7] vector<4xf32>, vector<4xf32> 
-//       %512 = vector.insert_strided_slice %511 ... 
-//
-// 
-
-// LogicalResult insertTree(Operation * funcOp){
-// 
-// }
-
-
-LogicalResult localExtractInsertOptimizations(Operation * funcOp){
+LogicalResult localExtractInsertOptimizations(Operation *funcOp) {
 
   IRRewriter rewriter(funcOp->getContext());
-
-
 
   // Let's start surgically, go straight for what we know is the optimization.
   SmallVector<vector::ShuffleOp> shuffleOps;
   DenseSet<Block *> blocksWithShuffles;
   funcOp->walk([&](vector::ShuffleOp shuffleOp) {
     blocksWithShuffles.insert(shuffleOp->getBlock());
-    // // Check that it is rank-1:
-    // if (shuffleOp.getType().getRank() != 1) {
-    //   return WalkResult::advance();
-    // }
-    // auto indices = shuffleOp.getMask();
-    // shuffleOps.push_back(shuffleOp);
-    // return WalkResult::advance();
   });
 
-  for (auto block : blocksWithShuffles){
+  for (auto block : blocksWithShuffles) {
     processBlock(block, rewriter);
-    llvm::errs() << "block processed " << "\n";
   }
-
-  llvm::errs() << "all blocks processed " << "\n";
 
   return success();
 }
@@ -280,11 +218,11 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     if (auto vectorType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
       int64_t rank = vectorType.getRank();
       ArrayRef<int64_t> shape = vectorType.getShape();
-     //  auto bitWidth  = vectorType.getElementTypeBitWidth();
-     //  int factor = 1;
-     //  if (bitWidth == 32) factor = 1; 
-     //  else if (bitWidth == 16) factor = 2;
-     //  else if (bitWidth == 8) factor = 4;
+      //  auto bitWidth  = vectorType.getElementTypeBitWidth();
+      //  int factor = 1;
+      //  if (bitWidth == 32) factor = 1;
+      //  else if (bitWidth == 16) factor = 2;
+      //  else if (bitWidth == 8) factor = 4;
 
       auto iter = std::find_if_not(shape.rbegin(), shape.rend(),
                                    [](int64_t dim) { return dim == 1; });
@@ -293,8 +231,8 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
         // Found a non-1 dimension, so we can keep it.
         auto val = *iter;
         val = 1;
-       //  if (val % factor == 0) val = factor;
-       //  else val = 1;
+        //  if (val % factor == 0) val = factor;
+        //  else val = 1;
         nativeSize[rank - 1 - std::distance(shape.rbegin(), iter)] = val;
       }
       return nativeSize;
@@ -390,12 +328,6 @@ struct LLVMGPUVectorLoweringPass final
       }
     }
 
-    llvm::errs() << "\n\n==================================\nState just before "
-                    "the start of the lowering of the transfer ops"
-                 << "\n==================================\n";
-    llvm::errs() << funcOp << "\n";
-
-
     // transfer_read -> load and transfer_write -> store.
     {
       RewritePatternSet patterns(context);
@@ -409,13 +341,13 @@ struct LLVMGPUVectorLoweringPass final
         return signalPassFailure();
       }
     }
-   //  {
-   //    RewritePatternSet patterns(context);
-   //    vector::populateVectorTransferLoweringPatterns(patterns);
-   //    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-   //      return signalPassFailure();
-   //    }
-   //  }
+    //  {
+    //    RewritePatternSet patterns(context);
+    //    vector::populateVectorTransferLoweringPatterns(patterns);
+    //    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+    //      return signalPassFailure();
+    //    }
+    //  }
 
     // Canonicalize.
     {
@@ -427,39 +359,33 @@ struct LLVMGPUVectorLoweringPass final
       }
     }
 
-    llvm::errs() << "\n\n==================================\nState just before "
-                    "the start of flattening process"
-                 << "\n==================================\n";
-    llvm::errs() << funcOp << "\n";
+    // TODO(newling) it's the flattening which is causing the increase in
+    // memory. Flatten!
+    {
+      RewritePatternSet patterns(context);
+      GreedyRewriteConfig config;
+      config.fold = false;
 
+      // TODO(newling) this is very clearly defined set of patterns --
 
-    // TODO(newling) it's the flattening which is causing the increase in memory. 
-     // Flatten!
-     {
-       RewritePatternSet patterns(context);
-       GreedyRewriteConfig config;
-       config.fold = false;
- 
-       // TODO(newling) this is very clearly defined set of patterns --
- 
-       // energy function that the patterns try to minimize is
-       // sum(operations in vector and arith dialects of) energy(op)
-       // - energy(shape_cast) = 0
-       // - energy(other_op) = sum of ranks of vector operands.
- 
-       // IREE uses this as a late stage canonicaliazation before lowering to
-       // LLVM, only after unrolling of single-threaded code. Any pattern which
-       // decreases this object should be added. Any pattern that increases this
-       // objective should definitely not be added to avoid cycles. Any pattern
-       // that leaves the energy unchanged -- the energy function can be extended
-       // (lexicographically).
- 
-       populateFlattenVectorExtractInsertPatterns(patterns);
-       populateForOpInductionVarShapePatterns(patterns);
-       if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
-         return signalPassFailure();
-       }
-     }
+      // energy function that the patterns try to minimize is
+      // sum(operations in vector and arith dialects of) energy(op)
+      // - energy(shape_cast) = 0
+      // - energy(other_op) = sum of ranks of vector operands.
+
+      // IREE uses this as a late stage canonicaliazation before lowering to
+      // LLVM, only after unrolling of single-threaded code. Any pattern which
+      // decreases this object should be added. Any pattern that increases this
+      // objective should definitely not be added to avoid cycles. Any pattern
+      // that leaves the energy unchanged -- the energy function can be extended
+      // (lexicographically).
+
+      populateFlattenVectorExtractInsertPatterns(patterns);
+      populateForOpInductionVarShapePatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
+        return signalPassFailure();
+      }
+    }
 
     // Canonicalize.
     {
@@ -470,21 +396,15 @@ struct LLVMGPUVectorLoweringPass final
       }
     }
 
-
-    if (failed(localExtractInsertOptimizations(funcOp))) 
-      return signalPassFailure();
-
-   // if (failed(insertTree(funcOp)))
-   //   return signalPassFailure();
+//     if (failed(localExtractInsertOptimizations(funcOp)))
+//       return signalPassFailure();
 
 
-     bool shapesRemain = false;
-     funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true; });
-     if (shapesRemain) {
-       llvm::errs() << "\n\nfuncOp at this point is \n\n" << funcOp << "\n\n";
-       return signalPassFailure();
-     }
-
+  //   bool shapesRemain = false;
+  //   funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true; });
+  //   if (shapesRemain) {
+  //     return signalPassFailure();
+  //   }
 
     // Less desirable unrolls, delayed till here in case previous
     // canonicalization can eliminate them.
