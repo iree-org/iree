@@ -453,18 +453,9 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       convert_nan = true;
     } else {
       // Generate the max finite value.
-      if (nan_as_neg_zero || !have_nan) {
-        // When either NaN is encoded as negative zero, or there is no NaN,
-        // the max finite value is encoded with all mantissa bits set.
-        dst_mantissa = dst_mantissa_mask;
-      } else {
-        // When there is a NaN encoded in the top exponent and the type has
-        // no infinities, NaN encodings are restricted to all mantissa bits
-        // set. The max finite value is then the value with the bottom
-        // mantissa bit unset.
-        dst_mantissa = dst_mantissa_mask ^ 1;
-      }
-      return dst_sign | dst_exp_mask | dst_mantissa;
+      // As we are here in the case where there is no NaN, the max finite value
+      // is encoded with all mantissa bits set.
+      return dst_sign | dst_exp_mask | dst_mantissa_mask;
     }
   }
 
