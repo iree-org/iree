@@ -879,8 +879,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
 
   // Set the batch and K size for the input tensor.
   const int64_t kPos = getKPos().front();
-  const int64_t bPos = getBatchPos().front();
   if (contiguousAlongB) {
+    const int64_t bPos = getBatchPos().front();
     sliceSizes[bPos] = innerInputTileSize;
   } else {
     sliceSizes[kPos] = innerInputTileSize;
