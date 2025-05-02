@@ -775,4 +775,277 @@ TEST(F8E4M3FNUZConversionTest, F32ToF8E4M3FNUZToF32) {
   EXPECT_NE(nan, nan);
 }
 
+//==============================================================================
+// F6E3M2FN support
+//==============================================================================
+
+// See
+// https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+// Paragraph 5.3.2.
+
+TEST(F6E3M2FNConversionTest, F32ToF6E3M2FN) {
+  constexpr float kF6E3M2FNMax = 28.f;
+  constexpr float kF6E3M2FNMin = 0.25f;
+  // Within range, normal truncation.
+  EXPECT_EQ(0x00, iree_math_f32_to_f6e3m2fn(0.f));
+  EXPECT_EQ(0x20, iree_math_f32_to_f6e3m2fn(-0.f));
+  EXPECT_EQ(0x04, iree_math_f32_to_f6e3m2fn(0.25f));
+  EXPECT_EQ(0x39, iree_math_f32_to_f6e3m2fn(-10.f));
+  // Extra large finite values thanks to not having infinities.
+  EXPECT_EQ(0x1F, iree_math_f32_to_f6e3m2fn(kF6E3M2FNMax));
+  EXPECT_EQ(0x3F, iree_math_f32_to_f6e3m2fn(-kF6E3M2FNMax));
+  // Min normal values.
+  EXPECT_EQ(0x04, iree_math_f32_to_f6e3m2fn(kF6E3M2FNMin));
+  EXPECT_EQ(0x24, iree_math_f32_to_f6e3m2fn(-kF6E3M2FNMin));
+  // Infinity clamped to max finite.
+  EXPECT_EQ(0x1F, iree_math_f32_to_f6e3m2fn(INFINITY));
+  EXPECT_EQ(0x3F, iree_math_f32_to_f6e3m2fn(-INFINITY));
+  // Large finite value clamped to max finite.
+  EXPECT_EQ(0x1F, iree_math_f32_to_f6e3m2fn(FLT_MAX));
+  EXPECT_EQ(0x3F, iree_math_f32_to_f6e3m2fn(-FLT_MAX));
+  // Test some round-to-nearest-even behavior.
+  EXPECT_EQ(0x18, iree_math_f32_to_f6e3m2fn(8.0f));
+  EXPECT_EQ(0x18, iree_math_f32_to_f6e3m2fn(9.0f));
+  EXPECT_EQ(0x19, iree_math_f32_to_f6e3m2fn(10.0f));
+  EXPECT_EQ(0x1A, iree_math_f32_to_f6e3m2fn(11.0f));
+  EXPECT_EQ(0x1A, iree_math_f32_to_f6e3m2fn(12.0f));
+  // Underflow
+  EXPECT_EQ(0, iree_math_f32_to_f6e3m2fn(FLT_MIN));
+  EXPECT_EQ(0x20, iree_math_f32_to_f6e3m2fn(-FLT_MIN));
+  // NaN conversion is implementation-defined. We canonicalize to +0.0.
+  EXPECT_EQ(0, iree_math_f32_to_f6e3m2fn(NAN));
+}
+
+TEST(F6E3M2FNConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(3, 2, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                          iree_math_f32_to_f6e3m2fn, iree_math_f6e3m2fn_to_f32);
+}
+
+TEST(F6E3M2FNConversionTest, F6E3M2FNToF32) {
+  for (int sign_bit = 0; sign_bit <= 0x20; sign_bit += 0x20) {
+    float sign = sign_bit ? -1.f : 1.f;
+    // Zero
+    EXPECT_EQ(sign * 0x0.0p0f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x00));
+    // Denormals
+    EXPECT_EQ(sign * 0x0.4p-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x01));
+    EXPECT_EQ(sign * 0x0.8p-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x02));
+    EXPECT_EQ(sign * 0x0.Cp-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x03));
+    // Normal finite values
+    EXPECT_EQ(sign * 0x1.0p-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x04));
+    EXPECT_EQ(sign * 0x1.4p-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x05));
+    EXPECT_EQ(sign * 0x1.8p-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x06));
+    EXPECT_EQ(sign * 0x1.Cp-2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x07));
+    EXPECT_EQ(sign * 0x1.0p-1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x08));
+    EXPECT_EQ(sign * 0x1.4p-1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x09));
+    EXPECT_EQ(sign * 0x1.8p-1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x0A));
+    EXPECT_EQ(sign * 0x1.Cp-1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x0B));
+    EXPECT_EQ(sign * 0x1.0p+0f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x0C));
+    EXPECT_EQ(sign * 0x1.4p+0f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x0D));
+    EXPECT_EQ(sign * 0x1.8p+0f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x0E));
+    EXPECT_EQ(sign * 0x1.Cp+0f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x0F));
+    EXPECT_EQ(sign * 0x1.0p+1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x10));
+    EXPECT_EQ(sign * 0x1.4p+1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x11));
+    EXPECT_EQ(sign * 0x1.8p+1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x12));
+    EXPECT_EQ(sign * 0x1.Cp+1f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x13));
+    EXPECT_EQ(sign * 0x1.0p+2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x14));
+    EXPECT_EQ(sign * 0x1.4p+2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x15));
+    EXPECT_EQ(sign * 0x1.8p+2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x16));
+    EXPECT_EQ(sign * 0x1.Cp+2f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x17));
+    EXPECT_EQ(sign * 0x1.0p+3f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x18));
+    EXPECT_EQ(sign * 0x1.4p+3f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x19));
+    EXPECT_EQ(sign * 0x1.8p+3f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x1A));
+    EXPECT_EQ(sign * 0x1.Cp+3f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x1B));
+    // Extra finite values in the top exponent thanks to no Inf and no NaN.
+    EXPECT_EQ(sign * 0x1.0p+4f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x1C));
+    EXPECT_EQ(sign * 0x1.4p+4f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x1D));
+    EXPECT_EQ(sign * 0x1.8p+4f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x1E));
+    EXPECT_EQ(sign * 0x1.Cp+4f, iree_math_f6e3m2fn_to_f32(sign_bit | 0x1F));
+  }
+}
+
+//==============================================================================
+// F6E2M3FN support
+//==============================================================================
+
+// See
+// https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+// Paragraph 5.3.2.
+
+TEST(F6E2M3FNConversionTest, F32ToF6E2M3FN) {
+  constexpr float kF6E2M3FNMax = 7.5f;
+  constexpr float kF6E2M3FNMin = 1.0f;
+  // Within range, normal truncation.
+  EXPECT_EQ(0x00, iree_math_f32_to_f6e2m3fn(0.f));
+  EXPECT_EQ(0x20, iree_math_f32_to_f6e2m3fn(-0.f));
+  EXPECT_EQ(0x02, iree_math_f32_to_f6e2m3fn(0.25f));
+  EXPECT_EQ(0x34, iree_math_f32_to_f6e2m3fn(-3.0f));
+  // Extra large finite values thanks to not having infinities.
+  EXPECT_EQ(0x1F, iree_math_f32_to_f6e2m3fn(kF6E2M3FNMax));
+  EXPECT_EQ(0x3F, iree_math_f32_to_f6e2m3fn(-kF6E2M3FNMax));
+  // Min normal values.
+  EXPECT_EQ(0x08, iree_math_f32_to_f6e2m3fn(kF6E2M3FNMin));
+  EXPECT_EQ(0x28, iree_math_f32_to_f6e2m3fn(-kF6E2M3FNMin));
+  // Infinity clamped to max finite.
+  EXPECT_EQ(0x1F, iree_math_f32_to_f6e2m3fn(INFINITY));
+  EXPECT_EQ(0x3F, iree_math_f32_to_f6e2m3fn(-INFINITY));
+  // Large finite value clamped to max finite.
+  EXPECT_EQ(0x1F, iree_math_f32_to_f6e2m3fn(FLT_MAX));
+  EXPECT_EQ(0x3F, iree_math_f32_to_f6e2m3fn(-FLT_MAX));
+  // Test some round-to-nearest-even behavior.
+  EXPECT_EQ(0x18, iree_math_f32_to_f6e2m3fn(4.0f));
+  EXPECT_EQ(0x18, iree_math_f32_to_f6e2m3fn(4.25f));
+  EXPECT_EQ(0x19, iree_math_f32_to_f6e2m3fn(4.5f));
+  EXPECT_EQ(0x1A, iree_math_f32_to_f6e2m3fn(4.75f));
+  EXPECT_EQ(0x1A, iree_math_f32_to_f6e2m3fn(5.0f));
+  // Underflow
+  EXPECT_EQ(0, iree_math_f32_to_f6e2m3fn(FLT_MIN));
+  EXPECT_EQ(0x20, iree_math_f32_to_f6e2m3fn(-FLT_MIN));
+  // NaN conversion is implementation-defined. We canonicalize to +0.0.
+  EXPECT_EQ(0, iree_math_f32_to_f6e2m3fn(NAN));
+}
+
+TEST(F6E2M3FNConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(2, 3, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                          iree_math_f32_to_f6e2m3fn, iree_math_f6e2m3fn_to_f32);
+}
+
+TEST(F6E2M3FNConversionTest, F6E2M3FNToF32) {
+  for (int sign_bit = 0; sign_bit <= 0x20; sign_bit += 0x20) {
+    float sign = sign_bit ? -1.f : 1.f;
+    // Zero
+    EXPECT_EQ(sign * 0x0.0p0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x00));
+    // Denormals
+    EXPECT_EQ(sign * 0x0.2p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x01));
+    EXPECT_EQ(sign * 0x0.4p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x02));
+    EXPECT_EQ(sign * 0x0.6p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x03));
+    EXPECT_EQ(sign * 0x0.8p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x04));
+    EXPECT_EQ(sign * 0x0.Ap+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x05));
+    EXPECT_EQ(sign * 0x0.Cp+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x06));
+    EXPECT_EQ(sign * 0x0.Ep+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x07));
+    // Normal finite values
+    EXPECT_EQ(sign * 0x1.0p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x08));
+    EXPECT_EQ(sign * 0x1.2p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x09));
+    EXPECT_EQ(sign * 0x1.4p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x0A));
+    EXPECT_EQ(sign * 0x1.6p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x0B));
+    EXPECT_EQ(sign * 0x1.8p+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x0C));
+    EXPECT_EQ(sign * 0x1.Ap+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x0D));
+    EXPECT_EQ(sign * 0x1.Cp+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x0E));
+    EXPECT_EQ(sign * 0x1.Ep+0f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x0F));
+    EXPECT_EQ(sign * 0x1.0p+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x10));
+    EXPECT_EQ(sign * 0x1.2p+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x11));
+    EXPECT_EQ(sign * 0x1.4p+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x12));
+    EXPECT_EQ(sign * 0x1.6p+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x13));
+    EXPECT_EQ(sign * 0x1.8p+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x14));
+    EXPECT_EQ(sign * 0x1.Ap+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x15));
+    EXPECT_EQ(sign * 0x1.Cp+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x16));
+    EXPECT_EQ(sign * 0x1.Ep+1f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x17));
+    // Extra finite values in the top exponent thanks to no Inf and no NaN.
+    EXPECT_EQ(sign * 0x1.0p+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x18));
+    EXPECT_EQ(sign * 0x1.2p+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x19));
+    EXPECT_EQ(sign * 0x1.4p+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x1A));
+    EXPECT_EQ(sign * 0x1.6p+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x1B));
+    EXPECT_EQ(sign * 0x1.8p+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x1C));
+    EXPECT_EQ(sign * 0x1.Ap+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x1D));
+    EXPECT_EQ(sign * 0x1.Cp+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x1E));
+    EXPECT_EQ(sign * 0x1.Ep+2f, iree_math_f6e2m3fn_to_f32(sign_bit | 0x1F));
+  }
+}
+
+//==============================================================================
+// F4E2M1FN support
+//==============================================================================
+
+// See
+// https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+// Paragraph 5.3.3.
+
+TEST(F4E2M1FNConversionTest, F32ToF4E2M1FN) {
+  constexpr float kF4E2M1FNMax = 6.0f;
+  constexpr float kF4E2M1FNMin = 1.0f;
+  // Within range, normal truncation.
+  EXPECT_EQ(0x00, iree_math_f32_to_f4e2m1fn(0.f));
+  EXPECT_EQ(0x08, iree_math_f32_to_f4e2m1fn(-0.f));
+  EXPECT_EQ(0x02, iree_math_f32_to_f4e2m1fn(1.0f));
+  EXPECT_EQ(0x0D, iree_math_f32_to_f4e2m1fn(-3.0f));
+  // Extra large finite values thanks to not having infinities.
+  EXPECT_EQ(0x07, iree_math_f32_to_f4e2m1fn(kF4E2M1FNMax));
+  EXPECT_EQ(0x0F, iree_math_f32_to_f4e2m1fn(-kF4E2M1FNMax));
+  // Min normal values.
+  EXPECT_EQ(0x02, iree_math_f32_to_f4e2m1fn(kF4E2M1FNMin));
+  EXPECT_EQ(0x0A, iree_math_f32_to_f4e2m1fn(-kF4E2M1FNMin));
+  // Infinity clamped to max finite.
+  EXPECT_EQ(0x07, iree_math_f32_to_f4e2m1fn(INFINITY));
+  EXPECT_EQ(0x0F, iree_math_f32_to_f4e2m1fn(-INFINITY));
+  // Large finite value clamped to max finite.
+  EXPECT_EQ(0x07, iree_math_f32_to_f4e2m1fn(FLT_MAX));
+  EXPECT_EQ(0x0F, iree_math_f32_to_f4e2m1fn(-FLT_MAX));
+  // Test some round-to-nearest-even behavior.
+  EXPECT_EQ(0x04, iree_math_f32_to_f4e2m1fn(2.0f));
+  EXPECT_EQ(0x04, iree_math_f32_to_f4e2m1fn(2.5f));
+  EXPECT_EQ(0x05, iree_math_f32_to_f4e2m1fn(3.0f));
+  EXPECT_EQ(0x06, iree_math_f32_to_f4e2m1fn(3.5f));
+  EXPECT_EQ(0x06, iree_math_f32_to_f4e2m1fn(4.0f));
+  // Underflow
+  EXPECT_EQ(0x00, iree_math_f32_to_f4e2m1fn(FLT_MIN));
+  EXPECT_EQ(0x08, iree_math_f32_to_f4e2m1fn(-FLT_MIN));
+  // NaN conversion is implementation-defined. We canonicalize to +0.0.
+  EXPECT_EQ(0, iree_math_f32_to_f4e2m1fn(NAN));
+}
+
+TEST(F4E2M1FNConversionTest, Denormals) {
+  CheckDenormals<uint8_t>(2, 1, /*bias_tweak=*/0, /*have_neg_zero=*/true,
+                          iree_math_f32_to_f4e2m1fn, iree_math_f4e2m1fn_to_f32);
+}
+
+TEST(F4E2M1FNConversionTest, F4E2M1FNToF32) {
+  for (int sign_bit = 0; sign_bit <= 0x08; sign_bit += 0x08) {
+    float sign = sign_bit ? -1.f : 1.f;
+    // Zero
+    EXPECT_EQ(sign * 0x0.0p0f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x00));
+    // Denormals
+    EXPECT_EQ(sign * 0x0.8p+0f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x01));
+    // Normal finite values
+    EXPECT_EQ(sign * 0x1.0p+0f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x02));
+    EXPECT_EQ(sign * 0x1.8p+0f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x03));
+    EXPECT_EQ(sign * 0x1.0p+1f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x04));
+    EXPECT_EQ(sign * 0x1.8p+1f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x05));
+    // Extra finite values in the top exponent thanks to no Inf and no NaN.
+    EXPECT_EQ(sign * 0x1.0p+2f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x06));
+    EXPECT_EQ(sign * 0x1.8p+2f, iree_math_f4e2m1fn_to_f32(sign_bit | 0x07));
+  }
+}
+
+//==============================================================================
+// F8E8M0FNU support
+//==============================================================================
+
+// See
+// https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+// Paragraph 5.4.1.
+
+TEST(F8E8M0FNUConversionTest, F32ToF8E8M0FNU) {
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
+  for (int exp = -127; exp <= 127; ++exp) {
+    EXPECT_EQ(127 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.0f, exp)));
+    // 1.5 Should get rounded to the next exponent value or to NaN if that
+    // overflows.
+    EXPECT_EQ(128 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.5f, exp)));
+  }
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(+INFINITY));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(-INFINITY));
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(-1.0f));
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(0.0f));
+  EXPECT_EQ(0x01, iree_math_f32_to_f8e8m0fnu(FLT_MIN));
+  // Overflow to NaN
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(FLT_MAX));
+}
+
+TEST(F8E8M0FNUConversionTest, F8E8M0FNUToF32) {
+  for (int value = 0; value <= 0xFE; ++value) {
+    EXPECT_EQ(ldexpf(1.0f, value - 127), iree_math_f8e8m0fnu_to_f32(value));
+  }
+  EXPECT_TRUE(isnan(iree_math_f8e8m0fnu_to_f32(0xFF)));
+}
+
 }  // namespace
