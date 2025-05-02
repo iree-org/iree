@@ -55,7 +55,7 @@ void iree_wait_handle_close(iree_wait_handle_t* handle) {
       iree_futex_handle_t* futex =
           (iree_futex_handle_t*)handle->value.local_futex;
       iree_notification_deinitialize(&futex->notification);
-      iree_allocator_free(iree_allocator_system(), futex);
+      iree_allocator_free(iree_allocator_default(), futex);
       break;
     }
 #endif  // IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX
@@ -330,7 +330,7 @@ iree_status_t iree_event_initialize(bool initial_state,
   memset(out_event, 0, sizeof(*out_event));
 
   iree_futex_handle_t* futex = NULL;
-  iree_status_t status = iree_allocator_malloc(iree_allocator_system(),
+  iree_status_t status = iree_allocator_malloc(iree_allocator_default(),
                                                sizeof(*futex), (void**)&futex);
   if (iree_status_is_ok(status)) {
     out_event->type = IREE_WAIT_PRIMITIVE_TYPE_LOCAL_FUTEX;

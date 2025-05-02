@@ -169,7 +169,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
 
   vm::ref<iree_vm_list_t> outputs;
   IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
-                                    iree_allocator_system(), &outputs));
+                                    iree_allocator_default(), &outputs));
 
   // Benchmarking loop.
   while (state.KeepRunningBatch(batch_size)) {
@@ -177,7 +177,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
-        inputs, outputs.get(), iree_allocator_system()));
+        inputs, outputs.get(), iree_allocator_default()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
     IREE_TRACE_ZONE_END(z1);
     if (device) {
@@ -235,7 +235,7 @@ static void BenchmarkAsyncFunction(
   IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
                                       benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
 
   // Round up batch size to some multiple of concurrency.
   batch_size = (int32_t)iree_host_align(batch_size, batch_concurrency);
@@ -380,13 +380,13 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
 
   vm::ref<iree_vm_list_t> inputs;
   IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
-                                    iree_allocator_system(), &inputs));
+                                    iree_allocator_default(), &inputs));
   iree_vm_value_t batch_size = iree_vm_value_make_i32(FLAG_batch_size);
   IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &batch_size));
 
   vm::ref<iree_vm_list_t> outputs;
   IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
-                                    iree_allocator_system(), &outputs));
+                                    iree_allocator_default(), &outputs));
 
   // Benchmarking loop.
   while (state.KeepRunningBatch(FLAG_batch_size)) {
@@ -394,7 +394,7 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
-        inputs.get(), outputs.get(), iree_allocator_system()));
+        inputs.get(), outputs.get(), iree_allocator_default()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
     IREE_TRACE_ZONE_END(z1);
   }
@@ -471,7 +471,7 @@ class IREEBenchmark {
     IREE_TRACE_SCOPE_NAMED("IREEBenchmark::Init");
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
-    iree_allocator_t host_allocator = iree_allocator_system();
+    iree_allocator_t host_allocator = iree_allocator_default();
     IREE_RETURN_IF_ERROR(
         iree_tooling_create_instance(host_allocator, &instance_));
 

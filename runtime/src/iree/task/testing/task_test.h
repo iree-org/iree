@@ -28,7 +28,7 @@ class TaskTest : public ::testing::Test {
     iree_task_topology_t topology;
     iree_task_topology_initialize_from_group_count(8, &topology);
     IREE_ASSERT_OK(iree_task_executor_create(
-        options, &topology, iree_allocator_system(), &executor_));
+        options, &topology, iree_allocator_default(), &executor_));
     iree_task_topology_deinitialize(&topology);
 
     iree_task_scope_initialize(iree_make_cstring_view("scope"),

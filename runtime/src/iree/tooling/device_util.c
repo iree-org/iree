@@ -61,7 +61,7 @@ static void iree_hal_flags_print_action_flag(iree_string_view_t flag_name,
 static iree_status_t iree_hal_flags_list_drivers(iree_string_view_t flag_name,
                                                  void* storage,
                                                  iree_string_view_t value) {
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
 
   iree_hal_flags_print_action_header();
   fprintf(stdout, "# Available HAL drivers\n");
@@ -138,7 +138,7 @@ static iree_status_t iree_hal_flags_list_driver_devices(
 static iree_status_t iree_hal_flags_list_devices(iree_string_view_t flag_name,
                                                  void* storage,
                                                  iree_string_view_t value) {
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
   iree_hal_driver_registry_t* driver_registry =
       iree_hal_available_driver_registry();
 
@@ -243,7 +243,7 @@ static iree_status_t iree_hal_flags_dump_driver_devices(
 static iree_status_t iree_hal_flags_dump_devices(iree_string_view_t flag_name,
                                                  void* storage,
                                                  iree_string_view_t value) {
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
   iree_hal_driver_registry_t* driver_registry =
       iree_hal_available_driver_registry();
 

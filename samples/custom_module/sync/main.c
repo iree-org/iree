@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
   // Internally IREE does not (in general) use malloc and instead uses the
   // provided allocator to allocate and free memory. Applications can integrate
   // their own allocator as-needed.
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
 
   // Create and configure the instance shared across all sessions.
   iree_runtime_instance_options_t instance_options;

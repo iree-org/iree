@@ -110,8 +110,8 @@ using testing::Eq;
 class VMBytecodeModuleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance_));
 
     const auto* module_file_toc = iree_vm_bytecode_module_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
@@ -119,12 +119,12 @@ class VMBytecodeModuleTest : public ::testing::Test {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             static_cast<iree_host_size_t>(module_file_toc->size)},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
+        iree_allocator_null(), iree_allocator_default(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-        iree_allocator_system(), &context_));
+        iree_allocator_default(), &context_));
   }
 
   virtual void TearDown() {
@@ -138,7 +138,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
     ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(iree_vm_make_undefined_type_def(), inputs.size(),
-                            iree_allocator_system(), &input_list));
+                            iree_allocator_default(), &input_list));
     IREE_RETURN_IF_ERROR(iree_vm_list_resize(input_list.get(), inputs.size()));
     for (iree_host_size_t i = 0; i < inputs.size(); ++i) {
       IREE_RETURN_IF_ERROR(
@@ -147,7 +147,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
 
     ref<iree_vm_list_t> output_list;
     IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             8, iree_allocator_system(),
+                                             8, iree_allocator_default(),
                                              &output_list));
 
     iree_vm_function_t function;
@@ -157,7 +157,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
     IREE_RETURN_IF_ERROR(
         iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                        /*policy=*/nullptr, input_list.get(), output_list.get(),
-                       iree_allocator_system()));
+                       iree_allocator_default()));
 
     std::vector<iree_vm_value_t> outputs;
     outputs.resize(iree_vm_list_size(output_list.get()));
@@ -173,7 +173,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
     ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(iree_vm_make_undefined_type_def(), inputs.size(),
-                            iree_allocator_system(), &input_list));
+                            iree_allocator_default(), &input_list));
     IREE_RETURN_IF_ERROR(iree_vm_list_resize(input_list.get(), inputs.size()));
     for (iree_host_size_t i = 0; i < inputs.size(); ++i) {
       IREE_RETURN_IF_ERROR(
@@ -182,7 +182,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
 
     ref<iree_vm_list_t> output_list;
     IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             8, iree_allocator_system(),
+                                             8, iree_allocator_default(),
                                              &output_list));
 
     iree_vm_function_t function;
@@ -192,7 +192,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
     IREE_RETURN_IF_ERROR(
         iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                        /*policy=*/nullptr, input_list.get(), output_list.get(),
-                       iree_allocator_system()));
+                       iree_allocator_default()));
 
     std::vector<iree_vm_ref_t> outputs;
     outputs.resize(iree_vm_list_size(output_list.get()));

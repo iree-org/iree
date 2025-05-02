@@ -73,7 +73,7 @@ static iree_status_t TryGetDriver(const std::string& driver_name,
   iree_status_t status = iree_hal_driver_registry_try_create(
       iree_hal_driver_registry_default(),
       iree_make_string_view(driver_name.data(), driver_name.size()),
-      iree_allocator_system(), &driver);
+      iree_allocator_default(), &driver);
   if (iree_status_is_unavailable(status)) {
     unavailable_driver_names.insert(driver_name);
   }
@@ -121,7 +121,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
     iree_hal_device_t* device = NULL;
     status = iree_hal_driver_create_default_device(
-        driver_, iree_allocator_system(), &device);
+        driver_, iree_allocator_default(), &device);
     if (iree_status_is_unavailable(status)) {
       iree_status_ignore(status);
       return;
@@ -277,7 +277,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
   // in the message of a.
   void CheckStatusContains(iree_status_t a, iree_status_t b) {
     EXPECT_EQ(iree_status_code(a), iree_status_code(b));
-    iree_allocator_t allocator = iree_allocator_system();
+    iree_allocator_t allocator = iree_allocator_default();
     char* a_str = NULL;
     iree_host_size_t a_str_length = 0;
     EXPECT_TRUE(iree_status_to_string(a, &allocator, &a_str, &a_str_length));

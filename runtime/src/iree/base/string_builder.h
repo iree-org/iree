@@ -24,7 +24,7 @@ extern "C" {
 //
 // Usage:
 //  iree_string_builder_t builder;
-//  iree_string_builder_initialize(iree_allocator_system(), &builder);
+//  iree_string_builder_initialize(iree_allocator_default(), &builder);
 //  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(&builder, "hel"));
 //  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(&builder, "lo"));
 //  fprintf(stream, "%.*s", (int)iree_string_builder_size(&builder),
@@ -92,13 +92,13 @@ iree_string_builder_view(const iree_string_builder_t* builder);
 //
 // Usage:
 //  iree_string_builder_t builder;
-//  iree_string_builder_initialize(iree_allocator_system(), &builder);
+//  iree_string_builder_initialize(iree_allocator_default(), &builder);
 //  ...
 //  char* buffer = iree_string_builder_take_storage(&builder);
 //  iree_host_size_t buffer_size = iree_string_builder_size(&builder);
 //  iree_string_builder_deinitialize(&builder);
 //  ...
-//  iree_allocator_free(iree_allocator_system(), buffer);
+//  iree_allocator_free(iree_allocator_default(), buffer);
 IREE_API_EXPORT IREE_MUST_USE_RESULT char* iree_string_builder_take_storage(
     iree_string_builder_t* builder);
 

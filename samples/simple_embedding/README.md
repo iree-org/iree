@@ -22,6 +22,7 @@ bytecode with various target backends.
 Set up the CMake configuration with `-DIREE_BUILD_SAMPLES=ON` (default on)
 
 Then run
+
 ```sh
 cmake --build <build dir> --target samples/simple_embedding/all
 ```
@@ -69,14 +70,14 @@ iree_hal_sync_device_params_t params;
 iree_hal_sync_device_params_initialize(&params);
 iree_hal_executable_loader_t* loader = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_embedded_elf_loader_create(
-      /*plugin_manager=*/NULL, iree_allocator_system(),
+      /*plugin_manager=*/NULL, iree_allocator_default(),
       &loader));
 
 iree_string_view_t identifier = iree_make_cstring_view("local-sync");
 
 iree_status_t status =
     iree_hal_sync_device_create(identifier, &params, /*loader_count=*/1,
-                                &loader, iree_allocator_system(), device);
+                                &loader, iree_allocator_default(), device);
 ```
 
 Whereas for [device_embedded.c](./device_embedded.c), the "sync device" is
@@ -87,7 +88,7 @@ replaced with the multithreaded "task device", which uses a "task executor":
 iree_task_executor_t* executor = NULL;
 iree_host_size_t executor_count = 0;
 iree_status_t status =
-    iree_task_executors_create_from_flags(iree_allocator_system(),
+    iree_task_executors_create_from_flags(iree_allocator_default(),
                                           1, &executor, &executor_count);
 IREE_ASSERT_EQ(count, 1, "NUMA unsupported");
 
@@ -97,8 +98,9 @@ if (iree_status_is_ok(status)) {
   status = iree_hal_task_device_create(identifier, &params,
                                        /*queue_count=*/1, &executor,
                                        /*loader_count=*/1, &loader,
-                                       iree_allocator_system(), device);
+                                       iree_allocator_default(), device);
 ```
+
 An example that utilizes a higher-level driver registry is in
 [device_vulkan.c](./device_vulkan.c)
 

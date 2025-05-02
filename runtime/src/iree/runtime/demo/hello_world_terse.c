@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_runtime_instance_create(
-      &instance_options, iree_allocator_system(), &instance));
+      &instance_options, iree_allocator_default(), &instance));
 
   // All sessions should share the same instance.
   iree_runtime_demo_run_session(instance);

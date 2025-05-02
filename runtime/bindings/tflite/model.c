@@ -100,7 +100,7 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
 
 TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreate(const void* model_data,
                                                       size_t model_size) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   TfLiteModel* model = NULL;
@@ -131,7 +131,7 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreate(const void* model_data,
 
 TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreateFromFile(
     const char* model_path) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // TODO(#3909): use file mapping C API.

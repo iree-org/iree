@@ -100,7 +100,7 @@ void iree_uk_benchmark_register(
       .user_data = user_data,
   };
   iree_string_builder_t full_name;
-  iree_string_builder_initialize(iree_allocator_system(), &full_name);
+  iree_string_builder_initialize(iree_allocator_default(), &full_name);
   IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, name));
   if (strlen(cpu_features)) {
     IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, "_"));

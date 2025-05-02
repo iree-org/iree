@@ -19,7 +19,7 @@ namespace {
 
 struct FunctionIOTest : public ::testing::Test {
   virtual void SetUp() {
-    host_allocator = iree_allocator_system();
+    host_allocator = iree_allocator_default();
     IREE_ASSERT_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
                                            host_allocator, &instance));
     IREE_ASSERT_OK(iree_hal_module_register_all_types(instance));

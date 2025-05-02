@@ -22,7 +22,7 @@ using TaskPoolPtr =
     std::unique_ptr<iree_task_pool_t, void (*)(iree_task_pool_t*)>;
 static inline TaskPoolPtr AllocateNopPool() {
   iree_task_pool_t* pool = new iree_task_pool_t();
-  IREE_CHECK_OK(iree_task_pool_initialize(iree_allocator_system(),
+  IREE_CHECK_OK(iree_task_pool_initialize(iree_allocator_default(),
                                           sizeof(iree_task_nop_t), 1024, pool));
   return {pool, [](iree_task_pool_t* pool) {
             iree_task_pool_deinitialize(pool);

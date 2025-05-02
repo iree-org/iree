@@ -47,13 +47,13 @@ iree_status_t create_bytecode_module(iree_vm_instance_t* instance,
       iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
   return iree_vm_bytecode_module_create(instance, module_data,
                                         iree_allocator_null(),
-                                        iree_allocator_system(), out_module);
+                                        iree_allocator_default(), out_module);
 }
 
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* state = NULL;
   iree_status_t status = iree_allocator_malloc(
-      iree_allocator_system(), sizeof(iree_sample_state_t), (void**)&state);
+      iree_allocator_default(), sizeof(iree_sample_state_t), (void**)&state);
 
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(&instance_options);
@@ -61,11 +61,11 @@ iree_sample_state_t* setup_sample() {
 
   if (iree_status_is_ok(status)) {
     status = iree_runtime_instance_create(
-        &instance_options, iree_allocator_system(), &state->instance);
+        &instance_options, iree_allocator_default(), &state->instance);
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_device_with_static_loader(iree_allocator_system(),
+    status = create_device_with_static_loader(iree_allocator_default(),
                                               &state->device);
   }
 

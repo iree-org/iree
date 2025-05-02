@@ -11,7 +11,7 @@
 class RedBlackTreeTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    iree_allocator_t allocator = iree_allocator_system();
+    iree_allocator_t allocator = iree_allocator_default();
     iree_hal_hip_util_tree_initialize(allocator, sizeof(int), initial_cache,
                                       1024, &tree_);
   }

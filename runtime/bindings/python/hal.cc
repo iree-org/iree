@@ -155,7 +155,7 @@ py::dict HalAllocator::QueryStatistics() {
 py::str HalAllocator::FormattedStatistics() {
   // Perform all allocating string manipulation without early exit.
   iree_string_builder_t builder;
-  iree_string_builder_initialize(iree_allocator_system(), &builder);
+  iree_string_builder_initialize(iree_allocator_default(), &builder);
   iree_hal_allocator_statistics_t stats;
   iree_hal_allocator_query_statistics(raw_ptr(), &stats);
   auto status = iree_hal_allocator_statistics_format(&stats, &builder);
@@ -887,7 +887,7 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   iree_status_t status =
       iree_hal_buffer_view_create(imported_buffer, dlt->ndim, dims, et,
                                   IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-                                  iree_allocator_system(), &buffer_view);
+                                  iree_allocator_default(), &buffer_view);
 
   if (!iree_status_is_ok(status)) {
     iree_hal_buffer_release(imported_buffer);
@@ -906,7 +906,7 @@ std::vector<std::string> HalDriver::Query() {
   iree_hal_driver_info_t* driver_infos = NULL;
   CheckApiStatus(
       iree_hal_driver_registry_enumerate(iree_hal_driver_registry_default(),
-                                         iree_allocator_system(),
+                                         iree_allocator_default(),
                                          &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
   std::vector<std::string> driver_names(driver_info_count);
@@ -914,7 +914,7 @@ std::vector<std::string> HalDriver::Query() {
     driver_names[i] = std::string(driver_infos[i].driver_name.data,
                                   driver_infos[i].driver_name.size);
   }
-  iree_allocator_free(iree_allocator_system(), driver_infos);
+  iree_allocator_free(iree_allocator_default(), driver_infos);
   return driver_names;
 }
 
@@ -928,7 +928,7 @@ py::object HalDriver::Create(const DeviceUri& device_uri) {
   iree_hal_driver_t* driver;
   CheckApiStatus(iree_hal_driver_registry_try_create(
                      iree_hal_driver_registry_default(), device_uri.driver_name,
-                     iree_allocator_system(), &driver),
+                     iree_allocator_default(), &driver),
                  "Error creating driver");
 
   py::object driver_obj = py::cast(HalDriver::StealFromRawPtr(driver));
@@ -959,9 +959,10 @@ py::object HalDriver::Create(const std::string& device_uri,
 py::list HalDriver::QueryAvailableDevices() {
   iree_hal_device_info_t* device_infos;
   iree_host_size_t count;
-  CheckApiStatus(iree_hal_driver_query_available_devices(
-                     raw_ptr(), iree_allocator_system(), &count, &device_infos),
-                 "Error querying devices");
+  CheckApiStatus(
+      iree_hal_driver_query_available_devices(
+          raw_ptr(), iree_allocator_default(), &count, &device_infos),
+      "Error querying devices");
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
     py::dict device_data;
@@ -973,7 +974,7 @@ py::list HalDriver::QueryAvailableDevices() {
     results.append(device_data);
   }
 
-  iree_allocator_free(iree_allocator_system(), device_infos);
+  iree_allocator_free(iree_allocator_default(), device_infos);
   return results;
 }
 
@@ -1013,7 +1014,7 @@ static iree_status_t ConfigureDevice(iree_hal_device_t* device,
 HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_default_device(
-                     raw_ptr(), iree_allocator_system(), &device),
+                     raw_ptr(), iree_allocator_default(), &device),
                  "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
@@ -1052,7 +1053,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
   CheckApiStatus(iree_hal_driver_create_device_by_id(
                      raw_ptr(), device_id, params.size(),
                      (params.empty() ? nullptr : &params.front()),
-                     iree_allocator_system(), &device),
+                     iree_allocator_default(), &device),
                  "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
@@ -1066,7 +1067,7 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   CheckApiStatus(
       iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
-                                           iree_allocator_system(), &device),
+                                           iree_allocator_default(), &device),
       "Error creating device");
   CheckApiStatus(ConfigureDevice(device, allocators),
                  "Error configuring the device");
@@ -1115,7 +1116,7 @@ VmModule CreateHalModule(
   CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
                                         devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
                                         iree_hal_module_debug_sink,
-                                        iree_allocator_system(), &module),
+                                        iree_allocator_default(), &module),
                  "Error creating hal module");
   VmModule vm_module = VmModule::StealFromRawPtr(module);
   if (debug_sink) {
@@ -1469,7 +1470,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("dump_device_info",
            [](HalDriver& self, iree_hal_device_id_t device_id) {
              iree_string_builder_t builder;
-             iree_string_builder_initialize(iree_allocator_system(), &builder);
+             iree_string_builder_initialize(iree_allocator_default(), &builder);
              CheckApiStatus(iree_hal_driver_dump_device_info(
                                 self.raw_ptr(), device_id, &builder),
                             "Querying device info");
@@ -1588,7 +1589,7 @@ void SetupHalBindings(nanobind::module_ m) {
         CheckApiStatus(iree_hal_buffer_view_create(
                            buffer.raw_ptr(), rank, dims, element_type,
                            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-                           iree_allocator_system(), &out_bv),
+                           iree_allocator_default(), &out_bv),
                        "creating buffer view");
         new (new_self) HalBufferView();
         *new_self = HalBufferView::StealFromRawPtr(out_bv);
@@ -1721,7 +1722,7 @@ void SetupHalBindings(nanobind::module_ m) {
           [](HalFence* new_fence, iree_host_size_t capacity) {
             iree_hal_fence_t* out_fence;
             CheckApiStatus(iree_hal_fence_create(
-                               capacity, iree_allocator_system(), &out_fence),
+                               capacity, iree_allocator_default(), &out_fence),
                            "creating fence");
             new (new_fence) HalFence();
             (*new_fence) = HalFence::StealFromRawPtr(out_fence);
@@ -1733,7 +1734,7 @@ void SetupHalBindings(nanobind::module_ m) {
             iree_hal_fence_t* out_fence;
             CheckApiStatus(
                 iree_hal_fence_create_at(sem.raw_ptr(), value,
-                                         iree_allocator_system(), &out_fence),
+                                         iree_allocator_default(), &out_fence),
                 "creating fence");
             return HalFence::StealFromRawPtr(out_fence);
           },
@@ -1749,7 +1750,7 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             iree_hal_fence_t* out_fence;
             CheckApiStatus(
-                iree_hal_fence_join(count, fence_ptrs, iree_allocator_system(),
+                iree_hal_fence_join(count, fence_ptrs, iree_allocator_default(),
                                     &out_fence),
                 "joining fences");
             return HalFence::StealFromRawPtr(out_fence);

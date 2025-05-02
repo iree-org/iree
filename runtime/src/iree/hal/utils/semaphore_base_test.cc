@@ -159,7 +159,7 @@ static iree_hal_semaphore_callback_t MakeCallback(CallbackState* state) {
 struct TrackingSemaphoreTest : public ::testing::Test {
   // We could check the allocator to ensure all memory is freed if we wanted to
   // reduce the reliance on asan.
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
 
   void SetUp() override {}
 

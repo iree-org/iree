@@ -29,7 +29,7 @@ LogicalResult handleRuntimeError(Operation *op, iree_status_t status,
 }
 
 FailureOr<ArchiveBuilder> createArchiveBuilder(Operation *op) {
-  iree_allocator_t hostAllocator = iree_allocator_system();
+  iree_allocator_t hostAllocator = iree_allocator_default();
   iree_io_parameter_archive_builder_t *builderPtr = NULL;
   if (failed(handleRuntimeError(op,
                                 iree_allocator_malloc(hostAllocator,

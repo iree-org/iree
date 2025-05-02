@@ -87,7 +87,7 @@ iree_status_t iree_hal_hip_dynamic_symbols_initialize(
   bool loaded_one = false;
   iree_status_t status = iree_ok_status();
   iree_string_builder_t error_builder;
-  iree_string_builder_initialize(iree_allocator_system(), &error_builder);
+  iree_string_builder_initialize(iree_allocator_default(), &error_builder);
 
   if (hip_lib_search_path_count == 0) {
     // If no explicit search path, then have the system try to find the library

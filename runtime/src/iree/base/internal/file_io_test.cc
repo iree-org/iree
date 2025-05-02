@@ -87,7 +87,7 @@ TEST(FileIO, ReadWriteContentsPreload) {
   iree_file_contents_t* read_contents = NULL;
   IREE_ASSERT_OK(
       iree_file_read_contents(path.c_str(), IREE_FILE_READ_FLAG_PRELOAD,
-                              iree_allocator_system(), &read_contents));
+                              iree_allocator_default(), &read_contents));
 
   // Expect the contents are equal.
   EXPECT_EQ(write_contents.size(), read_contents->const_buffer.data_length);
@@ -118,7 +118,7 @@ TEST(FileIO, ReadWriteContentsMmap) {
   // Read the contents from disk.
   iree_file_contents_t* read_contents = NULL;
   IREE_ASSERT_OK(iree_file_read_contents(path.c_str(), IREE_FILE_READ_FLAG_MMAP,
-                                         iree_allocator_system(),
+                                         iree_allocator_default(),
                                          &read_contents));
 
   // Expect the contents are equal.

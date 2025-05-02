@@ -59,10 +59,10 @@ static iree_status_t run_test() {
   memset(&import_table, 0, sizeof(import_table));
   iree_elf_module_t module;
   IREE_RETURN_IF_ERROR(iree_elf_module_initialize_from_memory(
-      file_data, &import_table, iree_allocator_system(), &module));
+      file_data, &import_table, iree_allocator_default(), &module));
 
   iree_hal_executable_environment_v0_t environment;
-  iree_hal_executable_environment_initialize(iree_allocator_system(),
+  iree_hal_executable_environment_initialize(iree_allocator_default(),
                                              &environment);
 
   void* query_fn_ptr = NULL;

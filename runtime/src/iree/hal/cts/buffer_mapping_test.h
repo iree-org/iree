@@ -142,7 +142,7 @@ TEST_F(BufferMappingTest, ZeroSubspan) {
   iree_hal_buffer_t* buffer_subspan = NULL;
   IREE_ASSERT_OK(
       iree_hal_buffer_subspan(buffer, /*byte_offset=*/4, subspan_length,
-                              iree_allocator_system(), &buffer_subspan));
+                              iree_allocator_default(), &buffer_subspan));
 
   // Zero part of the subspan.
   IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer_subspan, /*byte_offset=*/4,
@@ -256,7 +256,7 @@ TEST_F(BufferMappingTest, FillSubspan) {
   iree_hal_buffer_t* buffer_subspan = NULL;
   IREE_ASSERT_OK(
       iree_hal_buffer_subspan(buffer, /*byte_offset=*/4, subspan_length,
-                              iree_allocator_system(), &buffer_subspan));
+                              iree_allocator_default(), &buffer_subspan));
 
   // Fill part of the subspan.
   uint8_t fill_value = 0xFF;
@@ -346,7 +346,7 @@ TEST_F(BufferMappingTest, ReadDataSubspan) {
   iree_hal_buffer_t* buffer_subspan = NULL;
   IREE_ASSERT_OK(
       iree_hal_buffer_subspan(buffer, /*byte_offset=*/4, subspan_length,
-                              iree_allocator_system(), &buffer_subspan));
+                              iree_allocator_default(), &buffer_subspan));
 
   // Read the entire buffer subspan.
   std::vector<uint8_t> actual_data(subspan_length);
@@ -431,7 +431,7 @@ TEST_F(BufferMappingTest, WriteDataSubspan) {
   iree_hal_buffer_t* buffer_subspan = NULL;
   IREE_ASSERT_OK(
       iree_hal_buffer_subspan(buffer, /*byte_offset=*/4, subspan_length,
-                              iree_allocator_system(), &buffer_subspan));
+                              iree_allocator_default(), &buffer_subspan));
 
   // Write over part of the subspan.
   std::vector<uint8_t> fill_buffer{0x11, 0x22, 0x33, 0x44};

@@ -38,7 +38,7 @@ std::vector<TestParams> GetModuleTestParams() {
 
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
+                                        iree_allocator_default(), &instance));
 
   const struct iree_file_toc_t* module_file_toc =
       all_bytecode_modules_c_create();
@@ -50,7 +50,7 @@ std::vector<TestParams> GetModuleTestParams() {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
             static_cast<iree_host_size_t>(module_file.size)},
-        iree_allocator_null(), iree_allocator_system(), &module));
+        iree_allocator_null(), iree_allocator_default(), &module));
     iree_vm_module_signature_t signature = iree_vm_module_signature(module);
     test_params.reserve(test_params.size() + signature.export_function_count);
     for (int i = 0; i < signature.export_function_count; ++i) {
@@ -76,20 +76,20 @@ class VMBytecodeDispatchTest
   virtual void SetUp() {
     const auto& test_params = GetParam();
 
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
             static_cast<iree_host_size_t>(test_params.module_file.size)},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
+        iree_allocator_null(), iree_allocator_default(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-        iree_allocator_system(), &context_));
+        iree_allocator_default(), &context_));
   }
 
   virtual void TearDown() {
@@ -109,7 +109,7 @@ class VMBytecodeDispatchTest
     // flags |= IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION;
     return iree_vm_invoke(context_, function, flags,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
-                          /*outputs=*/nullptr, iree_allocator_system());
+                          /*outputs=*/nullptr, iree_allocator_default());
   }
 
   iree_vm_instance_t* instance_ = nullptr;

@@ -362,6 +362,21 @@ extern void* IREE_ALLOCATOR_DEFAULT_SELF;
 // `IREE_ALLOCATOR_DEFAULT_SELF` global `void*` variable can be defined if the
 // allocator requires state and otherwise `NULL` will be passed as the `self`
 // parameter to the control function.
+//
+// Any number of allocators can be linked into a program so long as they have
+// unique control functions. Since (nearly) all IREE APIs that allocate take an
+// `iree_allocator_t` as an argument frameworks and applications using IREE need
+// not modify IREE at all in order to use their own. Any code internal to IREE
+// that uses an allocator not taken as an argument (such as `iree_status_t`)
+// will use `iree_allocator_default()` to get its allocator. By default this
+// allocator is an alias for `iree_allocator_system()` using whatever C's malloc
+// and free are implemented with. If the user wishes to override this default
+// they can do so by either changing malloc/free at the global level or
+// specifically telling IREE to use a different default allocator.
+//
+// To make it easier to link in new allocators as part of build configuration
+// the CMake `IREE_ALLOCATOR_DEFAULT` value can be set to a named allocator
+// either provided by the user or by the IREE source.
 static inline iree_allocator_t iree_allocator_default(void) {
   iree_allocator_t v = {
 #if defined(IREE_ALLOCATOR_DEFAULT_SELF)

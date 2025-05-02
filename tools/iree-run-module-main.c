@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 
   // Hosting applications can provide their own allocators to pool resources or
   // track allocation statistics related to IREE code.
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
   // Hosting applications should reuse instances across multiple contexts that
   // have similar composition (similar types/modules/etc). Most applications can
   // get by with a single shared instance.

@@ -31,7 +31,7 @@
 int main(int argc, char** argv) {
   // Default environment.
   iree_hal_executable_environment_v0_t environment;
-  iree_hal_executable_environment_initialize(iree_allocator_system(),
+  iree_hal_executable_environment_initialize(iree_allocator_default(),
                                              &environment);
 
   // Query the library header at the requested version.

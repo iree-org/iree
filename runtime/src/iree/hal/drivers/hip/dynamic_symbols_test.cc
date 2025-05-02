@@ -26,7 +26,7 @@ namespace {
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree_hal_hip_dynamic_symbols_t symbols;
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
-      iree_allocator_system(), /*hip_lib_search_path_count=*/0,
+      iree_allocator_default(), /*hip_lib_search_path_count=*/0,
       /*hip_lib_search_paths=*/NULL, &symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
@@ -54,7 +54,7 @@ static const iree_string_view_t non_existing_search_paths[] = {
 TEST(DynamicSymbolsTest, SearchPathsFail) {
   iree_hal_hip_dynamic_symbols_t symbols;
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
-      iree_allocator_system(),
+      iree_allocator_default(),
       /*hip_lib_search_path_count=*/IREE_ARRAYSIZE(non_existing_search_paths),
       non_existing_search_paths, &symbols);
 
@@ -70,7 +70,7 @@ TEST(DynamicSymbolsTest, SearchPathsFail) {
 TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
   iree_hal_hip_dynamic_symbols_t hip_symbols;
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
-      iree_allocator_system(), /*hip_lib_search_path_count=*/0,
+      iree_allocator_default(), /*hip_lib_search_path_count=*/0,
       /*hip_lib_search_paths=*/NULL, &hip_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
@@ -80,7 +80,7 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
 
   iree_hal_hip_nccl_dynamic_symbols_t nccl_symbols;
   status = iree_hal_hip_nccl_dynamic_symbols_initialize(
-      iree_allocator_system(), &hip_symbols, &nccl_symbols);
+      iree_allocator_default(), &hip_symbols, &nccl_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);

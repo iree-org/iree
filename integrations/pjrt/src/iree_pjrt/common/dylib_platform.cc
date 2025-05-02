@@ -180,11 +180,11 @@ std::optional<std::string> DylibPlatform::GetBinaryDir() {
     char* path;
     auto status = iree_file_path_join(
         iree_make_string_view(home_dir->data(), home_dir->size()),
-        iree_make_cstring_view(local_name), iree_allocator_system(), &path);
+        iree_make_cstring_view(local_name), iree_allocator_default(), &path);
     if (!iree_status_is_ok(status)) continue;
 
     std::string existing_path(path);
-    iree_allocator_free(iree_allocator_system(), path);
+    iree_allocator_free(iree_allocator_default(), path);
     status = iree_file_exists(path);
     if (iree_status_is_ok(status)) return existing_path;
   }
@@ -207,11 +207,11 @@ std::optional<std::string> DylibPlatform::GetLibraryDir() {
     char* path;
     auto status = iree_file_path_join(
         iree_make_string_view(home_dir->data(), home_dir->size()),
-        iree_make_cstring_view(local_name), iree_allocator_system(), &path);
+        iree_make_cstring_view(local_name), iree_allocator_default(), &path);
     if (!iree_status_is_ok(status)) continue;
 
     std::string existing_path(path);
-    iree_allocator_free(iree_allocator_system(), path);
+    iree_allocator_free(iree_allocator_default(), path);
     status = iree_file_exists(path);
     if (iree_status_is_ok(status)) return existing_path;
   }
@@ -232,12 +232,12 @@ std::optional<std::string> DylibPlatform::GetCompilerLibraryPath() {
   char* path;
   auto status = iree_file_path_join(
       iree_make_string_view(lib_dir->data(), lib_dir->size()),
-      iree_make_cstring_view("libIREECompiler.so"), iree_allocator_system(),
+      iree_make_cstring_view("libIREECompiler.so"), iree_allocator_default(),
       &path);
   if (!iree_status_is_ok(status)) return {};
 
   std::string joined_path(path);
-  iree_allocator_free(iree_allocator_system(), path);
+  iree_allocator_free(iree_allocator_default(), path);
   return joined_path;
 }
 
@@ -255,11 +255,11 @@ std::optional<std::string> DylibPlatform::GetPartitionerLibraryPath() {
   auto status = iree_file_path_join(
       iree_make_string_view(lib_dir->data(), lib_dir->size()),
       iree_make_cstring_view("libOpenXLAPartitioner.so"),
-      iree_allocator_system(), &path);
+      iree_allocator_default(), &path);
   if (!iree_status_is_ok(status)) return {};
 
   std::string joined_path(path);
-  iree_allocator_free(iree_allocator_system(), path);
+  iree_allocator_free(iree_allocator_default(), path);
   return joined_path;
 }
 

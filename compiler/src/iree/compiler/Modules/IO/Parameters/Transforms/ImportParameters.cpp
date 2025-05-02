@@ -33,7 +33,7 @@ namespace {
 
 static FailureOr<FileHandle> openArchiveFile(ModuleOp moduleOp,
                                              StringRef archivePath) {
-  iree_allocator_t hostAllocator = iree_allocator_system();
+  iree_allocator_t hostAllocator = iree_allocator_default();
 
   // Open the archive (hopefully mapped).
   auto fileOrErr = llvm::MemoryBuffer::getFile(
@@ -80,7 +80,7 @@ loadParameterIndex(ModuleOp moduleOp, StringRef path,
     return failure();
 
   // Parse the archive as a particular format.
-  iree_allocator_t hostAllocator = iree_allocator_system();
+  iree_allocator_t hostAllocator = iree_allocator_default();
   return handleRuntimeError(
       moduleOp,
       iree_io_parse_file_index(iree_make_string_view(path.data(), path.size()),
@@ -102,7 +102,7 @@ public:
 
   iree_io_parameter_index_t *lookupOrCreate(ModuleOp moduleOp,
                                             StringRef scope) {
-    iree_allocator_t hostAllocator = iree_allocator_system();
+    iree_allocator_t hostAllocator = iree_allocator_default();
     if (iree_io_parameter_index_t *existing = lookup(scope))
       return existing;
     iree_io_parameter_index_t *parameterIndexPtr = nullptr;

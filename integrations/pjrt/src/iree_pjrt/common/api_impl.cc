@@ -1261,7 +1261,7 @@ iree_status_t DeviceInstance::GetHalDevice(iree_hal_device_t** out_device) {
 
 ClientInstance::ClientInstance(std::unique_ptr<Platform> platform)
     : platform_(std::move(platform)) {
-  host_allocator_ = iree_allocator_system();
+  host_allocator_ = iree_allocator_default();
   IREE_CHECK_OK(
       iree_hal_driver_registry_allocate(host_allocator_, &driver_registry_));
   cached_platform_version_ = "git";  // TODO: Plumb through version info.
@@ -1974,7 +1974,7 @@ iree_status_t LoadedExecutableInstance::LoadAll() {
 
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         client_.vm_instance(), IREE_VM_CONTEXT_FLAG_NONE, module_ptrs.size(),
-        module_ptrs.data(), iree_allocator_system(), &loaded.vm_context));
+        module_ptrs.data(), iree_allocator_default(), &loaded.vm_context));
   }
 
   new_list.swap(resident_executables_);

@@ -477,7 +477,7 @@ int main(int argc, char** argv) {
   }
 
   iree_status_t status = iree_test_utils_load_and_run_e2e_tests(
-      iree_allocator_system(), attention_test_module_create);
+      iree_allocator_default(), attention_test_module_create);
   int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);

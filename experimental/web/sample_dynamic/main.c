@@ -78,7 +78,7 @@ extern iree_status_t create_device_with_loaders(iree_allocator_t host_allocator,
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* sample_state = NULL;
   iree_status_t status =
-      iree_allocator_malloc(iree_allocator_system(),
+      iree_allocator_malloc(iree_allocator_default(),
                             sizeof(iree_sample_state_t), (void**)&sample_state);
 
   iree_runtime_instance_options_t instance_options;
@@ -87,11 +87,11 @@ iree_sample_state_t* setup_sample() {
 
   if (iree_status_is_ok(status)) {
     status = iree_runtime_instance_create(
-        &instance_options, iree_allocator_system(), &sample_state->instance);
+        &instance_options, iree_allocator_default(), &sample_state->instance);
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_device_with_loaders(iree_allocator_system(),
+    status = create_device_with_loaders(iree_allocator_default(),
                                         &sample_state->device);
   }
 
@@ -114,7 +114,7 @@ void cleanup_sample(iree_sample_state_t* sample_state) {
 iree_program_state_t* load_program(iree_sample_state_t* sample_state,
                                    uint8_t* vmfb_data, size_t length) {
   iree_program_state_t* program_state = NULL;
-  iree_status_t status = iree_allocator_malloc(iree_allocator_system(),
+  iree_status_t status = iree_allocator_malloc(iree_allocator_default(),
                                                sizeof(iree_program_state_t),
                                                (void**)&program_state);
 
@@ -133,11 +133,11 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
     status = iree_vm_bytecode_module_create(
         iree_runtime_instance_vm_instance(sample_state->instance),
         iree_make_const_byte_span(vmfb_data, length),
-        /*flatbuffer_allocator=*/iree_allocator_system(),
-        iree_allocator_system(), &program_state->module);
+        /*flatbuffer_allocator=*/iree_allocator_default(),
+        iree_allocator_default(), &program_state->module);
   } else {
     // Must clean up the FlatBuffer data directly.
-    iree_allocator_free(iree_allocator_system(), (void*)vmfb_data);
+    iree_allocator_free(iree_allocator_default(), (void*)vmfb_data);
   }
 
   if (iree_status_is_ok(status)) {
@@ -341,13 +341,13 @@ static iree_status_t print_outputs_from_call(
         // Allocate scratch heap memory for the result and format into it.
         char* result_str = NULL;
         IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-            iree_allocator_system(), result_length, (void**)&result_str));
+            iree_allocator_default(), result_length, (void**)&result_str));
         IREE_RETURN_IF_ERROR(iree_hal_buffer_view_format(
             buffer_view, IREE_HOST_SIZE_MAX, result_length, result_str,
             &result_length));
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
             outputs_builder, "%.*s", (int)result_length, result_str));
-        iree_allocator_free(iree_allocator_system(), result_str);
+        iree_allocator_free(iree_allocator_default(), result_str);
       } else {
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
             outputs_builder, "(no printer)"));
@@ -376,7 +376,7 @@ const char* call_function(iree_program_state_t* program_state,
   // Fully qualify the function name. This sample only supports loading one
   // module (i.e. 'program') per session, so we can do this.
   iree_string_builder_t name_builder;
-  iree_string_builder_initialize(iree_allocator_system(), &name_builder);
+  iree_string_builder_initialize(iree_allocator_default(), &name_builder);
   if (iree_status_is_ok(status)) {
     iree_string_view_t module_name = iree_vm_module_name(program_state->module);
     status = iree_string_builder_append_format(&name_builder, "%.*s.%s",
@@ -411,7 +411,7 @@ const char* call_function(iree_program_state_t* program_state,
   iree_time_t time_elapsed = end_time - start_time;
 
   iree_string_builder_t outputs_builder;
-  iree_string_builder_initialize(iree_allocator_system(), &outputs_builder);
+  iree_string_builder_initialize(iree_allocator_default(), &outputs_builder);
 
   // Output a JSON object as a string:
   // {

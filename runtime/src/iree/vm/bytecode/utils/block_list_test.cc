@@ -21,7 +21,7 @@ using testing::Eq;
 
 // Tests usage on empty lists.
 TEST(BlockListTest, Empty) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(0u, allocator, &block_list));
@@ -48,7 +48,7 @@ TEST(BlockListTest, Empty) {
 // Valid IR usage for 3 blocks. Note that we insert them out of order: 1 2 0.
 // These should be stored inline in the block list struct.
 TEST(BlockListTest, Valid) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(3u, allocator, &block_list));
@@ -119,7 +119,7 @@ TEST(BlockListTest, Valid) {
 
 // Tests that a declared block that was never defined errors on verification.
 TEST(BlockListTest, Undefined) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(1u, allocator, &block_list));
@@ -143,7 +143,7 @@ TEST(BlockListTest, Undefined) {
 
 // Tests adding fewer blocks than expected by the capacity.
 TEST(BlockListTest, Underflow) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(2u, allocator, &block_list));
@@ -172,7 +172,7 @@ TEST(BlockListTest, Underflow) {
 
 // Tests adding more blocks than allowed by the capacity.
 TEST(BlockListTest, Overflow) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(1u, allocator, &block_list));
@@ -197,7 +197,7 @@ TEST(BlockListTest, Overflow) {
 
 // Tests adding any blocks to an expected-empty list.
 TEST(BlockListTest, OverflowEmpty) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(0u, allocator, &block_list));
@@ -214,7 +214,7 @@ TEST(BlockListTest, OverflowEmpty) {
 
 // Tests a block that is missing its marker in the bytecode.
 TEST(BlockListTest, MissingMarker) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(1u, allocator, &block_list));
@@ -237,7 +237,7 @@ TEST(BlockListTest, MissingMarker) {
 
 // Tests a block with a pc outside of the bytecode range.
 TEST(BlockListTest, OutOfBoundsPC) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(1u, allocator, &block_list));
@@ -261,7 +261,7 @@ TEST(BlockListTest, OutOfBoundsPC) {
 // Tests inserting a block with a PC outside of what we can track. This should
 // be really rare in practice.
 TEST(BlockListTest, OverMaxPC) {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(1u, allocator, &block_list));
@@ -277,7 +277,7 @@ TEST(BlockListTest, OverMaxPC) {
 // Tests adding a lot of blocks such that we trigger a heap storage allocation.
 TEST(BlockListTest, HeapStorage) {
   uint32_t count = IREE_VM_BYTECODE_INLINE_BLOCK_LIST_CAPACITY * 8;
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_vm_bytecode_block_list_t block_list;
   IREE_ASSERT_OK(
       iree_vm_bytecode_block_list_initialize(count, allocator, &block_list));

@@ -182,14 +182,14 @@ static void iree_call_function_state_destroy(
     }
     iree_event_deinitialize(&call_state->output_states[i].ready_event);
   }
-  iree_allocator_free(iree_allocator_system(), call_state->output_states);
+  iree_allocator_free(iree_allocator_default(), call_state->output_states);
   iree_status_free(call_state->async_status);
 
   // Invoke state.
-  iree_allocator_free(iree_allocator_system(), call_state->invoke_state);
+  iree_allocator_free(iree_allocator_default(), call_state->invoke_state);
   iree_runtime_call_deinitialize(&call_state->call);
 
-  iree_allocator_free(iree_allocator_system(), call_state);
+  iree_allocator_free(iree_allocator_default(), call_state);
 }
 
 extern iree_status_t create_device(iree_allocator_t host_allocator,
@@ -198,7 +198,7 @@ extern iree_status_t create_device(iree_allocator_t host_allocator,
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* sample_state = NULL;
   iree_status_t status = iree_allocator_malloc(
-      iree_allocator_system(), sizeof(*sample_state), (void**)&sample_state);
+      iree_allocator_default(), sizeof(*sample_state), (void**)&sample_state);
 
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(&instance_options);
@@ -206,15 +206,15 @@ iree_sample_state_t* setup_sample() {
 
   if (iree_status_is_ok(status)) {
     status = iree_runtime_instance_create(
-        &instance_options, iree_allocator_system(), &sample_state->instance);
+        &instance_options, iree_allocator_default(), &sample_state->instance);
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_device(iree_allocator_system(), &sample_state->device);
+    status = create_device(iree_allocator_default(), &sample_state->device);
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_loop_emscripten_allocate(iree_allocator_system(),
+    status = iree_loop_emscripten_allocate(iree_allocator_default(),
                                            &sample_state->loop);
   }
 
@@ -239,7 +239,7 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
                                    uint8_t* vmfb_data, size_t length) {
   iree_program_state_t* program_state = NULL;
   iree_status_t status = iree_allocator_malloc(
-      iree_allocator_system(), sizeof(*program_state), (void**)&program_state);
+      iree_allocator_default(), sizeof(*program_state), (void**)&program_state);
   program_state->sample_state = sample_state;
 
   iree_runtime_session_options_t session_options;
@@ -257,11 +257,11 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
     status = iree_vm_bytecode_module_create(
         iree_runtime_instance_vm_instance(sample_state->instance),
         iree_make_const_byte_span(vmfb_data, length),
-        /*flatbuffer_allocator=*/iree_allocator_system(),
-        iree_allocator_system(), &program_state->module);
+        /*flatbuffer_allocator=*/iree_allocator_default(),
+        iree_allocator_default(), &program_state->module);
   } else {
     // Must clean up the FlatBuffer data directly.
-    iree_allocator_free(iree_allocator_system(), (void*)vmfb_data);
+    iree_allocator_free(iree_allocator_default(), (void*)vmfb_data);
   }
 
   if (iree_status_is_ok(status)) {
@@ -503,7 +503,7 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
 
   iree_event_set(
       &userdata->call_state->output_states[buffer_index].ready_event);
-  iree_allocator_free(iree_allocator_system(), userdata);
+  iree_allocator_free(iree_allocator_default(), userdata);
 }
 
 static iree_status_t print_outputs_from_call(
@@ -559,7 +559,7 @@ static iree_status_t print_outputs_from_call(
       iree_hal_buffer_view_t* heap_buffer_view = NULL;
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create_like(
           call_state->output_states[i].mapped_host_buffer,
-          call_state->output_states[i].buffer_view, iree_allocator_system(),
+          call_state->output_states[i].buffer_view, iree_allocator_default(),
           &heap_buffer_view));
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_append_to_builder(
           heap_buffer_view, SIZE_MAX, outputs_builder));
@@ -589,7 +589,7 @@ static iree_status_t map_all_callback(void* user_data, iree_loop_t loop,
   status = iree_status_join(call_state->async_status, status);
 
   iree_string_builder_t output_string_builder;
-  iree_string_builder_initialize(iree_allocator_system(),
+  iree_string_builder_initialize(iree_allocator_default(),
                                  &output_string_builder);
 
   // Output a JSON object as a string:
@@ -681,7 +681,7 @@ static iree_status_t allocate_mappable_device_buffer(
       data_length,
       /*byte_offset=*/0,
       /*byte_length=*/data_length, device_buffer_handle,
-      iree_allocator_system(), out_buffer);
+      iree_allocator_default(), out_buffer);
 }
 
 // Processes outputs from a completed function invocation.
@@ -696,7 +696,7 @@ static iree_status_t process_call_outputs(
       iree_runtime_session_device(call_state->call.session);
 
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      iree_allocator_system(), sizeof(iree_output_state_t) * outputs_size,
+      iree_allocator_default(), sizeof(iree_output_state_t) * outputs_size,
       (void**)&call_state->output_states));
   call_state->outputs_size = outputs_size;
 
@@ -819,8 +819,9 @@ static iree_status_t process_call_outputs(
     if (!call_state->output_states[i].mappable_device_buffer) continue;
 
     iree_buffer_map_userdata_t* map_userdata = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        iree_allocator_system(), sizeof(*map_userdata), (void**)&map_userdata));
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(iree_allocator_default(),
+                                               sizeof(*map_userdata),
+                                               (void**)&map_userdata));
 
     map_userdata->call_state = call_state;
     map_userdata->buffer_index = i;
@@ -889,8 +890,8 @@ const bool call_function(
 
   iree_call_function_state_t* call_state = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(iree_allocator_system(), sizeof(*call_state),
-                                   (void**)&call_state);
+    status = iree_allocator_malloc(iree_allocator_default(),
+                                   sizeof(*call_state), (void**)&call_state);
   }
   call_state->loop = program_state->sample_state->loop;
   call_state->callback_fn = completion_callback_fn;
@@ -898,7 +899,7 @@ const bool call_function(
   // Fully qualify the function name. This sample only supports loading one
   // module (i.e. 'program') per session, so we can do this.
   iree_string_builder_t name_builder;
-  iree_string_builder_initialize(iree_allocator_system(), &name_builder);
+  iree_string_builder_initialize(iree_allocator_default(), &name_builder);
   if (iree_status_is_ok(status)) {
     iree_string_view_t module_name = iree_vm_module_name(program_state->module);
     status = iree_string_builder_append_format(&name_builder, "%.*s.%s",
@@ -920,7 +921,7 @@ const bool call_function(
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(iree_allocator_system(),
+    status = iree_allocator_malloc(iree_allocator_default(),
                                    sizeof(*(call_state->invoke_state)),
                                    (void**)&(call_state->invoke_state));
   }
@@ -937,7 +938,7 @@ const bool call_function(
     status = iree_vm_async_invoke(
         loop, call_state->invoke_state, vm_context, vm_function,
         IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL, inputs, outputs,
-        iree_allocator_system(), invoke_callback, /*user_data=*/call_state);
+        iree_allocator_default(), invoke_callback, /*user_data=*/call_state);
   }
 
   if (!iree_status_is_ok(status)) {

@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   // Internally IREE does not (in general) use malloc and instead uses the
   // provided allocator to allocate and free memory. Applications can integrate
   // their own allocator as-needed.
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
 
   // Create the root isolated VM instance that we can create contexts within.
   iree_vm_instance_t* instance = NULL;

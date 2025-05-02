@@ -21,7 +21,7 @@ inline iree_status_t iree_hal_drivers_hip_cts_default_multi_queue_create(
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_driver_query_available_devices(
-      driver, iree_allocator_system(), &device_info_count, &device_infos));
+      driver, iree_allocator_default(), &device_info_count, &device_infos));
 
   for (iree_host_size_t i = 0; i < device_info_count; ++i) {
     const char* nm = device_infos[i].name.data;
@@ -58,7 +58,7 @@ inline iree_status_t iree_hal_drivers_hip_cts_default_multi_queue_create(
     max_valid_devices = device_count;
   }
 
-  iree_allocator_free(iree_allocator_system(), device_infos);
+  iree_allocator_free(iree_allocator_default(), device_infos);
 
   if (!max_valid_devices) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
@@ -66,7 +66,7 @@ inline iree_status_t iree_hal_drivers_hip_cts_default_multi_queue_create(
   }
   return iree_hal_driver_create_device_by_path(
       driver, IREE_SV("hip"), IREE_SV(path.c_str()), /*param_count=*/0,
-      /*params=*/NULL, iree_allocator_system(), out_device);
+      /*params=*/NULL, iree_allocator_default(), out_device);
 }
 
 #endif  // IREE_HAL_DRIVERS_HIP_REGISTRATION_MULTI_QUEUE_H_

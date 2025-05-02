@@ -33,16 +33,16 @@ extern const iree_const_byte_span_t load_bytecode_module_data();
 iree_status_t Run() {
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_instance_create(
-      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance));
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance));
   IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance));
 
   iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(create_sample_device(iree_allocator_system(), &device),
+  IREE_RETURN_IF_ERROR(create_sample_device(iree_allocator_default(), &device),
                        "create device");
   iree_vm_module_t* hal_module = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_module_create(
       instance, /*device_count=*/1, &device, IREE_HAL_MODULE_FLAG_SYNCHRONOUS,
-      iree_hal_module_debug_sink_stdio(stderr), iree_allocator_system(),
+      iree_hal_module_debug_sink_stdio(stderr), iree_allocator_default(),
       &hal_module));
 
   // Load bytecode module from the embedded data.
@@ -50,7 +50,7 @@ iree_status_t Run() {
 
   iree_vm_module_t* bytecode_module = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      instance, module_data, iree_allocator_null(), iree_allocator_system(),
+      instance, module_data, iree_allocator_null(), iree_allocator_default(),
       &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
@@ -58,7 +58,7 @@ iree_status_t Run() {
   iree_vm_module_t* modules[] = {hal_module, bytecode_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
       instance, IREE_VM_CONTEXT_FLAG_NONE, IREE_ARRAYSIZE(modules), &modules[0],
-      iree_allocator_system(), &context));
+      iree_allocator_default(), &context));
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
 
@@ -100,7 +100,7 @@ iree_status_t Run() {
   iree_vm_list_t* inputs = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                          /*capacity=*/2, iree_allocator_system(), &inputs),
+                          /*capacity=*/2, iree_allocator_default(), &inputs),
       "can't allocate input vm list");
 
   iree_vm_ref_t arg0_buffer_view_ref =
@@ -117,13 +117,13 @@ iree_status_t Run() {
   iree_vm_list_t* outputs = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                          /*capacity=*/1, iree_allocator_system(), &outputs),
+                          /*capacity=*/1, iree_allocator_default(), &outputs),
       "can't allocate output vm list");
 
   // Synchronously invoke the function.
   IREE_RETURN_IF_ERROR(iree_vm_invoke(
       context, main_function, IREE_VM_INVOCATION_FLAG_NONE,
-      /*policy=*/NULL, inputs, outputs, iree_allocator_system()));
+      /*policy=*/NULL, inputs, outputs, iree_allocator_default()));
 
   // Get the result buffers from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view =

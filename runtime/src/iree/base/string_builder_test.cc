@@ -19,7 +19,7 @@ using iree::testing::status::StatusIs;
 struct StringBuilder {
   static StringBuilder MakeSystem() {
     iree_string_builder_t builder;
-    iree_string_builder_initialize(iree_allocator_system(), &builder);
+    iree_string_builder_initialize(iree_allocator_default(), &builder);
     return StringBuilder(builder);
   }
 
@@ -58,7 +58,7 @@ struct InlineStringBuilder : public StringBuilder {
 struct StringPairBuilder {
   static StringPairBuilder MakeSystem() {
     iree_string_pair_builder_t builder;
-    iree_string_pair_builder_initialize(iree_allocator_system(), &builder);
+    iree_string_pair_builder_initialize(iree_allocator_default(), &builder);
     return StringPairBuilder(builder);
   }
 

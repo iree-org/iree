@@ -14,7 +14,7 @@ void _TfLiteInterpreterOptionsSetDefaults(TfLiteInterpreterOptions* options) {
 
 TFL_CAPI_EXPORT extern TfLiteInterpreterOptions*
 TfLiteInterpreterOptionsCreate() {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   TfLiteInterpreterOptions* options = NULL;

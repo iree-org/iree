@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   IREE_TRACE_APP_ENTER();
   IREE_TRACE_SCOPE_NAMED("ExecutorTest::Any");
 
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
 
   iree_task_topology_t topology;
 #if 1

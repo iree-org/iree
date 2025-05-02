@@ -152,12 +152,12 @@ LogicalResult FunctionCall::initialize(Location loc) {
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_vm_list_create(iree_vm_make_undefined_type_def(), argCapacity,
-                                 iree_allocator_system(), &inputs);
+                                 iree_allocator_default(), &inputs);
   }
   if (iree_status_is_ok(status)) {
     status =
         iree_vm_list_create(iree_vm_make_undefined_type_def(), resultCapacity,
-                            iree_allocator_system(), &outputs);
+                            iree_allocator_default(), &outputs);
   }
   return handleRuntimeError(loc, status);
 }
@@ -246,7 +246,7 @@ LogicalResult FunctionCall::addBufferViewArgumentAttr(
           loc,
           iree_hal_buffer_view_create(buffer->get(), rank, shape, elementType,
                                       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-                                      iree_allocator_system(), &bufferView))))
+                                      iree_allocator_default(), &bufferView))))
     return failure();
 
   return handleRuntimeError(
@@ -345,7 +345,7 @@ LogicalResult FunctionCall::invoke(Location loc, StringRef name) {
                                                 IREE_VM_INVOCATION_FLAG_NONE,
                                                 /*policy=*/nullptr,
                                                 inputs.get(), outputs.get(),
-                                                iree_allocator_system()));
+                                                iree_allocator_default()));
 }
 
 LogicalResult FunctionCall::getResultAsAttr(Location loc, size_t index,
@@ -457,12 +457,12 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   if (iree_status_is_ok(status)) {
     status = iree_hal_driver_registry_try_create(
         runtime.registry, iree_make_cstring_view("local-task"),
-        iree_allocator_system(), &driver);
+        iree_allocator_default(), &driver);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_driver_create_default_device(
-        driver, iree_allocator_system(), &device);
+        driver, iree_allocator_default(), &device);
   }
   iree_hal_driver_release(driver);
 
@@ -472,14 +472,14 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
     status = iree_hal_module_create(runtime.instance.get(), devices.size(),
                                     devices.data(), IREE_HAL_MODULE_FLAG_NONE,
                                     iree_hal_module_debug_sink_stdio(stderr),
-                                    iree_allocator_system(), &hal_module);
+                                    iree_allocator_default(), &hal_module);
   }
 
   // Bytecode module.
   if (iree_status_is_ok(status)) {
     status = iree_vm_bytecode_module_create(
         runtime.instance.get(), iree_make_const_byte_span(data, length),
-        iree_allocator_null(), iree_allocator_system(), &main_module);
+        iree_allocator_null(), iree_allocator_default(), &main_module);
   }
 
   // Create context.
@@ -490,7 +490,7 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
     };
     status = iree_vm_context_create_with_modules(
         runtime.instance.get(), IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
-        modules.data(), iree_allocator_system(), &context);
+        modules.data(), iree_allocator_default(), &context);
   }
 
   return handleRuntimeError(loc, status);
@@ -514,14 +514,14 @@ InMemoryCompiledBinary::translateFromModule(mlir::ModuleOp moduleOp) {
 Runtime::Runtime() {
   if (iree_status_is_ok(initStatus)) {
     initStatus =
-        iree_hal_driver_registry_allocate(iree_allocator_system(), &registry);
+        iree_hal_driver_registry_allocate(iree_allocator_default(), &registry);
   }
   if (iree_status_is_ok(initStatus)) {
     initStatus = iree_hal_local_task_driver_module_register(registry);
   }
   if (iree_status_is_ok(initStatus)) {
     initStatus = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                         iree_allocator_system(), &instance);
+                                         iree_allocator_default(), &instance);
   }
   if (iree_status_is_ok(initStatus)) {
     initStatus = iree_hal_module_register_all_types(instance.get());

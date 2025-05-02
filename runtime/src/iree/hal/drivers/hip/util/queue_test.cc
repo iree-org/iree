@@ -14,7 +14,7 @@ IREE_HAL_HIP_UTIL_TYPED_QUEUE_WRAPPER(test_queue, int32_t, 4);
 class QueueTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    test_queue_initialize(iree_allocator_system(), &queue_);
+    test_queue_initialize(iree_allocator_default(), &queue_);
   }
 
   void TearDown() override { test_queue_deinitialize(&queue_); }

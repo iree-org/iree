@@ -23,7 +23,7 @@ namespace iree {
 namespace testing {
 
 struct LoopTest : public ::testing::Test {
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_loop_t loop;
   iree_status_t loop_status = iree_ok_status();
 

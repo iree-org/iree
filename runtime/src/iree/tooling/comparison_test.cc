@@ -76,7 +76,7 @@ class ComparisonTest : public ::testing::Test {
   }
 
   iree_vm_instance_t* instance_ = nullptr;
-  iree_allocator_t host_allocator_ = iree_allocator_system();
+  iree_allocator_t host_allocator_ = iree_allocator_default();
   iree_hal_allocator_t* device_allocator_ = nullptr;
 };
 

@@ -73,11 +73,11 @@ static std::string JoinPaths(std::string lhs, std::string rhs) {
   IREE_IGNORE_ERROR(
       iree_file_path_join(iree_make_string_view(lhs.data(), lhs.size()),
                           iree_make_string_view(rhs.data(), rhs.size()),
-                          iree_allocator_system(), &result_str));
+                          iree_allocator_default(), &result_str));
   std::string result;
   result.resize(strlen(result_str));
   memcpy((char*)result.data(), result_str, result.size());
-  iree_allocator_free(iree_allocator_system(), result_str);
+  iree_allocator_free(iree_allocator_default(), result_str);
   return result;
 }
 

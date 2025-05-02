@@ -153,7 +153,7 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   iree_runtime_instance_t* instance = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_runtime_instance_create(&instance_options,
-                                          iree_allocator_system(), &instance);
+                                          iree_allocator_default(), &instance);
   }
   // TODO(#5724): move device selection into the compiled modules.
   iree_hal_device_t* device = NULL;

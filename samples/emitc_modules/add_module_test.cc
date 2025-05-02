@@ -17,17 +17,17 @@ namespace {
 class VMAddModuleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance_));
 
     iree_vm_module_t* add_module = nullptr;
     IREE_CHECK_OK(
-        add_module_create(instance_, iree_allocator_system(), &add_module));
+        add_module_create(instance_, iree_allocator_default(), &add_module));
 
     std::vector<iree_vm_module_t*> modules = {add_module};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-        iree_allocator_system(), &context_));
+        iree_allocator_default(), &context_));
 
     iree_vm_module_release(add_module);
   }
@@ -49,20 +49,20 @@ class VMAddModuleTest : public ::testing::Test {
     // populated upon return.
     vm::ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             1, iree_allocator_system(),
+                                             1, iree_allocator_default(),
                                              &input_list));
     auto arg_value = iree_vm_value_make_i32(arg);
     IREE_RETURN_IF_ERROR(iree_vm_list_push_value(input_list.get(), &arg_value));
     vm::ref<iree_vm_list_t> output_list;
     IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             1, iree_allocator_system(),
+                                             1, iree_allocator_default(),
                                              &output_list));
 
     // Invoke the entry function to do our work. Runs synchronously.
     IREE_RETURN_IF_ERROR(
         iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                        /*policy=*/nullptr, input_list.get(), output_list.get(),
-                       iree_allocator_system()));
+                       iree_allocator_default()));
 
     // Load the output result.
     iree_vm_value_t ret_value;
@@ -84,7 +84,7 @@ class VMAddModuleTest : public ::testing::Test {
     // populated upon return.
     vm::ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             1, iree_allocator_system(),
+                                             1, iree_allocator_default(),
                                              &input_list));
     auto arg0_value = iree_vm_value_make_i32(arg0);
     auto arg1_value = iree_vm_value_make_i32(arg1);
@@ -94,14 +94,14 @@ class VMAddModuleTest : public ::testing::Test {
         iree_vm_list_push_value(input_list.get(), &arg1_value));
     vm::ref<iree_vm_list_t> output_list;
     IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             1, iree_allocator_system(),
+                                             1, iree_allocator_default(),
                                              &output_list));
 
     // Invoke the entry function to do our work. Runs synchronously.
     IREE_RETURN_IF_ERROR(
         iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                        /*policy=*/nullptr, input_list.get(), output_list.get(),
-                       iree_allocator_system()));
+                       iree_allocator_default()));
 
     // Load the output result.
     iree_vm_value_t ret_value;

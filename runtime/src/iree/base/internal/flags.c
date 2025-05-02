@@ -27,8 +27,9 @@ static iree_status_t iree_flags_leaky_allocator_ctl(
     void* self, iree_allocator_command_t command, const void* params,
     void** inout_ptr) {
   IREE_LEAK_CHECK_DISABLE_PUSH();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_status_t status =
-      iree_allocator_system_ctl(/*self=*/NULL, command, params, inout_ptr);
+      allocator.ctl(allocator.self, command, params, inout_ptr);
   IREE_LEAK_CHECK_DISABLE_POP();
   return status;
 }

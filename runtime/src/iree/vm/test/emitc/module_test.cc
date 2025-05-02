@@ -119,17 +119,17 @@ class VMCModuleTest : public ::testing::Test,
   virtual void SetUp() {
     const auto& test_params = GetParam();
 
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance_));
 
     iree_vm_module_t* module_ = nullptr;
     IREE_CHECK_OK(test_params.create_function(
-        instance_, iree_allocator_system(), &module_));
+        instance_, iree_allocator_default(), &module_));
 
     std::vector<iree_vm_module_t*> modules = {module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-        iree_allocator_system(), &context_));
+        iree_allocator_default(), &context_));
 
     iree_vm_module_release(module_);
   }
@@ -150,7 +150,7 @@ class VMCModuleTest : public ::testing::Test,
 
     return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
-                          /*outputs=*/nullptr, iree_allocator_system());
+                          /*outputs=*/nullptr, iree_allocator_default());
   }
 
   iree_vm_instance_t* instance_ = nullptr;
