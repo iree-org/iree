@@ -110,7 +110,6 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
                                                      newReadOp, constantValue);
     rewriter.replaceAllUsesWith(readOp, selectOp);
   }
-  return;
 }
 
 struct ROCDLBufferInstructionsOptimizationPass final
