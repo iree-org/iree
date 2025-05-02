@@ -485,8 +485,6 @@ static GPUMMASchedule getOptimalAttentionPVSchedule(
 
   int64_t remainingSubgroups = seeds.bestSubgroupCountPerWorkgroup;
   int64_t remainingTiles = seeds.bestMNTileCountPerSubgroup;
-  int mDim = problem.mSizes.size() - 1;
-  int nDim = problem.nSizes.size() - 1;
   SmallVector<int64_t> mTileSizes(problem.mSizes.size(), 0),
       nTileSizes(problem.nSizes.size(), 0),
       mSubgroupCounts(problem.mSizes.size(), 0),
@@ -506,29 +504,26 @@ static GPUMMASchedule getOptimalAttentionPVSchedule(
   //
   // Distribute tile sizes on N as much as we can as it's completly unrolled and
   // then distribute remaining tiles and subgroups on M.
-  while (mDim >= 0 || nDim >= 0) {
-    if (nDim >= 0) {
-      // Do not distribute N on subgroups.
-      nSubgroupCounts[nDim] = 1;
+  for (int nDim = problem.nSizes.size() - 1; nDim >= 0; --nDim) {
+    // Do not distribute N on subgroups.
+    nSubgroupCounts[nDim] = 1;
 
-      APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                         APInt(64, remainingTiles));
-      nTileSizes[nDim] = nGCD.getSExtValue();
-      remainingTiles /= nTileSizes[nDim];
-      --nDim;
-    } else if (mDim >= 0) {
-      APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
-                                         APInt(64, remainingSubgroups));
-      mSubgroupCounts[mDim] = mGCD.getSExtValue();
-      mTotalTileCounts[mDim] /= mSubgroupCounts[mDim];
-      remainingSubgroups /= mSubgroupCounts[mDim];
+    APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
+                                       APInt(64, remainingTiles));
+    nTileSizes[nDim] = nGCD.getSExtValue();
+    remainingTiles /= nTileSizes[nDim];
+  }
+  for (int mDim = problem.mSizes.size() - 1; mDim >= 0; --mDim) {
+    APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
+                                       APInt(64, remainingSubgroups));
+    mSubgroupCounts[mDim] = mGCD.getSExtValue();
+    mTotalTileCounts[mDim] /= mSubgroupCounts[mDim];
+    remainingSubgroups /= mSubgroupCounts[mDim];
 
-      mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
-                                   APInt(64, remainingTiles));
-      mTileSizes[mDim] = mGCD.getSExtValue();
-      remainingTiles /= mTileSizes[mDim];
-      --mDim;
-    }
+    mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
+                                 APInt(64, remainingTiles));
+    mTileSizes[mDim] = mGCD.getSExtValue();
+    remainingTiles /= mTileSizes[mDim];
   }
 
   SmallVector<int64_t> kTileSizes =
