@@ -68,11 +68,6 @@ llvm::cl::opt<bool> clLLVMGPUVectorizePipeline(
     llvm::cl::desc("forces use of the legacy LLVMGPU vectorize pipeline"),
     llvm::cl::init(false));
 
-llvm::cl::opt<bool> clGPUTestVectorDistributeOnReduction(
-    "iree-codegen-llvmgpu-test-vector-distribution-on-reduction",
-    llvm::cl::desc("test vector distribute on reduction."),
-    llvm::cl::init(false));
-
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
@@ -139,6 +134,8 @@ struct TileWorkgroupSizePair {
 constexpr unsigned softwarePipelineDepthSimt = 0;
 
 } // namespace
+
+static bool isMatvecLike(linalg::LinalgOp linalgOp);
 
 bool isROCmBackend(IREE::GPU::TargetAttr target) {
   return target.getArch().starts_with("gfx");
@@ -433,6 +430,12 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
     return linalg::isaContractionOpInterface(linalgOp) &&
            linalgOp.getNumParallelLoops() >= 2;
   };
+
+  // Currently, only the skinny matmul pass the numerics.
+  // TODO: Enable it for other reduction dispatches.
+  if (!isMatmulLike(op)) {
+    return failure();
+  }
 
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
@@ -2987,12 +2990,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG("Contract Config");
       return success();
     }
-    if (clGPUTestVectorDistributeOnReduction) {
-      if (succeeded(setReductionVectorDistributionConfig(target, entryPointFn,
-                                                         linalgOp))) {
-        LDBG("Vector Distribution Subgroup Reduction Config");
-        return success();
-      }
+    if (succeeded(setReductionVectorDistributionConfig(target, entryPointFn,
+                                                       linalgOp))) {
+      LDBG("Vector Distribution Subgroup Reduction Config");
+      return success();
     }
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
       LDBG("Warp Reduction Config");
