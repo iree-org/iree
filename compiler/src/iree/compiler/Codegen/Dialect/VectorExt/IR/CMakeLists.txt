@@ -104,6 +104,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     IREEVectorExtDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "VectorExtOps.td"
   OUTS

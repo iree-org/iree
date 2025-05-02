@@ -116,6 +116,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     UtilDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "UtilOps.td"
   OUTS

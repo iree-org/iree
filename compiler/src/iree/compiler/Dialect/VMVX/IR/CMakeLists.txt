@@ -99,6 +99,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     VMVXDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "VMVXOps.td"
   OUTS

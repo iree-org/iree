@@ -109,6 +109,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     StreamDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "StreamOps.td"
   OUTS

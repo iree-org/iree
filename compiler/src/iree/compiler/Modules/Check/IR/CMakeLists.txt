@@ -64,6 +64,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     CheckDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "CheckOps.td"
   OUTS

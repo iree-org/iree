@@ -72,4 +72,15 @@ iree_tablegen_library(
     --gen-pass-decls Passes.h.inc
 )
 
+iree_tablegen_doc(
+  NAME
+    VMPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc VMPasses.md
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

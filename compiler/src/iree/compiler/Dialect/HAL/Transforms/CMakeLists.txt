@@ -100,4 +100,15 @@ iree_tablegen_library(
     --gen-pass-decls Passes.h.inc
 )
 
+iree_tablegen_doc(
+  NAME
+    HALPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc HALPasses.md
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

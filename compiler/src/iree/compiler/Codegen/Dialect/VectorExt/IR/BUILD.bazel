@@ -177,6 +177,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "IREEVectorExtDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

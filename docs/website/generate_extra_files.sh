@@ -38,26 +38,38 @@ if (( IREE_USE_CCACHE == 1 )); then
 fi
 
 # Copy into a new directory before making edits, so CMake only runs when needed.
-BUILD_DOCS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects"
-BUILD_DOCS_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/llvm-external-projects/mlir-iree-dialects/docs/Dialects"
-BUILD_DOCS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website"
-mkdir -p "${BUILD_DOCS_PROCESSED_DIR}"
-cp -r "${BUILD_DOCS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
-cp -r "${BUILD_DOCS_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
+BUILD_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects"
+BUILD_EXTERNAL_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/llvm-external-projects/mlir-iree-dialects/docs/Dialects"
+BUILD_DIALECTS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website"
+mkdir -p "${BUILD_DIALECTS_PROCESSED_DIR}"
+cp -r "${BUILD_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DIALECTS_PROCESSED_DIR}"
+cp -r "${BUILD_EXTERNAL_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DIALECTS_PROCESSED_DIR}"
+
+BUILD_PASSES_ORIGINAL_DIR="${BUILD_DIR}/doc/Passes"
+BUILD_PASSES_PROCESSED_DIR="${BUILD_DIR}/doc/Passes_for_website"
+mkdir -p "${BUILD_PASSES_PROCESSED_DIR}"
+cp -r "${BUILD_PASSES_ORIGINAL_DIR}/." "${BUILD_PASSES_PROCESSED_DIR}"
 
 # Delete any dialect docs we don't want to publish (yet?).
-rm "${BUILD_DOCS_PROCESSED_DIR}/SimpleIODialect.md" # Sample dialect, just ignore
-rm "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" # Dialect extensions
+rm "${BUILD_DIALECTS_PROCESSED_DIR}/SimpleIODialect.md" # Sample dialect, just ignore
+rm "${BUILD_DIALECTS_PROCESSED_DIR}/StructuredTransformOpsExt.md" # Dialect extensions
 
-# Trim "Dialect" suffix from file names, e.g. FlowDialect.md -> Flow.md.
-for f in ${BUILD_DOCS_PROCESSED_DIR}/*Dialect.md; do
+# Trim "Dialect"/"Passes" suffix from file names e.g. FlowDialect.md -> Flow.md.
+for f in ${BUILD_DIALECTS_PROCESSED_DIR}/*Dialect.md; do
   mv "$f" "${f/%Dialect.md/.md}"
 done
+for f in ${BUILD_PASSES_PROCESSED_DIR}/*Passes.md; do
+  mv "$f" "${f/%Passes.md/.md}"
+done
 
-# Postprocess the dialect docs (e.g. making tweaks to the markdown source).
-python3 "${THIS_DIR}/postprocess_dialect_docs.py" "${BUILD_DOCS_PROCESSED_DIR}"
+# Postprocess the generated docs (e.g. making tweaks to the markdown source).
+python3 "${THIS_DIR}/postprocess_dialect_docs.py" "${BUILD_DIALECTS_PROCESSED_DIR}"
+python3 "${THIS_DIR}/postprocess_passes_docs.py" "${BUILD_PASSES_PROCESSED_DIR}"
 
 # Copy from build directory -> source directory (files are .gitignore'd).
 cp -r \
-  "${BUILD_DOCS_PROCESSED_DIR}/." \
+  "${BUILD_DIALECTS_PROCESSED_DIR}/." \
   "${THIS_DIR}/docs/reference/mlir-dialects/"
+cp -r \
+  "${BUILD_PASSES_PROCESSED_DIR}/." \
+  "${THIS_DIR}/docs/reference/mlir-passes/"

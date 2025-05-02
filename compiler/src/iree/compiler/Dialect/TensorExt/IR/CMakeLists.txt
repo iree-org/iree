@@ -53,6 +53,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     TensorExtDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "TensorExtOps.td"
   OUTS

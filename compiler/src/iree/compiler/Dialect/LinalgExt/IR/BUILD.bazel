@@ -187,6 +187,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "LinalgExtDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [
