@@ -727,10 +727,10 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const unsigned largestLoadSizeInBits =
       maxLoadBits.has_value() ? *maxLoadBits : 128;
 
-  unsigned vectorSize = largestLoadSizeInBits / *bitWidth;
+  unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
   if (numDynamicReductionDims == 0) {
-    while ((reductionSize / vectorSize) % subgroupSize != 0) {
-      vectorSize /= 2;
+    while ((reductionSize / threadLoads) % subgroupSize != 0) {
+      threadLoads /= 2;
     }
   }
   // Deduce the workgroup size we should use for reduction. Currently a
@@ -738,7 +738,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // the workgroup size we use can divide the total reduction size, and it's
   // also within hardware limitations.
   const int64_t maxWorkgroupSize = 1024;
-  int64_t workgroupSize = reductionSize / vectorSize;
+  int64_t workgroupSize = reductionSize / threadLoads;
   if (workgroupSize > maxWorkgroupSize) {
     workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
                         {64, static_cast<uint64_t>(workgroupSize)},
@@ -762,7 +762,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
          (workgroupSize / 2) % subgroupSize == 0 &&
-         reductionSize / (workgroupSize * vectorSize) < targetVectorCount) {
+         reductionSize / (workgroupSize * threadLoads) < targetVectorCount) {
     // Use less subgroups per workgroup..
     workgroupSize /= 2;
     // in order to host more workgroups per hardware compute unit.
@@ -773,7 +773,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // the root operation and ignores other operation within a dispatch.
   // Extend it to use per operation within a dispatch.
   if (failed(populateConfigInfo(*computeOps, target, workgroupSize,
-                                subgroupSize, vectorSize))) {
+                                subgroupSize, threadLoads))) {
     return failure();
   }
 
