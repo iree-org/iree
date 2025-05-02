@@ -351,32 +351,18 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
   const uint32_t f32_mantissa = u32_value & f32_mantissa_mask;
   uint32_t dst_exp = 0;
   uint32_t dst_mantissa = 0;
-  bool generate_nan = false;
+  // Flags that we set when we determine that we need to generate a NaN, an Inf,
+  // or a max finite value, deferring to handlers are the end of this function.
+  bool convert_nan = false;
+  bool convert_inf = false;
+  bool generate_max_finite = false;
   if (f32_exp >= f32_exp_mask) {
     // NaN or Inf case.
     dst_exp = dst_exp_mask;
-    if (f32_mantissa || !have_infinity) {
-      // NaN. Defer to NaN handling at the end of this function.
-      generate_nan = true;
+    if (f32_mantissa) {
+      convert_nan = true;
     } else {
-      // Infinity.
-      if (have_infinity) {
-        // Leave zero mantissa to encode an infinity value.
-      } else {
-        // The destination type has no infinities. Such types have extra finite
-        // values in the top exponent range. Clamp to the max finite value.
-        if (nan_as_neg_zero || !have_nan) {
-          // When either NaN is encoded as negative zero, or there is no NaN,
-          // the max finite value is encoded with all mantissa bits set.
-          dst_mantissa = dst_mantissa_mask;
-        } else {
-          // When there is a NaN encoded in the top exponent and the type has
-          // no infinities, NaN encodings are restricted to all mantissa bits
-          // set. The max finite value is then the value with the bottom
-          // mantissa bit unset.
-          dst_mantissa = dst_mantissa_mask ^ 1;
-        }
-      }
+      convert_inf = true;
     }
   } else if (f32_exp == 0) {
     // Zero or subnormal.
@@ -397,12 +383,8 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     // the destination type does not have infinities, that frees up the
     // max exponent value for additional finite values.
     if (arithmetic_exp > (1 << (dst_exp_bits - 1)) - have_infinity) {
-      // Overflow. Generate Inf. Leave zero mantissa.
-      dst_exp = dst_exp_mask;
-      if (!have_infinity) {
-        // Generate NaN.
-        generate_nan = true;
-      }
+      // Overflow.
+      convert_inf = true;
     } else if (arithmetic_exp + dst_exp_bias <= 0) {
       // Underflow. Generate a subnormal or zero.
       dst_exp = 0;
@@ -458,24 +440,60 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       dst_mantissa =
           biased_f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
       if (!have_infinity && dst_exp > dst_exp_mask) {
-        generate_nan = true;
+        convert_nan = true;
       }
     }
   }
-  if (generate_nan) {
-    if (nan_as_neg_zero) {
+
+  // Handler for convert Inf values. Needs to be before handlers for Nan or
+  // max finite values as it may fall through to either when the destination
+  // type does not have Inf.
+  if (convert_inf) {
+    if (have_infinity) {
+      return dst_sign | dst_exp_mask;
+    } else if (have_nan) {
+      convert_nan = true;
+    } else {
+      generate_max_finite = true;
+    }
+  }
+
+  // Handler for converting NaN values.
+  if (convert_nan) {
+    if (!have_nan) {
+      // When the destination type has no NaN encoding, conversion of NaN is
+      // implementation-defined. We choose to convert NaN to +0.0.
+      return 0;
+    } else if (nan_as_neg_zero) {
       return dst_sign_mask;
     } else {
       return dst_sign | dst_exp_mask | dst_mantissa_mask;
     }
-  } else {
-    if (nan_as_neg_zero && dst_exp == 0 && dst_mantissa == 0) {
-      // Negative zero needs to be rounded to positive zero to avoid
-      // accidentally producing NaN when negative-zero is the NaN encoding.
-      return 0;
+  }
+
+  // Handler for generating the max finite values.
+  if (generate_max_finite) {
+    if (nan_as_neg_zero || !have_nan) {
+      // When either NaN is encoded as negative zero, or there is no NaN,
+      // the max finite value is encoded with all mantissa bits set.
+      dst_mantissa = dst_mantissa_mask;
     } else {
-      return dst_sign | dst_exp | dst_mantissa;
+      // When there is a NaN encoded in the top exponent and the type has
+      // no infinities, NaN encodings are restricted to all mantissa bits
+      // set. The max finite value is then the value with the bottom
+      // mantissa bit unset.
+      dst_mantissa = dst_mantissa_mask ^ 1;
     }
+    return dst_sign | dst_exp_mask | dst_mantissa;
+  }
+
+  // Normal case.
+  if (nan_as_neg_zero && dst_exp == 0 && dst_mantissa == 0) {
+    // Negative zero needs to be rounded to positive zero to avoid
+    // accidentally producing NaN when negative-zero is the NaN encoding.
+    return 0;
+  } else {
+    return dst_sign | dst_exp | dst_mantissa;
   }
 }
 

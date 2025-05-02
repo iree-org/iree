@@ -812,6 +812,8 @@ TEST(F6E3M2FNConversionTest, F32ToF6E3M2FN) {
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f6e3m2fn(FLT_MIN));
   EXPECT_EQ(0x20, iree_math_f32_to_f6e3m2fn(-FLT_MIN));
+  // NaN conversion is implementation-defined. We canonicalize to +0.0.
+  EXPECT_EQ(0, iree_math_f32_to_f6e3m2fn(NAN));
 }
 
 TEST(F6E3M2FNConversionTest, Denormals) {
