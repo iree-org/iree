@@ -49,8 +49,7 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v,
 
 /// Helper to promote results. If the target value is consumed only by a
 /// `tensor.extract_slice`, this will promote the result of the slice instead.
-void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared,
-                   bool useDirectLoad) {
+void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   IRRewriter rewriter(builder);
   Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
@@ -103,7 +102,7 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared,
   }
 
   rewriter.setInsertionPointAfterValue(replacement);
-  replacement = promoteValue(rewriter, loc, replacement, useDirectLoad);
+  replacement = promoteValue(rewriter, loc, replacement, false);
   valueToReplace.replaceUsesWithIf(replacement, [&](OpOperand &use) {
     return opsToReplaceUseIn.contains(use.getOwner());
   });
@@ -141,7 +140,7 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
     index -= dpsOp.getNumDpsInputs();
     assert(index < op->getNumResults() &&
            "trying to promote out of bound result index");
-    return promoteResult(builder, op, op->getResult(index), useDirectLoad);
+    return promoteResult(builder, op, op->getResult(index));
   }
   Value operand = op->getOperand(index);
 
