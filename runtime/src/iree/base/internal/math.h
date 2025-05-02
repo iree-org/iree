@@ -297,7 +297,7 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
 static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
                                                  int mantissa_bits,
                                                  bool have_infinity,
-                                                 int bias_tweak,
+                                                 bool have_nan, int bias_tweak,
                                                  bool nan_as_neg_zero) {
   IREE_MATH_FP_FORMAT_CONSTANTS(src_, exp_bits, mantissa_bits, bias_tweak)
   const float float_sign = (src & src_sign_mask) ? -1.f : 1.f;
@@ -307,18 +307,18 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
     // Top exponent value normally means infinity or NaN.
     if (have_infinity) {
       // NaN or Inf case.
-      if (src_mantissa) {
+      if (have_nan && src_mantissa) {
         return NAN;
       } else {
         return float_sign * INFINITY;
       }
-    } else {
+    } else if (have_nan) {
       // No infinities => more large finite values, unless this is a NaN.
       if (src_mantissa == src_mantissa_mask && !nan_as_neg_zero) {
         return NAN;
       }
     }
-  } else if (nan_as_neg_zero && src == src_sign_mask) {
+  } else if (have_nan && nan_as_neg_zero && src == src_sign_mask) {
     // Case of small FP types using the negative-0 encoding for NaN.
     return NAN;
   } else if (src_exp == 0) {
@@ -340,7 +340,7 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
 // The upper bits of the return value are unused.
 static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     float value, int exp_bits, int mantissa_bits, bool have_infinity,
-    int bias_tweak, bool nan_as_neg_zero) {
+    bool have_nan, int bias_tweak, bool nan_as_neg_zero) {
   IREE_MATH_FP_FORMAT_CONSTANTS(dst_, exp_bits, mantissa_bits, bias_tweak)
   IREE_MATH_FP_FORMAT_CONSTANTS(f32_, 8, 23, 0)
   uint32_t u32_value;
@@ -356,10 +356,27 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     // NaN or Inf case.
     dst_exp = dst_exp_mask;
     if (f32_mantissa || !have_infinity) {
-      // NaN. Generate a quiet NaN.
+      // NaN. Defer to NaN handling at the end of this function.
       generate_nan = true;
     } else {
-      // Inf. Leave zero mantissa.
+      // Infinity.
+      if (have_infinity) {
+        // Leave zero mantissa to encode an infinity value.
+      } else {
+        // The destination type has no infinities. Such types have extra finite
+        // values in the top exponent range. Clamp to the max finite value.
+        if (nan_as_neg_zero || !have_nan) {
+          // When either NaN is encoded as negative zero, or there is no NaN,
+          // the max finite value is encoded with all mantissa bits set.
+          dst_mantissa = dst_mantissa_mask;
+        } else {
+          // When there is a NaN encoded in the top exponent and the type has
+          // no infinities, NaN encodings are restricted to all mantissa bits
+          // set. The max finite value is then the value with the bottom
+          // mantissa bit unset.
+          dst_mantissa = dst_mantissa_mask ^ 1;
+        }
+      }
     }
   } else if (f32_exp == 0) {
     // Zero or subnormal.
@@ -462,44 +479,48 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
   }
 }
 
-#define IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(NAME, INT_TYPE, EXP_BITS,     \
-                                          MANTISSA_BITS, HAVE_INFINITY, \
-                                          BIAS_TWEAK, NAN_AS_NEG_ZERO)  \
-  /* Converts a to a 32-bit C `float`. */                               \
-  static inline float iree_math_##NAME##_to_f32(INT_TYPE src) {         \
-    return iree_math_make_f32_from_bits(src, EXP_BITS, MANTISSA_BITS,   \
-                                        HAVE_INFINITY, BIAS_TWEAK,      \
-                                        NAN_AS_NEG_ZERO);               \
-  }                                                                     \
-  /* Truncates a 32-bit C `float`, rounding to nearest even. */         \
-  static inline INT_TYPE iree_math_f32_to_##NAME(float value) {         \
-    return iree_math_truncate_f32_to_bits_rounding_to_nearest_even(     \
-        value, EXP_BITS, MANTISSA_BITS, HAVE_INFINITY, BIAS_TWEAK,      \
-        NAN_AS_NEG_ZERO);                                               \
-  }                                                                     \
-  /* Round-trip f32->f32 rounding via the narrow float type */          \
-  static inline float iree_math_round_to_nearest_##NAME(float value) {  \
-    return iree_math_##NAME##_to_f32(iree_math_f32_to_##NAME(value));   \
+#define IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(                                   \
+    NAME, INT_TYPE, EXP_BITS, MANTISSA_BITS, HAVE_INFINITY, HAVE_NAN,        \
+    BIAS_TWEAK, NAN_AS_NEG_ZERO)                                             \
+  /* Converts a to a 32-bit C `float`. */                                    \
+  static inline float iree_math_##NAME##_to_f32(INT_TYPE src) {              \
+    return iree_math_make_f32_from_bits(src, EXP_BITS, MANTISSA_BITS,        \
+                                        HAVE_INFINITY, HAVE_NAN, BIAS_TWEAK, \
+                                        NAN_AS_NEG_ZERO);                    \
+  }                                                                          \
+  /* Truncates a 32-bit C `float`, rounding to nearest even. */              \
+  static inline INT_TYPE iree_math_f32_to_##NAME(float value) {              \
+    return iree_math_truncate_f32_to_bits_rounding_to_nearest_even(          \
+        value, EXP_BITS, MANTISSA_BITS, HAVE_INFINITY, HAVE_NAN, BIAS_TWEAK, \
+        NAN_AS_NEG_ZERO);                                                    \
+  }                                                                          \
+  /* Round-trip f32->f32 rounding via the narrow float type */               \
+  static inline float iree_math_round_to_nearest_##NAME(float value) {       \
+    return iree_math_##NAME##_to_f32(iree_math_f32_to_##NAME(value));        \
   }
 
 // IEEE half-precision a.k.a. float16,
 // https://en.wikipedia.org/wiki/Half-precision_floating-point_format
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f16, uint16_t, 5, 10, /*have_infinity=*/true,
+                                  /*have_nan=*/true,
                                   /*bias_tweak=*/0, /*nan_as_neg_zero=*/false)
 
 // Bfloat16, https://en.wikipedia.org/wiki/Bfloat16_floating-point_format
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(bf16, uint16_t, 8, 7, /*have_infinity=*/true,
+                                  /*have_nan=*/true,
                                   /*bias_tweak=*/0, /*nan_as_neg_zero=*/false)
 
 // F8E5M2 type, https://arxiv.org/abs/2209.05433
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2, uint8_t, 5, 2, /*have_infinity=*/true,
+                                  /*have_nan=*/true,
                                   /*bias_tweak=*/0, /*nan_as_neg_zero=*/false)
 
 // F8E4M3FN type, https://arxiv.org/abs/2209.05433. The paper doesn't use the FN
 // suffix, but APFloat and MLIR do to indicate that the float is Finite and has
 // one NaN (or maybe just that it's FiNite, can't recall).
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3fn, uint8_t, 4, 3,
-                                  /*have_infinity=*/false, /*bias_tweak=*/0,
+                                  /*have_infinity=*/false, /*have_nan=*/true,
+                                  /*bias_tweak=*/0,
                                   /*nan_as_neg_zero=*/false)
 
 // F8E5M2FNUZ type, found in some AMD GPUs (MI300), called "BF8" there.
@@ -511,7 +532,8 @@ IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3fn, uint8_t, 4, 3,
 //   This format's exponent bias is 16, instead of the 15 (2 ** (5 - 1) - 1)
 //   that IEEE precedent would imply.
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2fnuz, uint8_t, 5, 2,
-                                  /*have_infinity=*/false, /*bias_tweak=*/1,
+                                  /*have_infinity=*/false, /*have_nan=*/true,
+                                  /*bias_tweak=*/1,
                                   /*nan_as_neg_zero=*/true)
 
 // F8E4M3FNUZ type, found in some AMD GPUs (MI300), called "FP8" there.
@@ -523,7 +545,17 @@ IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2fnuz, uint8_t, 5, 2,
 //   This format's exponent bias is 8, instead of the 7 (2 ** (4 - 1) - 1)
 //   that IEEE precedent would imply.
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3fnuz, uint8_t, 4, 3,
-                                  /*have_infinity=*/false, /*bias_tweak=*/1,
+                                  /*have_infinity=*/false, /*have_nan=*/true,
+                                  /*bias_tweak=*/1,
                                   /*nan_as_neg_zero=*/true)
+
+// F6E3M2FN type. Quoting LLVM's APFloat.h:
+//   6-bit floating point number with bit layout S1E3M2. Unlike IEEE-754
+//   types, there are no infinity or NaN values. The format is detailed in
+//   https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f6e3m2fn, uint8_t, 3, 2,
+                                  /*have_infinity=*/false, /*have_nan=*/false,
+                                  /*bias_tweak=*/0,
+                                  /*nan_as_neg_zero=*/false)
 
 #endif  // IREE_BASE_INTERNAL_MATH_H_
