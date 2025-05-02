@@ -78,7 +78,7 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   // enable additional debug checking and more readable stack traces (as
   // errors come from within the ICD, where we have symbols).
   static iree_status_t CreateFromSystemLoader(
-      ref_ptr<DynamicSymbols>* out_syms);
+      iree_allocator_t host_allocator, ref_ptr<DynamicSymbols>* out_syms);
 
   // Loads all required and optional Vulkan functions from the given instance.
   //
