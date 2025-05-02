@@ -81,8 +81,9 @@ static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
   }
 
   // Let the tile size for the target dim be the smaller of the vector size and
-  // the target loop range. If `allowMultiDimCollapse` is false, or
-  // `vectorizeOutermost` is true, return here.
+  // the target loop range. Return here, if `allowMultiDimCollapse` is false, or
+  // `vectorizeOutermost` is true, because we don't expect consecutive
+  // dimensions to be vectorizable contiguously for these cases.
   tileSizes[targetDim] = std::min(targetRange, maxVectorSize);
   if (targetRange >= maxVectorSize || !allowMultiDimCollapse ||
       vectorizeOutermost) {
