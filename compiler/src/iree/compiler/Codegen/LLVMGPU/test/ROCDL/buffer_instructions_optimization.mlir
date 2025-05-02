@@ -67,6 +67,62 @@ func.func @simplify_mask3(%1 : memref<?x?x1x?x8xbf16, #amdgpu.address_space<fat_
 
 // -----
 
+func.func @simplify_mask4(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %2 : vector<1x1x1x8xbf16>,
+  %3 : vector<1x1x1x8xbf16>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 1.000000e+00 : bf16
+  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
+  vector.transfer_write %2, %1[%c0, %c0, %c0, %c0], %mask {in_bounds = [true, true, true, true]} : vector<1x1x1x8xbf16>, memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
+  vector.transfer_write %3, %1[%c0, %c0, %c0, %c0], %mask {in_bounds = [true, true, true, true]} : vector<1x1x1x8xbf16>, memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+  return %read : vector<1x1x1x8xbf16>
+}
+
+// CHECK-LABEL: @simplify_mask4
+//  CHECK-SAME:  (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: vector<1x1x1x8xbf16>, %[[ARG2:.+]]: vector<1x1x1x8xbf16>, %[[ARG3:.+]]: index, %[[ARG4:.+]]: index)
+//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x1x1x8xbf16>
+//   CHECK-DAG: %[[CSTBF16:.+]] = arith.constant 1.000000e+00 : bf16
+//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask %{{.+}}, %[[ARG3]], %[[ARG4]], %{{.+}} : vector<1x1x1x8xi1>
+//       CHECK: vector.transfer_write %[[ARG1]], %[[ARG0]]{{.+}}, %[[MASK]]
+//       CHECK: %[[IDX1:.+]] = arith.index_castui %[[ARG3]] : index to i1
+//       CHECK: %[[IDX2:.+]] = arith.index_castui %[[ARG4]] : index to i1
+//       CHECK: %[[AND:.+]] = arith.andi %[[IDX1]], %[[IDX2]] : i1
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[CSTBF16]]
+//       CHECK: %[[SEL:.+]] = arith.select %[[AND]], %[[READ]], %[[CST]]
+//       CHECK: vector.transfer_write %[[ARG2]], %[[ARG0]]{{.+}}, %[[MASK]]
+//       CHECK: return %[[SEL]]
+
+// -----
+
+func.func @simplify_mask5(%1 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %2 : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %index1 : index, %index2 : index) -> (vector<1x1x1x8xbf16>, vector<1x1x1x8xbf16>)  {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 1.000000e+00 : bf16
+  %mask = vector.create_mask %c1, %index1, %index2, %c8 : vector<1x1x1x8xi1>
+  %read = vector.transfer_read %1[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
+  %read2 = vector.transfer_read %2[%c0, %c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
+  return %read, %read2 : vector<1x1x1x8xbf16>,  vector<1x1x1x8xbf16>
+}
+
+// CHECK-LABEL: @simplify_mask5
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
+//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x1x1x8xbf16>
+//   CHECK-DAG: %[[CSTBF16:.+]] = arith.constant 1.000000e+00 : bf16
+//       CHECK: %[[IDX1:.+]] = arith.index_castui %[[ARG2]] : index to i1
+//       CHECK: %[[IDX2:.+]] = arith.index_castui %[[ARG3]] : index to i1
+//       CHECK: %[[AND:.+]] = arith.andi %[[IDX1]], %[[IDX2]] : i1
+//       CHECK: %[[READ0:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[CSTBF16]]
+//       CHECK: %[[SEL0:.+]] = arith.select %[[AND]], %[[READ0]], %[[CST]]
+//       CHECK: %[[READ1:.+]] = vector.transfer_read %[[ARG1]]{{.+}}, %[[CSTBF16]]
+//       CHECK: %[[SEL1:.+]] = arith.select %[[AND]], %[[READ1]], %[[CST]]
+//       CHECK: return %[[SEL0]], %[[SEL1]]
+
+// -----
+
 func.func @no_simplify_mask_no_fat_raw_buffer(%1 : memref<1x?x?x8xbf16>, %index1 : index, %index2 : index) -> vector<1x1x1x8xbf16> {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index

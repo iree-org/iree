@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 #define DEBUG_TYPE "iree-codegen-rocdl-buffer-instructions-optimization"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
@@ -43,69 +42,63 @@ Value createI1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
 // %masked_read
 //   = arith.select %0 && ... && %n ? %read : %padding : index,vector<1x ... x1x8xbf16>
 // clang-format on
-struct SimplifyMaskVectorTransferRead final
-    : OpRewritePattern<vector::CreateMaskOp> {
-  using OpRewritePattern::OpRewritePattern;
+// Note we currently dont support cases where muliple masks are ANDed or ORed
+// together to form the final mask to a read but such support can be added where
+// we track a set of valid masks and add that an AND or OR of valid masks is
+// valid
 
-  LogicalResult matchAndRewrite(vector::CreateMaskOp maskOp,
-                                PatternRewriter &rewriter) const override {
-    Location loc = maskOp.getLoc();
-    auto readOp = dyn_cast<vector::TransferReadOp>(
-        *(maskOp.getResult().getUsers().begin()));
-    if (!readOp) {
-      return rewriter.notifyMatchFailure(maskOp,
-                                         "only TransferReadOp supported");
+void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
+  Location loc = maskOp.getLoc();
+
+  SmallVector<vector::TransferReadOp> validReads;
+  // First determine if the mask meets the criteria of being either all ones or
+  // all empty.
+  SmallVector<Value> ValuesToAnd;
+  SmallVector<Value> maskIndices = maskOp.getOperands();
+  ArrayRef<int64_t> maskShape = maskOp.getResult().getType().getShape();
+  bool isValid = true;
+  for (auto [idx, maskIndex] : llvm::enumerate(maskIndices)) {
+
+    std::optional<int64_t> constantValue = getConstantIndex(maskIndex);
+    if (constantValue) {
+      if (maskShape[idx] != constantValue) {
+        isValid = false;
+        break;
+      }
+    } else {
+      if (maskShape[idx] != 1) {
+        isValid = false;
+        break;
+      }
+      ValuesToAnd.push_back(maskIndex);
     }
+  }
+  // Bail out if the mask doesnt meet the criteria or
+  // is statically all 1's in which case we dont need
+  // to do anything.
+  if (!isValid || ValuesToAnd.empty()) {
+    return;
+  }
+
+  for (Operation *user : maskOp.getResult().getUsers()) {
+    auto readOp = dyn_cast<vector::TransferReadOp>(user);
+    // Only TransferReadOps are supported.
+    if (!readOp)
+      continue;
 
     auto sourceType = dyn_cast<MemRefType>(readOp.getSource().getType());
-    if (!sourceType) {
-      return failure();
-    }
-    // This optimization only works on fat raw buffers.
-    if (!hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
-      return rewriter.notifyMatchFailure(maskOp,
-                                         "only supported for fat raw buffers");
-    }
+    // only supported for fat raw buffers.
+    if (!sourceType || !hasAMDGPUFatRawBufferAddressSpace(sourceType))
+      continue;
 
     SmallVector<bool> inBounds = readOp.getInBoundsValues();
-    if (inBounds.size() != sourceType.getRank()) {
-      return rewriter.notifyMatchFailure(
-          maskOp, "only supported in presence of in_bounds attr");
+    // Only supported for reads that are fully in_bounds.
+    if (inBounds.size() != sourceType.getRank() ||
+        llvm::any_of(inBounds, [](bool inBound) { return !inBound; })) {
+      continue;
     }
 
-    SmallVector<Value> maskIndices = maskOp.getOperands();
-    ArrayRef<int64_t> maskShape = maskOp.getResult().getType().getShape();
-    SmallVector<Value> ValuesToAnd;
-    for (auto [idx, maskIndex] : llvm::enumerate(maskIndices)) {
-      std::optional<int64_t> constantValue = getConstantIndex(maskIndex);
-      // We only support the pattern for reads that are in-bounds.
-      if (!inBounds[idx]) {
-        return rewriter.notifyMatchFailure(
-            maskOp, "only supported for in_bounds reads");
-      }
-      if (constantValue) {
-        // We bail-out if we can statically determine that a mask dim is not
-        // full.
-        if (maskShape[idx] != constantValue) {
-          return rewriter.notifyMatchFailure(
-              maskOp, "not a all ones or an all zeros mask.");
-        }
-      } else {
-        // The non-constant dimensions are only allowed to be unit to ensure
-        // an all ones or an all zeros mask.
-        if (maskShape[idx] != 1) {
-          return rewriter.notifyMatchFailure(
-              maskOp, "non-unit, non-constant dimension found");
-        }
-        ValuesToAnd.push_back(maskIndex);
-      }
-    }
-    // There are no non-constant unit dimensions which means this is
-    // a always one mask, such masks should be folded by vector
-    // canonicalizations so we dont handle it.
-    if (ValuesToAnd.empty()) {
-      return rewriter.notifyMatchFailure(maskOp, "trivial mask not supported");
-    }
+    rewriter.setInsertionPoint(readOp);
     Value selectValue = createI1And(loc, ValuesToAnd, rewriter);
     auto constantValue = rewriter.create<vector::SplatOp>(
         loc, readOp.getVectorType(), readOp.getPadding());
@@ -113,22 +106,26 @@ struct SimplifyMaskVectorTransferRead final
     auto newReadOp = rewriter.create<vector::TransferReadOp>(
         loc, readOp.getVectorType(), readOp.getSource(), readOp.getIndices(),
         readOp.getPadding(), ArrayRef<bool>{inBounds});
-
     auto selectOp = rewriter.create<arith::SelectOp>(loc, selectValue,
                                                      newReadOp, constantValue);
     rewriter.replaceAllUsesWith(readOp, selectOp);
-
-    return success();
   }
-};
+}
 
 struct ROCDLBufferInstructionsOptimizationPass final
     : impl::ROCDLBufferInstructionsOptimizationPassBase<
           ROCDLBufferInstructionsOptimizationPass> {
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    patterns.add<SimplifyMaskVectorTransferRead>(&getContext());
-    walkAndApplyPatterns(getOperation(), std::move(patterns));
+    MLIRContext *context = &getContext();
+    FunctionOpInterface funcOp = getOperation();
+    SmallVector<vector::CreateMaskOp> maskOps;
+    funcOp.walk(
+        [&](vector::CreateMaskOp maskOp) { maskOps.push_back(maskOp); });
+
+    IRRewriter rewriter(context);
+    for (vector::CreateMaskOp maskOp : maskOps) {
+      simplifyMaskOps(rewriter, maskOp);
+    }
   }
 };
 
