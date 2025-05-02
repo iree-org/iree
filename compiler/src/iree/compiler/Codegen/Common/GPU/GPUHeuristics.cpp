@@ -275,6 +275,40 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   return success();
 }
 
+static SmallVector<int64_t>
+getBestKTileSizes(const GPUMatmulShapeType &problem,
+                  const GPUMatmulShapeType &intrinsic,
+                  const GPUMMAHeuristicSeeds &seeds) {
+  // kTotalTileCounts is similar to m/nTotalTileCounts, representing the total
+  // number of intrinsics along the K dimensions needed to fill the problem.
+  // For the problem described above {M:[4, 16], N:[2, 32], K[3, 128]} with a
+  // 16x16x16 intrinsic, then:
+  //  - kTotalTileCounts would be 3 * (128/16) = 24
+  SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
+  kTotalTileCounts.back() =
+      llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
+  // Compute the ideal number of intrinsics along K per subgroup based on the
+  // seed.
+  int64_t bestKTileCountPerSubgroup =
+      seeds.bestKElementCountPerSubgroup
+          ? llvm::divideCeil(seeds.bestKElementCountPerSubgroup,
+                             intrinsic.kSizes[0])
+          : seeds.bestKTileCountPerSubgroup;
+  SmallVector<int64_t> kTileSizes(problem.kSizes.size(), 0);
+  // Start at the innermost K dim, and tile each dim to try to satisfy the ideal
+  // K intrinsic count per subgroup with the overall product of K tile counts.
+  int kDim = problem.kSizes.size() - 1;
+  while (kDim >= 0) {
+    APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCounts[kDim]),
+                                       APInt(64, bestKTileCountPerSubgroup));
+    kTileSizes[kDim] = kGCD.getSExtValue();
+    bestKTileCountPerSubgroup /= kTileSizes[kDim];
+    --kDim;
+  }
+
+  return kTileSizes;
+}
+
 /// Choose an optimal mma schedule with the heuristic that minimized the total
 /// amount of data read from global memory, per workgroup, respecting the
 /// heuristic seeds.
@@ -368,32 +402,8 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
     --nDim;
   }
 
-  // kTotalTileCounts is similar to m/nTotalTileCounts, representing the total
-  // number of intrinsics along the K dimensions needed to fill the problem.
-  // For the problem described above {M:[4, 16], N:[2, 32], K[3, 128]} with a
-  // 16x16x16 intrinsic, then:
-  //  - kTotalTileCounts would be 3 * (128/16) = 24
-  SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
-  kTotalTileCounts.back() =
-      llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
-  // Compute the ideal number of intrinsics along K per subgroup based on the
-  // seed.
-  int64_t bestKTileCountPerSubgroup =
-      seeds.bestKElementCountPerSubgroup
-          ? llvm::divideCeil(seeds.bestKElementCountPerSubgroup,
-                             intrinsic.kSizes[0])
-          : seeds.bestKTileCountPerSubgroup;
-  SmallVector<int64_t> kTileSizes(problem.kSizes.size(), 0);
-  // Start at the innermost K dim, and tile each dim to try to satisfy the ideal
-  // K intrinsic count per subgroup with the overall product of K tile counts.
-  int kDim = problem.kSizes.size() - 1;
-  while (kDim >= 0) {
-    APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCounts[kDim]),
-                                       APInt(64, bestKTileCountPerSubgroup));
-    kTileSizes[kDim] = kGCD.getSExtValue();
-    bestKTileCountPerSubgroup /= kTileSizes[kDim];
-    --kDim;
-  }
+  SmallVector<int64_t> kTileSizes =
+      getBestKTileSizes(problem, intrinsic, seeds);
 
   return GPUMMASchedule{
       intrinsicIndex,      intrinsic.mSizes[0], intrinsic.nSizes[0],
@@ -451,6 +461,80 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
   return failure();
 }
 
+/// Choose an optimal attention PV schedule with the heuristic that minimized
+/// the total amount of data read from global memory, per workgroup, respecting
+/// the heuristic seeds.
+static GPUMMASchedule getOptimalAttentionPVSchedule(
+    const GPUMatmulShapeType &problem, const GPUMatmulShapeType &intrinsic,
+    const GPUMMAHeuristicSeeds &seeds, uint64_t intrinsicIndex) {
+  assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
+         intrinsic.kSizes.size() == 1 &&
+         "expected intrinsic to have a single M, N, and K dimension.");
+  // mTotalTileCounts and nTotalTileCounts represent the total number of
+  // intrinsics along the M or N dimensions needed to fill the problem size.
+  // For example, if the problem is {M:[4, 16], N:[2, 32], K[3, 128]} for a
+  // 16x16x16 intrinsic, then:
+  //  - mTotalTileCounts would be 4 * (16/16) = 4
+  //  - nTotalTileCounts would be 2 * (32/16) = 4
+  SmallVector<int64_t, 2> mTotalTileCounts = problem.mSizes;
+  SmallVector<int64_t, 2> nTotalTileCounts = problem.nSizes;
+  mTotalTileCounts.back() =
+      llvm::divideCeil(problem.mSizes.back(), intrinsic.mSizes[0]);
+  nTotalTileCounts.back() =
+      llvm::divideCeil(problem.nSizes.back(), intrinsic.nSizes[0]);
+
+  int64_t remainingSubgroups = seeds.bestSubgroupCountPerWorkgroup;
+  int64_t remainingTiles = seeds.bestMNTileCountPerSubgroup;
+  SmallVector<int64_t> mTileSizes(problem.mSizes.size(), 0),
+      nTileSizes(problem.nSizes.size(), 0),
+      mSubgroupCounts(problem.mSizes.size(), 0),
+      nSubgroupCounts(problem.nSizes.size(), 0);
+
+  // For Attention, we use a simple heuristic based on other Flash Attention
+  // implementations, there are better heuristics to use, but we use something
+  // that consistently works, is simple, and is used every other implementation.
+  //
+  // For Attention, we can assume that the N dimension is constant and is
+  // completely unrolled. This means that we distribute all available tiles to
+  // N first, and then the remaining tiles to M.
+  //
+  // We do not distribute subgroups on N. This is because distributing
+  // subgroups on N leaves room to distribute subgroups on K1 and how that
+  // effects the softmax computation hasn't been experimented with yet.
+  //
+  // Distribute tile sizes on N as much as we can as it's completly unrolled and
+  // then distribute remaining tiles and subgroups on M.
+  for (int nDim = problem.nSizes.size() - 1; nDim >= 0; --nDim) {
+    // Do not distribute N on subgroups.
+    nSubgroupCounts[nDim] = 1;
+
+    APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
+                                       APInt(64, remainingTiles));
+    nTileSizes[nDim] = nGCD.getSExtValue();
+    remainingTiles /= nTileSizes[nDim];
+  }
+  for (int mDim = problem.mSizes.size() - 1; mDim >= 0; --mDim) {
+    APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
+                                       APInt(64, remainingSubgroups));
+    mSubgroupCounts[mDim] = mGCD.getSExtValue();
+    mTotalTileCounts[mDim] /= mSubgroupCounts[mDim];
+    remainingSubgroups /= mSubgroupCounts[mDim];
+
+    mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
+                                 APInt(64, remainingTiles));
+    mTileSizes[mDim] = mGCD.getSExtValue();
+    remainingTiles /= mTileSizes[mDim];
+  }
+
+  SmallVector<int64_t> kTileSizes =
+      getBestKTileSizes(problem, intrinsic, seeds);
+
+  return GPUMMASchedule{
+      intrinsicIndex,      intrinsic.mSizes[0], intrinsic.nSizes[0],
+      intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,
+      mTileSizes,          nTileSizes,          kTileSizes};
+}
+
 FailureOr<GPUMMASchedule> deduceAttentionSchedule(
     const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
     ArrayRef<GPUMatmulShapeType> intrinsics,
@@ -472,8 +556,8 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
       continue;
     }
 
-    GPUMMASchedule schedule =
-        getOptimalMMASchedule(pvMatmul, intrinsic, pvMatmulSeeds, index);
+    GPUMMASchedule schedule = getOptimalAttentionPVSchedule(
+        pvMatmul, intrinsic, pvMatmulSeeds, index);
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
