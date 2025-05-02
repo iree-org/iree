@@ -339,6 +339,51 @@ IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
 IREE_API_EXPORT void iree_allocator_free_aligned(iree_allocator_t allocator,
                                                  void* ptr);
 
+//===----------------------------------------------------------------------===//
+// User-provided allocator support
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_ALLOCATOR_DEFAULT_CTL)
+
+// Default allocator provided by the user as part of build-time configuration.
+// The implementation need only be linked into final executable binaries.
+IREE_API_EXPORT iree_status_t
+IREE_ALLOCATOR_DEFAULT_CTL(void* self, iree_allocator_command_t command,
+                           const void* params, void** inout_ptr);
+
+#if defined(IREE_ALLOCATOR_DEFAULT_SELF)
+extern void* IREE_ALLOCATOR_DEFAULT_SELF;
+#endif  // IREE_ALLOCATOR_DEFAULT_SELF
+
+// Default allocator provided by the user as part of build-time configuration.
+//
+// Specified by defining `IREE_ALLOCATOR_DEFAULT_CTL`, an implementation of the
+// allocator control function (see `iree_allocator_ctl_fn_t`). An optional
+// `IREE_ALLOCATOR_DEFAULT_SELF` global `void*` variable can be defined if the
+// allocator requires state and otherwise `NULL` will be passed as the `self`
+// parameter to the control function.
+static inline iree_allocator_t iree_allocator_default(void) {
+  iree_allocator_t v = {
+#if defined(IREE_ALLOCATOR_DEFAULT_SELF)
+      IREE_ALLOCATOR_DEFAULT_SELF,
+#else
+      NULL,
+#endif  // IREE_ALLOCATOR_DEFAULT_SELF
+      IREE_ALLOCATOR_DEFAULT_CTL,
+  };
+  return v;
+}
+
+#else
+
+// Default allocator provided by the user as part of build-time configuration
+// (or a fallback of `iree_allocator_system()`).
+static inline iree_allocator_t iree_allocator_default(void) {
+  return iree_allocator_system();
+}
+
+#endif  // IREE_ALLOCATOR_DEFAULT_CTL
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
