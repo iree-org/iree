@@ -106,6 +106,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     EncodingDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "EncodingOps.td"
   OUTS

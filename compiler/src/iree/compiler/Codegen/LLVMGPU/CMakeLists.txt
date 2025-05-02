@@ -204,4 +204,15 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_tablegen_doc(
+  NAME
+    CodegenLLVMGPUPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenLLVMGPUPasses.md
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
