@@ -12,8 +12,8 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Format.h"
@@ -295,7 +295,8 @@ private:
     os << " = " << op->getName();
   }
 
-  void printDispatchTensorLoad(raw_ostream &os, DispatchTensorLoadOp op,
+  void printDispatchTensorLoad(raw_ostream &os,
+                               IREE::TensorExt::DispatchTensorLoadOp op,
                                AsmState &state) {
     printResultsAndName(os, op.getOperation(), state);
     os << " ";
@@ -304,7 +305,8 @@ private:
     os << "\r";
   }
 
-  void printDispatchTensorStore(raw_ostream &os, DispatchTensorStoreOp op,
+  void printDispatchTensorStore(raw_ostream &os,
+                                IREE::TensorExt::DispatchTensorStoreOp op,
                                 AsmState &state) {
     os << op->getName() << " ";
     op.getValue().printAsOperand(os, state);
@@ -341,12 +343,12 @@ private:
         isa<mlir::FunctionOpInterface>(op->getParentOp()))
       return;
 
-    if (auto load = dyn_cast<DispatchTensorLoadOp>(op)) {
+    if (auto load = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
       printDispatchTensorLoad(os, load, state);
       return;
     }
 
-    if (auto store = dyn_cast<DispatchTensorStoreOp>(op)) {
+    if (auto store = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
       printDispatchTensorStore(os, store, state);
       return;
     }

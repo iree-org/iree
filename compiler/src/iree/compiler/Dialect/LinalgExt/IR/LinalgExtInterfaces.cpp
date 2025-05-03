@@ -17,11 +17,16 @@ LogicalResult
 IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
   // TODO(ravishankarm): Make `LinalgExt` Interface inherit from
   // `DestinationStyleOpInterface`
-  LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
-  if (!isa<DestinationStyleOpInterface>(op)) {
-    return linalgExtOp.emitOpError(
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
+  if (!dpsOp) {
+    return op->emitOpError(
         "expected operation that implements LinalgExtInterface to also "
         "implement DestinationStyleOpInterface");
+  }
+  if (!dpsOp.hasPureBufferSemantics() && !dpsOp.hasPureTensorSemantics()) {
+    return op->emitOpError(
+        "expected operation that implements LinalgExtInterface to have "
+        "either pure buffer semantics or pure tensor semantics");
   }
   return success();
 }

@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugCounter.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -124,24 +126,18 @@ static NestedLayoutAttr createNestedLayout(
     ArrayRef<int64_t> batchCount, IREE::GPU::MMASingleSubgroupLayout counts) {
 
   LLVM_DEBUG({
-    llvm::dbgs() << "Creating Nested Layout for::";
-    llvm::dbgs() << "\n    outerDim = " << outerDim;
-    llvm::dbgs() << "\n    innerDim = " << innerDim;
-    llvm::dbgs() << "\n    subgroupSizes: ";
-    llvm::interleaveComma(subgroupSizes, llvm::dbgs());
-    llvm::dbgs() << "\n    subgroupStrides: ";
-    llvm::interleaveComma(subgroupStrides, llvm::dbgs());
-    llvm::dbgs() << "\n    batchCount: ";
-    llvm::interleaveComma(batchCount, llvm::dbgs());
-    llvm::dbgs() << "\n    counts.outer: ";
-    llvm::interleaveComma(counts.outer, llvm::dbgs());
-    llvm::dbgs() << "\n    counts.thread: ";
-    llvm::interleaveComma(counts.thread, llvm::dbgs());
-    llvm::dbgs() << "\n    counts.element: ";
-    llvm::interleaveComma(counts.element, llvm::dbgs());
-    llvm::dbgs() << "\n    counts.tstrides: ";
-    llvm::interleaveComma(counts.tstrides, llvm::dbgs());
-    llvm::dbgs() << "\n";
+    llvm::dbgs() << "Creating Nested Layout for::" << "\n    outerDim = "
+                 << outerDim << "\n    innerDim = " << innerDim
+                 << "\n    subgroupSizes: " << llvm::interleaved(subgroupSizes)
+                 << "\n    subgroupStrides: "
+                 << llvm::interleaved(subgroupStrides)
+                 << "\n    batchCount: " << llvm::interleaved(batchCount)
+                 << "\n    counts.outer: " << llvm::interleaved(counts.outer)
+                 << "\n    counts.thread: " << llvm::interleaved(counts.thread)
+                 << "\n    counts.element: "
+                 << llvm::interleaved(counts.element)
+                 << "\n    counts.tstrides: "
+                 << llvm::interleaved(counts.tstrides) << "\n";
   });
 
   SmallVector<int64_t> outerCount =

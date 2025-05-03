@@ -19,9 +19,9 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -35,6 +35,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -183,6 +184,7 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 
 static void addBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(createGPUBubbleResourceCastsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
@@ -333,6 +335,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(createGPUBubbleResourceCastsPass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
@@ -344,6 +347,8 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
   addIREEPostBufferizationPasses(funcPassManager);
 
+  funcPassManager.addPass(createROCDLBufferInstructionsOptimizationPass());
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
@@ -353,13 +358,13 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 /// only DispatchTensorStoreOp consumers.
 LogicalResult isAtBoundary(Operation *op) {
   if (isa<linalg::PackOp>(op)) {
-    if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
+    if (isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp>(
             op->getOperand(0).getDefiningOp())) {
       return success();
     }
   } else if (isa<linalg::UnPackOp>(op)) {
     if (llvm::all_of(op->getUsers(), [](Operation *user) {
-          return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+          return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
         })) {
       return success();
     }
@@ -459,6 +464,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // hoisting and fusion pass, as well as a lack of a fallback distribution
   // pass.
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
+
+  // Drop resource casts if needed. This is the last possible place to do so
+  // before greedy fusion.
+  funcPassManager.addPass(createGPUBubbleResourceCastsPass());
   {
     OptimizeTensorInsertExtractSlicesPassOptions options;
     options.foldIdentitySlices = true;
@@ -1107,7 +1116,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass(createExpandGPUOpsPass);
+      .addPass(createExpandGPUOpsPass)
+      // Barrier elimination before we reach unstructured control flow.
+      .addPass(createGpuEliminateBarriers);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1128,7 +1139,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createMathTransformPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(createIREEExpandStridedMetadataPass)
+      .addPass([]() {
+        IREEExpandStridedMetadataPassOptions options;
+        options.allowSubviewExpansion = true;
+        return createIREEExpandStridedMetadataPass(options);
+      })
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);

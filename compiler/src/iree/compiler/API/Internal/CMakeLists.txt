@@ -20,6 +20,7 @@ iree_cc_library(
     "Diagnostics.cpp"
   DEPS
     LLVMSupport
+    LLVMTargetParser
     MLIRBuiltinToLLVMIRTranslation
     MLIRBytecodeWriter
     MLIRCAPIIR

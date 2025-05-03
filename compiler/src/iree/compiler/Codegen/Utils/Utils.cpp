@@ -7,17 +7,19 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -301,11 +303,11 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
           [&](auto op) { return isReadOnly(op.getSource()); })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return llvm::cast<IREE::Flow::DispatchTensorType>(
+      .Case<IREE::TensorExt::DispatchTensorLoadOp>(
+          [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+            return llvm::cast<IREE::TensorExt::DispatchTensorType>(
                        loadOp.getSource().getType())
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+                       .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
 }
@@ -1136,8 +1138,151 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
 };
 
 //===---------------------------------------------------------------------===//
+// Bufferization utility functions
+//===---------------------------------------------------------------------===//
+
+/// Get strides for row-major oredering of a tensor with the given `shape`.
+static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
+  if (shape.empty()) {
+    return {};
+  }
+  SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
+  strides.back() = 1;
+  for (int i = strides.size() - 1; i > 0; --i) {
+    if (ShapedType::isDynamic(shape[i])) {
+      break;
+    }
+    strides[i - 1] = strides[i] * shape[i];
+  }
+  return strides;
+}
+
+Value findOrCreateSubspanBuffer(
+    RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+  auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+      subspanOp.getResult().getType());
+  assert((shapedType && shapedType.hasRank()) &&
+         "expected the result of subspanOp is DispatchTensorType");
+
+  Value byteOffset = subspanOp.getByteOffset();
+  MemRefLayoutAttrInterface layoutAttr = {};
+  if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
+    // Using buffer resources on AMDGPU will require buffers to be relocated to
+    // offset 0, so any static offset we can compute here might change.
+    // Therefore, always use a ? for the offset field unless it's known to be 0.
+    auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
+    SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
+    layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
+                                        ShapedType::kDynamic, strides);
+  }
+  bool useRocdlBuffers = false;
+  if (auto *ireeGpuDialect =
+          rewriter.getContext()
+              ->getLoadedDialect<IREE::GPU::IREEGPUDialect>()) {
+    useRocdlBuffers =
+        ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
+            subspanOp);
+  }
+  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
+      subspanOp.getDescriptorType());
+  auto memRefType =
+      MemRefType::get(shapedType.getShape(), shapedType.getBoundElementType(),
+                      layoutAttr, memorySpace);
+
+  // Look for an existing op.
+  Block *block = subspanOp->getBlock();
+  for (Operation &op : *block) {
+    if (&op == subspanOp.getOperation())
+      break;
+    auto bufferSubspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(&op);
+    if (!bufferSubspanOp)
+      continue;
+
+    auto bufferMemrefType =
+        llvm::dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
+    if (!bufferMemrefType)
+      continue;
+
+    if (bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
+        bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
+        bufferSubspanOp.getByteOffset() != subspanOp.getByteOffset() ||
+        !llvm::equal(bufferSubspanOp.getDynamicDims(),
+                     subspanOp.getDynamicDims()) ||
+        bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
+        memRefType != bufferMemrefType)
+      continue;
+
+    if (useRocdlBuffers && bufferSubspanOp->hasOneUse()) {
+      auto castOp = llvm::dyn_cast<amdgpu::FatRawBufferCastOp>(
+          *bufferSubspanOp->getUsers().begin());
+      if (!castOp)
+        continue;
+      return castOp.getResult();
+    }
+    return bufferSubspanOp.getResult();
+  }
+
+  // None found, create a new op.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(subspanOp);
+  // Just change the result type of the InterfaceBindingSubspanOp.
+  Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+      subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
+      subspanOp.getBinding(), subspanOp.getByteOffset(),
+      subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+      subspanOp.getDescriptorFlagsAttr());
+  if (useRocdlBuffers) {
+    buffer = rewriter.create<amdgpu::FatRawBufferCastOp>(
+        subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
+        /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
+        /*resetOffset=*/true);
+  }
+  rewriter.create<memref::AssumeAlignmentOp>(
+      subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
+  return buffer;
+}
+
+//===---------------------------------------------------------------------===//
 // Misc. utility functions
 //===---------------------------------------------------------------------===//
+
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp) {
+  DominanceInfo domInfo;
+  SmallVector<Value> values = subsetOp.getValuesNeededToBuildSubsetExtraction();
+  Operation *lastOp = nullptr;
+  bool setInsertionPointBefore = false;
+  for (auto val : values) {
+    auto definingOp = val.getDefiningOp();
+    if (!definingOp) {
+      definingOp =
+          &cast<BlockArgument>(val).getOwner()->getOperations().front();
+    }
+    if (!definingOp || (lastOp && domInfo.dominates(definingOp, lastOp)))
+      continue;
+    lastOp = definingOp;
+
+    // For block arguments we want the insertion point to be at the start of
+    // the block, so we need to set the insertion point before the first op
+    // in the block.
+    setInsertionPointBefore = isa<BlockArgument>(val);
+  }
+  if (setInsertionPointBefore) {
+    builder.setInsertionPoint(lastOp);
+  } else {
+    builder.setInsertionPointAfter(lastOp);
+  }
+  return lastOp;
+}
+
+bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
+                      IREE::TensorExt::DispatchTensorType dispatchTensorType,
+                      ValueRange dispatchTensorDynSizes) {
+  return llvm::equal(tensorType.getShape(), dispatchTensorType.getShape()) &&
+         tensorDynSizes.size() == dispatchTensorDynSizes.size() &&
+         llvm::equal(tensorDynSizes, dispatchTensorDynSizes);
+}
 
 OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               Location loc,
@@ -1590,7 +1735,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
                         ArrayRef<OpFoldResult> mixedSizes,
                         ArrayRef<OpFoldResult> mixedStrides,
-                        IREE::Flow::DispatchTensorType tensorType,
+                        IREE::TensorExt::DispatchTensorType tensorType,
                         ValueRange dynamicDims) {
   OpBuilder builder(tensorType.getContext());
   SmallVector<int64_t> tensorShape = llvm::to_vector(tensorType.getShape());
@@ -1602,7 +1747,7 @@ static bool isFullSlice(ArrayRef<OpFoldResult> mixedOffsets,
 }
 
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::Flow::DispatchTensorType tensorType,
+                 IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims) {
   return isFullSlice(
       sliceLoadStoreOp.getMixedOffsets(), sliceLoadStoreOp.getMixedSizes(),
@@ -1812,6 +1957,17 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       })
       .Default([&](Operation *) {});
   return result;
+}
+
+std::optional<int64_t> getConstantIndex(Value value) {
+  if (!isa<IndexType>(value.getType()))
+    return std::nullopt;
+
+  APInt val;
+  if (!matchPattern(value, m_ConstantInt(&val)))
+    return std::nullopt;
+
+  return val.getSExtValue();
 }
 
 } // namespace mlir::iree_compiler

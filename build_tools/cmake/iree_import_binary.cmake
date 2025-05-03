@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
-
 # iree_import_binary()
 #
 # CMake function to import an executable/binary file into a CMake target.

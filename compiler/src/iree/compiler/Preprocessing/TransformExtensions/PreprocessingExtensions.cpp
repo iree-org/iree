@@ -327,6 +327,7 @@ DiagnosedSilenceableFailure
 IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
     Value current, transform::TransformResults &results,
     transform::TransformState &state) {
+  MLIRContext *ctx = current.getContext();
   auto shapedType = dyn_cast<ShapedType>(current.getType());
   if (!shapedType) {
     return emitSilenceableError()
@@ -338,7 +339,20 @@ IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
            << "dim " << dim << " out of range for shaped type " << shapedType;
   }
   int64_t size = getSize();
-  if (shapedType.getShape()[dim] % size != 0) {
+  ValueBoundsConstraintSet::Variable dimVar(current, dim);
+
+  // Check if current[dim] % size == 0. There are a couple of options for how
+  // to do this (e.g. mul(floordiv)). Affine map canonicalizations are good
+  // at dropping terms that statically divide the mod RHS so we go with this
+  // one.
+  AffineMap modMap = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/1,
+                                    getAffineSymbolExpr(0, ctx) %
+                                        getAffineConstantExpr(size, ctx));
+  ValueBoundsConstraintSet::Variable modVar(modMap, {dimVar});
+  Builder b(ctx);
+  FailureOr<bool> maybeFailed = ValueBoundsConstraintSet::areEqual(
+      modVar, OpFoldResult{b.getIndexAttr(0)});
+  if (failed(maybeFailed) || !maybeFailed.value()) {
     return emitSilenceableError()
            << "dim " << dim << " of shaped type " << shapedType
            << " is not a multiple of " << size;

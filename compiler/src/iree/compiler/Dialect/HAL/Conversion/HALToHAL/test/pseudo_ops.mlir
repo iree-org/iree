@@ -5,8 +5,7 @@
 ]>
 hal.executable private @ex {
   hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index

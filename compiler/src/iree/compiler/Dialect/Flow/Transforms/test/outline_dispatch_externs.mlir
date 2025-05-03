@@ -5,7 +5,7 @@
 // CHECK-SAME:       objects([#hal.executable.object<{path = "a.o"}>])
 // CHECK-NEXT:     hal.executable.export public @main ordinal(100)
 // CHECK-SAME:         layout(#hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer>]>)
-// CHECK-NEXT:     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+// CHECK-SAME:         count(%arg0: !hal.device, %arg1: index, %arg2: index)
 // CHECK-NEXT:       %ok, %value = hal.device.query<%arg0 : !hal.device> key("some" :: "value") : i1, i32
 // CHECK-NEXT:       %0 = arith.index_cast %value : i32 to index
 // CHECK-NEXT:       hal.return %arg1, %arg2, %0 : index, index, index
@@ -16,7 +16,7 @@
 // CHECK-NEXT:       hal.return %ok : i1
 //      CHECK:     hal.executable.export public @main ordinal(200)
 // CHECK-SAME:         layout(#hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer>]>)
-// CHECK-NEXT:     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+// CHECK-SAME:         count(%arg0: !hal.device, %arg1: index, %arg2: index)
 
 // Demonstrates the full functionality of an extern dispatch op.
 // Note that some fields are optional.

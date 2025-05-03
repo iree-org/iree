@@ -604,8 +604,7 @@ class IREEBenchmark {
 }  // namespace
 }  // namespace iree
 
-int main(int argc, char** argv) {
-  IREE_TRACE_APP_ENTER();
+static int runMain(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).
@@ -627,7 +626,6 @@ int main(int argc, char** argv) {
     int exit_code = static_cast<int>(iree_status_code(status));
     printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
     IREE_TRACE_ZONE_END(z0);
-    IREE_TRACE_APP_EXIT(exit_code);
     return exit_code;
   }
   IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(iree_benchmark.device()));
@@ -635,6 +633,12 @@ int main(int argc, char** argv) {
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(iree_benchmark.device()));
 
   IREE_TRACE_ZONE_END(z0);
-  IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
   return EXIT_SUCCESS;
+}
+
+int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+  int exit_code = runMain(argc, argv);
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }

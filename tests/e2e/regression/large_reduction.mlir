@@ -7,7 +7,7 @@ func.func @reduction_aligned() {
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%in : tensor<128x384xf32>) outs(%fill : tensor<128xf32>) {
-    ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
+    ^bb0(%arg3: f32, %arg4: f32):
       %2 = arith.addf %arg3, %arg4 : f32
       linalg.yield %2 : f32
     } -> tensor<128xf32>
@@ -24,7 +24,7 @@ func.func @reduction_unaligned() {
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%in : tensor<129x384xf32>) outs(%fill : tensor<129xf32>) {
-    ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
+    ^bb0(%arg3: f32, %arg4: f32):
       %2 = arith.addf %arg3, %arg4 : f32
       linalg.yield %2 : f32
     } -> tensor<129xf32>
@@ -42,7 +42,7 @@ func.func @reduction_aligned_larger() {
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%in : tensor<2x40960xf32>) outs(%fill : tensor<2xf32>) {
-    ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
+    ^bb0(%arg3: f32, %arg4: f32):
       %2 = arith.addf %arg3, %arg4 : f32
       linalg.yield %2 : f32
     } -> tensor<2xf32>
@@ -59,7 +59,7 @@ func.func @half_reduction_aligned() {
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%in : tensor<2x4096xf16>) outs(%fill : tensor<2xf16>) {
-    ^bb0(%arg3: f16, %arg4: f16):  // no predecessors
+    ^bb0(%arg3: f16, %arg4: f16):
       %2 = arith.addf %arg3, %arg4 : f16
       linalg.yield %2 : f16
     } -> tensor<2xf16>
@@ -76,7 +76,7 @@ func.func @quarter_reduction_aligned_smaller() {
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%in : tensor<128x128xi8>) outs(%fill : tensor<128xi8>) {
-    ^bb0(%arg3: i8, %arg4: i8):  // no predecessors
+    ^bb0(%arg3: i8, %arg4: i8):
       %2 = arith.addi %arg3, %arg4 : i8
       linalg.yield %2 : i8
     } -> tensor<128xi8>

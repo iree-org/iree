@@ -251,6 +251,12 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
   // separated from compiler fusion decisions.
   if (clEnableDataTiling) {
     FunctionLikeNest(passManager)
+        // Run canonicalizer first to make propagation easier.
+        .addPass([&]() {
+          IREE::Flow::CanonicalizerPassOptions options;
+          options.cseConstants = false;
+          return IREE::Flow::createCanonicalizerPass(options);
+        })
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
@@ -343,7 +349,7 @@ void buildDispatchCreationPassPipeline(
       ///   resolved in the backends into the actual workgroup count
       ///   computation.
       /// - To correlate back to the captured workload,
-      /// `flow.dispatch.workload.ordinal`
+      /// `iree_tensor_ext.dispatch.workload.ordinal`
       ///   to map the captured operand to the position in the workload list.
       .addPass(
           DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass);

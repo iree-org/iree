@@ -9,11 +9,13 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 #define DEBUG_TYPE "iree-codegen-amdgpu-distribute-contract"
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 namespace {
@@ -142,11 +144,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     }
 
     SmallVector<int64_t> distShape = resultLayout.getDistributedShape();
-    LLVM_DEBUG({
-      llvm::dbgs() << "distributed shape: [";
-      llvm::interleaveComma(distShape, llvm::dbgs());
-      llvm::dbgs() << "]\n";
-    });
+    LDBG("distributed shape: " << llvm::interleaved_array(distShape));
 
     // Create a zero vector with the full distributed vector shape for
     // accumulating unrolled contraction results.
@@ -218,14 +216,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         fillOperandBatchOffsets(opDetail, k, resultBatchOffsets,
                                 lhsBatchOffsets, rhsBatchOffsets, lhsMap,
                                 rhsMap);
-        LLVM_DEBUG({
-          llvm::dbgs() << "current lhs batch offsets: [";
-          llvm::interleaveComma(lhsBatchOffsets, llvm::dbgs());
-          llvm::dbgs() << "]\n";
-          llvm::dbgs() << "current rhs batch offsets: [";
-          llvm::interleaveComma(rhsBatchOffsets, llvm::dbgs());
-          llvm::dbgs() << "]\n";
-        });
+        LDBG("current lhs batch offsets: "
+             << llvm::interleaved_array(lhsBatchOffsets));
+        LDBG("current rhs batch offsets: "
+             << llvm::interleaved_array(rhsBatchOffsets));
 
         Value lhsSlice =
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);

@@ -259,6 +259,7 @@ def FormDispatchRegionsPass :
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
     "IREE::LinalgExt::IREELinalgExtDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 
@@ -323,6 +324,9 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
         "Select the type of encoding options to add.",
         [{::llvm::cl::values(
             clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
                 "matmulk", "Only encodes reduction dimensions in the encoding."),
             clEnumValN(
@@ -361,6 +365,7 @@ def ConvertDispatchRegionsToWorkgroupsPass :
     "mlir::scf::SCFDialect",
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
   let statistics = [
     Statistic<"numDispatches", "num-dispatches", "Number of dispatches created">
@@ -394,11 +399,13 @@ def MaterializeDefaultWorkgroupCountRegionPass:
         Apply dispatch workgroups canonicalization patterns.
       }];
       let dependentDialects = [
+        "IREE::TensorExt::IREETensorExtDialect",
         "mlir::affine::AffineDialect",
         "mlir::arith::ArithDialect",
         "mlir::linalg::LinalgDialect",
         "mlir::scf::SCFDialect",
         "IREE::Flow::FlowDialect",
+
       ];
 }
 

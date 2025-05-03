@@ -181,8 +181,7 @@ static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
 // the calling convention format is directly queried from the callee module.
 //
 // Encoding:
-// - each int is encoded as a 4-byte aligned value
-// - each ref is encoded as a 4-byte aligned iree_vm_ref_t value
+// - all types have 4 byte alignment (even if their natural alignment is higher)
 // - variadic tuples are encoded as a 4-byte count prefix and the tuple values
 //
 // For example, (i32, tuple<!vm.ref<?>, i32>..., i32) is encoded as:
@@ -191,6 +190,12 @@ static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
 //    repeated:
 //      8b-16b: iree_vm_ref_t
 //      4b: i32
+//    4b: i32
+//
+// When padding, (i32, i64, !vm.ref<?>, i32) is encoded as:
+//    4b: i32
+//    8b: i64
+//    8-16b: iree_vm_ref_t
 //    4b: i32
 //
 // Example sequence:
@@ -262,6 +267,7 @@ IREE_API_EXPORT bool iree_vm_function_call_is_variadic_cconv(
     iree_string_view_t cconv);
 
 // Counts the total number of arguments and results of a function.
+// Fails if the function is variadic.
 IREE_API_EXPORT iree_status_t iree_vm_function_call_count_arguments_and_results(
     const iree_vm_function_signature_t* signature,
     iree_host_size_t* out_argument_count, iree_host_size_t* out_result_count);
@@ -271,6 +277,9 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_count_arguments_and_results(
 //
 // The provided |segment_size_list| is used for variadic arguments/results. Each
 // entry represents one of the top level arguments with spans being flattened.
+//
+// The returned size may be padded with C alignment rules to have trailing
+// unused bytes. For example, the size to store `Ii` would be 8+4+(4)=16B.
 IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
     iree_string_view_t cconv_fragment,
     const iree_vm_register_list_t* segment_size_list,

@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -132,20 +133,26 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     }
   }
 
-  // Add patterns to fold pack/unpack ops with pad/extract_slice ops and
-  // resolve dims ops.
+  // Run patterns to fold pack/unpack ops with pad/extract_slice ops, resolve
+  // dims ops, and eliminate common sub-expressions.
   {
     RewritePatternSet patterns(ctx);
     populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::PackOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
       return failure();
     }
+
+    IRRewriter rewriter(ctx);
+    DominanceInfo domInfo;
+    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
   }
 
   return success();

@@ -37,8 +37,7 @@ module attributes {transform.with_named_sequence} {
         path = "samples/custom_dispatch/cpu/embedded/functions_x86_64.o"
       }>
     ]) {
-      hal.executable.export public @simple_mul_abs_negate ordinal(0) layout(#pipeline_layout) {
-      ^bb0(%device: !hal.device, %workload: index):
+      hal.executable.export public @simple_mul_abs_negate ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %workload: index) -> (index, index, index) {
         %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
         %c1 = arith.constant 1 : index
         hal.return %x, %c1, %c1 : index, index, index

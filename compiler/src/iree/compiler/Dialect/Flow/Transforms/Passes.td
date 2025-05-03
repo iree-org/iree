@@ -26,6 +26,8 @@ def CanonicalizerPass :
     Pass<"iree-flow-canonicalize", ""> {
   let summary = "Flow specific canonicalization pass";
   let options = [
+    Option<"cseConstants", "cse-constants", "bool",
+            /*default=*/"true", "Do Not CSE constants on canonicalization">,
     Option<"testConvergence", "test-convergence", "bool",
            /*default=*/"false", "Fails if the patterns fail to converge">
   ];

@@ -190,7 +190,7 @@ func.func @batch_matmul_with_padding_strategy(%arg0: tensor<1x?x1280xf16>, %arg1
   %c1 = arith.constant 1 : index
   %cst_0 = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x968x1280xf16>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x968x1280xf16>>
   %workgroup_id_z = hal.interface.workgroup.id[2] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %1 = affine.apply #map()[%workgroup_id_y]
@@ -212,7 +212,7 @@ func.func @batch_matmul_with_padding_strategy(%arg0: tensor<1x?x1280xf16>, %arg1
     scf.yield %13 : tensor<1x64x128xf16>
   }
   %extracted_slice = tensor.extract_slice %6[0, 0, 0] [1, %3, 128] [1, 1, 1] : tensor<1x64x128xf16> to tensor<1x?x128xf16>
-  flow.dispatch.tensor.store %extracted_slice, %0, offsets = [%workgroup_id_z, %1, %2], sizes = [1, %3, 128], strides = [1, 1, 1] : tensor<1x?x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x1280xf16>>
+  iree_tensor_ext.dispatch.tensor.store %extracted_slice, %0, offsets = [%workgroup_id_z, %1, %2], sizes = [1, %3, 128], strides = [1, 1, 1] : tensor<1x?x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x968x1280xf16>>
   return
 }
 // CHECK-LABEL: func.func @batch_matmul_with_padding_strategy
@@ -223,7 +223,7 @@ func.func @batch_matmul_with_padding_strategy(%arg0: tensor<1x?x1280xf16>, %arg1
 // CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[SCF]], %[[INIT]]
 // CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true, false, true]}
 // CHECK-SAME:      : vector<1x64x128xf16>, tensor<1x?x128xf16>
-// CHECK:         flow.dispatch.tensor.store %[[WRITE]]
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[WRITE]]
 
 // -----
 
@@ -236,19 +236,19 @@ func.func @_batch_matmul_narrow_n_2_dispatch_4_unpack_i32() attributes {translat
   %c2 = arith.constant 2 : index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c128) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x1x1x2x8xi32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x3x2xi32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c128) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x1x1x2x8xi32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x3x2xi32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   scf.for %arg0 = %workgroup_id_x to %c2 step %workgroup_count_x {
-    %2 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, 0], sizes = [1, 3, 2], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x3x2xi32>> -> tensor<1x3x2xi32>
-    %3 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0, 0, 0, 0], sizes = [1, 1, 1, 2, 8], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x1x1x2x8xi32>> -> tensor<1x1x1x2x8xi32>
+    %2 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%arg0, 0, 0], sizes = [1, 3, 2], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x3x2xi32>> -> tensor<1x3x2xi32>
+    %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%arg0, 0, 0, 0, 0], sizes = [1, 1, 1, 2, 8], strides = [1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x1x1x2x8xi32>> -> tensor<1x1x1x2x8xi32>
     %4 = vector.transfer_read %3[%c0, %c0, %c0, %c0, %c0], %c0_i32 {in_bounds = [true, true]} : tensor<1x1x1x2x8xi32>, vector<2x8xi32>
     %5 = vector.transpose %4, [1, 0] : vector<2x8xi32> to vector<8x2xi32>
     %6 = tensor.empty() : tensor<3x2xi32>
     %7 = vector.transfer_write %5, %6[%c0, %c0] {in_bounds = [false, true]} : vector<8x2xi32>, tensor<3x2xi32>
     %inserted_slice = tensor.insert_slice %7 into %2[0, 0, 0] [1, 3, 2] [1, 1, 1] : tensor<3x2xi32> into tensor<1x3x2xi32>
-    flow.dispatch.tensor.store %inserted_slice, %1, offsets = [%arg0, 0, 0], sizes = [1, 3, 2], strides = [1, 1, 1] : tensor<1x3x2xi32> -> !flow.dispatch.tensor<writeonly:tensor<2x3x2xi32>>
+    iree_tensor_ext.dispatch.tensor.store %inserted_slice, %1, offsets = [%arg0, 0, 0], sizes = [1, 3, 2], strides = [1, 1, 1] : tensor<1x3x2xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x3x2xi32>>
   }
   return
 }
@@ -339,3 +339,32 @@ func.func @push_up_extract_slice(%arg0: index, %arg1: vector<64x64xf32>, %arg2: 
 // CHECK-LABEL: @push_up_extract_slice
 //       CHECK:   tensor.extract_slice
 //       CHECK:   vector.transfer_write
+
+// -----
+
+#trait = {
+  indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+  iterator_types = ["parallel", "parallel"]
+}
+
+func.func @licm_generic(%source: tensor<32x32xf16>, %idx : index) -> tensor<32x32xf16> {
+  %empty = tensor.empty() : tensor<32x32xf16>
+  %c2 = arith.constant 2 : index
+  %out = linalg.generic #trait outs(%empty : tensor<32x32xf16>) {
+  ^bb0(%o: f16):
+    %rem = arith.remsi %idx, %c2 : index
+    %div = arith.divsi %idx, %c2 : index
+    %extracted = tensor.extract %source[%rem, %div] : tensor<32x32xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<32x32xf16>
+  func.return %out : tensor<32x32xf16>
+}
+
+// CHECK-LABEL: @licm_generic
+// CHECK-NOT: linalg.generic
+// CHECK: arith.remsi
+// CHECK: arith.divsi
+// CHECK: tensor.extract
+// CHECK: linalg.generic
+// CHECK-NOT: tensor.extract
+// CHECK: return

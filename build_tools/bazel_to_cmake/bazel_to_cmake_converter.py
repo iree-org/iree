@@ -732,6 +732,7 @@ class BuildFileFunctions(object):
     def iree_tablegen_doc(
         self,
         name,
+        category,
         tblgen,
         td_file,
         tbl_outs,
@@ -741,6 +742,7 @@ class BuildFileFunctions(object):
         test=None,
     ):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        category_block = self._convert_string_arg_block("CATEGORY", category)
         tblgen_block = self._convert_tblgen_block(tblgen)
         td_file_block = self._convert_td_file_block(td_file)
         outs_block = self._convert_tbl_outs_block(tbl_outs)
@@ -748,6 +750,7 @@ class BuildFileFunctions(object):
         self._converter.body += (
             f"iree_tablegen_doc(\n"
             f"{name_block}"
+            f"{category_block}"
             f"{td_file_block}"
             f"{outs_block}"
             f"{tblgen_block}"

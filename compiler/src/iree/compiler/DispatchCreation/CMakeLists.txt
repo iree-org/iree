@@ -89,6 +89,8 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::DFX
@@ -120,6 +122,17 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    DispatchCreationPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc DispatchCreationPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

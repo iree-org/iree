@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion --iree-vm-target-index-bits=32 %s | FileCheck %s --check-prefix=CHECK-32
-// RUN: iree-opt --split-input-file --iree-vm-conversion --iree-vm-target-index-bits=64 %s | FileCheck %s --check-prefix=CHECK-64
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=32})' %s | FileCheck %s --check-prefix=CHECK-32
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=64})' %s | FileCheck %s --check-prefix=CHECK-64
 
 // CHECK-LABEL: @buffer_constant
 func.func @buffer_constant() -> !util.buffer {

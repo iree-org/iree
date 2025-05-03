@@ -2560,7 +2560,18 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     OptionalAttr<DictionaryAttr>:$source_locs
   );
 
-  let regions = (region AnyRegion:$workgroup_count);
+  let regions = (region
+    AnyRegion:$workgroup_count
+  );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    (`ordinal` `(` $ordinal^ `)`)?
+    `layout` `(` qualified($layout) `)`
+    custom<OptionalWorkgroupCountRegion>($workgroup_count)
+    attr-dict-with-keyword
+  }];
 
   let builders = [
     OpBuilder<(ins

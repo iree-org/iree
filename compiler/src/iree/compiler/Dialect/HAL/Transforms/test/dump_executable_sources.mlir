@@ -15,13 +15,12 @@ hal.executable private @ex0 {
   // We expect local outputs with attributes inlined:
   // CHECK-NEXT: hal.executable.variant {{.+}} target(<"llvm-cpu"
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -34,13 +33,12 @@ hal.executable private @ex0 {
 // CHECK: hal.executable private @ex1
 hal.executable private @ex1 {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch1 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    hal.executable.export public @dispatch1 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch1() {

@@ -26,7 +26,7 @@ module attributes {hal.device.targets = [
 
   stream.executable private @executable {
     stream.executable.export public @dispatch workgroups() -> (index, index, index) {
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root
       stream.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -40,16 +40,16 @@ module attributes {hal.device.targets = [
         // CHECK: %[[WORKGROUP_KEY:.+]] = hal.instrument.workgroup[%[[INSTR_BUFFER]] : memref<67112960xi8>] dispatch(%[[SITE_ID]]) : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 2.000000e+00 : f32
-        %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<f32>>
-        %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<f32>>
-        %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
+        %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+        %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32>>
+        %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
         %3 = tensor.empty() : tensor<f32>
         %4 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%2 : tensor<f32>) outs(%3 : tensor<f32>) {
         ^bb0(%in: f32, %out: f32):
           %5 = math.powf %in, %cst : f32
           linalg.yield %5 : f32
         } -> tensor<f32>
-        flow.dispatch.tensor.store %4, %1, offsets = [], sizes = [], strides = [] : tensor<f32> -> !flow.dispatch.tensor<writeonly:tensor<f32>>
+        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [], sizes = [], strides = [] : tensor<f32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32>>
         return
       }
     }

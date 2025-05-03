@@ -23,6 +23,16 @@ vm.module @module {
     vm.return %zero : i32
   }
 
+  // Note that arguments are special and must be assigned monotonically
+  // increasing registers even if that leaves gaps. Here %arg2 must get i4
+  // and not the unused i1.
+  // CHECK-LABEL: @func_args
+  vm.func @func_args(%arg0: i32, %arg1: i64, %arg2: i32) -> (i32, i64, i32) {
+    // CHECK: vm.return
+    // CHECK-SAME: block_registers = ["i0", "i2+3", "i4"]
+    vm.return %arg0, %arg1, %arg2 : i32, i64, i32
+  }
+
   // CHECK-LABEL: @dominating_values
   vm.func @dominating_values(%arg0 : i32, %arg1 : i32) -> (i32, i32) {
     // CHECK: vm.const.i32 5

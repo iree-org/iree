@@ -118,6 +118,7 @@ def MatchDimBoundsOp : Op<Transform_Dialect, "iree.match.dim_bounds",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+// TODO: Combine with MatchDimBounds.
 def MatchDimIsMultipleOfOp : Op<Transform_Dialect, "iree.match.dim_is_multiple_of",
     [IsolatedFromAbove,
      MatchOpInterface,

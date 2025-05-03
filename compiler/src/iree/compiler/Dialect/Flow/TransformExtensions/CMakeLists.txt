@@ -45,6 +45,7 @@ iree_cc_library(
     MLIRTransformUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 

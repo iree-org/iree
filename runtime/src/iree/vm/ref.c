@@ -150,19 +150,20 @@ IREE_API_EXPORT void iree_vm_ref_retain(iree_vm_ref_t* ref,
   // potentially release.
   IREE_VM_REF_ASSERT(ref);
   IREE_VM_REF_ASSERT(out_ref);
-  iree_vm_ref_t temp_ref = *ref;
-  if (ref->ptr) {
-    iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(ref);
+  iree_vm_ref_t src_ref = *ref;
+  if (src_ref.ptr) {
+    iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(&src_ref);
     iree_atomic_ref_count_inc(counter);
     iree_vm_ref_trace("RETAIN", ref);
   }
-  if (out_ref->ptr) {
+  iree_vm_ref_t dst_ref = *out_ref;
+  if (dst_ref.ptr) {
     // Output ref contains a value that should be released first.
     // Note that we check above for it being the same as the new value so we
     // don't do extra work unless we have to.
-    iree_vm_ref_release(out_ref);
+    iree_vm_ref_release(&dst_ref);
   }
-  *out_ref = temp_ref;
+  *out_ref = src_ref;
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_ref_retain_checked(
@@ -170,7 +171,8 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_checked(
   IREE_VM_REF_ASSERT(ref);
   IREE_VM_REF_ASSERT(type);
   IREE_VM_REF_ASSERT(out_ref);
-  if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type &&
+  iree_vm_ref_t src_ref = *ref;
+  if (src_ref.type != IREE_VM_REF_TYPE_NULL && src_ref.type != type &&
       type != IREE_VM_REF_TYPE_ANY) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "source ref type mismatch");
@@ -196,7 +198,8 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_or_move_checked(
   IREE_VM_REF_ASSERT(ref);
   IREE_VM_REF_ASSERT(type);
   IREE_VM_REF_ASSERT(out_ref);
-  if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type &&
+  iree_vm_ref_t src_ref = *ref;
+  if (src_ref.type != IREE_VM_REF_TYPE_NULL && src_ref.type != type &&
       type != IREE_VM_REF_TYPE_ANY) {
     // Make no changes on failure.
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -208,17 +211,18 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_or_move_checked(
 
 IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref) {
   IREE_VM_REF_ASSERT(ref);
-  if (ref->type == IREE_VM_REF_TYPE_NULL || ref->ptr == NULL) return;
+  iree_vm_ref_t temp_ref = *ref;
+  if (temp_ref.type == IREE_VM_REF_TYPE_NULL || temp_ref.ptr == NULL) return;
 
   iree_vm_ref_trace("RELEASE", ref);
-  iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(ref);
+  iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(&temp_ref);
   if (iree_atomic_ref_count_dec(counter) == 1) {
     const iree_vm_ref_type_descriptor_t* descriptor =
-        iree_vm_ref_type_descriptor(ref->type);
+        iree_vm_ref_type_descriptor(temp_ref.type);
     if (descriptor->destroy) {
       // NOTE: this makes us not re-entrant, but I think that's OK.
       iree_vm_ref_trace("DESTROY", ref);
-      descriptor->destroy(ref->ptr);
+      descriptor->destroy(temp_ref.ptr);
     }
   }
 
@@ -232,17 +236,20 @@ IREE_API_EXPORT void iree_vm_ref_assign(iree_vm_ref_t* ref,
   IREE_VM_REF_ASSERT(out_ref);
 
   // NOTE: ref and out_ref may alias.
-  iree_vm_ref_t temp_ref = *ref;
+  iree_vm_ref_t src_ref = *ref;
   if (ref == out_ref) {
     // Source == target; ignore entirely.
     return;
-  } else if (out_ref->ptr != NULL) {
+  }
+
+  iree_vm_ref_t dst_ref = *out_ref;
+  if (dst_ref.ptr != NULL) {
     // Release existing value.
-    iree_vm_ref_release(out_ref);
+    iree_vm_ref_release(&dst_ref);
   }
 
   // Assign ref to out_ref (without incrementing counter).
-  *out_ref = temp_ref;
+  *out_ref = src_ref;
 }
 
 IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
@@ -257,21 +264,23 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
   }
 
   // Reset input ref so it points at nothing.
-  iree_vm_ref_t temp_ref = *ref;
+  iree_vm_ref_t src_ref = *ref;
   memset(ref, 0, sizeof(*ref));
 
-  if (out_ref->ptr != NULL) {
+  iree_vm_ref_t dst_ref = *out_ref;
+  if (dst_ref.ptr != NULL) {
     // Release existing value.
-    iree_vm_ref_release(out_ref);
+    iree_vm_ref_release(&dst_ref);
   }
 
   // Assign ref to out_ref (without incrementing counter).
-  *out_ref = temp_ref;
+  *out_ref = src_ref;
 }
 
 IREE_API_EXPORT bool iree_vm_ref_is_null(const iree_vm_ref_t* ref) {
   IREE_VM_REF_ASSERT(ref);
-  return ref->type == IREE_VM_REF_TYPE_NULL;
+  iree_vm_ref_type_t null_type = IREE_VM_REF_TYPE_NULL;
+  return memcmp(&ref->type, &null_type, sizeof(null_type)) == 0;
 }
 
 IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,

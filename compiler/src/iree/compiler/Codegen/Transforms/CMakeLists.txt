@@ -42,8 +42,8 @@ iree_cc_library(
     MLIRVectorDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 

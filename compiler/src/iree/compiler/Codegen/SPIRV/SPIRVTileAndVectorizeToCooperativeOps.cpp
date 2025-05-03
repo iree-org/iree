@@ -25,6 +25,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -116,11 +117,8 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
     subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
-  LLVM_DEBUG({
-    llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = [";
-    llvm::interleaveComma(subgroupCounts, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = "
+                          << llvm::interleaved_array(subgroupCounts) << "\n");
   return subgroupCounts;
 }
 

@@ -81,6 +81,7 @@ iree_cc_library(
     iree::compiler::Dialect::Stream::Conversion::StandardToStream
     iree::compiler::Dialect::Stream::Conversion::UtilToStream
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::Conversion
@@ -97,6 +98,17 @@ iree_tablegen_library(
     "Passes.td"
   OUTS
     --gen-pass-decls Passes.h.inc
+)
+
+iree_tablegen_doc(
+  NAME
+    StreamPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc StreamPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

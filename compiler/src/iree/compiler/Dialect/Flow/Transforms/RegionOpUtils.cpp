@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -214,8 +215,8 @@ static void createWorkgroupCountFromDagRootRegion(
   rewriter.setInsertionPointToStart(body);
   Location loc = regionOp.getLoc();
   auto countOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(loc,
-                                                                       args);
+      rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(
+          loc, args);
   rewriter.create<IREE::Flow::ReturnOp>(loc, countOp->getResults());
 }
 

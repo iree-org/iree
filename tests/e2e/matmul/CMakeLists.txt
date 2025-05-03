@@ -1619,8 +1619,6 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling"
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-global-opt-enable-early-materialization=true"
     "--iree-hip-enable-ukernels=multi_mma"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS

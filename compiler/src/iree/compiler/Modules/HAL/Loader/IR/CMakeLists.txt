@@ -72,6 +72,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     HALLoaderDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "HALLoaderOps.td"
   OUTS

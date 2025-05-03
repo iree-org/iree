@@ -23,6 +23,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile-and-fuse"
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -242,12 +243,12 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return WalkResult::interrupt();
   });
   if (!consumerOp) {
-    LLVM_DEBUG(llvm::dbgs() << "----- skip, no consumer op -----\n");
+    LDBG("----- skip, no consumer op -----");
     return;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << consumerOp << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "tilingLevel: " << tilingLevel << "\n");
+  LDBG("consumerOp: " << consumerOp);
+  LDBG("tilingLevel: " << tilingLevel);
 
   // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
   // fallback to find a lowering_config from other operations.
@@ -262,8 +263,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
         getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
             getComputeOps(funcOp));
     if (failed(maybeLoweringConfig)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "can't find lowering_config, skip TileAndFuse");
+      LDBG("can't find lowering_config, skip TileAndFuse");
       return;
     }
     tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
@@ -272,7 +272,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   }
 
   if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
-    LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
+    LDBG("----- skip, all zeros -----");
     return;
   }
 
@@ -283,7 +283,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   IRRewriter rewriter(context);
   DominanceInfo dominanceInfo(funcOp);
   if (failed(applyTileAndFuse(rewriter, consumerOp, dominanceInfo, options))) {
-    LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
+    LDBG("----- tile and fuse failed -----");
     return signalPassFailure();
   }
 
@@ -297,7 +297,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
+    LDBG("----- cleanup failed -----");
     return signalPassFailure();
   }
 }

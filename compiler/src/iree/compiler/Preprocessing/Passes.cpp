@@ -147,6 +147,8 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   // Generalize transposes and any other remaining named linalg ops that can
   // now be represented as generics.
   passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
+  passManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
   passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
   passManager.addPass(mlir::createCSEPass());
   DispatchCreation::BubbleUpExpandShapesPassOptions bubbleOptions;

@@ -120,6 +120,10 @@ static inline bool iree_is_power_of_two_uint64(uint64_t value) {
   return (value != 0) && ((value & (value - 1)) == 0);
 }
 
+// TODO(benvanik): when C23 is fully adopted we can make a single generic
+// version of the alignment functions that uses typeof to cast back to the
+// expected result. For now we explicitly spell out the variants we want.
+
 // Aligns |value| up to the given power-of-two |alignment| if required.
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
 static inline uint64_t iree_align_uint64(uint64_t value, uint64_t alignment) {

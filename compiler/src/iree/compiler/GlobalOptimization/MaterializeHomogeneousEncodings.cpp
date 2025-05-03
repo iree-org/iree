@@ -15,14 +15,6 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-// TODO: Remove the flag once the codegen can handle the late materialization
-// path. This is mainly for testing.
-static llvm::cl::opt<bool> clEnableExperimentalRocmDataTiling(
-    "iree-global-opt-experimental-rocm-data-tiling",
-    llvm::cl::desc("Enables data-tiling materialization for rocm backends "
-                   "(experimental)."),
-    llvm::cl::init(false));
-
 #define GEN_PASS_DEF_MATERIALIZEHOMOGENEOUSENCODINGSPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
@@ -68,21 +60,7 @@ struct MaterializeHomogeneousEncodingsPass final
       return;
     }
 
-    // Only llvm-cpu and rocm backends handle encodings for now, others just go
-    // with nop.
-    if (executableTarget.getBackend() == "llvm-cpu") {
-      passManager.addPass(createMaterializeHostEncodingPass());
-    } else if (clEnableExperimentalRocmDataTiling &&
-               executableTarget.getBackend() == "rocm") {
-      passManager.addPass(createMaterializeHostEncodingPass());
-      FunctionLikeNest(passManager).addPass([&]() {
-        return createDecomposePackUnPackOpsPass(
-            DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
-                                              /*useOnlyReshapes=*/true});
-      });
-    } else {
-      addNopPipeline(passManager);
-    }
+    passManager.addPass(createMaterializeHostEncodingPass());
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();
     }

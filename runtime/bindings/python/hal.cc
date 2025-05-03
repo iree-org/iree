@@ -21,6 +21,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
+#include "iree/hal/semaphore.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
@@ -1366,6 +1367,46 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__int__",
            [](enum iree_hal_element_types_t self) { return (uint64_t)self; });
 
+  py::enum_<iree_hal_external_timepoint_type_t>(
+      m, "ExternalTimepointType", py::is_arithmetic(), py::is_flag())
+      .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE)
+      .value("WAIT_PRIMITIVE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE)
+      .value("CUDA_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT)
+      .value("HIP_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT)
+      .export_values()
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
+
+  py::enum_<enum iree_hal_semaphore_compatibility_bits_t>(
+      m, "SemaphoreCompatibility", py::is_arithmetic(), py::is_flag())
+      .value("NONE", IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE)
+      .value("HOST_WAIT", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT)
+      .value("DEVICE_WAIT", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT)
+      .value("HOST_SIGNAL", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL)
+      .value("DEVICE_SIGNAL", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL)
+      .value("HOST_ONLY", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY)
+      .value("DEVICE_ONLY", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_ONLY)
+      .value("ALL", IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL)
+      .export_values()
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
+      .def("__and__",
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
+
+  py::enum_<iree_hal_external_timepoint_flag_bits_t>(
+      m, "ExternalTimepointFlags", py::is_arithmetic(), py::is_flag())
+      .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_FLAG_NONE)
+      .export_values()
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
+      .def("__and__",
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
+
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(
           "allocator",
@@ -1642,7 +1683,33 @@ void SetupHalBindings(nanobind::module_ m) {
             return true;
           },
           py::arg("payload"), py::arg("timeout") = py::none(),
-          py::arg("deadline") = py::none(), kHalWait);
+          py::arg("deadline") = py::none(), kHalWait)
+      .def(
+          "import_timepoint",
+          [](HalSemaphore& self, uint64_t value,
+             HalExternalTimepoint& external_timepoint) {
+            CheckApiStatus(
+                iree_hal_semaphore_import_timepoint(
+                    self.raw_ptr(), value, IREE_HAL_QUEUE_AFFINITY_ANY,
+                    external_timepoint.timepoint()),
+                "importing timepoint");
+          },
+          py::arg("value"), py::arg("external_timepoint"))
+      .def(
+          "export_timepoint",
+          [](HalSemaphore& self, uint64_t value,
+             iree_hal_external_timepoint_type_t requested_type,
+             iree_hal_external_timepoint_flags_t requested_flags,
+             HalExternalTimepoint& out_external_timepoint) {
+            CheckApiStatus(
+                iree_hal_semaphore_export_timepoint(
+                    self.raw_ptr(), value, IREE_HAL_QUEUE_AFFINITY_ANY,
+                    requested_type, requested_flags,
+                    &out_external_timepoint.timepoint()),
+                "exporting timepoint");
+          },
+          py::arg("value"), py::arg("requested_type"),
+          py::arg("requested_flags"), py::arg("out_external_timepoint"));
 
   auto hal_fence = py::class_<HalFence>(m, "HalFence");
   VmRef::BindRefProtocol(hal_fence, iree_hal_fence_type,
@@ -1778,6 +1845,73 @@ void SetupHalBindings(nanobind::module_ m) {
                                             py_mapped_memory);
           },
           py::arg("shape"), py::arg("numpy_dtype_descr"));
+
+  py::class_<HalExternalTimepoint>(m, "HalExternalTimepoint")
+      .def(
+          "__init__",
+          [](HalExternalTimepoint* self) { new (self) HalExternalTimepoint(); })
+      .def_prop_rw(
+          "type",
+          [](HalExternalTimepoint& self) -> int {
+            return static_cast<int>(self.type());
+          },
+          [](HalExternalTimepoint& self, int type) {
+            return self.type() =
+                       static_cast<iree_hal_external_timepoint_type_t>(type);
+          })
+      .def_prop_rw(
+          "flags",
+          [](HalExternalTimepoint& self) -> int {
+            return static_cast<int>(self.flags());
+          },
+          [](HalExternalTimepoint& self, int flags) {
+            return self.flags() =
+                       static_cast<iree_hal_external_timepoint_flags_t>(flags);
+          })
+      .def_prop_rw(
+          "compatibility",
+          [](HalExternalTimepoint& self) -> int {
+            return static_cast<int>(self.compatibility());
+          },
+          [](HalExternalTimepoint& self, int compatibility) {
+            return self.compatibility() =
+                       static_cast<iree_hal_semaphore_compatibility_t>(
+                           compatibility);
+          })
+      .def_prop_rw(
+          "cuda_event",
+          [](HalExternalTimepoint& self) -> uint64_t {
+            return static_cast<uint64_t>(
+                reinterpret_cast<uintptr_t>(self.cuda_event()));
+          },
+          [](HalExternalTimepoint& self, uint64_t cuda_event) {
+            if (self.type() == IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE) {
+              self.type() = IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT;
+            }
+            if (self.type() != IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT) {
+              throw RaiseValueError(
+                  "Unexpected cuda event for non cuda timepoint");
+            }
+            self.cuda_event() =
+                reinterpret_cast<void*>(static_cast<uintptr_t>(cuda_event));
+          })
+      .def_prop_rw(
+          "hip_event",
+          [](HalExternalTimepoint& self) -> uint64_t {
+            return static_cast<uint64_t>(
+                reinterpret_cast<uintptr_t>(self.hip_event()));
+          },
+          [](HalExternalTimepoint& self, uint64_t hip_event) {
+            if (self.type() == IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE) {
+              self.type() = IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT;
+            }
+            if (self.type() != IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT) {
+              throw RaiseValueError(
+                  "Unexpected hip event for non hip timepoint");
+            }
+            self.hip_event() =
+                reinterpret_cast<void*>(static_cast<uintptr_t>(hip_event));
+          });
 
   py::class_<HalShape>(m, "Shape")
       .def("__init__", [](HalShape* self, std::vector<iree_hal_dim_t> indices) {

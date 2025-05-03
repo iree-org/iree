@@ -264,4 +264,79 @@ def IREEEncoding_EncodingTypeInterface :
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// Encoding Propagation Attribute & Op Interfaces
+//===----------------------------------------------------------------------===//
+
+def IREEEncoding_PropagationAttrInterface :
+  AttrInterface<"EncodingPropagationAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query new encoding attributes that can be propagated to
+    the operands and result of the operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+        [{
+          Returns true if the encodings can be propagated across the operation.
+        }],
+        /*retTy=*/"bool",
+        /*methodName=*/"isPropagable",
+        /*args=*/(ins
+          "::mlir::Value":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+            return false;
+        }]
+    >,
+    InterfaceMethod<
+        [{
+          Returns the new encodings for operand and result types for the given
+          operation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
+        /*methodName=*/"generateEncodings",
+        /*args=*/(ins
+          "::mlir::Value":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >
+  ];
+}
+
+def IREEEncoding_PropagationOpInterface :
+  OpInterface<"EncodingPropagationOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+      Interface used to generate new operations with new encodings.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+        [{
+          Returns a list of transformed operations, set_encoding/unset_encoding
+          operations and the transformed result for further transformation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationResult>",
+        /*methodName=*/"propagateEncoding",
+        /*args=*/(ins
+          "::mlir::RewriterBase &":$builder,
+          "::mlir::iree_compiler::IREE::Encoding::PropagationEncoding":$encodings,
+          "::mlir::OpResult":$opResult
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >
+  ];
+}
+
 #endif // IREE_DIALECT_ENCODING_INTERFACES

@@ -8,7 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -56,15 +56,15 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     newShape.append(swizzledTileShape);
     return RankedTensorType::get(newShape, packedType.getElementType());
   });
-  addConversion([&](IREE::Flow::DispatchTensorType dispatchTensorType)
-                    -> IREE::Flow::DispatchTensorType {
+  addConversion([&](IREE::TensorExt::DispatchTensorType dispatchTensorType)
+                    -> IREE::TensorExt::DispatchTensorType {
     Type boundType = dispatchTensorType.getBoundType();
     Type convertedBoundType = convertType(boundType);
     if (convertedBoundType == boundType) {
       return dispatchTensorType;
     }
-    return IREE::Flow::DispatchTensorType::get(dispatchTensorType.getAccess(),
-                                               convertedBoundType);
+    return IREE::TensorExt::DispatchTensorType::get(
+        dispatchTensorType.getAccess(), convertedBoundType);
   });
 }
 
@@ -116,15 +116,6 @@ getEncodingInfoFromLayouts(RankedTensorType type) {
     return layout.getEncodingInfo(type);
   }
   return std::nullopt;
-}
-
-bool isNonZeroPadding(IREE::Encoding::PadEncodingLayoutAttr padLayout) {
-  if (!padLayout) {
-    return false;
-  }
-
-  return !llvm::all_of(padLayout.getPadding().asArrayRef(),
-                       [](int32_t padValue) { return padValue == 0; });
 }
 
 } // namespace mlir::iree_compiler

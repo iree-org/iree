@@ -108,6 +108,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     VMDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "VMOps.td"
   OUTS

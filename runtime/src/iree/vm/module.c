@@ -35,6 +35,12 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
       -1) {
     *out_arguments = cconv_body;
   }
+  if (iree_string_view_equal(*out_arguments, IREE_SV("v"))) {
+    *out_arguments = iree_string_view_empty();
+  }
+  if (iree_string_view_equal(*out_results, IREE_SV("v"))) {
+    *out_results = iree_string_view_empty();
+  }
   return iree_ok_status();
 }
 
@@ -54,27 +60,10 @@ static iree_status_t iree_vm_function_call_count_fragment_values(
       case IREE_VM_CCONV_TYPE_REF:
         ++count;
         break;
-      case IREE_VM_CCONV_TYPE_SPAN_START: {
-        for (i = i + 1; i < cconv_fragment.size &&
-                        cconv_fragment.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
-             ++i) {
-          switch (cconv_fragment.data[i]) {
-            case IREE_VM_CCONV_TYPE_VOID:
-              break;
-            case IREE_VM_CCONV_TYPE_I32:
-            case IREE_VM_CCONV_TYPE_F32:
-            case IREE_VM_CCONV_TYPE_I64:
-            case IREE_VM_CCONV_TYPE_F64:
-            case IREE_VM_CCONV_TYPE_REF:
-              ++count;
-              break;
-            default:
-              return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "unsupported cconv span type '%c'",
-                                      cconv_fragment.data[i]);
-          }
-        }
-      } break;
+      case IREE_VM_CCONV_TYPE_SPAN_START:
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "cannot statically count cconv values with variadic value spans");
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                 "unsupported cconv type '%c'",

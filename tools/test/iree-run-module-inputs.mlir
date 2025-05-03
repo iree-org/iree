@@ -1,8 +1,7 @@
 // Passing no inputs is okay.
 
-// RUN: (iree-compile --iree-hal-target-device=local \
-// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync --module=- --function=no_input) | \
+// RUN: (iree-compile %s | \
+// RUN:  iree-run-module --module=- --function=no_input) | \
 // RUN: FileCheck --check-prefix=NO-INPUT %s
 // NO-INPUT-LABEL: EXEC @no_input
 func.func @no_input() {
@@ -14,10 +13,8 @@ func.func @no_input() {
 // Scalars use the form `--input=value`. Type (float/int) should be omitted.
 //   * The VM does not use i1/i8 types, so i32 VM types are returned instead.
 
-// RUN: (iree-compile --iree-hal-target-device=local \
-// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync \
-// RUN:                  --module=- \
+// RUN: (iree-compile %s | \
+// RUN:  iree-run-module --module=- \
 // RUN:                  --function=scalars \
 // RUN:                  --input=1 \
 // RUN:                  --input=5 \
@@ -25,12 +22,12 @@ func.func @no_input() {
 // RUN:                  --input=-3.14) | \
 // RUN: FileCheck --check-prefix=INPUT-SCALARS %s
 // INPUT-SCALARS-LABEL: EXEC @scalars
-func.func @scalars(%arg0: i1, %arg1: i8, %arg2 : i32, %arg3 : f32) -> (i1, i8, i32, f32) {
+func.func @scalars(%arg0: i1, %arg1: i64, %arg2: i32, %arg3: f32) -> (i1, i64, i32, f32) {
   // INPUT-SCALARS: result[0]: i32=1
-  // INPUT-SCALARS: result[1]: i32=5
+  // INPUT-SCALARS: result[1]: i64=5
   // INPUT-SCALARS: result[2]: i32=1234
   // INPUT-SCALARS: result[3]: f32=-3.14
-  return %arg0, %arg1, %arg2, %arg3 : i1, i8, i32, f32
+  return %arg0, %arg1, %arg2, %arg3 : i1, i64, i32, f32
 }
 
 // -----

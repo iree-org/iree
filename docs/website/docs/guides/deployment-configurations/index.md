@@ -32,7 +32,7 @@ Compiler target backends are used to generate executable code for hardware APIs
 and device architectures. Compiler targets may implement special optimizations
 or generate distinct code for certain device/architecture/performance profiles.
 
-When compiling programs, a list of target backends must be specified via
+When compiling programs, a list of target backends can be specified via
 
 * `--iree-hal-target-backends=` (command-line)
 * `target_backends=[...]` (Python)

@@ -42,6 +42,7 @@ iree_cc_library(
   SRCS
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
+    "ConvertStridedContractionToContraction.cpp"
     "DataLayoutPropagation.cpp"
     "DecomposeConcat.cpp"
     "DemoteContractionInputsToBF16.cpp"
@@ -113,6 +114,17 @@ iree_cc_library(
     iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    GlobalOptimizationPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc GlobalOptimizationPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

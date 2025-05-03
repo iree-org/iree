@@ -20,6 +20,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -833,11 +834,7 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
-  LLVM_DEBUG({
-    DBGS() << "crossIntrinsicShape: ";
-    llvm::interleaveComma(crossIntrinsicShape, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LDBG("crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape));
   int rank = internalShape.size();
   SmallVector<int64_t> indices(rank, 0);
   SmallVector<int64_t> strides(rank, 1);
@@ -869,26 +866,20 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
 
   // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
   TileSwizzle lhsSwizzle = getSwizzle(*this, MMAFragment::Lhs);
-  LLVM_DEBUG({
-    DBGS() << "DataTiledMMAAttr::buildMmaOperation\n";
-    DBGS() << "    lhsSwizzle: " << lhsSwizzle << "\n";
-  });
+  LDBG("DataTiledMMAAttr::buildMmaOperation");
+  LDBG("    lhsSwizzle: " << lhsSwizzle);
   SmallVector<Value> intrinsicsLhs =
       distributeMmaFragmentToIntrinsics(builder, loc, lhs, lhsSwizzle);
 
   TileSwizzle rhsSwizzle = getSwizzle(*this, MMAFragment::Rhs);
-  LLVM_DEBUG({
-    DBGS() << "DataTiledMMAAttr::buildMmaOperation\n";
-    DBGS() << "    rhsSwizzle: " << rhsSwizzle << "\n";
-  });
+  LDBG("DataTiledMMAAttr::buildMmaOperation");
+  LDBG("    rhsSwizzle: " << rhsSwizzle);
   SmallVector<Value> intrinsicsRhs =
       distributeMmaFragmentToIntrinsics(builder, loc, rhs, rhsSwizzle);
 
   TileSwizzle accSwizzle = getSwizzle(*this, MMAFragment::Acc);
-  LLVM_DEBUG({
-    DBGS() << "DataTiledMMAAttr::buildMmaOperation\n";
-    DBGS() << "    accSwizzle: " << accSwizzle << "\n";
-  });
+  LDBG("DataTiledMMAAttr::buildMmaOperation");
+  LDBG("    accSwizzle: " << accSwizzle);
 
   SmallVector<Value> intrinsicsAcc =
       distributeMmaFragmentToIntrinsics(builder, loc, acc, accSwizzle);
@@ -919,14 +910,8 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
         return dim.kind == TileSwizzle::Dim::Kind::Internal;
       });
 
-  LLVM_DEBUG({
-    DBGS() << "accCrossIntrinsicShape: ";
-    llvm::interleaveComma(accCrossIntrinsicShape, llvm::dbgs());
-    llvm::dbgs() << "\n";
-    DBGS() << "accInternalShape: ";
-    llvm::interleaveComma(accInternalShape, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LDBG("accCrossIntrinsicShape: " << llvm::interleaved(accCrossIntrinsicShape));
+  LDBG("accInternalShape: " << llvm::interleaved(accInternalShape));
   int dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);
   SmallVector<int64_t> indices(dstRank, 0);

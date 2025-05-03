@@ -154,9 +154,8 @@ hal.executable private @llvm_func_attrs {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D {
   hal.executable.variant public @scf_forall_2D target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @scf_forall_2D layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+    hal.executable.export public @scf_forall_2D layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -164,9 +163,9 @@ hal.executable private @scf_forall_2D {
         %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
         %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
         %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
-        %0 = flow.dispatch.workload.ordinal %cst0, 0 : index
-        %1 = flow.dispatch.workload.ordinal %cst1, 1 : index
-        %2 = flow.dispatch.workload.ordinal %cst2, 2 : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
         scf.forall (%arg0, %arg1) = (0, 0) to (%0, %1) step(64, 32) {
           "use"(%arg0, %arg1) : (index, index) -> ()
           scf.forall.in_parallel {}
@@ -181,7 +180,7 @@ hal.executable private @scf_forall_2D {
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //      CHECK: hal.executable.export public @scf_forall_2D layout
-// CHECK-NEXT:     %[[ARG1:[a-zA-z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 //  CHECK-DAG:   %[[WG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
@@ -202,9 +201,8 @@ hal.executable private @scf_forall_2D {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D_dynamic_tile_size {
   hal.executable.variant public @scf_forall_2D_dynamic_tile_size target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @scf_forall_2D_dynamic_tile_size layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+    hal.executable.export public @scf_forall_2D_dynamic_tile_size layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -213,10 +211,10 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
         %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
         %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
         %cst3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
-        %0 = flow.dispatch.workload.ordinal %cst0, 0 : index
-        %1 = flow.dispatch.workload.ordinal %cst1, 1 : index
-        %2 = flow.dispatch.workload.ordinal %cst2, 2 : index
-        %3 = flow.dispatch.workload.ordinal %cst3, 3 : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
+        %3 = iree_tensor_ext.dispatch.workload.ordinal %cst3, 3 : index
         scf.forall (%arg0, %arg1) = (0, 0) to (%0, %1) step(%2, %3) {
           "use"(%arg0, %arg1) : (index, index) -> ()
           scf.forall.in_parallel {}
@@ -229,7 +227,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s1 * s0)>
 //      CHECK: hal.executable.export public @scf_forall_2D_dynamic_tile_size layout
-// CHECK-NEXT:     %[[ARG1:[a-zA-z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG4:[a-zA-z0-9]+]]: index
@@ -253,11 +251,10 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_4D {
   hal.executable.variant public @scf_forall_4D target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @scf_forall_4D layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index,
-         %arg5 : index, %arg6 : index, %arg7 : index, %arg8 : index,
-         %arg9 : index, %arg10 : index, %arg11 : index, %arg12 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3,
+    hal.executable.export public @scf_forall_4D layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index,
+                                                                               %arg5: index, %arg6: index, %arg7: index, %arg8: index,
+                                                                               %arg9: index, %arg10: index, %arg11: index, %arg12: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3,
           %arg4, %arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11, %arg12
       hal.return %x, %y, %z : index, index, index
     }
@@ -275,18 +272,18 @@ hal.executable private @scf_forall_4D {
         %cst9 = hal.interface.constant.load layout(#pipeline_layout) ordinal(9) : index
         %cst10 = hal.interface.constant.load layout(#pipeline_layout) ordinal(10) : index
         %cst11 = hal.interface.constant.load layout(#pipeline_layout) ordinal(11) : index
-        %0 = flow.dispatch.workload.ordinal %cst0, 0 : index
-        %1 = flow.dispatch.workload.ordinal %cst1, 1 : index
-        %2 = flow.dispatch.workload.ordinal %cst2, 2 : index
-        %3 = flow.dispatch.workload.ordinal %cst3, 3 : index
-        %4 = flow.dispatch.workload.ordinal %cst4, 4 : index
-        %5 = flow.dispatch.workload.ordinal %cst5, 5 : index
-        %6 = flow.dispatch.workload.ordinal %cst6, 6 : index
-        %7 = flow.dispatch.workload.ordinal %cst7, 7 : index
-        %8 = flow.dispatch.workload.ordinal %cst8, 8 : index
-        %9 = flow.dispatch.workload.ordinal %cst9, 9 : index
-        %10 = flow.dispatch.workload.ordinal %cst10, 10 : index
-        %11 = flow.dispatch.workload.ordinal %cst11, 11 : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
+        %3 = iree_tensor_ext.dispatch.workload.ordinal %cst3, 3 : index
+        %4 = iree_tensor_ext.dispatch.workload.ordinal %cst4, 4 : index
+        %5 = iree_tensor_ext.dispatch.workload.ordinal %cst5, 5 : index
+        %6 = iree_tensor_ext.dispatch.workload.ordinal %cst6, 6 : index
+        %7 = iree_tensor_ext.dispatch.workload.ordinal %cst7, 7 : index
+        %8 = iree_tensor_ext.dispatch.workload.ordinal %cst8, 8 : index
+        %9 = iree_tensor_ext.dispatch.workload.ordinal %cst9, 9 : index
+        %10 = iree_tensor_ext.dispatch.workload.ordinal %cst10, 10 : index
+        %11 = iree_tensor_ext.dispatch.workload.ordinal %cst11, 11 : index
         scf.forall (%arg0, %arg1, %arg2, %arg3) = (%0, %1, %2, %3) to (%4, %5, %6, %7) step(%8, %9, %10, %11) {
           "use"(%arg0, %arg1, %arg2, %arg3) : (index, index, index, index) -> ()
           scf.forall.in_parallel {}
@@ -303,7 +300,7 @@ hal.executable private @scf_forall_4D {
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s0 + s1) ceildiv s2) * ((-s3 + s4) ceildiv s5))>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s1 * s0)>
 //      CHECK: hal.executable.export public @scf_forall_4D layout
-// CHECK-NEXT:     %[[ARG1:[a-zA-z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG4:[a-zA-z0-9]+]]: index
@@ -347,9 +344,8 @@ hal.executable private @scf_forall_4D {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_4D_static_interchange {
   hal.executable.variant public @scf_forall_4D_static_interchange target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @scf_forall_4D_static_interchange layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+    hal.executable.export public @scf_forall_4D_static_interchange layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -394,8 +390,7 @@ hal.executable private @scf_forall_4D_static_interchange {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @no_loop_do_nothing {
   hal.executable.variant public @no_loop_do_nothing target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @no_loop_do_nothing layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @no_loop_do_nothing layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1: index
       %c2 = arith.constant 2: index
       hal.return %c1, %c2, %c1 : index, index, index
@@ -420,9 +415,8 @@ hal.executable private @no_loop_do_nothing {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @no_loop_default_workgroup_count {
   hal.executable.variant public @no_loop_default_workgroup_count target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @no_loop_default_workgroup_count layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %0:3 = flow.dispatch.workgroup_count_from_slice %arg1, %arg2
+    hal.executable.export public @no_loop_default_workgroup_count layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+      %0:3 = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2
       hal.return %0#1, %0#2, %0#0 : index, index, index
     }
     builtin.module {

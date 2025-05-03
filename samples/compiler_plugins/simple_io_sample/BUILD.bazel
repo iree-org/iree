@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_register_plugin", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
 
 package(
@@ -139,6 +140,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "SimpleIODialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

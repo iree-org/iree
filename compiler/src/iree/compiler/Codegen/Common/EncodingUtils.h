@@ -101,10 +101,6 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
-/// Returns true when `padLayout` adds non-zero padding to at least one
-/// dimension.
-bool isNonZeroPadding(IREE::Encoding::PadEncodingLayoutAttr padLayout);
-
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_

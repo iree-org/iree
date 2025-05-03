@@ -214,6 +214,26 @@ util.func public @quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<
 // -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#encoding = #iree_encoding.testing_encoding<>
+util.func public @do_not_collapse_ops_with_encoding(%arg0: tensor<2x320x128x128xf32, #encoding>) -> tensor<2x320x128x128xf32, #encoding> {
+  %0 = flow.dispatch.region -> (tensor<2x320x128x128xf32, #encoding>) {
+    %empty = tensor.empty() : tensor<2x320x128x128xf32, #encoding>
+    %cst = arith.constant 3.14 : f32
+    %elementwise = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<2x320x128x128xf32, #encoding>) outs(%empty : tensor<2x320x128x128xf32, #encoding>) {
+    ^bb0(%in : f32, %out : f32):
+      %22 = arith.mulf %cst, %in : f32
+      linalg.yield %22 : f32
+    } -> tensor<2x320x128x128xf32, #encoding>
+    flow.return %elementwise : tensor<2x320x128x128xf32, #encoding>
+  }
+  util.return %0 : tensor<2x320x128x128xf32, #encoding>
+}
+// CHECK-LABEL: @do_not_collapse_ops_with_encoding(
+//   CHECK-NOT:   tensor.collapse_shape
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 util.func public @elementwise_chain(%arg0: tensor<2x320x128x128xf32>) -> tensor<2x320x128x128xf32> {
   %0 = flow.dispatch.region -> (tensor<2x320x128x128xf32>) {
     %empty = tensor.empty() : tensor<2x320x128x128xf32>

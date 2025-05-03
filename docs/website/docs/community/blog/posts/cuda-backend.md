@@ -171,7 +171,7 @@ At this stage the IR looks like the following:
           memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>,
           memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>)
       outs(%12 : memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) {
-    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
       %13 = addf %arg1, %arg2 : f32
       linalg.yield %13 : f32
     }

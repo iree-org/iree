@@ -23,8 +23,7 @@ hal.executable private @executable_a {
   hal.executable.variant public @variant_a target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {replace_i64 = 123 : i64}>) {
     hal.executable.export public @dispatch_a ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
-    ]>) {
-    ^bb0(%arg0: !hal.device, %arg1: index):
+    ]>) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -41,8 +40,7 @@ hal.executable private @executable_a {
   hal.executable.variant public @variant_unmodified target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {}>) {
     hal.executable.export public @dispatch_unmodified ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
-    ]>) {
-    ^bb0(%arg0: !hal.device, %arg1: index):
+    ]>) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -63,8 +61,7 @@ hal.executable private @executable_b {
   hal.executable.variant public @variant_b target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {replace_i64 = 456 : i64}>) {
     hal.executable.export public @dispatch_b ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
-    ]>) {
-    ^bb0(%arg0: !hal.device):
+    ]>) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }

@@ -32,10 +32,7 @@ static inline char iree_tolower(char c) {
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
                                             iree_string_view_t rhs) {
   if (lhs.size != rhs.size) return false;
-  for (iree_host_size_t i = 0; i < lhs.size; ++i) {
-    if (lhs.data[i] != rhs.data[i]) return false;
-  }
-  return true;
+  return memcmp(lhs.data, rhs.data, lhs.size) == 0;
 }
 
 IREE_API_EXPORT bool iree_string_view_equal_case(iree_string_view_t lhs,

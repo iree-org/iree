@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "decompose_horizontally_fused_gemms.mlir"
     "gpu_apply_derived_thread_config.mlir"
     "gpu_apply_tiling_level.mlir"
+    "gpu_bubble_resource_casts.mlir"
     "gpu_check_resource_usage.mlir"
     "gpu_combine_value_barriers.mlir"
     "gpu_create_fast_slow_path.mlir"

@@ -28,7 +28,7 @@ func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 // CHECK-SAME:  )
 func.func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
   %0 = "stablehlo.sort"(%arg0) ( {
-  ^bb0(%arg2: tensor<ui32>, %arg3: tensor<ui32>):  // no predecessors
+  ^bb0(%arg2: tensor<ui32>, %arg3: tensor<ui32>):
     %1 = "stablehlo.compare"(%arg2, %arg3) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
     "stablehlo.return"(%1) : (tensor<i1>) -> ()
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xui32>) -> (tensor<128xui32>)

@@ -160,9 +160,18 @@ static const iree_hal_buffer_equality_t kExactEquality = ([]() {
   return equality;
 })();
 
-static const iree_hal_buffer_equality_t kApproximateEquality = ([]() {
+static const iree_hal_buffer_equality_t kApproximateAbsoluteEquality = ([]() {
   iree_hal_buffer_equality_t equality;
   equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_ABSOLUTE;
+  equality.f16_threshold = 0.001f;
+  equality.f32_threshold = 0.0001f;
+  equality.f64_threshold = 0.0001;
+  return equality;
+})();
+
+static const iree_hal_buffer_equality_t kApproximateRelativeEquality = ([]() {
+  iree_hal_buffer_equality_t equality;
+  equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_RELATIVE;
   equality.f16_threshold = 0.001f;
   equality.f32_threshold = 0.0001f;
   equality.f64_threshold = 0.0001;
@@ -213,7 +222,7 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastI8EQ) {
   const int8_t rhs[] = {1, 1, 1};
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_i8(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_i8(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
 }
@@ -223,7 +232,7 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastI8NE) {
   const int8_t rhs[] = {1, 2, 3};
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_i8(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_i8(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
   EXPECT_EQ(index, 1);
@@ -234,7 +243,7 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastI64EQ) {
   const int64_t rhs[] = {1, 1, 1};
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_i64(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_i64(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
 }
@@ -244,7 +253,7 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastI64NE) {
   const int64_t rhs[] = {1, 2, 3};
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_i64(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_i64(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
   EXPECT_EQ(index, 1);
@@ -259,7 +268,21 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF16EQ) {
   };
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_f16(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_f16(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastF16EQRelative) {
+  const float lhs = 1.0f;
+  const uint16_t rhs[] = {
+      iree_math_f32_to_f16(1.0f),
+      iree_math_f32_to_f16(1.0f),
+      iree_math_f32_to_f16(1.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_f16(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
 }
@@ -273,7 +296,22 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF16NE) {
   };
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_f16(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_f16(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+  EXPECT_EQ(index, 1);
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastF16NERelative) {
+  const float lhs = 1.0f;
+  const uint16_t rhs[] = {
+      iree_math_f32_to_f16(1.0f),
+      iree_math_f32_to_f16(3.0f),
+      iree_math_f32_to_f16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_f16(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
   EXPECT_EQ(index, 1);
@@ -284,7 +322,17 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF32EQ) {
   const float rhs[] = {1.0f, 1.0f, 1.0f};
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_f32(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_f32(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastF32EQRelative) {
+  const float lhs = 1.0f;
+  const float rhs[] = {1.0f, 1.0f, 1.0f};
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_f32(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
 }
@@ -294,7 +342,18 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF32NE) {
   const float rhs[] = {1.0f, 3.0f, 4.0f};
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_f32(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_f32(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+  EXPECT_EQ(index, 1);
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastF32NERelative) {
+  const float lhs = 1.0f;
+  const float rhs[] = {1.0f, 3.0f, 4.0f};
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_f32(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
   EXPECT_EQ(index, 1);
@@ -305,7 +364,17 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF64EQ) {
   const double rhs[] = {1.0, 1.0, 1.0};
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_f64(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_f64(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastF64EQRelative) {
+  const double lhs = 1.0;
+  const double rhs[] = {1.0, 1.0, 1.0};
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_f64(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
 }
@@ -315,7 +384,18 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF64NE) {
   const double rhs[] = {1.0, 3.0, 4.0};
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
-      kApproximateEquality, iree_hal_make_buffer_element_f64(lhs),
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_f64(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+  EXPECT_EQ(index, 1);
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastF64NERelative) {
+  const double lhs = 1.0;
+  const double rhs[] = {1.0, 3.0, 4.0};
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_f64(lhs),
       IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
       &index));
   EXPECT_EQ(index, 1);
@@ -334,8 +414,8 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF16EQ) {
   };
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
 }
 
@@ -354,8 +434,28 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF16NearEQ) {
   };
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseF16NearEQRelative) {
+  const uint16_t lhs[] = {
+      iree_math_f32_to_f16(100.0f),
+      iree_math_f32_to_f16(19.99f),
+      iree_math_f32_to_f16(1.00001f),
+      iree_math_f32_to_f16(4.0f),
+  };
+  const uint16_t rhs[] = {
+      iree_math_f32_to_f16(100.01f),
+      iree_math_f32_to_f16(20.00f),
+      iree_math_f32_to_f16(1.0f),
+      iree_math_f32_to_f16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateRelativeEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
 }
 
@@ -372,8 +472,8 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF16NE) {
   };
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
   EXPECT_EQ(index, 1);
 }
@@ -383,8 +483,8 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF32EQ) {
   const float rhs[] = {1.0f, 2.0f, 3.0f};
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
 }
 
@@ -393,8 +493,8 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF32NE) {
   const float rhs[] = {1.0f, 3.0f, 4.0f};
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
   EXPECT_EQ(index, 1);
 }
@@ -404,8 +504,8 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF64EQ) {
   const double rhs[] = {1.0, 2.0, 3.0};
   iree_host_size_t index = 0;
   EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_64, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_64,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
 }
 
@@ -414,8 +514,8 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF64NE) {
   const double rhs[] = {1.0, 3.0, 4.0};
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
-      kApproximateEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_64, IREE_ARRAYSIZE(lhs),
-      iree_make_const_byte_span(lhs, sizeof(lhs)),
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_64,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
   EXPECT_EQ(index, 1);
 }

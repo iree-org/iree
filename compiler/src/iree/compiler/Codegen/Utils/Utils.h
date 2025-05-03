@@ -7,9 +7,9 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -21,6 +21,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -202,8 +203,30 @@ int getReductionTilingFactor(int64_t dimSize);
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
 
 //===---------------------------------------------------------------------===//
+// Bufferization utility functions
+//===---------------------------------------------------------------------===//
+
+/// Find the memref version of the given InterfaceBindingSubspanOp. If no such
+/// op exists in the same block (before the given op), create a new op.
+Value findOrCreateSubspanBuffer(RewriterBase &rewriter,
+                                IREE::HAL::InterfaceBindingSubspanOp subspanOp);
+
+//===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//
+
+/// Given a SubsetInsertionOpInterface, find all values that are needed to
+/// build an equivalent subset extraction, and set the insertion point to the
+/// last of these values.
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp);
+
+/// Check if the two tensor types (with their respective dynamic dimension
+/// values) have the same shape.
+bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
+                      IREE::TensorExt::DispatchTensorType dispatchTensorType,
+                      ValueRange dispatchTensorDynSizes);
 
 /// Convert byte offset into offsets in terms of number of elements based
 /// on `elementType`
@@ -256,7 +279,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 // Utility to make sure we are storing the full incoming subspan. Otherwise we
 // cannot simply adjust the subspan's resultant type later.
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::Flow::DispatchTensorType tensorType,
+                 IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
 
 //===----------------------------------------------------------------------===//
@@ -289,6 +312,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 /// Returns std::nullopt if vector sizes can't be inferred.
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
+
+/// Returns the underlying index if the given value is a constant index.
+std::optional<int64_t> getConstantIndex(Value value);
 
 } // namespace mlir::iree_compiler
 

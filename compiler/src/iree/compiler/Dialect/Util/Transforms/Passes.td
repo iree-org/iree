@@ -81,7 +81,6 @@ def PropagateSubrangesPass : Pass<"iree-util-propagate-subranges", "mlir::Module
     "::mlir::scf::SCFDialect",
     "::mlir::iree_compiler::IREE::Util::UtilDialect"
   ];
-
 }
 
 def StripAndSplatConstantsPass :

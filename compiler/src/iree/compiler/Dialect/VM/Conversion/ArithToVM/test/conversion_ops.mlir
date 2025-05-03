@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion --cse --iree-vm-target-index-bits=64 --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=64},cse)' --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @zext_i1_i32
 module @zext_i1_i32 {

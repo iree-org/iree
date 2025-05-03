@@ -20,72 +20,77 @@ namespace mlir::iree_compiler::IREE::GPU {
 static constexpr int64_t kPreferredCopyNumBits = 128;
 
 // Helper to construct a list of tile sizes that simply uses the given vector
-// size or the innerDimSize as the inner most tile size, whichever is smaller.
-// All other dims are tiled to 1.
-static SmallVector<int64_t>
-getVectorSizeTileSizes(int64_t rank, int64_t innerDimSize, int64_t vectorSize) {
+// size or the `targetDimSize` as the inner/outer most tile size, whichever is
+// smaller. All other dims are tiled to 1.
+static SmallVector<int64_t> getVectorSizeTileSizes(int64_t rank,
+                                                   int64_t targetDim,
+                                                   int64_t targetDimSize,
+                                                   int64_t vectorSize) {
   SmallVector<int64_t> tileSizes(rank, 1);
-  if (ShapedType::isDynamic(innerDimSize) || innerDimSize >= vectorSize) {
-    tileSizes.back() = vectorSize;
-  } else {
-    tileSizes.back() = innerDimSize;
-  }
+  tileSizes[targetDim] =
+      ShapedType::isDynamic(targetDimSize) || targetDimSize >= vectorSize
+          ? vectorSize
+          : targetDimSize;
   return tileSizes;
 }
 
 /// Derives the tiles sizes to use based on loop ranges, the number of threads,
-/// and the optimal vector size. If |allowMultiDimCollapse| is true then this
+/// and the optimal vector size. If `vectorOutermost` is true, the vector tile
+/// size is set along the outermost loop dimension, instead of the default
+/// innermost dimension. If `allowMultiDimCollapse` is true then this
 /// will attempt to split the optimal vector size along multiple complete dims.
 ///
 /// For example, with a vector size of 8 and loop ranges of [64 x 2 x 4] this
-/// would return tile sizes of [1, 2, 4] if |allowMultiDimCollapse| is true and
+/// would return tile sizes of [1, 2, 4] if `allowMultiDimCollapse` is true and
 /// [1, 1, 4] otherwise. If the loop ranges were instead [64 x 4 x 4] this
 /// would give tile sizes of [1, 1, 4] no matter what because we won't be able
 /// to collapse the vector.transfer_read that results from this choice of tile
 /// size.
-static SmallVector<int64_t>
-getVectorTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
-                                 int64_t numThreads, int64_t vectorSize,
-                                 bool allowMultiDimCollapse = true) {
+static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
+    SmallVector<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
+    bool allowMultiDimCollapse = true, bool vectorizeOutermost = false) {
+  int64_t rank = loopRanges.size();
+  int64_t targetDim = vectorizeOutermost ? 0 : rank - 1;
+  int64_t targetRange = loopRanges[targetDim];
+
   // If any loop ranges are dynamic, default to a simple vector size based
   // tile size.
   if (llvm::any_of(loopRanges, &ShapedType::isDynamic)) {
-    return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
-                                  vectorSize);
+    return getVectorSizeTileSizes(rank, targetDim, targetRange, vectorSize);
   }
 
   // If the number of loop trips are indivisible by the number of threads then
-  // also default to just the vector size (i.e. [1, ..., 1, vector_size]).
+  // also default to just the vector size (e.g., [1, ..., 1, vector_size] when
+  // `targetDim` is the innermost).
   int64_t flatNumTrips = std::accumulate(loopRanges.begin(), loopRanges.end(),
                                          1, std::multiplies<int64_t>());
   if (flatNumTrips % numThreads != 0) {
-    return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
-                                  vectorSize);
+    return getVectorSizeTileSizes(rank, targetDim, targetRange, vectorSize);
   }
-  SmallVector<int64_t> tileSizes(loopRanges.size(), 1);
 
   // Let the maximum possible vector size be the minimum between:
   //   - The requested vector size
   //   - The maximum vector size that avoids an exec mask
   int64_t maxVectorSize = std::min(vectorSize, flatNumTrips / numThreads);
 
-  // Bail out to unit vector sizes if the inner most loop range is not divisible
+  // Bail out to unit vector sizes if the target loop range is not divisible
   // by the vector size or vice-versa.
-  int64_t innerMostRange = loopRanges.back();
-  if (innerMostRange % maxVectorSize != 0 &&
-      maxVectorSize % innerMostRange != 0) {
+  SmallVector<int64_t> tileSizes(rank, 1);
+  if (targetRange % maxVectorSize != 0 && maxVectorSize % targetRange != 0) {
     return tileSizes;
   }
 
-  // Let the inner most tile size be the smaller of the target vector size
-  // and the inner most loop range. If |allowMultiDimCollapse| is false, return
-  // here.
-  tileSizes.back() = std::min(innerMostRange, maxVectorSize);
-  if (innerMostRange >= maxVectorSize || !allowMultiDimCollapse) {
+  // Let the tile size for the target dim be the smaller of the vector size and
+  // the target loop range. Return here, if `allowMultiDimCollapse` is false, or
+  // `vectorizeOutermost` is true, because we don't expect consecutive
+  // dimensions to be vectorizable contiguously for these cases.
+  tileSizes[targetDim] = std::min(targetRange, maxVectorSize);
+  if (targetRange >= maxVectorSize || !allowMultiDimCollapse ||
+      vectorizeOutermost) {
     return tileSizes;
   }
 
-  maxVectorSize = maxVectorSize / innerMostRange;
+  maxVectorSize = maxVectorSize / targetRange;
   for (int64_t i = loopRanges.size() - 2, e = 0; i >= e; --i) {
     // Only increase the tile size if the remaining vector size is divisible
     // by the loop range (and thus range <= remaining vector size).
@@ -130,10 +135,21 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   int64_t vectorSize = kPreferredCopyNumBits /
                        getElementTypeOrSelf(im2colOp->getResultTypes()[0])
                            .getIntOrFloatBitWidth();
-  // Im2col cannot coalesce past the inner most dim so always default to only
-  // the inner most tile size being the vector size (or smaller).
+
+  // If the im2col input tensor has the batch dim at last, im2col output tensor
+  // has an implicit transpose to move the batch dim in front, and tiling should
+  // be along the batch dim. Currently only a single batch dim is supported for
+  // tiling along the batch dim.
+  unsigned innerDim = im2colOp.getInputRank() - 1;
+  bool singleBatchDimInnermost = im2colOp.getBatchPos().size() == 1 &&
+                                 im2colOp.getBatchPos().back() == innerDim;
+  bool vectorizeOutermost = singleBatchDimInnermost ? true : false;
+
+  // Im2col cannot coalesce past the inner/outer most dim so always default to
+  // only the inner/outer most tile size being the vector size (or smaller).
   return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize,
-                                          /*allowMultiDimCollapse=*/false);
+                                          /*allowMultiDimCollapse=*/false,
+                                          vectorizeOutermost);
 }
 
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {

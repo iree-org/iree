@@ -72,7 +72,7 @@ util.func public @interchange(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>
     iterator_types = ["reduction", "parallel", "parallel", "parallel"]}
   ins(%arg0, %arg1 : tensor<?x?x?xf32>, tensor<?x?x?xf32>)
   outs(%arg2 : tensor<?x?x?xf32>) {
-  ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+  ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
     %m = arith.mulf %arg3, %arg4 : f32
     %a = arith.addf %arg5, %m : f32
     linalg.yield %a : f32

@@ -4,7 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -91,6 +96,7 @@ iree_compiler_cc_library(
         "BubbleUpOrdinalOps.cpp",
         "BufferizationAnalysis.cpp",
         "BufferizeCopyOnlyDispatchesPass.cpp",
+        "BufferizeDispatchTensorLoadStore.cpp",
         "CleanupBufferAllocViewPass.cpp",
         "ConcretizePadResultShape.cpp",
         "ConfigTrackingCanonicalizer.cpp",
@@ -189,19 +195,22 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:KnownTargets",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/Transforms:VectorExtTransforms",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//compiler/src/iree/compiler/Codegen/Interfaces:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/Analysis",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/Stream/Analysis",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Utils",
@@ -290,9 +299,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TransformExtensions:IREEGPUExtensions",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/TransformExtensions:LinalgExtExtensions",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "@llvm-project//mlir:AffineDialect",
@@ -339,7 +348,6 @@ iree_compiler_cc_library(
         # TransformExtensions (needed for registration in the pass)
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
-        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
         "@llvm-project//mlir:AffineTransformOps",
@@ -351,5 +359,23 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:TransformLoopExtension",
         "@llvm-project//mlir:VectorTransformOps",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "CodegenCommonPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "CodegenCommonPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )

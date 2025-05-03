@@ -9,8 +9,7 @@
 ]>
 hal.executable private @ex {
   hal.executable.variant public @variant target(#hal.executable.target<"llvm", "embedded-elf-x86_64">) {
-    hal.executable.export public @dispatch ordinal(16) layout(#pipeline_layout) {
-    ^bb0(%device: !hal.device, %workload_x: index, %workload_y: index):
+    hal.executable.export public @dispatch ordinal(16) layout(#pipeline_layout) count(%device: !hal.device, %workload_x: index, %workload_y: index) -> (index, index, index) {
       %count_x = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_x]
       %count_y = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_y]
       %count_z = arith.constant 1 : index

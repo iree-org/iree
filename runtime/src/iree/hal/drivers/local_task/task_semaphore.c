@@ -409,10 +409,30 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   return status;
 }
 
+static iree_status_t iree_hal_task_semaphore_import_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint import is not yet implemented");
+}
+
+static iree_status_t iree_hal_task_semaphore_export_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint export is not yet implemented");
+}
+
 static const iree_hal_semaphore_vtable_t iree_hal_task_semaphore_vtable = {
     .destroy = iree_hal_task_semaphore_destroy,
     .query = iree_hal_task_semaphore_query,
     .signal = iree_hal_task_semaphore_signal,
     .fail = iree_hal_task_semaphore_fail,
     .wait = iree_hal_task_semaphore_wait,
+    .import_timepoint = iree_hal_task_semaphore_import_timepoint,
+    .export_timepoint = iree_hal_task_semaphore_export_timepoint,
 };

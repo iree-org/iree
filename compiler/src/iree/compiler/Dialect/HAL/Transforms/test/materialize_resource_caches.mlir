@@ -19,9 +19,9 @@ hal.executable private @exe {
       %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
       hal.return %selected : i1
     }
-    hal.executable.export @entry0 ordinal(0) layout(#pipeline_layout_0)
-    hal.executable.export @entry0_alias ordinal(0) layout(#pipeline_layout_0)
-    hal.executable.export @entry1 ordinal(1) layout(#pipeline_layout_1)
+    hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout_0)
+    hal.executable.export public @entry0_alias ordinal(0) layout(#pipeline_layout_0)
+    hal.executable.export public @entry1 ordinal(1) layout(#pipeline_layout_1)
     // CHECK-NOT: hal.executable.constant.block
     hal.executable.constant.block() -> (i32, i32) as ("foo", "bar") {
       %c123 = arith.constant 123 : i32
@@ -123,7 +123,7 @@ hal.executable private @exe {
       %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
       hal.return %selected : i1
     }
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>)
@@ -187,7 +187,7 @@ util.func public @fallbackLookup() -> (!hal.executable, !hal.executable) {
 
 hal.executable private @exe {
   hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
     ]>)
   }
@@ -279,7 +279,7 @@ util.initializer {
 
 hal.executable @exe {
   hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry ordinal(0) layout(#pipeline_layout_0) attributes {
+    hal.executable.export public @entry ordinal(0) layout(#pipeline_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

@@ -16,7 +16,11 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(IREE ASM C CXX)
+# NOTE: ASM is at the end of the list so CMake can test whether the C/CXX
+# compilers can be used for assembly.
+# See: https://cmake.org/cmake/help/latest/command/project.html#options
+project(IREE C CXX ASM)
+
 # If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
 # and we can just inform the user and then reset it.
 if(DEFINED CACHE{CMAKE_CXX_STANDARD})

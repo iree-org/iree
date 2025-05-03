@@ -16,7 +16,7 @@ iree_hal_module_debug_sink_null(void) {
   return sink;
 }
 
-#if defined(IREE_FILE_IO_ENABLE)
+#if IREE_FILE_IO_ENABLE
 
 #if IREE_HAL_MODULE_STRING_UTIL_ENABLE
 static iree_status_t iree_hal_module_buffer_view_trace_stdio(

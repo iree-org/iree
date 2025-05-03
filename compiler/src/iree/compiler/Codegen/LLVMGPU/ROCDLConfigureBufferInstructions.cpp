@@ -7,9 +7,8 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -92,7 +91,7 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   int64_t maxNumElems = 1;
   ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
   if (auto tensorType =
-          dyn_cast<IREE::Flow::DispatchTensorType>(binding.getType())) {
+          dyn_cast<IREE::TensorExt::DispatchTensorType>(binding.getType())) {
     resultTy = tensorType.asRankedTensorType();
   }
   if (!resultTy || !resultTy.hasRank())

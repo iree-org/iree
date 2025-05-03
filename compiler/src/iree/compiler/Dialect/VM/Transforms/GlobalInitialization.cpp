@@ -22,7 +22,8 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
-namespace {
+#define GEN_PASS_DEF_GLOBALINITIALIZATIONPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
 
 // Finds a function with |name| and returns it ready for appending.
 // The returned op builder will be set at an insertion point where new
@@ -112,8 +113,6 @@ static void fixupGlobalMutability(Operation *moduleOp,
   });
 }
 
-} // namespace
-
 // Finds all global variables and moves their inital values/initializer calls
 // into a single function. Relies on the inliner to later make the uber function
 // better.
@@ -127,17 +126,8 @@ static void fixupGlobalMutability(Operation *moduleOp,
 //
 // TODO(benvanik): combine i32 initializers to store more efficiently.
 class GlobalInitializationPass
-    : public PassWrapper<GlobalInitializationPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  StringRef getArgument() const override {
-    return "iree-vm-global-initialization";
-  }
-
-  StringRef getDescription() const override {
-    return "Creates module-level global init/deinit functions";
-  }
-
+    : public IREE::VM::impl::GlobalInitializationPassBase<
+          GlobalInitializationPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
@@ -207,7 +197,6 @@ public:
     exportFuncIfNeeded(moduleOp, deinitFuncOp);
   }
 
-private:
   LogicalResult
   appendPrimitiveInitialization(IREE::Util::GlobalOpInterface globalOp,
                                 OpBuilder &builder) {
@@ -320,12 +309,5 @@ private:
     return result;
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createGlobalInitializationPass() {
-  return std::make_unique<GlobalInitializationPass>();
-}
-
-static PassRegistration<GlobalInitializationPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

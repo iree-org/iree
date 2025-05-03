@@ -51,6 +51,7 @@ iree_cc_library(
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
     "GPUApplyTilingLevel.cpp"
+    "GPUBubbleResourceCasts.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCombineValueBarriers.cpp"
     "GPUCreateFastSlowPath.cpp"
@@ -143,6 +144,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
   PUBLIC
 )
@@ -159,6 +161,17 @@ iree_cc_library(
     MLIRIR
     MLIRSupport
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    CodegenCommonGPUPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenCommonGPUPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -375,9 +375,9 @@ module @dispatch_inline {
     %c0 = arith.constant 0 : index
     %x = tensor.dim %cst1, %c0 : tensor<4xi8>
     %0 = flow.dispatch.workgroups[%x](%cst0, %cst1) : (i8, tensor<4xi8>) -> tensor<4xi8> =
-        (%arg0: i8, %arg1: !flow.dispatch.tensor<readonly:tensor<4xi8>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<4xi8>>) {
+        (%arg0: i8, %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi8>>, %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi8>>) {
       %empty = tensor.empty() : tensor<4xi8>
-      %input = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[4], strides=[1] : !flow.dispatch.tensor<readonly:tensor<4xi8>> -> tensor<4xi8>
+      %input = iree_tensor_ext.dispatch.tensor.load %arg1, offsets=[0], sizes=[4], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi8>> -> tensor<4xi8>
       %output = linalg.generic {
         indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
         iterator_types = ["parallel"]
@@ -387,7 +387,7 @@ module @dispatch_inline {
         %result = arith.addi %addi_x2, %arg0 : i8
         linalg.yield %result : i8
       } -> tensor<4xi8>
-      flow.dispatch.tensor.store %output, %arg2, offsets=[0], sizes=[4], strides=[1] : tensor<4xi8> -> !flow.dispatch.tensor<writeonly:tensor<4xi8>>
+      iree_tensor_ext.dispatch.tensor.store %output, %arg2, offsets=[0], sizes=[4], strides=[1] : tensor<4xi8> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi8>>
       flow.return
     }
     util.global.store %0, @hoisted : tensor<4xi8>
@@ -405,13 +405,13 @@ module @dispatch_inline {
 module @dispatch_executable {
   flow.executable private @exe {
     flow.executable.export public @dispatch_fn workgroups(%arg0: index) -> (index, index, index) {
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg0
       flow.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func public @dispatch_fn(%arg0: i8, %arg1: !flow.dispatch.tensor<readonly:tensor<4xi8>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<4xi8>>) {
+      func.func public @dispatch_fn(%arg0: i8, %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi8>>, %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi8>>) {
         %empty = tensor.empty() : tensor<4xi8>
-        %input = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[4], strides=[1] : !flow.dispatch.tensor<readonly:tensor<4xi8>> -> tensor<4xi8>
+        %input = iree_tensor_ext.dispatch.tensor.load %arg1, offsets=[0], sizes=[4], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi8>> -> tensor<4xi8>
         %output = linalg.generic {
           indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
           iterator_types = ["parallel"]
@@ -421,7 +421,7 @@ module @dispatch_executable {
           %result = arith.addi %addi_x2, %arg0 : i8
           linalg.yield %result : i8
         } -> tensor<4xi8>
-        flow.dispatch.tensor.store %output, %arg2, offsets=[0], sizes=[4], strides=[1] : tensor<4xi8> -> !flow.dispatch.tensor<writeonly:tensor<4xi8>>
+        iree_tensor_ext.dispatch.tensor.store %output, %arg2, offsets=[0], sizes=[4], strides=[1] : tensor<4xi8> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi8>>
         return
       }
     }

@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
 """Common Bazel definitions for IREE."""
 
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
@@ -71,7 +73,7 @@ def iree_cc_library(includes = [], system_includes = [], **kwargs):
     but CMake does. So we allow them to be separate and glom them together
     here.
     """
-    native.cc_library(
+    cc_library(
         includes = includes + system_includes,
         **kwargs
     )
@@ -102,7 +104,7 @@ def iree_compiler_cc_test(deps = [], **kwargs):
     This is a pass-through to the native cc_test which adds specific
     runtime specific options and deps.
     """
-    native.cc_test(
+    cc_test(
         deps = deps + [
             "//compiler/src:defs",
         ],
@@ -115,7 +117,7 @@ def iree_compiler_cc_binary(deps = [], **kwargs):
     This is a pass-through to the native cc_binary which adds specific
     runtime specific options and deps.
     """
-    native.cc_binary(
+    cc_binary(
         deps = deps + [
             "//compiler/src:defs",
         ],
@@ -142,7 +144,7 @@ def iree_runtime_cc_test(deps = [], **kwargs):
     This is a pass-through to the native cc_test which adds specific
     runtime specific options and deps.
     """
-    native.cc_test(
+    cc_test(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
@@ -156,7 +158,7 @@ def iree_runtime_cc_binary(deps = [], **kwargs):
     This is a pass-through to the native cc_binary which adds specific
     runtime specific options and deps.
     """
-    native.cc_binary(
+    cc_binary(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
@@ -164,7 +166,7 @@ def iree_runtime_cc_binary(deps = [], **kwargs):
         **kwargs
     )
 
-def iree_tablegen_doc(includes = [], **kwargs):
+def iree_tablegen_doc(category, includes = [], **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
 
     This is a simple wrapper over gentbl() so we can differentiate between

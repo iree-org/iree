@@ -19,7 +19,7 @@ util.global private @default_device = #hal.device.target<"cpu", [
 // CHECK: hal.executable private @ex
 // CHECK:   hal.executable.variant public @arm_64 target(#executable_target_arm_64
 // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout)
-// CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
+// CHECK-SAME: count(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index) -> (index, index, index) {
 // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
 // CHECK-NEXT: }
 // CHECK:     builtin.module
@@ -27,7 +27,7 @@ util.global private @default_device = #hal.device.target<"cpu", [
 // CHECK-NEXT:  func.func @entry
 // CHECK:   hal.executable.variant public @x86_64 target(#executable_target_x86_64
 // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout)
-// CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
+// CHECK-SAME: count(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index) -> (index, index, index) {
 // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
 // CHECK-NEXT: }
 // CHECK:     builtin.module

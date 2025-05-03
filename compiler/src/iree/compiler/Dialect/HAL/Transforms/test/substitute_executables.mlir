@@ -9,8 +9,7 @@ hal.executable private @executable0 {
   hal.executable.variant public @variant target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
-    ]>) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    ]>) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
       // CHECK: arith.constant 123
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
@@ -38,8 +37,7 @@ hal.executable private @executable1 {
   hal.executable.variant public @variant target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @dispatch1 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
-    ]>) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    ]>) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
       // CHECK: arith.constant 100 : index
       %c100 = arith.constant 100 : index
       hal.return %c100, %c100, %c100 : index, index, index
