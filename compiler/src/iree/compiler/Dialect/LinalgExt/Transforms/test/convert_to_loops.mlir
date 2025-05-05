@@ -1520,3 +1520,37 @@ func.func @gather_inline_region(%arg0 : memref<2x2xi32>, %arg1 : memref<2x2xi32>
 // CHECK:           %[[LOAD0:.+]] = memref.load %[[ARG0]][%[[CAST0]], %[[CAST1]]] : memref<2x2xi32>
 // CHECK:           %[[MUL:.+]] = arith.muli %[[LOAD0]], %[[C3]] : i32
 // CHECK:           memref.store %[[MUL]], %[[ARG2]][%[[I]]] : memref<2xi32>
+
+// -----
+
+func.func @map_scatter_memref(
+  %input: memref<?xf32>, %output: memref<?x?xf32>, %bound: index
+) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim0 = memref.dim %output, %c0 : memref<?x?xf32>
+  %dim1 = memref.dim %output, %c1 : memref<?x?xf32>
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.cmpi uge, %idx0, %bound : index
+      %out_idx:2 = affine.delinearize_index %idx0 into (%dim0, %dim1) : index, index
+      iree_linalg_ext.yield %out_idx#0, %out_idx#1, %mask : index, index, i1
+  } : memref<?xf32> into memref<?x?xf32>
+  return
+}
+//      CHECK: func @map_scatter_memref
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[BOUND:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[IN_D0:.+]] = memref.dim %[[INPUT]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_D0:.+]] = memref.dim %[[OUTPUT]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_D1:.+]] = memref.dim %[[OUTPUT]], %[[C1]]
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[IN_D0]] step %[[C1]]
+//  CHECK-DAG:     %[[MASK:.+]] = arith.cmpi uge, %[[IV]], %[[BOUND]] : index
+//  CHECK-DAG:     %[[OUT_IDX:.+]]:2 = affine.delinearize_index %[[IV]] into (%[[OUT_D0]], %[[OUT_D1]]) : index, index
+//      CHECK:     scf.if %[[MASK]] {
+// CHECK-NEXT:       %[[INPUT_ELEM:.+]] = memref.load %[[INPUT]][%[[IV]]]
+// CHECK-NEXT:       memref.store %[[INPUT_ELEM]], %[[OUTPUT]]
+// CHECK-SAME:         [%[[OUT_IDX]]#0, %[[OUT_IDX]]#1] : memref<?x?xf32>

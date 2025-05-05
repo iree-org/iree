@@ -353,6 +353,40 @@ LogicalResult MapScatterOp::verify() {
   return success();
 }
 
+void MapScatterOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numSourceIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldSourceIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numSourceIndices, builder.getIndexType());
+  SmallVector<Location> locs(numSourceIndices, getLoc());
+
+  // Create the new block arguments for the new source indices, and transform
+  // them using the callback.
+  SmallVector<BlockArgument> newSourceIndices(
+      transformBody.addArguments(indexTypes, locs));
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(&transformBody);
+  SmallVector<Value> newSourceIndicesTransformed(
+      transformationBuilder(newSourceIndices));
+
+  // Replace the old source indices with the results of the transformation on
+  // the new source indices.
+  assert(oldSourceIndices.size() == newSourceIndicesTransformed.size() &&
+         "expected transformation to produce the same number of Values as the "
+         "previous number of source indices.");
+  for (auto [oldIdx, newIdx] :
+       llvm::zip_equal(oldSourceIndices, newSourceIndicesTransformed)) {
+    SmallVector<OpOperand *> uses(llvm::make_pointer_range(oldIdx.getUses()));
+    for (OpOperand *use : uses) {
+      use->set(newIdx);
+    }
+  }
+  transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//

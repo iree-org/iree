@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 
 #define DEBUG_TYPE "linalg-ext-tiling"
@@ -435,6 +436,154 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
   b.create<memref::StoreOp>(
       loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
       getOutput(), ivs);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MapScatterOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> MapScatterOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+SmallVector<Range> MapScatterOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
+    OpFoldResult ub = getDim(builder, loc, getInput(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+FailureOr<TilingResult>
+MapScatterOp::getTiledImplementation(OpBuilder &builder,
+                                     ArrayRef<OpFoldResult> offsets,
+                                     ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+
+  // Get a slice of the input.
+  SmallVector<OpFoldResult> inputStrides(getInputRank(),
+                                         builder.getI64IntegerAttr(1));
+  Operation *inputSlice =
+      getSlice(builder, loc, getInput(), offsets, sizes, inputStrides);
+  if (!inputSlice) {
+    return emitOpError("failed to get input slice");
+  }
+
+  // Clone the operation with the slice of the input, and then compose the
+  // tiling offsets with the index transformation of the map_scatter op,
+  // because the space of the transformation source indices is now local to
+  // the new input tile.
+  Operation *tiledOp = mlir::clone(builder, getOperation(), getResultTypes(),
+                                   {inputSlice->getResult(0), getOutput()});
+  auto tiledMapScatterOp = cast<MapScatterOp>(tiledOp);
+  auto indexTransformBuilder =
+      [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
+    SmallVector<OpFoldResult> offsetIndices;
+    auto addMap = AffineMap::get(
+        2, 0, {builder.getAffineDimExpr(0) + builder.getAffineDimExpr(1)});
+    for (auto [srcIdx, offset] : llvm::zip_equal(srcIndices, offsets)) {
+      offsetIndices.push_back(affine::makeComposedFoldedAffineApply(
+          builder, loc, addMap, {OpFoldResult(srcIdx), offset}));
+    }
+    return getValueOrCreateConstantIndexOp(builder, loc, offsetIndices);
+  };
+  tiledMapScatterOp.insertTransformationAtStart(builder, indexTransformBuilder,
+                                                offsets.size());
+  return TilingResult{{tiledOp}, {tiledOp->getResults()}, {inputSlice}};
+}
+
+LogicalResult MapScatterOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  resultOffsets = SmallVector<OpFoldResult>(getOutputRank(), zeroAttr);
+  for (auto dim : llvm::seq<int64_t>(getOutputRank())) {
+    resultSizes.push_back(getDim(builder, getLoc(), getOutput(), dim));
+  }
+  return success();
+}
+
+LogicalResult MapScatterOp::getIterationDomainTileFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  if (operandNumber != getInputMutable().getOperandNumber()) {
+    return failure();
+  }
+  // The iteration domain is defined in terms of the `input`, so simply
+  // use the given offsets/sizes.
+  iterDomainOffsets.assign(offsets.begin(), offsets.end());
+  iterDomainSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTile(
+    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromOperandTile(
+          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  return getTiledImplementation(b, mappedOffsets, mappedSizes);
+}
+
+/// The body of the transformation_region is inlined, and the yielded indices
+/// are used to write input values to the output. The reads and writes are
+/// wrapped in an scf.if, conditioned on the yielded mask value of the
+/// transformation body.
+LogicalResult MapScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                         Location loc,
+                                                         ValueRange ivs) {
+  // The scalar implementation is currently only implemented for buffer
+  // semantics, because we need to conditionally write values based on the
+  // mask.
+  if (!hasPureBufferSemantics()) {
+    return failure();
+  }
+  Block &transformBlock = getTransformationRegion().front();
+  IRMapping mapping;
+  // Map the induction variables of the loop nest to the block arguments of the
+  // transformation body. The induction variables are the indices looping over
+  // the elements of input operand.
+  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
+    mapping.map(arg, ivs[idx]);
+  }
+  // Clone the operations within the transformation body to the current
+  // insertion point, and map their results to the new cloned operations'
+  // results.
+  for (Operation &op : transformBlock.without_terminator()) {
+    Operation *clonedOp = b.clone(op, mapping);
+    for (auto [result, clonedResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapping.map(result, clonedResult);
+    }
+  }
+
+  // Get the cloned values that were yielded by the transformation body to use
+  // as the indices for the store into the output.
+  SmallVector<Value> storeIndexValues = llvm::map_to_vector(
+      transformBlock.getTerminator()->getOperands(),
+      [&](Value operand) { return mapping.lookupOrDefault(operand); });
+  // The last yielded Value is the mask, so use it as the if condition instead
+  // of the store indices.
+  Value ifCond = storeIndexValues.pop_back_val();
+  auto thenBuilder = [&](OpBuilder &nestedBuilder, Location nestedLoc) {
+    Value input = nestedBuilder.create<memref::LoadOp>(loc, getInput(), ivs);
+    nestedBuilder.create<memref::StoreOp>(nestedLoc, input, getOutput(),
+                                          storeIndexValues);
+    nestedBuilder.create<scf::YieldOp>(nestedLoc);
+  };
+  b.create<scf::IfOp>(loc, ifCond, thenBuilder);
   return success();
 }
 
