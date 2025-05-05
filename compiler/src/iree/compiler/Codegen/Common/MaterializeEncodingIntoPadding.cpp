@@ -88,8 +88,10 @@ static RankedTensorType getPaddedType(Attribute layoutAttr,
 struct MaterializePadEncodingTypeConverter final
     : MaterializeEncodingTypeConverter {
   MaterializePadEncodingTypeConverter(
-      IREE::Codegen::LayoutAttrInterface layoutAttr)
-      : MaterializeEncodingTypeConverter(layoutAttr) {
+      IREE::Codegen::LayoutAttrInterface layoutAttr,
+      MaterializeEncodingValueFn materializeEncodingValueFn)
+      : MaterializeEncodingTypeConverter(layoutAttr,
+                                         materializeEncodingValueFn) {
     addConversion([](RankedTensorType type) -> std::optional<RankedTensorType> {
       // The type converter is designed for `pad_encoding_layout` encoding
       // attribute. By the definition, the final converted type is the same
@@ -123,8 +125,8 @@ struct MaterializePadEncodingTypeConverter final
 /// source. This way we do not create partial loads prematurely, which would be
 /// difficult to undo later on.
 struct MaterializeFlowDispatchTensorLoadOp final
-    : OpMaterializeEncodingPattern<IREE::TensorExt::DispatchTensorLoadOp> {
-  using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
+    : OpConversionPattern<IREE::TensorExt::DispatchTensorLoadOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
@@ -179,8 +181,8 @@ struct MaterializeFlowDispatchTensorLoadOp final
 /// destination and insert the value into it. This way we do not create partial
 /// stores prematurely, which would be difficult to undo later on.
 struct MaterializeFlowDispatchTensorStoreOp final
-    : OpMaterializeEncodingPattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
+    : OpConversionPattern<IREE::TensorExt::DispatchTensorStoreOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
@@ -240,8 +242,8 @@ struct MaterializeFlowDispatchTensorStoreOp final
 /// same as the tensor type that drops encoding.
 /// TODO(#20160): Abstract new interface methods and collapse two patterns.
 struct MaterializeInterfaceBindingEncoding final
-    : OpMaterializeEncodingPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpMaterializeEncodingPattern::OpMaterializeEncodingPattern;
+    : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
@@ -319,11 +321,11 @@ struct MaterializeEncodingIntoPaddingPass final
     }
 
     RewritePatternSet materializeEncodingPattern(context);
-    MaterializePadEncodingTypeConverter typeConverter(layoutAttr);
+    MaterializePadEncodingTypeConverter typeConverter(
+        layoutAttr, materializeEncodingValueFn);
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(materializeEncodingPattern, target,
-                                        typeConverter,
-                                        materializeEncodingValueFn);
+                                        typeConverter);
 
     // The majority of this conversion is based on the 'Nop' materialization,
     // with the exception of a few ops that have to account for padding.
@@ -332,8 +334,7 @@ struct MaterializeEncodingIntoPaddingPass final
     materializeEncodingPattern.add<MaterializeFlowDispatchTensorLoadOp,
                                    MaterializeFlowDispatchTensorStoreOp,
                                    MaterializeInterfaceBindingEncoding>(
-        context, typeConverter, materializeEncodingValueFn,
-        PatternBenefit{100});
+        typeConverter, context, PatternBenefit{100});
 
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
