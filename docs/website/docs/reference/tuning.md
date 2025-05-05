@@ -81,6 +81,7 @@ transform.named_sequence
 transform.named_sequence
 @match_mmt_2048x1280x5120_f16_f16_f32(%matmul: !transform.any_op {transform.readonly})
   -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul)
     : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
