@@ -371,7 +371,7 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
 };
 
 struct GPUHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+    : HostSerializableEncodingAttrInterfaceExternalModelBase<
           GPUHostSerializableEncodingAttrInterface, GPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
