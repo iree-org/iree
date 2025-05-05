@@ -36,7 +36,8 @@ using MaterializeEncodingValueFn =
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
   MaterializeEncodingTypeConverter(
-      IREE::Codegen::LayoutAttrInterface layoutAttr);
+      IREE::Codegen::LayoutAttrInterface layoutAttr,
+      MaterializeEncodingValueFn materializeEncodingValueFn);
 
   const IREE::Codegen::LayoutAttrInterface &getLayoutAttr() const {
     return layoutAttr;
@@ -45,29 +46,19 @@ public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(RankedTensorType type) const;
 
+  FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfr(
+      OpBuilder &rewriter, Location loc, RankedTensorType tensorType,
+      const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo)
+      const;
+
 private:
   const IREE::Codegen::LayoutAttrInterface layoutAttr;
+  const MaterializeEncodingValueFn materializeEncodingValueFn;
 };
 
 /// Conversion target to use for for materializing the encoding.
 struct MaterializeEncodingConversionTarget : public ConversionTarget {
   MaterializeEncodingConversionTarget(MLIRContext &context);
-};
-
-/// Base class for patterns that materialize encoding.
-template <typename OpTy>
-class OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
-public:
-  OpMaterializeEncodingPattern(
-      MLIRContext *context,
-      const MaterializeEncodingTypeConverter &typeConverter,
-      MaterializeEncodingValueFn materializeEncodingValueFn = {},
-      PatternBenefit benefit = 1)
-      : OpConversionPattern<OpTy>(typeConverter, context, benefit),
-        materializeEncodingValueFn(materializeEncodingValueFn) {}
-
-protected:
-  const MaterializeEncodingValueFn materializeEncodingValueFn;
 };
 
 //===---------------------------------------------------------------------===//
@@ -84,22 +75,19 @@ getEncodingInfoFromLayouts(RankedTensorType type);
 /// NOTE: `source` could be returned when packing is not needed.
 FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
-    Value source, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
+    Value source, const MaterializeEncodingTypeConverter &typeConverter);
 
 /// Utility method to convert from `unset_encoding` op to `unpack` operation.
 /// NOTE: `packedValue` could be returned when unpacking is not needed.
 FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
-    Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
+    Value packedValue, const MaterializeEncodingTypeConverter &typeConverter);
 
 /// Populates the set of patterns that lowers operations with encoding types to
 /// operations without encodings.
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
-    MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn);
+    MaterializeEncodingTypeConverter &typeConverter);
 
 } // namespace mlir::iree_compiler
 
