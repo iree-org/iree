@@ -2,9 +2,7 @@
 hide:
   - tags
 tags:
-  - sharktuner
-  - SHARKTUNER
-  - Tuner
+  - performance
 icon: octicons/meter-16
 status: new
 ---
@@ -30,16 +28,18 @@ default specs, we aim to cover the most in-demand hardware and dispatches from
 the most popular ML models, although we do not guarantee completeness. So for
 many users, the default specs will provide sufficient performance.
 
-But for users looking to get the best performance on custom models and hardware
+For users looking to get the best performance on custom models and hardware
 targets, the IREE compiler also supports user-provided tuning specs. These
-specs can be made manually or generated using SHARK Tuner, which is still under
-development.
+specs can be made manually or generated using SHARK Tuner. SHARK Tuner is a
+"dispatch tuner", which means it performs tuning on knobs exposed within IREE
+"dispatch regions". Provided a "dispatch", a unit of compute produced in the
+lowering done by IREE, SHARK Tuner can generate a tuning spec to be used in the
+process of exploring possible tuning candidates to achieve greater performance.
 
 !!! info
-    Additional information on installation and a hands-on
-    [example](https://github.com/nod-ai/shark-ai/tree/main/sharktuner/model_tuner)
-    is available in an external
-    [repository](https://github.com/nod-ai/shark-ai/tree/main/sharktuner).
+    For more information about SHARK Tuner, see its source in the
+    [shark-ai GitHub repository](https://github.com/nod-ai/shark-ai/tree/main/sharktuner)
+    and the [Model Tuner example](https://github.com/nod-ai/shark-ai/tree/main/sharktuner/model_tuner).
 
 ## :octicons-package-16: Usage in IREE
 
