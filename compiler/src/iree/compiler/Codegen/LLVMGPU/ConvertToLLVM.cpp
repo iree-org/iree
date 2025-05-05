@@ -142,8 +142,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     if (!hasSharedMemoryAddressSpace(allocOp.getType()))
       return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
-    if (llvm::any_of(shape,
-                     [](int64_t dim) { return ShapedType::isDynamic(dim); })) {
+    if (ShapedType::isDynamicShape(shape)) {
       return failure();
     }
 
