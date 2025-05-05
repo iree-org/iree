@@ -624,12 +624,14 @@ public:
                      options.slpVectorization, passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
 
+        // Additional context on '-mcpu' flag in PR comments, see for example:
+        // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
         std::string header =
             llvm::formatv(R"TXT(
 ; To reproduce the .optimized.ll from the .linked.ll, run:
 ; opt -S -mtriple={} -mcpu={} --passes='{}'
 ; The flag '-S' to emit LLVMIR.
-; The behavior of some passes depend on '-mtriple' and '-mcpu'.
+; The behavior of some passes depends on '-mtriple' and '-mcpu'
 
 )TXT",
                           targetTriple, targetCPU, passesString);
