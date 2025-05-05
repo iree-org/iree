@@ -52,6 +52,8 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 
