@@ -59,8 +59,10 @@ getSerializableEncodingAttr(IREE::Codegen::LayoutAttrInterface layoutAttr,
 }
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
-    IREE::Codegen::LayoutAttrInterface layoutAttr)
-    : layoutAttr(layoutAttr) {
+    IREE::Codegen::LayoutAttrInterface layoutAttr,
+    MaterializeEncodingValueFn materializeEncodingValueFn)
+    : layoutAttr(layoutAttr),
+      materializeEncodingValueFn(materializeEncodingValueFn) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
@@ -134,6 +136,43 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
     return maybeEncodingInfo.value();
   }
   return layoutAttr.getEncodingInfo(type);
+}
+
+FailureOr<SmallVector<OpFoldResult>>
+MaterializeEncodingTypeConverter::getInnerTileSizesOfr(
+    OpBuilder &rewriter, Location loc, RankedTensorType tensorType,
+    const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo)
+    const {
+  ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
+  if (llvm::all_of(staticTileSizes,
+                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
+    return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
+  }
+  assert(materializeEncodingValueFn &&
+         "When dynamic tile sizes are generated, a MaterializeEncodingValueFn "
+         "should be provided.");
+
+  FailureOr<MaterializeEncodingValueInfo> materializeEncodingValueInfo =
+      materializeEncodingValueFn(tensorType, rewriter, loc);
+  if (failed(materializeEncodingValueInfo)) {
+    return failure();
+  }
+  ArrayRef<Value> innerTileSizeValues =
+      materializeEncodingValueInfo->innerTileSizes;
+
+  SmallVector<OpFoldResult> result(staticTileSizes.size());
+  for (size_t i = 0; i < result.size(); ++i) {
+    if (ShapedType::isDynamic(staticTileSizes[i])) {
+      result[i] = innerTileSizeValues[i];
+    } else if (tensorType.isDynamicDim(i)) {
+      result[i] =
+          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
+              .getResult();
+    } else {
+      result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
+    }
+  }
+  return result;
 }
 
 std::optional<IREE::Codegen::MaterializeEncodingInfo>

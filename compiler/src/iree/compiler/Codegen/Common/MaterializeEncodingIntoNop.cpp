@@ -44,11 +44,11 @@ struct MaterializeEncodingIntoNopPass final
 
     RewritePatternSet materializeEncodingPattern(context);
     MaterializeEncodingTypeConverter typeConverter(
-        IREE::Codegen::EncodingNopLayoutAttr::get(context));
+        IREE::Codegen::EncodingNopLayoutAttr::get(context),
+        materializeEncodingValueFn);
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(materializeEncodingPattern, target,
-                                        typeConverter,
-                                        materializeEncodingValueFn);
+                                        typeConverter);
 
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
