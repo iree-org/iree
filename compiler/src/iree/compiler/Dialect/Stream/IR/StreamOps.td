@@ -40,7 +40,7 @@ let opDocGroup = OpGroupContextOps in {
 def Stream_ContextResolveOp : Stream_PureOp<"context.resolve", [
   Stream_AffinityOp,
 ]> {
-  let summary = [{resolves low-level context resources based on type}];
+  let summary = [{Resolves low-level context resources based on type.}];
   let description = [{
     WIP; allows for accessing the implementation details of lower-level dialects
     such as the HAL. This will likely be reworked in the future to either
@@ -91,7 +91,7 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{allocates a persistent resource}];
+  let summary = [{Allocates a persistent resource.}];
   let description = [{
     Allocates a persistent value (one that is long-lived and possibly external
     to the program) with undefined contents. Consumers of the allocated
@@ -151,7 +151,7 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
   AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{allocates a transient value with undefined contents}];
+  let summary = [{Allocates a transient value with undefined contents.}];
   let description = [{
     Allocates a transient value (one that is short-lived and local to the
     current computation) with undefined contents. Consumers of the allocated
@@ -215,7 +215,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   Util_SizeAwareOp,
   MemoryEffects<[MemFree]>,
 ]> {
-  let summary = [{frees a transient value when available}];
+  let summary = [{Frees a transient value when available.}];
   let description = [{
     Deallocates a transient value (one that is short-lived and local to the
     current computation) previously allocated using `stream.resource.alloca`.
@@ -265,7 +265,7 @@ def Stream_ResourceRetainOp : Stream_Op<"resource.retain", [
   Stream_CmdPhaseOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{retains ownership of the resource}];
+  let summary = [{Retains ownership of the resource.}];
   let description = [{
     Retains ownership of the resource for the parent code until a corresponding
     `stream.resource.release` is used to release the ownership claim. A
@@ -300,7 +300,7 @@ def Stream_ResourceReleaseOp : Stream_Op<"resource.release", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{releases an ownership claim on the resource}];
+  let summary = [{Releases an ownership claim on the resource.}];
   let description = [{
     A resource is allowed to be deallocated or reused once the last owner
     releases their ownership. Returns a boolean indicating whether the owner
@@ -331,7 +331,7 @@ def Stream_ResourceIsTerminalOp : Stream_Op<"resource.is_terminal", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns true if the resource has no other claims to ownership}];
+  let summary = [{Returns true if the resource has no other claims to ownership.}];
   let description = [{
     Resources may have multiple conceptual owners and are generally only safe to
     deallocate if the code performing the deallocation is the last owner. This
@@ -361,7 +361,7 @@ def Stream_ResourceIsTerminalOp : Stream_Op<"resource.is_terminal", [
 def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
   Util_SizeAwareOp,
 ]> {
-  let summary = [{returns the size of the resource storage in bytes}];
+  let summary = [{Returns the size of the resource storage in bytes.}];
   let description = [{
     Returns a possibly runtime-dynamic byte size of the resource backing
     storage. This may differ from the logical storage size of a value based on
@@ -396,7 +396,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   Util_SizeAwareOp,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{maps read-only memory into a resource}];
+  let summary = [{Maps read-only memory into a resource.}];
   let description = [{
     Synchronously maps a host heap buffer into a stream-accessible resource
     with the requested lifetime. If the given source cannot be mapped the
@@ -438,7 +438,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
 def Stream_ResourceLoadOp : Stream_Op<"resource.load", [
   Util_SizeAwareOp,
 ]> {
-  let summary = [{loads a value from a staging resource}];
+  let summary = [{Loads a value from a staging resource.}];
   let description = [{
     Returns the element(s) at the given offset in the staging resource.
     The operation will complete synchronously against the resource though it may
@@ -476,7 +476,7 @@ def Stream_ResourceStoreOp : Stream_Op<"resource.store", [
   Util_SizeAwareOp,
   MemoryEffects<[MemWrite]>,
 ]> {
-  let summary = [{stores a value into a staging resource}];
+  let summary = [{Stores a value into a staging resource.}];
   let description = [{
     The operation will complete synchronously against the resource though it may
     introduce a yield point if the staging resource needs to be acquired.
@@ -513,7 +513,7 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Stream_AffinityOp,
 ]> {
-  let summary = [{packs variable-sized slices into a single slab}];
+  let summary = [{Packs variable-sized slices into a single slab.}];
   let description = [{
     Performs a greedy packing of one or more sized slices with specified
     lifetimes and returns their relative offsets in an aliased linear space.
@@ -619,7 +619,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{asynchronously uploads or maps constant values}];
+  let summary = [{Asynchronously uploads or maps constant values.}];
   let description = [{
     Represents an upload of constant resources that may be packed, suballocated,
     and mapped depending on the final lowering target.
@@ -688,7 +688,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{slices out a subview of a value}];
+  let summary = [{Slices out a subview of a value.}];
   let description = [{
     Aliases a byte subrange of a resource.
   }];
@@ -752,7 +752,7 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads one or more resources from a parameter scope}];
+  let summary = [{Reads one or more resources from a parameter scope.}];
   let description = [{
     Asynchronously reads one or more resources from an external parameter
     provider and returns the resulting stream resources. Depending on the
@@ -806,7 +806,7 @@ def Stream_ParameterReadOp : Stream_Op<"parameter.read", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads a resource from a parameter scope}];
+  let summary = [{Reads a resource from a parameter scope.}];
   let description = [{
     Asynchronously reads a resource from an external parameter provider into the
     provided target resource range.
@@ -858,7 +858,7 @@ def Stream_ParameterWriteOp : Stream_Op<"parameter.write", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{writes a resource to a parameter scope}];
+  let summary = [{Writes a resource to a parameter scope.}];
   let description = [{
     Asynchronously writes a resource to an external parameter provider from
     the provided source resource range.
@@ -911,7 +911,7 @@ def Stream_ParameterGatherOp : Stream_Op<"parameter.gather", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{gathers multiple resources from a parameter scope}];
+  let summary = [{Gathers multiple resources from a parameter scope.}];
   let description = [{
     Asynchronously gathers one or more resources into a single target stream
     resource. This is equivalent to one `stream.parameter.read` per parameter
@@ -967,7 +967,7 @@ def Stream_ParameterScatterOp : Stream_Op<"parameter.scatter", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{scatters multiple resources to a parameter scope}];
+  let summary = [{Scatters multiple resources to a parameter scope.}];
   let description = [{
     Asynchronously scatters one or more resources from a single source resource
     into one or more parameters. This is equivalent to one
@@ -1036,7 +1036,7 @@ def Stream_FileConstantOp : Stream_PureOp<"file.constant", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{creates a file backed by the provided constant host memory}];
+  let summary = [{Creates a file backed by the provided constant host memory.}];
   let description = [{
     Synchronously wraps a host heap buffer into a stream-accessible file handle.
     Changing the source buffer after definition has undefined behavior.
@@ -1074,7 +1074,7 @@ def Stream_FileReadOp : Stream_Op<"file.read", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads a segment of a file into a resource}];
+  let summary = [{Reads a segment of a file into a resource.}];
   let description = [{
     Asynchronously reads a segment of a file into a resource.
 
@@ -1129,7 +1129,7 @@ def Stream_FileWriteOp : Stream_Op<"file.write", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{writes a segment of a file from a resource}];
+  let summary = [{Writes a segment of a file from a resource.}];
   let description = [{
     Asynchronously writes a segment of a resource into a file.
     The file range must be valid within the file as this operation cannot
@@ -1205,7 +1205,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{conversion placeholder for other->stream type conversion}];
+  let summary = [{Conversion placeholder for other->stream type conversion.}];
   let description = [{
     Defines a conversion from a higher-level dialect type such as `tensor` that
     is resolved during lowering into the stream dialect. This can be used to
@@ -1267,7 +1267,7 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{conversion placeholder for stream->other type conversion}];
+  let summary = [{Conversion placeholder for stream->other type conversion.}];
   let description = [{
     Defines a conversion to a higher-level dialect type such as `tensor` that
     is resolved during lowering into the stream dialect. This can be used to
@@ -1327,7 +1327,7 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
   Stream_AffinityOp,
   Stream_TensorPhaseOp,
 ]> {
-  let summary = [{calculates the storage size of a given high-level type}];
+  let summary = [{Calculates the storage size of a given high-level type.}];
   let description = [{
     Target-dependent storage size calculation using a high-level annotated type.
     While within the stream dialect the storage size of a value is left as a
@@ -1365,7 +1365,7 @@ def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{defines an empty tensor value}];
+  let summary = [{Defines an empty tensor value.}];
   let description = [{
     Returns a typed resource initialized with no contents. This still carries
     shape metadata and may encode to a non-empty resource such as in cases
@@ -1410,7 +1410,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
   Util_ShapeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{defines a constant tensor value}];
+  let summary = [{Defines a constant tensor value.}];
   let description = [{
     Returns a typed resource initialized to the given constant value.
   }];
@@ -1455,7 +1455,7 @@ def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{splats a value into a shaped tensor}];
+  let summary = [{Splats a value into a shaped tensor.}];
   let description = [{
     Returns a typed resource initialized to the given primitive value.
   }];
@@ -1504,7 +1504,7 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{clones the contents of a value}];
+  let summary = [{Clones the contents of a value.}];
   let description = [{
     Clones the contents of a value at a snapshot in time. Future changes to the
     cloned value will not effect the result. Acts as a copy-on-write operation.
@@ -1558,7 +1558,7 @@ def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{Encodes the contents of a value}];
+  let summary = [{Encodes the contents of a value.}];
   let description = [{
     Elones the contents of a value at a snapshot in time. Future changes to the
     identity encoding will not effect the result. Acts as a copy-on-write
@@ -1612,7 +1612,7 @@ def Stream_TensorSliceOp : Stream_PureOp<"tensor.slice", [
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{slices out a cloned subview of a value}];
+  let summary = [{Slices out a cloned subview of a value.}];
   let description = [{
     Slices a subrange of a stream resource based on a tensor encoding. Acts as a
     copy-on-write operation.
@@ -1674,7 +1674,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{fills a subview of a stream resource with a value}];
+  let summary = [{Fills a subview of a stream resource with a value.}];
   let description = [{
     Splats a value into a subview of the given stream resource and returns the
     resource with the update applied.
@@ -1733,7 +1733,7 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{updates a slice of a subview of a resource in-place}];
+  let summary = [{Updates a slice of a subview of a resource in-place.}];
   let description = [{
     Copies a value into a resource based on tensor encodings. The returned value
     is the entire updated target value.
@@ -1791,7 +1791,7 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{loads a value from a tensor element}];
+  let summary = [{Loads a value from a tensor element.}];
   let description = [{
     Returns the element at the given location from within the tensor.
   }];
@@ -1841,7 +1841,7 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{stores a value into a tensor element}];
+  let summary = [{Stores a value into a tensor element.}];
   let description = [{
     Returns a tensor with the element at the given index set to the given value.
   }];
@@ -1886,7 +1886,7 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
   DeclareOpInterfaceMethods<Util_ShapeAwareOp>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{traces one or more tensor values at runtime}];
+  let summary = [{Traces one or more tensor values at runtime.}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
     tensors. The key is arbitrary and can be used for identifying the set of
@@ -1928,7 +1928,7 @@ def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
     "getTiedOperandsIndexAndLength",
   ]>,
 ]> {
-  let summary = [{dispatches a parallelized grid of work}];
+  let summary = [{Dispatches a parallelized grid of work.}];
   let description = [{
     Calls the specified entry point function once for each element in the
     specified workgroup count. Each workgroup has access to the same operands
@@ -2015,7 +2015,7 @@ def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{allocates a transient value with undefined contents}];
+  let summary = [{Allocates a transient value with undefined contents.}];
   let description = [{
     Allocates a transient value (one that is short-lived and local to the
     current computation) with undefined contents. Consumers of the allocated
@@ -2055,7 +2055,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{defines a constant resource}];
+  let summary = [{Defines a constant resource.}];
   let description = [{
     Returns a new resource with the given constant value.
   }];
@@ -2099,7 +2099,7 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
   ]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{splats a value into a resource}];
+  let summary = [{Splats a value into a resource.}];
   let description = [{
     Returns a new resource with the given primitive value splatted out to fill
     the entire contents.
@@ -2141,7 +2141,7 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
   ]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{clones the contents of a value}];
+  let summary = [{Clones the contents of a value.}];
   let description = [{
     Clones the contents of a value at a snapshot in time. Future changes to the
     cloned value will not effect the result. Acts as a copy-on-write operation.
@@ -2186,7 +2186,7 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   ]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{slices out a cloned subview of a value}];
+  let summary = [{Slices out a cloned subview of a value.}];
   let description = [{
     Slices a subrange of a stream resource based on a byte range. Acts as a
     copy-on-write operation.
@@ -2238,7 +2238,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{fills a subview of a stream resource with a value}];
+  let summary = [{Fills a subview of a stream resource with a value.}];
   let description = [{
     Splats a value into a subview of the given stream resource and returns the
     resource with the update applied.
@@ -2293,7 +2293,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{updates a slice of a subview of a resource in-place}];
+  let summary = [{Updates a slice of a subview of a resource in-place.}];
   let description = [{
     Copies a value into a resource based on a byte range. The returned value
     is the entire updated target value. Updates can be turned into placement
@@ -2350,7 +2350,7 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{copies a subview of a stream resource to another}];
+  let summary = [{Copies a subview of a stream resource to another.}];
   let description = [{
     Copies a subview of a resource into a subview of another.
     As with memcpy this does not support overlapping updates into the same
@@ -2413,7 +2413,7 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{performs a collective operation}];
+  let summary = [{Performs a collective operation.}];
   let description = [{
     TODO: document different usage. For now this should be considered a
     prototype and that modeling of collective operations may change in the
@@ -2482,7 +2482,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{indicates a value that must have a specific affinity}];
+  let summary = [{Indicates a value that must have a specific affinity.}];
   let description = [{
     Prevents fusion and scheduling of a value across an affinity boundary.
     May introduce copy-on-write behavior if the operand value is used as well as
@@ -2533,7 +2533,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   ]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{transfers a resource from one location/state to another}];
+  let summary = [{Transfers a resource from one location/state to another.}];
   let description = [{
     Transfers a resource between different states (such as a `staging` lifetime
     to a `local` lifetime) or different affinities. This is roughly equivalent
@@ -2583,7 +2583,7 @@ def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
   Stream_AsyncPhaseOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{loads a value from a resource}];
+  let summary = [{Loads a value from a resource.}];
   let description = [{
     Returns the element at the given location from within the resource.
   }];
@@ -2625,7 +2625,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{stores a value into a resource}];
+  let summary = [{Stores a value into a resource.}];
   let description = [{
     Returns a resource with the element at the given offset set to the given
     value.
@@ -2676,7 +2676,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     "getTiedOperandsIndexAndLength",
   ]>,
 ]> {
-  let summary = [{dispatches a parallelized grid of work}];
+  let summary = [{Dispatches a parallelized grid of work.}];
   let description = [{
     Calls the specified entry point function once for each element in the
     specified workgroup count. Each workgroup has access to the same operands
@@ -2772,7 +2772,7 @@ def Stream_AsyncFuncOp : Stream_Op<"async.func", [
   IsolatedFromAbove,
   Stream_AsyncPhaseOp,
 ]> {
-  let summary = [{streamable function declaration}];
+  let summary = [{Streamable function declaration.}];
   let description = [{
     Declares a function that can be called as an asynchronous streaming
     operation via `stream.async.call`. Today only external functions are
@@ -2850,7 +2850,7 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     "getTiedOperandsIndexAndLength",
   ]>,
 ]> {
-  let summary = [{calls a streamable external host function}];
+  let summary = [{Calls a streamable external host function.}];
   let description = [{
     Calls a function taking/returning resource values with stream semantics.
     Asynchronous calls must have no side-effects.
@@ -2959,7 +2959,7 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
     "getTiedResultsIndexAndLength",
   ]>,
 ]> {
-  let summary = [{executes a dependency-aware sequence of streamable ops}];
+  let summary = [{Executes a dependency-aware sequence of streamable ops.}];
   let description = [{
     Evaluates the operations within the region by dependency order while obeying
     ties when present. Nested ops execute serially in block order and nested
@@ -3052,7 +3052,7 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface>,
 ]> {
-  let summary = [{executes all ops concurrently}];
+  let summary = [{Executes all ops concurrently.}];
   let description = [{
     Represents a wave of work scheduled concurrently (each op executing at the
     same time). All resource inputs must be captured explicitly. All results are
@@ -3162,7 +3162,7 @@ def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{flushes a subview of a resource}];
+  let summary = [{Flushes a subview of a resource.}];
   let description = [{
     Transfers a resource to an external target. The resource memory is made
     available to the target and can be made visible there using
@@ -3201,7 +3201,7 @@ def Stream_CmdInvalidateOp : Stream_Op<"cmd.invalidate", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{invalidates a subview of a resource}];
+  let summary = [{Invalidates a subview of a resource.}];
   let description = [{
     Transfers a resource from an external source into the current target. The
     resource memory is assumed to have been made available at the source via
@@ -3240,7 +3240,7 @@ def Stream_CmdDiscardOp : Stream_Op<"cmd.discard", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{discards a subview of a resource}];
+  let summary = [{Discards a subview of a resource.}];
   let description = [{
     Discards a subview of a resource, indicating that after this command the
     specified contents are no longer needed. This can be used to trim memory
@@ -3277,7 +3277,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{fills a subview of a stream resource with a value}];
+  let summary = [{Fills a subview of a stream resource with a value.}];
   let description = [{
     Splats a value into a subview of the given stream resource and returns the
     resource with the update applied.
@@ -3316,7 +3316,7 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{copies a subview of a stream resource to another}];
+  let summary = [{Copies a subview of a stream resource to another.}];
   let description = [{
     Copies a subview of a resource into a subview of another.
     As with memcpy this does not support overlapping updates into the same
@@ -3362,7 +3362,7 @@ def Stream_CmdCollectiveOp : Stream_Op<"cmd.collective", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{dispatches a collective operation}];
+  let summary = [{Dispatches a collective operation.}];
   let description = [{
     Dispatches a collective operation specified against the device. If grouped
     with other collectives in a `stream.cmd.concurrent` region the collective
@@ -3415,7 +3415,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{dispatches a parallelized grid of work}];
+  let summary = [{Dispatches a parallelized grid of work.}];
   let description = [{
     Calls the specified entry point function once for each element in the
     specified workgroup count. Each workgroup has access to the same operands
@@ -3477,7 +3477,7 @@ def Stream_CmdFuncOp : Stream_Op<"cmd.func", [
   IsolatedFromAbove,
   Stream_CmdPhaseOp,
 ]> {
-  let summary = [{streamable function declaration}];
+  let summary = [{Streamable function declaration.}];
   let description = [{
     Declares a function that can be called as an asynchronous streaming
     operation via `stream.cmd.call`. Today only external functions are
@@ -3541,7 +3541,7 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{calls a streamable external host function}];
+  let summary = [{Calls a streamable external host function.}];
   let description = [{
     Calls a function operating on resource values with stream semantics.
     Asynchronous calls must have no side-effects.
@@ -3633,7 +3633,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
 ]> {
-  let summary = [{executes a dependency-aware sequence of streamable ops}];
+  let summary = [{Executes a dependency-aware sequence of streamable ops.}];
   let description = [{
     Evaluates the operations within the region by dependency order while obeying
     ties when present. Nested ops execute serially in block order and nested
@@ -3710,7 +3710,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   Stream_CmdPhaseOp,
   Stream_StreamableOp,
 ]> {
-  let summary = [{executes all ops serially (in-order)}];
+  let summary = [{Executes all ops serially (in-order).}];
   let description = [{
     Represents a sequence of work scheduled serially (each op executing one
     after the other).
@@ -3776,7 +3776,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   Stream_CmdPhaseOp,
   Stream_StreamableOp,
 ]> {
-  let summary = [{executes all ops concurrently}];
+  let summary = [{Executes all ops concurrently.}];
   let description = [{
     Represents a wave of work scheduled concurrently (each op executing at the
     same time).
@@ -3843,7 +3843,7 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   ConstantLike,
   Stream_TimelineOp,
 ]> {
-  let summary = [{results an immediately-available timepoint}];
+  let summary = [{Results an immediately-available timepoint.}];
   let description = [{
     Timepoints indicate a point in the execution timeline and this op can be
     used to get a placeholder representing the start of the timeline. Any waits
@@ -3871,7 +3871,7 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
 def Stream_TimepointImportOp : Stream_PureOp<"timepoint.import", [
   Stream_AffinityOp,
 ]> {
-  let summary = [{imports a timepoint from an external dialect type}];
+  let summary = [{Imports a timepoint from an external dialect type.}];
   let description = [{
     Defines a conversion from an external dialect type such as `hal.semaphore`
     that is resolved during lowering into the stream dialect. This can be used
@@ -3899,7 +3899,7 @@ def Stream_TimepointImportOp : Stream_PureOp<"timepoint.import", [
 def Stream_TimepointExportOp : Stream_PureOp<"timepoint.export", [
   Stream_AffinityOp,
 ]> {
-  let summary = [{exports a timepoint to an external dialect type}];
+  let summary = [{Exports a timepoint to an external dialect type.}];
   let description = [{
     Defines a conversion to an external dialect type such as `hal.fence`
     that is resolved during lowering into the stream dialect. This can be used
@@ -3930,7 +3930,7 @@ def Stream_TimepointChainExternalOp :
     Stream_Op<"timepoint.chain_external", [
       Stream_AffinityOp,
     ]> {
-  let summary = [{exports a timepoint to an external dialect type}];
+  let summary = [{Exports a timepoint to an external dialect type.}];
   let description = [{
     Defines a conversion to an external dialect type such as `hal.fence`
     that is resolved during lowering into the stream dialect. This can be used
@@ -3958,7 +3958,7 @@ def Stream_TimepointChainExternalOp :
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
   Stream_TimelineOp,
 ]> {
-  let summary = [{joins one or more timepoints into the max of all of them}];
+  let summary = [{Joins one or more timepoints into the max of all of them.}];
   let description = [{
     Returns a timepoint that indicates that all of the input timepoints have
     been reached.
@@ -4001,7 +4001,7 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
     "getTiedResultsIndexAndLength",
   ]>,
 ]> {
-  let summary = [{returns a timepoint indicating when a resource is available}];
+  let summary = [{Returns a timepoint indicating when a resource is available.}];
   let description = [{
     After asynchronous execution scheduling resources may exist in different
     states at different points in the execution timeline. This op enables
@@ -4055,7 +4055,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{awaits a timepoint before returning a set of resources}];
+  let summary = [{Awaits a timepoint before returning a set of resources.}];
   let description = [{
     After asynchronous execution scheduling resources may exist in different
     states at different points in the execution timeline. This op enables
@@ -4135,7 +4135,7 @@ def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Stream_AffinityOp,
 ]> {
-  let summary = [{creates a new channel for collective communication}];
+  let summary = [{Creates a new channel for collective communication.}];
   let description = [{
     Returns a new channel with the given rank associated with the specified
     affinity. Collective operations using this channel must only be submitted on
@@ -4173,7 +4173,7 @@ def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
 def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
 ]> {
-  let summary = [{splits a collective communication channel}];
+  let summary = [{Splits a collective communication channel.}];
   let description = [{
     Partitions the group associated with the given channel into disjoint
     subgroups for each unique value of color. Each new subgroup contains all
@@ -4205,7 +4205,7 @@ def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
 def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the rank of the local participant in the group}];
+  let summary = [{Returns the rank of the local participant in the group.}];
   let description = [{
     Returns the rank the channel represents as a participant in a collective
     group in `[0, count)`.
@@ -4229,7 +4229,7 @@ def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
 def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the total number of participants in the group}];
+  let summary = [{Returns the total number of participants in the group.}];
   let description = [{
     Returns the total participant count in the collective communicator group.
   }];
@@ -4269,7 +4269,7 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
   SymbolTable,
   Util_ObjectLike,
 ]> {
-  let summary = [{generic executable module}];
+  let summary = [{Generic executable module.}];
   let description = [{
     An executable module containing one or more public functions. The contents
     of the functions are safe to dispatch and can be lowered further to
@@ -4311,7 +4311,7 @@ def Stream_ExecutableEndOp : Stream_Op<"executable.end", [
   HasParent<"IREE::Stream::ExecutableOp">,
   Terminator,
 ]> {
-  let summary = [{terminator pseudo-op for the executable op}];
+  let summary = [{Terminator pseudo-op for the executable op.}];
   let assemblyFormat = "attr-dict";
 }
 
@@ -4320,7 +4320,7 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   Symbol,
   IsolatedFromAbove,
 ]> {
-  let summary = [{defines an executable entry point for dispatch operations}];
+  let summary = [{Defines an executable entry point for dispatch operations.}];
   let description = [{
     Specifies an exported function with an externally-visible alias. Multiple
     exports can reference the same internal function.
@@ -4362,7 +4362,7 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{returns an alias to a subspan of interface binding data}];
+  let summary = [{Returns an alias to a subspan of interface binding data.}];
   let description = [{
     Returns a subview to a tensor or memref-like type from a binding. The same
     binding may have multiple subviews at different byte offsets.
@@ -4393,7 +4393,7 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
 def Stream_DispatchWorkgroupIDOp : Stream_PureOp<"dispatch.workgroup.id", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the index of the current workgroup in the grid}];
+  let summary = [{Returns the index of the current workgroup in the grid.}];
   let description = [{
     The global workgroup ID of the current workgroup in the range of
     `[0, stream.dispatch.workgroup.count)` along each dimension.
@@ -4427,7 +4427,7 @@ def Stream_DispatchWorkgroupIDOp : Stream_PureOp<"dispatch.workgroup.id", [
 def Stream_DispatchWorkgroupCountOp : Stream_PureOp<"dispatch.workgroup.count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the total workgroup count of the grid}];
+  let summary = [{Returns the total workgroup count of the grid.}];
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
 
@@ -4460,7 +4460,7 @@ def Stream_DispatchWorkgroupCountOp : Stream_PureOp<"dispatch.workgroup.count", 
 def Stream_DispatchWorkgroupSizeOp : Stream_PureOp<"dispatch.workgroup.size", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the size of each workgroup in invocations}];
+  let summary = [{Returns the size of each workgroup in invocations.}];
   let description = [{
     The number of local invocations within the current workgroup along each
     dimension. Depending on backend this may map to the SIMT thread count or
@@ -4518,7 +4518,7 @@ def Stream_ReturnOp : Stream_Op<"return", [
   ReturnLike,
   Terminator,
 ]> {
-  let summary = [{returns results from a region}];
+  let summary = [{Returns results from a region.}];
   let description = [{
     The values returned are copied by-value.
   }];
@@ -4550,7 +4550,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
   ]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{yields stream values from an execution region}];
+  let summary = [{Yields stream values from an execution region.}];
   let description = [{
     The values returned represent the asynchronous value at the point in time
     the SSA value is defined (or tied).
