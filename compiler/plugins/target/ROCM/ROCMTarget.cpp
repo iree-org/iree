@@ -612,17 +612,28 @@ public:
                          ".linked.ll", *llvmModule);
       }
 
+      // For example 'gfx942'
+      StringRef targetCPU = targetMachine->getTargetCPU();
+
+      // For example 'amdgcn-amd-amdhsa'
+      std::string targetTriple = targetMachine->getTargetTriple().str();
+
       // Run LLVM optimization passes.
       std::string passesString;
       optimizeModule(*llvmModule, *targetMachine, options.passPlugins,
                      options.slpVectorization, passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
-        std::string header = llvm::formatv(R"TXT(
+
+        std::string header =
+            llvm::formatv(R"TXT(
 ; To reproduce the .optimized.ll from the .linked.ll, run:
-; opt --passes='{}'
+; opt -S -mtriple={} -mcpu={} --passes='{}'
+; The flag '-S' to emit LLVMIR.
+; The behavior of some passes depend on '-mtriple' and '-mcpu'.
 
 )TXT",
-                                           passesString);
+                          targetTriple, targetCPU, passesString);
+
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
                          ".optimized.ll", *llvmModule, header);
