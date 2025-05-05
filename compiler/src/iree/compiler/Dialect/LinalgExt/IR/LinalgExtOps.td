@@ -375,6 +375,19 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
       return getOutputType().getRank();
     }
 
+    // Helper to apply transformations to the source index block arguments of
+    // the transformation body, and replace the uses of the previous source
+    // indices with the values returned by `transformationBuilder`. The argument
+    // to `transformationBuilder` function will be an ArrayRef of the new block
+    // arguments, the number of which is determined by `numSourceIndices`. The
+    // `transformationBuilder` should return the replacements for the old block
+    // arguments.
+    void insertTransformationAtStart(
+        OpBuilder &builder,
+        function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+            transformationBuilder,
+        int64_t numSourceIndices);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {

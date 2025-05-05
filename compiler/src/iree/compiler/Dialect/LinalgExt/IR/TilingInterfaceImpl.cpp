@@ -5,10 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -496,8 +494,8 @@ MapScatterOp::getTiledImplementation(OpBuilder &builder,
     }
     return getValueOrCreateConstantIndexOp(builder, loc, offsetIndices);
   };
-  insertTransformationAtMapScatterStart(builder, tiledMapScatterOp,
-                                        indexTransformBuilder, offsets.size());
+  tiledMapScatterOp.insertTransformationAtStart(builder, indexTransformBuilder,
+                                                offsets.size());
   return TilingResult{{tiledOp}, {tiledOp->getResults()}, {inputSlice}};
 }
 
