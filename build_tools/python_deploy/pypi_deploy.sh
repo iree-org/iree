@@ -22,7 +22,7 @@
 #   python -m venv .venv
 #   source .venv/bin/activate
 #   python -m pip install -r ./pypi_deploy_requirements.txt
-#   ./pypi_deploy.sh candidate-20220930.282
+#   ./pypi_deploy.sh iree-3.4.0rc20250430
 
 set -euo pipefail
 
