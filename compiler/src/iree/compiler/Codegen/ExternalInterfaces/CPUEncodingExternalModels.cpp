@@ -638,7 +638,7 @@ struct CPUHostEncodingLayoutResolverAttrInterface final
 };
 
 struct CPUHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+    : HostSerializableEncodingAttrInterfaceExternalModelBase<
           CPUHostSerializableEncodingAttrInterface, CPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
@@ -769,7 +769,7 @@ struct VMVXHostEncodingLayoutResolverAttrInterface final
 };
 
 struct VMVXHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+    : HostSerializableEncodingAttrInterfaceExternalModelBase<
           VMVXHostSerializableEncodingAttrInterface, VMVXEncodingLayoutAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
