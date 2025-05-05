@@ -712,13 +712,13 @@ TestingEncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 
 Attribute
 UnspecializedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
-  MLIRContext *ctx = getContext();
-  return SpecializedEncodingAttr::get(ctx, getSeed(), /*type=*/{});
+  return *this;
 }
 
-Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
+Attribute UnspecializedEncodingAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  return get(ctx, getSeed(), TypeAttr::get(type.dropEncoding()));
+  return SpecializedEncodingAttr::get(ctx, getSeed(),
+                                      TypeAttr::get(type.dropEncoding()));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

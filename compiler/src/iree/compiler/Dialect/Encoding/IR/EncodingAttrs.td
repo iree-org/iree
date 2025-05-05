@@ -376,6 +376,7 @@ def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "cloneWithSimplifiedConfig",
+        "getLayout",
       ]>
     ]> {
   let mnemonic = "unspecialized_encoding";
@@ -386,11 +387,11 @@ def UnspecializedEncodingAttr :
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
     very basic interface methods of EncodingLayoutResolverAttrInterface that
-    converts it to the SpecializeEncodingAttr during encoding specialization.
+    returns the SpecializedEncodingAttr with the same seed as serialized layout
+    in encoding specialization. Different seed values indicate different layouts.
+
     It is mainly for testing purpose as some transformations do not depend on
     actual dialects that implement the attribute interface.
-
-    Different seed values indicate different layouts.
   }];
 
   let parameters = (ins "int32_t":$seed);
@@ -398,9 +399,6 @@ def UnspecializedEncodingAttr :
 
 def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
-        "getLayout",
-      ]>,
       IREEEncoding_SerializableEncodingAttrInterface
     ]> {
   let mnemonic = "specialized_encoding";
@@ -410,11 +408,10 @@ def SpecializedEncodingAttr :
 
   let description = [{
     This attribute is similar to UnspecializedEncodingAttr, but with an optional
-    type. The attribute denotes the layout of the type. Different seed values
-    indicate different layouts, which can be used to emulate different encoding
-    attributes.
+    type. The attribute denotes the layout of the type.
 
-    Different seed values indicate different layouts.
+    Different seed values indicate different layouts, which can be used to
+    emulate different encoding attributes.
   }];
 
   let parameters = (ins
