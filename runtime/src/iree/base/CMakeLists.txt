@@ -23,6 +23,7 @@ iree_cc_library(
 # Note that with out of tree sources they must be absolute paths in order to be
 # found in this directory.
 set(IREE_ALLOCATOR_LIBC_SRCS "allocator_libc.c")
+set(IREE_ALLOCATOR_MIMALLOC_SRCS "allocator_mimalloc.c")
 
 # IREE_ALLOCATOR_SYSTEM -> variable expansion.
 string(TOUPPER ${IREE_ALLOCATOR_SYSTEM} _IREE_ALLOCATOR_SYSTEM)
