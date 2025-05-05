@@ -185,9 +185,10 @@ static const int64_t kDefaultSubgroupSize = 64; // TODO: can we query this?
 static const int64_t kDefaultGlobalLoadBitSizePerThread =
     32; // TODO: make it a query.
 SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
-  std::optional<SmallVector<int64_t>> workgroupSize =
-      getWorkgroupSize(op->getParentOfType<FunctionOpInterface>());
-  if (!workgroupSize) {
+  auto funcOp = op->getParentOfType<FunctionOpInterface>();
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!workgroupSize || !subgroupSize) {
     return {};
   }
   [[maybe_unused]] int64_t numThreads =
@@ -198,7 +199,7 @@ SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
   SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
 
   int64_t subgroupLoadSize =
-      (kDefaultGlobalLoadBitSizePerThread * kDefaultSubgroupSize) /
+      (kDefaultGlobalLoadBitSizePerThread * subgroupSize.value()) /
       getElementTypeOrSelf(linalgOp->getResultTypes()[0])
           .getIntOrFloatBitWidth();
   SmallVector<int64_t> tileSizes = getVectorTileSizesFromLoopRanges(
