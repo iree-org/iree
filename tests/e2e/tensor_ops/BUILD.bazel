@@ -19,12 +19,8 @@ ALL_SRCS = enforce_glob(
         "concat.mlir",
         "expand_shape.mlir",
         "extract_slice.mlir",
-        "pack.mlir",
-        "pack_dynamic_inner_tiles.mlir",
-        "pack_i8.mlir",
         "tensor_cast.mlir",
         "tensor_insert_slice.mlir",
-        "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [],
@@ -45,27 +41,6 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
-iree_check_single_backend_test_suite(
-    name = "check_vmvx_ukernel_local-task",
-    srcs = [
-        "pack.mlir",
-        "pack_dynamic_inner_tiles.mlir",
-        "unpack.mlir",
-    ],
-    compiler_flags = [
-        "--iree-vmvx-enable-microkernels",
-        # Some testcases have linalg.generic ops with multiple ops in the body.
-        # If we don't opt out from it, DecomposeLinalgGenericPass splits those
-        # into smaller linalg.generic ops with only one op in the body. This
-        # results in the creation of temporary buffers between these split
-        # linalg.generic ops, causing:
-        # > error: failed to legalize operation 'memref.alloca' that was explicitly marked illegal
-        "--iree-vmvx-enable-ukernels-decompose-linalg-generic=false",
-    ],
-    driver = "local-task",
-    target_backend = "vmvx",
-)
-
 LLVM_GPU_SRCS = enforce_glob(
     # keep sorted
     [
@@ -73,18 +48,11 @@ LLVM_GPU_SRCS = enforce_glob(
         "concat.mlir",
         "expand_shape.mlir",
         "extract_slice.mlir",
-        "pack_i8.mlir",
         "tensor_cast.mlir",
         "tensor_insert_slice.mlir",
-        "unpack.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        # https://github.com/llvm/llvm-project/issues/131386 causes
-        # See bug #20294
-        "pack.mlir",
-        "pack_dynamic_inner_tiles.mlir",
-    ],
+    exclude = [],
 )
 
 iree_check_single_backend_test_suite(
@@ -119,12 +87,7 @@ SPIRV_SRCS = enforce_glob(
         "tensor_insert_slice.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "pack.mlir",
-        "pack_i8.mlir",
-        "pack_dynamic_inner_tiles.mlir",
-        "unpack.mlir",
-    ],
+    exclude = [],
 )
 
 iree_check_single_backend_test_suite(
