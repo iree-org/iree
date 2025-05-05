@@ -132,6 +132,37 @@ set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulte
 option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility" ON)
 
 #-------------------------------------------------------------------------------
+# Custom runtime allocator configuration
+#-------------------------------------------------------------------------------
+# See iree/base/allocator.h for more information on `iree_allocator_system`.
+
+# A default allocator can be specified by C defines
+# (`IREE_ALLOCATOR_SYSTEM_CTL`) and linked in manually or by name with the
+# `IREE_ALLOCATOR_SYSTEM` option at the CMake level. If set in CMake additional
+# sources, copts, and dependencies can be added to iree::base in order to make
+# the allocator accessible.
+#
+# Built-in allocators available:
+# - `libc`: whatever `malloc`/`free` are defined as.
+#
+# Users adding their own allocators out of tree may define any of the following
+# CMake variables to control behavior:
+# - IREE_ALLOCATOR_{NAME}_SRCS:
+#       List of source files to add to iree::base. Must be an absolute/resolved
+#       path unless present in the iree/base/ directory. Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_COPTS:
+#       Compiler defines (`-DFOO`) private to iree::base. Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_DEPS:
+#       Dependencies (static/dynamic libraries) added to iree::base.
+#       Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_CTL:
+#       iree_allocator_ctl_fn_t name. Defaults to `iree_allocator_{NAME}_ctl`.
+# - IREE_ALLOCATOR_{NAME}_SELF:
+#       iree_allocator_t self void* name. Defaults to empty (NULL).
+set(IREE_ALLOCATOR_SYSTEM "libc" CACHE STRING
+    "Default named `iree_allocator_t` library and function base name.")
+
+#-------------------------------------------------------------------------------
 # IREE command-line tooling configuration
 #-------------------------------------------------------------------------------
 
