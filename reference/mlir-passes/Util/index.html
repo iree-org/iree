@@ -2500,6 +2500,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-util-drop-compiler-hints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2513,7 +2528,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options" class="md-nav__link">
+  <a href="#options_1" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2579,7 +2594,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_1" class="md-nav__link">
+  <a href="#options_2" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2621,7 +2636,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_2" class="md-nav__link">
+  <a href="#options_3" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2681,7 +2696,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_3" class="md-nav__link">
+  <a href="#options_4" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -4808,6 +4823,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-util-drop-compiler-hints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4821,7 +4851,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options" class="md-nav__link">
+  <a href="#options_1" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -4887,7 +4917,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_1" class="md-nav__link">
+  <a href="#options_2" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -4929,7 +4959,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_2" class="md-nav__link">
+  <a href="#options_3" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -4989,7 +5019,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_3" class="md-nav__link">
+  <a href="#options_4" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5049,11 +5079,18 @@
 <p>Deletes operations that have no runtime equivalent and are only
 used in the compiler. This should be performed after all other
 compiler passes.</p>
+<p>With keep-assume-int=true, leaves util.int.assume operations in place
+so they can be propagated to backends. This is a temporary measure
+until all bbackends have a rewrite for those assumptions (currently
+they're only handled by the patterns that target LLVM).</p>
+<h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-keep-assume-int : Whether annotations about the ranges and divisibility of integers should be kept.
+</code></pre></div>
 <h3 id="-iree-util-dump-module"><code>-iree-util-dump-module</code><a class="headerlink" href="#-iree-util-dump-module" title="Permanent link">link</a></h3>
 <p><em>Dumps the module IR to the given file path.</em></p>
 <p>Dumps the module IR to the given file path in either textual (.mlir) or
 binary (.mlirbc) format. Source locations remain unchanged.</p>
-<h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
+<h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-path : File path to write the module text or binary into.
 </code></pre></div>
 <h3 id="-iree-util-fixed-point-iterator"><code>-iree-util-fixed-point-iterator</code><a class="headerlink" href="#-iree-util-fixed-point-iterator" title="Permanent link">link</a></h3>
@@ -5068,7 +5105,7 @@ global ops after folding  : Number of util.global ops after folding
 <p><em>Fuses correlated globals together.</em></p>
 <h3 id="-iree-util-hoist-into-globals"><code>-iree-util-hoist-into-globals</code><a class="headerlink" href="#-iree-util-hoist-into-globals" title="Permanent link">link</a></h3>
 <p><em>Greedily hoists eligible constant expressions into globals.</em></p>
-<h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
+<h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-max-size-increase-threshold : Maximum byte size increase allowed for constant expr hoisting policy toallow hoisting. The threshold is 1MB by default.
 </code></pre></div>
 <h3 id="-iree-util-import-resources"><code>-iree-util-import-resources</code><a class="headerlink" href="#-iree-util-import-resources" title="Permanent link">link</a></h3>
@@ -5084,7 +5121,7 @@ transition and testing by doing a manual conversion with iree-opt.</p>
 <p><em>Performs basic inter-procedural optimization.</em></p>
 <h3 id="-iree-util-optimize-int-arithmetic"><code>-iree-util-optimize-int-arithmetic</code><a class="headerlink" href="#-iree-util-optimize-int-arithmetic" title="Permanent link">link</a></h3>
 <p><em>Optimizes integer arithmetic using a variety of dataflow analysis and patterns.</em></p>
-<h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
+<h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-narrow-to-i32 : Flag indicating if computations that can be performed with 32 bits should be. Mainly used for GPU code generation to not waste registers.
 </code></pre></div>
 <h3 id="-iree-util-propagate-subranges"><code>-iree-util-propagate-subranges</code><a class="headerlink" href="#-iree-util-propagate-subranges" title="Permanent link">link</a></h3>
@@ -5097,7 +5134,7 @@ transition and testing by doing a manual conversion with iree-opt.</p>
 <p><em>Strips debug ops, like assertions.</em></p>
 <h3 id="-iree-util-test-conversion"><code>-iree-util-test-conversion</code><a class="headerlink" href="#-iree-util-test-conversion" title="Permanent link">link</a></h3>
 <p><em>Tests util dialect conversion patterns.</em></p>
-<h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
+<h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-widen-integers        : Tests type conversion by widening integers to i32.
 -structural-conversion : Tests generic structural conversion ops.
 </code></pre></div>
