@@ -36,6 +36,26 @@ struct EncodingNopDeviceLayoutAttrInterface final
         .Default([&](auto concreteType) { return concreteType; });
   }
 
+  LogicalResult getOffsetsSizesStrides(
+      Attribute attr, OpBuilder &builder, Location loc,
+      IREE::TensorExt::DispatchTensorType type, ValueRange dynamicDims,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+      ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
+      SmallVectorImpl<OpFoldResult> &newSizes,
+      SmallVectorImpl<OpFoldResult> &newStrides) const {
+    // Only handle cases where the slice spans the whole
+    // `!iree_tensor_ext.dispatch.tensor` type.
+    // TODO(jornt): Enable partial slices.
+    if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
+      return failure();
+    }
+    auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
+    newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
+    newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
+    newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
+    return success();
+  }
+
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {

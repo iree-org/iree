@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGTYPES_H_
 #define IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGTYPES_H_
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -14,6 +15,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir::iree_compiler::IREE::Encoding {
 

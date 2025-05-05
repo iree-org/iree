@@ -11,6 +11,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
@@ -124,6 +125,13 @@ public:
     }
     return llvm::cast<RankedTensorType>(boundType);
   }
+
+  /// Returns `true` if the slice (described by the `offset`, `sizes` and
+  /// `strides`) spans the dispatch tensor type.
+  bool doesSliceSpanWholeTensor(ValueRange dispatchTypeDims,
+                                ArrayRef<OpFoldResult> offsets,
+                                ArrayRef<OpFoldResult> sizes,
+                                ArrayRef<OpFoldResult> strides) const;
 };
 
 void printType(DispatchTensorType &type, DialectAsmPrinter &p);
