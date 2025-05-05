@@ -8,6 +8,48 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    core_headers
+  HDRS
+    "alignment.h"
+    "attributes.h"
+    "config.h"
+    "target_platform.h"
+    "time.h"
+    "tracing.h"
+  PUBLIC
+)
+
+# Users providing their own allocators can have their sources live out-of-tree.
+# Note that with out of tree sources they must be absolute paths in order to be
+# found in this directory.
+set(IREE_ALLOCATOR_LIBC_SRCS "allocator_libc.c")
+
+# IREE_ALLOCATOR_SYSTEM -> variable expansion.
+string(TOUPPER ${IREE_ALLOCATOR_SYSTEM} _IREE_ALLOCATOR_SYSTEM)
+string(REGEX REPLACE "-" "_" _IREE_ALLOCATOR_SYSTEM ${_IREE_ALLOCATOR_SYSTEM})
+message(STATUS "iree_allocator_system() using `IREE_ALLOCATOR_${_IREE_ALLOCATOR_SYSTEM}_*`")
+get_property(_IREE_ALLOCATOR_SYSTEM_SRCS VARIABLE PROPERTY IREE_ALLOCATOR_${_IREE_ALLOCATOR_SYSTEM}_SRCS)
+get_property(_IREE_ALLOCATOR_SYSTEM_COPTS VARIABLE PROPERTY IREE_ALLOCATOR_${_IREE_ALLOCATOR_SYSTEM}_COPTS)
+get_property(_IREE_ALLOCATOR_SYSTEM_DEPS VARIABLE PROPERTY IREE_ALLOCATOR_${_IREE_ALLOCATOR_SYSTEM}_DEPS)
+get_property(_IREE_ALLOCATOR_SYSTEM_CTL VARIABLE PROPERTY IREE_ALLOCATOR_${_IREE_ALLOCATOR_SYSTEM}_CTL)
+get_property(_IREE_ALLOCATOR_SYSTEM_SELF VARIABLE PROPERTY IREE_ALLOCATOR_${_IREE_ALLOCATOR_SYSTEM}_SELF)
+if(IREE_ALLOCATOR_SYSTEM_CTL)
+  list(APPEND _IREE_ALLOCATOR_SYSTEM_DEFINES
+    "-DIREE_ALLOCATOR_SYSTEM_CTL=${_IREE_ALLOCATOR_SYSTEM_CTL}"
+  )
+else()
+  list(APPEND _IREE_ALLOCATOR_SYSTEM_DEFINES
+    "-DIREE_ALLOCATOR_SYSTEM_CTL=iree_allocator_${IREE_ALLOCATOR_SYSTEM}_ctl"
+  )
+endif()
+if(IREE_ALLOCATOR_SYSTEM_SELF)
+  list(APPEND _IREE_ALLOCATOR_SYSTEM_DEFINES
+    "-DIREE_ALLOCATOR_SYSTEM_SELF=${_IREE_ALLOCATOR_SYSTEM_SELF}"
+  )
+endif()
+
+iree_cc_library(
+  NAME
     base
   HDRS
     "api.h"
@@ -33,23 +75,16 @@ iree_cc_library(
     "time.c"
     "wait_source.c"
     "wait_source.h"
+    ${_IREE_ALLOCATOR_SYSTEM_SRCS}
+  COPTS
+    ${_IREE_ALLOCATOR_SYSTEM_COPTS}
+  DEFINES
+    ${_IREE_ALLOCATOR_SYSTEM_DEFINES}
   DEPS
     ::core_headers
     iree::base::internal::time
     iree::base::tracing::provider
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    core_headers
-  HDRS
-    "alignment.h"
-    "attributes.h"
-    "config.h"
-    "target_platform.h"
-    "time.h"
-    "tracing.h"
+    ${_IREE_ALLOCATOR_SYSTEM_DEPS}
   PUBLIC
 )
 

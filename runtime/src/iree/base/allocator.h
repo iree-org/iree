@@ -238,18 +238,6 @@ IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator, void* ptr);
 // Built-in iree_allocator_t implementations
 //===----------------------------------------------------------------------===//
 
-// Default C allocator controller using malloc/free.
-IREE_API_EXPORT iree_status_t
-iree_allocator_system_ctl(void* self, iree_allocator_command_t command,
-                          const void* params, void** inout_ptr);
-
-// Allocates using the iree_allocator_malloc and iree_allocator_free methods.
-// These will usually be backed by malloc and free.
-static inline iree_allocator_t iree_allocator_system(void) {
-  iree_allocator_t v = {NULL, iree_allocator_system_ctl};
-  return v;
-}
-
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
 static inline iree_allocator_t iree_allocator_null(void) {
@@ -301,6 +289,44 @@ static inline iree_allocator_t iree_allocator_inline_arena(
   iree_allocator_t v = {storage, iree_allocator_inline_arena_ctl};
   return v;
 }
+
+//===----------------------------------------------------------------------===//
+// System allocator support (builtin or user-provided)
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_ALLOCATOR_SYSTEM_CTL)
+
+// System allocator provided by the user as part of build-time configuration.
+// The implementation need only be linked into final executable binaries.
+IREE_API_EXPORT iree_status_t
+IREE_ALLOCATOR_SYSTEM_CTL(void* self, iree_allocator_command_t command,
+                          const void* params, void** inout_ptr);
+
+#if defined(IREE_ALLOCATOR_SYSTEM_SELF)
+// Optional self for the default allocator.
+// Must be defined but may be NULL.
+IREE_API_EXPORT void* IREE_ALLOCATOR_SYSTEM_SELF;
+#else
+#define IREE_ALLOCATOR_SYSTEM_SELF NULL
+#endif  // IREE_ALLOCATOR_SYSTEM_SELF
+
+// System allocator provided by the user as part of build-time configuration
+// (or a fallback of `malloc` and `free`).
+//
+// Specified by defining `IREE_ALLOCATOR_SYSTEM_CTL`, an implementation of the
+// allocator control function (see `iree_allocator_ctl_fn_t`). An optional
+// `IREE_ALLOCATOR_SYSTEM_SELF` global `void*` variable can be defined if the
+// allocator requires state and otherwise `NULL` will be passed as the `self`
+// parameter to the control function.
+static inline iree_allocator_t iree_allocator_system(void) {
+  iree_allocator_t v = {
+      IREE_ALLOCATOR_SYSTEM_SELF,
+      IREE_ALLOCATOR_SYSTEM_CTL,
+  };
+  return v;
+}
+
+#endif  // IREE_ALLOCATOR_SYSTEM_CTL
 
 //===----------------------------------------------------------------------===//
 // Aligned allocations via iree_allocator_t

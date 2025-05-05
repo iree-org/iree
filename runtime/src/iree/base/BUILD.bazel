@@ -23,6 +23,7 @@ iree_runtime_cc_library(
     srcs = [
         "allocator.c",
         "allocator.h",
+        "allocator_libc.c",
         "assert.h",
         "bitfield.c",
         "bitfield.h",
@@ -44,6 +45,9 @@ iree_runtime_cc_library(
         "wait_source.h",
     ],
     hdrs = ["api.h"],
+    defines = [
+        "IREE_ALLOCATOR_SYSTEM_CTL=iree_allocator_libc_ctl",
+    ],
     deps = [
         ":core_headers",
         "//runtime/src/iree/base/internal:time",
