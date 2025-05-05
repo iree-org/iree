@@ -76,8 +76,12 @@
 // MERGE:         transform.named_sequence @__kernel_config
 // MERGE-SAME:    attributes {iree_codegen.tuning_spec_entrypoint}
 // MERGE:         transform.foreach_match
-// MERGE:           @match_mmt -> @apply_op_config
-// MERGE-NEXT:      @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config
+// MERGE:           @match_mmt -> @apply_op_config,
+// MERGE-NEXT:      @match_mmt_f16_f16_f32_large_expanded -> @apply_expanded_pingpong_op_config,
+// MERGE-NEXT:      @match_mmt_f8_f8_f32_large_expanded -> @apply_expanded_f8_pingpong_op_config,
+// MERGE-NEXT:      @match_mmt_f16_f16_f32_large -> @apply_pingpong_op_config,
+// MERGE-NEXT:      @match_mmt_f16_f16_f32_medium_expanded -> @apply_expanded_medium_pingpong_op_config,
+// MERGE-NEXT:      @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config,
 // MERGE-NEXT:      @match_mmt_2048x1280x5120_f16_f16_f32 -> @iree_default_tuning_spec_gfx942_1_apply_op_config
 
 // NOTE: The order matters above because `foreach_match` ops performs matching from top to bottom.
