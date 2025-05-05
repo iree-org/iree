@@ -27,7 +27,20 @@ def DropCompilerHintsPass : Pass<"iree-util-drop-compiler-hints", ""> {
     Deletes operations that have no runtime equivalent and are only
     used in the compiler. This should be performed after all other
     compiler passes.
+
+    With keep-assume-int=true, leaves util.int.assume operations in place
+    so they can be propagated to backends. This is a temporary measure
+    until all bbackends have a rewrite for those assumptions (currently
+    they're only handled by the patterns that target LLVM).
   }];
+
+  let options = [
+    Option<
+      "keepAssumeInt", "keep-assume-int",
+      "bool", "false",
+      "Whether annotations about the ranges and divisibility of integers should be kept."
+    >,
+  ];
 }
 
 def DumpModulePass : Pass<"iree-util-dump-module", "mlir::ModuleOp"> {

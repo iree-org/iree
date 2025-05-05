@@ -17,9 +17,10 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-class DropCompilerHintsPass
+struct DropCompilerHintsPass
     : public impl::DropCompilerHintsPassBase<DropCompilerHintsPass> {
-public:
+  using Base::Base;
+
   void runOnOperation() override {
     // We can't use patterns and applyPatternsGreedily because that
     // automatically does canonicalization.
@@ -28,6 +29,8 @@ public:
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
       } else if (auto op = dyn_cast<IREE::Util::AssumeIntOp>(genericOp)) {
+        if (keepAssumeInt)
+          return;
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
       }

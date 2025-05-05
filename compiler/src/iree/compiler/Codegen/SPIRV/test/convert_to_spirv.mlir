@@ -38,6 +38,45 @@ hal.executable private @push_constant {
 
 #pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
   #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @push_constant_annotated {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
+    hal.executable.export @push_constant_annotated layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader, ExpectAssumeKHR], [SPV_KHR_expect_assume]>, #spirv.resource_limits<>>} {
+      // CHECK-LABEL: spirv.func @push_constant_annotated()
+      func.func @push_constant_annotated() -> index {
+        // CHECK: %[[LOAD:.+]] = spirv.Load "PushConstant" %{{.*}} : i32
+        // CHECK-DAG: %[[C0:.+]] = spirv.Constant 0 : i32
+        // CHECK-DAG: %[[C4096:.+]] = spirv.Constant 4096 : i32
+        // CHECK-DAG: %[[UGE:.+]] = spirv.UGreaterThanEqual %[[LOAD]], %[[C0]]
+        // CHECK-DAG: spirv.KHR.AssumeTrue %[[UGE]]
+        // CHECK-DAG: %[[ULE:.+]] = spirv.ULessThanEqual %[[LOAD]], %[[C4096]]
+        // CHECK-DAG: spirv.KHR.AssumeTrue %[[ULE]]
+        // CHECK-DAG: %[[C2048:.+]] = spirv.Constant 2048 : i32
+        // CHECK-DAG: %[[C0_2:.+]] = spirv.Constant 0 : i32
+        // CHECK-DAG: %[[MOD:.+]] = spirv.UMod %[[LOAD]], %[[C2048]]
+        // CHECK-DAG: %[[LOWCLEAR:.+]] = spirv.IEqual %[[MOD]], %[[C0_2]]
+        // CHECK-DAG: spirv.KHR.AssumeTrue %[[LOWCLEAR]]
+        // CHECK: spirv.ReturnValue %[[LOAD]]
+        %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+        %1 = util.assume.int %0[
+          <umin = 0, umax = 0>,
+          <umin = 2048, umax = 2049, udiv = 2048>,
+          <umin = 4096, umax = 4096, udiv = 4096>] : i32
+        %2 = arith.index_castui %1 : i32 to index
+        return %2 : index
+      }
+    }
+  }
+}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>

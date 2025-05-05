@@ -10,7 +10,9 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
@@ -241,15 +243,13 @@ analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
   return result;
 }
 
-class ConvertFunc : public ConvertToLLVMPattern {
+class ConvertFunc : public ConvertOpToLLVMPattern<func::FuncOp> {
 public:
-  explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
-                             converter, 100) {}
+  explicit ConvertFunc(LLVMTypeConverter &converter)
+      : ConvertOpToLLVMPattern(converter, 100) {}
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto funcOp = cast<func::FuncOp>(op);
     FunctionType fnType = funcOp.getFunctionType();
     (void)fnType;
     if (!funcOp.isPublic())
@@ -365,16 +365,12 @@ public:
   }
 };
 
-class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
-public:
-  explicit ConvertIREEBindingSubspanOp(MLIRContext *context,
-                                       LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
-            converter) {}
+struct ConvertIREEBindingSubspanOp final
+    : public ConvertOpToLLVMPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
@@ -384,8 +380,6 @@ public:
 
     Location loc = op->getLoc();
     auto subspanOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
-    IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
-        operands, op->getAttrDictionary());
     MemRefType memrefType =
         llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
     mlir::BlockArgument llvmBufferArg =
@@ -476,15 +470,12 @@ public:
   }
 };
 
-class ConvertIREEConstantOp : public ConvertToLLVMPattern {
-public:
-  explicit ConvertIREEConstantOp(MLIRContext *context,
-                                 LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
-            converter) {}
+struct ConvertIREEConstantOp final
+    : public ConvertOpToLLVMPattern<IREE::HAL::InterfaceConstantLoadOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
@@ -497,6 +488,53 @@ public:
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         numBindings + ireeConstantOp.getOrdinal().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
+
+    // If the constant has non-trivial assumptions placed on it about
+    // its min and max values or divisibility, use that information to
+    // annotate the corresponding arguments. The hasOneUse() check prevents us
+    // from applying assumptions that don't hold at all usage sites.
+    if (op.getResult().hasOneUse()) {
+      OpOperand *operand = op.getResult().getUses().begin().getOperand();
+      auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(operand->getOwner());
+      if (assumeOp) {
+        unsigned opIdx = operand->getOperandNumber();
+        auto [min, max] = assumeOp.getUnionedUnsignedRange(opIdx);
+
+        if (min.has_value() && max.has_value()) {
+          assert(*min <= std::numeric_limits<uint32_t>::max() &&
+                 "Push-constant's maximum value can't be outside 32 bits, but "
+                 "this is assumed");
+          // Note: LLVM's range(iN lb, ub) is [lb, ub), while MLIR's is [lb,
+          // ub], so we add 1 to the upper bound.
+          llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                                LLVM::LLVMDialect::getRangeAttrName(),
+                                rewriter.getAttr<LLVM::ConstantRangeAttr>(
+                                    APInt(32, *min), APInt(32, *max) + 1));
+        }
+
+        auto divisibility = assumeOp.getUnionedUnsignedDivisor(opIdx);
+
+        auto makeI32Const = [&](uint32_t val) -> Value {
+          return rewriter.create<LLVM::ConstantOp>(
+              assumeOp.getLoc(), rewriter.getI32Type(),
+              rewriter.getI32IntegerAttr(val));
+        };
+        if (divisibility.has_value() && *divisibility > 1) {
+          Location loc = assumeOp.getLoc();
+          assert(*divisibility <= std::numeric_limits<uint32_t>::max() &&
+                 "push constant shouldn't be statically divisible by a value "
+                 "it can't hold");
+          Value knownDivisibleBy = makeI32Const(*divisibility);
+          // This'll almost always become an and
+          Value lowPart = rewriter.create<LLVM::URemOp>(loc, llvmBufferArg,
+                                                        knownDivisibleBy);
+          Value zero = makeI32Const(0);
+          Value isEvenlyDivided = rewriter.create<LLVM::ICmpOp>(
+              loc, LLVM::ICmpPredicate::eq, lowPart, zero);
+          rewriter.create<LLVM::AssumeOp>(loc, isEvenlyDivided);
+        }
+      }
+    }
 
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     // llvm.zext requires that the result type has a larger bitwidth.
@@ -530,13 +568,14 @@ struct HALInterfaceWorkgroupOpsConverter final
   }
 };
 
-class ConvertNullPointerOp : public ConvertToLLVMPattern {
+class ConvertNullPointerOp
+    : public ConvertOpToLLVMPattern<IREE::Codegen::NullPointerOp> {
 public:
-  ConvertNullPointerOp(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(IREE::Codegen::NullPointerOp::getOperationName(),
-                             context, converter) {}
+  using ConvertOpToLLVMPattern<
+      IREE::Codegen::NullPointerOp>::ConvertOpToLLVMPattern;
+
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::Codegen::NullPointerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<LLVM::ZeroOp>(
         op, LLVM::LLVMPointerType::get(getContext()));
@@ -544,13 +583,75 @@ public:
   }
 };
 
+struct ConvertIREEUtilAssumeIntOp final
+    : public ConvertOpToLLVMPattern<IREE::Util::AssumeIntOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::AssumeIntOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Bail until nested under an LLVMFuncOp.
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp)
+      return failure();
+
+    Location loc = op.getLoc();
+    auto updateConds = [&](std::optional<Value> &conds, Value cond) {
+      if (!conds)
+        conds = cond;
+      else
+        conds = rewriter.create<LLVM::AndOp>(loc, *conds, cond);
+    };
+    // Materialize the assumptions that aren't atteched directly to arguments
+    // in order to account for the fact that i64 inputs get passed in as a pair
+    // of i32 constants.
+    for (auto [idx, mlirVal, llvmVal] :
+         llvm::enumerate(op.getOperands(), adaptor.getOperands())) {
+      if (mlirVal.getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>())
+        continue;
+      std::optional<Value> conds;
+      Type type = llvmVal.getType();
+      auto [min, max] = op.getUnionedUnsignedRange(idx);
+      // This should be a range() bundle but LLVM doesn't understand those yet.
+      if (min.has_value() && *min > 0) {
+        Value minConst = createIndexAttrConstant(rewriter, loc, type, *min);
+        Value minCond = rewriter.create<LLVM::ICmpOp>(
+            loc, LLVM::ICmpPredicate::uge, llvmVal, minConst);
+        updateConds(conds, minCond);
+      }
+      if (max.has_value()) {
+        Value maxConst = createIndexAttrConstant(rewriter, loc, type, *max);
+        Value maxCond = rewriter.create<LLVM::ICmpOp>(
+            loc, LLVM::ICmpPredicate::ule, llvmVal, maxConst);
+        updateConds(conds, maxCond);
+      }
+      std::optional<uint64_t> divisor = op.getUnionedUnsignedDivisor(idx);
+      if (divisor && *divisor > 1) {
+        Value divisorConst =
+            createIndexAttrConstant(rewriter, loc, type, *divisor);
+        Value remainder =
+            rewriter.create<LLVM::URemOp>(loc, llvmVal, divisorConst);
+        Value zero = createIndexAttrConstant(rewriter, loc, type, 0);
+        Value divisorCond = rewriter.create<LLVM::ICmpOp>(
+            loc, LLVM::ICmpPredicate::eq, remainder, zero);
+        updateConds(conds, divisorCond);
+      }
+
+      if (conds.has_value()) {
+        rewriter.create<LLVM::AssumeOp>(loc, *conds);
+      }
+    }
+    rewriter.replaceOp(op, adaptor.getOperands());
+    return success();
+  }
+};
 } // namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
   patterns.add<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp,
-               ConvertNullPointerOp>(context, converter);
+               ConvertNullPointerOp, ConvertIREEUtilAssumeIntOp>(converter);
   converter.addConversion([context](IREE::Codegen::NullPointerType type) {
     return LLVM::LLVMPointerType::get(context);
   });

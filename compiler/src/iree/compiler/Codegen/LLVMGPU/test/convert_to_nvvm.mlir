@@ -40,7 +40,7 @@ hal.executable @abs_ex_dispatch_0 {
 //  CHECK: llvm.store %[[FADD]], %[[ADDR]] : f32, !llvm.ptr
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -54,13 +54,24 @@ hal.executable @abs_dynamic {
         %c3 = arith.constant 3 : index
         %c5 = arith.constant 5 : index
         %c7 = arith.constant 7 : index
-        %o = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-        %d0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-        %d1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
-        %d2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%o) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%d0, %d1, %d2}
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?x?xi32>{%d0, %d1, %d2}
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<?x?x?xf32>{%d0, %d1, %d2}
+        %c32_i64 = arith.constant 32 : i64
+        // This method for passing in 64-bit values is taken from a Llama dispatch
+        // and added here to test integer range assumption preservation.
+        %o.low = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+        %o.high = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+        %o.low.ext = arith.extui %o.low : i32 to i64
+        %o.high.ext = arith.extui %o.high : i32 to i64
+        %o.high.shift = arith.shli %o.high.ext, %c32_i64 : i64
+        %o.i64 = arith.ori %o.low.ext, %o.high.shift : i64
+        %o.index = arith.index_castui %o.i64 : i64 to index
+        %o.tagged = util.assume.int %o.index[<umin = 5185728, umax = 4438911803328>] : index
+        %d0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %d1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
+        %d1.tagged = util.assume.int %d1[<umin = 0, umax = 0>, <umin = 4096, umax = 4096, udiv = 4096>] : index
+        %d2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%o.tagged) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%d0, %d1.tagged, %d2}
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?x?xi32>{%d0, %d1.tagged, %d2}
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<?x?x?xf32>{%d0, %d1.tagged, %d2}
         %9 = memref.load %0[%c3, %c5, %c7] : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>
         %10 = memref.load %1[%c3, %c5, %c7] : memref<?x?x?xi32>
         %11 = arith.sitofp %10 : i32 to f32
@@ -78,10 +89,26 @@ hal.executable @abs_dynamic {
 //  CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
 //  CHECK-SAME:  %[[ARG4:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
 //  CHECK-SAME:  %[[ARG5:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
-//  CHECK-SAME:  %[[ARG6:[a-zA-Z0-9]+]]: i32 {llvm.noundef})
-//   CHECK-DAG:   %[[OFFSET:.+]] = llvm.zext %[[ARG3]] : i32 to i64
-//   CHECK-DAG:   %[[D1:.+]] = llvm.zext %[[ARG5]] : i32 to i64
-//   CHECK-DAG:   %[[D2:.+]] = llvm.zext %[[ARG6]] : i32 to i64
+//  CHECK-SAME:  %[[ARG6:[a-zA-Z0-9]+]]: i32 {llvm.noundef, llvm.range = #llvm.constant_range<i32, 0, 4097>},
+//  CHECK-SAME:  %[[ARG7:[a-zA-Z0-9]+]]: i32 {llvm.noundef})
+//   CHECK-DAG: %[[C4096_i32:.+]] = llvm.mlir.constant(4096 : i32) : i32
+//   CHECK-DAG: %[[C0_i32:.+]] = llvm.mlir.constant(0 : i32) : i32
+//   CHECK-DAG: %[[C32_i64:.+]] = llvm.mlir.constant(32 : i64) : i64
+//   CHECK-DAG: %[[C5185728_i64:.+]] = llvm.mlir.constant(5185728 : index) : i64
+//   CHECK-DAG: %[[C4438911803328_i64:.+]] = llvm.mlir.constant(4438911803328 : index) : i64
+//   CHECK-DAG: %[[OFFSET_LO:.+]] = llvm.zext %[[ARG3]] : i32 to i64
+//   CHECK-DAG: %[[OFFSET_HI:.+]] = llvm.zext %[[ARG4]] : i32 to i64
+//   CHECK-DAG: %[[OFFSET_HI_SHL:.+]] = llvm.shl %[[OFFSET_HI]], %[[C32_i64]] : i64
+//   CHECK-DAG: %[[OFFSET:.+]] = llvm.or %[[OFFSET_LO]], %[[OFFSET_HI_SHL]] : i64
+//   CHECK-DAG: %[[MIN_COND:.+]] = llvm.icmp "uge" %[[OFFSET]], %[[C5185728_i64]] : i64
+//   CHECK-DAG: %[[MAX_COND:.+]] = llvm.icmp "ule" %[[OFFSET]], %[[C4438911803328_i64]] : i64
+//   CHECK-DAG: %[[OFFSET_COND:.+]] = llvm.and %[[MIN_COND]], %[[MAX_COND]] : i1
+//   CHECK-DAG: llvm.intr.assume %[[OFFSET_COND]]
+//   CHECK-DAG: %[[D1:.+]] = llvm.zext %[[ARG6]] : i32 to i64
+//   CHECK-DAG: %[[ARG6_UREM:.+]] = llvm.urem %[[ARG6]], %[[C4096_i32]] : i32
+//   CHECK-DAG: %[[ARG6_CMP:.+]] = llvm.icmp "eq" %[[ARG6_UREM]], %[[C0_i32]]
+//   CHECK-DAG: llvm.intr.assume %[[ARG6_CMP]]
+//   CHECK-DAG: %[[D2:.+]] = llvm.zext %[[ARG7]] : i32 to i64
 //   CHECK: %[[GEP1:.+]] = llvm.getelementptr %[[ARG1]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //   CHECK: %[[GEP:.+]] = llvm.getelementptr %[[GEP1]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //   CHECK: %[[LOAD:.+]] = llvm.load %[[GEP]] : !llvm.ptr -> f32
