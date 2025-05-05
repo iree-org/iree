@@ -41,23 +41,9 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
-LLVM_GPU_SRCS = enforce_glob(
-    # keep sorted
-    [
-        "collapse_shape.mlir",
-        "concat.mlir",
-        "expand_shape.mlir",
-        "extract_slice.mlir",
-        "tensor_cast.mlir",
-        "tensor_insert_slice.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_cuda",
-    srcs = LLVM_GPU_SRCS,
+    srcs = ALL_SRCS,
     driver = "cuda",
     tags = [
         "noasan",
@@ -71,7 +57,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
-    srcs = LLVM_GPU_SRCS,
+    srcs = ALL_SRCS,
     driver = "hip",
     target_backend = "rocm",
 )
