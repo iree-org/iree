@@ -8776,7 +8776,7 @@ input.</p>
 <h3 id="allocator-ops">Allocator ops<a class="headerlink" href="#allocator-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.allocator</code> / <code>iree_hal_allocator_t</code>.</p>
 <h4 id="halallocatorallocate-halallocatorallocateop"><code>hal.allocator.allocate</code> (HAL::AllocatorAllocateOp)<a class="headerlink" href="#halallocatorallocate-halallocatorallocateop" title="Permanent link">link</a></h4>
-<p><em>Empty buffer allocation operation</em></p>
+<p><em>Empty buffer allocation operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.allocate` `&lt;` $allocator `:` type($allocator) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -8835,7 +8835,7 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 </tbody>
 </table>
 <h4 id="halallocatorimport-halallocatorimportop"><code>hal.allocator.import</code> (HAL::AllocatorImportOp)<a class="headerlink" href="#halallocatorimport-halallocatorimportop" title="Permanent link">link</a></h4>
-<p><em>Allocator-supported host buffer import operation</em></p>
+<p><em>Allocator-supported host buffer import operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.import` `&lt;` $allocator `:` type($allocator) `&gt;`
               `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
@@ -8877,7 +8877,7 @@ memory) then <code>did_import</code> will indicate that the returned buffer is n
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offset</code></td>
@@ -8911,7 +8911,7 @@ memory) then <code>did_import</code> will indicate that the returned buffer is n
 <h3 id="buffer-ops">Buffer ops<a class="headerlink" href="#buffer-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.buffer</code> / <code>iree_hal_buffer_t</code>.</p>
 <h4 id="halbufferallocationdiscard-halbufferallocationdiscardop"><code>hal.buffer.allocation.discard</code> (HAL::BufferAllocationDiscardOp)<a class="headerlink" href="#halbufferallocationdiscard-halbufferallocationdiscardop" title="Permanent link">link</a></h4>
-<p><em>Discards ownership of the underlying buffer allocation by the caller</em></p>
+<p><em>Discards ownership of the underlying buffer allocation by the caller.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.allocation.discard` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($result)
@@ -8963,7 +8963,7 @@ now be deallocated.</p>
 </tbody>
 </table>
 <h4 id="halbufferallocationis_terminal-halbufferallocationisterminalop"><code>hal.buffer.allocation.is_terminal</code> (HAL::BufferAllocationIsTerminalOp)<a class="headerlink" href="#halbufferallocationis_terminal-halbufferallocationisterminalop" title="Permanent link">link</a></h4>
-<p><em>Returns true if the underlying buffer allocation has a single owner</em></p>
+<p><em>Returns true if the underlying buffer allocation has a single owner.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.allocation.is_terminal` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($result)
@@ -9010,7 +9010,7 @@ buffers).</p>
 </tbody>
 </table>
 <h4 id="halbufferallocationpreserve-halbufferallocationpreserveop"><code>hal.buffer.allocation.preserve</code> (HAL::BufferAllocationPreserveOp)<a class="headerlink" href="#halbufferallocationpreserve-halbufferallocationpreserveop" title="Permanent link">link</a></h4>
-<p><em>Preserves the underlying buffer allocation for the caller</em></p>
+<p><em>Preserves the underlying buffer allocation for the caller.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.allocation.preserve` `&lt;` $buffer `:` type($buffer) `&gt;`
               attr-dict-with-keyword
@@ -9053,7 +9053,7 @@ ownership.</p>
 </tbody>
 </table>
 <h4 id="halbufferassert-halbufferassertop"><code>hal.buffer.assert</code> (HAL::BufferAssertOp)<a class="headerlink" href="#halbufferassert-halbufferassertop" title="Permanent link">link</a></h4>
-<p><em>Buffer compatibility assertion</em></p>
+<p><em>Buffer compatibility assertion.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.assert` `&lt;` $buffer `:` type($buffer) `&gt;`
               `message` `(` $message `)`
@@ -9103,7 +9103,7 @@ ignored).</p>
 </tbody>
 </table>
 <h4 id="halbufferlength-halbufferlengthop"><code>hal.buffer.length</code> (HAL::BufferLengthOp)<a class="headerlink" href="#halbufferlength-halbufferlengthop" title="Permanent link">link</a></h4>
-<p><em>Buffer byte length accessor</em></p>
+<p><em>Buffer byte length accessor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.length` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($result)
@@ -9146,7 +9146,7 @@ view into another buffer.</p>
 </tbody>
 </table>
 <h4 id="halbufferload-halbufferloadop"><code>hal.buffer.load</code> (HAL::BufferLoadOp)<a class="headerlink" href="#halbufferload-halbufferloadop" title="Permanent link">link</a></h4>
-<p><em>Buffer element load operation</em></p>
+<p><em>Buffer element load operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.load` `&lt;` $source_buffer `:` type($source_buffer) `&gt;`
               `` `[` $source_offset `]`
@@ -9192,7 +9192,7 @@ view into another buffer.</p>
 </tbody>
 </table>
 <h4 id="halbufferstore-halbufferstoreop"><code>hal.buffer.store</code> (HAL::BufferStoreOp)<a class="headerlink" href="#halbufferstore-halbufferstoreop" title="Permanent link">link</a></h4>
-<p><em>Buffer element store operation</em></p>
+<p><em>Buffer element store operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.store` `&lt;` $target_buffer `:` type($target_buffer) `&gt;`
               `` `[` $target_offset `]`
@@ -9224,7 +9224,7 @@ view into another buffer.</p>
 </tbody>
 </table>
 <h4 id="halbuffersubspan-halbuffersubspanop"><code>hal.buffer.subspan</code> (HAL::BufferSubspanOp)<a class="headerlink" href="#halbuffersubspan-halbuffersubspanop" title="Permanent link">link</a></h4>
-<p><em>Buffer subspan operation</em></p>
+<p><em>Buffer subspan operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer.subspan` `&lt;` $source_buffer `:` type($source_buffer) `&gt;`
               `` `[` $source_offset `,` $length `]`
@@ -9276,7 +9276,7 @@ view into another buffer.</p>
 <h3 id="buffer-view-ops">Buffer view ops<a class="headerlink" href="#buffer-view-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.buffer_view</code> / <code>iree_hal_buffer_view_t</code>.</p>
 <h4 id="halbuffer_viewassert-halbufferviewassertop"><code>hal.buffer_view.assert</code> (HAL::BufferViewAssertOp)<a class="headerlink" href="#halbuffer_viewassert-halbufferviewassertop" title="Permanent link">link</a></h4>
-<p><em>Buffer view contents assertion</em></p>
+<p><em>Buffer view contents assertion.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.assert` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `message` `(` $message `)`
@@ -9322,7 +9322,7 @@ used.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewbuffer-halbufferviewbufferop"><code>hal.buffer_view.buffer</code> (HAL::BufferViewBufferOp)<a class="headerlink" href="#halbuffer_viewbuffer-halbufferviewbufferop" title="Permanent link">link</a></h4>
-<p><em>Buffer view buffer accessor</em></p>
+<p><em>Buffer view buffer accessor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.buffer` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -9363,7 +9363,7 @@ used.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewcreate-halbufferviewcreateop"><code>hal.buffer_view.create</code> (HAL::BufferViewCreateOp)<a class="headerlink" href="#halbuffer_viewcreate-halbufferviewcreateop" title="Permanent link">link</a></h4>
-<p><em>Buffer view reference initializer</em></p>
+<p><em>Buffer view reference initializer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.create` `buffer` `(` $source_buffer `:` type($source_buffer) `)`
               `` `[` $source_offset `,` $source_length `]`
@@ -9431,7 +9431,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewdim-halbufferviewdimop"><code>hal.buffer_view.dim</code> (HAL::BufferViewDimOp)<a class="headerlink" href="#halbuffer_viewdim-halbufferviewdimop" title="Permanent link">link</a></h4>
-<p><em>Buffer view dimension value query</em></p>
+<p><em>Buffer view dimension value query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.dim` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `` `[` $index `]`
@@ -9479,7 +9479,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewelement_type-halbufferviewelementtypeop"><code>hal.buffer_view.element_type</code> (HAL::BufferViewElementTypeOp)<a class="headerlink" href="#halbuffer_viewelement_type-halbufferviewelementtypeop" title="Permanent link">link</a></h4>
-<p><em>Buffer view element type query</em></p>
+<p><em>Buffer view element type query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -9520,7 +9520,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewencoding_type-halbufferviewencodingtypeop"><code>hal.buffer_view.encoding_type</code> (HAL::BufferViewEncodingTypeOp)<a class="headerlink" href="#halbuffer_viewencoding_type-halbufferviewencodingtypeop" title="Permanent link">link</a></h4>
-<p><em>Buffer view encoding type query</em></p>
+<p><em>Buffer view encoding type query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -9561,7 +9561,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewrank-halbufferviewrankop"><code>hal.buffer_view.rank</code> (HAL::BufferViewRankOp)<a class="headerlink" href="#halbuffer_viewrank-halbufferviewrankop" title="Permanent link">link</a></h4>
-<p><em>Buffer view rank query</em></p>
+<p><em>Buffer view rank query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -9602,7 +9602,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="halbuffer_viewtrace-halbufferviewtraceop"><code>hal.buffer_view.trace</code> (HAL::BufferViewTraceOp)<a class="headerlink" href="#halbuffer_viewtrace-halbufferviewtraceop" title="Permanent link">link</a></h4>
-<p><em>Trace value(s) operation</em></p>
+<p><em>Trace value(s) operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.trace` $key `=`
               $operands `:` type($operands)
@@ -9633,7 +9633,7 @@ useful for titling/marking specific sets of buffers for easier searching.</p>
 </tbody>
 </table>
 <h4 id="halelement_type-halelementtypeop"><code>hal.element_type</code> (HAL::ElementTypeOp)<a class="headerlink" href="#halelement_type-halelementtypeop" title="Permanent link">link</a></h4>
-<p><em>An iree_hal_element_type_t for the given MLIR type</em></p>
+<p><em>An iree_hal_element_type_t for the given MLIR type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.element_type` `&lt;` $type `&gt;`
               attr-dict
@@ -9666,7 +9666,7 @@ that are convertable.</p>
 </tbody>
 </table>
 <h4 id="halencoding_type-halencodingtypeop"><code>hal.encoding_type</code> (HAL::EncodingTypeOp)<a class="headerlink" href="#halencoding_type-halencodingtypeop" title="Permanent link">link</a></h4>
-<p><em>An iree_hal_encoding_type_t for the given MLIR encoding</em></p>
+<p><em>An iree_hal_encoding_type_t for the given MLIR encoding.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.encoding_type` `&lt;` ($encoding^):( `` `dense_row_major`)? `&gt;`
               attr-dict
@@ -9701,7 +9701,7 @@ encodings that are convertable.</p>
 <h3 id="channel-ops">Channel ops<a class="headerlink" href="#channel-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.channel</code> / <code>iree_hal_channel_t</code>.</p>
 <h4 id="halchannelcreate-halchannelcreateop"><code>hal.channel.create</code> (HAL::ChannelCreateOp)<a class="headerlink" href="#halchannelcreate-halchannelcreateop" title="Permanent link">link</a></h4>
-<p><em>Creates a new channel for collective communication</em></p>
+<p><em>Creates a new channel for collective communication.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.channel.create` `device` `(` $device `:` type($device) `)`
               `affinity` `(` $queue_affinity `)`
@@ -9745,11 +9745,11 @@ configuration.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>id</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>group</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rank</code></td>
@@ -9777,7 +9777,7 @@ configuration.</p>
 </tbody>
 </table>
 <h4 id="halchannelrank_and_count-halchannelrankandcountop"><code>hal.channel.rank_and_count</code> (HAL::ChannelRankAndCountOp)<a class="headerlink" href="#halchannelrank_and_count-halchannelrankandcountop" title="Permanent link">link</a></h4>
-<p><em>Returns the rank of the local participant in the group</em></p>
+<p><em>Returns the rank of the local participant in the group.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.channel.rank_and_count` `&lt;` $channel `:` type($channel) `&gt;`
               `:` type($rank) `,` type($count)
@@ -9823,7 +9823,7 @@ group in <code>[0, count)</code> and the total participant count.</p>
 </tbody>
 </table>
 <h4 id="halchannelsplit-halchannelsplitop"><code>hal.channel.split</code> (HAL::ChannelSplitOp)<a class="headerlink" href="#halchannelsplit-halchannelsplitop" title="Permanent link">link</a></h4>
-<p><em>Splits a collective communication channel</em></p>
+<p><em>Splits a collective communication channel.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.channel.split` `&lt;` $channel `:` type($channel) `&gt;`
               `color` `(` $color `)`
@@ -9887,7 +9887,7 @@ subgroup and will return a null channel.</p>
 <h3 id="command-buffer-ops">Command buffer ops<a class="headerlink" href="#command-buffer-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.command_buffer</code> / <code>iree_hal_command_buffer_t</code>.</p>
 <h4 id="halcommand_bufferbegin_debug_group-halcommandbufferbegindebuggroupop"><code>hal.command_buffer.begin_debug_group</code> (HAL::CommandBufferBeginDebugGroupOp)<a class="headerlink" href="#halcommand_bufferbegin_debug_group-halcommandbufferbegindebuggroupop" title="Permanent link">link</a></h4>
-<p><em>Pushes a command buffer debug group label</em></p>
+<p><em>Pushes a command buffer debug group label.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.begin_debug_group` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `label` `(` $label `)`
@@ -9919,7 +9919,7 @@ given label.</p>
 </tbody>
 </table>
 <h4 id="halcommand_buffercollective-halcommandbuffercollectiveop"><code>hal.command_buffer.collective</code> (HAL::CommandBufferCollectiveOp)<a class="headerlink" href="#halcommand_buffercollective-halcommandbuffercollectiveop" title="Permanent link">link</a></h4>
-<p><em>Command buffer collective dispatch recording operation</em></p>
+<p><em>Command buffer collective dispatch recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.collective` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `channel` `(` $channel `:` type($channel) `)`
@@ -9937,7 +9937,7 @@ given label.</p>
 <h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>op</code></td><td>::mlir::iree_compiler::IREE::HAL::CollectiveAttr</td><td>collective operation and specification</td></tr>
+<tr><td><code>op</code></td><td>::mlir::iree_compiler::IREE::HAL::CollectiveAttr</td><td>Collective operation and specification.</td></tr>
 </table>
 
 <h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
@@ -9992,7 +9992,7 @@ given label.</p>
 </tbody>
 </table>
 <h4 id="halcommand_buffercopy_buffer-halcommandbuffercopybufferop"><code>hal.command_buffer.copy_buffer</code> (HAL::CommandBufferCopyBufferOp)<a class="headerlink" href="#halcommand_buffercopy_buffer-halcommandbuffercopybufferop" title="Permanent link">link</a></h4>
-<p><em>Command buffer buffer copy recording operation</em></p>
+<p><em>Command buffer buffer copy recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.copy_buffer` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `source` `(` $source_buffer `:` type($source_buffer) `)`
@@ -10046,7 +10046,7 @@ given label.</p>
 </tbody>
 </table>
 <h4 id="halcommand_buffercreate-halcommandbuffercreateop"><code>hal.command_buffer.create</code> (HAL::CommandBufferCreateOp)<a class="headerlink" href="#halcommand_buffercreate-halcommandbuffercreateop" title="Permanent link">link</a></h4>
-<p><em>Command buffer allocation operation</em></p>
+<p><em>Command buffer allocation operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.create` `device` `(` $device `:` type($device) `)`
               `mode` `(` $modes `)`
@@ -10104,7 +10104,7 @@ given label.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferdevice-halcommandbufferdeviceop"><code>hal.command_buffer.device</code> (HAL::CommandBufferDeviceOp)<a class="headerlink" href="#halcommand_bufferdevice-halcommandbufferdeviceop" title="Permanent link">link</a></h4>
-<p><em>Command buffer device query operation</em></p>
+<p><em>Command buffer device query operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.device` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `:` type($device)
@@ -10145,7 +10145,7 @@ given label.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferdispatchindirect-halcommandbufferdispatchindirectop"><code>hal.command_buffer.dispatch.indirect</code> (HAL::CommandBufferDispatchIndirectOp)<a class="headerlink" href="#halcommand_bufferdispatchindirect-halcommandbufferdispatchindirectop" title="Permanent link">link</a></h4>
-<p><em>Command buffer indirect dispatch recording operation</em></p>
+<p><em>Command buffer indirect dispatch recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.dispatch.indirect` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `target` `(` $executable `:` type($executable) `)`
@@ -10229,7 +10229,7 @@ be HAL buffers or indirect references into the command buffer binding table.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferdispatch-halcommandbufferdispatchop"><code>hal.command_buffer.dispatch</code> (HAL::CommandBufferDispatchOp)<a class="headerlink" href="#halcommand_bufferdispatch-halcommandbufferdispatchop" title="Permanent link">link</a></h4>
-<p><em>Command buffer dispatch recording operation</em></p>
+<p><em>Command buffer dispatch recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.dispatch` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `target` `(` $executable `:` type($executable) `)`
@@ -10316,7 +10316,7 @@ be HAL buffers or indirect references into the command buffer binding table.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferend_debug_group-halcommandbufferenddebuggroupop"><code>hal.command_buffer.end_debug_group</code> (HAL::CommandBufferEndDebugGroupOp)<a class="headerlink" href="#halcommand_bufferend_debug_group-halcommandbufferenddebuggroupop" title="Permanent link">link</a></h4>
-<p><em>Pops a command buffer debug group label</em></p>
+<p><em>Pops a command buffer debug group label.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.end_debug_group` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               attr-dict-with-keyword
@@ -10338,7 +10338,7 @@ be HAL buffers or indirect references into the command buffer binding table.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferexecution_barrier-halcommandbufferexecutionbarrierop"><code>hal.command_buffer.execution_barrier</code> (HAL::CommandBufferExecutionBarrierOp)<a class="headerlink" href="#halcommand_bufferexecution_barrier-halcommandbufferexecutionbarrierop" title="Permanent link">link</a></h4>
-<p><em>Command buffer execution barrier recording operation</em></p>
+<p><em>Command buffer execution barrier recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.execution_barrier` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `source` `(` $source_stage_mask `)`
@@ -10373,7 +10373,7 @@ provided will be affected.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferfill_buffer-halcommandbufferfillbufferop"><code>hal.command_buffer.fill_buffer</code> (HAL::CommandBufferFillBufferOp)<a class="headerlink" href="#halcommand_bufferfill_buffer-halcommandbufferfillbufferop" title="Permanent link">link</a></h4>
-<p><em>Command buffer buffer fill recording operation</em></p>
+<p><em>Command buffer buffer fill recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.fill_buffer` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `target` `(` $target_buffer `:` type($target_buffer) `)`
@@ -10421,7 +10421,7 @@ provided will be affected.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferfinalize-halcommandbufferfinalizeop"><code>hal.command_buffer.finalize</code> (HAL::CommandBufferFinalizeOp)<a class="headerlink" href="#halcommand_bufferfinalize-halcommandbufferfinalizeop" title="Permanent link">link</a></h4>
-<p><em>Finalizes command buffer recording</em></p>
+<p><em>Finalizes command buffer recording.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.finalize` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               attr-dict-with-keyword
@@ -10444,7 +10444,7 @@ No more commands may be recorded into the command buffer.</p>
 </tbody>
 </table>
 <h4 id="halcommand_bufferupdate_buffer-halcommandbufferupdatebufferop"><code>hal.command_buffer.update_buffer</code> (HAL::CommandBufferUpdateBufferOp)<a class="headerlink" href="#halcommand_bufferupdate_buffer-halcommandbufferupdatebufferop" title="Permanent link">link</a></h4>
-<p><em>Command buffer buffer update recording operation</em></p>
+<p><em>Command buffer buffer update recording operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.command_buffer.update_buffer` `&lt;` $command_buffer `:` type($command_buffer) `&gt;`
               `source` `(` $source_buffer `:` type($source_buffer) `{` $source_size `}` `)`
@@ -10481,7 +10481,7 @@ command buffer.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -10508,7 +10508,7 @@ command buffer.</p>
 <h3 id="device-management-ops">Device management ops<a class="headerlink" href="#device-management-ops" title="Permanent link">link</a></h3>
 <p>Device availability and selection support.</p>
 <h4 id="haldevicescount-haldevicescountop"><code>hal.devices.count</code> (HAL::DevicesCountOp)<a class="headerlink" href="#haldevicescount-haldevicescountop" title="Permanent link">link</a></h4>
-<p><em>Returns the number of available devices</em></p>
+<p><em>Returns the number of available devices.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.devices.count` attr-dict `:` type($result)
 </code></pre></div>
@@ -10532,7 +10532,7 @@ command buffer.</p>
 </tbody>
 </table>
 <h4 id="haldevicesget-haldevicesgetop"><code>hal.devices.get</code> (HAL::DevicesGetOp)<a class="headerlink" href="#haldevicesget-haldevicesgetop" title="Permanent link">link</a></h4>
-<p><em>Returns the device with the given index</em></p>
+<p><em>Returns the device with the given index.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.devices.get` $index attr-dict `:` type($result)
 </code></pre></div>
@@ -10574,7 +10574,7 @@ Devices may be lazily initialized upon first use.</p>
 <h3 id="device-ops">Device ops<a class="headerlink" href="#device-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.device</code> / <code>iree_hal_device_t</code>.</p>
 <h4 id="haldeviceallocator-haldeviceallocatorop"><code>hal.device.allocator</code> (HAL::DeviceAllocatorOp)<a class="headerlink" href="#haldeviceallocator-haldeviceallocatorop" title="Permanent link">link</a></h4>
-<p><em>Device allocator accessor operation</em></p>
+<p><em>Device allocator accessor operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.allocator` `&lt;` $device `:` type($device) `&gt;` `:` type($result) attr-dict-with-keyword
 </code></pre></div>
@@ -10614,7 +10614,7 @@ the device.</p>
 </tbody>
 </table>
 <h4 id="haldevicequery-haldevicequeryop"><code>hal.device.query</code> (HAL::DeviceQueryOp)<a class="headerlink" href="#haldevicequery-haldevicequeryop" title="Permanent link">link</a></h4>
-<p><em>Returns a runtime configuration parameter from the device</em></p>
+<p><em>Returns a runtime configuration parameter from the device.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.query` `&lt;` $device `:` type($device) `&gt;`
               `key` `(` $category `:` `` `:` $key `)`
@@ -10705,7 +10705,7 @@ forever; all non-experimental keys should be vetted.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeuealloca-haldevicequeueallocaop"><code>hal.device.queue.alloca</code> (HAL::DeviceQueueAllocaOp)<a class="headerlink" href="#haldevicequeuealloca-haldevicequeueallocaop" title="Permanent link">link</a></h4>
-<p><em>Allocates a queue-ordered transient buffer</em></p>
+<p><em>Allocates a queue-ordered transient buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.alloca` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -10786,7 +10786,7 @@ and after the deallocation wait fence has been reached.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeuebarrier-haldevicequeuebarrierop"><code>hal.device.queue.barrier</code> (HAL::DeviceQueueBarrierOp)<a class="headerlink" href="#haldevicequeuebarrier-haldevicequeuebarrierop" title="Permanent link">link</a></h4>
-<p><em>Enqueues an execution barrier</em></p>
+<p><em>Enqueues an execution barrier.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.barrier` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -10831,7 +10831,7 @@ and after the deallocation wait fence has been reached.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeuecopy-haldevicequeuecopyop"><code>hal.device.queue.copy</code> (HAL::DeviceQueueCopyOp)<a class="headerlink" href="#haldevicequeuecopy-haldevicequeuecopyop" title="Permanent link">link</a></h4>
-<p><em>Copies one device-visible buffer to another</em></p>
+<p><em>Copies one device-visible buffer to another.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.copy` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -10907,7 +10907,7 @@ should be batched with other operations in command buffers.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeuedealloca-haldevicequeuedeallocaop"><code>hal.device.queue.dealloca</code> (HAL::DeviceQueueDeallocaOp)<a class="headerlink" href="#haldevicequeuedealloca-haldevicequeuedeallocaop" title="Permanent link">link</a></h4>
-<p><em>Deallocates a queue-ordered transient buffer</em></p>
+<p><em>Deallocates a queue-ordered transient buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.dealloca` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -10961,7 +10961,7 @@ will have undefined contents as other operations reuse the memory.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeueexecuteindirect-haldevicequeueexecuteindirectop"><code>hal.device.queue.execute.indirect</code> (HAL::DeviceQueueExecuteIndirectOp)<a class="headerlink" href="#haldevicequeueexecuteindirect-haldevicequeueexecuteindirectop" title="Permanent link">link</a></h4>
-<p><em>Enqueues command buffer execution</em></p>
+<p><em>Enqueues command buffer execution.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.execute.indirect` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11032,7 +11032,7 @@ signal fence will be signaled when all commands have completed.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeueexecute-haldevicequeueexecuteop"><code>hal.device.queue.execute</code> (HAL::DeviceQueueExecuteOp)<a class="headerlink" href="#haldevicequeueexecute-haldevicequeueexecuteop" title="Permanent link">link</a></h4>
-<p><em>Enqueues command buffer execution</em></p>
+<p><em>Enqueues command buffer execution.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.execute` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11084,7 +11084,7 @@ signal fence will be signaled when all commands have completed.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeuefill-haldevicequeuefillop"><code>hal.device.queue.fill</code> (HAL::DeviceQueueFillOp)<a class="headerlink" href="#haldevicequeuefill-haldevicequeuefillop" title="Permanent link">link</a></h4>
-<p><em>Fills a buffer with a repeating pattern</em></p>
+<p><em>Fills a buffer with a repeating pattern.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.fill` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11153,7 +11153,7 @@ should be batched with other operations in command buffers.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeueflush-haldevicequeueflushop"><code>hal.device.queue.flush</code> (HAL::DeviceQueueFlushOp)<a class="headerlink" href="#haldevicequeueflush-haldevicequeueflushop" title="Permanent link">link</a></h4>
-<p><em>Flushes locally-pending submissions to the queue</em></p>
+<p><em>Flushes locally-pending submissions to the queue.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.flush` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11183,7 +11183,7 @@ This may be a no-op.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeueread-haldevicequeuereadop"><code>hal.device.queue.read</code> (HAL::DeviceQueueReadOp)<a class="headerlink" href="#haldevicequeueread-haldevicequeuereadop" title="Permanent link">link</a></h4>
-<p><em>Reads a segment from a file into a device buffer</em></p>
+<p><em>Reads a segment from a file into a device buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.read` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11258,7 +11258,7 @@ result in propagated semaphore failure or device loss.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeueupdate-haldevicequeueupdateop"><code>hal.device.queue.update</code> (HAL::DeviceQueueUpdateOp)<a class="headerlink" href="#haldevicequeueupdate-haldevicequeueupdateop" title="Permanent link">link</a></h4>
-<p><em>Updates a buffer with the contents of a host buffer</em></p>
+<p><em>Updates a buffer with the contents of a host buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.update` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11316,7 +11316,7 @@ should be batched with other operations in command buffers.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offset</code></td>
@@ -11337,7 +11337,7 @@ should be batched with other operations in command buffers.</p>
 </tbody>
 </table>
 <h4 id="haldevicequeuewrite-haldevicequeuewriteop"><code>hal.device.queue.write</code> (HAL::DeviceQueueWriteOp)<a class="headerlink" href="#haldevicequeuewrite-haldevicequeuewriteop" title="Permanent link">link</a></h4>
-<p><em>Writes a segment from a device buffer into a file</em></p>
+<p><em>Writes a segment from a device buffer into a file.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.write` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -11412,7 +11412,7 @@ result in propagated semaphore failure or device loss.</p>
 </tbody>
 </table>
 <h4 id="haldeviceresolve-haldeviceresolveop"><code>hal.device.resolve</code> (HAL::DeviceResolveOp)<a class="headerlink" href="#haldeviceresolve-haldeviceresolveop" title="Permanent link">link</a></h4>
-<p><em>Resolves device handles based on affinity</em></p>
+<p><em>Resolves device handles based on affinity.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.resolve` (`on` `(` $affinity^ `)`)?
               attr-dict `:` type($results)
@@ -11433,7 +11433,7 @@ result in propagated semaphore failure or device loss.</p>
 <h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::HAL::DeviceAffinityAttr</td><td>specifies a named device and optional queue affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::HAL::DeviceAffinityAttr</td><td>Specifies a named device and optional queue affinity.</td></tr>
 </table>
 
 <h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
@@ -11452,7 +11452,7 @@ result in propagated semaphore failure or device loss.</p>
 </tbody>
 </table>
 <h4 id="halreturn-halreturnop"><code>hal.return</code> (HAL::ReturnOp)<a class="headerlink" href="#halreturn-halreturnop" title="Permanent link">link</a></h4>
-<p><em>Return from a hal.* region</em></p>
+<p><em>Return from a hal.* region.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.return` ($operands^ `:` type($operands))? attr-dict
 </code></pre></div>
@@ -11476,7 +11476,7 @@ result in propagated semaphore failure or device loss.</p>
 <h3 id="executable-ops">Executable ops<a class="headerlink" href="#executable-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.executable</code> / <code>iree_hal_executable_t</code>.</p>
 <h4 id="halexecutablebinary-halexecutablebinaryop"><code>hal.executable.binary</code> (HAL::ExecutableBinaryOp)<a class="headerlink" href="#halexecutablebinary-halexecutablebinaryop" title="Permanent link">link</a></h4>
-<p><em>Compiled executable binary data</em></p>
+<p><em>Compiled executable binary data.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.binary` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -11497,7 +11497,7 @@ IR prior to serialization (for debugging).</p>
 </table>
 
 <h4 id="halexecutablecalculate_workgroups-halexecutablecalculateworkgroupsop"><code>hal.executable.calculate_workgroups</code> (HAL::ExecutableCalculateWorkgroupsOp)<a class="headerlink" href="#halexecutablecalculate_workgroups-halexecutablecalculateworkgroupsop" title="Permanent link">link</a></h4>
-<p><em>Calculates workgroup count from workload for an exported function</em></p>
+<p><em>Calculates workgroup count from workload for an exported function.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.calculate_workgroups` `device` `(` $device `:` type($device) `)`
               `target` `(` $entry_point `)`
@@ -11560,7 +11560,7 @@ the workgroup count calculation region of the target
 </tbody>
 </table>
 <h4 id="halexecutablecondition-halexecutableconditionop"><code>hal.executable.condition</code> (HAL::ExecutableConditionOp)<a class="headerlink" href="#halexecutablecondition-halexecutableconditionop" title="Permanent link">link</a></h4>
-<p><em>Host code to determine if the executable is enabled</em></p>
+<p><em>Host code to determine if the executable is enabled.</em></p>
 <p>Variants are selected based on their target and this optional condition
 op that returns true if the variant is valid for use on the provided
 runtime <code>!hal.device</code>. If no variants within an executable are valid then
@@ -11577,7 +11577,7 @@ one found will be loaded and used for execution.</p>
 </table>
 
 <h4 id="halexecutableconstantblock-halexecutableconstantblockop"><code>hal.executable.constant.block</code> (HAL::ExecutableConstantBlockOp)<a class="headerlink" href="#halexecutableconstantblock-halexecutableconstantblockop" title="Permanent link">link</a></h4>
-<p><em>Executable constant block initializer</em></p>
+<p><em>Executable constant block initializer.</em></p>
 <p>Initializes one or more constants in the executable constant block by
 returning one value per identified constant. Each constant block is
 evaluated on the host prior to instantiating the executable for a given
@@ -11623,7 +11623,7 @@ a way compatible with its execution model. Examples:
 </table>
 
 <h4 id="halexecutableconstantload-halexecutableconstantloadop"><code>hal.executable.constant.load</code> (HAL::ExecutableConstantLoadOp)<a class="headerlink" href="#halexecutableconstantload-halexecutableconstantloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a constant value from the executable constant block</em></p>
+<p><em>Loads a constant value from the executable constant block.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.constant.load` $key attr-dict `:` type($result)
 </code></pre></div>
@@ -11658,7 +11658,7 @@ those not needing special behavior.</p>
 </tbody>
 </table>
 <h4 id="halexecutablecreate-halexecutablecreateop"><code>hal.executable.create</code> (HAL::ExecutableCreateOp)<a class="headerlink" href="#halexecutablecreate-halexecutablecreateop" title="Permanent link">link</a></h4>
-<p><em>Creates an executable</em></p>
+<p><em>Creates an executable.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.create` `device` `(` $device `:` type($device) `)`
               `affinity` `(` $queue_affinity `)`
@@ -11724,13 +11724,13 @@ runtime-derived parameters.</p>
 </tbody>
 </table>
 <h4 id="halexecutable_end-halexecutableendop"><code>hal.executable_end</code> (HAL::ExecutableEndOp)<a class="headerlink" href="#halexecutable_end-halexecutableendop" title="Permanent link">link</a></h4>
-<p><em>Terminator pseudo-op for the executable op</em></p>
+<p><em>Terminator pseudo-op for the executable op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable_end` attr-dict
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutableexport-halexecutableexportop"><code>hal.executable.export</code> (HAL::ExecutableExportOp)<a class="headerlink" href="#halexecutableexport-halexecutableexportop" title="Permanent link">link</a></h4>
-<p><em>Executable entry point declaration</em></p>
+<p><em>Executable entry point declaration.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.export` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -11753,7 +11753,7 @@ dispatch. It returns the number of workgroups along x, y, and z.</p>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
-<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
 <tr><td><code>workgroup_size</code></td><td>::mlir::ArrayAttr</td><td>index array attribute</td></tr>
 <tr><td><code>subgroup_size</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <tr><td><code>workgroup_local_memory</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
@@ -11761,7 +11761,7 @@ dispatch. It returns the number of workgroups along x, y, and z.</p>
 </table>
 
 <h4 id="halexecutableexportordinal-halexecutableexportordinalop"><code>hal.executable.export.ordinal</code> (HAL::ExecutableExportOrdinalOp)<a class="headerlink" href="#halexecutableexportordinal-halexecutableexportordinalop" title="Permanent link">link</a></h4>
-<p><em>Executable export ordinal lookup pseudo-op</em></p>
+<p><em>Executable export ordinal lookup pseudo-op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.export.ordinal` `target` `(` $entry_point `)`
               `:` type($result)
@@ -11794,7 +11794,7 @@ assigned.</p>
 </tbody>
 </table>
 <h4 id="halexecutablelookup-halexecutablelookupop"><code>hal.executable.lookup</code> (HAL::ExecutableLookupOp)<a class="headerlink" href="#halexecutablelookup-halexecutablelookupop" title="Permanent link">link</a></h4>
-<p><em>Executable cache lookup pseudo-op</em></p>
+<p><em>Executable cache lookup pseudo-op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.lookup` `device` `(` $device `:` type($device) `)`
               `executable` `(` $executable `)`
@@ -11843,7 +11843,7 @@ possibly lazy-initialized executable.</p>
 </tbody>
 </table>
 <h4 id="halexecutable-halexecutableop"><code>hal.executable</code> (HAL::ExecutableOp)<a class="headerlink" href="#halexecutable-halexecutableop" title="Permanent link">link</a></h4>
-<p><em>Target-specific executable module</em></p>
+<p><em>Target-specific executable module.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -11862,13 +11862,13 @@ kernel/shader/etc.</p>
 </table>
 
 <h4 id="halexecutablesource_end-halexecutablesourceendop"><code>hal.executable.source_end</code> (HAL::ExecutableSourceEndOp)<a class="headerlink" href="#halexecutablesource_end-halexecutablesourceendop" title="Permanent link">link</a></h4>
-<p><em>Terminator pseudo-op for the executable source op</em></p>
+<p><em>Terminator pseudo-op for the executable source op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.source_end` attr-dict
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutablesource-halexecutablesourceop"><code>hal.executable.source</code> (HAL::ExecutableSourceOp)<a class="headerlink" href="#halexecutablesource-halexecutablesourceop" title="Permanent link">link</a></h4>
-<p><em>Generic source contents of an executable op</em></p>
+<p><em>Generic source contents of an executable op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.source` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -11885,17 +11885,17 @@ executables prior to device specification.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>objects</code></td><td>::mlir::iree_compiler::IREE::HAL::ExecutableObjectsAttr</td><td>target-specific object file references</td></tr>
+<tr><td><code>objects</code></td><td>::mlir::iree_compiler::IREE::HAL::ExecutableObjectsAttr</td><td>Target-specific object file references.</td></tr>
 </table>
 
 <h4 id="halexecutablevariant_end-halexecutablevariantendop"><code>hal.executable.variant_end</code> (HAL::ExecutableVariantEndOp)<a class="headerlink" href="#halexecutablevariant_end-halexecutablevariantendop" title="Permanent link">link</a></h4>
-<p><em>Terminator pseudo-op for the executable variant op</em></p>
+<p><em>Terminator pseudo-op for the executable variant op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.variant_end` attr-dict
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableVariantOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutablevariant-halexecutablevariantop"><code>hal.executable.variant</code> (HAL::ExecutableVariantOp)<a class="headerlink" href="#halexecutablevariant-halexecutablevariantop" title="Permanent link">link</a></h4>
-<p><em>Target-specific variant of an executable op</em></p>
+<p><em>Target-specific variant of an executable op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.variant` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -11919,7 +11919,7 @@ one found will be loaded and used for execution.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target</code></td><td>::mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr</td><td>generic executable target specification</td></tr>
+<tr><td><code>target</code></td><td>::mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr</td><td>Generic executable target specification.</td></tr>
 <tr><td><code>objects</code></td><td>::mlir::ArrayAttr</td><td>HAL executable object references</td></tr>
 <tr><td><code>sources</code></td><td>::mlir::DictionaryAttr</td><td>dictionary of named attribute values</td></tr>
 </table>
@@ -11927,7 +11927,7 @@ one found will be loaded and used for execution.</p>
 <h3 id="experimental-ops">Experimental ops<a class="headerlink" href="#experimental-ops" title="Permanent link">link</a></h3>
 <p>Temporary hack ops expected to be removed in the future.</p>
 <h4 id="halexfilefrom_memory-halexfilefrommemoryop"><code>hal.ex.file.from_memory</code> (HAL::ExFileFromMemoryOp)<a class="headerlink" href="#halexfilefrom_memory-halexfilefrommemoryop" title="Permanent link">link</a></h4>
-<p><em>Creates a file mapped into a byte range of a host buffer</em></p>
+<p><em>Creates a file mapped into a byte range of a host buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.ex.file.from_memory` `device` `(` $device `:` type($device) `)`
               `affinity` `(` $queue_affinity `)`
@@ -11976,7 +11976,7 @@ be marked epxerimental.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offset</code></td>
@@ -12010,7 +12010,7 @@ be marked epxerimental.</p>
 <h3 id="fence-ops">Fence ops<a class="headerlink" href="#fence-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.fence</code> / <code>iree_hal_fence_t</code>.</p>
 <h4 id="halfenceawait-halfenceawaitop"><code>hal.fence.await</code> (HAL::FenceAwaitOp)<a class="headerlink" href="#halfenceawait-halfenceawaitop" title="Permanent link">link</a></h4>
-<p><em>Asynchronous fence wait operation</em></p>
+<p><em>Asynchronous fence wait operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.fence.await` `until` `(` `[` $fences `]` `)`
               `timeout_millis` `(` $timeout_millis `)`
@@ -12063,7 +12063,7 @@ fence after the wait, with a non-zero value indicating failure.</p>
 </tbody>
 </table>
 <h4 id="halfencecreate-halfencecreateop"><code>hal.fence.create</code> (HAL::FenceCreateOp)<a class="headerlink" href="#halfencecreate-halfencecreateop" title="Permanent link">link</a></h4>
-<p><em>Creates an unsignaled fence</em></p>
+<p><em>Creates an unsignaled fence.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.fence.create` `device` `(` $device `:` type($device) `)`
               `flags` `(` $flags `)`
@@ -12113,7 +12113,7 @@ queue submission ops.</p>
 </tbody>
 </table>
 <h4 id="halfencefail-halfencefailop"><code>hal.fence.fail</code> (HAL::FenceFailOp)<a class="headerlink" href="#halfencefail-halfencefailop" title="Permanent link">link</a></h4>
-<p><em>Fence failure operation</em></p>
+<p><em>Fence failure operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.fence.fail` `&lt;` $fence `:` type($fence) `&gt;`
               `status` `(` $status `)`
@@ -12142,7 +12142,7 @@ for the lifetime of each semaphore.</p>
 </tbody>
 </table>
 <h4 id="halfencejoin-halfencejoinop"><code>hal.fence.join</code> (HAL::FenceJoinOp)<a class="headerlink" href="#halfencejoin-halfencejoinop" title="Permanent link">link</a></h4>
-<p><em>Creates a fence from the given timepoints</em></p>
+<p><em>Creates a fence from the given timepoints.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.fence.join` `at` `(` `[` $fences `]` `)`
               `flags` `(` $flags `)`
@@ -12188,7 +12188,7 @@ for the lifetime of each semaphore.</p>
 </tbody>
 </table>
 <h4 id="halfencequery-halfencequeryop"><code>hal.fence.query</code> (HAL::FenceQueryOp)<a class="headerlink" href="#halfencequery-halfencequeryop" title="Permanent link">link</a></h4>
-<p><em>Fence query operation</em></p>
+<p><em>Fence query operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.fence.query` `&lt;` $fence `:` type($fence) `&gt;`
               `:` type($status)
@@ -12229,7 +12229,7 @@ unsignaled, and otherwise an error indicating the failure.</p>
 </tbody>
 </table>
 <h4 id="halfencesignal-halfencesignalop"><code>hal.fence.signal</code> (HAL::FenceSignalOp)<a class="headerlink" href="#halfencesignal-halfencesignalop" title="Permanent link">link</a></h4>
-<p><em>Fence signal operation</em></p>
+<p><em>Fence signal operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.fence.signal` `&lt;` $fence `:` type($fence) `&gt;`
               attr-dict-with-keyword
@@ -12254,7 +12254,7 @@ reached. Waiting work may begin immediately.</p>
 <h3 id="instrument-ops">Instrument ops<a class="headerlink" href="#instrument-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.instrument.*</code>.</p>
 <h4 id="halinstrumentmemoryload-halinstrumentmemoryloadop"><code>hal.instrument.memory.load</code> (HAL::InstrumentMemoryLoadOp)<a class="headerlink" href="#halinstrumentmemoryload-halinstrumentmemoryloadop" title="Permanent link">link</a></h4>
-<p><em>Emits a memory load instrumentation event</em></p>
+<p><em>Emits a memory load instrumentation event.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.instrument.memory.load` `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
               $base `[` $indices `]` `,` $loadValue
@@ -12312,7 +12312,7 @@ bytes from the given resolved pointer have been loaded by the workgroup.</p>
 </tbody>
 </table>
 <h4 id="halinstrumentmemorystore-halinstrumentmemorystoreop"><code>hal.instrument.memory.store</code> (HAL::InstrumentMemoryStoreOp)<a class="headerlink" href="#halinstrumentmemorystore-halinstrumentmemorystoreop" title="Permanent link">link</a></h4>
-<p><em>Emits a memory store instrumentation event</em></p>
+<p><em>Emits a memory store instrumentation event.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.instrument.memory.store` `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
               $base `[` $indices `]` `,` $storeValue
@@ -12370,7 +12370,7 @@ bytes have been stored to the given resolved pointer by the workgroup.</p>
 </tbody>
 </table>
 <h4 id="halinstrumentprint-halinstrumentprintop"><code>hal.instrument.print</code> (HAL::InstrumentPrintOp)<a class="headerlink" href="#halinstrumentprint-halinstrumentprintop" title="Permanent link">link</a></h4>
-<p><em>Emits a human-readable printf-style string event</em></p>
+<p><em>Emits a human-readable printf-style string event.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.instrument.print` `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
               $format (`*` `(` $values^ `:` type($values) `)`)?
@@ -12411,7 +12411,7 @@ instrumentation storage buffers with redundant strings.</p>
 </tbody>
 </table>
 <h4 id="halinstrumentvalue-halinstrumentvalueop"><code>hal.instrument.value</code> (HAL::InstrumentValueOp)<a class="headerlink" href="#halinstrumentvalue-halinstrumentvalueop" title="Permanent link">link</a></h4>
-<p><em>Emits a scalar value instrumentation event</em></p>
+<p><em>Emits a scalar value instrumentation event.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.instrument.value` `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
               $ordinal `=` $operand attr-dict `:` type($operand)
@@ -12466,7 +12466,7 @@ debugging purposes.</p>
 </tbody>
 </table>
 <h4 id="halinstrumentworkgroup-halinstrumentworkgroupop"><code>hal.instrument.workgroup</code> (HAL::InstrumentWorkgroupOp)<a class="headerlink" href="#halinstrumentworkgroup-halinstrumentworkgroupop" title="Permanent link">link</a></h4>
-<p><em>Emits a dispatch workgroup instrumentation event</em></p>
+<p><em>Emits a dispatch workgroup instrumentation event.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.instrument.workgroup` `` `[` $buffer `:` type($buffer) `]`
               `dispatch` `(` $dispatchId `)`
@@ -12522,7 +12522,7 @@ instrumentation events.</p>
 <h3 id="interface-ops">Interface ops<a class="headerlink" href="#interface-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.interface.*</code>.</p>
 <h4 id="halinterfacebindingsubspan-halinterfacebindingsubspanop"><code>hal.interface.binding.subspan</code> (HAL::InterfaceBindingSubspanOp)<a class="headerlink" href="#halinterfacebindingsubspan-halinterfacebindingsubspanop" title="Permanent link">link</a></h4>
-<p><em>Returns an alias to a subspan of interface binding data</em></p>
+<p><em>Returns an alias to a subspan of interface binding data.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.interface.binding.subspan` `layout` `(` $layout `)`
               `binding` `(` $binding `)`
@@ -12543,7 +12543,7 @@ will be the minimum of the two.</p>
 <h5 id="attributes_49">Attributes:<a class="headerlink" href="#attributes_49" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
 <tr><td><code>binding</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>alignment</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>descriptor_flags</code></td><td>::mlir::iree_compiler::IREE::HAL::DescriptorFlagsAttr</td><td>valid Descriptor flags</td></tr>
@@ -12584,7 +12584,7 @@ will be the minimum of the two.</p>
 </tbody>
 </table>
 <h4 id="halinterfaceconstantload-halinterfaceconstantloadop"><code>hal.interface.constant.load</code> (HAL::InterfaceConstantLoadOp)<a class="headerlink" href="#halinterfaceconstantload-halinterfaceconstantloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a constant value from the interface constant block</em></p>
+<p><em>Loads a constant value from the interface constant block.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.interface.constant.load` `layout` `(` $layout `)`
               `ordinal` `(` $ordinal `)`
@@ -12610,7 +12610,7 @@ and must be assumed to have any value.</p>
 <h5 id="attributes_50">Attributes:<a class="headerlink" href="#attributes_50" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <tr><td><code>alignment</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>values</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
@@ -12632,7 +12632,7 @@ and must be assumed to have any value.</p>
 </tbody>
 </table>
 <h4 id="halinterfaceworkgroupcount-halinterfaceworkgroupcountop"><code>hal.interface.workgroup.count</code> (HAL::InterfaceWorkgroupCountOp)<a class="headerlink" href="#halinterfaceworkgroupcount-halinterfaceworkgroupcountop" title="Permanent link">link</a></h4>
-<p><em>Returns the total workgroup count of the grid</em></p>
+<p><em>Returns the total workgroup count of the grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.count` `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
 </code></pre></div>
@@ -12671,7 +12671,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="halinterfaceworkgroupid-halinterfaceworkgroupidop"><code>hal.interface.workgroup.id</code> (HAL::InterfaceWorkgroupIDOp)<a class="headerlink" href="#halinterfaceworkgroupid-halinterfaceworkgroupidop" title="Permanent link">link</a></h4>
-<p><em>Returns the index of the current workgroup in the grid</em></p>
+<p><em>Returns the index of the current workgroup in the grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.id` `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
 </code></pre></div>
@@ -12709,7 +12709,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="halinterfaceworkgroupsize-halinterfaceworkgroupsizeop"><code>hal.interface.workgroup.size</code> (HAL::InterfaceWorkgroupSizeOp)<a class="headerlink" href="#halinterfaceworkgroupsize-halinterfaceworkgroupsizeop" title="Permanent link">link</a></h4>
-<p><em>Returns the size of each workgroup in invocations</em></p>
+<p><em>Returns the size of each workgroup in invocations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.interface.workgroup.size` `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
 </code></pre></div>
@@ -12750,7 +12750,7 @@ built-in variable.</p>
 <h3 id="pseudo-ops">Pseudo Ops<a class="headerlink" href="#pseudo-ops" title="Permanent link">link</a></h3>
 <p>Pseudo ops for conversion support.</p>
 <h4 id="haldevicememoize-haldevicememoizeop"><code>hal.device.memoize</code> (HAL::DeviceMemoizeOp)<a class="headerlink" href="#haldevicememoize-haldevicememoizeop" title="Permanent link">link</a></h4>
-<p><em>Memoizes resources for a particular device and queue affinity</em></p>
+<p><em>Memoizes resources for a particular device and queue affinity.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.device.memoize` `&lt;` $device `:` type($device) `&gt;`
               `affinity` `(` $queue_affinity `)`
@@ -12806,7 +12806,7 @@ forced with the <code>--iree-hal-memoization=false</code> flag.</p>
 </tbody>
 </table>
 <h4 id="haldispatchextern-haldispatchexternop"><code>hal.dispatch.extern</code> (HAL::DispatchExternOp)<a class="headerlink" href="#haldispatchextern-haldispatchexternop" title="Permanent link">link</a></h4>
-<p><em>A dispatch of workgroups across a 3-dimensional grid</em></p>
+<p><em>A dispatch of workgroups across a 3-dimensional grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.dispatch.extern` $export
               (`[` $workload^ `]`)? ``
@@ -12892,7 +12892,7 @@ used for execution.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>export</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
 <tr><td><code>targets</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
 <tr><td><code>target_ordinals</code></td><td>::mlir::ArrayAttr</td><td>Array of index ordinal attributes</td></tr>
 <tr><td><code>target_objects</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
@@ -12945,7 +12945,7 @@ used for execution.</p>
 </tbody>
 </table>
 <h4 id="haltensoralias-haltensoraliasop"><code>hal.tensor.alias</code> (HAL::TensorAliasOp)<a class="headerlink" href="#haltensoralias-haltensoraliasop" title="Permanent link">link</a></h4>
-<p><em>Hints that tensor storage should alias a HAL buffer view</em></p>
+<p><em>Hints that tensor storage should alias a HAL buffer view.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.tensor.alias` (`on` `(` $affinity^ `)`)?
               (`wait` `(` $wait_fence^ `)` `=` `` `&gt;`)?
@@ -13030,7 +13030,7 @@ the compiler consumes or produces the aliased memory consistent with itself.</p>
 </tbody>
 </table>
 <h4 id="haltensorbarrier-haltensorbarrierop"><code>hal.tensor.barrier</code> (HAL::TensorBarrierOp)<a class="headerlink" href="#haltensorbarrier-haltensorbarrierop" title="Permanent link">link</a></h4>
-<p><em>Signals a fence when all tensors are available</em></p>
+<p><em>Signals a fence when all tensors are available.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.tensor.barrier` `join` `` `(` $sources `:` type($sources) `)`
               `=` `` `&gt;`
@@ -13075,7 +13075,7 @@ tensors by signaling a fence. The source tensors are returned for chaining.</p>
 </tbody>
 </table>
 <h4 id="haltensorexport-haltensorexportop"><code>hal.tensor.export</code> (HAL::TensorExportOp)<a class="headerlink" href="#haltensorexport-haltensorexportop" title="Permanent link">link</a></h4>
-<p><em>Exports a tensor to a HAL buffer view</em></p>
+<p><em>Exports a tensor to a HAL buffer view.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.tensor.export` (`on` `(` $affinity^ `)`)?
               $source
@@ -13139,7 +13139,7 @@ types, etc.</p>
 </tbody>
 </table>
 <h4 id="haltensorimport-haltensorimportop"><code>hal.tensor.import</code> (HAL::TensorImportOp)<a class="headerlink" href="#haltensorimport-haltensorimportop" title="Permanent link">link</a></h4>
-<p><em>Imports a tensor from a HAL buffer view</em></p>
+<p><em>Imports a tensor from a HAL buffer view.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.tensor.import` (`on` `(` $affinity^ `)`)?
               (`wait` `(` $wait_fence^ `)` `=` `` `&gt;`)?
@@ -13216,7 +13216,7 @@ importer atomically.</p>
 </table>
 <h2 id="attributes_58">Attributes<a class="headerlink" href="#attributes_58" title="Permanent link">link</a></h2>
 <h3 id="collectiveattr">CollectiveAttr<a class="headerlink" href="#collectiveattr" title="Permanent link">link</a></h3>
-<p><em>Collective operation and specification</em></p>
+<p><em>Collective operation and specification.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.collective&lt;
   CollectiveKind,   # kind
@@ -13277,7 +13277,7 @@ importer atomically.</p>
 </tbody>
 </table>
 <h3 id="deviceaffinityattr">DeviceAffinityAttr<a class="headerlink" href="#deviceaffinityattr" title="Permanent link">link</a></h3>
-<p><em>Specifies a named device and optional queue affinity</em></p>
+<p><em>Specifies a named device and optional queue affinity.</em></p>
 <p>Specifies that an annotated operation or scope is only allowed to execute on
 a specific device and optionally a set of queues (0-64) provided.
 Operations will not run on other queues. If the queue mask is omitted then
@@ -13311,7 +13311,7 @@ any queue on the device is allowed to execute the specified operations.</p>
 </tbody>
 </table>
 <h3 id="devicealiasattr">DeviceAliasAttr<a class="headerlink" href="#devicealiasattr" title="Permanent link">link</a></h3>
-<p><em>Device target named alias</em></p>
+<p><em>Device target named alias.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.device.alias&lt;
   ::mlir::Type,   # type
@@ -13366,7 +13366,7 @@ provided will override any defaults provided by the configuration.</p>
 </tbody>
 </table>
 <h3 id="devicefallbackattr">DeviceFallbackAttr<a class="headerlink" href="#devicefallbackattr" title="Permanent link">link</a></h3>
-<p><em>Specifies a reference to another device</em></p>
+<p><em>Specifies a reference to another device.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.device.fallback&lt;
   ::mlir::Type,   # type
@@ -13399,7 +13399,7 @@ null.</p>
 </tbody>
 </table>
 <h3 id="deviceordinalattr">DeviceOrdinalAttr<a class="headerlink" href="#deviceordinalattr" title="Permanent link">link</a></h3>
-<p><em>Specifies a device by runtime registration ordinal</em></p>
+<p><em>Specifies a device by runtime registration ordinal.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.device.ordinal&lt;
   ::mlir::Type,   # type
@@ -13432,7 +13432,7 @@ initialization if the device ordinal is out of range.</p>
 </tbody>
 </table>
 <h3 id="devicepromiseattr">DevicePromiseAttr<a class="headerlink" href="#devicepromiseattr" title="Permanent link">link</a></h3>
-<p><em>Promises a named device and optional queue affinity</em></p>
+<p><em>Promises a named device and optional queue affinity.</em></p>
 <p>Specifies that an annotated operation or scope is only allowed to execute on
 a specific device that has not yet been declared and optionally a set of
 queues (0-64) provided. Operations will not run on other queues. If the
@@ -13472,7 +13472,7 @@ Verification is performed as part of the ResolveDevicePromisesPass.</p>
 </tbody>
 </table>
 <h3 id="deviceselectattr">DeviceSelectAttr<a class="headerlink" href="#deviceselectattr" title="Permanent link">link</a></h3>
-<p><em>Selects a device from one or more options</em></p>
+<p><em>Selects a device from one or more options.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.device.select&lt;
   ::mlir::Type,   # type
@@ -13525,7 +13525,7 @@ device can be selected.</p>
 </tbody>
 </table>
 <h3 id="devicetargetattr">DeviceTargetAttr<a class="headerlink" href="#devicetargetattr" title="Permanent link">link</a></h3>
-<p><em>Generic device target specification</em></p>
+<p><em>Generic device target specification.</em></p>
 <p>Specifies the properties of a target runtime device.
 Target devices are specified with a canonical identifier matching those used
 by the runtime (such as <code>cpu</code>, <code>vulkan</code>, etc). Target devices may support
@@ -13571,7 +13571,7 @@ select between multiple homogeneous devices.</p>
 </tbody>
 </table>
 <h3 id="executableobjectattr">ExecutableObjectAttr<a class="headerlink" href="#executableobjectattr" title="Permanent link">link</a></h3>
-<p><em>Object file reference</em></p>
+<p><em>Object file reference.</em></p>
 <p>Defines an object file that can be linked into executables.
 Today this is only supported for external file references with paths the
 compiler can successfully resolve from its current working directory.
@@ -13617,7 +13617,7 @@ variant without needing to reach into the IREE compiler code.</p>
 </tbody>
 </table>
 <h3 id="executableobjectsattr">ExecutableObjectsAttr<a class="headerlink" href="#executableobjectsattr" title="Permanent link">link</a></h3>
-<p><em>Target-specific object file references</em></p>
+<p><em>Target-specific object file references.</em></p>
 <p>A dictionary mapping executable target specifications to a list of objects.
 This is used to allow layers of the stack that support multi-targeting to
 specify information used during lowering into each particular target.</p>
@@ -13660,7 +13660,7 @@ ones ("only x86_64 targets with vector_size = 64 get these objects").</p>
 </tbody>
 </table>
 <h3 id="executabletargetattr">ExecutableTargetAttr<a class="headerlink" href="#executabletargetattr" title="Permanent link">link</a></h3>
-<p><em>Generic executable target specification</em></p>
+<p><em>Generic executable target specification.</em></p>
 <p>Specifies how to compile an executable for a specific target backend.
 A backend is used to translate and serialize the executable into the final
 form passed to the runtime. The format of the executable is a
@@ -13709,7 +13709,7 @@ two in all cases.</p>
 </tbody>
 </table>
 <h3 id="pipelinebindingattr">PipelineBindingAttr<a class="headerlink" href="#pipelinebindingattr" title="Permanent link">link</a></h3>
-<p><em>Pipeline binding specification</em></p>
+<p><em>Pipeline binding specification.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.pipeline.binding&lt;
   DescriptorType,   # type
@@ -13740,7 +13740,7 @@ two in all cases.</p>
 </tbody>
 </table>
 <h3 id="pipelinelayoutattr">PipelineLayoutAttr<a class="headerlink" href="#pipelinelayoutattr" title="Permanent link">link</a></h3>
-<p><em>Executable entry point layout specification</em></p>
+<p><em>Executable entry point layout specification.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.pipeline.layout&lt;
   ::llvm::ArrayRef&lt;PipelineBindingAttr&gt;,   # bindings

@@ -4749,7 +4749,7 @@ restrictions.</p>
 <h3 id="executable-ops">Executable ops<a class="headerlink" href="#executable-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.executable</code> / <code>iree_hal_executable_t</code>.</p>
 <h4 id="hal_loaderexecutabledispatch-halloaderexecutabledispatchop"><code>hal_loader.executable.dispatch</code> (HAL::Loader::ExecutableDispatchOp)<a class="headerlink" href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop" title="Permanent link">link</a></h4>
-<p><em>Inline executable dispatch operation</em></p>
+<p><em>Inline executable dispatch operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.dispatch` `executable` `(` $executable `:` type($executable) `)`
               `` `[` $entry_point `]`
@@ -4804,7 +4804,7 @@ restrictions.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>binding_buffers</code></td>
-<td>variadic of a reference counted byte buffer</td>
+<td>variadic of A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>binding_offsets</code></td>
@@ -4817,7 +4817,7 @@ restrictions.</p>
 </tbody>
 </table>
 <h4 id="hal_loaderexecutableexportordinal-halloaderexecutableexportordinalop"><code>hal_loader.executable.export.ordinal</code> (HAL::Loader::ExecutableExportOrdinalOp)<a class="headerlink" href="#hal_loaderexecutableexportordinal-halloaderexecutableexportordinalop" title="Permanent link">link</a></h4>
-<p><em>Executable export ordinal lookup pseudo-op</em></p>
+<p><em>Executable export ordinal lookup pseudo-op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.export.ordinal` `target` `(` $entry_point `)`
               `:` type($result)
@@ -4850,7 +4850,7 @@ assigned.</p>
 </tbody>
 </table>
 <h4 id="hal_loaderexecutableload-halloaderexecutableloadop"><code>hal_loader.executable.load</code> (HAL::Loader::ExecutableLoadOp)<a class="headerlink" href="#hal_loaderexecutableload-halloaderexecutableloadop" title="Permanent link">link</a></h4>
-<p><em>Dynamically loads an executable</em></p>
+<p><em>Dynamically loads an executable.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.load` `format` `(` $format `)`
               `data` `(` $data `)`
@@ -4881,7 +4881,7 @@ runtime-derived parameters.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>data</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>constants</code></td>
@@ -4905,7 +4905,7 @@ runtime-derived parameters.</p>
 </tbody>
 </table>
 <h4 id="hal_loaderexecutablelookup-halloaderexecutablelookupop"><code>hal_loader.executable.lookup</code> (HAL::Loader::ExecutableLookupOp)<a class="headerlink" href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" title="Permanent link">link</a></h4>
-<p><em>Executable cache lookup pseudo-op</em></p>
+<p><em>Executable cache lookup pseudo-op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.lookup` `executable` `(` $executable `)`
               `:` type($result)
@@ -4938,7 +4938,7 @@ possibly lazy-initialized executable.</p>
 </tbody>
 </table>
 <h4 id="hal_loaderexecutablequery_support-halloaderexecutablequerysupportop"><code>hal_loader.executable.query_support</code> (HAL::Loader::ExecutableQuerySupportOp)<a class="headerlink" href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" title="Permanent link">link</a></h4>
-<p><em>Queries whether an executable format is supported</em></p>
+<p><em>Queries whether an executable format is supported.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.query_support` `format` `(` $executable_format `)`
               `:` type($supported)

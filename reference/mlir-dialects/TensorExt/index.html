@@ -4799,7 +4799,7 @@ beyond what is currently available in the Tensor Dialect.</p>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop"><code>iree_tensor_ext.dispatch.tensor.load</code> (TensorExt::DispatchTensorLoadOp)<a class="headerlink" href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop" title="Permanent link">link</a></h3>
-<p><em>Loads a tensor from a dispatch input placeholder</em></p>
+<p><em>Loads a tensor from a dispatch input placeholder.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.tensor.load` $source
               `,` `offsets` `=` custom&lt;DynamicIndexList&gt;(
@@ -4871,7 +4871,7 @@ results of regions that may overlap.</p>
 </tbody>
 </table>
 <h3 id="iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop"><code>iree_tensor_ext.dispatch.tensor.store</code> (TensorExt::DispatchTensorStoreOp)<a class="headerlink" href="#iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop" title="Permanent link">link</a></h3>
-<p><em>Stores a tensor into a dispatch output placeholder</em></p>
+<p><em>Stores a tensor into a dispatch output placeholder.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.tensor.store` $value `,` $target
               `,` `offsets` `=` custom&lt;DynamicIndexList&gt;(

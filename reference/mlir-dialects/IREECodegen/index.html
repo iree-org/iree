@@ -4789,7 +4789,7 @@ within a backend.</p>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="iree_codegenextract_strided_metadata-codegenextractstridedmetadataop"><code>iree_codegen.extract_strided_metadata</code> (Codegen::ExtractStridedMetadataOp)<a class="headerlink" href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" title="Permanent link">link</a></h3>
-<p><em>Extracts a buffer base with offset and strides</em></p>
+<p><em>Extracts a buffer base with offset and strides.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.extract_strided_metadata` $source `:` type($source) `-&gt;` type(results) attr-dict
 </code></pre></div>
@@ -4875,7 +4875,7 @@ This makes lowering more progressive and brings the following benefits:
 </tbody>
 </table>
 <h3 id="iree_codegenload_from_memref-codegenloadfrommemrefop"><code>iree_codegen.load_from_memref</code> (Codegen::LoadFromMemrefOp)<a class="headerlink" href="#iree_codegenload_from_memref-codegenloadfrommemrefop" title="Permanent link">link</a></h3>
-<p><em>Loads a tensor from a memref</em></p>
+<p><em>Loads a tensor from a memref.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_memref` $source attr-dict `:` type($source) `-&gt;` type($result)
 </code></pre></div>
@@ -4937,11 +4937,13 @@ type.</p>
 </tbody>
 </table>
 <h3 id="iree_codegenquery_tile_sizes-codegenquerytilesizesop"><code>iree_codegen.query_tile_sizes</code> (Codegen::QueryTileSizesOp)<a class="headerlink" href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" title="Permanent link">link</a></h3>
-<p><em>Query tile sizes</em></p>
+<p><em>Yields tile sizes for the specified tensor type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.query_tile_sizes` attr-dict $tensor_type `-&gt;` type($results)
 </code></pre></div>
-<p>Query tile sizes</p>
+<p>For targets where tile sizes can't be resolved at compile time, this
+operation allows querying the sizes at runtime. Today this only applies
+to VMVX.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -4967,7 +4969,7 @@ type.</p>
 </tbody>
 </table>
 <h3 id="iree_codegenstore_to_memref-codegenstoretomemrefop"><code>iree_codegen.store_to_memref</code> (Codegen::StoreToMemrefOp)<a class="headerlink" href="#iree_codegenstore_to_memref-codegenstoretomemrefop" title="Permanent link">link</a></h3>
-<p><em>Stores a tensor into a memref</em></p>
+<p><em>Stores a tensor into a memref.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_memref` $value `,` $target
               attr-dict `:` type($value) `into` type($target)
@@ -4995,7 +4997,7 @@ type.</p>
 </tbody>
 </table>
 <h3 id="iree_codegenswizzle_hint-codegenswizzlehintop"><code>iree_codegen.swizzle_hint</code> (Codegen::SwizzleHintOp)<a class="headerlink" href="#iree_codegenswizzle_hint-codegenswizzlehintop" title="Permanent link">link</a></h3>
-<p><em>Hint to swizzle accesses according to an access pattern</em></p>
+<p><em>Hint to swizzle accesses according to an access pattern.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.swizzle_hint` $operand `[` $swizzle attr-dict `]` `:` type($result)
 </code></pre></div>

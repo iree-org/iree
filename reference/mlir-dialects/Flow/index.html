@@ -5863,7 +5863,7 @@ workload size, shapes of inputs and outputs, etc.</p>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="collective-communication-ops">Collective communication ops<a class="headerlink" href="#collective-communication-ops" title="Permanent link">link</a></h3>
 <h4 id="flowchannelcount-flowchannelcountop"><code>flow.channel.count</code> (Flow::ChannelCountOp)<a class="headerlink" href="#flowchannelcount-flowchannelcountop" title="Permanent link">link</a></h4>
-<p><em>Returns the total number of participants in the group</em></p>
+<p><em>Returns the total number of participants in the group.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.channel.count` $channel `:` type($result)
               attr-dict-with-keyword
@@ -5883,7 +5883,7 @@ workload size, shapes of inputs and outputs, etc.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -5903,7 +5903,7 @@ workload size, shapes of inputs and outputs, etc.</p>
 </tbody>
 </table>
 <h4 id="flowchanneldefault-flowchanneldefaultop"><code>flow.channel.default</code> (Flow::ChannelDefaultOp)<a class="headerlink" href="#flowchanneldefault-flowchanneldefaultop" title="Permanent link">link</a></h4>
-<p><em>Returns a default collective communication channel</em></p>
+<p><em>Returns a default collective communication channel.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.channel.default` ($group^)?
               `:` type($result)
@@ -5930,12 +5930,12 @@ workload size, shapes of inputs and outputs, etc.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="flowchannelrank-flowchannelrankop"><code>flow.channel.rank</code> (Flow::ChannelRankOp)<a class="headerlink" href="#flowchannelrank-flowchannelrankop" title="Permanent link">link</a></h4>
-<p><em>Returns the rank of the local participant in the group</em></p>
+<p><em>Returns the rank of the local participant in the group.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.channel.rank` $channel `:` type($result)
               attr-dict-with-keyword
@@ -5956,7 +5956,7 @@ group in <code>[0, count)</code>.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -5976,7 +5976,7 @@ group in <code>[0, count)</code>.</p>
 </tbody>
 </table>
 <h4 id="flowchannelsplit-flowchannelsplitop"><code>flow.channel.split</code> (Flow::ChannelSplitOp)<a class="headerlink" href="#flowchannelsplit-flowchannelsplitop" title="Permanent link">link</a></h4>
-<p><em>Splits a collective communication channel</em></p>
+<p><em>Splits a collective communication channel.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.channel.split` $channel `,` $color `,` $key
               `:` type($channel) `-&gt;` type($result)
@@ -6000,7 +6000,7 @@ group.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>color</code></td>
@@ -6023,19 +6023,19 @@ group.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="flowcollectiveall_gather-flowcollectiveallgatherop"><code>flow.collective.all_gather</code> (Flow::CollectiveAllGatherOp)<a class="headerlink" href="#flowcollectiveall_gather-flowcollectiveallgatherop" title="Permanent link">link</a></h4>
-<p><em>Performs all-gather operation</em></p>
+<p><em>Performs all-gather operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.collective.all_gather` $element_type `,` $target `,` $source `,` $channel `:`
               `(` type($target) `,` type($source) `,` type($channel) `)` `-&gt;`
               custom&lt;ShapedTiedResult&gt;(type($result), $target_dims, $tied_operands)
               attr-dict-with-keyword
 </code></pre></div>
-<p>It gathers data from all ranks and concatenates them on the 0-th dimension.</p>
+<p>Gathers data from all ranks and concatenates them on the 0-th dimension.</p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>TiedOpInterface</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
@@ -6067,7 +6067,7 @@ group.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -6087,14 +6087,14 @@ group.</p>
 </tbody>
 </table>
 <h4 id="flowcollectiveall_reduce-flowcollectiveallreduceop"><code>flow.collective.all_reduce</code> (Flow::CollectiveAllReduceOp)<a class="headerlink" href="#flowcollectiveall_reduce-flowcollectiveallreduceop" title="Permanent link">link</a></h4>
-<p><em>Performs all-reduce operation</em></p>
+<p><em>Performs all-reduce operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.collective.all_reduce` $reduction_op `,` $element_type `,` $target `,` $source `,` $channel `:`
               `(` type($target) `,` type($source) `,` type($channel) `)` `-&gt;`
               custom&lt;ShapedTiedResult&gt;(type($result), $target_dims, $tied_operands)
               attr-dict-with-keyword
 </code></pre></div>
-<p>The operation reduces data across all the ranks in the channel.</p>
+<p>Reduces data across all the ranks in the channel.</p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>TiedOpInterface</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
@@ -6127,7 +6127,7 @@ group.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -6147,7 +6147,7 @@ group.</p>
 </tbody>
 </table>
 <h4 id="flowcollectiveall_to_all-flowcollectivealltoallop"><code>flow.collective.all_to_all</code> (Flow::CollectiveAllToAllOp)<a class="headerlink" href="#flowcollectiveall_to_all-flowcollectivealltoallop" title="Permanent link">link</a></h4>
-<p><em>Performs all-to-all operation</em></p>
+<p><em>Performs all-to-all operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.collective.all_to_all` $element_type `,` $target `,` $source `,` $channel `:`
               `(` type($target) `,` type($source) `,` type($channel) `)` `-&gt;`
@@ -6186,7 +6186,7 @@ group.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -6206,7 +6206,7 @@ group.</p>
 </tbody>
 </table>
 <h4 id="flowcollectivereduce_scatter-flowcollectivereducescatterop"><code>flow.collective.reduce_scatter</code> (Flow::CollectiveReduceScatterOp)<a class="headerlink" href="#flowcollectivereduce_scatter-flowcollectivereducescatterop" title="Permanent link">link</a></h4>
-<p><em>Performs reduce and scatter operations</em></p>
+<p><em>Performs reduce and scatter operations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.collective.reduce_scatter` $reduction_op `,` $element_type `,` $target `,` $source `,` $channel `:`
               `(` type($target) `,` type($source) `,` type($channel) `)` `-&gt;`
@@ -6247,7 +6247,7 @@ group.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -6267,7 +6267,7 @@ group.</p>
 </tbody>
 </table>
 <h4 id="flowcollectivesend_recv-flowcollectivesendrecvop"><code>flow.collective.send_recv</code> (Flow::CollectiveSendRecvOp)<a class="headerlink" href="#flowcollectivesend_recv-flowcollectivesendrecvop" title="Permanent link">link</a></h4>
-<p><em>Performs a grouped send and receive operation</em></p>
+<p><em>Performs a grouped send and receive operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.collective.send_recv` $element_type `,` $target `,` $source `,` $channel `,` $send `,` $recv `:`
               `(` type($target) `,` type($source) `,` type($channel) `,` type($send) `,` type($recv) `)` `-&gt;`
@@ -6309,7 +6309,7 @@ group.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collecive communication channel</td>
+<td>A collecive communication channel.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>send</code></td>
@@ -6338,7 +6338,7 @@ group.</p>
 </table>
 <h3 id="dispatch-ops">Dispatch ops<a class="headerlink" href="#dispatch-ops" title="Permanent link">link</a></h3>
 <h4 id="flowdispatch-flowdispatchop"><code>flow.dispatch</code> (Flow::DispatchOp)<a class="headerlink" href="#flowdispatch-flowdispatchop" title="Permanent link">link</a></h4>
-<p><em>A dispatch of workgroups across a grid</em></p>
+<p><em>A dispatch of workgroups across a grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch` custom&lt;DispatchEntryPoints&gt;($entry_points)
               (`[` $workload^ `]`)? ``
@@ -6408,13 +6408,13 @@ arbitrary host logic.</p>
 <h3 id="executable-ops">Executable ops<a class="headerlink" href="#executable-ops" title="Permanent link">link</a></h3>
 <p>Executables for outlined regions.</p>
 <h4 id="flowexecutable_end-flowexecutableendop"><code>flow.executable_end</code> (Flow::ExecutableEndOp)<a class="headerlink" href="#flowexecutable_end-flowexecutableendop" title="Permanent link">link</a></h4>
-<p><em>Terminator pseudo-op for the executable op</em></p>
+<p><em>Terminator pseudo-op for the executable op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.executable_end` attr-dict
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::Flow::ExecutableOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="flowexecutableexport-flowexecutableexportop"><code>flow.executable.export</code> (Flow::ExecutableExportOp)<a class="headerlink" href="#flowexecutableexport-flowexecutableexportop" title="Permanent link">link</a></h4>
-<p><em>Defines an executable entry point for dispatch operations</em></p>
+<p><em>Defines an executable entry point for dispatch operations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.executable.export` custom&lt;SymbolVisibility&gt;($sym_visibility)
               custom&lt;SymbolAlias&gt;($sym_name, $function_ref)
@@ -6437,7 +6437,7 @@ produces an XYZ workgroup count for the 3D grid dispatch.</p>
 </table>
 
 <h4 id="flowexecutable-flowexecutableop"><code>flow.executable</code> (Flow::ExecutableOp)<a class="headerlink" href="#flowexecutable-flowexecutableop" title="Permanent link">link</a></h4>
-<p><em>Generic executable module</em></p>
+<p><em>Generic executable module.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.executable` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -6458,7 +6458,7 @@ target-specific backend IR representations.</p>
 
 <h3 id="partitioned-region-ops">Partitioned region ops<a class="headerlink" href="#partitioned-region-ops" title="Permanent link">link</a></h3>
 <h4 id="flowdispatchregion-flowdispatchregionop"><code>flow.dispatch.region</code> (Flow::DispatchRegionOp)<a class="headerlink" href="#flowdispatchregion-flowdispatchregionop" title="Permanent link">link</a></h4>
-<p><em>A group of ops</em></p>
+<p><em>A grouping of ops with implicit capture.</em></p>
 <p>This op is a container/grouping of ops. It represents a fusion group before
 being lowered to a dispatch region. Ops are collected inside of the region
 body of the op. Values from parent regions can be captured. Results are
@@ -6509,7 +6509,7 @@ workgroups for the dispatch. The region is lowered directly to
 </tbody>
 </table>
 <h4 id="flowdispatchtie_shape-flowdispatchtieshapeop"><code>flow.dispatch.tie_shape</code> (Flow::DispatchTieShapeOp)<a class="headerlink" href="#flowdispatchtie_shape-flowdispatchtieshapeop" title="Permanent link">link</a></h4>
-<p><em>Ties a runtime shape to a dispatch I/O argument</em></p>
+<p><em>Ties a runtime shape to a dispatch I/O argument.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.tie_shape` $operand attr-dict
               `:` type($result) (`{` $dynamic_dims^ `}`)?
@@ -6555,7 +6555,7 @@ pass-through result of this op to allow for SSA-based shape resolution.</p>
 </tbody>
 </table>
 <h4 id="flowdispatchworkgroupcount-flowdispatchworkgroupcountop"><code>flow.dispatch.workgroup.count</code> (Flow::DispatchWorkgroupCountOp)<a class="headerlink" href="#flowdispatchworkgroupcount-flowdispatchworkgroupcountop" title="Permanent link">link</a></h4>
-<p><em>Returns the total workgroup count of the grid</em></p>
+<p><em>Returns the total workgroup count of the grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workgroup.count` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
@@ -6592,7 +6592,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="flowdispatchworkgroupid-flowdispatchworkgroupidop"><code>flow.dispatch.workgroup.id</code> (Flow::DispatchWorkgroupIDOp)<a class="headerlink" href="#flowdispatchworkgroupid-flowdispatchworkgroupidop" title="Permanent link">link</a></h4>
-<p><em>Returns the index of the current workgroup in the grid</em></p>
+<p><em>Returns the index of the current workgroup in the grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workgroup.id` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
@@ -6630,7 +6630,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="flowdispatchworkgroupsize-flowdispatchworkgroupsizeop"><code>flow.dispatch.workgroup.size</code> (Flow::DispatchWorkgroupSizeOp)<a class="headerlink" href="#flowdispatchworkgroupsize-flowdispatchworkgroupsizeop" title="Permanent link">link</a></h4>
-<p><em>Returns the size of each workgroup in invocations</em></p>
+<p><em>Returns the size of each workgroup in invocations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workgroup.size` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
@@ -6673,7 +6673,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="flowdispatchworkgroups-flowdispatchworkgroupsop"><code>flow.dispatch.workgroups</code> (Flow::DispatchWorkgroupsOp)<a class="headerlink" href="#flowdispatchworkgroups-flowdispatchworkgroupsop" title="Permanent link">link</a></h4>
-<p><em>A dispatch of workgroups across a 3-dimensional grid</em></p>
+<p><em>A dispatch of workgroups across a 3-dimensional grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workgroups` (`[` $workload^ `]`)? ``
               `(` $arguments `)` `:`
@@ -6786,7 +6786,7 @@ result.</p>
 </tbody>
 </table>
 <h4 id="flowreturn-flowreturnop"><code>flow.return</code> (Flow::ReturnOp)<a class="headerlink" href="#flowreturn-flowreturnop" title="Permanent link">link</a></h4>
-<p><em>Return from a flow.dispatch_region</em></p>
+<p><em>Return from a flow.dispatch_region.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.return` attr-dict ($operands^ `:` type($operands))?
 </code></pre></div>
@@ -6811,7 +6811,7 @@ result.</p>
 </table>
 <h3 id="streamable-call-ops">Streamable call ops<a class="headerlink" href="#streamable-call-ops" title="Permanent link">link</a></h3>
 <h4 id="flowcall-flowcallop"><code>flow.call</code> (Flow::CallOp)<a class="headerlink" href="#flowcall-flowcallop" title="Permanent link">link</a></h4>
-<p><em>Calls a streamable external host function</em></p>
+<p><em>Calls a streamable external host function.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.call` $callee
               `(` $arguments `)` attr-dict `:`
@@ -6879,7 +6879,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 </tbody>
 </table>
 <h4 id="flowfunc-flowfuncop"><code>flow.func</code> (Flow::FuncOp)<a class="headerlink" href="#flowfunc-flowfuncop" title="Permanent link">link</a></h4>
-<p><em>Streamable function declaration</em></p>
+<p><em>Streamable function declaration.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.func` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -6908,7 +6908,7 @@ operation via <code>flow.call</code>. Today only external functions are allowed.
 
 <h3 id="tensor-ops">Tensor ops<a class="headerlink" href="#tensor-ops" title="Permanent link">link</a></h3>
 <h4 id="flowtensoralloca-flowtensorallocaop"><code>flow.tensor.alloca</code> (Flow::TensorAllocaOp)<a class="headerlink" href="#flowtensoralloca-flowtensorallocaop" title="Permanent link">link</a></h4>
-<p><em>An empty tensor allocation with undefined contents</em></p>
+<p><em>An empty tensor allocation with undefined contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.alloca` `:` type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
@@ -6953,7 +6953,7 @@ lowering.</p>
 </tbody>
 </table>
 <h4 id="flowtensorbarrier-flowtensorbarrierop"><code>flow.tensor.barrier</code> (Flow::TensorBarrierOp)<a class="headerlink" href="#flowtensorbarrier-flowtensorbarrierop" title="Permanent link">link</a></h4>
-<p><em>Indicates a value that must have a specific affinity</em></p>
+<p><em>Indicates a value that must have a specific affinity.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.barrier` $operand `:` type($result) (`{` $operand_dims^ `}`)?
               `on` $target
@@ -7007,14 +7007,21 @@ op.</p>
 </tbody>
 </table>
 <h4 id="flowtensorbitcast-flowtensorbitcastop"><code>flow.tensor.bitcast</code> (Flow::TensorBitCastOp)<a class="headerlink" href="#flowtensorbitcast-flowtensorbitcastop" title="Permanent link">link</a></h4>
-<p><em>Bitcasts a tensor</em></p>
+<p><em>Bitcasts a tensor without modifying the contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.bitcast` $source `:`
               type($source) (`{` $source_dims^ `}`)? `-&gt;`
               type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
 </code></pre></div>
-<p>Bitcasts a tensor to a new type without modifying the contents.</p>
+<p>Bitcasts a tensor |source| to the shape implied by this operations result
+type interleaved with |result_dims|, potentially with a different element
+type. For example,</p>
+<div class="highlight"><pre><span></span><code>result_dims = {%0, %1}
+result_type = tensor&lt;1x?x2x?x3 x!eltype&gt;
+</code></pre></div>
+<p>produces a tensor of shape [1, %0, 2, %1, 3] and element type <code>!eltype</code>.
+Note that the source and result tensors must serialized to the same size.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -7057,7 +7064,7 @@ op.</p>
 </tbody>
 </table>
 <h4 id="flowtensorclone-flowtensorcloneop"><code>flow.tensor.clone</code> (Flow::TensorCloneOp)<a class="headerlink" href="#flowtensorclone-flowtensorcloneop" title="Permanent link">link</a></h4>
-<p><em>Performs a full tensor clone operation</em></p>
+<p><em>Performs a full tensor clone operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.clone` $operand `:` type($result) (`{` $operand_dims^ `}`)?
               attr-dict-with-keyword
@@ -7101,7 +7108,7 @@ op.</p>
 </tbody>
 </table>
 <h4 id="flowtensorconstant-flowtensorconstantop"><code>flow.tensor.constant</code> (Flow::TensorConstantOp)<a class="headerlink" href="#flowtensorconstant-flowtensorconstantop" title="Permanent link">link</a></h4>
-<p><em>Tensor constant that can have dynamic dimensions</em></p>
+<p><em>Tensor constant that can have dynamic dimensions.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.constant` attr-dict $value
 </code></pre></div>
@@ -7134,7 +7141,7 @@ op.</p>
 </tbody>
 </table>
 <h4 id="flowtensordynamic_constant-flowtensordynamicconstantop"><code>flow.tensor.dynamic_constant</code> (Flow::TensorDynamicConstantOp)<a class="headerlink" href="#flowtensordynamic_constant-flowtensordynamicconstantop" title="Permanent link">link</a></h4>
-<p><em>Tensor constant that can have dynamic dimensions</em></p>
+<p><em>Tensor constant that can have dynamic dimensions.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.dynamic_constant` attr-dict $value `-&gt;` type($result)
 </code></pre></div>
@@ -7168,7 +7175,7 @@ preserved.</p>
 </tbody>
 </table>
 <h4 id="flowtensorempty-flowtensoremptyop"><code>flow.tensor.empty</code> (Flow::TensorEmptyOp)<a class="headerlink" href="#flowtensorempty-flowtensoremptyop" title="Permanent link">link</a></h4>
-<p><em>An empty tensor carrying metadata but no contents</em></p>
+<p><em>An empty tensor carrying metadata but no contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.empty` `:` type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
@@ -7209,7 +7216,7 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensorencode-flowtensorencodeop"><code>flow.tensor.encode</code> (Flow::TensorEncodeOp)<a class="headerlink" href="#flowtensorencode-flowtensorencodeop" title="Permanent link">link</a></h4>
-<p><em>Performs a full tensor encode operation</em></p>
+<p><em>Performs a full tensor encode operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.encode` $operand `:`
               type($operand) (`{` $operand_dims^ `}`)? `-&gt;`
@@ -7259,7 +7266,7 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensorload-flowtensorloadop"><code>flow.tensor.load</code> (Flow::TensorLoadOp)<a class="headerlink" href="#flowtensorload-flowtensorloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a tensor element</em></p>
+<p><em>Loads a value from a tensor element.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.load` $source (`[` $indices^ `]`)? `:`
               type($source) (`{` $source_dims^ `}`)?
@@ -7308,14 +7315,19 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensorreshape-flowtensorreshapeop"><code>flow.tensor.reshape</code> (Flow::TensorReshapeOp)<a class="headerlink" href="#flowtensorreshape-flowtensorreshapeop" title="Permanent link">link</a></h4>
-<p><em>Reshapes a tensor</em></p>
+<p><em>Reshapes a tensor without modifying the contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.reshape` $source `:`
               type($source) (`{` $source_dims^ `}`)? `-&gt;`
               type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
 </code></pre></div>
-<p>Reshapes a tensor to a new shape without modifying the contents.</p>
+<p>Reshapes a tensor |source| to the shape implied by this operations result
+type interleaved with |result_dims|. For example,</p>
+<div class="highlight"><pre><span></span><code>result_dims = {%0, %1}
+result_type = tensor&lt;1x?x2x?x3&gt;
+</code></pre></div>
+<p>produces a tensor of shape [1, %0, 2, %1, 3] and the same element type.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -7358,14 +7370,13 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensorslice-flowtensorsliceop"><code>flow.tensor.slice</code> (Flow::TensorSliceOp)<a class="headerlink" href="#flowtensorslice-flowtensorsliceop" title="Permanent link">link</a></h4>
-<p><em>Slices out a subregion of a tensor</em></p>
+<p><em>Clones a subregion of a tensor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.slice` $source `[` $start_indices `for` $lengths `]` `:`
               type($source) (`{` $source_dims^ `}`)? `-&gt;`
               type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
 </code></pre></div>
-<p>Clones a subregion of a tensor.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -7416,7 +7427,7 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensorsplat-flowtensorsplatop"><code>flow.tensor.splat</code> (Flow::TensorSplatOp)<a class="headerlink" href="#flowtensorsplat-flowtensorsplatop" title="Permanent link">link</a></h4>
-<p><em>Splats a value into a shaped tensor</em></p>
+<p><em>Splats a value into a shaped tensor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.splat` $value `:` type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
@@ -7460,7 +7471,7 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensorstore-flowtensorstoreop"><code>flow.tensor.store</code> (Flow::TensorStoreOp)<a class="headerlink" href="#flowtensorstore-flowtensorstoreop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a tensor element</em></p>
+<p><em>Stores a value into a tensor element.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.store` $value `,` $target (`[` $indices^ `]`)? `:`
               type($target) (`{` $target_dims^ `}`)?
@@ -7513,7 +7524,7 @@ any ranges of the tensor that are later read.</p>
 </tbody>
 </table>
 <h4 id="flowtensortie_shape-flowtensortieshapeop"><code>flow.tensor.tie_shape</code> (Flow::TensorTieShapeOp)<a class="headerlink" href="#flowtensortie_shape-flowtensortieshapeop" title="Permanent link">link</a></h4>
-<p><em>Ties a runtime shape to a tensor value</em></p>
+<p><em>Ties a runtime shape to a tensor value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.tie_shape` $operand attr-dict
               `:` type($result) (`{` $dynamic_dims^ `}`)?
@@ -7559,7 +7570,7 @@ calculations and is removed during lowering.</p>
 </tbody>
 </table>
 <h4 id="flowtensortrace-flowtensortraceop"><code>flow.tensor.trace</code> (Flow::TensorTraceOp)<a class="headerlink" href="#flowtensortrace-flowtensortraceop" title="Permanent link">link</a></h4>
-<p><em>Traces one or more tensor values at runtime</em></p>
+<p><em>Traces one or more tensor values at runtime.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.trace` $key `=` `[`
               custom&lt;ShapedOperandList&gt;($values, type($values), $value_dims)
@@ -7596,7 +7607,7 @@ values being traced.</p>
 </tbody>
 </table>
 <h4 id="flowtensortransfer-flowtensortransferop"><code>flow.tensor.transfer</code> (Flow::TensorTransferOp)<a class="headerlink" href="#flowtensortransfer-flowtensortransferop" title="Permanent link">link</a></h4>
-<p><em>Transfers a tensor to a target by copying if needed</em></p>
+<p><em>Transfers a tensor to a target by copying if needed.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.transfer` $operand `:` type($result) (`{` $operand_dims^ `}`)?
               `to` $target
@@ -7651,7 +7662,7 @@ context is required.</p>
 </tbody>
 </table>
 <h4 id="flowtensorupdate-flowtensorupdateop"><code>flow.tensor.update</code> (Flow::TensorUpdateOp)<a class="headerlink" href="#flowtensorupdate-flowtensorupdateop" title="Permanent link">link</a></h4>
-<p><em>Updates a tensor with the contents of another tensor</em></p>
+<p><em>Updates a tensor with the contents of another tensor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.update` $update `,` $target `[` $start_indices `]` `:`
               type($update) (`{` $update_dims^ `}`)? `-&gt;`
@@ -7713,7 +7724,7 @@ given offset indices.</p>
 <h3 id="dummyattr">DummyAttr<a class="headerlink" href="#dummyattr" title="Permanent link">link</a></h3>
 <p>Syntax: <code>#flow.dummy</code></p>
 <h3 id="namedparameterattr">NamedParameterAttr<a class="headerlink" href="#namedparameterattr" title="Permanent link">link</a></h3>
-<p><em>Named parameter referenced an optional scope and key</em></p>
+<p><em>Named parameter referenced an optional scope and key.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#flow.parameter.named&lt;
   ::mlir::Type,   # type
@@ -7759,7 +7770,7 @@ the parameter within its scope.</p>
 </table>
 <h2 id="types">Types<a class="headerlink" href="#types" title="Permanent link">link</a></h2>
 <h3 id="channeltype">ChannelType<a class="headerlink" href="#channeltype" title="Permanent link">link</a></h3>
-<p><em>A collecive communication channel</em></p>
+<p><em>A collecive communication channel.</em></p>
 <p>Syntax: <code>!flow.channel</code></p>
 <p>Represents a single participant in a collective clique. Multiple channels
 may exist within the same program to allow for partial operations or

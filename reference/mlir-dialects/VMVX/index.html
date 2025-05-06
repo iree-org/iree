@@ -6286,7 +6286,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="abi-ops">ABI ops<a class="headerlink" href="#abi-ops" title="Permanent link">link</a></h3>
 <h4 id="vmvxbinary-vmvxbinaryop"><code>vmvx.binary</code> (VMVX::BinaryOp)<a class="headerlink" href="#vmvxbinary-vmvxbinaryop" title="Permanent link">link</a></h4>
-<p><em>Performs a strided elementwise operation on two same-rank buffers</em></p>
+<p><em>Performs a strided elementwise operation on two same-rank buffers.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.binary` `op` `` `(` $opcode `:` $element_type `)`
               `lhs` `` `(` $lhs_buffer `offset` $lhs_offset `strides` `[` $lhs_strides `]` `:` type($lhs_buffer) `)`
@@ -6318,7 +6318,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>lhs_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>lhs_offset</code></td>
@@ -6330,7 +6330,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rhs_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rhs_offset</code></td>
@@ -6342,7 +6342,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_offset</code></td>
@@ -6359,7 +6359,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tbody>
 </table>
 <h4 id="vmvxcopy-vmvxcopyop"><code>vmvx.copy</code> (VMVX::CopyOp)<a class="headerlink" href="#vmvxcopy-vmvxcopyop" title="Permanent link">link</a></h4>
-<p><em>Copy from one buffer to another</em></p>
+<p><em>Copy from one buffer to another.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.copy` `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
@@ -6385,7 +6385,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>in_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>in_offset</code></td>
@@ -6397,7 +6397,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_offset</code></td>
@@ -6414,7 +6414,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tbody>
 </table>
 <h4 id="vmvxfill2d-vmvxfill2dop"><code>vmvx.fill2d</code> (VMVX::Fill2DOp)<a class="headerlink" href="#vmvxfill2d-vmvxfill2dop" title="Permanent link">link</a></h4>
-<p><em>Fill a tile with a scalar</em></p>
+<p><em>Fill a tile with a scalar.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.fill2d` `scalar` `` `(` $scalar `:` type($scalar) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
@@ -6437,7 +6437,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_offset</code></td>
@@ -6458,7 +6458,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tbody>
 </table>
 <h4 id="vmvxunary-vmvxunaryop"><code>vmvx.unary</code> (VMVX::UnaryOp)<a class="headerlink" href="#vmvxunary-vmvxunaryop" title="Permanent link">link</a></h4>
-<p><em>Performs a strided elementwise unary operation</em></p>
+<p><em>Performs a strided elementwise unary operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.unary` `op` `` `(` $opcode `:` $element_type `)`
               `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
@@ -6489,7 +6489,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>in_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>in_offset</code></td>
@@ -6501,7 +6501,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>out_offset</code></td>
@@ -6519,7 +6519,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 </table>
 <h3 id="utility-ops">Utility ops<a class="headerlink" href="#utility-ops" title="Permanent link">link</a></h3>
 <h4 id="vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop"><code>vmvx.get_buffer_descriptor</code> (VMVX::GetBufferDescriptorOp)<a class="headerlink" href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" title="Permanent link">link</a></h4>
-<p><em>Late binds a base buffer/offset/strides</em></p>
+<p><em>Late binds a base buffer/offset/strides.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_buffer_descriptor` $source `:` type($source) `-&gt;` type(results) attr-dict
 </code></pre></div>
@@ -6559,7 +6559,7 @@ concrete sources.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>base_buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offset</code></td>
@@ -6576,7 +6576,7 @@ concrete sources.</p>
 </tbody>
 </table>
 <h4 id="vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop"><code>vmvx.get_raw_interface_binding_buffer</code> (VMVX::GetRawInterfaceBindingBufferOp)<a class="headerlink" href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" title="Permanent link">link</a></h4>
-<p><em>Gets the raw buffer associated with a binding</em></p>
+<p><em>Gets the raw buffer associated with a binding.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_raw_interface_binding_buffer` `layout` `(` $layout `)`
               `binding` `(` $binding `)`
@@ -6595,7 +6595,7 @@ buffer as passed to the interface.</p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
 <tr><td><code>binding</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
@@ -6610,7 +6610,7 @@ buffer as passed to the interface.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>

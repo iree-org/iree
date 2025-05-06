@@ -6163,7 +6163,7 @@
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="addressoffset-arithmetic-ops">Address/offset arithmetic ops<a class="headerlink" href="#addressoffset-arithmetic-ops" title="Permanent link">link</a></h3>
 <h4 id="utilalign-utilalignop"><code>util.align</code> (Util::AlignOp)<a class="headerlink" href="#utilalign-utilalignop" title="Permanent link">link</a></h4>
-<p><em>Aligns up to a power-of-two alignment if required</em></p>
+<p><em>Aligns up to a power-of-two alignment if required.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.align` $value `,` $alignment attr-dict `:` type($result)
 </code></pre></div>
@@ -6206,7 +6206,7 @@
 </tbody>
 </table>
 <h4 id="utilsizeof-utilsizeofop"><code>util.sizeof</code> (Util::SizeOfOp)<a class="headerlink" href="#utilsizeof-utilsizeofop" title="Permanent link">link</a></h4>
-<p><em>Returns the size in bytes of a datatype</em></p>
+<p><em>Returns the size in bytes of a datatype.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.sizeof` $sizedType attr-dict-with-keyword
 </code></pre></div>
@@ -6243,7 +6243,7 @@ and FloatType. All others are not folded.</p>
 </table>
 <h3 id="buffer-ops">Buffer ops<a class="headerlink" href="#buffer-ops" title="Permanent link">link</a></h3>
 <h4 id="utilbufferalloc-utilbufferallocop"><code>util.buffer.alloc</code> (Util::BufferAllocOp)<a class="headerlink" href="#utilbufferalloc-utilbufferallocop" title="Permanent link">link</a></h4>
-<p><em>Allocates a buffer with undefined contents</em></p>
+<p><em>Allocates a buffer with undefined contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.alloc` `uninitialized`
               attr-dict
@@ -6287,12 +6287,12 @@ result must assume nothing of the contents.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="utilbuffercompare-utilbuffercompareop"><code>util.buffer.compare</code> (Util::BufferCompareOp)<a class="headerlink" href="#utilbuffercompare-utilbuffercompareop" title="Permanent link">link</a></h4>
-<p><em>Compares a range of two buffers</em></p>
+<p><em>Compares a range of two buffers.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.compare` $lhs `[` $lhs_offset `]` `,`
               $rhs `[` $rhs_offset `]` `,`
@@ -6316,7 +6316,7 @@ result must assume nothing of the contents.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>lhs</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>lhs_size</code></td>
@@ -6328,7 +6328,7 @@ result must assume nothing of the contents.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rhs</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rhs_size</code></td>
@@ -6360,7 +6360,7 @@ result must assume nothing of the contents.</p>
 </tbody>
 </table>
 <h4 id="utilbufferconstant-utilbufferconstantop"><code>util.buffer.constant</code> (Util::BufferConstantOp)<a class="headerlink" href="#utilbufferconstant-utilbufferconstantop" title="Permanent link">link</a></h4>
-<p><em>Constant host-side byte buffer</em></p>
+<p><em>Constant host-side byte buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.constant` ($name^)? attr-dict `:` type($result) `=` $value
 </code></pre></div>
@@ -6390,12 +6390,12 @@ chosen host target.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="utilbuffercopy-utilbuffercopyop"><code>util.buffer.copy</code> (Util::BufferCopyOp)<a class="headerlink" href="#utilbuffercopy-utilbuffercopyop" title="Permanent link">link</a></h4>
-<p><em>Copies a range of bytes between buffers</em></p>
+<p><em>Copies a range of bytes between buffers.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.copy` $source `[` $source_offset `]` `,`
               $target `[` $target_offset `]` `,`
@@ -6418,7 +6418,7 @@ chosen host target.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -6430,7 +6430,7 @@ chosen host target.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_size</code></td>
@@ -6447,7 +6447,7 @@ chosen host target.</p>
 </tbody>
 </table>
 <h4 id="utilbufferdealloc-utilbufferdeallocop"><code>util.buffer.dealloc</code> (Util::BufferDeallocOp)<a class="headerlink" href="#utilbufferdealloc-utilbufferdeallocop" title="Permanent link">link</a></h4>
-<p><em>Deallocates a buffer</em></p>
+<p><em>Deallocates a buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.dealloc` $operand `:` type($operand) `{` $operand_size `}`
               attr-dict-with-keyword
@@ -6468,7 +6468,7 @@ counted and other owners may keep it live beyond the dealloc.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>operand_size</code></td>
@@ -6477,7 +6477,7 @@ counted and other owners may keep it live beyond the dealloc.</p>
 </tbody>
 </table>
 <h4 id="utilbufferfill-utilbufferfillop"><code>util.buffer.fill</code> (Util::BufferFillOp)<a class="headerlink" href="#utilbufferfill-utilbufferfillop" title="Permanent link">link</a></h4>
-<p><em>Fills a range of bytes with a value</em></p>
+<p><em>Fills a range of bytes with a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.fill` $pattern `,`
               $target `[` $target_offset `for` $length `]` `:`
@@ -6504,7 +6504,7 @@ The offset and length must match the natural alignment of the pattern type.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_size</code></td>
@@ -6521,7 +6521,7 @@ The offset and length must match the natural alignment of the pattern type.</p>
 </tbody>
 </table>
 <h4 id="utilbufferhash-utilbufferhashop"><code>util.buffer.hash</code> (Util::BufferHashOp)<a class="headerlink" href="#utilbufferhash-utilbufferhashop" title="Permanent link">link</a></h4>
-<p><em>Computes the hash of a byte range of a buffer</em></p>
+<p><em>Computes the hash of a byte range of a buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.hash` $source `[` $source_offset `for` $length `]`
               `:` type($source) `` `{` $source_size `}` `-&gt;` type($result)
@@ -6543,7 +6543,7 @@ bit value.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -6575,7 +6575,7 @@ bit value.</p>
 </tbody>
 </table>
 <h4 id="utilbufferload-utilbufferloadop"><code>util.buffer.load</code> (Util::BufferLoadOp)<a class="headerlink" href="#utilbufferload-utilbufferloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a buffer</em></p>
+<p><em>Loads a value from a buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.load` $source `[` $source_offset `for` $length `]`
               `:` type($source) `` `{` $source_size `}` `-&gt;` type($result)
@@ -6596,7 +6596,7 @@ result type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -6628,7 +6628,7 @@ result type.</p>
 </tbody>
 </table>
 <h4 id="utilbuffersize-utilbuffersizeop"><code>util.buffer.size</code> (Util::BufferSizeOp)<a class="headerlink" href="#utilbuffersize-utilbuffersizeop" title="Permanent link">link</a></h4>
-<p><em>Returns the total buffer storage size in bytes</em></p>
+<p><em>Returns the total buffer storage size in bytes.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.size` $operand
               `:` type($operand)
@@ -6649,7 +6649,7 @@ result type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
@@ -6669,7 +6669,7 @@ result type.</p>
 </tbody>
 </table>
 <h4 id="utilbufferslice-utilbuffersliceop"><code>util.buffer.slice</code> (Util::BufferSliceOp)<a class="headerlink" href="#utilbufferslice-utilbuffersliceop" title="Permanent link">link</a></h4>
-<p><em>Clones a subregion of a buffer</em></p>
+<p><em>Clones a subregion of a buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.slice` $source `[` $source_offset `]` attr-dict `:`
               type($source) `` `{` $source_size `}` `-&gt;`
@@ -6696,7 +6696,7 @@ result type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -6723,12 +6723,12 @@ result type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="utilbufferstorage-utilbufferstorageop"><code>util.buffer.storage</code> (Util::BufferStorageOp)<a class="headerlink" href="#utilbufferstorage-utilbufferstorageop" title="Permanent link">link</a></h4>
-<p><em>Returns the underlying buffer storage range</em></p>
+<p><em>Returns the underlying buffer storage range.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.storage` $operand
               `:` type($operand) `` `{` $operand_size `}` `-&gt;` `(` type($result) `,` type($offset) `)`
@@ -6752,7 +6752,7 @@ for the data they are accessing.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>operand_size</code></td>
@@ -6780,7 +6780,7 @@ for the data they are accessing.</p>
 </tbody>
 </table>
 <h4 id="utilbufferstore-utilbufferstoreop"><code>util.buffer.store</code> (Util::BufferStoreOp)<a class="headerlink" href="#utilbufferstore-utilbufferstoreop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a buffer</em></p>
+<p><em>Stores a value into a buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.store` $source `,`
               $target `[` $target_offset `for` $length `]`
@@ -6806,7 +6806,7 @@ source type.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_size</code></td>
@@ -6823,7 +6823,7 @@ source type.</p>
 </tbody>
 </table>
 <h4 id="utilbuffersubspan-utilbuffersubspanop"><code>util.buffer.subspan</code> (Util::BufferSubspanOp)<a class="headerlink" href="#utilbuffersubspan-utilbuffersubspanop" title="Permanent link">link</a></h4>
-<p><em>Returns a reference to a subrange of a buffer</em></p>
+<p><em>Returns a reference to a subrange of a buffer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.subspan` $source `[` $source_offset `]` `:`
               type($source) `` `{` $source_size `}` `-&gt;`
@@ -6850,7 +6850,7 @@ been used.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -6877,7 +6877,7 @@ been used.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
@@ -7001,7 +7001,7 @@ std.constant wrapped in an util.optimization_barrier.</p>
 </tbody>
 </table>
 <h4 id="utilunreachable-utilunreachableop"><code>util.unreachable</code> (Util::UnreachableOp)<a class="headerlink" href="#utilunreachable-utilunreachableop" title="Permanent link">link</a></h4>
-<p><em>Unreachable assertion op</em></p>
+<p><em>Unreachable assertion op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.unreachable` $message attr-dict
 </code></pre></div>
@@ -7028,7 +7028,7 @@ stripped during translation.</p>
 
 <h3 id="data-type-conversion-ops">Data type conversion ops<a class="headerlink" href="#data-type-conversion-ops" title="Permanent link">link</a></h3>
 <h4 id="utilnumericoptional_narrow-utilnumericoptionalnarrowop"><code>util.numeric.optional_narrow</code> (Util::NumericOptionalNarrowOp)<a class="headerlink" href="#utilnumericoptional_narrow-utilnumericoptionalnarrowop" title="Permanent link">link</a></h4>
-<p><em>Memorializes an optional numeric narrowing that is valid</em></p>
+<p><em>Memorializes an optional numeric narrowing that is valid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.numeric.optional_narrow` $operand `:` type($operand) `as` $semantic_type attr-dict
 </code></pre></div>
@@ -7091,7 +7091,7 @@ types) are tracked if known.</p>
 </table>
 <h3 id="global-ops">Global ops<a class="headerlink" href="#global-ops" title="Permanent link">link</a></h3>
 <h4 id="utilglobaladdress-utilglobaladdressop"><code>util.global.address</code> (Util::GlobalAddressOp)<a class="headerlink" href="#utilglobaladdress-utilglobaladdressop" title="Permanent link">link</a></h4>
-<p><em>Returns an address reference to a global</em></p>
+<p><em>Returns an address reference to a global.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.address` (`immutable` $is_immutable^)?
               $global attr-dict `:` qualified(type($result))
@@ -7119,12 +7119,12 @@ global load and store indirect ops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a pointer-like reference</td>
+<td>A pointer-like reference.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="utilgloballoadindirect-utilgloballoadindirectop"><code>util.global.load.indirect</code> (Util::GlobalLoadIndirectOp)<a class="headerlink" href="#utilgloballoadindirect-utilgloballoadindirectop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a global variable</em></p>
+<p><em>Loads a value from a global variable.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.load.indirect` (`immutable` $is_immutable^)?
               $global attr-dict `:` qualified(type($global)) `-&gt;` type($result)
@@ -7148,7 +7148,7 @@ global load and store indirect ops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>global</code></td>
-<td>a pointer-like reference</td>
+<td>A pointer-like reference.</td>
 </tr>
 </tbody>
 </table>
@@ -7168,12 +7168,14 @@ global load and store indirect ops.</p>
 </tbody>
 </table>
 <h4 id="utilglobalload-utilgloballoadop"><code>util.global.load</code> (Util::GlobalLoadOp)<a class="headerlink" href="#utilglobalload-utilgloballoadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a global variable</em></p>
+<p><em>Loads a value from a global variable.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.load` (`immutable` $is_immutable^)?
               $global attr-dict `:` type($result)
 </code></pre></div>
-<p>Returns a global variable value.</p>
+<p>Returns a global variable value. |is_immutable| is a reflection of the
+mutability of the loaded global to minimize the need to traverse symbol
+tables.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
@@ -7198,7 +7200,7 @@ global load and store indirect ops.</p>
 </tbody>
 </table>
 <h4 id="utilglobal-utilglobalop"><code>util.global</code> (Util::GlobalOp)<a class="headerlink" href="#utilglobal-utilglobalop" title="Permanent link">link</a></h4>
-<p><em>Stateful global variable declaration</em></p>
+<p><em>Stateful global variable declaration.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
@@ -7222,7 +7224,7 @@ contexts will have different variable storage.</p>
 </table>
 
 <h4 id="utilglobalstoreindirect-utilglobalstoreindirectop"><code>util.global.store.indirect</code> (Util::GlobalStoreIndirectOp)<a class="headerlink" href="#utilglobalstoreindirect-utilglobalstoreindirectop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a global variable</em></p>
+<p><em>Stores a value into a global variable.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.store.indirect` $value `,` $global attr-dict `:` type($value) `-&gt;` qualified(type($global))
 </code></pre></div>
@@ -7243,12 +7245,12 @@ contexts will have different variable storage.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>global</code></td>
-<td>a pointer-like reference</td>
+<td>A pointer-like reference.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="utilglobalstore-utilglobalstoreop"><code>util.global.store</code> (Util::GlobalStoreOp)<a class="headerlink" href="#utilglobalstore-utilglobalstoreop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a global variable</em></p>
+<p><em>Stores a value into a global variable.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.store` $value `,` $global attr-dict `:` type($value)
 </code></pre></div>
@@ -7278,7 +7280,7 @@ contexts will have different variable storage.</p>
 <h3 id="list-ops">List ops<a class="headerlink" href="#list-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!util.list&lt;T&gt;</code> (mostly just a placeholder for now).</p>
 <h4 id="utillistcreate-utillistcreateop"><code>util.list.create</code> (Util::ListCreateOp)<a class="headerlink" href="#utillistcreate-utillistcreateop" title="Permanent link">link</a></h4>
-<p><em>Creates a new empty list</em></p>
+<p><em>Creates a new empty list.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.create` ($initial_capacity^)? attr-dict `:` qualified(type($result))
 </code></pre></div>
@@ -7312,12 +7314,12 @@ contexts will have different variable storage.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>dense list container type</td>
+<td>Dense list container type.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="utillistget-utillistgetop"><code>util.list.get</code> (Util::ListGetOp)<a class="headerlink" href="#utillistget-utillistgetop" title="Permanent link">link</a></h4>
-<p><em>Element accessor</em></p>
+<p><em>Element accessor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.get` $list `[` $index `]` attr-dict `:` custom&lt;ListTypeGet&gt;(type($list), type($result))
 </code></pre></div>
@@ -7336,7 +7338,7 @@ may be null if the element is null or the type does not match.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>list</code></td>
-<td>dense list container type</td>
+<td>Dense list container type.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>index</code></td>
@@ -7360,7 +7362,7 @@ may be null if the element is null or the type does not match.</p>
 </tbody>
 </table>
 <h4 id="utillistresize-utillistresizeop"><code>util.list.resize</code> (Util::ListResizeOp)<a class="headerlink" href="#utillistresize-utillistresizeop" title="Permanent link">link</a></h4>
-<p><em>Resizes the list to a new count in elements</em></p>
+<p><em>Resizes the list to a new count in elements.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.resize` operands attr-dict `:` qualified(type($list))
 </code></pre></div>
@@ -7380,7 +7382,7 @@ with the default list value of the element type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>list</code></td>
-<td>dense list container type</td>
+<td>Dense list container type.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>new_size</code></td>
@@ -7389,7 +7391,7 @@ with the default list value of the element type.</p>
 </tbody>
 </table>
 <h4 id="utillistset-utillistsetop"><code>util.list.set</code> (Util::ListSetOp)<a class="headerlink" href="#utillistset-utillistsetop" title="Permanent link">link</a></h4>
-<p><em>Element mutator</em></p>
+<p><em>Element mutator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.set` $list `[` $index `]` `,` $value attr-dict `:` custom&lt;ListTypeSet&gt;(type($list), type($value))
 </code></pre></div>
@@ -7407,7 +7409,7 @@ with the default list value of the element type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>list</code></td>
-<td>dense list container type</td>
+<td>Dense list container type.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>index</code></td>
@@ -7420,7 +7422,7 @@ with the default list value of the element type.</p>
 </tbody>
 </table>
 <h4 id="utillistsize-utillistsizeop"><code>util.list.size</code> (Util::ListSizeOp)<a class="headerlink" href="#utillistsize-utillistsizeop" title="Permanent link">link</a></h4>
-<p><em>The size of the list in elements</em></p>
+<p><em>The size of the list in elements.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.size` operands attr-dict `:` qualified(type($list))
 </code></pre></div>
@@ -7438,7 +7440,7 @@ with the default list value of the element type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>list</code></td>
-<td>dense list container type</td>
+<td>Dense list container type.</td>
 </tr>
 </tbody>
 </table>
@@ -7459,7 +7461,7 @@ with the default list value of the element type.</p>
 </table>
 <h3 id="range-arithmetic-ops">Range arithmetic ops<a class="headerlink" href="#range-arithmetic-ops" title="Permanent link">link</a></h3>
 <h4 id="utilrangeextents-utilrangeextentsop"><code>util.range.extents</code> (Util::RangeExtentsOp)<a class="headerlink" href="#utilrangeextents-utilrangeextentsop" title="Permanent link">link</a></h4>
-<p><em>Returns the min/max of a union of a set of ranges</em></p>
+<p><em>Returns the min/max of a union of a set of ranges.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.range.extents` custom&lt;RangeList&gt;($offsets, $lengths) attr-dict `:` type($min)
 </code></pre></div>
@@ -7508,7 +7510,7 @@ meaningful folding/optimizations.</p>
 </tbody>
 </table>
 <h4 id="utilrangemax-utilrangemaxop"><code>util.range.max</code> (Util::RangeMaxOp)<a class="headerlink" href="#utilrangemax-utilrangemaxop" title="Permanent link">link</a></h4>
-<p><em>Returns the max of all values</em></p>
+<p><em>Returns the max of all values.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.range.max` $operands attr-dict `:` type($result)
 </code></pre></div>
@@ -7549,7 +7551,7 @@ meaningful folding/optimizations.</p>
 </tbody>
 </table>
 <h4 id="utilrangemin-utilrangeminop"><code>util.range.min</code> (Util::RangeMinOp)<a class="headerlink" href="#utilrangemin-utilrangeminop" title="Permanent link">link</a></h4>
-<p><em>Returns the min of all values</em></p>
+<p><em>Returns the min of all values.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.range.min` $operands attr-dict `:` type($result)
 </code></pre></div>
@@ -7591,7 +7593,7 @@ meaningful folding/optimizations.</p>
 </table>
 <h3 id="status-ops">Status ops<a class="headerlink" href="#status-ops" title="Permanent link">link</a></h3>
 <h4 id="utilstatuscheck_ok-utilstatuscheckokop"><code>util.status.check_ok</code> (Util::StatusCheckOkOp)<a class="headerlink" href="#utilstatuscheck_ok-utilstatuscheckokop" title="Permanent link">link</a></h4>
-<p><em>Raises a global failure if a status is not 'ok'</em></p>
+<p><em>Raises a global failure if a status is not 'ok'.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.status.check_ok` $status (`,` $message^)? attr-dict
 </code></pre></div>
@@ -7627,7 +7629,7 @@ or pending when the failure occurs will complete.</p>
 </table>
 <h3 id="structural-ops">Structural ops<a class="headerlink" href="#structural-ops" title="Permanent link">link</a></h3>
 <h4 id="utilcall-utilcallop"><code>util.call</code> (Util::CallOp)<a class="headerlink" href="#utilcall-utilcallop" title="Permanent link">link</a></h4>
-<p><em>Function call operation</em></p>
+<p><em>Function call operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.call` $callee `(` $operands `)`
               attr-dict `:`
@@ -7690,7 +7692,7 @@ a cast is performed within the callee.</p>
 </tbody>
 </table>
 <h4 id="utilfunc-utilfuncop"><code>util.func</code> (Util::FuncOp)<a class="headerlink" href="#utilfunc-utilfuncop" title="Permanent link">link</a></h4>
-<p><em>Function operation containing a CFG region</em></p>
+<p><em>Function operation containing a CFG region.</em></p>
 <p>An operation declaring a callable function.</p>
 <p>An external function declaration (used when referring to a function declared
 in some other module) has no body.</p>
@@ -7709,7 +7711,7 @@ in some other module) has no body.</p>
 </table>
 
 <h4 id="utilinitializer-utilinitializerop"><code>util.initializer</code> (Util::InitializerOp)<a class="headerlink" href="#utilinitializer-utilinitializerop" title="Permanent link">link</a></h4>
-<p><em>Global initialization function</em></p>
+<p><em>Global initialization function.</em></p>
 <p>A function that is called in definition order upon module initialization.
 Must not load any globals that are defined or initialized after it in the
 module.</p>
@@ -7724,7 +7726,7 @@ module.</p>
 </table>
 
 <h4 id="utilreturn-utilreturnop"><code>util.return</code> (Util::ReturnOp)<a class="headerlink" href="#utilreturn-utilreturnop" title="Permanent link">link</a></h4>
-<p><em>Return from a util.initializer</em></p>
+<p><em>Return from a util.initializer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.return` attr-dict
               ($operands^ `:` type($operands))?
@@ -7750,7 +7752,7 @@ module.</p>
 </table>
 <h3 id="type-manipulation-ops">Type manipulation ops<a class="headerlink" href="#type-manipulation-ops" title="Permanent link">link</a></h3>
 <h4 id="utilcast-utilcastop"><code>util.cast</code> (Util::CastOp)<a class="headerlink" href="#utilcast-utilcastop" title="Permanent link">link</a></h4>
-<p><em>Casts one util type to another ala static_cast/dynamic_cast</em></p>
+<p><em>Casts one util type to another ala static_cast/dynamic_cast.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.cast` $operand attr-dict `:` type($operand) `to` type($result)
 </code></pre></div>
@@ -7789,7 +7791,7 @@ module.</p>
 </tbody>
 </table>
 <h4 id="utilcmpeq-utilcmpeqop"><code>util.cmp.eq</code> (Util::CmpEQOp)<a class="headerlink" href="#utilcmpeq-utilcmpeqop" title="Permanent link">link</a></h4>
-<p><em>Compares two values for equality</em></p>
+<p><em>Compares two values for equality.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.cmp.eq` operands attr-dict `:` type($lhs)
 </code></pre></div>
@@ -7833,7 +7835,7 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </tbody>
 </table>
 <h4 id="utilcmpne-utilcmpneop"><code>util.cmp.ne</code> (Util::CmpNEOp)<a class="headerlink" href="#utilcmpne-utilcmpneop" title="Permanent link">link</a></h4>
-<p><em>Compares two values for inequality</em></p>
+<p><em>Compares two values for inequality.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.cmp.ne` operands attr-dict `:` type($lhs)
 </code></pre></div>
@@ -7877,7 +7879,7 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </tbody>
 </table>
 <h4 id="utilnull-utilnullop"><code>util.null</code> (Util::NullOp)<a class="headerlink" href="#utilnull-utilnullop" title="Permanent link">link</a></h4>
-<p><em>Returns a null type value</em></p>
+<p><em>Returns a null type value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.null` attr-dict `:` type($result)
 </code></pre></div>
@@ -7903,7 +7905,7 @@ null/undefined/optional/etc values.</p>
 </table>
 <h3 id="value-utility-ops">Value utility ops<a class="headerlink" href="#value-utility-ops" title="Permanent link">link</a></h3>
 <h4 id="utilswitch-utilswitchop"><code>util.switch</code> (Util::SwitchOp)<a class="headerlink" href="#utilswitch-utilswitchop" title="Permanent link">link</a></h4>
-<p><em>Primitive switch operation</em></p>
+<p><em>Primitive switch operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.switch` type($default_value) `from`
               custom&lt;TypedValueList&gt;(ref(type($default_value)), $values, type($values))
@@ -7961,7 +7963,7 @@ the index is out of bounds.</p>
 </table>
 <h2 id="attributes_17">Attributes<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h2>
 <h3 id="bytepatternattr">BytePatternAttr<a class="headerlink" href="#bytepatternattr" title="Permanent link">link</a></h3>
-<p><em>An attribute containing a filled byte pattern</em></p>
+<p><em>An attribute containing a filled byte pattern.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#util.byte_pattern&lt;
   ::mlir::Type,   # type
@@ -7992,7 +7994,7 @@ the index is out of bounds.</p>
 </tbody>
 </table>
 <h3 id="byterangeattr">ByteRangeAttr<a class="headerlink" href="#byterangeattr" title="Permanent link">link</a></h3>
-<p><em>Defines a range of bytes</em></p>
+<p><em>Defines a range of bytes.</em></p>
 <p>Specifies a starting offset and total length in bytes.</p>
 <h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
 <table>
@@ -8017,7 +8019,7 @@ the index is out of bounds.</p>
 </tbody>
 </table>
 <h3 id="compositeattr">CompositeAttr<a class="headerlink" href="#compositeattr" title="Permanent link">link</a></h3>
-<p><em>An attribute composed of a sequence of attributes</em></p>
+<p><em>An attribute composed of a sequence of attributes.</em></p>
 <p>Models a concatenated set of serializable attributes that when combined
 form a single sequence of i8 elements. As each value references the uniqued
 storage of the composite element this attribute is cheap to construct. When
@@ -8050,19 +8052,19 @@ components padded to byte alignment.</p>
 </tbody>
 </table>
 <h3 id="inlinealwaysattr">InlineAlwaysAttr<a class="headerlink" href="#inlinealwaysattr" title="Permanent link">link</a></h3>
-<p><em>Forces inlining on the associated function when possible</em></p>
+<p><em>Forces inlining on the associated function when possible.</em></p>
 <p>Syntax: <code>#util.inline.always</code></p>
 <p>Skips any cost-model decisions as to whether a function should be inlined
 into call-sites and allows the inlining to happen. Any policies that prevent
 inlining will still be observed and inlining may fail if any are not
 satisfied.</p>
 <h3 id="inlineneverattr">InlineNeverAttr<a class="headerlink" href="#inlineneverattr" title="Permanent link">link</a></h3>
-<p><em>Disables inlining on the associated function</em></p>
+<p><em>Disables inlining on the associated function.</em></p>
 <p>Syntax: <code>#util.inline.never</code></p>
 <p>Disables inlining of the function the attribute is associated with into
 any call-site.</p>
 <h3 id="intassumptionattr">IntAssumptionAttr<a class="headerlink" href="#intassumptionattr" title="Permanent link">link</a></h3>
-<p><em>Specifies assumptions that can be made about an integer's value</em></p>
+<p><em>Specifies assumptions that can be made about an integer's value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#util.int.assumption&lt;
   std::optional&lt;uint64_t&gt;,   # umin
@@ -8101,7 +8103,7 @@ or outside knowledge. All components of the attribute are optional.</p>
 </tbody>
 </table>
 <h3 id="nullattr">NullAttr<a class="headerlink" href="#nullattr" title="Permanent link">link</a></h3>
-<p><em>An attribute specifying a null reference</em></p>
+<p><em>An attribute specifying a null reference.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#util.null&lt;
   ::mlir::Type   # type
@@ -8126,7 +8128,7 @@ or outside knowledge. All components of the attribute are optional.</p>
 </tbody>
 </table>
 <h3 id="preprocessingpasspipelineattr">PreprocessingPassPipelineAttr<a class="headerlink" href="#preprocessingpasspipelineattr" title="Permanent link">link</a></h3>
-<p><em>[{preprocessing pass-pipeline to run on the function}]</em></p>
+<p><em>[{Preprocessing pass-pipeline to run on the function.}]</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#util.preprocessing_pipeline&lt;
   StringAttr   # pipelineString
@@ -8157,7 +8159,7 @@ attribute is specified as</p>
 </tbody>
 </table>
 <h3 id="uninitializedattr">UninitializedAttr<a class="headerlink" href="#uninitializedattr" title="Permanent link">link</a></h3>
-<p><em>An attribute specifying uninitialized storage</em></p>
+<p><em>An attribute specifying uninitialized storage.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#util.uninitialized&lt;
   ::mlir::Type   # type
@@ -8186,11 +8188,11 @@ undefined contents upon return.</p>
 </table>
 <h2 id="types">Types<a class="headerlink" href="#types" title="Permanent link">link</a></h2>
 <h3 id="buffertype">BufferType<a class="headerlink" href="#buffertype" title="Permanent link">link</a></h3>
-<p><em>A reference counted byte buffer</em></p>
+<p><em>A reference counted byte buffer.</em></p>
 <p>Syntax: <code>!util.buffer</code></p>
 <p>A reference counted byte buffer that models a pointer, offset, and length.</p>
 <h3 id="listtype">ListType<a class="headerlink" href="#listtype" title="Permanent link">link</a></h3>
-<p><em>Dense list container type</em></p>
+<p><em>Dense list container type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>!util.list&lt;
   Type   # element_type
@@ -8215,12 +8217,12 @@ undefined contents upon return.</p>
 </tbody>
 </table>
 <h3 id="objecttype">ObjectType<a class="headerlink" href="#objecttype" title="Permanent link">link</a></h3>
-<p><em>A placeholder for an unspecified object type</em></p>
+<p><em>A placeholder for an unspecified object type.</em></p>
 <p>Syntax: <code>!util.object</code></p>
 <p>Describes a runtime object type. These may be reference counted or garbage
 collected at runtime.</p>
 <h3 id="ptrtype">PtrType<a class="headerlink" href="#ptrtype" title="Permanent link">link</a></h3>
-<p><em>A pointer-like reference</em></p>
+<p><em>A pointer-like reference.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>!util.ptr&lt;
   Type   # target_type
@@ -8246,12 +8248,12 @@ value that is strongly referenced.</p>
 </tbody>
 </table>
 <h3 id="unusedtype">UnusedType<a class="headerlink" href="#unusedtype" title="Permanent link">link</a></h3>
-<p><em>A placeholder for unused types</em></p>
+<p><em>A placeholder for unused types.</em></p>
 <p>Syntax: <code>!util.unused</code></p>
 <p>An unused type placeholder used to satisfy verifiers that may require a
 type even if unused.</p>
 <h3 id="varianttype">VariantType<a class="headerlink" href="#varianttype" title="Permanent link">link</a></h3>
-<p><em>A placeholder for a variant type (<code>?</code>)</em></p>
+<p><em>A placeholder for a variant type (<code>?</code>).</em></p>
 <p>Syntax: <code>!util.variant</code></p>
 <p>Describes a runtime variant type. These may be primitives (i32, f32, etc) or
 object types.</p>

@@ -5225,7 +5225,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="iree_linalg_extcustom_op-linalgextcustomop"><code>iree_linalg_ext.custom_op</code> (LinalgExt::CustomOp)<a class="headerlink" href="#iree_linalg_extcustom_op-linalgextcustomop" title="Permanent link">link</a></h3>
-<p><em>Custom operation for compiling with IREE</em></p>
+<p><em>Custom operation for compiling with IREE.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.custom_op` `{` `indexing_maps` `=` $indexing_maps `,`
               `iterator_types` `=` $iterator_types `}`
@@ -5332,7 +5332,7 @@ as follows</p>
 <p>Operations for working with data layouts, padding, encodings, and other
 properties useful for tiling computations across iteration space dimensions.</p>
 <h4 id="iree_linalg_extpack-linalgextpackop"><code>iree_linalg_ext.pack</code> (LinalgExt::PackOp)<a class="headerlink" href="#iree_linalg_extpack-linalgextpackop" title="Permanent link">link</a></h4>
-<p><em>Pack operation</em></p>
+<p><em>LinalgExt pack operation for both tensors and buffers.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.pack` attr-dict
               $inputs
@@ -5427,7 +5427,7 @@ KC_to_CKkc example the tiled loops.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extunpack-linalgextunpackop"><code>iree_linalg_ext.unpack</code> (LinalgExt::UnPackOp)<a class="headerlink" href="#iree_linalg_extunpack-linalgextunpackop" title="Permanent link">link</a></h4>
-<p><em>Unpack operation</em></p>
+<p><em>LinalgExt unpack operation for both tensors and buffers.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.unpack` attr-dict
               $inputs
@@ -5504,7 +5504,7 @@ also supports permuting the tiled loops.</p>
 </table>
 <h3 id="non-structured-ops">Non-structured ops<a class="headerlink" href="#non-structured-ops" title="Permanent link">link</a></h3>
 <h4 id="iree_linalg_extattention-linalgextattentionop"><code>iree_linalg_ext.attention</code> (LinalgExt::AttentionOp)<a class="headerlink" href="#iree_linalg_extattention-linalgextattentionop" title="Permanent link">link</a></h4>
-<p><em>Attention operator</em></p>
+<p><em>Attention operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
               `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
@@ -5578,7 +5578,7 @@ the scale to use.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extfft-linalgextfftop"><code>iree_linalg_ext.fft</code> (LinalgExt::FftOp)<a class="headerlink" href="#iree_linalg_extfft-linalgextfftop" title="Permanent link">link</a></h4>
-<p><em>Fft operator</em></p>
+<p><em>Fft operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.fft` attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               `outs` `(` $outputs `:` type($outputs) `)`
@@ -5630,7 +5630,7 @@ context, they will be the second and third inputs.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extgather-linalgextgatherop"><code>iree_linalg_ext.gather</code> (LinalgExt::GatherOp)<a class="headerlink" href="#iree_linalg_extgather-linalgextgatherop" title="Permanent link">link</a></h4>
-<p><em>Gather operator</em></p>
+<p><em>Gathers slices from a source based on a tensor of indices.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.gather` attr-dict `dimension_map` `=` $dimension_map
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
@@ -5696,7 +5696,7 @@ semantics.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extim2col-linalgextim2colop"><code>iree_linalg_ext.im2col</code> (LinalgExt::Im2colOp)<a class="headerlink" href="#iree_linalg_extim2col-linalgextim2colop" title="Permanent link">link</a></h4>
-<p><em>Im2col operation for convolutions</em></p>
+<p><em>Im2col operation for convolutions.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.im2col` attr-dict
               `strides` `=` $strides
@@ -5854,7 +5854,7 @@ before slice extraction.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extmap_scatter-linalgextmapscatterop"><code>iree_linalg_ext.map_scatter</code> (LinalgExt::MapScatterOp)<a class="headerlink" href="#iree_linalg_extmap_scatter-linalgextmapscatterop" title="Permanent link">link</a></h4>
-<p><em>Scatter with a mapping from source indices to result indices</em></p>
+<p><em>Scatter with a mapping from source indices to result indices.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_scatter` attr-dict $input `into` $output
               $transformation_region
@@ -5911,7 +5911,7 @@ the mask value is true, the input value will be written.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extonline_attention-linalgextonlineattentionop"><code>iree_linalg_ext.online_attention</code> (LinalgExt::OnlineAttentionOp)<a class="headerlink" href="#iree_linalg_extonline_attention-linalgextonlineattentionop" title="Permanent link">link</a></h4>
-<p><em>Online Attention operator</em></p>
+<p><em>Online Attention operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.online_attention` attr-dict
               `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
@@ -6004,7 +6004,7 @@ it over the entire softmax reduction dimension by:
 </tbody>
 </table>
 <h4 id="iree_linalg_extscan-linalgextscanop"><code>iree_linalg_ext.scan</code> (LinalgExt::ScanOp)<a class="headerlink" href="#iree_linalg_extscan-linalgextscanop" title="Permanent link">link</a></h4>
-<p><em>Scan operator</em></p>
+<p><em>Scan operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scan` attr-dict
               `dimension` `(` $dimension `)`
@@ -6058,7 +6058,7 @@ it over the entire softmax reduction dimension by:
 </tbody>
 </table>
 <h4 id="iree_linalg_extscatter-linalgextscatterop"><code>iree_linalg_ext.scatter</code> (LinalgExt::ScatterOp)<a class="headerlink" href="#iree_linalg_extscatter-linalgextscatterop" title="Permanent link">link</a></h4>
-<p><em>Scatter operator</em></p>
+<p><em>Scatters an input in slices based on a tensor of indices.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scatter` attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
@@ -6141,7 +6141,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 </tbody>
 </table>
 <h4 id="iree_linalg_extsort-linalgextsortop"><code>iree_linalg_ext.sort</code> (LinalgExt::SortOp)<a class="headerlink" href="#iree_linalg_extsort-linalgextsortop" title="Permanent link">link</a></h4>
-<p><em>Sort operator</em></p>
+<p><em>Sorts a tensor a specified dimension.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.sort` attr-dict
               `dimension` `(` $dimension `)`
@@ -6195,7 +6195,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 </tbody>
 </table>
 <h4 id="iree_linalg_exttopk-linalgexttopkop"><code>iree_linalg_ext.topk</code> (LinalgExt::TopkOp)<a class="headerlink" href="#iree_linalg_exttopk-linalgexttopkop" title="Permanent link">link</a></h4>
-<p><em>Top-K operator</em></p>
+<p><em>Top-K operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.topk` attr-dict
               `dimension` `(` $dimension `)`
@@ -6261,7 +6261,7 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 </table>
 <h3 id="utility-ops">Utility ops<a class="headerlink" href="#utility-ops" title="Permanent link">link</a></h3>
 <h4 id="iree_linalg_extindex-linalgextindexop"><code>iree_linalg_ext.index</code> (LinalgExt::IndexOp)<a class="headerlink" href="#iree_linalg_extindex-linalgextindexop" title="Permanent link">link</a></h4>
-<p><em>Linalg_ext index operation</em></p>
+<p><em>LinalgExt index operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.index` $dim attr-dict `:` type($result)
 </code></pre></div>
@@ -6294,7 +6294,7 @@ parent op is a <code>IREE::LinalgExt::CustomOp</code>.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extyield-linalgextyieldop"><code>iree_linalg_ext.yield</code> (LinalgExt::YieldOp)<a class="headerlink" href="#iree_linalg_extyield-linalgextyieldop" title="Permanent link">link</a></h4>
-<p><em>LinalgExt yield op</em></p>
+<p><em>LinalgExt yield op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.yield` attr-dict ($operands^ `:` type($operands))?
 </code></pre></div>
@@ -6320,7 +6320,7 @@ regions in <code>iree_linalg_ext</code> ops.</p>
 </table>
 <h3 id="winograd-ops">Winograd ops<a class="headerlink" href="#winograd-ops" title="Permanent link">link</a></h3>
 <h4 id="iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop"><code>iree_linalg_ext.winograd.filter_transform</code> (LinalgExt::WinogradFilterTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop" title="Permanent link">link</a></h4>
-<p><em>Winograd Filter Transform operator</em></p>
+<p><em>Winograd Filter Transform operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.filter_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`
@@ -6385,7 +6385,7 @@ and then fed to a batch matmul op.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop"><code>iree_linalg_ext.winograd.input_transform</code> (LinalgExt::WinogradInputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop" title="Permanent link">link</a></h4>
-<p><em>Winograd Input Transform operator</em></p>
+<p><em>Winograd Input Transform operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.input_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`
@@ -6450,7 +6450,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 </tbody>
 </table>
 <h4 id="iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop"><code>iree_linalg_ext.winograd.output_transform</code> (LinalgExt::WinogradOutputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop" title="Permanent link">link</a></h4>
-<p><em>Winograd Output Transform operator</em></p>
+<p><em>Winograd Output Transform operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.output_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`

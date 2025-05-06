@@ -7565,7 +7565,7 @@ breaking execution correctness.</p>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="async-control-flow-ops">Async control flow ops<a class="headerlink" href="#async-control-flow-ops" title="Permanent link">link</a></h3>
 <h4 id="streamasynccall-streamasynccallop"><code>stream.async.call</code> (Stream::AsyncCallOp)<a class="headerlink" href="#streamasynccall-streamasynccallop" title="Permanent link">link</a></h4>
-<p><em>Calls a streamable external host function</em></p>
+<p><em>Calls a streamable external host function.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.call` (`on` `(` $affinity^ `)`)?
               $callee ``
@@ -7595,7 +7595,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
 <tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 <tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
@@ -7649,7 +7649,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 </tbody>
 </table>
 <h4 id="streamasyncconcurrent-streamasyncconcurrentop"><code>stream.async.concurrent</code> (Stream::AsyncConcurrentOp)<a class="headerlink" href="#streamasyncconcurrent-streamasyncconcurrentop" title="Permanent link">link</a></h4>
-<p><em>Executes all ops concurrently</em></p>
+<p><em>Executes all ops concurrently.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.concurrent` (`on` `(` $affinity^ `)`)?
               `with` ``
@@ -7696,7 +7696,7 @@ only ready once all nested ops complete execution.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
@@ -7738,7 +7738,7 @@ only ready once all nested ops complete execution.</p>
 </tbody>
 </table>
 <h4 id="streamasyncexecute-streamasyncexecuteop"><code>stream.async.execute</code> (Stream::AsyncExecuteOp)<a class="headerlink" href="#streamasyncexecute-streamasyncexecuteop" title="Permanent link">link</a></h4>
-<p><em>Executes a dependency-aware sequence of streamable ops</em></p>
+<p><em>Executes a dependency-aware sequence of streamable ops.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.execute` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
@@ -7764,7 +7764,7 @@ execution may begin immediately.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
@@ -7790,7 +7790,7 @@ execution may begin immediately.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -7809,12 +7809,12 @@ execution may begin immediately.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamasyncfunc-streamasyncfuncop"><code>stream.async.func</code> (Stream::AsyncFuncOp)<a class="headerlink" href="#streamasyncfunc-streamasyncfuncop" title="Permanent link">link</a></h4>
-<p><em>Streamable function declaration</em></p>
+<p><em>Streamable function declaration.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.func` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -7844,7 +7844,7 @@ allowed.</p>
 
 <h3 id="async-ops">Async ops<a class="headerlink" href="#async-ops" title="Permanent link">link</a></h3>
 <h4 id="streamasyncalloca-streamasyncallocaop"><code>stream.async.alloca</code> (Stream::AsyncAllocaOp)<a class="headerlink" href="#streamasyncalloca-streamasyncallocaop" title="Permanent link">link</a></h4>
-<p><em>Allocates a transient value with undefined contents</em></p>
+<p><em>Allocates a transient value with undefined contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.alloca` (`on` `(` $affinity^ `)`)?
               attr-dict `:` type($result) `{` $storage_size `}`
@@ -7858,7 +7858,7 @@ result must assume nothing of the contents and use <code>discard</code> access.<
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
@@ -7892,7 +7892,7 @@ result must assume nothing of the contents and use <code>discard</code> access.<
 </tbody>
 </table>
 <h4 id="streamasyncbarrier-streamasyncbarrierop"><code>stream.async.barrier</code> (Stream::AsyncBarrierOp)<a class="headerlink" href="#streamasyncbarrier-streamasyncbarrierop" title="Permanent link">link</a></h4>
-<p><em>Indicates a value that must have a specific affinity</em></p>
+<p><em>Indicates a value that must have a specific affinity.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.barrier` (`on` `(` $affinity^ `)`)?
               $source `:` type($source)
@@ -7908,7 +7908,7 @@ op.</p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
@@ -7946,7 +7946,7 @@ op.</p>
 </tbody>
 </table>
 <h4 id="streamasyncclone-streamasynccloneop"><code>stream.async.clone</code> (Stream::AsyncCloneOp)<a class="headerlink" href="#streamasyncclone-streamasynccloneop" title="Permanent link">link</a></h4>
-<p><em>Clones the contents of a value</em></p>
+<p><em>Clones the contents of a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.clone` (`on` `(` $affinity^ `)`)?
               $source `:`
@@ -7961,7 +7961,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
@@ -8003,7 +8003,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamasynccollective-streamasynccollectiveop"><code>stream.async.collective</code> (Stream::AsyncCollectiveOp)<a class="headerlink" href="#streamasynccollective-streamasynccollectiveop" title="Permanent link">link</a></h4>
-<p><em>Performs a collective operation</em></p>
+<p><em>Performs a collective operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.collective` `` $op `` `[` $element_count `]`
               (`on` `(` $affinity^ `)`)?
@@ -8026,8 +8026,8 @@ this base op.</p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>op</code></td><td>::mlir::iree_compiler::IREE::Stream::CollectiveAttr</td><td>collective operation and specification</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>op</code></td><td>::mlir::iree_compiler::IREE::Stream::CollectiveAttr</td><td>Collective operation and specification.</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
@@ -8085,7 +8085,7 @@ this base op.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>param</code></td>
@@ -8109,7 +8109,7 @@ this base op.</p>
 </tbody>
 </table>
 <h4 id="streamasyncconstant-streamasyncconstantop"><code>stream.async.constant</code> (Stream::AsyncConstantOp)<a class="headerlink" href="#streamasyncconstant-streamasyncconstantop" title="Permanent link">link</a></h4>
-<p><em>Defines a constant resource</em></p>
+<p><em>Defines a constant resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.constant` (`on` `(` $affinity^ `)`)?
               `:`
@@ -8126,7 +8126,7 @@ this base op.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>value</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
@@ -8160,7 +8160,7 @@ this base op.</p>
 </tbody>
 </table>
 <h4 id="streamasynccopy-streamasynccopyop"><code>stream.async.copy</code> (Stream::AsyncCopyOp)<a class="headerlink" href="#streamasynccopy-streamasynccopyop" title="Permanent link">link</a></h4>
-<p><em>Copies a subview of a stream resource to another</em></p>
+<p><em>Copies a subview of a stream resource to another.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.copy` (`on` `(` $affinity^ `)`)?
               $source `[` $source_offset `to` $source_end `]` `,`
@@ -8180,7 +8180,7 @@ in-place.</p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
@@ -8246,7 +8246,7 @@ in-place.</p>
 </tbody>
 </table>
 <h4 id="streamasyncdispatch-streamasyncdispatchop"><code>stream.async.dispatch</code> (Stream::AsyncDispatchOp)<a class="headerlink" href="#streamasyncdispatch-streamasyncdispatchop" title="Permanent link">link</a></h4>
-<p><em>Dispatches a parallelized grid of work</em></p>
+<p><em>Dispatches a parallelized grid of work.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.dispatch` (`on` `(` $affinity^ `)`)?
               custom&lt;DispatchEntryPoints&gt;($entry_points)
@@ -8270,7 +8270,7 @@ and results and is able to load/store at will.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>entry_points</code></td><td>::mlir::ArrayAttr</td><td>symbol ref array attribute</td></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
@@ -8328,7 +8328,7 @@ and results and is able to load/store at will.</p>
 </tbody>
 </table>
 <h4 id="streamasyncfill-streamasyncfillop"><code>stream.async.fill</code> (Stream::AsyncFillOp)<a class="headerlink" href="#streamasyncfill-streamasyncfillop" title="Permanent link">link</a></h4>
-<p><em>Fills a subview of a stream resource with a value</em></p>
+<p><em>Fills a subview of a stream resource with a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.fill` (`on` `(` $affinity^ `)`)?
               $value `,`
@@ -8345,7 +8345,7 @@ resource with the update applied.</p>
 <h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
@@ -8399,7 +8399,7 @@ resource with the update applied.</p>
 </tbody>
 </table>
 <h4 id="streamasyncload-streamasyncloadop"><code>stream.async.load</code> (Stream::AsyncLoadOp)<a class="headerlink" href="#streamasyncload-streamasyncloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a resource</em></p>
+<p><em>Loads a value from a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.load` $source `[` $source_offset `]` `:`
               type($source) `` `{` $source_size `}`
@@ -8450,7 +8450,7 @@ resource with the update applied.</p>
 </tbody>
 </table>
 <h4 id="streamasyncslice-streamasyncsliceop"><code>stream.async.slice</code> (Stream::AsyncSliceOp)<a class="headerlink" href="#streamasyncslice-streamasyncsliceop" title="Permanent link">link</a></h4>
-<p><em>Slices out a cloned subview of a value</em></p>
+<p><em>Slices out a cloned subview of a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.slice` (`on` `(` $affinity^ `)`)?
               $source `[` $source_offset `to` $source_end `]` `:`
@@ -8466,7 +8466,7 @@ copy-on-write operation.</p>
 <h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
@@ -8516,7 +8516,7 @@ copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamasyncsplat-streamasyncsplatop"><code>stream.async.splat</code> (Stream::AsyncSplatOp)<a class="headerlink" href="#streamasyncsplat-streamasyncsplatop" title="Permanent link">link</a></h4>
-<p><em>Splats a value into a resource</em></p>
+<p><em>Splats a value into a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.splat` (`on` `(` $affinity^ `)`)?
               $value `:` type($value) `-&gt;` type($result) `` `{` $result_size `}`
@@ -8529,7 +8529,7 @@ the entire contents.</p>
 <h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
@@ -8567,7 +8567,7 @@ the entire contents.</p>
 </tbody>
 </table>
 <h4 id="streamasyncstore-streamasyncstoreop"><code>stream.async.store</code> (Stream::AsyncStoreOp)<a class="headerlink" href="#streamasyncstore-streamasyncstoreop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a resource</em></p>
+<p><em>Stores a value into a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.store` $value `,`
               $target `[` $target_offset `]` `:`
@@ -8624,7 +8624,7 @@ value.</p>
 </tbody>
 </table>
 <h4 id="streamasynctransfer-streamasynctransferop"><code>stream.async.transfer</code> (Stream::AsyncTransferOp)<a class="headerlink" href="#streamasynctransfer-streamasynctransferop" title="Permanent link">link</a></h4>
-<p><em>Transfers a resource from one location/state to another</em></p>
+<p><em>Transfers a resource from one location/state to another.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.transfer` $source `:` type($source)
               `` `{` $source_size `}`
@@ -8643,8 +8643,8 @@ devices with discrete memory spaces or pools.</p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
-<tr><td><code>result_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
+<tr><td><code>result_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
@@ -8686,7 +8686,7 @@ devices with discrete memory spaces or pools.</p>
 </tbody>
 </table>
 <h4 id="streamasyncupdate-streamasyncupdateop"><code>stream.async.update</code> (Stream::AsyncUpdateOp)<a class="headerlink" href="#streamasyncupdate-streamasyncupdateop" title="Permanent link">link</a></h4>
-<p><em>Updates a slice of a subview of a resource in-place</em></p>
+<p><em>Updates a slice of a subview of a resource in-place.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.update` (`on` `(` $affinity^ `)`)?
               $update `,`
@@ -8703,7 +8703,7 @@ allocations and avoid copies.</p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
@@ -8758,7 +8758,7 @@ allocations and avoid copies.</p>
 </table>
 <h3 id="channel-ops">Channel ops<a class="headerlink" href="#channel-ops" title="Permanent link">link</a></h3>
 <h4 id="streamchannelcount-streamchannelcountop"><code>stream.channel.count</code> (Stream::ChannelCountOp)<a class="headerlink" href="#streamchannelcount-streamchannelcountop" title="Permanent link">link</a></h4>
-<p><em>Returns the total number of participants in the group</em></p>
+<p><em>Returns the total number of participants in the group.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.channel.count` $channel `:` type($result)
               attr-dict-with-keyword
@@ -8778,7 +8778,7 @@ allocations and avoid copies.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -8798,7 +8798,7 @@ allocations and avoid copies.</p>
 </tbody>
 </table>
 <h4 id="streamchannelcreate-streamchannelcreateop"><code>stream.channel.create</code> (Stream::ChannelCreateOp)<a class="headerlink" href="#streamchannelcreate-streamchannelcreateop" title="Permanent link">link</a></h4>
-<p><em>Creates a new channel for collective communication</em></p>
+<p><em>Creates a new channel for collective communication.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.channel.create` (`on` `(` $affinity^ `)`)?
               (`id` `(` $id^ `)`)?
@@ -8821,7 +8821,7 @@ configuration at runtime.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>group</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
@@ -8835,7 +8835,7 @@ configuration at runtime.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>id</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rank</code></td>
@@ -8858,12 +8858,12 @@ configuration at runtime.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamchannelrank-streamchannelrankop"><code>stream.channel.rank</code> (Stream::ChannelRankOp)<a class="headerlink" href="#streamchannelrank-streamchannelrankop" title="Permanent link">link</a></h4>
-<p><em>Returns the rank of the local participant in the group</em></p>
+<p><em>Returns the rank of the local participant in the group.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.channel.rank` $channel `:` type($result)
               attr-dict-with-keyword
@@ -8884,7 +8884,7 @@ group in <code>[0, count)</code>.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 </tbody>
 </table>
@@ -8904,7 +8904,7 @@ group in <code>[0, count)</code>.</p>
 </tbody>
 </table>
 <h4 id="streamchannelsplit-streamchannelsplitop"><code>stream.channel.split</code> (Stream::ChannelSplitOp)<a class="headerlink" href="#streamchannelsplit-streamchannelsplitop" title="Permanent link">link</a></h4>
-<p><em>Splits a collective communication channel</em></p>
+<p><em>Splits a collective communication channel.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.channel.split` $channel `,` $color `,` $key
               `:` type($channel) `-&gt;` type($result)
@@ -8931,7 +8931,7 @@ subgroup and will return a null channel.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>color</code></td>
@@ -8954,13 +8954,13 @@ subgroup and will return a null channel.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="executable-ops">Executable ops<a class="headerlink" href="#executable-ops" title="Permanent link">link</a></h3>
 <h4 id="streambindingsubspan-streambindingsubspanop"><code>stream.binding.subspan</code> (Stream::BindingSubspanOp)<a class="headerlink" href="#streambindingsubspan-streambindingsubspanop" title="Permanent link">link</a></h4>
-<p><em>Returns an alias to a subspan of interface binding data</em></p>
+<p><em>Returns an alias to a subspan of interface binding data.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.binding.subspan` $binding `` `[` $byte_offset `]`
               attr-dict `:` type($binding) `-&gt;` type($result) (`{` $dynamic_dims^ `}`)?
@@ -8981,7 +8981,7 @@ binding may have multiple subviews at different byte offsets.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>binding</code></td>
-<td>a managed resource binding into an executable scope</td>
+<td>A managed resource binding into an executable scope.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>byte_offset</code></td>
@@ -9009,7 +9009,7 @@ binding may have multiple subviews at different byte offsets.</p>
 </tbody>
 </table>
 <h4 id="streamdispatchworkgroupcount-streamdispatchworkgroupcountop"><code>stream.dispatch.workgroup.count</code> (Stream::DispatchWorkgroupCountOp)<a class="headerlink" href="#streamdispatchworkgroupcount-streamdispatchworkgroupcountop" title="Permanent link">link</a></h4>
-<p><em>Returns the total workgroup count of the grid</em></p>
+<p><em>Returns the total workgroup count of the grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.dispatch.workgroup.count` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
@@ -9046,7 +9046,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="streamdispatchworkgroupid-streamdispatchworkgroupidop"><code>stream.dispatch.workgroup.id</code> (Stream::DispatchWorkgroupIDOp)<a class="headerlink" href="#streamdispatchworkgroupid-streamdispatchworkgroupidop" title="Permanent link">link</a></h4>
-<p><em>Returns the index of the current workgroup in the grid</em></p>
+<p><em>Returns the index of the current workgroup in the grid.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.dispatch.workgroup.id` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
@@ -9084,7 +9084,7 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="streamdispatchworkgroupsize-streamdispatchworkgroupsizeop"><code>stream.dispatch.workgroup.size</code> (Stream::DispatchWorkgroupSizeOp)<a class="headerlink" href="#streamdispatchworkgroupsize-streamdispatchworkgroupsizeop" title="Permanent link">link</a></h4>
-<p><em>Returns the size of each workgroup in invocations</em></p>
+<p><em>Returns the size of each workgroup in invocations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.dispatch.workgroup.size` `[` $dimension `]` attr-dict `:` type($result)
 </code></pre></div>
@@ -9127,13 +9127,13 @@ built-in variable.</p>
 </tbody>
 </table>
 <h4 id="streamexecutableend-streamexecutableendop"><code>stream.executable.end</code> (Stream::ExecutableEndOp)<a class="headerlink" href="#streamexecutableend-streamexecutableendop" title="Permanent link">link</a></h4>
-<p><em>Terminator pseudo-op for the executable op</em></p>
+<p><em>Terminator pseudo-op for the executable op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.executable.end` attr-dict
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::Stream::ExecutableOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="streamexecutableexport-streamexecutableexportop"><code>stream.executable.export</code> (Stream::ExecutableExportOp)<a class="headerlink" href="#streamexecutableexport-streamexecutableexportop" title="Permanent link">link</a></h4>
-<p><em>Defines an executable entry point for dispatch operations</em></p>
+<p><em>Defines an executable entry point for dispatch operations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.executable.export` custom&lt;SymbolVisibility&gt;($sym_visibility)
               custom&lt;SymbolAlias&gt;($sym_name, $function_ref)
@@ -9156,7 +9156,7 @@ produces an XYZ workgroup count for the 3D grid dispatch.</p>
 </table>
 
 <h4 id="streamexecutable-streamexecutableop"><code>stream.executable</code> (Stream::ExecutableOp)<a class="headerlink" href="#streamexecutable-streamexecutableop" title="Permanent link">link</a></h4>
-<p><em>Generic executable module</em></p>
+<p><em>Generic executable module.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.executable` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
@@ -9179,7 +9179,7 @@ target-specific backend IR representations.</p>
 <p>Operations for interacting with the execution context that stream operations
 execute within.</p>
 <h4 id="streamcontextresolve-streamcontextresolveop"><code>stream.context.resolve</code> (Stream::ContextResolveOp)<a class="headerlink" href="#streamcontextresolve-streamcontextresolveop" title="Permanent link">link</a></h4>
-<p><em>Resolves low-level context resources based on type</em></p>
+<p><em>Resolves low-level context resources based on type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.context.resolve` (`on` `(` $affinity^ `)`)?
               attr-dict `:` type($results)
@@ -9203,7 +9203,7 @@ explicitly.</p>
 <h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
@@ -9223,7 +9223,7 @@ explicitly.</p>
 </table>
 <h3 id="explicit-command-ops">Explicit command ops<a class="headerlink" href="#explicit-command-ops" title="Permanent link">link</a></h3>
 <h4 id="streamcmdcall-streamcmdcallop"><code>stream.cmd.call</code> (Stream::CmdCallOp)<a class="headerlink" href="#streamcmdcall-streamcmdcallop" title="Permanent link">link</a></h4>
-<p><em>Calls a streamable external host function</em></p>
+<p><em>Calls a streamable external host function.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.call` $callee ``
               custom&lt;CmdCallOperands&gt;($resource_operands,
@@ -9298,7 +9298,7 @@ Asynchronous calls must have no side-effects.</p>
 </tbody>
 </table>
 <h4 id="streamcmdcollective-streamcmdcollectiveop"><code>stream.cmd.collective</code> (Stream::CmdCollectiveOp)<a class="headerlink" href="#streamcmdcollective-streamcmdcollectiveop" title="Permanent link">link</a></h4>
-<p><em>Dispatches a collective operation</em></p>
+<p><em>Dispatches a collective operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.collective` `` $op `` `[` $element_count `]`
               `channel` `(` $channel `)`
@@ -9317,7 +9317,7 @@ operations may fuse and execute more efficiently.</p>
 <h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>op</code></td><td>::mlir::iree_compiler::IREE::Stream::CollectiveAttr</td><td>collective operation and specification</td></tr>
+<tr><td><code>op</code></td><td>::mlir::iree_compiler::IREE::Stream::CollectiveAttr</td><td>Collective operation and specification.</td></tr>
 <tr><td><code>resource_accesses</code></td><td>::mlir::ArrayAttr</td><td>access array attribute</td></tr>
 </table>
 
@@ -9332,7 +9332,7 @@ operations may fuse and execute more efficiently.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>channel</code></td>
-<td>a collective communication channel</td>
+<td>A collective communication channel.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>element_count</code></td>
@@ -9361,7 +9361,7 @@ operations may fuse and execute more efficiently.</p>
 </tbody>
 </table>
 <h4 id="streamcmdconcurrent-streamcmdconcurrentop"><code>stream.cmd.concurrent</code> (Stream::CmdConcurrentOp)<a class="headerlink" href="#streamcmdconcurrent-streamcmdconcurrentop" title="Permanent link">link</a></h4>
-<p><em>Executes all ops concurrently</em></p>
+<p><em>Executes all ops concurrently.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.concurrent` $body
               attr-dict-with-keyword
@@ -9396,7 +9396,7 @@ same time).</p>
 <p>Traits: <code>HasParent&lt;IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp&gt;</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::YieldOp&gt;</code>, <code>SingleBlock</code>, <code>Stream_CmdPhaseOp</code></p>
 <p>Interfaces: <code>RegionBranchOpInterface</code>, <code>Stream_StreamableOp</code></p>
 <h4 id="streamcmdcopy-streamcmdcopyop"><code>stream.cmd.copy</code> (Stream::CmdCopyOp)<a class="headerlink" href="#streamcmdcopy-streamcmdcopyop" title="Permanent link">link</a></h4>
-<p><em>Copies a subview of a stream resource to another</em></p>
+<p><em>Copies a subview of a stream resource to another.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.copy` $source `[` $source_offset `]` `,`
               $target `[` $target_offset `]` `,`
@@ -9450,7 +9450,7 @@ resource.</p>
 </tbody>
 </table>
 <h4 id="streamcmddiscard-streamcmddiscardop"><code>stream.cmd.discard</code> (Stream::CmdDiscardOp)<a class="headerlink" href="#streamcmddiscard-streamcmddiscardop" title="Permanent link">link</a></h4>
-<p><em>Discards a subview of a resource</em></p>
+<p><em>Discards a subview of a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.discard` $target `[` $target_offset `for` $target_length `]` `:`
               type($target) `` `{` $target_size `}`
@@ -9489,7 +9489,7 @@ or invalidate caches.</p>
 </tbody>
 </table>
 <h4 id="streamcmddispatch-streamcmddispatchop"><code>stream.cmd.dispatch</code> (Stream::CmdDispatchOp)<a class="headerlink" href="#streamcmddispatch-streamcmddispatchop" title="Permanent link">link</a></h4>
-<p><em>Dispatches a parallelized grid of work</em></p>
+<p><em>Dispatches a parallelized grid of work.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.dispatch` custom&lt;DispatchEntryPoints&gt;($entry_points)
               (`[` $workload^ `]`)? ``
@@ -9548,7 +9548,7 @@ and results and is able to load/store at will.</p>
 </tbody>
 </table>
 <h4 id="streamcmdexecute-streamcmdexecuteop"><code>stream.cmd.execute</code> (Stream::CmdExecuteOp)<a class="headerlink" href="#streamcmdexecute-streamcmdexecuteop" title="Permanent link">link</a></h4>
-<p><em>Executes a dependency-aware sequence of streamable ops</em></p>
+<p><em>Executes a dependency-aware sequence of streamable ops.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.execute` (`once` $once^)?
               (`on` `(` $affinity^ `)`)?
@@ -9574,7 +9574,7 @@ execution may begin immediately.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>once</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
@@ -9596,7 +9596,7 @@ execution may begin immediately.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -9611,12 +9611,12 @@ execution may begin immediately.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamcmdfill-streamcmdfillop"><code>stream.cmd.fill</code> (Stream::CmdFillOp)<a class="headerlink" href="#streamcmdfill-streamcmdfillop" title="Permanent link">link</a></h4>
-<p><em>Fills a subview of a stream resource with a value</em></p>
+<p><em>Fills a subview of a stream resource with a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.fill` $value `,`
               $target `[` $target_offset `for` $target_length `]` `:`
@@ -9660,7 +9660,7 @@ resource with the update applied.</p>
 </tbody>
 </table>
 <h4 id="streamcmdflush-streamcmdflushop"><code>stream.cmd.flush</code> (Stream::CmdFlushOp)<a class="headerlink" href="#streamcmdflush-streamcmdflushop" title="Permanent link">link</a></h4>
-<p><em>Flushes a subview of a resource</em></p>
+<p><em>Flushes a subview of a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.flush` (`to` `(` $source_affinity^ `)`)?
               $target `[` $target_offset `for` $target_length `]` `:`
@@ -9675,7 +9675,7 @@ available to the target and can be made visible there using
 <h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
@@ -9706,7 +9706,7 @@ available to the target and can be made visible there using
 </tbody>
 </table>
 <h4 id="streamcmdfunc-streamcmdfuncop"><code>stream.cmd.func</code> (Stream::CmdFuncOp)<a class="headerlink" href="#streamcmdfunc-streamcmdfuncop" title="Permanent link">link</a></h4>
-<p><em>Streamable function declaration</em></p>
+<p><em>Streamable function declaration.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.func` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name ``
@@ -9732,7 +9732,7 @@ allowed.</p>
 </table>
 
 <h4 id="streamcmdinvalidate-streamcmdinvalidateop"><code>stream.cmd.invalidate</code> (Stream::CmdInvalidateOp)<a class="headerlink" href="#streamcmdinvalidate-streamcmdinvalidateop" title="Permanent link">link</a></h4>
-<p><em>Invalidates a subview of a resource</em></p>
+<p><em>Invalidates a subview of a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.invalidate` (`from` `(` $source_affinity^ `)`)?
               $target `[` $target_offset `for` $target_length `]` `:`
@@ -9747,7 +9747,7 @@ resource memory is assumed to have been made available at the source via
 <h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
@@ -9778,7 +9778,7 @@ resource memory is assumed to have been made available at the source via
 </tbody>
 </table>
 <h4 id="streamcmdserial-streamcmdserialop"><code>stream.cmd.serial</code> (Stream::CmdSerialOp)<a class="headerlink" href="#streamcmdserial-streamcmdserialop" title="Permanent link">link</a></h4>
-<p><em>Executes all ops serially (in-order)</em></p>
+<p><em>Executes all ops serially (in-order).</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.serial` $body
               attr-dict-with-keyword
@@ -9819,7 +9819,7 @@ after the other).</p>
 <h3 id="file-ops">File ops<a class="headerlink" href="#file-ops" title="Permanent link">link</a></h3>
 <p>File ops.</p>
 <h4 id="streamfileconstant-streamfileconstantop"><code>stream.file.constant</code> (Stream::FileConstantOp)<a class="headerlink" href="#streamfileconstant-streamfileconstantop" title="Permanent link">link</a></h4>
-<p><em>Creates a file backed by the provided constant host memory</em></p>
+<p><em>Creates a file backed by the provided constant host memory.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.file.constant` (`on` `(` $affinity^ `)`)?
               $source `[` $source_offset `for` $source_length `]` `:`
@@ -9836,7 +9836,7 @@ Changing the source buffer after definition has undefined behavior.</p>
 <h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
@@ -9850,7 +9850,7 @@ Changing the source buffer after definition has undefined behavior.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -9877,12 +9877,12 @@ Changing the source buffer after definition has undefined behavior.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>a file handle used for I/O operations</td>
+<td>A file handle used for I/O operations.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamfileread-streamfilereadop"><code>stream.file.read</code> (Stream::FileReadOp)<a class="headerlink" href="#streamfileread-streamfilereadop" title="Permanent link">link</a></h4>
-<p><em>Reads a segment of a file into a resource</em></p>
+<p><em>Reads a segment of a file into a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.file.read` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`):(`:`)?
@@ -9904,7 +9904,7 @@ memory through host buffers.</p>
 <h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
@@ -9918,7 +9918,7 @@ memory through host buffers.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a file handle used for I/O operations</td>
+<td>A file handle used for I/O operations.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offset</code></td>
@@ -9942,7 +9942,7 @@ memory through host buffers.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -9957,12 +9957,12 @@ memory through host buffers.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamfilewrite-streamfilewriteop"><code>stream.file.write</code> (Stream::FileWriteOp)<a class="headerlink" href="#streamfilewrite-streamfilewriteop" title="Permanent link">link</a></h4>
-<p><em>Writes a segment of a file from a resource</em></p>
+<p><em>Writes a segment of a file from a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.file.write` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`):(`:`)?
@@ -9986,7 +9986,7 @@ through host buffers.</p>
 <h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_33">Operands:<a class="headerlink" href="#operands_33" title="Permanent link">link</a></h5>
@@ -10012,7 +10012,7 @@ through host buffers.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target</code></td>
-<td>a file handle used for I/O operations</td>
+<td>A file handle used for I/O operations.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_offset</code></td>
@@ -10024,7 +10024,7 @@ through host buffers.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -10039,13 +10039,13 @@ through host buffers.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="miscellaneous-ops">Miscellaneous ops<a class="headerlink" href="#miscellaneous-ops" title="Permanent link">link</a></h3>
 <h4 id="streamreturn-streamreturnop"><code>stream.return</code> (Stream::ReturnOp)<a class="headerlink" href="#streamreturn-streamreturnop" title="Permanent link">link</a></h4>
-<p><em>Returns results from a region</em></p>
+<p><em>Returns results from a region.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.return` attr-dict
               $operands `:` type($operands)
@@ -10070,7 +10070,7 @@ through host buffers.</p>
 </tbody>
 </table>
 <h4 id="streamyield-streamyieldop"><code>stream.yield</code> (Stream::YieldOp)<a class="headerlink" href="#streamyield-streamyieldop" title="Permanent link">link</a></h4>
-<p><em>Yields stream values from an execution region</em></p>
+<p><em>Yields stream values from an execution region.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.yield` attr-dict
               ($resource_operands^ `:`
@@ -10104,7 +10104,7 @@ the SSA value is defined (or tied).</p>
 <h3 id="pseudo-ops">Pseudo Ops<a class="headerlink" href="#pseudo-ops" title="Permanent link">link</a></h3>
 <p>Pseudo ops for conversion support.</p>
 <h4 id="streamtensorexport-streamtensorexportop"><code>stream.tensor.export</code> (Stream::TensorExportOp)<a class="headerlink" href="#streamtensorexport-streamtensorexportop" title="Permanent link">link</a></h4>
-<p><em>Conversion placeholder for stream-&gt;other type conversion</em></p>
+<p><em>Conversion placeholder for stream-&gt;other type conversion.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.export` (`on` `(` $affinity^ `)`)?
               $source `:`
@@ -10126,7 +10126,7 @@ types and those that prior to lowering do not handle them.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_36">Operands:<a class="headerlink" href="#operands_36" title="Permanent link">link</a></h5>
@@ -10168,7 +10168,7 @@ types and those that prior to lowering do not handle them.</p>
 </tbody>
 </table>
 <h4 id="streamtensorimport-streamtensorimportop"><code>stream.tensor.import</code> (Stream::TensorImportOp)<a class="headerlink" href="#streamtensorimport-streamtensorimportop" title="Permanent link">link</a></h4>
-<p><em>Conversion placeholder for other-&gt;stream type conversion</em></p>
+<p><em>Conversion placeholder for other-&gt;stream type conversion.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.import` (`on` `(` $affinity^ `)`)?
               (`consume` $consume^)?
@@ -10196,7 +10196,7 @@ importer atomically.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>consume</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_37">Operands:<a class="headerlink" href="#operands_37" title="Permanent link">link</a></h5>
@@ -10240,7 +10240,7 @@ importer atomically.</p>
 <h3 id="resource-ops">Resource ops<a class="headerlink" href="#resource-ops" title="Permanent link">link</a></h3>
 <p>Generic resource ops.</p>
 <h4 id="streamresourcealloc-streamresourceallocop"><code>stream.resource.alloc</code> (Stream::ResourceAllocOp)<a class="headerlink" href="#streamresourcealloc-streamresourceallocop" title="Permanent link">link</a></h4>
-<p><em>Allocates a persistent resource</em></p>
+<p><em>Allocates a persistent resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.alloc` (`uninitialized` $uninitialized^)?
               (`on` `(` $affinity^ `)`)?
@@ -10267,7 +10267,7 @@ buffer may be, etc).</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>uninitialized</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_38">Operands:<a class="headerlink" href="#operands_38" title="Permanent link">link</a></h5>
@@ -10301,7 +10301,7 @@ buffer may be, etc).</p>
 </tbody>
 </table>
 <h4 id="streamresourcealloca-streamresourceallocaop"><code>stream.resource.alloca</code> (Stream::ResourceAllocaOp)<a class="headerlink" href="#streamresourcealloca-streamresourceallocaop" title="Permanent link">link</a></h4>
-<p><em>Allocates a transient value with undefined contents</em></p>
+<p><em>Allocates a transient value with undefined contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.alloca` `uninitialized`
               (`indeterminate` $indeterminate_lifetime^)?
@@ -10328,7 +10328,7 @@ released.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>indeterminate_lifetime</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_39">Operands:<a class="headerlink" href="#operands_39" title="Permanent link">link</a></h5>
@@ -10346,7 +10346,7 @@ released.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -10365,12 +10365,12 @@ released.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamresourceconstants-streamresourceconstantsop"><code>stream.resource.constants</code> (Stream::ResourceConstantsOp)<a class="headerlink" href="#streamresourceconstants-streamresourceconstantsop" title="Permanent link">link</a></h4>
-<p><em>Asynchronously uploads or maps constant values</em></p>
+<p><em>Asynchronously uploads or maps constant values.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.constants` (`on` `(` $affinity^ `)`)?
               attr-dict `:`
@@ -10403,7 +10403,7 @@ upload or mapping.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>values</code></td><td>::mlir::ArrayAttr</td><td>constant value array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_40">Operands:<a class="headerlink" href="#operands_40" title="Permanent link">link</a></h5>
@@ -10436,12 +10436,12 @@ upload or mapping.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamresourcedealloca-streamresourcedeallocaop"><code>stream.resource.dealloca</code> (Stream::ResourceDeallocaOp)<a class="headerlink" href="#streamresourcedealloca-streamresourcedeallocaop" title="Permanent link">link</a></h4>
-<p><em>Frees a transient value when available</em></p>
+<p><em>Frees a transient value when available.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.dealloca` (`origin` $prefer_origin^)?
               (`on` `(` $affinity^ `)`)?
@@ -10465,7 +10465,7 @@ will be used to perform a barrier operation.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>prefer_origin</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_41">Operands:<a class="headerlink" href="#operands_41" title="Permanent link">link</a></h5>
@@ -10487,7 +10487,7 @@ will be used to perform a barrier operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -10502,12 +10502,12 @@ will be used to perform a barrier operation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamresourceis_terminal-streamresourceisterminalop"><code>stream.resource.is_terminal</code> (Stream::ResourceIsTerminalOp)<a class="headerlink" href="#streamresourceis_terminal-streamresourceisterminalop" title="Permanent link">link</a></h4>
-<p><em>Returns true if the resource has no other claims to ownership</em></p>
+<p><em>Returns true if the resource has no other claims to ownership.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.is_terminal` $operand attr-dict `:` type($operand) `{` $operand_size `}`
 </code></pre></div>
@@ -10552,7 +10552,7 @@ ownership and can deallocate or reuse the resource for other purposes.</p>
 </tbody>
 </table>
 <h4 id="streamresourceload-streamresourceloadop"><code>stream.resource.load</code> (Stream::ResourceLoadOp)<a class="headerlink" href="#streamresourceload-streamresourceloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a staging resource</em></p>
+<p><em>Loads a value from a staging resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.load` $source `[` $source_offset `]` `:`
               type($source) `` `{` $source_size `}`
@@ -10603,7 +10603,7 @@ introduce a yield point if the staging resource needs to be transferred.</p>
 </tbody>
 </table>
 <h4 id="streamresourcepack-streamresourcepackop"><code>stream.resource.pack</code> (Stream::ResourcePackOp)<a class="headerlink" href="#streamresourcepack-streamresourcepackop" title="Permanent link">link</a></h4>
-<p><em>Packs variable-sized slices into a single slab</em></p>
+<p><em>Packs variable-sized slices into a single slab.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.pack` (`on` `(` $affinity^ `)`)?
               (`offset` `(` $offset^ `)`)?
@@ -10654,7 +10654,7 @@ underlying allocation buffer.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>lifetime_intervals</code></td><td>::mlir::ArrayAttr</td><td>index array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_44">Operands:<a class="headerlink" href="#operands_44" title="Permanent link">link</a></h5>
@@ -10696,7 +10696,7 @@ underlying allocation buffer.</p>
 </tbody>
 </table>
 <h4 id="streamresourcerelease-streamresourcereleaseop"><code>stream.resource.release</code> (Stream::ResourceReleaseOp)<a class="headerlink" href="#streamresourcerelease-streamresourcereleaseop" title="Permanent link">link</a></h4>
-<p><em>Releases an ownership claim on the resource</em></p>
+<p><em>Releases an ownership claim on the resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.release` $operand attr-dict `:` type($operand) `{` $operand_size `}`
 </code></pre></div>
@@ -10741,7 +10741,7 @@ releasing their claim was the last owner (equivalent to having used
 </tbody>
 </table>
 <h4 id="streamresourceretain-streamresourceretainop"><code>stream.resource.retain</code> (Stream::ResourceRetainOp)<a class="headerlink" href="#streamresourceretain-streamresourceretainop" title="Permanent link">link</a></h4>
-<p><em>Retains ownership of the resource</em></p>
+<p><em>Retains ownership of the resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.retain` $operand attr-dict `:` type($operand) `{` $operand_size `}`
 </code></pre></div>
@@ -10776,7 +10776,7 @@ their reference-type and do not need additional ownership management.</p>
 </tbody>
 </table>
 <h4 id="streamresourcesize-streamresourcesizeop"><code>stream.resource.size</code> (Stream::ResourceSizeOp)<a class="headerlink" href="#streamresourcesize-streamresourcesizeop" title="Permanent link">link</a></h4>
-<p><em>Returns the size of the resource storage in bytes</em></p>
+<p><em>Returns the size of the resource storage in bytes.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.size` $operand
               attr-dict `:` type($operand)
@@ -10791,7 +10791,7 @@ values such as sparse tensor formats.</p>
 <h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_47">Operands:<a class="headerlink" href="#operands_47" title="Permanent link">link</a></h5>
@@ -10825,7 +10825,7 @@ values such as sparse tensor formats.</p>
 </tbody>
 </table>
 <h4 id="streamresourcestore-streamresourcestoreop"><code>stream.resource.store</code> (Stream::ResourceStoreOp)<a class="headerlink" href="#streamresourcestore-streamresourcestoreop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a staging resource</em></p>
+<p><em>Stores a value into a staging resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.store` $value `,`
               $target `[` $target_offset `]` `:`
@@ -10866,7 +10866,7 @@ introduce a yield point if the staging resource needs to be acquired.</p>
 </tbody>
 </table>
 <h4 id="streamresourcesubview-streamresourcesubviewop"><code>stream.resource.subview</code> (Stream::ResourceSubviewOp)<a class="headerlink" href="#streamresourcesubview-streamresourcesubviewop" title="Permanent link">link</a></h4>
-<p><em>Slices out a subview of a value</em></p>
+<p><em>Slices out a subview of a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.subview` $source `[` $source_offset `]` `:`
               type($source) `` `{` $source_size `}` `-&gt;`
@@ -10920,7 +10920,7 @@ introduce a yield point if the staging resource needs to be acquired.</p>
 </tbody>
 </table>
 <h4 id="streamresourcetry_map-streamresourcetrymapop"><code>stream.resource.try_map</code> (Stream::ResourceTryMapOp)<a class="headerlink" href="#streamresourcetry_map-streamresourcetrymapop" title="Permanent link">link</a></h4>
-<p><em>Maps read-only memory into a resource</em></p>
+<p><em>Maps read-only memory into a resource.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.try_map` (`on` `(` $affinity^ `)`)?
               $source `[` $source_offset `]` `:`
@@ -10940,7 +10940,7 @@ and behavior is undefined if the underlying contents change.</p>
 <h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_50">Operands:<a class="headerlink" href="#operands_50" title="Permanent link">link</a></h5>
@@ -10954,7 +10954,7 @@ and behavior is undefined if the underlying contents change.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offset</code></td>
@@ -10988,7 +10988,7 @@ and behavior is undefined if the underlying contents change.</p>
 <h3 id="resource-parameter-io-ops">Resource parameter I/O ops<a class="headerlink" href="#resource-parameter-io-ops" title="Permanent link">link</a></h3>
 <p>Resource parameter I/O ops.</p>
 <h4 id="streamparametergather-streamparametergatherop"><code>stream.parameter.gather</code> (Stream::ParameterGatherOp)<a class="headerlink" href="#streamparametergather-streamparametergatherop" title="Permanent link">link</a></h4>
-<p><em>Gathers multiple resources from a parameter scope</em></p>
+<p><em>Gathers multiple resources from a parameter scope.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.parameter.gather` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
@@ -11012,7 +11012,7 @@ additional timeline overhead.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_51">Operands:<a class="headerlink" href="#operands_51" title="Permanent link">link</a></h5>
@@ -11046,7 +11046,7 @@ additional timeline overhead.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11061,12 +11061,12 @@ additional timeline overhead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamparameterload-streamparameterloadop"><code>stream.parameter.load</code> (Stream::ParameterLoadOp)<a class="headerlink" href="#streamparameterload-streamparameterloadop" title="Permanent link">link</a></h4>
-<p><em>Reads one or more resources from a parameter scope</em></p>
+<p><em>Reads one or more resources from a parameter scope.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.parameter.load` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
@@ -11092,7 +11092,7 @@ and <code>stream.parameter.read</code> had been used per parameter.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_52">Operands:<a class="headerlink" href="#operands_52" title="Permanent link">link</a></h5>
@@ -11114,7 +11114,7 @@ and <code>stream.parameter.read</code> had been used per parameter.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11133,12 +11133,12 @@ and <code>stream.parameter.read</code> had been used per parameter.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamparameterread-streamparameterreadop"><code>stream.parameter.read</code> (Stream::ParameterReadOp)<a class="headerlink" href="#streamparameterread-streamparameterreadop" title="Permanent link">link</a></h4>
-<p><em>Reads a resource from a parameter scope</em></p>
+<p><em>Reads a resource from a parameter scope.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.parameter.read` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
@@ -11159,7 +11159,7 @@ provided target resource range.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>source_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_53">Operands:<a class="headerlink" href="#operands_53" title="Permanent link">link</a></h5>
@@ -11193,7 +11193,7 @@ provided target resource range.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11208,12 +11208,12 @@ provided target resource range.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamparameterscatter-streamparameterscatterop"><code>stream.parameter.scatter</code> (Stream::ParameterScatterOp)<a class="headerlink" href="#streamparameterscatter-streamparameterscatterop" title="Permanent link">link</a></h4>
-<p><em>Scatters multiple resources to a parameter scope</em></p>
+<p><em>Scatters multiple resources to a parameter scope.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.parameter.scatter` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
@@ -11237,7 +11237,7 @@ batch operations to do so without additional overhead.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>target_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_54">Operands:<a class="headerlink" href="#operands_54" title="Permanent link">link</a></h5>
@@ -11271,7 +11271,7 @@ batch operations to do so without additional overhead.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11286,12 +11286,12 @@ batch operations to do so without additional overhead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamparameterwrite-streamparameterwriteop"><code>stream.parameter.write</code> (Stream::ParameterWriteOp)<a class="headerlink" href="#streamparameterwrite-streamparameterwriteop" title="Permanent link">link</a></h4>
-<p><em>Writes a resource to a parameter scope</em></p>
+<p><em>Writes a resource to a parameter scope.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.parameter.write` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
@@ -11312,7 +11312,7 @@ the provided source resource range.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>target_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_55">Operands:<a class="headerlink" href="#operands_55" title="Permanent link">link</a></h5>
@@ -11346,7 +11346,7 @@ the provided source resource range.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11361,13 +11361,13 @@ the provided source resource range.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="synchronization-ops">Synchronization ops<a class="headerlink" href="#synchronization-ops" title="Permanent link">link</a></h3>
 <h4 id="streamtimepointawait-streamtimepointawaitop"><code>stream.timepoint.await</code> (Stream::TimepointAwaitOp)<a class="headerlink" href="#streamtimepointawait-streamtimepointawaitop" title="Permanent link">link</a></h4>
-<p><em>Awaits a timepoint before returning a set of resources</em></p>
+<p><em>Awaits a timepoint before returning a set of resources.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.await` (`sync` $sync^)?
               $await_timepoint `=` `` `&gt;`
@@ -11410,7 +11410,7 @@ timepoint.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11430,7 +11430,7 @@ timepoint.</p>
 </tbody>
 </table>
 <h4 id="streamtimepointbarrier-streamtimepointbarrierop"><code>stream.timepoint.barrier</code> (Stream::TimepointBarrierOp)<a class="headerlink" href="#streamtimepointbarrier-streamtimepointbarrierop" title="Permanent link">link</a></h4>
-<p><em>Returns a timepoint indicating when a resource is available</em></p>
+<p><em>Returns a timepoint indicating when a resource is available.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.barrier` (`on` `(` $affinity^ `)`)?
               $resource `:` type($resource) `` `{` $resource_size `}`
@@ -11450,7 +11450,7 @@ production timepoint.</p>
 <h5 id="attributes_48">Attributes:<a class="headerlink" href="#attributes_48" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_57">Operands:<a class="headerlink" href="#operands_57" title="Permanent link">link</a></h5>
@@ -11487,12 +11487,12 @@ production timepoint.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamtimepointchain_external-streamtimepointchainexternalop"><code>stream.timepoint.chain_external</code> (Stream::TimepointChainExternalOp)<a class="headerlink" href="#streamtimepointchain_external-streamtimepointchainexternalop" title="Permanent link">link</a></h4>
-<p><em>Exports a timepoint to an external dialect type</em></p>
+<p><em>Exports a timepoint to an external dialect type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.chain_external` (`on` `(` $affinity^ `)`)?
               $await_timepoint
@@ -11508,7 +11508,7 @@ types and those that prior to lowering do not handle them.</p>
 <h5 id="attributes_49">Attributes:<a class="headerlink" href="#attributes_49" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_58">Operands:<a class="headerlink" href="#operands_58" title="Permanent link">link</a></h5>
@@ -11522,7 +11522,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>external_values</code></td>
@@ -11531,7 +11531,7 @@ types and those that prior to lowering do not handle them.</p>
 </tbody>
 </table>
 <h4 id="streamtimepointexport-streamtimepointexportop"><code>stream.timepoint.export</code> (Stream::TimepointExportOp)<a class="headerlink" href="#streamtimepointexport-streamtimepointexportop" title="Permanent link">link</a></h4>
-<p><em>Exports a timepoint to an external dialect type</em></p>
+<p><em>Exports a timepoint to an external dialect type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.export` (`on` `(` $affinity^ `)`)?
               $await_timepoint
@@ -11549,7 +11549,7 @@ types and those that prior to lowering do not handle them.</p>
 <h5 id="attributes_50">Attributes:<a class="headerlink" href="#attributes_50" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_59">Operands:<a class="headerlink" href="#operands_59" title="Permanent link">link</a></h5>
@@ -11563,7 +11563,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11583,7 +11583,7 @@ types and those that prior to lowering do not handle them.</p>
 </tbody>
 </table>
 <h4 id="streamtimepointimmediate-streamtimepointimmediateop"><code>stream.timepoint.immediate</code> (Stream::TimepointImmediateOp)<a class="headerlink" href="#streamtimepointimmediate-streamtimepointimmediateop" title="Permanent link">link</a></h4>
-<p><em>Results an immediately-available timepoint</em></p>
+<p><em>Results an immediately-available timepoint.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.immediate` attr-dict
               `=` `` `&gt;` type($result_timepoint)
@@ -11606,12 +11606,12 @@ away but can be useful if needing to initialize globals or branch args.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamtimepointimport-streamtimepointimportop"><code>stream.timepoint.import</code> (Stream::TimepointImportOp)<a class="headerlink" href="#streamtimepointimport-streamtimepointimportop" title="Permanent link">link</a></h4>
-<p><em>Imports a timepoint from an external dialect type</em></p>
+<p><em>Imports a timepoint from an external dialect type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.import` (`on` `(` $affinity^ `)`)?
               $operands `:` `(` type($operands) `)`
@@ -11629,7 +11629,7 @@ types and those that prior to lowering do not handle them.</p>
 <h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_60">Operands:<a class="headerlink" href="#operands_60" title="Permanent link">link</a></h5>
@@ -11658,12 +11658,12 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="streamtimepointjoin-streamtimepointjoinop"><code>stream.timepoint.join</code> (Stream::TimepointJoinOp)<a class="headerlink" href="#streamtimepointjoin-streamtimepointjoinop" title="Permanent link">link</a></h4>
-<p><em>Joins one or more timepoints into the max of all of them</em></p>
+<p><em>Joins one or more timepoints into the max of all of them.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.join` `max` `(` $await_timepoints `)` `=` `` `&gt;` type($result_timepoint)
               attr-dict-with-keyword
@@ -11684,7 +11684,7 @@ been reached.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>await_timepoints</code></td>
-<td>variadic of a timepoint indicating execution availability</td>
+<td>variadic of A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
@@ -11699,13 +11699,13 @@ been reached.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>A timepoint indicating execution availability.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="tensor-ops">Tensor ops<a class="headerlink" href="#tensor-ops" title="Permanent link">link</a></h3>
 <h4 id="streamtensorclone-streamtensorcloneop"><code>stream.tensor.clone</code> (Stream::TensorCloneOp)<a class="headerlink" href="#streamtensorclone-streamtensorcloneop" title="Permanent link">link</a></h4>
-<p><em>Clones the contents of a value</em></p>
+<p><em>Clones the contents of a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.clone` (`on` `(` $affinity^ `)`)?
               $source `:`
@@ -11728,7 +11728,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
@@ -11778,7 +11778,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamtensorconstant-streamtensorconstantop"><code>stream.tensor.constant</code> (Stream::TensorConstantOp)<a class="headerlink" href="#streamtensorconstant-streamtensorconstantop" title="Permanent link">link</a></h4>
-<p><em>Defines a constant tensor value</em></p>
+<p><em>Defines a constant tensor value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.constant` (`on` `(` $affinity^ `)`)?
               `:`
@@ -11798,7 +11798,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>value</code></td><td>::mlir::TypedAttr</td><td>TypedAttr instance</td></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
@@ -11832,7 +11832,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamtensordispatch-streamtensordispatchop"><code>stream.tensor.dispatch</code> (Stream::TensorDispatchOp)<a class="headerlink" href="#streamtensordispatch-streamtensordispatchop" title="Permanent link">link</a></h4>
-<p><em>Dispatches a parallelized grid of work</em></p>
+<p><em>Dispatches a parallelized grid of work.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.dispatch` (`on` `(` $affinity^ `)`)?
               custom&lt;DispatchEntryPoints&gt;($entry_points)
@@ -11859,7 +11859,7 @@ and results and is able to load/store at will.</p>
 <tr><td><code>operand_encodings</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
 <tr><td><code>result_encodings</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
@@ -11913,7 +11913,7 @@ and results and is able to load/store at will.</p>
 </tbody>
 </table>
 <h4 id="streamtensorempty-streamtensoremptyop"><code>stream.tensor.empty</code> (Stream::TensorEmptyOp)<a class="headerlink" href="#streamtensorempty-streamtensoremptyop" title="Permanent link">link</a></h4>
-<p><em>Defines an empty tensor value</em></p>
+<p><em>Defines an empty tensor value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.empty` (`on` `(` $affinity^ `)`)?
               `:`
@@ -11934,7 +11934,7 @@ read.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_65">Operands:<a class="headerlink" href="#operands_65" title="Permanent link">link</a></h5>
@@ -11972,7 +11972,7 @@ read.</p>
 </tbody>
 </table>
 <h4 id="streamtensorencode-streamtensorencodeop"><code>stream.tensor.encode</code> (Stream::TensorEncodeOp)<a class="headerlink" href="#streamtensorencode-streamtensorencodeop" title="Permanent link">link</a></h4>
-<p><em>Encodes the contents of a value</em></p>
+<p><em>Encodes the contents of a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.encode` (`on` `(` $affinity^ `)`)?
               $source `:`
@@ -11997,7 +11997,7 @@ during lowering.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_66">Operands:<a class="headerlink" href="#operands_66" title="Permanent link">link</a></h5>
@@ -12047,7 +12047,7 @@ during lowering.</p>
 </tbody>
 </table>
 <h4 id="streamtensorfill-streamtensorfillop"><code>stream.tensor.fill</code> (Stream::TensorFillOp)<a class="headerlink" href="#streamtensorfill-streamtensorfillop" title="Permanent link">link</a></h4>
-<p><em>Fills a subview of a stream resource with a value</em></p>
+<p><em>Fills a subview of a stream resource with a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.fill` (`on` `(` $affinity^ `)`)?
               $value `,` $target (`[` $start_indices `for` $lengths^ `]`)? `:`
@@ -12067,7 +12067,7 @@ resource with the update applied.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_67">Operands:<a class="headerlink" href="#operands_67" title="Permanent link">link</a></h5>
@@ -12121,7 +12121,7 @@ resource with the update applied.</p>
 </tbody>
 </table>
 <h4 id="streamtensorload-streamtensorloadop"><code>stream.tensor.load</code> (Stream::TensorLoadOp)<a class="headerlink" href="#streamtensorload-streamtensorloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a tensor element</em></p>
+<p><em>Loads a value from a tensor element.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.load` $source (`[` $indices^ `]`)? `:`
               $source_encoding (`` `{` $source_encoding_dims^ `}`)?
@@ -12184,7 +12184,7 @@ resource with the update applied.</p>
 </tbody>
 </table>
 <h4 id="streamtensorsizeof-streamtensorsizeofop"><code>stream.tensor.sizeof</code> (Stream::TensorSizeOfOp)<a class="headerlink" href="#streamtensorsizeof-streamtensorsizeofop" title="Permanent link">link</a></h4>
-<p><em>Calculates the storage size of a given high-level type</em></p>
+<p><em>Calculates the storage size of a given high-level type.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.sizeof` (`on` `(` $affinity^ `)`)?
               $encoding (`{` $encoding_dims^ `}`)?
@@ -12202,7 +12202,7 @@ assigned.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_69">Operands:<a class="headerlink" href="#operands_69" title="Permanent link">link</a></h5>
@@ -12236,7 +12236,7 @@ assigned.</p>
 </tbody>
 </table>
 <h4 id="streamtensorslice-streamtensorsliceop"><code>stream.tensor.slice</code> (Stream::TensorSliceOp)<a class="headerlink" href="#streamtensorslice-streamtensorsliceop" title="Permanent link">link</a></h4>
-<p><em>Slices out a cloned subview of a value</em></p>
+<p><em>Slices out a cloned subview of a value.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.slice` (`on` `(` $affinity^ `)`)?
               $source `[` $start_indices `for` $lengths `]` `:`
@@ -12259,7 +12259,7 @@ copy-on-write operation.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_70">Operands:<a class="headerlink" href="#operands_70" title="Permanent link">link</a></h5>
@@ -12317,7 +12317,7 @@ copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamtensorsplat-streamtensorsplatop"><code>stream.tensor.splat</code> (Stream::TensorSplatOp)<a class="headerlink" href="#streamtensorsplat-streamtensorsplatop" title="Permanent link">link</a></h4>
-<p><em>Splats a value into a shaped tensor</em></p>
+<p><em>Splats a value into a shaped tensor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.splat` (`on` `(` $affinity^ `)`)?
               $value
@@ -12336,7 +12336,7 @@ copy-on-write operation.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_71">Operands:<a class="headerlink" href="#operands_71" title="Permanent link">link</a></h5>
@@ -12378,7 +12378,7 @@ copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamtensorstore-streamtensorstoreop"><code>stream.tensor.store</code> (Stream::TensorStoreOp)<a class="headerlink" href="#streamtensorstore-streamtensorstoreop" title="Permanent link">link</a></h4>
-<p><em>Stores a value into a tensor element</em></p>
+<p><em>Stores a value into a tensor element.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.store` $value `,`
               $target (`[` $indices^ `]`)? `:`
@@ -12446,7 +12446,7 @@ copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamtensortrace-streamtensortraceop"><code>stream.tensor.trace</code> (Stream::TensorTraceOp)<a class="headerlink" href="#streamtensortrace-streamtensortraceop" title="Permanent link">link</a></h4>
-<p><em>Traces one or more tensor values at runtime</em></p>
+<p><em>Traces one or more tensor values at runtime.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.trace` $key `=` `[`
               custom&lt;EncodedResourceOperands&gt;(
@@ -12490,7 +12490,7 @@ values being traced.</p>
 </tbody>
 </table>
 <h4 id="streamtensorupdate-streamtensorupdateop"><code>stream.tensor.update</code> (Stream::TensorUpdateOp)<a class="headerlink" href="#streamtensorupdate-streamtensorupdateop" title="Permanent link">link</a></h4>
-<p><em>Updates a slice of a subview of a resource in-place</em></p>
+<p><em>Updates a slice of a subview of a resource in-place.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.update` (`on` `(` $affinity^ `)`)?
               $update `,` $target `[` $start_indices `]` `:`
@@ -12512,7 +12512,7 @@ is the entire updated target value.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>update_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
-<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_74">Operands:<a class="headerlink" href="#operands_74" title="Permanent link">link</a></h5>
@@ -12571,7 +12571,7 @@ is the entire updated target value.</p>
 </table>
 <h2 id="attributes_65">Attributes<a class="headerlink" href="#attributes_65" title="Permanent link">link</a></h2>
 <h3 id="collectiveattr">CollectiveAttr<a class="headerlink" href="#collectiveattr" title="Permanent link">link</a></h3>
-<p><em>Collective operation and specification</em></p>
+<p><em>Collective operation and specification.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#stream.collective&lt;
   CollectiveKind,   # kind
@@ -12608,7 +12608,7 @@ is the entire updated target value.</p>
 </tbody>
 </table>
 <h3 id="namedparameterattr">NamedParameterAttr<a class="headerlink" href="#namedparameterattr" title="Permanent link">link</a></h3>
-<p><em>Named parameter referenced an optional scope and key</em></p>
+<p><em>Named parameter referenced an optional scope and key.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#stream.parameter.named&lt;
   ::mlir::Type,   # type
@@ -12653,7 +12653,7 @@ the parameter within its scope.</p>
 </tbody>
 </table>
 <h3 id="partitioningconfigattr">PartitioningConfigAttr<a class="headerlink" href="#partitioningconfigattr" title="Permanent link">link</a></h3>
-<p><em>Defines partitioning configuration</em></p>
+<p><em>Defines partitioning configuration.</em></p>
 <p>Configures the partitioning algorithm to use and its configuration.
 Partitioning is useful to adjust when scheduling behavior of targets is
 radically different - such as single-threaded vs. multi-threaded CPUs or
@@ -12677,7 +12677,7 @@ the amount of concurrency, parallelism, memory consumption, and latency.</p>
 </tbody>
 </table>
 <h3 id="resourceconfigattr">ResourceConfigAttr<a class="headerlink" href="#resourceconfigattr" title="Permanent link">link</a></h3>
-<p><em>Defines resource constraints configuration</em></p>
+<p><em>Defines resource constraints configuration.</em></p>
 <p>Defines resource storage constraints. These allow for packing and layout
 algorithms to ensure they are producing usable results on target devices.</p>
 <h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
@@ -12728,7 +12728,7 @@ algorithms to ensure they are producing usable results on target devices.</p>
 </tbody>
 </table>
 <h3 id="timepointattr">TimepointAttr<a class="headerlink" href="#timepointattr" title="Permanent link">link</a></h3>
-<p><em>An immediately-resolved timepoint</em></p>
+<p><em>An immediately-resolved timepoint.</em></p>
 <h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -12784,12 +12784,12 @@ transfer operation. If the contents of the value are needed they must first
 be transferred via <code>stream.transfer</code> - which may incur a copy.</p>
 <h2 id="types">Types<a class="headerlink" href="#types" title="Permanent link">link</a></h2>
 <h3 id="bindingtype">BindingType<a class="headerlink" href="#bindingtype" title="Permanent link">link</a></h3>
-<p><em>A managed resource binding into an executable scope</em></p>
+<p><em>A managed resource binding into an executable scope.</em></p>
 <p>Syntax: <code>!stream.binding</code></p>
 <p>A resource binding available within an executable dispatch function.
 The bindings map 1:1 with the resources bound during dispatch operations.</p>
 <h3 id="channeltype">ChannelType<a class="headerlink" href="#channeltype" title="Permanent link">link</a></h3>
-<p><em>A collective communication channel</em></p>
+<p><em>A collective communication channel.</em></p>
 <p>Syntax: <code>!stream.channel</code></p>
 <p>Represents a single participant in a collective clique. Multiple channels
 may exist within the same program to allow for partial operations or
@@ -12800,12 +12800,12 @@ provided by hosting applications. For example, the program could expose a
 in globals for use throughout the program allowing for
 application-controlled channel configuration.</p>
 <h3 id="filetype">FileType<a class="headerlink" href="#filetype" title="Permanent link">link</a></h3>
-<p><em>A file handle used for I/O operations</em></p>
+<p><em>A file handle used for I/O operations.</em></p>
 <p>Syntax: <code>!stream.file</code></p>
 <p>A file handle that can be asynchronously read and written into/from
 stream resources.</p>
 <h3 id="resourcetype">ResourceType<a class="headerlink" href="#resourcetype" title="Permanent link">link</a></h3>
-<p><em>A managed resource</em></p>
+<p><em>A managed resource.</em></p>
 <p>Stream external values represent asynchronously-available and sequenced
 values that are owned and managed by external code - such as those passed in
 or out of the program entry points. Though external values are managed
@@ -12832,7 +12832,7 @@ be transferred via <code>stream.transfer</code> - which may incur a copy.</p>
 </tbody>
 </table>
 <h3 id="timepointtype">TimepointType<a class="headerlink" href="#timepointtype" title="Permanent link">link</a></h3>
-<p><em>A timepoint indicating execution availability</em></p>
+<p><em>A timepoint indicating execution availability.</em></p>
 <p>Syntax: <code>!stream.timepoint</code></p>
 <p>Represents a point in the execution timeline that when resolved indicates
 that all of the execution prior to this timepoint has completed and the

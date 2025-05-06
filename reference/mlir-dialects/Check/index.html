@@ -4745,7 +4745,7 @@
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="checkexpect_all_true-checkexpectalltrueop"><code>check.expect_all_true</code> (Check::ExpectAllTrueOp)<a class="headerlink" href="#checkexpect_all_true-checkexpectalltrueop" title="Permanent link">link</a></h3>
-<p><em>Checks that the operand contains only values that are true</em></p>
+<p><em>Checks that the operand contains only values that are true.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_all_true` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $operand `)` attr-dict `:` type($operand)
@@ -4776,7 +4776,7 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 </tbody>
 </table>
 <h3 id="checkexpect_almost_eq-checkexpectalmosteqop"><code>check.expect_almost_eq</code> (Check::ExpectAlmostEqOp)<a class="headerlink" href="#checkexpect_almost_eq-checkexpectalmosteqop" title="Permanent link">link</a></h3>
-<p><em>Checks that the operands are almost equal</em></p>
+<p><em>Checks that the operands are almost equal.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $lhs `,` $rhs (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
@@ -4831,7 +4831,7 @@ should care and so should provide explicit <code>atol</code>, <code>rtol</code> 
 </tbody>
 </table>
 <h3 id="checkexpect_almost_eq_const-checkexpectalmosteqconstop"><code>check.expect_almost_eq_const</code> (Check::ExpectAlmostEqConstOp)<a class="headerlink" href="#checkexpect_almost_eq_const-checkexpectalmosteqconstop" title="Permanent link">link</a></h3>
-<p><em>Checks that the tensor operand is almost equal to some constant</em></p>
+<p><em>Checks that the tensor operand is almost equal to some constant.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq_const` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $lhs `,` $value (`` `,` `atol` $atol^)? (`` `,` `rtol` $rtol^)? `)`
@@ -4872,7 +4872,7 @@ the Numpy-style fuzzy-comparision condition with pararameters <code>atol</code>,
 </tbody>
 </table>
 <h3 id="checkexpect_eq-checkexpecteqop"><code>check.expect_eq</code> (Check::ExpectEqOp)<a class="headerlink" href="#checkexpect_eq-checkexpecteqop" title="Permanent link">link</a></h3>
-<p><em>Checks that the tensor or buffer view operands are equal</em></p>
+<p><em>Checks that the tensor or buffer view operands are equal.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
@@ -4905,7 +4905,7 @@ the Numpy-style fuzzy-comparision condition with pararameters <code>atol</code>,
 </tbody>
 </table>
 <h3 id="checkexpect_eq_const-checkexpecteqconstop"><code>check.expect_eq_const</code> (Check::ExpectEqConstOp)<a class="headerlink" href="#checkexpect_eq_const-checkexpecteqconstop" title="Permanent link">link</a></h3>
-<p><em>Checks that the tensor operand is equal to some constant</em></p>
+<p><em>Checks that the tensor operand is equal to some constant.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq_const` (`` `&lt;` $device^ `&gt;`)?
               `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
@@ -4941,7 +4941,7 @@ the Numpy-style fuzzy-comparision condition with pararameters <code>atol</code>,
 </tbody>
 </table>
 <h3 id="checkexpect_false-checkexpectfalseop"><code>check.expect_false</code> (Check::ExpectFalseOp)<a class="headerlink" href="#checkexpect_false-checkexpectfalseop" title="Permanent link">link</a></h3>
-<p><em>Checks that the operand is false</em></p>
+<p><em>Checks that the operand is false.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_false` `(` $operand `)` attr-dict `:` type($operand)
 </code></pre></div>
@@ -4966,7 +4966,7 @@ zero.</p>
 </tbody>
 </table>
 <h3 id="checkexpect_true-checkexpecttrueop"><code>check.expect_true</code> (Check::ExpectTrueOp)<a class="headerlink" href="#checkexpect_true-checkexpecttrueop" title="Permanent link">link</a></h3>
-<p><em>Checks that the operand is true</em></p>
+<p><em>Checks that the operand is true.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_true` `(` $operand `)` attr-dict `:` type($operand)
 </code></pre></div>

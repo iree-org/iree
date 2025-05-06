@@ -5819,7 +5819,7 @@ SPIR-V/LLVM are handled separately.</p>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="iree_gpubarrier_region-gpubarrierregionop"><code>iree_gpu.barrier_region</code> (GPU::BarrierRegionOp)<a class="headerlink" href="#iree_gpubarrier_region-gpubarrierregionop" title="Permanent link">link</a></h3>
-<p><em>Synchronizes uses of a shared tensor.</em></p>
+<p><em>Synchronizes workers on a region of shared code.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.barrier_region` (`ins` `(` $inputs^ `:` type($inputs) `)` )?
               $region attr-dict `:` type($results)
@@ -5910,7 +5910,7 @@ and flexible.
 </tbody>
 </table>
 <h3 id="iree_gpubuffer_resource_cast-gpubufferresourcecastop"><code>iree_gpu.buffer_resource_cast</code> (GPU::BufferResourceCastOp)<a class="headerlink" href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" title="Permanent link">link</a></h3>
-<p><em>Represents a cast to addr_space&lt;7&gt; (buffer resource) before bufferization</em></p>
+<p><em>Represents a cast to addr_space&lt;7&gt; (buffer resource) before bufferization.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.buffer_resource_cast` $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
               attr-dict `:` type($result)
@@ -5962,7 +5962,7 @@ effort and has no verification or failure modes.</p>
 </tbody>
 </table>
 <h3 id="iree_gpumulti_mma-gpumultimmaop"><code>iree_gpu.multi_mma</code> (GPU::MultiMmaOp)<a class="headerlink" href="#iree_gpumulti_mma-gpumultimmaop" title="Permanent link">link</a></h3>
-<p><em>Models a contraction of multiple mma operations</em></p>
+<p><em>Models a contraction of multiple mma operations.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.multi_mma` $lhs `,` $rhs `,` $acc attr-dict
               `:` type($lhs) `,` type($rhs) `into` type($acc)
@@ -6172,7 +6172,7 @@ produces.</p>
 </tbody>
 </table>
 <h3 id="iree_gpuyield-gpuyieldop"><code>iree_gpu.yield</code> (GPU::YieldOp)<a class="headerlink" href="#iree_gpuyield-gpuyieldop" title="Permanent link">link</a></h3>
-<p><em>Yield values from a region</em></p>
+<p><em>Yield values from a iree_gpu region.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.yield` attr-dict ($values^ `:` type($values))?
 </code></pre></div>
@@ -6314,7 +6314,7 @@ tiling configs.</p>
 </tbody>
 </table>
 <h3 id="gpuencodinglayoutattr">GPUEncodingLayoutAttr<a class="headerlink" href="#gpuencodinglayoutattr" title="Permanent link">link</a></h3>
-<p><em>The encoding layout attribute for GPU backend</em></p>
+<p><em>The encoding layout attribute for GPU backend.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.gpu_encoding_layout&lt;
   DictionaryAttr   # configuration
@@ -6381,7 +6381,7 @@ compiler/Codegen/ExternalInterfaces/*.</p>
 </tbody>
 </table>
 <h3 id="gpupipelineoptionsattr">GPUPipelineOptionsAttr<a class="headerlink" href="#gpupipelineoptionsattr" title="Permanent link">link</a></h3>
-<p><em>GPU pipeline options attribute.</em></p>
+<p><em>Options attribute for linalg + tensors -&gt; vector + memref GPU pipelines.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.pipeline_options&lt;
   BoolAttr,   # prefetch_shared_memory
@@ -6703,7 +6703,7 @@ to solve a specific contraction problem.</p>
 </tbody>
 </table>
 <h3 id="targetattr">TargetAttr<a class="headerlink" href="#targetattr" title="Permanent link">link</a></h3>
-<p><em>Full GPU target attribute</em></p>
+<p><em>Full GPU target attribute.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.target&lt;
   ::llvm::StringRef,   # arch
@@ -6753,7 +6753,7 @@ to solve a specific contraction problem.</p>
 </tbody>
 </table>
 <h3 id="targetchipattr">TargetChipAttr<a class="headerlink" href="#targetchipattr" title="Permanent link">link</a></h3>
-<p><em>Chip level target description</em></p>
+<p><em>Chip level target description.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.target_chip&lt;
   uint32_t,   # wgp_count
@@ -6793,7 +6793,7 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
 </tbody>
 </table>
 <h3 id="targetwgpattr">TargetWgpAttr<a class="headerlink" href="#targetwgpattr" title="Permanent link">link</a></h3>
-<p><em>Workgroup processor level target description</em></p>
+<p><em>Workgroup processor level target description.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.target_wgp&lt;
   ComputeBitwidthsAttr,   # compute

@@ -4832,7 +4832,7 @@ beyond what is currently available in the Vector Dialect.</p>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
 <h3 id="iree_vector_extto_layout-vectorexttolayoutop"><code>iree_vector_ext.to_layout</code> (VectorExt::ToLayoutOp)<a class="headerlink" href="#iree_vector_extto_layout-vectorexttolayoutop" title="Permanent link">link</a></h3>
-<p><em>Layout conversion operator</em></p>
+<p><em>Layout conversion operator.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_layout` $input `to` `layout` `(` $layout `)` attr-dict `:` type($input)
 </code></pre></div>
@@ -4882,7 +4882,7 @@ change has to be materialized through shared memory.</p>
 </tbody>
 </table>
 <h3 id="iree_vector_extto_simd-vectorexttosimdop"><code>iree_vector_ext.to_simd</code> (VectorExt::ToSIMDOp)<a class="headerlink" href="#iree_vector_extto_simd-vectorexttosimdop" title="Permanent link">link</a></h3>
-<p><em>SIMT to SIMD conversion operation</em></p>
+<p><em>SIMT to SIMD conversion operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_simd` $input attr-dict `:` type($input) `-&gt;` type($output)
 </code></pre></div>
@@ -4923,7 +4923,7 @@ distributed vectors.</p>
 </tbody>
 </table>
 <h3 id="iree_vector_extto_simt-vectorexttosimtop"><code>iree_vector_ext.to_simt</code> (VectorExt::ToSIMTOp)<a class="headerlink" href="#iree_vector_extto_simt-vectorexttosimtop" title="Permanent link">link</a></h3>
-<p><em>SIMD to SIMT conversion operation</em></p>
+<p><em>SIMD to SIMT conversion operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_simt` $input attr-dict `:` type($input) `-&gt;` type($output)
 </code></pre></div>
@@ -5090,7 +5090,7 @@ to contiguous dimensions.</p>
 </table>
 <h2 id="attributes_2">Attributes<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h2>
 <h3 id="nestedlayoutattr">NestedLayoutAttr<a class="headerlink" href="#nestedlayoutattr" title="Permanent link">link</a></h3>
-<p><em>A layout representing a mapping from GPU thread hierarchy to a shape</em></p>
+<p><em>A layout representing a mapping from GPU thread hierarchy to a shape.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_vector_ext.nested_layout&lt;
   ::llvm::ArrayRef&lt;int64_t&gt;,   # subgroupTile

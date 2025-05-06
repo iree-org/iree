@@ -5005,7 +5005,7 @@ carries the same usage restrictions.</p>
 <h3 id="buffer-ops">Buffer ops<a class="headerlink" href="#buffer-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.buffer</code> / <code>iree_hal_buffer_t</code>.</p>
 <h4 id="hal_inlinebufferallocateinitialized-halinlinebufferallocateinitializedop"><code>hal_inline.buffer.allocate.initialized</code> (HAL::Inline::BufferAllocateInitializedOp)<a class="headerlink" href="#hal_inlinebufferallocateinitialized-halinlinebufferallocateinitializedop" title="Permanent link">link</a></h4>
-<p><em>Buffer allocation with cloning</em></p>
+<p><em>Buffer allocation with cloning.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.allocate.initialized` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
               `alignment` `(` $minimum_alignment `)`
@@ -5029,7 +5029,7 @@ carries the same usage restrictions.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offset</code></td>
@@ -5056,12 +5056,12 @@ carries the same usage restrictions.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>storage</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="hal_inlinebufferallocate-halinlinebufferallocateop"><code>hal_inline.buffer.allocate</code> (HAL::Inline::BufferAllocateOp)<a class="headerlink" href="#hal_inlinebufferallocate-halinlinebufferallocateop" title="Permanent link">link</a></h4>
-<p><em>Empty buffer allocation operation</em></p>
+<p><em>Empty buffer allocation operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.allocate` `alignment` `(` $minimum_alignment `)`
               `:` custom&lt;SizeAwareType&gt;(type($result), $allocation_size) `in` type($storage)
@@ -5105,12 +5105,12 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>storage</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="hal_inlinebufferlength-halinlinebufferlengthop"><code>hal_inline.buffer.length</code> (HAL::Inline::BufferLengthOp)<a class="headerlink" href="#hal_inlinebufferlength-halinlinebufferlengthop" title="Permanent link">link</a></h4>
-<p><em>Buffer byte length accessor</em></p>
+<p><em>Buffer byte length accessor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.length` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($result)
@@ -5153,7 +5153,7 @@ view into another buffer.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebufferstorage-halinlinebufferstorageop"><code>hal_inline.buffer.storage</code> (HAL::Inline::BufferStorageOp)<a class="headerlink" href="#hal_inlinebufferstorage-halinlinebufferstorageop" title="Permanent link">link</a></h4>
-<p><em>Buffer backing storage accessor</em></p>
+<p><em>Buffer backing storage accessor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.storage` `&lt;` $buffer `:` type($buffer) `&gt;`
               `:` type($storage)
@@ -5191,12 +5191,12 @@ byte 0 of the HAL buffer).</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>storage</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffersubspan-halinlinebuffersubspanop"><code>hal_inline.buffer.subspan</code> (HAL::Inline::BufferSubspanOp)<a class="headerlink" href="#hal_inlinebuffersubspan-halinlinebuffersubspanop" title="Permanent link">link</a></h4>
-<p><em>Buffer subspan operation</em></p>
+<p><em>Buffer subspan operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.subspan` `&lt;` $source_buffer `:` type($source_buffer) `&gt;`
               `` `[` $source_offset `,` $length `]`
@@ -5246,7 +5246,7 @@ byte 0 of the HAL buffer).</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebufferwrap-halinlinebufferwrapop"><code>hal_inline.buffer.wrap</code> (HAL::Inline::BufferWrapOp)<a class="headerlink" href="#hal_inlinebufferwrap-halinlinebufferwrapop" title="Permanent link">link</a></h4>
-<p><em>Host buffer wrapping operation</em></p>
+<p><em>Host buffer wrapping operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer.wrap` `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
               `:` type($result)
@@ -5266,7 +5266,7 @@ buffer.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offset</code></td>
@@ -5296,7 +5296,7 @@ buffer.</p>
 <h3 id="buffer-view-ops">Buffer view ops<a class="headerlink" href="#buffer-view-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.buffer_view</code> / <code>iree_hal_buffer_view_t</code>.</p>
 <h4 id="hal_inlinebuffer_viewassert-halinlinebufferviewassertop"><code>hal_inline.buffer_view.assert</code> (HAL::Inline::BufferViewAssertOp)<a class="headerlink" href="#hal_inlinebuffer_viewassert-halinlinebufferviewassertop" title="Permanent link">link</a></h4>
-<p><em>Buffer view contents assertion</em></p>
+<p><em>Buffer view contents assertion.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.assert` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `message` `(` $message `)`
@@ -5342,7 +5342,7 @@ used.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewbuffer-halinlinebufferviewbufferop"><code>hal_inline.buffer_view.buffer</code> (HAL::Inline::BufferViewBufferOp)<a class="headerlink" href="#hal_inlinebuffer_viewbuffer-halinlinebufferviewbufferop" title="Permanent link">link</a></h4>
-<p><em>Buffer view buffer accessor</em></p>
+<p><em>Buffer view buffer accessor.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.buffer` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -5383,7 +5383,7 @@ used.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewcreate-halinlinebufferviewcreateop"><code>hal_inline.buffer_view.create</code> (HAL::Inline::BufferViewCreateOp)<a class="headerlink" href="#hal_inlinebuffer_viewcreate-halinlinebufferviewcreateop" title="Permanent link">link</a></h4>
-<p><em>Buffer view reference initializer</em></p>
+<p><em>Buffer view reference initializer.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.create` `buffer` `(` $source_buffer `:` type($source_buffer) `)`
               `` `[` $source_offset `,` $source_length `]`
@@ -5451,7 +5451,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewdim-halinlinebufferviewdimop"><code>hal_inline.buffer_view.dim</code> (HAL::Inline::BufferViewDimOp)<a class="headerlink" href="#hal_inlinebuffer_viewdim-halinlinebufferviewdimop" title="Permanent link">link</a></h4>
-<p><em>Buffer view dimension value query</em></p>
+<p><em>Buffer view dimension value query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.dim` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `` `[` $index `]`
@@ -5499,7 +5499,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewelement_type-halinlinebufferviewelementtypeop"><code>hal_inline.buffer_view.element_type</code> (HAL::Inline::BufferViewElementTypeOp)<a class="headerlink" href="#hal_inlinebuffer_viewelement_type-halinlinebufferviewelementtypeop" title="Permanent link">link</a></h4>
-<p><em>Buffer view element type query</em></p>
+<p><em>Buffer view element type query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -5540,7 +5540,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewencoding_type-halinlinebufferviewencodingtypeop"><code>hal_inline.buffer_view.encoding_type</code> (HAL::Inline::BufferViewEncodingTypeOp)<a class="headerlink" href="#hal_inlinebuffer_viewencoding_type-halinlinebufferviewencodingtypeop" title="Permanent link">link</a></h4>
-<p><em>Buffer view encoding type query</em></p>
+<p><em>Buffer view encoding type query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -5581,7 +5581,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewrank-halinlinebufferviewrankop"><code>hal_inline.buffer_view.rank</code> (HAL::Inline::BufferViewRankOp)<a class="headerlink" href="#hal_inlinebuffer_viewrank-halinlinebufferviewrankop" title="Permanent link">link</a></h4>
-<p><em>Buffer view rank query</em></p>
+<p><em>Buffer view rank query.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
@@ -5622,7 +5622,7 @@ along with the contents.</p>
 </tbody>
 </table>
 <h4 id="hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop"><code>hal_inline.buffer_view.trace</code> (HAL::Inline::BufferViewTraceOp)<a class="headerlink" href="#hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop" title="Permanent link">link</a></h4>
-<p><em>Trace value(s) operation</em></p>
+<p><em>Trace value(s) operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.trace` $key `=`
               $operands `:` type($operands)
@@ -5655,7 +5655,7 @@ useful for titling/marking specific sets of buffers for easier searching.</p>
 <h3 id="device-ops">Device ops<a class="headerlink" href="#device-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.device</code> / <code>iree_hal_device_t</code>.</p>
 <h4 id="hal_inlinedevicequery-halinlinedevicequeryop"><code>hal_inline.device.query</code> (HAL::Inline::DeviceQueryOp)<a class="headerlink" href="#hal_inlinedevicequery-halinlinedevicequeryop" title="Permanent link">link</a></h4>
-<p><em>Returns a runtime configuration parameter from the device</em></p>
+<p><em>Returns a runtime configuration parameter from the device.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal_inline.device.query` `key` `(` $category `:` `` `:` $key `)`
               `:` type($ok) `,` type($value)
