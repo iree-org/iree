@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRSupport
     MLIRTensorDialect
     iree::compiler::Dialect::Util::IR
   PUBLIC
