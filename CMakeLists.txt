@@ -144,6 +144,7 @@ option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility
 #
 # Built-in allocators available:
 # - `libc`: whatever `malloc`/`free` are defined as.
+# - `mimalloc`: https://github.com/microsoft/mimalloc (v3)
 #
 # Users adding their own allocators out of tree may define any of the following
 # CMake variables to control behavior:
@@ -953,6 +954,41 @@ endif()
 
 # This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
 add_subdirectory(build_tools/third_party/flatcc)
+
+if(IREE_ALLOCATOR_SYSTEM STREQUAL "mimalloc")
+  set(IREE_ALLOCATOR_MIMALLOC_SRCS "allocator_mimalloc.c")
+  if(IREE_USE_SYSTEM_DEPS)
+    # NOTE: we don't know exactly what the user wants here and guess.
+    message(STATUS "iree_allocator_system using system mimalloc v3.*...")
+    set(MI_BUILD_STATIC ON)
+    find_package(mimalloc 3 REQUIRED)
+    set(IREE_ALLOCATOR_MIMALLOC_DEPS "mimalloc-static")
+  else()
+    # mimalloc is currently using the `dev3` branch (v3.*).
+    # Releases: https://github.com/microsoft/mimalloc/tags
+    #
+    # We directly inline the source into iree/base/allocator_mimalloc.c when
+    # fetching it ourselves and otherwise link against the static library. We
+    # do not want to override the global malloc/free implementations.
+    message(STATUS "Using fetched mimalloc v3.*...")
+    set(MI_OVERRIDE OFF)
+    set(MI_BUILD_STATIC OFF)
+    set(MI_BUILD_SHARED OFF)
+    set(MI_BUILD_OBJECT OFF)
+    set(MI_BUILD_TESTS OFF)
+    include(FetchContent)
+    FetchContent_Declare(
+      mimalloc
+      GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+      GIT_TAG        51c09e7b6a0ac5feeba998710f00c7dd7aa67bbf # v3.0.3
+    )
+    FetchContent_MakeAvailable(mimalloc)
+    list(APPEND IREE_ALLOCATOR_MIMALLOC_COPTS
+      "-I${mimalloc_SOURCE_DIR}/include"
+      "-DIREE_ALLOCATOR_MIMALLOC_STATIC_SRC=\"${mimalloc_SOURCE_DIR}/src/static.c\""
+    )
+  endif()
+endif()
 
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
