@@ -470,8 +470,9 @@ def MatchHasNoLoweringConfigOp : Op<Transform_Dialect, "iree.match.has_no_loweri
     [MatchOpInterface,
      SingleOpMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks that the payload op does not carry a lowering config or compilation info";
+  let summary = [{
+    Checks that the payload op does not carry a lowering config or compilation info
+  }];
   let description = [{
     Verifies that the payload does not have a "compilation_info" or
     "lowering_config" attribute. This is a very common check needed for external
