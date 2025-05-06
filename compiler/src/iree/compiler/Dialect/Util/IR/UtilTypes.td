@@ -29,7 +29,7 @@ def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
 ]> {
   let mnemonic = "buffer";
 
-  let summary = [{A reference counted byte buffer..}];
+  let summary = [{A reference counted byte buffer.}];
   let description = [{
     A reference counted byte buffer that models a pointer, offset, and length.
   }];
