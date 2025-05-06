@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
+    MLIRSubsetOpInterface
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
