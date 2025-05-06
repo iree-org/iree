@@ -436,7 +436,7 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
 
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
+  if (isROCmBackend(target) && !ShapedType::isDynamicShape(bounds) &&
       isMatmulLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
@@ -2276,7 +2276,7 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
       }
       ArrayRef<int64_t> shape =
           llvm::cast<ShapedType>(outputOperand.get().getType()).getShape();
-      if (llvm::any_of(shape, ShapedType::isDynamic)) {
+      if (ShapedType::isDynamicShape(shape)) {
         vectorSize = 1;
         break;
       }
@@ -2587,7 +2587,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
+  if (isROCmBackend(target) && !ShapedType::isDynamicShape(bounds) &&
       isMatvecLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
@@ -2858,7 +2858,7 @@ static LogicalResult setConvolutionConfig(
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
   if (ShapedType::isDynamic(inputShape[3]) ||
-      llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
+      ShapedType::isDynamicShape(outputShape.drop_front())) {
     return failure();
   }
   int64_t oh = outputShape[ohIndex], ow = outputShape[owIndex],

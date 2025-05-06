@@ -2704,8 +2704,7 @@ adjustTileSizesForPackOp(mlir::FunctionOpInterface entryPointFn,
   ArrayRef<int64_t> innerDimsPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
   // Currently we only handle pack op with static inner tile sizes.
-  if (llvm::any_of(innerTiles,
-                   [](int64_t size) { return ShapedType::isDynamic(size); })) {
+  if (ShapedType::isDynamicShape(innerTiles)) {
     return failure();
   }
   // Pack op requires special vector tile sizes to achieve good performance.

@@ -144,8 +144,7 @@ MaterializeEncodingTypeConverter::getInnerTileSizesOfr(
     const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo)
     const {
   ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
-  if (llvm::all_of(staticTileSizes,
-                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
+  if (!ShapedType::isDynamicShape(staticTileSizes)) {
     return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
   }
   assert(materializeEncodingValueFn &&
