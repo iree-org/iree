@@ -381,9 +381,7 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     canonicalScalableDims.append(linalgOp.getNumLoops(), false);
 
     // loop ranges must be static to infer vector sizes.
-    if (llvm::any_of(canonicalVectorSizes, [](int64_t size) {
-          return ShapedType::isDynamic(size);
-        })) {
+    if (ShapedType::isDynamicShape(canonicalVectorSizes)) {
       return failure();
     }
   }
