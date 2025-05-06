@@ -1062,7 +1062,12 @@ transform.named_sequence
   transform.iree.match.dim_is_multiple_of  %rhs[1], 64 : !transform.any_value
 
   // M, N >= 1024, K >= 256
-  transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+
+  // TODO: Kernel specialization is needed to apply this strategy selectively at
+  // runtime. Additionally model exports don't specify lower bounds so it is
+  // impossible to use this strategy with this check.
+  // transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+
   transform.iree.match.dim_bounds %rhs[0], umin = 1024, none : !transform.any_value
   transform.iree.match.dim_bounds %lhs[2], umin = 256, none : !transform.any_value
 
@@ -1164,7 +1169,12 @@ transform.named_sequence
   transform.iree.match.dim_is_multiple_of  %rhs[1], 128 : !transform.any_value
 
   // M, N >= 1024, K >= 512
-  transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+
+  // TODO: Kernel specialization is needed to apply this strategy selectively at
+  // runtime. Additionally model exports don't specify lower bounds so it is
+  // impossible to use this strategy with this check.
+  // transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+
   transform.iree.match.dim_bounds %rhs[0], umin = 1024, none : !transform.any_value
   transform.iree.match.dim_bounds %lhs[2], umin = 512, none : !transform.any_value
 
@@ -1266,7 +1276,12 @@ transform.named_sequence
   transform.iree.match.dim_is_multiple_of  %rhs[1], 64 : !transform.any_value
 
   // M >= 512, N >= 1024, K >= 256
-  transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+
+  // TODO: Kernel specialization is needed to apply this strategy selectively at
+  // runtime. Additionally model exports don't specify lower bounds so it is
+  // impossible to use this strategy with this check.
+  // transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+
   transform.iree.match.dim_bounds %rhs[0], umin = 1024, none : !transform.any_value
   transform.iree.match.dim_bounds %lhs[2], umin = 256, none : !transform.any_value
 
