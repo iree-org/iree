@@ -28,6 +28,16 @@ static llvm::cl::opt<int64_t>
     splitMatmulReductionRatio("iree-dispatch-creation-split-matmul-reduction",
                               llvm::cl::desc("split ratio"), llvm::cl::init(1));
 
+static llvm::cl::opt<bool> enableDefaultArgmaxSplitPattern(
+    "iree-dispatch-creation-enable-default-argmax-split-pattern",
+    llvm::cl::desc("Enable default argmax split-k for known reduction patterns "
+                   "with a reduction dimension of 128."),
+    llvm::cl::init(true));
+
+// Controls the tile size used when applying split-k to argmax reductions.
+// This value defines how many elements along the reduction dimension are
+// processed per tile (e.g., a value of 128 means each tile reduces over 128
+// elements).
 static llvm::cl::opt<int64_t> splitArgmaxReductionRatio(
     "iree-dispatch-creation-split-argmax-reduction",
     llvm::cl::desc("Ratio to split argmax. Set to 0 or 1 to disable"),
@@ -126,6 +136,11 @@ FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
 
   SmallVector<int64_t, 4> loopRanges = genericOp.getStaticLoopRanges();
   int64_t reductionDimSize = loopRanges[reductionDim];
+
+  //  The total number of output elements along this new dimension is
+  //  reductionDimSize / ratio.
+  int64_t output_dimsize = reductionDimSize / ratio;
+
   if (reductionDimSize == ShapedType::kDynamic ||
       reductionDimSize % ratio != 0) {
     return rewriter.notifyMatchFailure(
@@ -164,16 +179,16 @@ FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
       unsigned dim = map.getDimPosition(idx);
       if (reductionDim == dim) {
         if (control.innerParallel) {
+          newShape.push_back(ratio); // reduce
           newShape.push_back(genericOp.getShape(operand)[idx] /
-                             ratio); // reduce
-          newShape.push_back(ratio); // parallel (insert)
+                             ratio); // parallel (insert)
           exprs.push_back(rewriter.getAffineDimExpr(
               dim < insertSplitDimension ? dim : dim + 1));
           exprs.push_back(rewriter.getAffineDimExpr(insertSplitDimension));
         } else {
-          newShape.push_back(ratio); // parallel (insert)
           newShape.push_back(genericOp.getShape(operand)[idx] /
-                             ratio); // reduce
+                             ratio); // parallel (insert)
+          newShape.push_back(ratio); // reduce
           exprs.push_back(rewriter.getAffineDimExpr(insertSplitDimension));
           exprs.push_back(rewriter.getAffineDimExpr(
               dim < insertSplitDimension ? dim : dim + 1));
@@ -213,7 +228,7 @@ FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
     SmallVector<AffineExpr> outputExpr;
     for (unsigned idx = 0; idx <= oldShape.size(); ++idx) {
       if (idx == insertSplitIndex) {
-        thisOutputShape.push_back(ratio);
+        thisOutputShape.push_back(output_dimsize);
         outputExpr.push_back(rewriter.getAffineDimExpr(insertSplitDimension));
       }
       if (idx < oldShape.size()) {
@@ -277,8 +292,7 @@ FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
   }
 
   // Create partial linalg.generic op with global index computation.
-  Value tileSize =
-      rewriter.create<arith::ConstantIndexOp>(loc, reductionDimSize / ratio);
+  Value tileSize = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
   auto partialOp = rewriter.create<linalg::GenericOp>(
       loc, TypeRange{identityVal.getType(), identityIndex.getType()}, newInputs,
       ValueRange{identityVal, identityIndex}, newMaps, newIteratorTypes);
@@ -421,8 +435,17 @@ struct SplitReductionPass final
   void runOnOperation() override {
     if (splitMatmulReductionRatio.getValue() <= 1 &&
         topkSplitReductionRatio.empty() &&
-        splitArgmaxReductionRatio.getValue() <= 1) {
+        (splitArgmaxReductionRatio.getValue() <= 1 &&
+         !enableDefaultArgmaxSplitPattern)) {
       return;
+    }
+
+    if (enableDefaultArgmaxSplitPattern) {
+      // Use default split-k pattern for argmax ops: split the reduction dim
+      // (e.g., 131072) into tiles of size 128, resulting in 1024 tiles (131072
+      // / 128). So, the split ratio refers to the tile size of the reduction
+      // dimension.
+      splitArgmaxReductionRatio = 128;
     }
 
     MLIRContext *context = &getContext();
@@ -471,11 +494,7 @@ struct SplitReductionPass final
               /*innerParallel=*/false};
     };
     for (auto op : argmaxCandidates) {
-      if (failed(splitReductionWrapper(rewriter, op,
-                                       argmaxSplitReductionControlFn))) {
-        op.emitOpError("failed to split argmax operation");
-        return signalPassFailure();
-      }
+      (void)splitReductionWrapper(rewriter, op, argmaxSplitReductionControlFn);
     }
 
     // Split topk ops.

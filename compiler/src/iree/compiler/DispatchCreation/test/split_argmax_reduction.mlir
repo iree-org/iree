@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(util.func(iree-dispatch-creation-split-reduction-ops,cse, canonicalize))' --iree-dispatch-creation-split-argmax-reduction=4 %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(util.func(iree-dispatch-creation-split-reduction-ops,cse, canonicalize))' %s | FileCheck %s
 
 util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?xi64> {
   %cst = arith.constant 0xFF80 : bf16
@@ -35,16 +35,16 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: %[[FINALIDX:.+]] = linalg.fill ins(%[[ZERO]] : i64) outs(%[[FINALIDX_EMPTY]] : tensor<?xi64>) -> tensor<?xi64>
 
 // Check partial reduction
-// CHECK: %[[EXPAND:.+]] = tensor.expand_shape %arg0 {{\[}}[0], [1, 2]] output_shape [%{{.+}}, 4, 32768] : tensor<?x131072xbf16> into tensor<?x4x32768xbf16>
-// CHECK: %[[INITVAL:.+]] = tensor.empty(%{{.+}}) : tensor<?x4xbf16>
-// CHECK: %[[FILLVAL:.+]] = linalg.fill ins(%{{.+}} : bf16) outs(%[[INITVAL]] : tensor<?x4xbf16>) -> tensor<?x4xbf16>
-// CHECK: %[[INITIDX:.+]] = tensor.empty(%{{.+}}) : tensor<?x4xi64>
-// CHECK: %[[FILLIDX:.+]] = linalg.fill ins(%{{.+}} : i64) outs(%[[INITIDX]] : tensor<?x4xi64>) -> tensor<?x4xi64>
+// CHECK: %[[EXPAND:.+]] = tensor.expand_shape %arg0 {{\[}}[0], [1, 2]] output_shape [%{{.+}}, 1024, 128] : tensor<?x131072xbf16> into tensor<?x1024x128xbf16>
+// CHECK: %[[INITVAL:.+]] = tensor.empty(%{{.+}}) : tensor<?x1024xbf16>
+// CHECK: %[[FILLVAL:.+]] = linalg.fill ins(%{{.+}} : bf16) outs(%[[INITVAL]] : tensor<?x1024xbf16>) -> tensor<?x1024xbf16>
+// CHECK: %[[INITIDX:.+]] = tensor.empty(%{{.+}}) : tensor<?x1024xi64>
+// CHECK: %[[FILLIDX:.+]] = linalg.fill ins(%{{.+}} : i64) outs(%[[INITIDX]] : tensor<?x1024xi64>) -> tensor<?x1024xi64>
 
 // CHECK: %[[PARTIAL:.+]]:2 = linalg.generic
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
-// CHECK-SAME: ins(%[[EXPAND]] : tensor<?x4x32768xbf16>)
-// CHECK-SAME: outs(%[[FILLVAL]], %[[FILLIDX]] : tensor<?x4xbf16>, tensor<?x4xi64>)
+// CHECK-SAME: ins(%[[EXPAND]] : tensor<?x1024x128xbf16>)
+// CHECK-SAME: outs(%[[FILLVAL]], %[[FILLIDX]] : tensor<?x1024xbf16>, tensor<?x1024xi64>)
 // CHECK: ^bb0(%[[VAL:.+]]: bf16, %[[ACC:.+]]: bf16, %[[IDX:.+]]: i64)
 // CHECK: %[[OUTER:.+]] = linalg.index 1 : index
 // CHECK: %[[INNER:.+]] = linalg.index 2 : index
@@ -59,7 +59,7 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // Final reduction
 // CHECK: %[[FINAL:.+]]:2 = linalg.generic
 // CHECK-SAME: iterator_types = ["parallel", "reduction"]
-// CHECK-SAME: ins(%[[PARTIAL]]#0, %[[PARTIAL]]#1 : tensor<?x4xbf16>, tensor<?x4xi64>)
+// CHECK-SAME: ins(%[[PARTIAL]]#0, %[[PARTIAL]]#1 : tensor<?x1024xbf16>, tensor<?x1024xi64>)
 // CHECK-SAME: outs(%[[FINALVAL]], %[[FINALIDX]] : tensor<?xbf16>, tensor<?xi64>)
 // CHECK: ^bb0(%[[V1:.+]]: bf16, %[[I1:.+]]: i64, %[[V2:.+]]: bf16, %[[I2:.+]]: i64)
 // CHECK: %[[MAX2:.+]] = arith.maximumf %[[V1]], %[[V2]] : bf16
