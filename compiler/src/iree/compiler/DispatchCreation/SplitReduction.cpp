@@ -66,8 +66,13 @@ splitReductionImpl(RewriterBase &rewriter, LinalgOpTy op,
 // reduction.
 static LogicalResult
 collectArgmaxCombinerOps(linalg::GenericOp genericOp,
-                         SmallVector<Operation *, 4> &combinerOps) {
-  assert(IREE::LinalgExt::isArgmaxOp(genericOp) &&
+                         MutableArrayRef<Operation *> combinerOps) {
+  if (combinerOps.size() < 3) {
+    return genericOp->emitError(
+        "combinerOps must have space for exactly 3 elements");
+  }
+
+  assert(succeeded(IREE::LinalgExt::isArgmaxOp(genericOp)) &&
          "expected operation to be an argmax op");
 
   auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
@@ -75,24 +80,18 @@ collectArgmaxCombinerOps(linalg::GenericOp genericOp,
   // Extract max value producer: arith.maximumf.
   Value maxResult = yieldOp.getOperand(0);
   auto maxOp = dyn_cast<arith::MaximumFOp>(maxResult.getDefiningOp());
-  if (!maxOp)
-    return failure();
 
   // Extract index result producer: arith.select.
   Value indexResult = yieldOp.getOperand(1);
   auto selectOp = dyn_cast<arith::SelectOp>(indexResult.getDefiningOp());
-  if (!selectOp)
-    return failure();
 
   // Extract the condition of the select, expected to be arith.cmpf with
   // predicate OGT.
   auto cmpOp = dyn_cast<arith::CmpFOp>(selectOp.getCondition().getDefiningOp());
-  if (!cmpOp || cmpOp.getPredicate() != arith::CmpFPredicate::OGT)
-    return failure();
 
-  combinerOps.push_back(maxOp);
-  combinerOps.push_back(selectOp);
-  combinerOps.push_back(cmpOp);
+  combinerOps[0] = maxOp;
+  combinerOps[1] = selectOp;
+  combinerOps[2] = cmpOp;
 
   return success();
 }
@@ -101,7 +100,7 @@ template <>
 FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
     RewriterBase &rewriter, linalg::GenericOp genericOp,
     linalg::ControlSplitReductionFn controlSplitReductionFn) {
-  assert(IREE::LinalgExt::isArgmaxOp(genericOp) &&
+  assert(succeeded(IREE::LinalgExt::isArgmaxOp(genericOp)) &&
          "expected operation to be an argmax op");
 
   OpBuilder::InsertionGuard guard(rewriter);
@@ -120,10 +119,6 @@ FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
   SmallVector<unsigned> dims;
   genericOp.getReductionDims(dims);
 
-  if (dims.size() != 1) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "needs a single reduction dimension");
-  }
   unsigned reductionDim = dims[0];
   if (control.innerParallel) {
     insertSplitDimension = reductionDim + 1;
@@ -144,9 +139,11 @@ FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
                                        "compared to intermediate tensor size");
   }
 
-  SmallVector<Operation *, 4> combinerOps;
+  Operation *ops[3] = {nullptr, nullptr, nullptr};
+  MutableArrayRef<Operation *> combinerOps(ops);
   if (failed(collectArgmaxCombinerOps(genericOp, combinerOps)))
-    return rewriter.notifyMatchFailure(genericOp, "invalid combiner");
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "invalid combiner for argmax");
 
   Operation *reductionOp = combinerOps[0];
   std::optional<TypedAttr> identity = arith::getNeutralElement(reductionOp);
@@ -450,7 +447,7 @@ struct SplitReductionPass final
           })
           .Case<linalg::GenericOp>([&](auto genericOp) {
             if (splitArgmaxReductionRatio > 1 &&
-                IREE::LinalgExt::isArgmaxOp(genericOp)) {
+                succeeded(IREE::LinalgExt::isArgmaxOp(genericOp))) {
               argmaxCandidates.push_back(genericOp);
             }
           });

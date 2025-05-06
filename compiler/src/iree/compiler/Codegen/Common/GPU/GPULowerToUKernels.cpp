@@ -70,7 +70,7 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!IREE::LinalgExt::isArgmaxOp(op)) {
+    if (failed(IREE::LinalgExt::isArgmaxOp(op))) {
       return failure();
     }
     FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
