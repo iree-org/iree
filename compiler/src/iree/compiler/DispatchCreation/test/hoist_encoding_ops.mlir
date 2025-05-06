@@ -253,3 +253,23 @@ util.func public @hoist_encoding_only() -> tensor<640x320xf32> {
 // NO-CONST:         %[[CST:.+]] = arith.constant
 // NO-CONST:         flow.dispatch.region
 // NO-CONST:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+
+// -----
+
+// Avoid hoisting `set_encoding` operations that have pad encodings
+
+#encoding = #iree_encoding.pad_encoding_layout<[0, ?]>
+util.func public @dont_hoist_pad_encoding() -> tensor<640x320xf32, #encoding> {
+  %cst = arith.constant dense<1.0> : tensor<640x320xf32>
+  %0 = flow.dispatch.region -> (tensor<640x320xf32, #encoding>) {
+    %1 = tensor.empty() : tensor<640x320xf32>
+    %2 = iree_encoding.set_encoding %1 : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
+    flow.return %2 : tensor<640x320xf32, #encoding>
+  }
+  util.return %0 : tensor<640x320xf32, #encoding>
+}
+// CHECK-LABEL: @dont_hoist_pad_encoding
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+//       CHECK:     flow.return %[[SET_ENCODING]]
+//       CHECK:   return %[[DISPATCH]]
