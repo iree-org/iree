@@ -2532,6 +2532,7 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 
 def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
   Symbol,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   ParentOneOf<[
     "IREE::HAL::ExecutableSourceOp",
     "IREE::HAL::ExecutableVariantOp",
@@ -2547,6 +2548,24 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     returns the number of workgroups to use in the 3D grid dispatch.
     The arguments to the region represents the workload as captured by each
     dispatch. It returns the number of workgroups along x, y, and z.
+
+    The optional `condition` region provides boolean logic determining whether
+    the export should be dispatched given the device and workload or if a
+    specified fallback export in the same executable should be dispatched
+    instead. Multiple exports can be chained together as fallbacks to allow for
+    arbitrarily complex decisions trees. Fallbacks for an export must match the
+    layout and workload exactly but may vary any other attribute (such as
+    workgroup size or translation configuration).
+
+    Workgroup count and condition regions that have dependencies on dynamic
+    workload information will be executed using indirect dispatch. If the
+    information is available on the host at the time a command buffer containing
+    the dispatch is available the indirect dispatch _may_ have lower overhead
+    by using `IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS`. If the
+    information required is data-dependent on work within the same command
+    buffer some backends will suffer a performance penalty. Condition regions
+    consuming dynamic workloads in particular may result in long chains of
+    indirect dispatches sent to the device or even host round-trips.
   }];
 
   let arguments = (ins
@@ -2554,6 +2573,7 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     SymbolNameAttr:$sym_name,
     OptionalAttr<HAL_OrdinalAttr>:$ordinal,
     HAL_PipelineLayoutAttr:$layout,
+    OptionalAttr<FlatSymbolRefAttr>:$condition_fallback,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory,
@@ -2561,7 +2581,8 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
   );
 
   let regions = (region
-    AnyRegion:$workgroup_count
+    AnyRegion:$workgroup_count,
+    AnyRegion:$condition
   );
 
   let assemblyFormat = [{
@@ -2569,7 +2590,9 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     $sym_name
     (`ordinal` `(` $ordinal^ `)`)?
     `layout` `(` qualified($layout) `)`
-    custom<OptionalWorkgroupCountRegion>($workgroup_count)
+    (`condition` `` custom<ExportConditionRegion>($condition)^)?
+    (`fallback` `(` $condition_fallback^ `)`)?
+    (`count` `` custom<WorkgroupCountRegion>($workgroup_count)^)?
     attr-dict-with-keyword
   }];
 
@@ -2583,14 +2606,26 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, nullptr, sym_name, ordinal, layout,
+            /*condition_fallback=*/FlatSymbolRefAttr{},
             workgroup_size, subgroup_size, workgroup_local_memory,
-            DictionaryAttr{});
+            /*source_locs=*/DictionaryAttr{});
     }]>,
   ];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
+    Block* getConditionBody() {
+      if (getCondition().empty()) return nullptr;
+      return &getCondition().front();
+    }
+
+    // Calculates whether the condition region (if any) evaluates to true for
+    // the export.
+    Value calculateCondition(
+        Location loc, Value device, ValueRange workload, OpBuilder &builder);
+
     /// For now assume that the workload is at max 3D.
     /// Arguments to the region are workload along x, y and z.
     // TODO: Propogate this and avoid magic constants.
