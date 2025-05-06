@@ -17,7 +17,11 @@ iree_check_single_backend_test_suite(
     "conv2d.mlir"
     "fp_to_subbyte.mlir"
     "narrow_n_matmuls.mlir"
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
     "subbyte_to_fp.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -34,10 +38,30 @@ iree_check_single_backend_test_suite(
   SRCS
     "conv2d.mlir"
     "narrow_n_matmuls.mlir"
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
     "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_ukernel_local-task
+  SRCS
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-vmvx-enable-ukernels-decompose-linalg-generic=false"
 )
 
 iree_check_single_backend_test_suite(
@@ -88,7 +112,9 @@ iree_check_single_backend_test_suite(
     "fp_to_subbyte.mlir"
     "large_linalg_matmul.mlir"
     "narrow_n_matmuls.mlir"
+    "pack_i8.mlir"
     "subbyte_to_fp.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -99,6 +125,18 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm_hip
+  SRCS
+    "pack_i8.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
 )
 
 iree_check_single_backend_test_suite(

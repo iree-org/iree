@@ -24,7 +24,11 @@ LLVM_SRCS = enforce_glob(
         "conv2d.mlir",
         "fp_to_subbyte.mlir",
         "narrow_n_matmuls.mlir",
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "pack_i8.mlir",
         "subbyte_to_fp.mlir",
+        "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
@@ -46,9 +50,14 @@ iree_check_single_backend_test_suite(
 )
 
 VMVX_SRCS = enforce_glob(
+    # keep sorted
     [
         "conv2d.mlir",
         "narrow_n_matmuls.mlir",
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "pack_i8.mlir",
+        "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
@@ -66,17 +75,43 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_ukernel_local-task",
+    srcs = [
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "unpack.mlir",
+    ],
+    compiler_flags = [
+        "--iree-vmvx-enable-microkernels",
+        # Some testcases have linalg.generic ops with multiple ops in the body.
+        # If we don't opt out from it, DecomposeLinalgGenericPass splits those
+        # into smaller linalg.generic ops with only one op in the body. This
+        # results in the creation of temporary buffers between these split
+        # linalg.generic ops, causing:
+        # > error: failed to legalize operation 'memref.alloca' that was explicitly marked illegal
+        "--iree-vmvx-enable-ukernels-decompose-linalg-generic=false",
+    ],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
 VULKAN_SRCS = enforce_glob(
+    # keep sorted
     [
         "conv2d.mlir",
-        "subbyte_to_fp.mlir",
         "narrow_n_matmuls.mlir",
+        "subbyte_to_fp.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "large_linalg_matmul.mlir",
         "fp_to_subbyte.mlir",
         "index.mlir",
+        "large_linalg_matmul.mlir",
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "pack_i8.mlir",
+        "unpack.mlir",
     ],
 )
 
@@ -121,10 +156,16 @@ CUDA_SRCS = enforce_glob(
         # currently only enabled on cuda as it can be slow on other backends.
         "large_linalg_matmul.mlir",
         "narrow_n_matmuls.mlir",
+        "pack_i8.mlir",
+        "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "index.mlir",
+        # https://github.com/llvm/llvm-project/issues/131386 causes
+        # See bug #20294
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
     ],
 )
 
@@ -141,6 +182,34 @@ iree_check_single_backend_test_suite(
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
+)
+
+ROCM_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "pack_i8.mlir",
+        "unpack.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "conv2d.mlir",
+        "fp_to_subbyte.mlir",
+        "index.mlir",
+        "large_linalg_matmul.mlir",
+        "narrow_n_matmuls.mlir",
+        "subbyte_to_fp.mlir",
+        # https://github.com/llvm/llvm-project/issues/131386 causes
+        # See bug #20294
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_rocm_hip",
+    srcs = ROCM_SRCS,
+    driver = "hip",
+    target_backend = "rocm",
 )
 
 INDEX_SRCS = [
