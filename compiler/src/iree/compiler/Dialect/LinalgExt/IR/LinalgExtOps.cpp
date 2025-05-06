@@ -321,6 +321,34 @@ GatherOp::reifyResultShapes(OpBuilder &b,
 // MapScatterOp
 //===----------------------------------------------------------------------===//
 
+MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
+                                                    Location loc, Value input,
+                                                    Value output) {
+  assert(input.getType() == output.getType() &&
+         "expected input and output types to match");
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  auto mapScatterOp =
+      builder.create<MapScatterOp>(loc, resultType, input, output);
+
+  // Add the transformation block with an identity transformation.
+  Region &region = mapScatterOp.getTransformationRegion();
+  auto inputType = cast<ShapedType>(input.getType());
+  SmallVector<Location> blockArgLocs(inputType.getRank(), loc);
+  SmallVector<Type> indexTypes(inputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+  Value mask = builder.create<arith::ConstantIntOp>(loc, /*value=*/1,
+                                                    /*width=*/1);
+  yieldedValues.push_back(mask);
+  builder.create<IREE::LinalgExt::YieldOp>(loc, yieldedValues);
+  return mapScatterOp;
+}
+
 LogicalResult MapScatterOp::verify() {
   if (getInputType().getElementType() != getOutputType().getElementType()) {
     return emitOpError("expected input and output element types to match");
@@ -385,6 +413,31 @@ void MapScatterOp::insertTransformationAtStart(
     }
   }
   transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
+bool MapScatterOp::isIdentity() {
+  if (getInputType() != getOutputType()) {
+    return false;
+  }
+
+  // Check that the mask is always true.
+  Block &transformBody = getTransformationRegion().getBlocks().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  Value mask = yieldOp->getOperands().back();
+  std::optional<int64_t> constMask = getConstantIntValue(mask);
+  if (!constMask.has_value() || *constMask == 0) {
+    return false;
+  }
+
+  // Check that the block arguments are directly yielded in the order that they
+  // are defined in the block.
+  for (int i = 0; i < getOutputRank(); ++i) {
+    auto yieldedBbArg = dyn_cast<BlockArgument>(yieldOp.getOperand(i));
+    if (yieldedBbArg != transformBody.getArgument(i)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 //===----------------------------------------------------------------------===//

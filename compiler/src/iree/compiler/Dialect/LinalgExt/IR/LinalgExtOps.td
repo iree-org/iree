@@ -388,6 +388,18 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
             transformationBuilder,
         int64_t numSourceIndices);
 
+    // Return true if the mapScatterOp is an identity transformation, meaning
+    // it is just doing a copy from input to output. This is true if the mask
+    // always evaluates to true, and the mapping from input to output index is
+    // identity.
+    bool isIdentity();
+
+    // Creates a MapScatterOp with an identity mapping in the transforamtion
+    // body. Expects the types of `input` and `output` to be the same.
+    static MapScatterOp createIdentityMapScatter(OpBuilder &builder,
+                                                 Location loc, Value input,
+                                                 Value output);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {

@@ -86,6 +86,7 @@ iree_cc_library(
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "BufferizeDispatchTensorLoadStore.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "CombineLayoutTransformation.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
