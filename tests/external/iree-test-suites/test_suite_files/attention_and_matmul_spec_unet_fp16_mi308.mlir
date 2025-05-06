@@ -20,6 +20,8 @@ transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {tr
 }
 
 transform.named_sequence @match_attention_f16(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %attention : !transform.any_op
+
   transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
   %in0 = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
   transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf16> : !transform.any_value
@@ -72,6 +74,8 @@ transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transf
 //===----------------------------------------------------------------------===//
 
 transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -92,6 +96,8 @@ transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {
 }
 
 transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -112,6 +118,8 @@ transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {t
 }
 
 transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -132,6 +140,8 @@ transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {t
 }
 
 transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -152,6 +162,8 @@ transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {tr
 }
 
 transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -172,6 +184,8 @@ transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {tr
 }
 
 transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -192,6 +206,8 @@ transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {tra
 }
 
 transform.named_sequence @match_mmt_7680x640x2560(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
