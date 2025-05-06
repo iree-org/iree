@@ -16,6 +16,8 @@ module attributes {transform.with_named_sequence} {
 //===----------------------------------------------------------------------===//
 
   transform.named_sequence @match_contraction_4608x21504x3072_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<4608x3072xbf16>, %arg2: tensor<21504x3072xbf16>, %arg3: tensor<4608x21504xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<4608x3072xbf16>, tensor<21504x3072xbf16>) outs(%arg3 : tensor<4608x21504xf32>) {
@@ -32,6 +34,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_4608x3072x4608_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<15360x4608xbf16>, %arg2: tensor<3072x15360xbf16>, %arg3: tensor<4608x3072xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<15360x4608xbf16>, tensor<3072x15360xbf16>) outs(%arg3 : tensor<4608x3072xf32>) {
@@ -48,6 +52,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_4096x12288x3072_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<4096x3072xbf16>, %arg2: tensor<12288x3072xbf16>, %arg3: tensor<4096x12288xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<4096x3072xbf16>, tensor<12288x3072xbf16>) outs(%arg3 : tensor<4096x12288xf32>) {
@@ -64,6 +70,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_4096x3072x12288_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<4096x12288xbf16>, %arg2: tensor<3072x12288xbf16>, %arg3: tensor<4096x3072xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<4096x12288xbf16>, tensor<3072x12288xbf16>) outs(%arg3 : tensor<4096x3072xf32>) {
@@ -80,6 +88,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_72x4096x3072_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<4096x3072xbf16>, %arg2: tensor<72x128x3072xbf16>, %arg3: tensor<72x4096x128xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<4096x3072xbf16>, tensor<72x128x3072xbf16>) outs(%arg3 : tensor<72x4096x128xf32>) {
@@ -96,6 +106,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_4096x3072x3072_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<4096x3072xbf16>, %arg2: tensor<3072x3072xbf16>, %arg3: tensor<4096x3072xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<4096x3072xbf16>, tensor<3072x3072xbf16>) outs(%arg3 : tensor<4096x3072xf32>) {
@@ -112,6 +124,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_512x12288x3072_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<512x3072xbf16>, %arg2: tensor<12288x3072xbf16>, %arg3: tensor<512x12288xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<512x3072xbf16>, tensor<12288x3072xbf16>) outs(%arg3 : tensor<512x12288xf32>) {
@@ -128,6 +142,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_contraction_512x3072x12288_bf16xbf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+    transform.iree.match.has_no_lowering_config %arg0 : !transform.any_op
+
     %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
     ^bb0(%arg1: tensor<512x12288xbf16>, %arg2: tensor<3072x12288xbf16>, %arg3: tensor<512x3072xf32>):
       %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1, %arg2 : tensor<512x12288xbf16>, tensor<3072x12288xbf16>) outs(%arg3 : tensor<512x3072xf32>) {

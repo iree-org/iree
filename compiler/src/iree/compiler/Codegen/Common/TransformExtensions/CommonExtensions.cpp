@@ -646,6 +646,21 @@ void transform_dialect::HoistStaticAllocOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
+// MatchHasNoLoweringConfigOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchHasNoLoweringConfigOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  if (getLoweringConfig(current) || getCompilationInfo(current)) {
+    return emitSilenceableError()
+           << "payload has a lowering config or compilation info.";
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
 // PopulateWorkgroupCountRegionUsingNumThreadsSliceOp
 //===---------------------------------------------------------------------===//
 

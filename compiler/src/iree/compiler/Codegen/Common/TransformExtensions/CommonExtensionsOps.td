@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
 
+include "mlir/Dialect/Transform/Interfaces/MatchInterfaces.td"
 include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformTypes.td"
@@ -463,6 +464,32 @@ def IREEEliminateEmptyTensorsOp : Op<
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
+}
+
+def MatchHasNoLoweringConfigOp : Op<Transform_Dialect, "iree.match.has_no_lowering_config",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary =
+      "Checks that the payload op does not carry a lowering config or compilation info";
+  let description = [{
+    Verifies that the payload does not have a "compilation_info" or
+    "lowering_config" attribute. This is a very common check needed for external
+    matchers to avoid overwriting already configured ops.
+
+    #### Return modes
+
+    Succeeds if the payload lacks a configuration. Produces a silenceable
+    failure otherwise. Produces a definite failure if the operand is not
+    associated with a single payload op.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$operand_handle);
+  let results = (outs);
+  let assemblyFormat = "$operand_handle attr-dict `:` type($operand_handle)";
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 def PopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
