@@ -32,7 +32,7 @@ let opDocGroup = OpGroupExecutableOps in {
 def HALLoader_ExecutableQuerySupportOp : HALLoader_PureOp<"executable.query_support", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = "queries whether an executable format is supported";
+  let summary = [{Queries whether an executable format is supported.}];
   let description = [{
     Returns true if the given format is supported by the device loader. This
     does not guarantee that loading will succeed as the executable may require
@@ -56,7 +56,7 @@ def HALLoader_ExecutableQuerySupportOp : HALLoader_PureOp<"executable.query_supp
 def HALLoader_ExecutableLoadOp : HALLoader_PureOp<"executable.load", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = "dynamically loads an executable";
+  let summary = [{Dynamically loads an executable.}];
   let description = [{
     Creates, loads, and dynamically links an executable.
 
@@ -86,7 +86,7 @@ def HALLoader_ExecutableLookupOp : HALLoader_PureOp<"executable.lookup", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
 ]> {
-  let summary = [{executable cache lookup pseudo-op}];
+  let summary = [{Executable cache lookup pseudo-op.}];
   let description = [{
     Used during conversion to provide a placeholder for a globally cached and
     possibly lazy-initialized executable.
@@ -110,7 +110,7 @@ def HALLoader_ExecutableExportOrdinalOp : HALLoader_PureOp<"executable.export.or
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
 ]> {
-  let summary = [{executable export ordinal lookup pseudo-op}];
+  let summary = [{Executable export ordinal lookup pseudo-op.}];
   let description = [{
     Resolves an executable export ordinal to a value once ordinals have been
     assigned.
@@ -133,7 +133,7 @@ def HALLoader_ExecutableExportOrdinalOp : HALLoader_PureOp<"executable.export.or
 def HALLoader_ExecutableDispatchOp : HALLoader_Op<"executable.dispatch", [
   AttrSizedOperandSegments,
 ]> {
-  let summary = [{inline executable dispatch operation}];
+  let summary = [{Inline executable dispatch operation.}];
   let description = [{
     Dispatches execution to an executable entry point with the given parameters.
   }];

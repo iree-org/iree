@@ -26,7 +26,7 @@ def IREEGPU_BarrierRegionOp : Op<IREEGPU_Dialect, "barrier_region", [
     Pure,
     SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::GPU::YieldOp">
     ]> {
-  let summary = "Synchronizes uses of a shared tensor.";
+  let summary = [{Synchronizes workers on a region of shared code.}];
   let description = [{
     This op is designed to represent synchronization of workers on the operands
     and results of the given region. This operation naturally arises when combining
@@ -125,7 +125,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
         "getTiledImplementation",
         "getResultTilePosition"]>
     ]> {
-  let summary = "Models a contraction of multiple mma operations";
+  let summary = [{Models a contraction of multiple mma operations.}];
   let description = [{
     Computes the sum of inner MMA operations along a set of outer dimensions.
     Logically matches closely with a `vector.contraction` operation, however
@@ -391,7 +391,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
 def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
   Pure,
   AllTypesMatch<["inputs", "results"]>]> {
-  let summary = "Synchronizes workers on a value semantic tensor or vector.";
+  let summary = [{Synchronizes workers on a value semantic tensor or vector.}];
   let description = [{
     This operation acts as a barrier on a value semantic SSA values (tensor or
     vector). It takes multiple operands and produces a value equivalent to each
@@ -444,7 +444,7 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
 def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
     Pure, ReturnLike, Terminator,
     HasParent<"::mlir::iree_compiler::IREE::GPU::BarrierRegionOp">]> {
-  let summary = "Yield values from a region";
+  let summary = [{Yield values from a iree_gpu region.}];
   let description = [{
      This operation is used to yield values from a within a region.
   }];
@@ -469,7 +469,7 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
 def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
   Pure,
   AllTypesMatch<["input", "result"]>]> {
-  let summary = "Represents a cast to addr_space<7> (buffer resource) before bufferization";
+  let summary = [{Represents a cast to addr_space<7> (buffer resource) before bufferization.}];
   let description = [{
     Nominal cast of a tensor to AMDGPU buffer resource memory space before
     bufferization. This op takes the parameters with which to perform the cast

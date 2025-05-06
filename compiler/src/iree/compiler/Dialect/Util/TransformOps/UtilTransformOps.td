@@ -21,7 +21,7 @@ def CreateSerializedModuleOp : Op<Transform_Dialect, "util.create_serialized_mod
      ReportTrackingListenerFailuresOpTrait,
     ] # GraphRegionNoTerminator.traits> {
   let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
-  let summary = "Creates a serialized module op using the transform region";
+  let summary = [{Creates a serialized module op using the transform region.}];
   let description = [{
     This op creates an owning op reference to a module op and executes the
     transforms contained within this operations body on it. Then the serialized
@@ -151,8 +151,9 @@ def CastAndCallOp : Op<Transform_Dialect, "util.cast_and_call", [
 ] # GraphRegionNoTerminator.traits> {
   let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
 
-  let summary = "Casts values to the signature of a function and replaces them "
-                "with a call";
+  let summary = [{
+    Casts values to the signature of a function and replaces them with a call.
+  }];
   let description = [{
     This transform takes value handles to a set of `inputs` and `outputs` and
     attempts to cast them to the function signature of the attached function

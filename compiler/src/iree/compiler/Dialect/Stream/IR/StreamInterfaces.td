@@ -16,7 +16,7 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 
-  let summary = [{defines execution context affinity}];
+  let summary = [{Defines execution context affinity.}];
   let description = [{
     WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
 

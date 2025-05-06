@@ -37,7 +37,7 @@ def IREETensorExt_DispatchTensorLoadOp : IREETensorExt_PureOp<"dispatch.tensor.l
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{loads a tensor from a dispatch input placeholder}];
+  let summary = [{Loads a tensor from a dispatch input placeholder.}];
   let description = [{
     Loads an input tensor or subtensor from an input placeholder. As each
     workgroup executes concurrently all workgroups will receive identical loaded
@@ -155,7 +155,7 @@ def IREETensorExt_DispatchTensorStoreOp : IREETensorExt_Op<"dispatch.tensor.stor
   OffsetSizeAndStrideOpInterface,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{stores a tensor into a dispatch output placeholder}];
+  let summary = [{Stores a tensor into a dispatch output placeholder.}];
   let description = [{
     Stores a tensor or subtensor into an output tensor placeholder. As each
     workgroup executes concurrently behavior is undefined if more than one
@@ -270,7 +270,7 @@ class IREETensorExt_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits
 def IREETensorExt_DispatchWorkgroupCountFromDagRootOp :
     IREETensorExt_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_dag_root"> {
   let summary = [{
-    workgroup count computed based on iteration range of the root of the DAG
+    Workgroup count computed based on iteration range of the root of the DAG
     for ops within the dispatch.
   }];
   let description = [{

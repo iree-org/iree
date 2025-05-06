@@ -231,7 +231,7 @@ def Stream_CollectiveElementTypeAttr :
 def Stream_CollectiveAttr :
     AttrDef<Stream_Dialect, "Collective", []> {
   let mnemonic = "collective";
-  let summary = [{collective operation and specification}];
+  let summary = [{Collective operation and specification.}];
   let description = [{
     Specifies the collective operation to perform and any mode bits required.
   }];
@@ -260,7 +260,7 @@ def Stream_FavorAttr :
 def Stream_PartitioningConfigAttr :
     AttrDef<Stream_Dialect, "PartitioningConfig"> {
   let mnemonic = "partitioning_config";
-  let summary = [{defines partitioning configuration}];
+  let summary = [{Defines partitioning configuration.}];
   let description = [{
     Configures the partitioning algorithm to use and its configuration.
     Partitioning is useful to adjust when scheduling behavior of targets is
@@ -306,7 +306,7 @@ def Stream_ResourceConfigAttr :
     AttrDef<Stream_Dialect, "ResourceConfig", []> {
   let mnemonic = "resource_config";
 
-  let summary = [{defines resource constraints configuration}];
+  let summary = [{Defines resource constraints configuration.}];
   let description = [{
     Defines resource storage constraints. These allow for packing and layout
     algorithms to ensure they are producing usable results on target devices.
@@ -388,7 +388,7 @@ def Stream_NamedParameterAttr :
       ]>,
     ]> {
   let mnemonic = "parameter.named";
-  let summary = [{named parameter referenced an optional scope and key}];
+  let summary = [{Named parameter referenced an optional scope and key.}];
   let description = [{
     Species an externally-defined parameter that can be referenced by an
     optional scope defining a set of parameters and a key uniquely identifying
@@ -417,7 +417,7 @@ def Stream_Timepoint : TypeDef<Stream_Dialect, "Timepoint", [
 ]> {
   let mnemonic = "timepoint";
 
-  let summary = [{a timepoint indicating execution availability}];
+  let summary = [{A timepoint indicating execution availability.}];
   let description = [{
     Represents a point in the execution timeline that when resolved indicates
     that all of the execution prior to this timepoint has completed and the
@@ -433,7 +433,7 @@ def Stream_Timepoint : TypeDef<Stream_Dialect, "Timepoint", [
 def Stream_TimepointAttr : AttrDef<Stream_Dialect, "Timepoint",
                              [TypedAttrInterface]> {
   let mnemonic = "timepoint";
-  let summary = [{an immediately-resolved timepoint}];
+  let summary = [{An immediately-resolved timepoint.}];
   let description = [{}];
   let parameters = (ins AttributeSelfTypeParameter<"">:$type);
   let valueType = Stream_Timepoint;
@@ -489,7 +489,7 @@ def Stream_Channel : TypeDef<Stream_Dialect, "Channel", [
 ]> {
   let mnemonic = "channel";
 
-  let summary = [{a collective communication channel}];
+  let summary = [{A collective communication channel.}];
   let description = [{
     Represents a single participant in a collective clique. Multiple channels
     may exist within the same program to allow for partial operations or
@@ -519,7 +519,7 @@ def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
 ]> {
   let mnemonic = "resource";
 
-  let summary = [{a managed resource}];
+  let summary = [{A managed resource.}];
   let description = [{
     Stream external values represent asynchronously-available and sequenced
     values that are owned and managed by external code - such as those passed in
@@ -670,7 +670,7 @@ def Stream_AnyStreamResource : AnyTypeOf<[
 def Stream_File : TypeDef<Stream_Dialect, "File", []> {
   let mnemonic = "file";
 
-  let summary = [{a file handle used for I/O operations}];
+  let summary = [{A file handle used for I/O operations.}];
   let description = [{
     A file handle that can be asynchronously read and written into/from
     stream resources.
@@ -692,7 +692,7 @@ def Stream_File : TypeDef<Stream_Dialect, "File", []> {
 def Stream_Binding : TypeDef<Stream_Dialect, "Binding", []> {
   let mnemonic = "binding";
 
-  let summary = [{a managed resource binding into an executable scope}];
+  let summary = [{A managed resource binding into an executable scope.}];
   let description = [{
     A resource binding available within an executable dispatch function.
     The bindings map 1:1 with the resources bound during dispatch operations.

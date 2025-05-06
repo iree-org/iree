@@ -56,7 +56,7 @@ def LayoutAttr :
   let mnemonic = "layout";
   let assemblyFormat = "`<` $layouts `>`";
 
-  let summary = [{Indicates potential serialized layouts}];
+  let summary = [{Indicates potential serialized layouts.}];
   let description = [{
     This attribute describes the potential layouts of the encoding. It is an
     array because a device could have multiple target layouts.
@@ -108,7 +108,7 @@ def EncodingAttr :
       ]>
     ]> {
   let mnemonic = "encoding";
-  let summary = [{information to decide how to data-tile a tensor}];
+  let summary = [{Information to decide how to data-tile a tensor.}];
   let description = [{
     This attribute describes the change in the layout for
     a given tensor to execute subsequent operations on
@@ -193,7 +193,7 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
       ]>,
     ]> {
   let mnemonic = "matmul_k";
-  let summary = [{An attribute that tracks reduction dimensions for matmul}];
+  let summary = [{An attribute that tracks reduction dimensions for matmul.}];
   let description = [{
     The attribute is specialized for tracking the matmul reduction dimensions
     only. The encoded dimensions are the reduction dimensions that will be
@@ -253,7 +253,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
   let mnemonic = "pad_encoding_layout";
   let assemblyFormat = "`<` custom<Padding>($padding) `>`";
 
-  let summary = "An attribute that encodes padding values of tensor dimensions";
+  let summary = [{An attribute that encodes padding values of tensor dimensions.}];
   let description = [{
     Associates tensor dimensions with pad values (numbers of appended elements).
     The logical dimensions of the tensors do not change, and the elements in the
@@ -302,7 +302,7 @@ def IdentityEncodingAttr :
       ]>
     ]> {
   let mnemonic = "identity_encoding";
-  let summary = "A layout resolver that behaves like an identity function";
+  let summary = [{A layout resolver that behaves like an identity function.}];
   let description = [{
     A layout resolver that behaves like an identity function. I.e., it resolves
     the layout to the same layout without encodings.
@@ -323,7 +323,7 @@ def UnsupportedEncodingAttr :
       ]>
     ]> {
   let mnemonic = "unsupported_encoding";
-  let summary = "A layout resolver attribute that always fails to get layout";
+  let summary = [{A layout resolver attribute that always fails to get layout.}];
   let description = [{
     An layout resolver that never resolves the layout. I.e., it always fails on
     getting a layout. It can be used in testing or a default unknown attribute
@@ -345,7 +345,7 @@ def TestingEncodingAttr :
       ]>
     ]> {
   let mnemonic = "testing_encoding";
-  let summary = "An encoding attribute for testing purpose";
+  let summary = [{An encoding attribute for testing purposes.}];
 
   let description = [{
     An attribute for testing purpose. It is intended to be attached on
@@ -363,7 +363,7 @@ def TestingEncodingAttr :
 
 def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
   let mnemonic = "unknown_encoding";
-  let summary = "A pure encoding attribute for testing purpose";
+  let summary = [{A pure encoding attribute for testing purpose.}];
 
   let description = [{
     An attribute for testing purpose. It is intended to be attached on
@@ -382,7 +382,7 @@ def UnspecializedEncodingAttr :
   let mnemonic = "unspecialized_encoding";
   let assemblyFormat = "`<` $seed `>`";
 
-  let summary = "An attribute that indicates the encoding is not yet specialized";
+  let summary = [{An attribute that indicates the encoding is not yet specialized.}];
 
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
@@ -404,7 +404,7 @@ def SpecializedEncodingAttr :
   let mnemonic = "specialized_encoding";
   let assemblyFormat = "`<` $seed (`,` $type^)? `>`";
 
-  let summary = "An attribute that indicates the encoding is specialized";
+  let summary = [{An attribute that indicates the encoding is specialized.}];
 
   let description = [{
     This attribute is similar to UnspecializedEncodingAttr, but with an optional

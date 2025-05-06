@@ -445,7 +445,7 @@ def HAL_CollectiveElementTypeAttr :
 def HAL_CollectiveAttr :
     AttrDef<HAL_Dialect, "Collective", []> {
   let mnemonic = "collective";
-  let summary = [{collective operation and specification}];
+  let summary = [{Collective operation and specification.}];
   let description = [{
     Specifies the collective operation to perform and any mode bits required.
   }];
@@ -470,7 +470,7 @@ def HAL_CollectiveAttr :
 def HAL_PipelineBindingAttr :
     AttrDef<HAL_Dialect, "PipelineBinding", []> {
   let mnemonic = "pipeline.binding";
-  let summary = [{pipeline binding specification}];
+  let summary = [{Pipeline binding specification.}];
   let description = [{
     Specifies a single binding within a pipeline layout.
   }];
@@ -490,7 +490,7 @@ def HAL_PipelineBindingAttr :
 def HAL_PipelineLayoutAttr :
     AttrDef<HAL_Dialect, "PipelineLayout", []> {
   let mnemonic = "pipeline.layout";
-  let summary = [{executable entry point layout specification}];
+  let summary = [{Executable entry point layout specification.}];
   let description = [{
     Specifies the layout information used for interacting with executable
     functions. This allows host code to correctly map parameters to the
@@ -523,7 +523,7 @@ def HAL_PipelineLayoutAttr :
 def HAL_ExecutableTargetAttr :
     AttrDef<HAL_Dialect, "ExecutableTarget"> {
   let mnemonic = "executable.target";
-  let summary = [{generic executable target specification}];
+  let summary = [{Generic executable target specification.}];
   let description = [{
     Specifies how to compile an executable for a specific target backend.
     A backend is used to translate and serialize the executable into the final
@@ -589,7 +589,7 @@ def HAL_ExecutableTargetAttr :
 
 def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
   let mnemonic = "executable.object";
-  let summary = [{object file reference}];
+  let summary = [{Object file reference.}];
   let description = [{
     Defines an object file that can be linked into executables.
     Today this is only supported for external file references with paths the
@@ -652,7 +652,7 @@ def HAL_ExecutableObjectArrayAttr :
 
 def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
   let mnemonic = "executable.objects";
-  let summary = [{target-specific object file references}];
+  let summary = [{Target-specific object file references.}];
   let description = [{
     A dictionary mapping executable target specifications to a list of objects.
     This is used to allow layers of the stack that support multi-targeting to
@@ -701,7 +701,7 @@ def HAL_DeviceAliasAttr : AttrDef<HAL_Dialect, "DeviceAlias", [
   TypedAttrInterface,
 ]> {
   let mnemonic = "device.alias";
-  let summary = [{device target named alias}];
+  let summary = [{Device target named alias.}];
   let description = [{
     Specifies a device target by named alias whose configuration will be
     expanded based on compiler configuration and flags. Any configuration
@@ -752,7 +752,7 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.target";
-  let summary = [{generic device target specification}];
+  let summary = [{Generic device target specification.}];
   let description = [{
     Specifies the properties of a target runtime device.
     Target devices are specified with a canonical identifier matching those used
@@ -828,7 +828,7 @@ def HAL_DeviceOrdinalAttr : AttrDef<HAL_Dialect, "DeviceOrdinal", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.ordinal";
-  let summary = [{specifies a device by runtime registration ordinal}];
+  let summary = [{Specifies a device by runtime registration ordinal.}];
   let description = [{
     Represents the device registered with the runtime in the order it was
     registered with ordinal 0 being the first registered. Returns null during
@@ -853,7 +853,7 @@ def HAL_DeviceFallbackAttr : AttrDef<HAL_Dialect, "DeviceFallback", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.fallback";
-  let summary = [{specifies a reference to another device}];
+  let summary = [{Specifies a reference to another device.}];
   let description = [{
     Specifies by symbol a device that has already been initialized.
     Returns null during initialization if the device specified as a fallback is
@@ -878,7 +878,7 @@ def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.select";
-  let summary = [{selects a device from one or more options}];
+  let summary = [{Selects a device from one or more options.}];
   let description = [{
     Selects a HAL device at runtime by either enumerating and querying for
     target support or matching the given existing device by affinity.
@@ -941,7 +941,7 @@ def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   ]>,
 ]> {
   let mnemonic = "device.affinity";
-  let summary = [{specifies a named device and optional queue affinity}];
+  let summary = [{Specifies a named device and optional queue affinity.}];
   let description = [{
     Specifies that an annotated operation or scope is only allowed to execute on
     a specific device and optionally a set of queues (0-64) provided.
@@ -980,7 +980,7 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   ]>,
 ]> {
   let mnemonic = "device.promise";
-  let summary = [{promises a named device and optional queue affinity}];
+  let summary = [{Promises a named device and optional queue affinity.}];
   let description = [{
     Specifies that an annotated operation or scope is only allowed to execute on
     a specific device that has not yet been declared and optionally a set of

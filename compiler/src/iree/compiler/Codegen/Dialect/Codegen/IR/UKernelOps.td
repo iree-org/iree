@@ -22,7 +22,7 @@ class IREECodegen_UKernelOp<string mnemonic, list<Trait> traits = []> :
 def IREECodegen_UKernelGenericOp :
     IREECodegen_UKernelOp<"ukernel.generic", [
       AttrSizedOperandSegments]> {
-  let summary = "Generic Microkernel operator";
+  let summary = [{Generic Microkernel operator.}];
 
   let description = [{
     Operation to wrap a computation forwarded to a microkernel.

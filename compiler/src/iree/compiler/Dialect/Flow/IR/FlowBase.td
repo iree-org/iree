@@ -143,7 +143,7 @@ def FLOW_CollectiveElementTypeAttr :
 
 def FLOW_Channel : TypeDef<Flow_Dialect, "Channel", []> {
   let mnemonic = "channel";
-  let summary = [{a collecive communication channel}];
+  let summary = [{A collecive communication channel.}];
   let description = [{
     Represents a single participant in a collective clique. Multiple channels
     may exist within the same program to allow for partial operations or
@@ -193,7 +193,7 @@ def FLOW_NamedParameterAttr :
       ]>,
     ]> {
   let mnemonic = "parameter.named";
-  let summary = [{named parameter referenced an optional scope and key}];
+  let summary = [{Named parameter referenced an optional scope and key.}];
   let description = [{
     Species an externally-defined parameter that can be referenced by an
     optional scope defining a set of parameters and a key uniquely identifying

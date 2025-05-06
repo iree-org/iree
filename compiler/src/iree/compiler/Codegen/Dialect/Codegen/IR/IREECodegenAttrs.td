@@ -204,7 +204,7 @@ def WorkgroupMappingAttr :
 def IREECodegen_TranslationInfoAttr :
     AttrDef<IREECodegen_Dialect, "TranslationInfo", []> {
   let mnemonic = "translation_info";
-  let summary = [{drive dispatch entry point lowering}];
+  let summary = [{Drive dispatch entry point lowering.}];
   let description = [{
     Specifies the information that is used to drive the translation of
     an entry point function using Linalg based structured-op
@@ -294,7 +294,7 @@ def IREECodegen_LoweringConfigAttr :
       ]>
     ]> {
   let mnemonic = "lowering_config";
-  let summary = [{drive lowering of an operation within dispatch region}];
+  let summary = [{Drive lowering of an operation within dispatch region.}];
   let description = [{
     Default implementation of a lowering configuration attribute. It includes
     only tiling and optionally vectorization information. The interpretation of
@@ -364,7 +364,7 @@ def IREECodegen_LoweringConfigAttr :
 def IREECodegen_CompilationInfoAttr :
     AttrDef<IREECodegen_Dialect, "CompilationInfo", []> {
   let mnemonic = "compilation_info";
-  let summary = [{drive lowering of an operation from input dialect}];
+  let summary = [{Drive lowering of an operation from input dialect.}];
   let description = [{
     Specifies the information that allows controlling the compilation
     of operations like `linalg.matmul`/`linalg.*conv` within
@@ -398,7 +398,7 @@ def IREECodegen_CompilationInfoAttr :
 
 def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> {
   let mnemonic = "export_config";
-  let summary = "User defined workgroup size specification";
+  let summary = [{User defined workgroup size specification.}];
   let description = [{
     Allows setting workgroup size for pre-formed dispatches.
   }];
@@ -426,7 +426,7 @@ def IREECodegen_EncodingNopLayoutAttr  :
       ]>
     ]> {
   let mnemonic = "encoding_nop_layout";
-  let summary = "An attribute with implementation that treats encoding as nop.";
+  let summary = [{An attribute with implementation that treats encoding as nop.}];
   let description = [{
     An attribute that implements the interface methods that discards the
     encodings. It can be a default attribute when a backend does not implement
@@ -446,7 +446,7 @@ def IREECodegen_RotateRowsAttr  :
       ]>
     ]> {
   let mnemonic = "rotate_rows";
-  let summary = "An attribute that describes a swizzling pattern for rotating rows.";
+  let summary = [{An attribute that describes a swizzling pattern for rotating rows.}];
   let description = [{
     This attribute rotates accesses of |access_width| within rows of size
     |row_width|. For any given access into logical memref of shape

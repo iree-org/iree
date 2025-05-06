@@ -29,7 +29,7 @@ def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
 ]> {
   let mnemonic = "buffer";
 
-  let summary = [{a reference counted byte buffer}];
+  let summary = [{A reference counted byte buffer.}];
   let description = [{
     A reference counted byte buffer that models a pointer, offset, and length.
   }];
@@ -48,7 +48,7 @@ def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
 def Util_ListType : TypeDef<Util_Dialect, "List"> {
   let mnemonic = "list";
 
-  let summary = [{dense list container type}];
+  let summary = [{Dense list container type.}];
   let description = [{
     Typed container supporting variant storage.
   }];
@@ -99,7 +99,7 @@ class Util_ListOf<Type type> :
 def Util_PtrType : TypeDef<Util_Dialect, "Ptr"> {
   let mnemonic = "ptr";
 
-  let summary = [{a pointer-like reference}];
+  let summary = [{A pointer-like reference.}];
   let description = [{
     A typed indirect reference to a value. These define a runtime addressable
     value that is strongly referenced.
@@ -165,7 +165,7 @@ class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtrType> {
 def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
   let mnemonic = "object";
 
-  let summary = [{a placeholder for an unspecified object type}];
+  let summary = [{A placeholder for an unspecified object type.}];
   let description = [{
     Describes a runtime object type. These may be reference counted or garbage
     collected at runtime.
@@ -190,7 +190,7 @@ def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
 def Util_UnusedType : TypeDef<Util_Dialect, "Unused"> {
   let mnemonic = "unused";
 
-  let summary = [{a placeholder for unused types}];
+  let summary = [{A placeholder for unused types.}];
   let description = [{
     An unused type placeholder used to satisfy verifiers that may require a
     type even if unused.
@@ -210,7 +210,7 @@ def Util_UnusedType : TypeDef<Util_Dialect, "Unused"> {
 def Util_VariantType : TypeDef<Util_Dialect, "Variant"> {
   let mnemonic = "variant";
 
-  let summary = [{a placeholder for a variant type (`?`)}];
+  let summary = [{A placeholder for a variant type (`?`).}];
   let description = [{
     Describes a runtime variant type. These may be primitives (i32, f32, etc) or
     object types.

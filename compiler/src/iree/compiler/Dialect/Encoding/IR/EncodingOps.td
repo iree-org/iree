@@ -26,7 +26,7 @@ class IREEEncoding_PureOp<string mnemonic, list<Trait> traits = []> :
 def IREEEncoding_SetEncodingOp : IREEEncoding_PureOp<"set_encoding",[
    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {
-  let summary = "perform pack and pad operation on source";
+  let summary = [{Perform pack and pad operation on source.}];
   let description = [{
     Operation to assign an encoding to a tensor. The operation does not change
     the rank or extent of a tensor. Instead it adds an
@@ -60,7 +60,7 @@ def IREEEncoding_SetEncodingOp : IREEEncoding_PureOp<"set_encoding",[
 def IREEEncoding_UnsetEncodingOp : IREEEncoding_PureOp<"unset_encoding", [
     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {
-  let summary = "perfom unpack and extract operation on source";
+  let summary = [{Perform unpack and extract operation on source.}];
   let description = [{
     Operation to convert an tensor with EncodingLayoutResolverAttrInterface
     encoding that represents its data layout into a tensor with default layout

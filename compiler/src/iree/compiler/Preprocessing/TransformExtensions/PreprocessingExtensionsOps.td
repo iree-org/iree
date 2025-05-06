@@ -21,9 +21,10 @@ def MatchCastCompatibleDagFromRootOp : Op<Transform_Dialect, "iree.match.cast_co
      SingleOpMatcher,
      SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches an operation dag starting "
-      "at the given root";
+  let summary = [{
+      Checks if the body of the target op matches an operation dag starting
+      at the given root.
+  }];
   let description = [{
     Checks whether the given root op matches an operation dag specified in the
     body of this op. Enforces cast compatibilty between types rather than a
@@ -62,8 +63,7 @@ def MatchCastCompatibleTypesOp : Op<Transform_Dialect, "iree.match.cast_compatib
      MatchOpInterface,
      SingleValueMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches the body of the single contained op";
+  let summary = [{Checks if the payload value is cast compatible with a target type.}];
   let description = [{
     Checks whether the given value is cast-compatible with the given target
     type attribute.
@@ -91,8 +91,7 @@ def MatchDimBoundsOp : Op<Transform_Dialect, "iree.match.dim_bounds",
      MatchOpInterface,
      SingleValueMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks whether the size of a dim is within given bounds";
+  let summary = [{Checks whether the size of a dim is within given bounds.}];
   let description = [{
     Checks whether a dim is within a specified lower and upper bound.
 
@@ -124,8 +123,7 @@ def MatchDimIsMultipleOfOp : Op<Transform_Dialect, "iree.match.dim_is_multiple_o
      MatchOpInterface,
      SingleValueMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks the static size of a dim is divisible by a given value";
+  let summary = [{Checks the static size of a dim is divisible by a given value.}];
   let description = [{
     Checks whether the given dimension given shaped value is a multiple of the
     given size.
@@ -153,8 +151,7 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
      SingleOpMatcher,
      SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches the body of the single contained op";
+  let summary = [{Checks if the body of the target op matches the body of the single contained op.}];
   let description = [{
     Does a structural comparison of the regions of the single op contained
     within the region of this op against the regions of the target operation.

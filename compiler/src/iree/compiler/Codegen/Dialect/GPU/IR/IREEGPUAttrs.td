@@ -44,7 +44,7 @@ def IREEGPU_LoweringConfigAttr :
       ]>
     ]> {
   let mnemonic = "lowering_config";
-  let summary = "drive lowering of an operation for gpu compilation.";
+  let summary = [{Drive lowering of an operation for gpu compilation.}];
   let description = [{
     GPU specific implementation of a lowering config. This carries just a
     dictionary attribute to store any relevant fields. This is the simplest
@@ -69,7 +69,7 @@ def IREEGPU_DerivedThreadConfig :
     ]> {
   let mnemonic = "derived_thread_config";
   let summary = [{
-    drive lowering of an operation by deriving thread distribution when needed.
+    Drive lowering of an operation by deriving thread distribution when needed.
   }];
   let description = [{
     Lowering config for a single thread tiling level that is inferred after
@@ -295,7 +295,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 def IREEGPU_GPUEncodingLayoutAttr :
     AttrDef<IREEGPU_Dialect, "GPUEncodingLayout"> {
   let mnemonic = "gpu_encoding_layout";
-  let summary = "The encoding layout attribute for GPU backend";
+  let summary = [{The encoding layout attribute for GPU backend.}];
   let description = [{
     This attribute can implement any layout interface methods for data-tiling,
     e.g., Codegen::LayoutAttrInterface, etc. They should be implemented
@@ -319,7 +319,7 @@ def IREEGPU_GPUEncodingLayoutAttr :
 
 def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
   let mnemonic = "gpu_pad_layout";
-  let summary = "The padded encoding layout attribute for GPU targets.";
+  let summary = [{The padded encoding layout attribute for GPU targets.}];
   let assemblyFormat = "`<` struct(params) `>`";
 
   let description = [{
@@ -345,7 +345,7 @@ def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
-  let summary = "Workgroup processor level target description";
+  let summary = [{Workgroup processor level target description.}];
   let description = [{
     This attribute contains hardware features/limits at a single GPU workgroup
     processor (WGP) level. Here a GPU workgroup processor means the basic
@@ -403,7 +403,7 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
 // AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
 
 def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
-  let summary = "Chip level target description";
+  let summary = [{Chip level target description.}];
   let description = [{
     This attribute contains hardware features/limits at a single GPU chip level.
     Here a GPU chip means the hardware functionality scope where the whole
@@ -433,7 +433,7 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
-  let summary = "Full GPU target attribute";
+  let summary = [{Full GPU target attribute.}];
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:
     * The canonical target architecture for compilation, e.g., sm_80 for
@@ -530,7 +530,7 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
 def IREEGPU_UKernelConfigAttr  :
     AttrDef<IREEGPU_Dialect, "UKernelConfig", []> {
   let mnemonic = "ukernel_config";
-  let summary = "An attribute specifying a ukernel that an op can lower to.";
+  let summary = [{An attribute specifying a ukernel that an op can lower to.}];
   let description = [{
     An attribute that can be applied to any operation to specify that it has
     been matched with a ukernel that is a legal lowering for it.
@@ -554,7 +554,7 @@ def IREEGPU_ReorderWorkgroupsStrategyAttr :
 }
 
 def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOptions"> {
-  let summary = "GPU pipeline options attribute.";
+  let summary = [{Options attribute for linalg + tensors -> vector + memref GPU pipelines.}];
   let description = [{
     This attributes describes lowering pipeline specific configuration options:
     * prefetch_shared_memory: Boolean option indicating whether or not to run
