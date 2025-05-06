@@ -35,12 +35,13 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
   if (reIndices.size() != destType.getShape().size())
     return failure();
   // Iterator to insert outer sizes.
-  auto outerShapeIter = expandedShape.begin();
+  auto outerShapeIdx = 0;
   for (auto [reassociations, destSize] :
        llvm::zip_equal(reIndices, destType.getShape())) {
     // Dynamic destination dims that are not getting expanded are allowed.
     if (ShapedType::isDynamic(destSize) && reassociations.size() == 1) {
-      expandedShape.insert(outerShapeIter++, destSize);
+      expandedShape.insert(expandedShape.begin() + outerShapeIdx, destSize);
+      outerShapeIdx++;
       totalInnerSizes.push_back(1);
       continue;
     }
@@ -62,9 +63,10 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
       return failure();
     totalInnerSizes.push_back(totalInnerSize);
     // insert the outer size in front of any inner sizes.
-    expandedShape.insert(outerShapeIter, destSize / totalInnerSize);
+    expandedShape.insert(expandedShape.begin() + outerShapeIdx,
+                         destSize / totalInnerSize);
     // set up the iterator for the next uncollapsed dimension.
-    outerShapeIter = expandedShape.end();
+    outerShapeIdx = expandedShape.size();
   }
   return success();
 }
@@ -117,7 +119,7 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
       -> std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
                     SmallVector<OpFoldResult>> {
     SmallVector<OpFoldResult> expandedOffsets;
-    auto expandedOffsetsIter = expandedOffsets.begin();
+    auto expandedOffsetsIdx = 0;
 
     for (auto [index, offset] : llvm::enumerate(mixedOffsets)) {
       // Add zero offsets for the extra dimensions from reIndices.
@@ -131,13 +133,13 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
       AffineExpr outerDimExpr = (s0).floorDiv(s1);
       // Insert computed offset using affine expression.
       expandedOffsets.insert(
-          expandedOffsetsIter,
+          expandedOffsets.begin() + expandedOffsetsIdx,
           affine::makeComposedFoldedAffineApply(
               rewriter, loc, outerDimExpr,
               {getValueOrCreateConstantIndexOp(rewriter, loc, offset),
                rewriter.getIndexAttr(totalInnerSizes[index])}));
 
-      expandedOffsetsIter = expandedOffsets.end();
+      expandedOffsetsIdx = expandedOffsets.size();
     }
     SmallVector<OpFoldResult> expandedSizes =
         getAsIndexOpFoldResult(ctx, resultType.getShape());
