@@ -226,7 +226,7 @@ bool isaHorizontallyFusedContraction(Operation *op);
 
 /// Returns true if the operation is a GenericOp that has no tensor inputs,
 /// either as inputs or as implicit captures.
-bool isFillLikeOp(linalg::GenericOp op);
+bool hasOnlyScalarInputs(linalg::GenericOp op);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

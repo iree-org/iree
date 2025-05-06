@@ -827,7 +827,7 @@ bool isaHorizontallyFusedContraction(Operation *op) {
   return true;
 }
 
-bool isFillLikeOp(linalg::GenericOp linalgOp) {
+bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
   // Check if there are any non-scalar inputs or non-scalar captures in the
   // region.
   for (Value input : linalgOp.getDpsInputs()) {

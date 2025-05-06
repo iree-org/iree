@@ -371,10 +371,10 @@ struct HoistableLinalgOpInterface
       return !isa<linalg::FillOp>(op);
     }
 
-    // Don't hoist ops with no tensor inputs, they can be fused with their
-    // consumers. Additionally, fusing these operations preserves information
-    // (e.g. contiguous indexing).
-    if (IREE::LinalgExt::isFillLikeOp(genericOp)) {
+    // Don't hoist ops with no tensor inputs. They are likely to be fill-like
+    // or sequences (from `linalg.index`) which can be fused with their
+    // consumers.
+    if (IREE::LinalgExt::hasOnlyScalarInputs(genericOp)) {
       return false;
     }
 
