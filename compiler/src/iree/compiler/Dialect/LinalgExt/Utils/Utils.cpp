@@ -826,32 +826,30 @@ bool isaHorizontallyFusedContraction(Operation *op) {
   return true;
 }
 
-LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
+bool isArgmaxOp(linalg::GenericOp genericOp) {
   // Check for 2 results(value, index), and 1 input
   if (genericOp.getNumDpsInits() != 2) {
-    return genericOp->emitError(
-        "argmax op must have exactly two init operands (value and index)");
+    return false;
   }
 
   if (genericOp.getNumDpsInputs() != 1) {
-    return genericOp->emitError(
-        "argmax op must have exactly one input operand");
+    return false;
   }
 
   // If max value is being used, it is not a pure argmax.
   if (!genericOp.getResults()[0].use_empty()) {
-    return genericOp->emitError("argmax value result must be unused");
+    return false;
   }
 
   // Argmax will require 1D reduction.
   if (genericOp.getNumReductionLoops() != 1) {
-    return genericOp->emitError("argmax must have exactly one reduction loop");
+    return false;
   }
 
   // TODO: Add better affine map checks.
   auto indexing_maps = genericOp.getIndexingMapsArray();
   if (!indexing_maps[0].isIdentity())
-    return genericOp->emitError("argmax expects identity map for input");
+    return false;
 
   // Check that initial value is negative Infinite.
   // TODO: Move this check to ukernel once we implement
@@ -859,11 +857,10 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   Value initVal = genericOp.getDpsInitOperand(0)->get();
   auto fillOp = initVal.getDefiningOp<linalg::FillOp>();
   if (!fillOp)
-    return genericOp->emitError("expected linalg.fill op for initial value");
+    return false;
   Value fillVal = fillOp.getDpsInputOperand(0)->get();
   if (!matchPattern(fillVal, m_NegInfFloat()))
-    return genericOp->emitError(
-        "expected negative infinity as initial value for argmax");
+    return false;
 
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.select,
@@ -877,12 +874,10 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     producerOutput = yieldOp->getOperand(0);
     producer = producerOutput.getDefiningOp();
     if (!producer || producer->getNumOperands() == 0) {
-      return genericOp->emitError(
-          "expected first yiled value has a valid producer");
+      return false;
     }
     if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
-      return genericOp->emitError(
-          "expected first yielded value to be produced by arith.maximumf");
+      return false;
     }
   }
 
@@ -893,12 +888,10 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     producerOutput = yieldOp->getOperand(1);
     producer = producerOutput.getDefiningOp();
     if (!producer || producer->getNumOperands() == 0) {
-      return genericOp->emitError(
-          "expected second yiled value has a valid producer");
+      return false;
     }
     if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
-      return genericOp->emitError(
-          "expected second yielded value to be produced by arith.select");
+      return false;
     }
   }
 
@@ -907,14 +900,12 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
     if (!producer || producer->getNumOperands() == 0) {
-      return genericOp->emitError(
-          "expected predication for arith.select has a valid producer");
+      return false;
     }
     auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
     if (!producerCmpFOp ||
         producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
-      return genericOp->emitError(
-          "expected comparison predicate to be arith.cmpf ogt");
+      return false;
     }
 
     // Check that in and out of cmpf are loop variables.
@@ -922,12 +913,11 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     // which would lead it to be extf(%arg0).
     // TODO: Add better mixed type support check.
     if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-      return genericOp->emitError(
-          "expected second operand of cmpf to be current max value");
+      return false;
     }
   }
 
-  return success();
+  return true;
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

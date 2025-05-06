@@ -225,7 +225,7 @@ bool isGatherlikeOp(Operation *op);
 bool isaHorizontallyFusedContraction(Operation *op);
 
 /// Check if a linalg.generic is representing an argmax operation.
-LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
+bool isArgmaxOp(linalg::GenericOp genericOp);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

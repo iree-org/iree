@@ -53,7 +53,7 @@ getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.
 static UKernelNameAndSuffix getUKernelNameAndSuffix(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    if (succeeded(IREE::LinalgExt::isArgmaxOp(genericOp))) {
+    if (IREE::LinalgExt::isArgmaxOp(genericOp)) {
       return getUKernelNameAndSuffixForArgmax(genericOp);
     }
   } else if (auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op)) {

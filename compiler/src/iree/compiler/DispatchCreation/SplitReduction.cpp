@@ -72,7 +72,7 @@ collectArgmaxCombinerOps(linalg::GenericOp genericOp,
         "combinerOps must have space for exactly 3 elements");
   }
 
-  assert(succeeded(IREE::LinalgExt::isArgmaxOp(genericOp)) &&
+  assert(IREE::LinalgExt::isArgmaxOp(genericOp) &&
          "expected operation to be an argmax op");
 
   auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
@@ -100,7 +100,7 @@ template <>
 FailureOr<linalg::SplitReductionResult> splitReductionImpl<linalg::GenericOp>(
     RewriterBase &rewriter, linalg::GenericOp genericOp,
     linalg::ControlSplitReductionFn controlSplitReductionFn) {
-  assert(succeeded(IREE::LinalgExt::isArgmaxOp(genericOp)) &&
+  assert(IREE::LinalgExt::isArgmaxOp(genericOp) &&
          "expected operation to be an argmax op");
 
   OpBuilder::InsertionGuard guard(rewriter);
@@ -447,7 +447,7 @@ struct SplitReductionPass final
           })
           .Case<linalg::GenericOp>([&](auto genericOp) {
             if (splitArgmaxReductionRatio > 1 &&
-                succeeded(IREE::LinalgExt::isArgmaxOp(genericOp))) {
+                IREE::LinalgExt::isArgmaxOp(genericOp)) {
               argmaxCandidates.push_back(genericOp);
             }
           });
