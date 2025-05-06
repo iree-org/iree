@@ -223,10 +223,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[RED_IDENTITY:.+]] = arith.constant dense<0.000000e+00> : vector<2x1x2x1x2x8xf16>
 
 // CHECK: %[[MASK:.+]] = vector.create_mask
-// CHECK: %[[MASK_PCK:.+]] = vector.shape_cast %[[MASK]] : vector<8x8xi1> to vector<2x2x2x1x1x8xi1>
-// CHECK: %[[MASK_ITL_PCK:.+]] = vector.transpose %[[MASK_PCK]], [0, 3, 1, 4, 2, 5] : vector<2x2x2x1x1x8xi1> to vector<2x1x2x1x2x8xi1>
+// CHECK: %[[MASK_PCK:.+]] = vector.shape_cast %[[MASK]] : vector<8x8xi1> to vector<2x1x2x1x2x8xi1>
 
-// CHECK: %[[SELECT:.+]] = arith.select %[[MASK_ITL_PCK]], {{.*}}, %[[RED_IDENTITY]] : vector<2x1x2x1x2x8xi1>, vector<2x1x2x1x2x8xf16>
+// CHECK: %[[SELECT:.+]] = arith.select %[[MASK_PCK]], {{.*}}, %[[RED_IDENTITY]] : vector<2x1x2x1x2x8xi1>, vector<2x1x2x1x2x8xf16>
 // CHECK: vector.multi_reduction <add>, %[[SELECT]], {{.*}} [0, 2, 4] : vector<2x1x2x1x2x8xf16> to vector<1x1x8xf16>
 
 // -----
@@ -308,8 +307,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // Currently, it does not fold away.
 // CHECK-DAG: %[[MASK_OP_1D:.+]] = vector.extract %[[MASK_OP]][0] : vector<2xi1> from vector<2x2xi1>
 // CHECK-DAG: %[[MASK_OP_1D_PACKED:.+]] = vector.shape_cast %[[MASK_OP_1D]] : vector<2xi1> to vector<1x1x2xi1>
-// CHECK-DAG: %[[MASK_OP_PACKED:.+]] = vector.shape_cast %[[MASK_OP]] : vector<2x2xi1> to vector<1x1x2x1x1x2xi1>
-// CHECK-DAG: %[[MASK_OP_INTERLEAVED:.+]] = vector.transpose %[[MASK_OP_PACKED]], [0, 3, 1, 4, 2, 5] : vector<1x1x2x1x1x2xi1> to vector<1x1x1x1x2x2xi1>
+// CHECK-DAG: %[[MASK_OP_PACKED:.+]] = vector.shape_cast %[[MASK_OP]] : vector<2x2xi1> to vector<1x1x1x1x2x2xi1>
 // CHECK-DAG: %[[MASK_OUT:.+]] = vector.create_mask {{.*}} : vector<2xi1>
 
 // CHECK-DAG: %[[LHS_READ:.+]] = vector.transfer_read %arg0{{.*}} %[[MASK_LHS]] {in_bounds = [true]} : memref<?xf16>, vector<2xf16>
@@ -318,6 +316,6 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[RHS:.+]] = vector.insert_strided_slice %[[RHS_READ]]
 
 // CHECK-DAG: %[[LHS_SELECT:.+]] = arith.select %[[MASK_OP_1D_PACKED]], %[[LHS]], %[[RED_IDENTITY_LHS]] : vector<1x1x2xi1>, vector<1x1x2xf16>
-// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP_INTERLEAVED]], %[[RHS]], %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
+// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP_PACKED]], %[[RHS]], %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
 
 // CHECK: vector.contract {{.*}} %[[LHS_SELECT]], %[[RHS_SELECT]]

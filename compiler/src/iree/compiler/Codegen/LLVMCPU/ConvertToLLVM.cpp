@@ -349,9 +349,9 @@ acquireInstrumentationEntry(Location loc, Value buffer, Value bufferPtr,
   Value offsetIndex =
       builder.create<LLVM::ConstantOp>(loc, i64Type, headOffset);
   auto i8Type = builder.getI8Type();
-  Value offsetPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), i8Type,
-                                                basePtr, offsetIndex,
-                                                /*inbounds=*/true);
+  Value offsetPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), i8Type, basePtr, offsetIndex,
+      /*noWrapFlags =*/LLVM::GEPNoWrapFlags::inbounds);
   Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
       loc, LLVM::AtomicBinOp::add, offsetPtr, entrySize,
       LLVM::AtomicOrdering::monotonic);
