@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-preprocessing-attr-based-pipeline --mlir-print-local-scope --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --iree-preprocessing-attr-based-pipeline --mlir-print-local-scope --split-input-file --verify-diagnostics --iree-dispatch-creation-propagate-collapse-across-expands=true %s | FileCheck %s
 
 func.func @single_dispatch_dropunitdims(%lhs : tensor<1x26x18x288xbf16>, %rhs :  tensor<288x288x3x3xbf16>, %outs : tensor<1x288x26x18xbf16>,
     %outs2 : tensor<1x288x24x16xf32>) -> tensor<1x288x24x16xf32> attributes {
@@ -12,9 +12,9 @@ func.func @single_dispatch_dropunitdims(%lhs : tensor<1x26x18x288xbf16>, %rhs : 
 // CHECK-LABEL: @single_dispatch_dropunitdims
 //  CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<1x26x18x288xbf16>
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ARG0]]
-//       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[COLLAPSE]]
-//       CHECK:     %[[CONV:.+]] = linalg.generic {{.*}} ins(%[[EXPAND]]
+//       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
+//       CHECK:     %[[CONV:.+]] = linalg.generic {{.*}} ins(%[[COLLAPSE]]
 //       CHECK:     flow.return %[[CONV]]
 //       CHECK:   return %[[DISPATCH]]
 

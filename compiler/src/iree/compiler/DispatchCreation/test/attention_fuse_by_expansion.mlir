@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes, canonicalize, cse, canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes, canonicalize, cse, canonicalize))" --iree-dispatch-creation-propagate-collapse-across-expands=true %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
@@ -584,8 +584,7 @@ util.func @scatter_collapse_original_partial(%arg0: tensor<?x1x32x8x128xf16>, %a
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
 //   CHECK-DAG:   %[[UPDATES:.+]] = tensor.expand_shape %[[ARG0]] {{.*}} tensor<?x1x32x8x128xf16> into tensor<?x1x2x16x4x2x64x2xf16>
-// TODO(IanWood1): fix this so the collapse folds with the expand
-//   CHECK-DAG:   %[[ORIGINAL:.+]] = tensor.expand_shape {{.*}} tensor<?x32x8x128xf16> into tensor<?x2x16x4x2x64x2xf16>
+//   CHECK-DAG:   %[[ORIGINAL:.+]] = tensor.collapse_shape %[[ARG2]] {{.*}} tensor<5x?x2x16x4x2x64x2xf16> into tensor<?x2x16x4x2x64x2xf16>
 //       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:       ins(%[[UPDATES]], %[[ARG1]]
 //  CHECK-SAME:       outs(%[[ORIGINAL]]
