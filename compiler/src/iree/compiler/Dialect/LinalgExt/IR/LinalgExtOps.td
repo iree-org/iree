@@ -51,7 +51,7 @@ let opDocGroup = OpGroupUtilityOps in {
 def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
     Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
     Results<(outs Index:$result)> {
-  let summary = "linalg_ext index operation";
+  let summary = [{LinalgExt index operation.}];
   let description = [{
     This operation is a mirror of `linalg.index` operation and has the same
     semantics, except that `linalg.index` enforces that the parent op is a
@@ -64,7 +64,7 @@ def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
 }
 
 def IREELinalgExt_YieldOp : IREELinalgExt_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
-  let summary = "LinalgExt yield op";
+  let summary = [{LinalgExt yield op.}];
   let description = [{
     `iree_linalg_ext.yield` is a special terminator operation for blocks inside
     regions in `iree_linalg_ext` ops.
@@ -105,7 +105,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getTiledImplementation",
          "getIterationDomainTileFromOperandTile",
          "getTiledImplementationFromOperandTile"]>]> {
-  let summary = "Scatter operator";
+  let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
     Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
     The operation updates the value at the slices specified by `indices` by
@@ -232,7 +232,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
          "getResultTilePosition",
          "getTiledImplementation",
          "generateResultTileValue"]>]> {
-  let summary = "Gather operator";
+  let summary = [{Gathers slices from a source based on a tensor of indices.}];
   let description = [{
     Takes two inputs (`source` and `indices`) and outputs value (`output`).
     The operation returns the value at the slices specified by `indices` by
@@ -331,7 +331,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
          "getTiledImplementationFromOperandTile",
          "generateScalarImplementation"]>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
-  let summary = "Scatter with a mapping from source indices to result indices";
+  let summary = [{Scatter with a mapping from source indices to result indices.}];
   let description = [{
     Takes two operands, `input` and `output`, and stores every element of
     `input` to a unique location in `output`. If the operands are tensors, the
@@ -416,7 +416,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation"]>]> {
-  let summary = "Sort operator";
+  let summary = [{Sorts a tensor a specified dimension.}];
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
     `dimension` with the given `comparator`.
@@ -467,7 +467,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation"]>]> {
-  let summary = "Fft operator";
+  let summary = [{Fft operator.}];
   let description = [{
     Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
     Thus, the bit reversal is assumed applied on the input. The op carries an
@@ -537,7 +537,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation"]>]> {
-  let summary = "Scan operator";
+  let summary = [{Scan operator.}];
   let description = [{
     Computes the inclusive/exclusive scan along a given dimension.
   }];
@@ -600,7 +600,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
      "getResultTilePosition",
      "getTiledImplementation"]>
 ]>{
-  let summary = "Top-K operator";
+  let summary = [{Top-K operator.}];
   let description = [{
    A Top-K operation for N-D tensors. Reduces the target dimension from the input
    size N down to K elements based on the supplied binary region.
@@ -686,7 +686,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
        "getResultTilePosition",
        "getTiledImplementation",
        "generateResultTileValue"]>]> {
-  let summary = "Attention operator";
+  let summary = [{Attention operator.}];
   let description = [{
     Computes the scaled dot product attention function:
 
@@ -793,7 +793,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
        "tileToPartialReduction",
        "mergeReductions",
        "getPartialResultTilePosition"]>]> {
-  let summary = "Online Attention operator";
+  let summary = [{Online Attention operator.}];
   let description = [{
     Traditional scaled dot product attention computes:
 
@@ -918,7 +918,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
        "getResultTilePosition",
        "getTiledImplementation",
        "generateResultTileValue"]>]> {
-  let summary = "Im2col operation for convolutions";
+  let summary = [{Im2col operation for convolutions.}];
   let description = [{
     Im2col op for convolutions. The operation performs a transformation on the
     input to convert it from a convolution input to an equivalent gemm input.
@@ -1112,7 +1112,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
      "generateScalarImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
-  let summary = "pack operation";
+  let summary = [{LinalgExt pack operation for both tensors and buffers.}];
   let description = [{
     The pack operation converts an `input` into a tiled and packed layout. The
     dimensions to be tiled are obtained from `inner_dims_pos` and the size of the
@@ -1275,7 +1275,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
      "generateScalarImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
-  let summary = "unpack operation";
+  let summary = [{LinalgExt unpack operation for both tensors and buffers.}];
 
   let description = [{
     The unpack operation converts a tiled and packed input to an unpacked
@@ -1408,7 +1408,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation"]>]> {
-  let summary = "Winograd Input Transform operator";
+  let summary = [{Winograd Input Transform operator.}];
   let description = [{
     This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
@@ -1519,7 +1519,7 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation"]>]> {
-  let summary = "Winograd Filter Transform operator";
+  let summary = [{Winograd Filter Transform operator.}];
   let description = [{
     This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of a convolution filter (F),
@@ -1635,7 +1635,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation"]>]> {
-  let summary = "Winograd Output Transform operator";
+  let summary = [{Winograd Output Transform operator.}];
   let description = [{
     This operator is the last transform in converting a convolution to
     its Winograd equivalent. After convolution in the Winograd domain
@@ -1760,7 +1760,7 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
      "getResultTilePosition",
      "getTiledImplementation"]>
   ]> {
-  let summary = "Custom operation for compiling with IREE";
+  let summary = [{Custom operation for compiling with IREE.}];
   let description = [{
     This operation is meant to allow computation sequences that are fused at
     tile level prescriptively. This is to account for cases where such fusion

@@ -20,10 +20,12 @@ def TensorTypeAttr : TypeAttrBase<"TensorType", "Tensor type attribute">;
 
 def IREECodegen_QueryTileSizesOp :
     Op<IREECodegen_Dialect, "query_tile_sizes", [Pure]> {
-  let summary = "Query tile sizes";
+  let summary = [{Yields tile sizes for the specified tensor type.}];
 
   let description = [{
-    Query tile sizes
+    For targets where tile sizes can't be resolved at compile time, this
+    operation allows querying the sizes at runtime. Today this only applies
+    to VMVX.
   }];
 
   let arguments = (ins TensorTypeAttr:$tensor_type);
@@ -43,7 +45,7 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
     SameVariadicResultSize,
     ViewLikeOpInterface,
     InferTypeOpAdaptor]> {
-  let summary = "Extracts a buffer base with offset and strides";
+  let summary = [{Extracts a buffer base with offset and strides.}];
   let description = [{
     This op is implemented similarly to the upstream MemRef::ExtractStridedMetadataOp
     with the following differences.
@@ -109,7 +111,7 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
 
 def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     SameOperandsAndResultType, Pure]> {
-  let summary = "Hint to swizzle accesses according to an access pattern";
+  let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
     Optimization hint to swizzle all accesses to the memref this takes a view
     of. This only affects reads/writes immediately consuming this operation and
@@ -163,7 +165,7 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
 
 def IREECodegen_NullPointerOp :
      Op<IREECodegen_Dialect, "null_pointer", [Pure]> {
-  let summary = "Returns a null_pointer value.";
+  let summary = [{Returns a null_pointer value.}];
   let description = [{
     This is meant to be used only as arguments to microkernels.
   }];
@@ -177,7 +179,7 @@ def IREECodegen_NullPointerOp :
 
 def IREECodegen_LoadFromMemrefOp : Op<IREECodegen_Dialect, "load_from_memref",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
-  let summary = [{loads a tensor from a memref}];
+  let summary = [{Loads a tensor from a memref.}];
   let description = [{
     Loads a tensor from a memref with a compatible shape and the same element
     type.
@@ -199,7 +201,7 @@ def IREECodegen_LoadFromMemrefOp : Op<IREECodegen_Dialect, "load_from_memref",
 
 def IREECodegen_StoreToMemrefOp : Op<IREECodegen_Dialect, "store_to_memref",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
-  let summary = [{stores a tensor into a memref}];
+  let summary = [{Stores a tensor into a memref.}];
   let description = [{
     Stores a tensor into a memref with a compatible shape and the same element
     type.

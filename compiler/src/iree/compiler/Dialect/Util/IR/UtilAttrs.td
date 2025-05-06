@@ -20,7 +20,7 @@ include "mlir/IR/OpBase.td"
 def Util_IntAssumptionAttr : AttrDef<Util_Dialect, "IntAssumption", []
 > {
   let mnemonic = "int.assumption";
-  let summary = [{specifies assumptions that can be made about an integer's value}];
+  let summary = [{Specifies assumptions that can be made about an integer's value.}];
   let description = [{
     This is typically used to memorialize the result of some integer analysis
     or outside knowledge. All components of the attribute are optional.
@@ -59,7 +59,7 @@ def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
   ]>,
 ]> {
   let mnemonic = "byte_pattern";
-  let summary = [{an attribute containing a filled byte pattern}];
+  let summary = [{An attribute containing a filled byte pattern.}];
   let description = [{
     A dense serializable attribute with the given byte pattern.
   }];
@@ -80,7 +80,7 @@ def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
 
 def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
   let mnemonic = "byte_range";
-  let summary = [{defines a range of bytes}];
+  let summary = [{Defines a range of bytes.}];
   let description = [{
     Specifies a starting offset and total length in bytes.
   }];
@@ -107,7 +107,7 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   ]>,
 ]> {
   let mnemonic = "composite";
-  let summary = [{an attribute composed of a sequence of attributes}];
+  let summary = [{An attribute composed of a sequence of attributes.}];
   let description = [{
     Models a concatenated set of serializable attributes that when combined
     form a single sequence of i8 elements. As each value references the uniqued
@@ -149,7 +149,7 @@ def Util_InlineNeverAttr : AttrDef<Util_Dialect, "InlineNever", [
   Util_InliningPolicyAttrInterface,
 ]> {
   let mnemonic = "inline.never";
-  let summary = [{disables inlining on the associated function}];
+  let summary = [{Disables inlining on the associated function.}];
   let description = [{
     Disables inlining of the function the attribute is associated with into
     any call-site.
@@ -167,7 +167,7 @@ def Util_InlineAlwaysAttr : AttrDef<Util_Dialect, "InlineAlways", [
   Util_InliningPolicyAttrInterface,
 ]> {
   let mnemonic = "inline.always";
-  let summary = [{forces inlining on the associated function when possible}];
+  let summary = [{Forces inlining on the associated function when possible.}];
   let description = [{
     Skips any cost-model decisions as to whether a function should be inlined
     into call-sites and allows the inlining to happen. Any policies that prevent
@@ -191,7 +191,7 @@ def Util_NullAttr : AttrDef<Util_Dialect, "Null", [
   TypedAttrInterface,
 ]> {
   let mnemonic = "null";
-  let summary = [{an attribute specifying a null reference}];
+  let summary = [{An attribute specifying a null reference.}];
   let description = [{
     A null reference value.
   }];
@@ -210,7 +210,7 @@ def Util_NullAttr : AttrDef<Util_Dialect, "Null", [
 def Util_PreprocessingPipelineAttr : AttrDef<Util_Dialect,
     "PreprocessingPassPipeline"> {
   let mnemonic = "preprocessing_pipeline";
-  let summary = "[{preprocessing pass-pipeline to run on the function}]";
+  let summary = "[{Preprocessing pass-pipeline to run on the function.}]";
   let description = [{
     Textual description of the preprocessing pass-pipeline to run on the
     function-like object that the attribute is specified on. Note that the
@@ -241,7 +241,7 @@ def Util_UninitializedAttr : AttrDef<Util_Dialect, "Uninitialized", [
   ]>,
 ]> {
   let mnemonic = "uninitialized";
-  let summary = [{an attribute specifying uninitialized storage}];
+  let summary = [{An attribute specifying uninitialized storage.}];
   let description = [{
     The contents of the storage backing this attribute _may_ be uninitialized at
     runtime. This is a hint to implementations that if policy allows memory

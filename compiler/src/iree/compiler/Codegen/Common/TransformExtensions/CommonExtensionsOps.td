@@ -179,7 +179,7 @@ def CopyTensorOperandOp :  Op<Transform_Dialect, "iree.copy_tensor_operand",
      TransformEachOpTrait,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
-  let summary = "Hoist static allocations";
+  let summary = [{Create a linalg copy of a specified value.}];
   let description = [{
     Inserts a copy of the specified operand of the target operation.
 
@@ -214,7 +214,7 @@ def GpuDistributeSharedMemoryCopyOp :
   Op<Transform_Dialect, "iree.gpu_distribute_shared_memory_copy",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface, TransformEachOpTrait]> {
-  let summary = "Distribute shared memory copies";
+  let summary = [{Distribute shared memory copies.}];
   let description = [{
     Find copies to/from shared memory and distribute the copies based on the
     workgroup size.
@@ -244,7 +244,7 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
      TransformEachOpTrait,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
-  let summary = "Hoist static allocations";
+  let summary = [{Hoist static allocations.}];
   let description = [{
     Find static allocations and hoist them to the top level.
 
@@ -470,8 +470,9 @@ def MatchHasNoLoweringConfigOp : Op<Transform_Dialect, "iree.match.has_no_loweri
     [MatchOpInterface,
      SingleOpMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks that the payload op does not carry a lowering config or compilation info";
+  let summary = [{
+    Checks that the payload op does not carry a lowering config or compilation info.
+  }];
   let description = [{
     Verifies that the payload does not have a "compilation_info" or
     "lowering_config" attribute. This is a very common check needed for external
@@ -530,7 +531,7 @@ def ReduceSharedMemoryBankConflictsOp :  Op<Transform_Dialect, "iree.reduce_shar
      TransformEachOpTrait,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
-  let summary = "Add padding to 'memref.alloc' ops reduce shared memory bank conflicts";
+  let summary = [{Add padding to 'memref.alloc' ops reduce shared memory bank conflicts.}];
   let description = [{
     The `paddingSizeBits` argument should be picked based on the target
     architecture, striking balance between minimizing bank conflicts and keeping
