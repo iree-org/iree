@@ -8,10 +8,9 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -25,9 +24,8 @@ struct ConvertAttentionToOnlineAttentionPass final
     : impl::ConvertAttentionToOnlineAttentionPassBase<
           ConvertAttentionToOnlineAttentionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                linalg::LinalgDialect, tensor::TensorDialect>();
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
+                    linalg::LinalgDialect, tensor::TensorDialect>();
   }
   void runOnOperation() override;
 };
