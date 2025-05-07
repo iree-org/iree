@@ -69,3 +69,33 @@ hal.executable private @exe {
 util.func private @user() attributes {
   some.ref = @exe::@variant::@used_export
 }
+
+// -----
+
+// Tests that an export that is used as a fallback is not dropped but one only
+// used as the fallback for a dropped export is.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @exe {
+  hal.executable.variant public @variant target(<"backend", "format">) {
+    // CHECK-NOT: hal.executable.export public @unused_export
+    hal.executable.export public @unused_export layout(#pipeline_layout) condition(%device: !hal.device) -> i1 {
+      %false = arith.constant 0 : i1
+      hal.return %false : i1
+    } fallback(@unused_fallback_export)
+    // CHECK-NOT: hal.executable.export public @unused_fallback_export
+    hal.executable.export public @unused_fallback_export layout(#pipeline_layout)
+    // CHECK: hal.executable.export public @used_export
+    hal.executable.export public @used_export layout(#pipeline_layout) condition(%device: !hal.device) -> i1 {
+      %false = arith.constant 0 : i1
+      hal.return %false : i1
+    } fallback(@used_fallback_export)
+    // CHECK: hal.executable.export public @used_fallback_export
+    hal.executable.export public @used_fallback_export layout(#pipeline_layout)
+  }
+}
+util.func private @user() attributes {
+  some.ref = @exe::@variant::@used_export
+}

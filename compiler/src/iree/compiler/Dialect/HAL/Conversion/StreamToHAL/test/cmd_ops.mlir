@@ -318,15 +318,15 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !str
     // CHECK: scf.index_switch %[[VARIANT0]]
     // CHECK-NEXT: case 0 {
 
-    // Inlined workgroup count calculation:
-    // CHECK: %[[X:.+]] = affine.apply #map()[%c1]
-
     // Target executable/export:
     //  CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup
     // CHECK-SAME:     device(%[[CMD_DEVICE]] : !hal.device)
     // CHECK-SAME:     executable(@ex) : !hal.executable
     //  CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal
     // CHECK-SAME:     target(@ex::@aarch64::@dispatch) : index
+
+    // Inlined workgroup count calculation:
+    // CHECK: %[[X:.+]] = affine.apply #{{.*}}[%c1]
 
     // Dispatch:
     // CHECK: hal.command_buffer.dispatch<%[[CMD]]
@@ -352,6 +352,88 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !str
   //      CHECK: hal.device.queue.execute.indirect<%[[DEVICE]] : !hal.device> {{.+}} commands(%[[MEMOIZED_CMD]]) bindings([
   // CHECK-NEXT:   (%[[ARG_RESOURCE]] : !hal.buffer)[%c0, %[[ARG_SIZE]]]
   // CHECK-NEXT: ])
+  util.return %0 : !stream.timepoint
+}
+
+// -----
+
+// Tests export fallback logic.
+// Each dispatch will try to dispatch (@export0 -> @export1 -> @export2). Note
+// that the workgroup count region for each can vary and we must dispatch with
+// the workgroup count of the export selected.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, Indirect>
+]>
+hal.executable private @executable {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">) {
+    // Primary export to try. Fallback to @export1.
+    hal.executable.export public @export0 ordinal(0) layout(#pipeline_layout) condition(%device: !hal.device, %workload: index) -> i1 {
+      %c0 = arith.constant 0 : index
+      %cond = arith.cmpi eq, %workload, %c0 : index
+      hal.return %cond : i1
+    } fallback(@export1) count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      %c100 = arith.constant 100 : index
+      hal.return %workload, %c100, %c100 : index, index, index
+    }
+    // Secondary export to try. Fallback to @export2.
+    hal.executable.export public @export1 ordinal(1) layout(#pipeline_layout) condition(%device: !hal.device, %workload: index) -> i1 {
+      %c1 = arith.constant 1 : index
+      %cond = arith.cmpi eq, %workload, %c1 : index
+      hal.return %cond : i1
+    } fallback(@export2) count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      %c101 = arith.constant 101 : index
+      hal.return %workload, %c101, %c101 : index, index, index
+    }
+    // Fallback export, always selected if reached.
+    hal.executable.export public @export2 ordinal(2) layout(#pipeline_layout) count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      %102 = arith.constant 102 : index
+      hal.return %workload, %102, %102 : index, index, index
+    }
+    builtin.module {
+      // Opaque at this point (in some target-specific dialects).
+    }
+  }
+}
+
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @cmdDispatchFallback
+//  CHECK-SAME: (%[[WORKLOAD:.+]]: index, %[[ARG_RESOURCE:.+]]: !hal.buffer)
+util.func public @cmdDispatchFallback(%workload: index, %arg_resource: !stream.resource<external>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %arg_size = arith.constant 200 : index
+  // CHECK: hal.command_buffer.create
+  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg_resource as %arg_capture: !stream.resource<external>{%arg_size}) {
+    // Try @export0:
+    // CHECK: %[[EXPORT0_COND:.+]] = arith.cmpi eq, %[[WORKLOAD]], %c0
+    // CHECK: %[[ORDINAL_COUNT:.+]]:4 = scf.if %[[EXPORT0_COND]]
+    // CHECK-DAG: %[[EXPORT0_ORDINAL:.+]] = hal.executable.export.ordinal target(@executable::@variant::@export0)
+    // CHECK-DAG: %[[EXPORT0_YZ:.+]] = arith.constant 100
+    // CHECK-NEXT: scf.yield %[[EXPORT0_ORDINAL]], %[[WORKLOAD]], %[[EXPORT0_YZ]], %[[EXPORT0_YZ]]
+    // CHECK-NEXT: } else {
+
+    // Fallback and try @export1:
+    // CHECK: %[[EXPORT1_COND:.+]] = arith.cmpi eq, %[[WORKLOAD]], %c1
+    // CHECK: %[[ORDINAL_COUNT12:.+]]:4 = scf.if %[[EXPORT1_COND]]
+    // CHECK-DAG: %[[EXPORT1_ORDINAL:.+]] = hal.executable.export.ordinal target(@executable::@variant::@export1)
+    // CHECK-DAG: %[[EXPORT1_YZ:.+]] = arith.constant 101
+    // CHECK-NEXT: scf.yield %[[EXPORT1_ORDINAL]], %[[WORKLOAD]], %[[EXPORT1_YZ]], %[[EXPORT1_YZ]]
+    // CHECK-NEXT: } else {
+
+    // Finally fallback to @export2 unconditionally:
+    // CHECK-DAG: %[[EXPORT2_ORDINAL:.+]] = hal.executable.export.ordinal target(@executable::@variant::@export2)
+    // CHECK-DAG: %[[EXPORT2_YZ:.+]] = arith.constant 102
+    // CHECK-NEXT: scf.yield %[[EXPORT2_ORDINAL]], %[[WORKLOAD]], %[[EXPORT2_YZ]], %[[EXPORT2_YZ]]
+
+    // CHECK: scf.yield %[[ORDINAL_COUNT12]]#0, %[[ORDINAL_COUNT12]]#1, %[[ORDINAL_COUNT12]]#2, %[[ORDINAL_COUNT12]]#3
+
+    // CHECK: hal.command_buffer.dispatch{{.+}}[%[[ORDINAL_COUNT]]#0]
+    // CHECK-SAME: workgroups([%[[ORDINAL_COUNT]]#1, %[[ORDINAL_COUNT]]#2, %[[ORDINAL_COUNT]]#3])
+    stream.cmd.dispatch @executable::@variant::@export0[%workload] {
+      wo %arg_capture[%c0 for %arg_size] : !stream.resource<external>{%arg_size}
+    }
+  } => !stream.timepoint
   util.return %0 : !stream.timepoint
 }
 

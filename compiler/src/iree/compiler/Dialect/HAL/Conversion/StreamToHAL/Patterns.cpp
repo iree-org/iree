@@ -811,20 +811,142 @@ struct CmdDispatchOpPattern
     return success();
   }
 
+  // Returns the fully qualified export name (@executable::@variant::@export).
+  SymbolRefAttr getExportRef(IREE::HAL::ExecutableExportOp exportOp) const {
+    auto variantOp =
+        exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+    auto executableOp = variantOp->getParentOfType<IREE::HAL::ExecutableOp>();
+    return SymbolRefAttr::get(executableOp.getSymNameAttr(),
+                              {
+                                  FlatSymbolRefAttr::get(variantOp),
+                                  FlatSymbolRefAttr::get(exportOp),
+                              });
+  }
+
+  // Selects the ordinal for the given |baseExportOp| and calculates its
+  // workgroup count. The ordinal may be different than the ordinal of the
+  // export itself if any fallbacks are specified. Each export condition will be
+  // evaluated and the first that matches will be returned.
+  //
+  // As an example, a fallback chain of @0 -> @1 -> @2 (with @0 being the
+  // highest priority) would result in a decision tree:
+  //   %ordinal, %workgroups = scf.if %cond0 {
+  //     %ordinal0 = hal.executable.export.ordinal @0
+  //     %workgroups0 = calculate for @0
+  //     scf.yield %ordinal0, %workgroups0
+  //   } else {
+  //     %ordinal12, %workgroups12 = scf.if %cond1 {
+  //       %ordinal1 = hal.executable.export.ordinal @1
+  //       %workgroups1 = calculate for @1
+  //       scf.yield %ordinal1, %workgroups1
+  //     } else {
+  //       %ordinal2 = hal.executable.export.ordinal @2
+  //       %workgroups2 = calculate for @2
+  //       scf.yield %ordinal2, %workgroups2
+  //     }
+  //     scf.yield %ordinal12, %workgroups12
+  //   }
+  std::tuple<Value, std::array<Value, 3>>
+  selectExport(Location loc, IREE::HAL::ExecutableExportOp baseExportOp,
+               Value device, ValueRange workload, OpBuilder &builder) const {
+    if (!baseExportOp.getConditionBody()) {
+      // No fallback - fast path to just the base export.
+      Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+          loc, builder.getIndexType(), getExportRef(baseExportOp));
+      auto workgroupCount =
+          baseExportOp.calculateWorkgroupCount(loc, device, workload, builder);
+      return {ordinal, workgroupCount};
+    }
+    // Recursively build the selection decision tree.
+    auto fallbackExportOp =
+        SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+            baseExportOp, baseExportOp.getConditionFallbackAttr());
+    return buildExportSelection(loc, baseExportOp, fallbackExportOp, device,
+                                workload, builder);
+  }
+  std::tuple<Value, std::array<Value, 3>>
+  buildExportSelection(Location loc, IREE::HAL::ExecutableExportOp tryExportOp,
+                       IREE::HAL::ExecutableExportOp fallbackExportOp,
+                       Value device, ValueRange workload,
+                       OpBuilder &builder) const {
+    // Inline the condition logic.
+    Value tryCondition =
+        tryExportOp.calculateCondition(loc, device, workload, builder);
+
+    // Create an scf.if: the then region will simply return the
+    // ordinal (condition matches) and the else region will contain the rest of
+    // the decision tree.
+    Type indexType = builder.getIndexType();
+    auto ifOp = builder.create<scf::IfOp>(
+        loc, TypeRange{indexType, indexType, indexType, indexType},
+        tryCondition,
+        /*addThenBlock=*/true, /*addElseBlock=*/true);
+    {
+      auto thenBuilder = ifOp.getThenBodyBuilder();
+      Value tryOrdinal =
+          thenBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+              loc, thenBuilder.getIndexType(), getExportRef(tryExportOp));
+      auto tryWorkgroupCount = tryExportOp.calculateWorkgroupCount(
+          loc, device, workload, thenBuilder);
+      thenBuilder.create<scf::YieldOp>(loc, ValueRange{
+                                                tryOrdinal,
+                                                tryWorkgroupCount[0],
+                                                tryWorkgroupCount[1],
+                                                tryWorkgroupCount[2],
+                                            });
+    }
+    {
+      auto elseBuilder = ifOp.getElseBodyBuilder();
+      if (fallbackExportOp.getConditionBody()) {
+        // Recursively chain to the next fallback-enabled export.
+        auto chainExportOp =
+            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+                fallbackExportOp, fallbackExportOp.getConditionFallbackAttr());
+        auto [chainOrdinal, chainWorkgroupCount] =
+            buildExportSelection(loc, fallbackExportOp, chainExportOp, device,
+                                 workload, elseBuilder);
+        elseBuilder.create<scf::YieldOp>(loc, ValueRange{
+                                                  chainOrdinal,
+                                                  chainWorkgroupCount[0],
+                                                  chainWorkgroupCount[1],
+                                                  chainWorkgroupCount[2],
+                                              });
+      } else {
+        // Tail of recursion; fallback has no fallback.
+        Value fallbackOrdinal =
+            elseBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+                loc, indexType, getExportRef(fallbackExportOp));
+        auto fallbackWorkgroupCount = fallbackExportOp.calculateWorkgroupCount(
+            loc, device, workload, elseBuilder);
+        elseBuilder.create<scf::YieldOp>(loc, ValueRange{
+                                                  fallbackOrdinal,
+                                                  fallbackWorkgroupCount[0],
+                                                  fallbackWorkgroupCount[1],
+                                                  fallbackWorkgroupCount[2],
+                                              });
+      }
+    }
+    return {ifOp.getResult(0),
+            {
+                ifOp.getResult(1),
+                ifOp.getResult(2),
+                ifOp.getResult(3),
+            }};
+  }
+
   Operation *emitDispatchOp(
       Location loc, IREE::Stream::AffinityAttr affinityAttr, Value device,
       CommandBufferConversionMapping &commandBufferMapping,
       IREE::HAL::ExecutableExportOp exportOp, SymbolRefAttr entryPointAttr,
       IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
       OpBuilder &builder) const {
-    auto workgroupCount = exportOp.calculateWorkgroupCount(
-        loc, device, adaptor.getWorkload(), builder);
-
     Value executable = builder.create<IREE::HAL::ExecutableLookupOp>(
         loc, builder.getType<IREE::HAL::ExecutableType>(), device,
         entryPointAttr.getRootReference().getValue());
-    Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
-        loc, builder.getIndexType(), entryPointAttr);
+
+    // Select the export and calculate its workgroup count.
+    auto [ordinal, workgroupCount] =
+        selectExport(loc, exportOp, device, adaptor.getWorkload(), builder);
 
     auto layoutAttr = exportOp.getLayout();
     SmallVector<IREE::HAL::BindingValue> bindings;
