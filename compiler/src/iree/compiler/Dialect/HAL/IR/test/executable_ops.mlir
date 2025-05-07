@@ -2,8 +2,8 @@
 
 #executable_target_format = #hal.executable.target<"backend", "format">
 
-// CHECK-LABEL: @ex
-hal.executable @ex {
+// CHECK-LABEL: @executable
+hal.executable @executable {
   // CHECK: hal.executable.variant public @backend
   // CHECK-SAME: target(#executable_target_format)
   // CHECK-SAME: objects([#hal.executable.object<{path = "foo.bin"}>, #hal.executable.object<{path = "bar.bin"}>])
@@ -33,29 +33,21 @@ hal.executable @ex {
 
 #executable_target_format = #hal.executable.target<"backend", "format">
 
-// CHECK-LABEL: @ex_with_workgroup_count_region
-hal.executable @ex_with_workgroup_count_region {
+// CHECK-LABEL: @export_with_workgroup_count_region
+hal.executable @export_with_workgroup_count_region {
   // CHECK: hal.executable.variant public @backend target(#executable_target_format
   hal.executable.variant @backend target(#executable_target_format) {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout)
-    // CHECK:     subgroup_size = 64 : index
-    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
-    ]>) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
-      hal.return %arg0, %arg1, %arg2 : index, index, index
-    } attributes {
-      subgroup_size = 64 : index,
-      workgroup_size = [4 : index, 1 : index, 1 : index]
+    // CHECK: count(%[[DEVICE:.+]]: !hal.device, %[[WORKLOAD0:.+]]: index, %[[WORKLOAD1:.+]]: index) -> (index, index, index)
+    ]>) count(%device: !hal.device, %workload0: index, %workload1: index) -> (index, index, index) {
+      // CHECK-NEXT: %[[Z:.+]] = arith.constant 1
+      %z = arith.constant 1 : index
+      // CHECK-NEXT: hal.return %[[WORKLOAD0]], %[[WORKLOAD1]], %[[Z]]
+      hal.return %workload0, %workload1, %z : index, index, index
     }
-  }
-  // CHECK: hal.executable.binary
-  hal.executable.binary @backend_binary attributes {
-    // CHECK-SAME: data = dense<1> : vector<128xi8>,
-    data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = "some_format"
-    format = "some_format"
   }
 }
 
@@ -63,8 +55,36 @@ hal.executable @ex_with_workgroup_count_region {
 
 #executable_target_format = #hal.executable.target<"backend", "format">
 
-// CHECK-LABEL: @ex_with_condition
-hal.executable @ex_with_condition {
+// CHECK-LABEL: @export_with_condition_region
+hal.executable @export_with_condition_region {
+  // CHECK: hal.executable.variant public @backend target(#executable_target_format
+  hal.executable.variant @backend target(#executable_target_format) {
+    // CHECK: hal.executable.export public @use_lt_1024
+    hal.executable.export public @use_lt_1024 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
+    // CHECK-SAME: condition(%[[DEVICE:.+]]: !hal.device, %[[WORKLOAD:.+]]: index) -> i1
+    ]>) condition(%device: !hal.device, %workload: index) -> i1 {
+      %c1024 = arith.constant 1024 : index
+      %use_me = arith.cmpi slt, %workload, %c1024 : index
+      // CHECK: hal.return
+      hal.return %use_me : i1
+    // CHECK: fallback(@fallback_ge_1024)
+    } fallback(@fallback_ge_1024)
+    // CHECK: hal.executable.export public @fallback
+    hal.executable.export public @fallback_ge_1024 ordinal(1) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
+    ]>)
+  }
+}
+
+// -----
+
+#executable_target_format = #hal.executable.target<"backend", "format">
+
+// CHECK-LABEL: @executable_with_condition
+hal.executable @executable_with_condition {
   // CHECK: hal.executable.variant public @backend target(#executable_target_format
   hal.executable.variant @backend target(#executable_target_format) {
     // CHECK: hal.executable.condition(%[[DEVICE:.+]]: !hal.device) -> i1 {
@@ -101,8 +121,8 @@ hal.executable @ex_with_condition {
 
 #executable_target_format = #hal.executable.target<"backend", "format">
 
-// CHECK-LABEL: @ex_with_constants
-hal.executable @ex_with_constants {
+// CHECK-LABEL: @executable_with_constants
+hal.executable @executable_with_constants {
   // CHECK: hal.executable.variant public @backend
   hal.executable.variant @backend target(#executable_target_format) {
     // CHECK: hal.executable.constant.block(%{{.+}}: !hal.device) -> (i32, i32) as ("foo", "bar")

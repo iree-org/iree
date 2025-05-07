@@ -454,24 +454,47 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<OptionalWorkgroupCountRegion>($body)
+// custom<ExportConditionRegion>($body)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseOptionalWorkgroupCountRegion(OpAsmParser &parser,
-                                                     Region &body) {
-  // Empty region if not specified.
-  if (failed(parser.parseOptionalKeyword("count"))) {
-    return success();
+static ParseResult parseExportConditionRegion(OpAsmParser &parser,
+                                              Region &body) {
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
   }
-  return parseWorkgroupCountRegion(parser, body);
+
+  // Return types must be an i1.
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 1 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isInteger(1); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "condition region must return a boolean value";
+  }
+
+  // Parse region contents.
+  return parser.parseRegion(body, args,
+                            /*enableNameShadowing=*/false);
 }
 
-static void printOptionalWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
-                                              Region &body) {
+static void printExportConditionRegion(OpAsmPrinter &p, Operation *op,
+                                       Region &body) {
   if (body.empty())
     return;
-  p << "count";
-  printWorkgroupCountRegion(p, op, body);
+  p << "(";
+  llvm::interleaveComma(body.getArguments(), p,
+                        [&](BlockArgument arg) { p.printRegionArgument(arg); });
+  p << ")";
+  Type boolType = IntegerType::get(op->getContext(), 1);
+  p.printArrowTypeList(TypeRange{boolType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1508,17 +1531,156 @@ LogicalResult ExecutableOp::verify() {
 // hal.executable.export
 //===----------------------------------------------------------------------===//
 
+// Verifies that the export condition region matches the expected
+// signature. Returns success if the region is empty.
+static LogicalResult verifyExportConditionRegion(Operation *op,
+                                                 Region &region) {
+  if (region.empty())
+    return success();
+
+  // Verify one of the supported signatures.
+  bool validArguments = true;
+  if (region.getNumArguments() == 0) {
+    // Need at least a !hal.device.
+    validArguments = false;
+  } else if (!llvm::isa<IREE::HAL::DeviceType>(
+                 region.getArgument(0).getType())) {
+    // !hal.device must come first.
+    validArguments = false;
+  } else {
+    // All remaining arguments need to be of type index (today).
+    for (BlockArgument &blockArg : region.getArguments().drop_front(1)) {
+      if (!llvm::isa<IndexType>(blockArg.getType())) {
+        validArguments = false;
+        break;
+      }
+    }
+  }
+  if (!validArguments) {
+    return op->emitOpError(
+        "expected condition region to take (%device: !hal.device, "
+        "%workload_0: index, %workload_1: index, ...");
+  }
+
+  // Verify the return type is i1.
+  for (auto returnOp : region.getOps<IREE::HAL::ReturnOp>()) {
+    auto returnTypes = returnOp.getOperandTypes();
+    if (returnTypes.size() != 1 || !llvm::all_of(returnTypes, [](Type type) {
+          return type.isInteger(1);
+        })) {
+      return op->emitError("condition region must return a boolean value");
+    }
+  }
+
+  return success();
+}
+
 LogicalResult ExecutableExportOp::verify() {
   ExecutableExportOp op = *this;
 
-  // When there is no body, nothing to verify.
-  if (!getWorkgroupCountBody()) {
-    return success();
-  } else if (!llvm::hasSingleElement(getWorkgroupCount())) {
-    return op.emitOpError() << "expected a single region block";
+  if (getConditionBody()) {
+    if (!llvm::hasSingleElement(getCondition())) {
+      return op.emitOpError()
+             << "expected a single region block for the condition";
+    } else if (failed(verifyExportConditionRegion(op, getCondition()))) {
+      return failure();
+    } else if (!op.getConditionFallbackAttr()) {
+      return op.emitOpError()
+             << "must have a fallback if a condition region is defined";
+    }
+  } else if (op.getConditionFallbackAttr()) {
+    return op.emitOpError()
+           << "fallback must only be present if a condition region is defined";
   }
 
-  return verifyWorkgroupCountRegion(op, getWorkgroupCount());
+  if (getWorkgroupCountBody()) {
+    if (!llvm::hasSingleElement(getWorkgroupCount())) {
+      return op.emitOpError()
+             << "expected a single region block for the workgroup count";
+    } else if (failed(verifyWorkgroupCountRegion(op, getWorkgroupCount()))) {
+      return failure();
+    }
+  }
+
+  return success();
+}
+
+// Returns true if the given argument type lists are equal.
+static bool compareArgumentTypes(Block *lhs, Block *rhs) {
+  auto lhsTypes = lhs->getArgumentTypes();
+  auto rhsTypes = rhs->getArgumentTypes();
+  if (lhsTypes.size() != rhsTypes.size()) {
+    return false; // count mismatch
+  }
+  return llvm::equal(lhsTypes, rhsTypes);
+}
+
+LogicalResult
+ExecutableExportOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  if (auto fallbackAttr = getConditionFallbackAttr()) {
+    // Ensure the fallback is defined.
+    auto fallbackOp =
+        symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+            *this, fallbackAttr);
+    if (!fallbackOp) {
+      return emitOpError() << "undefined fallback entry point: "
+                           << fallbackAttr;
+    }
+
+    // Layouts must match exactly.
+    if (getLayout() != fallbackOp.getLayout()) {
+      return emitOpError() << "fallback layout does not match (base has "
+                           << getLayout() << ", fallback has "
+                           << fallbackOp.getLayout() << ")";
+    }
+
+    // Workgroup count signature and condition signatures must match to allow
+    // us to chain them during materialization.
+    if (getConditionBody() && fallbackOp.getConditionBody()) {
+      if (!compareArgumentTypes(getConditionBody(),
+                                fallbackOp.getConditionBody())) {
+        return emitOpError() << "fallback condition argument mismatch; "
+                                "fallback args must match exactly";
+      }
+    }
+    if (getWorkgroupCountBody() && fallbackOp.getWorkgroupCountBody()) {
+      if (!compareArgumentTypes(getWorkgroupCountBody(),
+                                fallbackOp.getWorkgroupCountBody())) {
+        return emitOpError() << "fallback workgroup count argument mismatch; "
+                                "fallback args must match exactly";
+      }
+    }
+  }
+  return success();
+}
+
+Value ExecutableExportOp::calculateCondition(Location loc, Value device,
+                                             ValueRange workload,
+                                             OpBuilder &builder) {
+  // Always evaluate to true if no region is present.
+  auto *body = getConditionBody();
+  if (!body) {
+    return builder.create<arith::ConstantIntOp>(loc, 1, 1);
+  }
+
+  // TODO(benvanik): replace with region inlining util.
+  IRMapping bvm;
+  bvm.map(body->getArgument(0), device);
+  // For now use the number of args to minimum of number of args used by
+  // the body, and number of workload entries. When there is a more explicit
+  // propagation of number of workload entries to the `hal.executable.variant`
+  // this will be the same by construction.
+  unsigned numArgs =
+      std::min<unsigned>(body->getNumArguments() - 1, workload.size());
+  for (unsigned argNum : llvm::seq<unsigned>(0, numArgs)) {
+    bvm.map(body->getArgument(/*device*/ 1 + argNum), workload[argNum]);
+  }
+  for (Operation &op : body->without_terminator()) {
+    builder.clone(op, bvm);
+  }
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 1 && "must return bool");
+  return bvm.lookup(returnOp.getOperands()[0]);
 }
 
 // Calculates the workgroup count (x, y, z) given the total N-dimensional

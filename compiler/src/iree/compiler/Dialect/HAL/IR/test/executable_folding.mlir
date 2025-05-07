@@ -1,5 +1,28 @@
 // RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
+// Tests that an export condition that is always true will remove the region
+// and fallback reference (as it will never be reachable from the export).
+
+// CHECK-LABEL: @DropTrueConditionRegion
+hal.executable @DropTrueConditionRegion {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
+    // CHECK: hal.executable.export public @always_use
+    // CHECK-NOT: condition
+    // CHECK-NOT: fallback(@never_fallback)
+    hal.executable.export public @always_use ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
+    ]>) condition(%device: !hal.device) -> i1 {
+      %true = arith.constant 1 : i1
+      hal.return %true : i1
+    } fallback(@never_fallback)
+    hal.executable.export public @never_fallback ordinal(1) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
+    ]>)
+  }
+}
+
+// -----
+
 // Tests that multiple constant blocks get merged into one.
 
 // CHECK-LABEL: @multiple_constant_blocks

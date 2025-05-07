@@ -23,6 +23,7 @@ namespace {
 struct SymbolReferences {
   Operation *symbolOp;
   unsigned count = 0;
+  SmallVector<Attribute> fallbackOf;
 };
 using SymbolReferenceMap = DenseMap<Attribute, SymbolReferences>;
 
@@ -59,12 +60,32 @@ static void processOp(Operation *op, SymbolReferenceMap &referenceMap) {
   }
 }
 
+// Returns true if the users treating a symbol as a fallback are transitively
+// reachable directly or as fallbacks for reachable symbols.
+static bool reachableAsFallback(ArrayRef<Attribute> users,
+                                SymbolReferenceMap &referenceMap) {
+  for (auto user : users) {
+    if (referenceMap[user].count > 0) {
+      // The user treating the given symbol as a fallback is used directly.
+      return true;
+    }
+    if (reachableAsFallback(referenceMap[user].fallbackOf, referenceMap)) {
+      // The user treating the given symbol as a fallback itself is a fallback
+      // that has uses.
+      return true;
+    }
+  }
+  return false;
+}
+
 static void eraseOps(ArrayRef<Attribute> symbolRefAttrs,
                      SymbolReferenceMap &referenceMap) {
   for (auto symbolRefAttr : symbolRefAttrs) {
     auto &symbolRefs = referenceMap[symbolRefAttr];
-    if (symbolRefs.count == 0)
+    if (symbolRefs.count == 0 &&
+        !reachableAsFallback(symbolRefs.fallbackOf, referenceMap)) {
       symbolRefs.symbolOp->erase();
+    }
   }
 }
 
@@ -83,7 +104,7 @@ struct PruneExecutablesPass
     SymbolReferenceMap referenceMap;
     SmallVector<Attribute> executableRefAttrs;
     SmallVector<Attribute> variantRefAttrs;
-    SmallVector<Attribute> exportRefAttrs;
+    SetVector<Attribute> exportRefAttrs;
     for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
       ignoredOps.insert(executableOp);
       if (!executableOp.isPrivate())
@@ -112,7 +133,21 @@ struct PruneExecutablesPass
                   FlatSymbolRefAttr::get(exportOp.getSymNameAttr()),
               });
           referenceMap[exportRefAttr].symbolOp = exportOp;
-          exportRefAttrs.push_back(exportRefAttr);
+          exportRefAttrs.insert(exportRefAttr);
+          if (auto localFallbackAttr = exportOp.getConditionFallbackAttr()) {
+            auto fallbackRefAttr = SymbolRefAttr::get(
+                executableOp.getSymNameAttr(),
+                {
+                    FlatSymbolRefAttr::get(variantOp.getSymNameAttr()),
+                    localFallbackAttr,
+                });
+            auto fallbackOp = SymbolTable::lookupNearestSymbolFrom(
+                exportOp, localFallbackAttr);
+            auto &fallbackRefs = referenceMap[fallbackRefAttr];
+            fallbackRefs.symbolOp = fallbackOp;
+            fallbackRefs.fallbackOf.push_back(exportRefAttr);
+            exportRefAttrs.insert(fallbackRefAttr);
+          }
         }
       }
     }
@@ -132,7 +167,7 @@ struct PruneExecutablesPass
     // Erase any executable-related op with no references.
     // We have to start with exports > variants > executables so that we don't
     // erase a container before the nested ops.
-    eraseOps(exportRefAttrs, referenceMap);
+    eraseOps(exportRefAttrs.getArrayRef(), referenceMap);
     eraseOps(variantRefAttrs, referenceMap);
     eraseOps(executableRefAttrs, referenceMap);
   }
