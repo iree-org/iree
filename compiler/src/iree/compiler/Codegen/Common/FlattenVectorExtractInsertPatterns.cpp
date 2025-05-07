@@ -149,37 +149,71 @@ FailureOr<int64_t> getNumberOfElements(Type type) {
   return failure();
 }
 
-/// Return an equivalent strided slice to inserting `small` into `large`
-/// starting at `offsets`. The result is a tuple of three vectors: 1) The shape
-/// of the new small vector. 2) The shape of the new large vector. 3) The
-/// offsets of the new large vector.
-std::array<SmallVector<int64_t>, 3>
-getCollapsedStridedSliceShape(ArrayRef<int64_t> small, ArrayRef<int64_t> large,
-                              ArrayRef<int64_t> offsets) {
+
+/// Return the strided slice with the lowest rank that is equivalent to the
+/// strided slice of `small` from `large`, starting at `offsets`. The result is
+/// a tuple of three vectors:
+///
+/// 0) The shape of the new small vector.
+/// 1) The shape of the new large vector.
+/// 2) The offsets of the new large vector.
+///
+/// Example 1 (contiguous slices can always be represented in 1-D).
+///
+/// Input:
+///  small  = (1, 3, 4)
+///  large  = (3, 3, 4)
+///  offset = (2, 3, 4)
+///
+/// Output:
+///  small  = (12)
+///  large  = (36)
+///  offset = (24)
+///
+/// Example 2 (a non-contiguous slice)
+///
+/// Input:
+///  small  =    (2, 2, 1, 2)
+///  large  = (2, 2, 2, 2, 2)
+///  offset = (1, 1, 0, 1, 0)
+///
+///
+/// Output:
+///  small  =  (4, 2)
+///  large  =  (8, 4)
+///  offset = (24, 2)
+///
+///
+std::array<SmallVector<int64_t>, 3> static getCollapsedStridedSliceShape(
+    ArrayRef<int64_t> small, ArrayRef<int64_t> large,
+    ArrayRef<int64_t> offsets) {
 
   // The total number of elements in the small (large, respectively) vector.
   int64_t tSmall = std::accumulate(small.begin(), small.end(), 1,
                                    std::multiplies<int64_t>());
   int64_t tLarge = std::accumulate(large.begin(), large.end(), 1,
                                    std::multiplies<int64_t>());
-  assert((tLarge >= tSmall && large.size() >= small.size()) &&
-         "confusion of small vs large");
+  assert(tLarge >= tSmall &&
+         "total number of elements in 'small' is larger than in 'large'");
+  assert(large.size() >= small.size() &&
+         "rank of 'small' is larger than  rank of 'large'");
+
   unsigned delta = large.size() - small.size();
 
-  // The number of cumulative elements from the back currently visited in the
-  // small (large, respectively) vector.
+  // The cumulative (product of dimensions) number of elements from the back
+  // currently visited in the small (large, respectively) vector.
   int64_t nSmall = 1;
   int64_t nLarge = 1;
 
-  // The number of cumulative elements from back currently visited within the
-  // current collapse group in the small (large, respectively) vector.
+  // The cumulative number (product of dimensions) of elements from the back
+  // currently visited within the current collapse group in the small (large,
+  // respectively) vector.
   int64_t cSmall = 1;
   int64_t cLarge = 1;
 
   SmallVector<int64_t> newSmall, newLarge, newOffsets;
-  if (large.size() == 0) {
+  if (large.size() == 0)
     return {newSmall, newLarge, newOffsets};
-  }
 
   // The offset assigned to the current collapse group.
   int64_t cOff = 0;
@@ -214,6 +248,7 @@ getCollapsedStridedSliceShape(ArrayRef<int64_t> small, ArrayRef<int64_t> large,
   std::reverse(newOffsets.begin(), newOffsets.end());
   return {newSmall, newLarge, newOffsets};
 }
+
 
 SmallVector<int64_t>
 getFlattenedStridedSliceIndices(ArrayRef<int64_t> small,
