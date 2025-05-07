@@ -855,7 +855,7 @@ struct CmdDispatchOpPattern
           loc, builder.getIndexType(), getExportRef(baseExportOp));
       auto workgroupCount =
           baseExportOp.calculateWorkgroupCount(loc, device, workload, builder);
-      return std::make_tuple(ordinal, workgroupCount);
+      return {ordinal, workgroupCount};
     }
     // Recursively build the selection decision tree.
     auto fallbackExportOp =
@@ -926,11 +926,12 @@ struct CmdDispatchOpPattern
                                               });
       }
     }
-    return std::make_tuple(ifOp.getResult(0), std::array<Value, 3>{
-                                                  ifOp.getResult(1),
-                                                  ifOp.getResult(2),
-                                                  ifOp.getResult(3),
-                                              });
+    return {ifOp.getResult(0),
+            {
+                ifOp.getResult(1),
+                ifOp.getResult(2),
+                ifOp.getResult(3),
+            }};
   }
 
   Operation *emitDispatchOp(

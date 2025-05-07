@@ -326,7 +326,7 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !str
     // CHECK-SAME:     target(@ex::@aarch64::@dispatch) : index
 
     // Inlined workgroup count calculation:
-    // CHECK: %[[X:.+]] = affine.apply #map()[%c1]
+    // CHECK: %[[X:.+]] = affine.apply #{{.*}}[%c1]
 
     // Dispatch:
     // CHECK: hal.command_buffer.dispatch<%[[CMD]]
