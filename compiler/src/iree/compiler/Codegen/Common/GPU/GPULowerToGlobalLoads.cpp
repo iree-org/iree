@@ -39,8 +39,7 @@ namespace {
 // TODO: Move this to a common place.
 //====---------------------------------------------------------------------===//
 
-// For optimal performance we always want to copy 128 bits
-static constexpr int kPreferredCopyNumBits = 128;
+static constexpr int kNumBitsPerCopy = 32;
 
 // Slice the tensor into numParts parts, and return the i-th part.
 static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
@@ -130,6 +129,14 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto rank = copyMemRefType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
 
+  size_t elementBitWidth = copyMemRefType.getElementTypeBitWidth();
+  if (kNumBitsPerCopy % elementBitWidth != 0) {
+    copy.emitOpError("Cannot proceed: preferred copy size is not a multiple of "
+                     "element bit width.");
+    return false;
+  }
+  size_t elementsPerCopy = kNumBitsPerCopy / elementBitWidth;
+
   // divide the copy by subgroup:
   assert(subgroupSize.size() == 1); // only 1-D
   assert(workgroupSize[0] % subgroupSize[0] == 0);
@@ -138,7 +145,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto totalCopySize = getTotalSize(copyMemRefType.getShape());
   auto totalCopySizePerSubgroup = totalCopySize / numSubgroups;
 
-  auto numCopiesPerThread = totalCopySizePerSubgroup / subgroupSize[0];
+  auto numCopiesPerThread =
+      (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize[0];
 
   // build For loop
   SmallVector<Attribute> mapping;
@@ -168,7 +176,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     auto subgroupIdExpr = symbols[1];
     auto iterationExpr = symbols[2];
 
-    AffineExpr strideExpr = rewriter.getAffineConstantExpr(subgroupSize[0]);
+    AffineExpr strideExpr =
+        rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
