@@ -632,6 +632,7 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
 
 void buildSPIRVCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
 }
