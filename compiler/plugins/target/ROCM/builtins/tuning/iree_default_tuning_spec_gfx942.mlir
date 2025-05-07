@@ -1583,8 +1583,7 @@ transform.named_sequence
   transform.iree.match.dim_is_multiple_of  %rhs[0], 256 : !transform.any_value
   transform.iree.match.dim_is_multiple_of  %rhs[1], 128 : !transform.any_value
 
-  // M >= 512, N >= 1024, K >= 512
-  transform.iree.match.dim_bounds %lhs[0], umin = 4, none : !transform.any_value
+  // N >= 1024, K >= 512
   transform.iree.match.dim_bounds %rhs[0], umin = 1024, none : !transform.any_value
   transform.iree.match.dim_bounds %lhs[2], umin = 512, none : !transform.any_value
 
