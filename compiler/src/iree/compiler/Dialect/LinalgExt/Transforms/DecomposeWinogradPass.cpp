@@ -9,16 +9,13 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -339,9 +336,8 @@ namespace {
 struct DecomposeWinogradTransformPass final
     : impl::DecomposeWinogradTransformPassBase<DecomposeWinogradTransformPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-        linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
+                    linalg::LinalgDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
