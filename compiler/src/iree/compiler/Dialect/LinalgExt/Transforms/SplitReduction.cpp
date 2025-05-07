@@ -7,13 +7,11 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
@@ -299,8 +297,7 @@ struct TopkSplitReductionPass final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<linalg::LinalgDialect, arith::ArithDialect, math::MathDialect,
-                memref::MemRefDialect, scf::SCFDialect>();
+        .insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -330,17 +327,6 @@ struct TopkSplitReductionPass final
 };
 } // namespace
 
-// Transforms an applicable standard single reduction TopkOp into a parallel
-// reduction TopkOp with a reduce step following.
-//
-// Handles parallel reductions in 2 phases: A "map" parallel phase and the a
-// single "reduce" reduction phase. The first phase expands the input tensor
-// shape by breaking the reduction dimension into multiple parallel reductions
-// (upping the rank of the input). Topk is run on these dimensions in parallel
-// The second phase collapses the parallel results into a single final reduce.
-// Topk is run again on the combined output to produce a final output.
-//
-// Currently only topk operations without input indices are supported.
 LogicalResult
 splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
                const TopkSplitReductionControlFn &splitReductionFn) {
