@@ -11736,7 +11736,9 @@ runtime-derived parameters.</p>
               $sym_name
               (`ordinal` `(` $ordinal^ `)`)?
               `layout` `(` qualified($layout) `)`
-              custom&lt;OptionalWorkgroupCountRegion&gt;($workgroup_count)
+              (`condition` `` custom&lt;ExportConditionRegion&gt;($condition)^)?
+              (`fallback` `(` $condition_fallback^ `)`)?
+              (`count` `` custom&lt;WorkgroupCountRegion&gt;($workgroup_count)^)?
               attr-dict-with-keyword
 </code></pre></div>
 <p>An entry point exported by the executable with statically-available
@@ -11745,8 +11747,24 @@ information describing the IO interface it uses and other dispatch metadata.</p>
 returns the number of workgroups to use in the 3D grid dispatch.
 The arguments to the region represents the workload as captured by each
 dispatch. It returns the number of workgroups along x, y, and z.</p>
+<p>The optional <code>condition</code> region provides boolean logic determining whether
+the export should be dispatched given the device and workload or if a
+specified fallback export in the same executable should be dispatched
+instead. Multiple exports can be chained together as fallbacks to allow for
+arbitrarily complex decisions trees. Fallbacks for an export must match the
+layout and workload exactly but may vary any other attribute (such as
+workgroup size or translation configuration).</p>
+<p>Workgroup count and condition regions that have dependencies on dynamic
+workload information will be executed using indirect dispatch. If the
+information is available on the host at the time a command buffer containing
+the dispatch is available the indirect dispatch <em>may</em> have lower overhead
+by using <code>IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS</code>. If the
+information required is data-dependent on work within the same command
+buffer some backends will suffer a performance penalty. Condition regions
+consuming dynamic workloads in particular may result in long chains of
+indirect dispatches sent to the device or even host round-trips.</p>
 <p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>Symbol</code></p>
+<p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -11754,6 +11772,7 @@ dispatch. It returns the number of workgroups along x, y, and z.</p>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
+<tr><td><code>condition_fallback</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 <tr><td><code>workgroup_size</code></td><td>::mlir::ArrayAttr</td><td>index array attribute</td></tr>
 <tr><td><code>subgroup_size</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <tr><td><code>workgroup_local_memory</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
