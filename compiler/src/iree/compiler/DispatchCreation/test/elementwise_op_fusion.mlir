@@ -455,3 +455,150 @@ util.func public @gather_fusion_compose_maps(%arg0: tensor<2x64x64x640xf16>, %ar
 //       CHECK:     %[[EXTRACT1:.*]] = tensor.extract %[[ARG1]][%[[CAST0]], %[[CAST3]], %[[CAST2]], %[[CAST1]]] : tensor<2x64x64x640xf16>
 //       CHECK:     %[[ADDF:.+]] = arith.addf %[[EXTRACT0]], %[[EXTRACT1]] : f16
 //       CHECK:   util.return %[[GEN]] : tensor<2x128x128x640xi8>
+
+// -----
+
+util.func public @broadcast_gather_fusion(%arg0: tensor<128xf32>, %arg1: tensor<4xi64>) -> tensor<4x128xf32> {
+  %c0_i64 = arith.constant 0 : i64
+  %c131072_i64 = arith.constant 131072 : i64
+  %0 = tensor.empty() : tensor<131072x128xf32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<128xf32>) outs(%0 : tensor<131072x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %4 = linalg.index 0 : index
+    %5 = arith.index_cast %4 : index to i64
+    %6 = arith.sitofp %5 : i64 to f32
+    %7 = arith.mulf %6, %in : f32
+    linalg.yield %7 : f32
+  } -> tensor<131072x128xf32>
+  %2 = tensor.empty() : tensor<4x128xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<4xi64>) outs(%2 : tensor<4x128xf32>) {
+  ^bb0(%in: i64, %out: f32):
+    %4 = arith.cmpi slt, %in, %c0_i64 : i64
+    %5 = arith.addi %in, %c131072_i64 : i64
+    %6 = arith.select %4, %5, %in : i64
+    %7 = arith.index_cast %6 : i64 to index
+    %8 = linalg.index 1 : index
+    %extracted = tensor.extract %1[%7, %8] : tensor<131072x128xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<4x128xf32>
+  util.return %3 : tensor<4x128xf32>
+}
+// CHECK-LABEL: util.func public @broadcast_gather_fusion(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1) -> (d0)>,
+//  CHECK-SAME:       affine_map<(d0, d1) -> (d0, d1)>
+//  CHECK-SAME:     ins(%[[ARG1]]
+//       CHECK:     ^bb0(
+//  CHECK-SAME:       %[[IN0:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[OUT0:[_a-zA-Z0-9]+]]: f32
+//   CHECK-DAG:     %[[V0:.+]] = arith.cmpi slt, %[[IN0]]
+//   CHECK-DAG:     %[[V1:.+]] = arith.addi %[[IN0]]
+//       CHECK:     %[[V2:.+]] = arith.select %[[V0]], %[[V1]]
+//       CHECK:     %[[V3:.+]] = arith.index_cast %[[V2]]
+//       CHECK:     %[[IDX:.+]] = linalg.index 1 : index
+//       CHECK:     %[[EXTRACT:.*]] = tensor.extract %[[ARG0]][%[[IDX]]]
+//       CHECK:     %[[V4:.+]] = arith.index_cast %[[V3]]
+//       CHECK:     %[[V5:.+]] = arith.sitofp %[[V4]]
+//       CHECK:     %[[V6:.+]] = arith.mulf %[[V5]], %[[EXTRACT]]
+//       CHECK:     linalg.yield %[[V6]]
+//       CHECK:   util.return %[[GEN]] : tensor<4x128xf32>
+
+
+// -----
+
+util.func public @broadcast_fusion_multiple_bcast_dims(%arg0: tensor<128x2048xf32>, %arg1: tensor<4xi64>) -> tensor<4x128xf32> {
+  %c0_i64 = arith.constant 0 : i64
+  %c131072_i64 = arith.constant 131072 : i64
+  %0 = tensor.empty() : tensor<131072x128x2048xf32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<128x2048xf32>) outs(%0 : tensor<131072x128x2048xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %4 = linalg.index 0 : index
+    %5 = arith.index_cast %4 : index to i64
+    %6 = arith.sitofp %5 : i64 to f32
+    %7 = arith.mulf %6, %in : f32
+    linalg.yield %7 : f32
+  } -> tensor<131072x128x2048xf32>
+  %2 = tensor.empty() : tensor<4x128xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<4xi64>) outs(%2 : tensor<4x128xf32>) {
+  ^bb0(%in: i64, %out: f32):
+    %4 = arith.cmpi slt, %in, %c0_i64 : i64
+    %5 = arith.addi %in, %c131072_i64 : i64
+    %6 = arith.select %4, %5, %in : i64
+    %7 = arith.index_cast %6 : i64 to index
+    %8 = linalg.index 1 : index
+    %extracted = tensor.extract %1[%7, %8, %8] : tensor<131072x128x2048xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<4x128xf32>
+  util.return %3 : tensor<4x128xf32>
+}
+// CHECK-LABEL: util.func public @broadcast_fusion_multiple_bcast_dims(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1) -> (d0)>,
+//  CHECK-SAME:       affine_map<(d0, d1) -> (d0, d1)>
+//  CHECK-SAME:     ins(%[[ARG1]]
+//       CHECK:     ^bb0(
+//  CHECK-SAME:       %[[IN0:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[OUT0:[_a-zA-Z0-9]+]]: f32
+//   CHECK-DAG:     %[[V0:.+]] = arith.cmpi slt, %[[IN0]]
+//   CHECK-DAG:     %[[V1:.+]] = arith.addi %[[IN0]]
+//       CHECK:     %[[V2:.+]] = arith.select %[[V0]], %[[V1]]
+//       CHECK:     %[[V3:.+]] = arith.index_cast %[[V2]]
+//       CHECK:     %[[IDX:.+]] = linalg.index 1 : index
+//       CHECK:     %[[EXTRACT:.*]] = tensor.extract %[[ARG0]][%[[IDX]], %[[IDX]]]
+//       CHECK:     %[[V4:.+]] = arith.index_cast %[[V3]]
+//       CHECK:     %[[V5:.+]] = arith.sitofp %[[V4]]
+//       CHECK:     %[[V6:.+]] = arith.mulf %[[V5]], %[[EXTRACT]]
+//       CHECK:     linalg.yield %[[V6]]
+//       CHECK:   util.return %[[GEN]] : tensor<4x128xf32>
+
+// -----
+
+util.func public @broadcast_gather_fusion_transpose(%arg0: tensor<128xf32>, %arg1: tensor<4xi64>) -> tensor<4x128xf32> {
+  %c0_i64 = arith.constant 0 : i64
+  %c131072_i64 = arith.constant 131072 : i64
+  %0 = tensor.empty() : tensor<131072x128xf32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1, d0)>], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<128xf32>) outs(%0 : tensor<131072x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %4 = linalg.index 0 : index
+    %5 = arith.index_cast %4 : index to i64
+    %6 = arith.sitofp %5 : i64 to f32
+    %7 = arith.mulf %6, %in : f32
+    linalg.yield %7 : f32
+  } -> tensor<131072x128xf32>
+  %2 = tensor.empty() : tensor<4x128xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<4xi64>) outs(%2 : tensor<4x128xf32>) {
+  ^bb0(%in: i64, %out: f32):
+    %4 = arith.cmpi slt, %in, %c0_i64 : i64
+    %5 = arith.addi %in, %c131072_i64 : i64
+    %6 = arith.select %4, %5, %in : i64
+    %7 = arith.index_cast %6 : i64 to index
+    %8 = linalg.index 1 : index
+    %extracted = tensor.extract %1[%7, %8] : tensor<131072x128xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<4x128xf32>
+  util.return %3 : tensor<4x128xf32>
+}
+// CHECK-LABEL: util.func public @broadcast_gather_fusion_transpose(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1) -> (d0)>,
+//  CHECK-SAME:       affine_map<(d0, d1) -> (d0, d1)>
+//  CHECK-SAME:     ins(%[[ARG1]]
+//       CHECK:     ^bb0(
+//  CHECK-SAME:       %[[IN0:[_a-zA-Z0-9]+]]: i64,
+//  CHECK-SAME:       %[[OUT0:[_a-zA-Z0-9]+]]: f32
+//       CHECK:     %[[IDX:.+]] = linalg.index 1 : index
+//       CHECK:     %[[EXTRACT:.*]] = tensor.extract %[[ARG0]][%[[IDX]]]
+//       CHECK:     %[[V4:.+]] = arith.index_cast %[[IDX]]
+//       CHECK:     %[[V5:.+]] = arith.sitofp %[[V4]]
+//       CHECK:     %[[V6:.+]] = arith.mulf %[[V5]], %[[EXTRACT]]
+//       CHECK:     linalg.yield %[[V6]]
+//       CHECK:   util.return %[[GEN]] : tensor<4x128xf32>
