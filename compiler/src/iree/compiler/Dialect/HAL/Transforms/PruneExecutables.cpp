@@ -69,10 +69,10 @@ static bool reachableAsFallback(ArrayRef<Attribute> users,
       // The user treating the given symbol as a fallback is used directly.
       return true;
     }
-    if (!reachableAsFallback(referenceMap[user].fallbackOf, referenceMap)) {
+    if (reachableAsFallback(referenceMap[user].fallbackOf, referenceMap)) {
       // The user treating the given symbol as a fallback itself is a fallback
       // that has uses.
-      return false;
+      return true;
     }
   }
   return false;
