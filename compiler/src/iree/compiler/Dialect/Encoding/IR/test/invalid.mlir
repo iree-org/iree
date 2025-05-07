@@ -1,6 +1,7 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
-// expected-error @+1 {{missing required parameter: `operand_index`}}
+// expected-error @+2 {{expected valid keyword}}
+// expected-error @+1 {{expected a parameter name in struct}}
 #encoding = #iree_encoding.encoding<>
 func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
@@ -9,7 +10,8 @@ func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -
 
 // -----
 
-// expected-error @+1 {{missing required parameter: `op_type`}}
+
+// expected-error @+1 {{struct is missing required parameter: op_type}}
 #encoding = #iree_encoding.encoding<operand_index = 0>
 func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
@@ -18,7 +20,7 @@ func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -
 
 // -----
 
-// expected-error @+1 {{missing required parameter: `element_types`}}
+// expected-error @+1 {{struct is missing required parameter: element_types}}
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul>
 func.func @illegal_encoding_attr_missing_operand_index(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
