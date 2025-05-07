@@ -39,8 +39,55 @@ namespace {
 // TODO: Move this to a common place.
 //====---------------------------------------------------------------------===//
 
+// For optimal performance we always want to copy 128 bits
+static constexpr int kPreferredCopyNumBits = 128;
+
+// Slice the tensor into numParts parts, and return the i-th part.
+static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
+                                        size_t numParts, Value index) {
+  auto tensorType = cast<RankedTensorType>(tensor.getType());
+  auto outermostDimSize = tensorType.getDimSize(0);
+  if (outermostDimSize % numParts != 0) {
+    return std::nullopt;
+  }
+
+  // Create an extract slice
+  SmallVector<int64_t> newShape(tensorType.getShape());
+  newShape[0] = outermostDimSize / numParts;
+
+  auto loc = tensor.getLoc();
+  SmallVector<Value> newShapeOfSlice;
+  for (auto dim : newShape) {
+    newShapeOfSlice.push_back(
+        rewriter.create<arith::ConstantIndexOp>(loc, dim));
+  }
+
+  SmallVector<Value> offsets = {rewriter.create<arith::MulIOp>(
+      loc, index, rewriter.create<arith::ConstantIndexOp>(loc, numParts))};
+
+  SmallVector<int64_t> strides;
+  for (auto i = tensorType.getRank() - 1; i >= 0; --i) {
+    if (i == 0) {
+      strides.push_back(1);
+    } else {
+      strides.push_back(tensorType.getDimSize(i));
+    }
+  }
+
+  auto newSliceType =
+      RankedTensorType::get(newShape, tensorType.getElementType());
+  auto noVals = ValueRange{};
+  return rewriter.create<tensor::ExtractSliceOp>(
+      loc, newSliceType, tensor, offsets, noVals, noVals,
+      /*static_offset =*/ArrayRef<int64_t>{INT64_MIN, 0},
+      /*static_shape =*/newShape, /*static_strides =*/strides);
+}
+
 static std::optional<int64_t> getMemRefTypeNumElements(MemRefType memRefType) {
   auto shape = memRefType.getShape();
+  if (shape.empty()) {
+    return std::nullopt;
+  }
   int64_t numElements = 1;
   for (int64_t dim : shape) {
     if (dim == ShapedType::kDynamic) {
@@ -74,8 +121,13 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   // memory slice.
 
   // Get the copy size:
-  auto copyTensorType = cast<TensorType>(copy.getOperand(1).getType());
-  auto rank = copyTensorType.getRank();
+  auto copyMemRefType = cast<MemRefType>(copy.getOperand(1).getType());
+  if (!memref::isStaticShapeAndContiguousRowMajor(copyMemRefType)) {
+    copy.emitOpError("Cannot proceed: copy to non-static or non-contiguous, "
+                     "non-row major memref.");
+    return false;
+  }
+  auto rank = copyMemRefType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
 
   // divide the copy by subgroup:
@@ -83,8 +135,9 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   assert(workgroupSize[0] % subgroupSize[0] == 0);
 
   auto numSubgroups = workgroupSize[0] / subgroupSize[0];
-  auto totalCopySize = getTotalSize(copyTensorType.getShape());
+  auto totalCopySize = getTotalSize(copyMemRefType.getShape());
   auto totalCopySizePerSubgroup = totalCopySize / numSubgroups;
+
   auto numCopiesPerThread = totalCopySizePerSubgroup / subgroupSize[0];
 
   // build For loop
@@ -104,8 +157,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   // TODO: make it multidimensional.
 
   // compute number of loads per thread
-  auto sourceType = cast<TensorType>(copy.getOperand(0).getType());
-  TensorType localType = cast<TensorType>(copy.getOutputs().front().getType());
+  auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
+  MemRefType localType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                   Value indVar) -> OpFoldResult {
@@ -143,17 +196,47 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
                                                  {sgIdVal, indVar});
   };
 
-  // TODO: build the slice for the source tensor.
-
   // Build for loop skeleton:
-  auto destTensor = copy.getOutputs().front();
   scf::ForOp forOp = rewriter.create<scf::ForOp>(
       loc, /*lb = */ rewriter.create<arith::ConstantIndexOp>(loc, 0),
       /*ub = */
       rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread),
       /*steps = */
       rewriter.create<arith::ConstantIndexOp>(loc, 1),
-      /*outputs=*/ValueRange{destTensor});
+      /*outputs=*/ValueRange{});
+
+  bool residualElements = totalCopySizePerSubgroup % subgroupSize[0];
+  if (residualElements != 0) {
+    auto laneIdCmp = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, laneId,
+        rewriter.create<arith::ConstantIndexOp>(loc, residualElements));
+
+    // statically we know where to load the last elements from.
+    rewriter.create<scf::IfOp>(
+        loc, laneIdCmp, [&](OpBuilder &builder, Location loc) {
+          auto numCopies =
+              builder.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
+          auto residualStoreBase = getBaseIndex(subgroupId, numCopies);
+          auto delinearizedBaseIndices =
+              builder
+                  .create<affine::AffineDelinearizeIndexOp>(
+                      loc, dyn_cast<Value>(residualStoreBase),
+                      sourceType.getShape())
+                  .getMultiIndex();
+          auto laneGatherOffset =
+              getGlobalGatherIndex(subgroupId, laneId, numCopies);
+          auto delinearizedGatherIndices =
+              builder
+                  .create<affine::AffineDelinearizeIndexOp>(
+                      loc, dyn_cast<Value>(laneGatherOffset),
+                      sourceType.getShape())
+                  .getMultiIndex();
+          builder.create<IREE::GPU::GlobalLoadDMAOp>(
+              loc, copy.getOperand(0), delinearizedGatherIndices,
+              copy.getOutputs()[0], delinearizedBaseIndices);
+          builder.create<scf::YieldOp>(loc);
+        });
+  }
 
   // sync at the end of the loop across threads
   rewriter.create<gpu::BarrierOp>(loc);
@@ -189,7 +272,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
         copy.getOutputs()[0], delinearizedLocalIndices);
   }
 
-  rewriter.replaceOp(copy, forOp.getResults());
+  copy->erase();
   return true;
 }
 
@@ -223,8 +306,6 @@ struct GPULowerToGlobalLoadsPass final
     });
     return copies;
   }
-
-  
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
