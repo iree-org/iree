@@ -935,6 +935,32 @@ iree_status_t iree_hal_hip_allocator_free_async(
   return status;
 }
 
+iree_status_t iree_hal_hip_allocator_free_sync(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer) {
+  iree_hal_hip_allocator_t* allocator =
+      iree_hal_hip_allocator_cast(base_allocator);
+  hipDeviceptr_t device_ptr = iree_hal_hip_buffer_device_pointer(buffer);
+  if (!device_ptr) {
+    return iree_ok_status();
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_ALLOCATOR_ID, (void*)device_ptr);
+  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+      &allocator->statistics, iree_hal_buffer_memory_type(buffer),
+      iree_hal_buffer_allocation_size(buffer)));
+
+  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
+      allocator->symbols, hipFree(device_ptr), "hipFree");
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_buffer_set_allocation_empty(buffer);
+  }
+  IREE_TRACE_ZONE_END(z0);
+
+  return status;
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_hip_allocator_vtable = {
     .destroy = iree_hal_hip_allocator_destroy,
     .host_allocator = iree_hal_hip_allocator_host_allocator,
