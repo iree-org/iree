@@ -546,21 +546,16 @@ hal.executable private @i4_dequant_matvec {
 }
 
 //   CHECK-LABEL: func.func @i4_dequant_matvec()
-//         CHECK:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8xf16>
-//         CHECK:   %[[FOR:.+]] = scf.for %{{.+}} = %c0 to %c32 step %c4 iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x8xf16>)
-//         CHECK:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x32x128xi4, #hal.descriptor_type<storage_buffer>>, vector<1x8xi4>
-//         CHECK:     %[[READ1:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #hal.descriptor_type<storage_buffer>>, vector<1x8xf16>
-//         CHECK:     %[[READ2:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #hal.descriptor_type<storage_buffer>>, vector<1x8xf16>
-//         CHECK:     %[[READ3:.+]] = vector.transfer_read {{.+}} : memref<32x128xf16, #hal.descriptor_type<storage_buffer>>, vector<1x8xf16>
-//         CHECK:     %[[EXTEND:.+]] = arith.extui %[[READ0]] : vector<1x8xi4> to vector<1x8xi32>
-//         CHECK:     %[[CVT:.+]] = arith.uitofp %[[EXTEND]] : vector<1x8xi32> to vector<1x8xf16>
-//         CHECK:     %[[SUB:.+]] = arith.subf %[[CVT]], %[[READ1]] : vector<1x8xf16>
-//         CHECK:     %[[MUL0:.+]] = arith.mulf %[[SUB]], %[[READ2]] : vector<1x8xf16>
-//         CHECK:     %[[MUL1:.+]] = arith.mulf %[[READ3]], %[[MUL0]] : vector<1x8xf16>
-//         CHECK:     %[[ADD:.+]] = arith.addf %[[MUL1]], %[[ARG]] : vector<1x8xf16>
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//     CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4xf16>
+//         CHECK:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x4xf16>)
+//         CHECK:   %{{.*}} = arith.extui %{{.*}} : vector<1x1x4xi4> to vector<1x1x4xi32>
+//         CHECK:   %{{.*}} = arith.uitofp %{{.*}} : vector<1x1x4xi32> to vector<1x1x4xf16>
+//         CHECK:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:   %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
 
-//         CHECK:   %[[SCAST:.+]] = vector.shape_cast %[[FOR]] : vector<1x8xf16> to vector<8xf16>
-//         CHECK:   vector.reduction <add>, %[[SCAST]] : vector<8xf16> into f16
-// CHECK-COUNT-6:   gpu.shuffle  xor
-//         CHECK:   scf.if
-//         CHECK:     vector.transfer_write
+//         CHECK:   %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [0, 1, 2] : vector<1x1x4xf16> to f16

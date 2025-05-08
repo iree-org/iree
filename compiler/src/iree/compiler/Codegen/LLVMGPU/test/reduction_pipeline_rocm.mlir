@@ -132,27 +132,22 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//        CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//        CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //        CDNA3: func.func @i4_dequant_matvec()
 //   CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
-//         CDNA3:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8xf16>
-//         CDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %c0 to %c32 step %c4 iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x8xf16>)
-//         CDNA3:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x32x128xi4, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xi4>
-//         CDNA3:     %[[READ1:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xf16>
-//         CDNA3:     %[[READ2:.+]] = vector.transfer_read {{.+}} : memref<4096x32xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xf16>
-//         CDNA3:     %[[READ3:.+]] = vector.transfer_read {{.+}} : memref<32x128xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xf16>
-//         CDNA3:     %[[EXTEND:.+]] = arith.extui %[[READ0]] : vector<1x8xi4> to vector<1x8xi32>
-//         CDNA3:     %[[CVT:.+]] = arith.uitofp %[[EXTEND]] : vector<1x8xi32> to vector<1x8xf16>
-//         CDNA3:     %[[SUB:.+]] = arith.subf %[[CVT]], %[[READ1]] : vector<1x8xf16>
-//         CDNA3:     %[[MUL0:.+]] = arith.mulf %[[SUB]], %[[READ2]] : vector<1x8xf16>
-//         CDNA3:     %[[MUL1:.+]] = arith.mulf %[[READ3]], %[[MUL0]] : vector<1x8xf16>
-//         CDNA3:     %[[ADD:.+]] = arith.addf %[[MUL1]], %[[ARG]] : vector<1x8xf16>
+//     CDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//     CDNA3-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//     CDNA3-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//     CDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x4xf16>
+//         CDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<4x1x1x1x1x4xf16>)
+//         CDNA3:   %{{.*}} = arith.extui %{{.*}} : vector<4x1x1x1x1x4xi4> to vector<4x1x1x1x1x4xi32>
+//         CDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x4xi32> to vector<4x1x1x1x1x4xf16>
+//         CDNA3:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
+//         CDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
+//         CDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
+//         CDNA3:   %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
 
-//         CDNA3:   %[[SCAST:.+]] = vector.shape_cast %[[FOR]] : vector<1x8xf16> to vector<8xf16>
-//         CDNA3:   vector.reduction <add>, %[[SCAST]] : vector<8xf16> into f16
-// CDNA3-COUNT-6:   gpu.shuffle  xor
-//         CDNA3:   scf.if
-//         CDNA3:     vector.transfer_write
+//         CDNA3:   %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<4x1x1x1x1x4xf16> to vector<4x1x1xf16>
 
 // -----
 
@@ -206,7 +201,7 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //      CHECK: func.func @i4_dequant_matvec()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 
@@ -233,8 +228,8 @@ hal.executable private @matvec_fp16 {
         %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x4096xf16>> -> tensor<1x4096xf16>
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
         %5 = tensor.empty() : tensor<1x32000xf16>
-        %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8], [0, 0, 512]]>} ins(%cst : f16) outs(%5 : tensor<1x32000xf16>) -> tensor<1x32000xf16>
-        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<1x4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<1x32000xf16>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8], [0, 0, 512]]>} {
+        %6 = linalg.fill  ins(%cst : f16) outs(%5 : tensor<1x32000xf16>) -> tensor<1x32000xf16>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<1x4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<1x32000xf16>) {
         ^bb0(%in: f16, %in_0: f16, %out: f16):
           %8 = arith.mulf %in, %in_0 : f16
           %9 = arith.addf %out, %8 : f16
@@ -252,23 +247,18 @@ hal.executable private @matvec_fp16 {
 // write 8 results at the end.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //          CHECK: func.func @matvec_fp16()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //      CHECK-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
-//      CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x8xf16>
-//          CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x8xf16>)
-//      CHECK-DAG:     %[[MAT:.+]] = vector.transfer_read {{.+}} : memref<32000x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
-//      CHECK-DAG:     %[[VEC:.+]] = vector.transfer_read {{.+}} : memref<1x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
-//          CHECK:     %[[MUL:.+]] = arith.mulf %[[VEC]], %[[MAT]] : vector<8x8xf16>
-//          CHECK:     %[[ADD:.+]] = arith.addf %[[ARG]], %[[MUL]] : vector<8x8xf16>
+//      CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x1x1x1x1x8xf16>
+//          CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x1x1x1x1x8xf16>)
+//          CHECK:     {{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<8x1x1x1x1x8xf16>
+//          CHECK:     {{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<8x1x1x1x1x8xf16>
 
-//          CHECK:   vector.reduction <add>, %{{.+}} : vector<8xf16> into f16
-// CHECK-COUNT-24:   gpu.shuffle xor
-//          CHECK:   scf.if
-//          CHECK:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<8x1x1x1x1x8xf16> to vector<8x1x1xf16>
 
 // -----
 
@@ -293,8 +283,8 @@ hal.executable private @matvec_fp16 {
         %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x4096xf16>> -> tensor<1x4096xf16>
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
         %5 = tensor.empty() : tensor<1x32000xf16>
-        %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 4], [0, 0, 512]]>} ins(%cst : f16) outs(%5 : tensor<1x32000xf16>) -> tensor<1x32000xf16>
-        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<1x4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<1x32000xf16>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 4], [0, 0, 512]]>} {
+        %6 = linalg.fill  ins(%cst : f16) outs(%5 : tensor<1x32000xf16>) -> tensor<1x32000xf16>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<1x4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<1x32000xf16>) {
         ^bb0(%in: f16, %in_0: f16, %out: f16):
           %8 = arith.mulf %in, %in_0 : f16
           %9 = arith.addf %out, %8 : f16
@@ -310,23 +300,18 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //          CDNA3: func.func @matvec_fp16()
 //     CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //      CDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CDNA3-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //      CDNA3-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
-//      CDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x8xf16>
-//          CDNA3:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x8xf16>)
-//      CDNA3-DAG:     %[[MAT:.+]] = vector.transfer_read {{.+}} : memref<32000x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
-//      CDNA3-DAG:     %[[VEC:.+]] = vector.transfer_read {{.+}} : memref<1x4096xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x8xf16>
-//          CDNA3:     %[[MUL:.+]] = arith.mulf %[[VEC]], %[[MAT]] : vector<8x8xf16>
-//          CDNA3:     %[[ADD:.+]] = arith.addf %[[ARG]], %[[MUL]] : vector<8x8xf16>
+//      CDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x1x1x1x1x8xf16>
+//          CDNA3:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x1x1x1x1x8xf16>)
+//          CDNA3:     {{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<8x1x1x1x1x8xf16>
+//          CDNA3:     {{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<8x1x1x1x1x8xf16>
 
-//          CDNA3:   vector.reduction <add>, %{{.+}} : vector<8xf16> into f16
-// CDNA3-COUNT-24:   gpu.shuffle xor
-//          CDNA3:   scf.if
-//          CDNA3:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #amdgpu.address_space<fat_raw_buffer>>
+//          CDNA3: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<8x1x1x1x1x8xf16> to vector<8x1x1xf16>
 
 // -----
 
@@ -394,7 +379,7 @@ hal.executable public @multi_reduction {
 
 // Check that all loops are singly nested.
 //
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 64>
 //          CHECK: func.func @multi_reduction()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index

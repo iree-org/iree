@@ -698,9 +698,13 @@ func.func @i4_dequant_matvec() {
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
-// CHECK-LABEL: func.func @i4_dequant_matvec()
-//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 32
+//      CHECK: func.func @i4_dequant_matvec()
+// CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 256],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 2], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 4], thread_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [1, 1, 0]

@@ -73,12 +73,16 @@ func.func @vmt1() attributes {hal.executable.target = #executable_target_rocm_hs
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8], [0, 0, 512]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @vmt1()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 512],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 8], thread_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [1, 8, 0]
+
 
 // -----
 
@@ -111,12 +115,15 @@ func.func @matvec_like_no_m_dim() attributes {hal.executable.target = #executabl
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8], [0, 512]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @matvec_like_no_m_dim()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 512],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1], [0, 1]],
+//  CHECK-SAME:               thread = [0, 8], thread_basis = {{\[}}[1, 64], [0, 1]],
+//  CHECK-SAME:               workgroup = [8, 0]
 
 // -----
 
@@ -149,12 +156,15 @@ func.func @matvec_unit_n_dim() attributes {hal.executable.target = #executable_t
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 1], [0, 0, 512]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @matvec_unit_n_dim()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 512],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 8], thread_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [8, 1, 0]
 
 // -----
 
@@ -189,12 +199,15 @@ func.func @vmt2() attributes {hal.executable.target = #executable_target_rocm_hs
   return
 }
 
-//   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8], [0, 0, 512]{{\]}}>
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 32
 // CDNA3-LABEL: func.func @vmt2()
 //  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //       CDNA3:   linalg.generic
-//  CDNA3-SAME:       lowering_config = #[[$CONFIG]]
+//  CDNA3-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CDNA3-SAME:               partial_reduction = [0, 0, 512],
+//  CDNA3-SAME:               subgroup_basis = {{\[}}[1, 1, 2], [0, 1, 2]],
+//  CDNA3-SAME:               thread = [0, 0, 8], thread_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
+//  CDNA3-SAME:               workgroup = [1, 8, 0]
 
 // -----
 
@@ -244,12 +257,16 @@ func.func @i4_dequant_matvec() {
 
 // TODO: We should process multiple rows per subgroup.
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 4, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //       CHECK: func.func @i4_dequant_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 1, 128],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 1, 2], thread_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [8, 0, 0]
 
 // -----
 

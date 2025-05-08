@@ -521,11 +521,14 @@ static VectorValue broadcastToShape(RewriterBase &rewriter, Value source,
 
   VectorType broadcastedVecType =
       VectorType::get(leadingBroadcastShape, getElementTypeOrSelf(source));
-  Value broadcasted = rewriter.create<vector::BroadcastOp>(
+  VectorValue broadcasted = rewriter.create<vector::BroadcastOp>(
       source.getLoc(), broadcastedVecType, source);
 
   // Transpose the broadcasted dims to the right place.
   SmallVector<int64_t> inversePerm = invertPermutationVector(perm);
+  if (isIdentityPermutation(inversePerm)) {
+    return broadcasted;
+  }
   return rewriter.create<vector::TransposeOp>(source.getLoc(), broadcasted,
                                               inversePerm);
 }
