@@ -125,7 +125,12 @@ def EncodingAttr :
     - The maps in `user_indexing_maps` should be composable.
   }];
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    `<`
+    struct($operand_index, $op_type, $element_types, $user_indexing_maps,
+           custom<DynamicI64ArrayAttr>($iteration_sizes))
+    `>`
+  }];
 
   let parameters = (ins
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,

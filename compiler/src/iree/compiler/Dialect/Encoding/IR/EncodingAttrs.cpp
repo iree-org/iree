@@ -141,59 +141,6 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
              b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
 }
 
-/// Parse a comma-separated list of key-value pairs with a specified
-/// delimiter. This performs similar parsing as the the assembly format
-/// `struct` directive parser with a specified delimiter. The variables are
-/// printed in the order they are specified in the argument list but can be
-/// parsed in any order.
-///
-/// Example:
-/// <
-///   foo = something_parsed_by_a_custom_parser,
-///   bar = something_parsed_by_a_different_custom_parser,
-///   ...
-/// >
-/// TODO(jornt): Replace with upstream implementation.
-static ParseResult
-parseStruct(AsmParser &p, AsmParser::Delimiter delimiter,
-            ArrayRef<StringRef> keywords,
-            ArrayRef<llvm::function_ref<ParseResult()>> parseFuncs) {
-  assert(keywords.size() == parseFuncs.size());
-  auto keyError = [&]() -> ParseResult {
-    InFlightDiagnostic parseError =
-        p.emitError(p.getCurrentLocation(), "expected one of: ");
-    llvm::interleaveComma(keywords, parseError, [&](StringRef kw) {
-      parseError << '`' << kw << '`';
-    });
-    return parseError;
-  };
-  SmallVector<bool> seen(keywords.size(), false);
-  DenseMap<StringRef, size_t> keywordToIndex;
-  for (auto [idx, keyword] : llvm::enumerate(keywords))
-    keywordToIndex[keyword] = idx;
-  return p.parseCommaSeparatedList(
-      delimiter,
-      [&]() -> ParseResult {
-        StringRef keyword;
-        if (failed(p.parseOptionalKeyword(&keyword)))
-          return keyError();
-        if (!keywordToIndex.contains(keyword))
-          return keyError();
-        size_t idx = keywordToIndex[keyword];
-        if (seen[idx]) {
-          return p.emitError(p.getCurrentLocation(), "duplicated `")
-                 << keyword << "` entry";
-        }
-        if (failed(p.parseEqual()))
-          return failure();
-        if (failed(parseFuncs[idx]()))
-          return failure();
-        seen[idx] = true;
-        return success();
-      },
-      "parse struct");
-}
-
 /// Parse a list of integer values and/or dynamic values ('?')
 static FailureOr<SmallVector<int64_t>>
 parseDynamicI64IntegerList(AsmParser &parser) {
@@ -213,7 +160,7 @@ parseDynamicI64IntegerList(AsmParser &parser) {
 }
 
 /// Utility to parse an array of integer and/or dynamic values (`?`).
-static FailureOr<ArrayAttr> parseDynamicI64ArrayAttr(AsmParser &p) {
+static ParseResult parseDynamicI64ArrayAttr(AsmParser &p, ArrayAttr &attr) {
   FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(p);
   if (failed(integerVals)) {
     return failure();
@@ -222,7 +169,8 @@ static FailureOr<ArrayAttr> parseDynamicI64ArrayAttr(AsmParser &p) {
       llvm::map_to_vector(integerVals.value(), [&](int64_t val) -> Attribute {
         return IntegerAttr::get(IntegerType::get(p.getContext(), 64), val);
       });
-  return ArrayAttr::get(p.getContext(), integerValsAttr);
+  attr = ArrayAttr::get(p.getContext(), integerValsAttr);
+  return success();
 }
 
 /// Print a list of integer values and/or dynamic values ('?')
@@ -245,108 +193,6 @@ static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
   SmallVector<int64_t> intVals = llvm::map_to_vector(
       attrs, [&](Attribute attr) { return cast<IntegerAttr>(attr).getInt(); });
   return printDynamicI64IntegerList(p, intVals);
-}
-
-Attribute EncodingAttr::parse(AsmParser &p, Type type) {
-  SMLoc loc = p.getCurrentLocation();
-  FailureOr<IntegerAttr> operandIndex;
-  FailureOr<EncodingOpTypeAttr> opType;
-  FailureOr<ArrayAttr> elementTypes;
-  FailureOr<ArrayAttr> userIndexingMaps;
-  FailureOr<ArrayAttr> iterationSizes;
-  if (failed(parseStruct(
-          p, AsmParser::Delimiter::LessGreater,
-          {"operand_index", "op_type", "element_types", "user_indexing_maps",
-           "iteration_sizes"},
-          {[&]() {
-             operandIndex = mlir::FieldParser<IntegerAttr>::parse(p);
-             if (failed(operandIndex)) {
-               p.emitError(p.getCurrentLocation())
-                   << "failed to parse EncodingAttr parameter 'operand_index' "
-                      "which is to be a `IntegerAttr`";
-               return failure();
-             }
-             return success();
-           },
-           [&]() {
-             opType = FieldParser<EncodingOpTypeAttr>::parse(p);
-             if (failed(opType)) {
-               p.emitError(p.getCurrentLocation())
-                   << "failed to parse EncodingAttr parameter 'op_type' "
-                      "which is to be a `EncodingOpTypeAttr`";
-               return failure();
-             }
-             return success();
-           },
-           [&]() {
-             elementTypes = FieldParser<ArrayAttr>::parse(p);
-             if (failed(elementTypes)) {
-               p.emitError(p.getCurrentLocation())
-                   << "failed to parse EncodingAttr parameter 'element_types' "
-                      "which is to be a `ArrayAttr`";
-               return failure();
-             }
-             return success();
-           },
-           [&]() {
-             userIndexingMaps = FieldParser<ArrayAttr>::parse(p);
-             if (failed(userIndexingMaps)) {
-               p.emitError(p.getCurrentLocation())
-                   << "failed to parse EncodingAttr parameter "
-                      "'user_indexing_maps' which is to be a `ArrayAttr`";
-               return failure();
-             }
-             return success();
-           },
-           [&]() {
-             iterationSizes = parseDynamicI64ArrayAttr(p);
-             if (failed(iterationSizes)) {
-               p.emitError(p.getCurrentLocation())
-                   << "failed to parse EncodingAttr parameter "
-                      "'iteration_sizes' "
-                      "which is to be an i64 `ArrayAttr`";
-               return failure();
-             }
-             return success();
-           }}))) {
-    p.emitError(p.getCurrentLocation()) << "failed parsing encoding attribute";
-    return {};
-  }
-  if (failed(operandIndex)) {
-    p.emitError(loc, "missing required parameter: `operand_index`");
-    return {};
-  }
-  if (failed(opType)) {
-    p.emitError(loc, "missing required parameter: `op_type`");
-    return {};
-  }
-  if (failed(elementTypes)) {
-    p.emitError(loc, "missing required parameter: `element_types`");
-    return {};
-  }
-  return p.getChecked<EncodingAttr>(loc, p.getContext(), *operandIndex, *opType,
-                                    *elementTypes,
-                                    userIndexingMaps.value_or(ArrayAttr()),
-                                    iterationSizes.value_or(ArrayAttr()));
-}
-
-void EncodingAttr::print(AsmPrinter &p) const {
-  p << "<";
-  p << "operand_index = ";
-  p.printStrippedAttrOrType(getOperandIndex());
-  p << ", op_type = ";
-  p.printStrippedAttrOrType(getOpType());
-  p << ", element_types = ";
-  p.printStrippedAttrOrType(getElementTypes());
-  if (ArrayAttr maps = getUserIndexingMaps()) {
-    p << ", user_indexing_maps = ";
-    p.printStrippedAttrOrType(maps);
-  }
-  if (ArrayAttr iterationSizes = getIterationSizes()) {
-    p << ", iteration_sizes = ";
-    printDynamicI64ArrayAttr(p, iterationSizes);
-  }
-  p << ">";
 }
 
 LogicalResult
