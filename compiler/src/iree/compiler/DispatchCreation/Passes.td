@@ -164,6 +164,7 @@ def SplitReductionPass :
   let summary = "Split reduction dimension to increase parallelism.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 
