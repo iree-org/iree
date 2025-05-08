@@ -980,6 +980,12 @@ iree_hal_hip_device_query_semaphore_compatibility(
 void iree_hal_hip_async_buffer_release(void* user_data,
                                        struct iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = (iree_hal_hip_device_t*)user_data;
+  // TODO(#20043): This is temporary and will be removed. The plan is to
+  // make caching allocator timeline aware which will allow us to not
+  // differentiate allocators.
+  if (!iree_hal_hip_allocator_isa(device->device_allocator)) {
+    return;
+  }
   void* ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (ptr) {
     iree_hal_hip_allocator_free_async(device->device_allocator, buffer);
@@ -1008,7 +1014,11 @@ static iree_status_t iree_hal_hip_device_prepare_async_alloc(
   iree_status_t status = iree_hal_hip_buffer_wrap(
       placement, params.type, params.access, params.usage, allocation_size,
       /*byte_offset=*/0,
-      /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
+      /*byte_length=*/allocation_size,
+      iree_hal_hip_allocator_isa(
+          iree_hal_device_allocator((iree_hal_device_t*)device))
+          ? IREE_HAL_HIP_BUFFER_TYPE_ASYNC
+          : IREE_HAL_HIP_BUFFER_TYPE_WRAPPER,
       /*device_ptr=*/NULL, /*host_ptr=*/NULL, callback, device->host_allocator,
       &buffer);
 
@@ -1301,6 +1311,7 @@ static iree_status_t iree_hal_hip_device_semaphore_callback(
 typedef struct iree_hal_hip_device_semaphore_buffer_operation_callback_data_t {
   iree_hal_hip_semaphore_callback_data_t base;
   iree_hal_buffer_t* buffer;
+  iree_hal_buffer_params_t params;
   iree_hal_hip_device_semaphore_buffer_operation_type_t type;
 } iree_hal_hip_device_semaphore_buffer_operation_callback_data_t;
 
@@ -1333,15 +1344,19 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
 
   if (data->buffer &&
       data->type == IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC) {
-    int device_ordinal =
-        iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
     if (data->base.device->supports_memory_pools) {
+      int device_ordinal =
+          iree_math_count_trailing_zeros_u64(data->base.queue_affinity);
       status = iree_status_join(
           status,
           iree_hal_hip_memory_pools_deallocate(
               &data->base.device->devices[device_ordinal].memory_pools,
               data->base.device->devices[device_ordinal].hip_dispatch_stream,
               data->buffer));
+    } else if (!iree_hal_hip_allocator_isa(iree_hal_device_allocator(
+                   (iree_hal_device_t*)data->base.device))) {
+      iree_hal_hip_buffer_set_wrapped_buffer(data->buffer, NULL);
+      iree_hal_hip_buffer_set_allocation_empty(data->buffer);
     }
   }
 
@@ -1401,6 +1416,11 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   IREE_TRACE_ZONE_BEGIN_NAMED(
       z3, "iree_hal_hip_device_perform_buffer_operation_now_launch_operation");
   if (iree_status_is_ok(status)) {
+    // TODO(#20043): This is temporary and will be removed. The plan is to
+    // make caching allocator timeline aware which will allow us to not
+    // differentiate allocators.
+    bool is_hip_allocator = iree_hal_hip_allocator_isa(
+        iree_hal_device_allocator((iree_hal_device_t*)device));
     switch (data->type) {
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC:
         if (device->supports_memory_pools) {
@@ -1409,12 +1429,26 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
               stream, iree_hal_buffer_allocation_size(data->buffer));
           break;
         }
-        status = iree_hal_hip_allocator_alloc_async(
+        if (is_hip_allocator) {
+          status = iree_hal_hip_allocator_alloc_async(
+              iree_hal_device_allocator((iree_hal_device_t*)device),
+              data->buffer);
+          break;
+        }
+        iree_hal_buffer_t* buffer = NULL;
+        iree_device_size_t allocation_size =
+            iree_hal_buffer_allocation_size(data->buffer);
+        iree_hal_buffer_params_t buffer_params = data->params;
+        status = iree_hal_allocator_allocate_buffer(
             iree_hal_device_allocator((iree_hal_device_t*)device),
-            data->buffer);
+            buffer_params, allocation_size, &buffer);
+        if (iree_status_is_ok(status)) {
+          iree_hal_hip_buffer_set_wrapped_buffer(data->buffer, buffer);
+        }
         break;
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC: {
-        if (!data->base.device->supports_memory_pools && data->buffer) {
+        if (!data->base.device->supports_memory_pools && data->buffer &&
+            is_hip_allocator) {
           // If we support memory pools this free is done on the cleanup thread.
           status = iree_status_join(
               status, iree_hal_hip_allocator_free_async(
@@ -1513,9 +1547,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   queue_affinity = (uint64_t)1 << device_ordinal;
 
   iree_status_t status = iree_ok_status();
-  if (!iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
-      (device->supports_memory_pools ||
-       iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device)))) {
+  if (!iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     iree_hal_buffer_t* buffer = NULL;
 
     status = iree_hal_hip_device_prepare_async_alloc(
@@ -1528,6 +1560,7 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
           device, device->host_allocator, queue_affinity, wait_semaphore_list,
           signal_semaphore_list, buffer,
           IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC, &callback_data);
+      callback_data->params = params;
     }
     if (iree_status_is_ok(status) && wait_semaphore_list.count == 0) {
       status = iree_hal_hip_dispatch_thread_add_dispatch(
@@ -1618,7 +1651,8 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   queue_affinity = (uint64_t)1 << device_ordinal;
 
   iree_status_t status = iree_ok_status();
-  if (iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device))) {
+  if (!iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     iree_hal_hip_device_semaphore_buffer_operation_callback_data_t*
         callback_data;
     status = iree_hal_hip_device_make_buffer_callback_data(
@@ -1663,13 +1697,7 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
       z0, iree_hal_semaphore_list_wait(wait_semaphore_list,
                                        iree_infinite_timeout()));
 
-  // Schedule the buffer deallocation if we got it from a pool and otherwise
-  // drop it on the floor and let it be freed when the buffer is released.
-  if (device->supports_memory_pools) {
-    status = iree_hal_hip_memory_pools_deallocate(
-        &device->devices[device_ordinal].memory_pools,
-        device->devices[device_ordinal].hip_dispatch_stream, buffer);
-  }
+  // let the buffer be freed when the it is released.
 
   // Only signal if not returning a synchronous error - synchronous failure
   // indicates that the stream is unchanged (it's not really since we waited

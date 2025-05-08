@@ -415,6 +415,10 @@ static void iree_hal_hip_buffer_free(
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; external)");
       break;
     }
+    case IREE_HAL_HIP_BUFFER_TYPE_WRAPPER: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; wrapper)");
+      break;
+    }
   }
   IREE_TRACE_ZONE_END(z0);
 }
@@ -773,6 +777,7 @@ static iree_status_t iree_hal_hip_allocator_export_buffer(
         case IREE_HAL_HIP_BUFFER_TYPE_DEVICE:
         case IREE_HAL_HIP_BUFFER_TYPE_EXTERNAL:
         case IREE_HAL_HIP_BUFFER_TYPE_ASYNC:
+        case IREE_HAL_HIP_BUFFER_TYPE_WRAPPER:
           out_external_buffer->flags = requested_flags;
           out_external_buffer->type = requested_type;
           out_external_buffer->handle.device_allocation.ptr =
