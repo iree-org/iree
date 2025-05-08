@@ -108,7 +108,7 @@ typedef struct iree_hal_hip_device_params_t {
   bool allow_inline_execution;
 
   // Enable async caching on the device.
-  bool enable_async_caching;
+  bool async_caching;
 } iree_hal_hip_device_params_t;
 
 // Initializes |out_params| to default values.
