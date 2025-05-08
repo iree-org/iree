@@ -538,7 +538,8 @@ Types of Sharktank tests:
 * Quality tests for full models
 * Benchmarks for full models
 
-The quality and benchmark test config files are stored in [`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models)
+The quality and benchmark test config files are stored in
+[`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models).
 
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 
