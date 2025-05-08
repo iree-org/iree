@@ -299,12 +299,12 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
                                                        ValueRange dynamicSizes,
                                                        unsigned alignment) {
   Attribute memorySpace = memRefType.getMemorySpace();
-  // Bail out if the memref type specifies a nonnull memory space that is not
-  // #gpu.address_space.
+  // Default to private space if the memref type specifies a nonnull memory
+  // space that is not #gpu.address_space.
   if (memorySpace &&
       !llvm::isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(
           memorySpace)) {
-    return failure();
+    memorySpace = Attribute();
   }
 
   MemRefType allocType = memRefType;
