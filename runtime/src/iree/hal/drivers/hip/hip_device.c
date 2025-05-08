@@ -229,6 +229,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   out_params->file_transfer_chunk_size =
       IREE_HAL_DEVICE_MAX_TRANSFER_DEFAULT_CHUNK_SIZE;
   out_params->allow_inline_execution = false;
+  out_params->async_caching = true;
 }
 
 static iree_status_t iree_hal_hip_device_check_params(
@@ -1342,6 +1343,12 @@ static iree_status_t iree_hal_hip_device_complete_buffer_operation(
               &data->base.device->devices[device_ordinal].memory_pools,
               data->base.device->devices[device_ordinal].hip_dispatch_stream,
               data->buffer));
+    } else if (!data->base.device->params.async_caching) {
+      status = iree_status_join(
+          status,
+          iree_hal_hip_allocator_free_sync(
+              iree_hal_device_allocator((iree_hal_device_t*)data->base.device),
+              data->buffer));
     }
   }
 
@@ -1414,7 +1421,8 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
             data->buffer);
         break;
       case IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC: {
-        if (!data->base.device->supports_memory_pools && data->buffer) {
+        if (!data->base.device->supports_memory_pools && data->buffer &&
+            data->base.device->params.async_caching) {
           // If we support memory pools this free is done on the cleanup thread.
           status = iree_status_join(
               status, iree_hal_hip_allocator_free_async(

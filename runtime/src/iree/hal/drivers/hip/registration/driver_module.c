@@ -35,6 +35,9 @@ IREE_FLAG(
     bool, hip_async_allocations, true,
     "Enables HIP asynchronous stream-ordered allocations when supported.");
 
+IREE_FLAG(bool, hip_async_caching, true,
+          "Enables caching for stream-ordered allocations")
+
 IREE_FLAG(
     int32_t, hip_tracing, 2,
     "Controls the verbosity of tracing when Tracy instrumentation is enabled.\n"
@@ -75,6 +78,8 @@ static const iree_string_view_t key_hip_allow_inline_execution =
     iree_string_view_literal("hip_allow_inline_execution");
 static const iree_string_view_t key_hip_async_allocations =
     iree_string_view_literal("hip_async_allocations");
+static const iree_string_view_t key_hip_async_caching =
+    iree_string_view_literal("hip_async_caching");
 static const iree_string_view_t key_hip_tracing =
     iree_string_view_literal("hip_tracing");
 static const iree_string_view_t key_hip_default_index =
@@ -100,6 +105,8 @@ static iree_status_t iree_hal_hip_driver_parse_flags(
       FLAG_hip_allow_inline_execution));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_async_allocations, FLAG_hip_async_allocations));
+  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
+      builder, key_hip_async_caching, FLAG_hip_async_caching));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_tracing, FLAG_hip_tracing));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
@@ -178,6 +185,14 @@ static iree_status_t iree_hal_hip_driver_populate_options(
             (int)value.size, value.data);
       }
       device_params->async_allocations = ivalue ? true : false;
+    } else if (iree_string_view_equal(key, key_hip_async_caching)) {
+      if (!iree_string_view_atoi_int32(value, &ivalue)) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "Option 'hip_async_caching' expected to be int Got: '%.*s'",
+            (int)value.size, value.data);
+      }
+      device_params->async_caching = ivalue ? true : false;
     } else if (iree_string_view_equal(key, key_hip_tracing)) {
       if (!iree_string_view_atoi_int32(value, &ivalue)) {
         return iree_make_status(
