@@ -272,6 +272,12 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
 //====---------------------------------------------------------------------===//
 // Vector Distribution Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
+//
+
+static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
+  return linalg::isaContractionOpInterface(linalgOp) &&
+         linalgOp.getNumParallelLoops() >= 1;
+};
 
 /// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
 /// reduction iterator.
@@ -428,11 +434,6 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
   // Setting the config for operation with atleast one reduction dimension.
   SmallVector<int64_t> partialReductionTileSizes(op.getNumLoops(), 0);
   int64_t lastReductionDim = reductionDims.back();
-
-  auto isMatmulLike = [](linalg::LinalgOp &linalgOp) -> bool {
-    return linalg::isaContractionOpInterface(linalgOp) &&
-           linalgOp.getNumParallelLoops() >= 2;
-  };
 
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
@@ -2987,7 +2988,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG("Contract Config");
       return success();
     }
-    if (clGPUTestVectorDistributeOnReduction) {
+    // Skinny matmuls go through the vectordistribute pipeline by default.
+    if (clGPUTestVectorDistributeOnReduction || isMatmulLike(linalgOp)) {
       if (succeeded(setReductionVectorDistributionConfig(target, entryPointFn,
                                                          linalgOp))) {
         LDBG("Vector Distribution Subgroup Reduction Config");
