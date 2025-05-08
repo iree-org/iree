@@ -75,8 +75,8 @@ public:
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {
     // Inherit the same config defaults from the upstream canonicalizer pass.
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Normal;
+    config.setUseTopDownTraversal().setRegionSimplificationLevel(
+        GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet owningPatterns(context);
     for (auto *dialect : context->getLoadedDialects())
@@ -93,10 +93,10 @@ public:
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
     ConfigTrackingListener listener;
     {
-      config.listener = &listener;
+      config.setListener(&listener);
       LogicalResult didConverge =
           applyPatternsGreedily(getOperation(), *patterns, config);
-      config.listener = nullptr;
+      config.setListener(nullptr);
       if (this->testConvergence && failed(didConverge)) {
         getOperation()->emitError("Canonicalizer failed to converge");
         return signalPassFailure();

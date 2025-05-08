@@ -487,8 +487,7 @@ class OptimizeIntArithmeticPass
 
     GreedyRewriteConfig config;
     // Results in fewer recursive data flow flushes/cycles on modification.
-    config.useTopDownTraversal = false;
-    config.listener = &listener;
+    config.setUseTopDownTraversal().setListener(&listener);
 
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     for (int i = 0;; ++i) {

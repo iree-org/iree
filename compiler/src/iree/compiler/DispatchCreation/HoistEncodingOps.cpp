@@ -181,7 +181,7 @@ void HoistEncodingOpsPass::runOnOperation() {
   RewritePatternSet bubblingPatterns(ctx);
   bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
   GreedyRewriteConfig config;
-  config.cseConstants = false;
+  config.enableConstantCSE(false);
   if (failed(
           applyPatternsGreedily(funcOp, std::move(bubblingPatterns), config))) {
     return signalPassFailure();

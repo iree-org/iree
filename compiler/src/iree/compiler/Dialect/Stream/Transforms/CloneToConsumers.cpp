@@ -116,8 +116,8 @@ struct CloneToConsumersPass
 
   LogicalResult initialize(MLIRContext *context) override {
     // Inherit the same config defaults from the upstream canonicalizer pass.
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Normal;
+    config.setUseTopDownTraversal().setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet owningPatterns(context);
     for (auto *dialect : context->getLoadedDialects()) {

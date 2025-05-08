@@ -605,7 +605,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
     (void)listener.checkAndResetError();
   });
   GreedyRewriteConfig config;
-  config.listener = &listener;
+  config.setListener(&listener);
   if (failed(applyPatternsGreedily(target, std::move(preProcessingPatterns),
                                    config))) {
     return mlir::emitDefiniteFailure(target,
@@ -671,7 +671,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   ErrorCheckingTrackingListener listener(state, *this);
   GreedyRewriteConfig config;
-  config.listener = &listener;
+  config.setListener(&listener);
 
   // Unrolling to native vector size must have previously occurred.
   // TODO: Add pattern to propagate the extract through the scf.for
@@ -1410,7 +1410,7 @@ transform_dialect::EliminateGpuBarriersOp::applyToOne(
     (void)listener.checkAndResetError();
   });
   GreedyRewriteConfig config;
-  config.listener = &listener;
+  config.setListener(&listener);
   if (failed(applyPatternsGreedily(target, std::move(patterns), config))) {
     return emitDefaultSilenceableFailure(target);
   }

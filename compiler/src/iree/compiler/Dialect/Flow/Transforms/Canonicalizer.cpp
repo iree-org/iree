@@ -92,8 +92,8 @@ struct CanonicalizerPass
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {
     // Inherit the same config defaults from the upstream canonicalizer pass.
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Normal;
+    config.setUseTopDownTraversal().setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet owningPatterns(context);
     for (auto *dialect : context->getLoadedDialects())
@@ -112,7 +112,7 @@ struct CanonicalizerPass
   }
   void runOnOperation() override {
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
-    config.cseConstants = cseConstants;
+    config.enableConstantCSE(cseConstants);
     LogicalResult didConverge =
         applyPatternsGreedily(getOperation(), *patterns, config);
     if (this->testConvergence && failed(didConverge)) {

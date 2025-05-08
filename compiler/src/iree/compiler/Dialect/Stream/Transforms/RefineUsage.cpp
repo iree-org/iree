@@ -475,7 +475,7 @@ struct RefineUsagePass
     insertUsageRefinementPatterns(&getContext(), analysis, patterns);
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     GreedyRewriteConfig rewriteConfig;
-    rewriteConfig.useTopDownTraversal = true;
+    rewriteConfig.setUseTopDownTraversal();
     if (failed(
             applyPatternsGreedily(moduleOp, frozenPatterns, rewriteConfig))) {
       return signalPassFailure();
