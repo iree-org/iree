@@ -1099,13 +1099,14 @@ void PropagateLinalgTransposePass::runOnOperation() {
     linalg::FillOp::getCanonicalizationPatterns(bubblingPatterns, context);
 
     if (enableAttentionVTranspose) {
-      linalg::ControlFusionFn bubbleTransposeControlFn = [](OpOperand
-                                                                *fusedOperand) {
-        Operation *producer = fusedOperand->get().getDefiningOp();
-        Operation *consumer = fusedOperand->getOwner();
+      linalg::ControlFusionFn bubbleTransposeControlFn =
+          [](OpOperand *fusedOperand) {
+            Operation *producer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
 
-        return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
-      };
+            return IREE::Flow::isNonNullAndOutsideDispatch(
+                {producer, consumer});
+          };
       IREE::LinalgExt::populateBubbleTransposeFromLinalgExtOps(
           bubblingPatterns, bubbleTransposeControlFn);
     }
