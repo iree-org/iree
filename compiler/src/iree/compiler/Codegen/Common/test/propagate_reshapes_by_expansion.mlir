@@ -477,10 +477,10 @@ func.func @expand_dest_forall_chained() {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-func.func @expand_dest_forall_no_crash_is_20736(%arg0: tensor<16x8x48x32x3x96xbf16>, %arg1: tensor<3x96x1x3x3x96xbf16>) {
+func.func @expand_dest_forall_no_crash_issue_20736(%arg0: tensor<16x8x48x32x3x96xbf16>, %arg1: tensor<3x96x1x3x3x96xbf16>) {
   // IR that previously crashed during pattern application.
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x8x48x32x3x96xbf16>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x8x48x32x3x96xbf16>>
   %1 = tensor.empty() : tensor<16x8x48x32x3x96xbf16>
   %2 = scf.forall (%arg2, %arg3, %arg4, %arg5, %arg6) = (0, 0, 0, 0, 0) to (16, 8, 48, 3, 96) step (1, 1, 16, 1, 32) shared_outs(%arg7 = %1) -> (tensor<16x8x48x32x3x96xbf16>) {
     %extracted_slice = tensor.extract_slice %arg7[%arg2, %arg3, %arg4, 0, %arg5, %arg6] [1, 1, 16, 32, 1, 32] [1, 1, 1, 1, 1, 1] : tensor<16x8x48x32x3x96xbf16> to tensor<1x1x16x32x1x32xbf16>
@@ -494,7 +494,7 @@ func.func @expand_dest_forall_no_crash_is_20736(%arg0: tensor<16x8x48x32x3x96xbf
   iree_tensor_ext.dispatch.tensor.store %2, %0, offsets = [0, 0, 0, 0, 0, 0], sizes = [16, 8, 48, 32, 3, 96], strides = [1, 1, 1, 1, 1, 1] : tensor<16x8x48x32x3x96xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x8x48x32x3x96xbf16>>
   return
 }
-// CHECK-LABEL: func @expand_dest_forall_no_crash_is_20736(
+// CHECK-LABEL: func @expand_dest_forall_no_crash_issue_20736(
 //       CHECK:   scf.forall
 //   CHECK-NOT:     tensor.collapse_shape
 //       CHECK:     tensor.parallel_insert_slice
