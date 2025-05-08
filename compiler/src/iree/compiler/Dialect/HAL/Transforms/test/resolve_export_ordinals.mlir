@@ -2,14 +2,14 @@
 
 hal.executable @exe0 {
   hal.executable.variant @target target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry123 ordinal(123) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry123 ordinal(123) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }
 hal.executable @exe1 {
   hal.executable.variant @target target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry456 ordinal(456) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry456 ordinal(456) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
     ]>)
   }

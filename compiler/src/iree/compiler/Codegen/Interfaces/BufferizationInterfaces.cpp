@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -44,140 +46,11 @@ using mlir::bufferization::replaceOpWithBufferizedValues;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
 
 namespace mlir::iree_compiler {
-
-//===----------------------------------------------------------------------===//
-// Utility functions.
-//===----------------------------------------------------------------------===//
-
-/// Get strides for row-major oredering of a tensor with the given `shape`.
-static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
-  if (shape.empty()) {
-    return {};
-  }
-  SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
-  strides.back() = 1;
-  for (int i = strides.size() - 1; i > 0; --i) {
-    if (ShapedType::isDynamic(shape[i])) {
-      break;
-    }
-    strides[i - 1] = strides[i] * shape[i];
-  }
-  return strides;
-}
-
-static MemRefType
-getMemrefTypeForTensor(IREE::TensorExt::DispatchTensorType tensorType,
-                       MemRefLayoutAttrInterface layout = {},
-                       Attribute memorySpace = {}) {
-  return MemRefType::get(tensorType.getShape(),
-                         tensorType.getBoundElementType(), layout, memorySpace);
-}
-
-/// Find the memref version of the given InterfaceBindingSubspanOp. If no such
-/// op exists in the same block (before the given op), create a new op.
-// TODO(#12933): Because of regressions in CUDA backend, there is an
-// option to keep a legacy mode of not representing the offset in the
-// type. Remove once the bug is fixed.
-static Value
-findOrCreateSubspanBuffer(RewriterBase &rewriter,
-                          IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-  // Ensure that this a tensor subspan op.
-  auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-      subspanOp.getResult().getType());
-  assert(shapedType && shapedType.hasRank());
-
-  Value byteOffset = subspanOp.getByteOffset();
-  MemRefLayoutAttrInterface layoutAttr = {};
-  if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
-    // Using buffer resources on AMDGPU will require buffers to be relocated to
-    // offset 0, so any static offset we can compute here might change.
-    // Therefore, always use a ? for the offset field unless it's known to be 0.
-    auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
-    SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
-    layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
-                                        ShapedType::kDynamic, strides);
-  }
-  bool useRocdlBuffers = false;
-  if (auto *ireeGpuDialect =
-          rewriter.getContext()
-              ->getLoadedDialect<IREE::GPU::IREEGPUDialect>()) {
-    useRocdlBuffers =
-        ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
-            subspanOp);
-  }
-  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
-      subspanOp.getDescriptorType());
-  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr, memorySpace);
-
-  // Look for an existing op.
-  Block *block = subspanOp->getBlock();
-  for (Operation &op : *block) {
-    if (&op == subspanOp.getOperation())
-      break;
-    auto bufferSubspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(&op);
-    if (!bufferSubspanOp)
-      continue;
-
-    auto bufferMemrefType =
-        llvm::dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
-    if (!bufferMemrefType)
-      continue;
-
-    if (bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
-        bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
-        bufferSubspanOp.getByteOffset() != subspanOp.getByteOffset() ||
-        !llvm::equal(bufferSubspanOp.getDynamicDims(),
-                     subspanOp.getDynamicDims()) ||
-        bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
-        memRefType != bufferMemrefType)
-      continue;
-
-    if (useRocdlBuffers && bufferSubspanOp->hasOneUse()) {
-      auto castOp = llvm::dyn_cast<amdgpu::FatRawBufferCastOp>(
-          *bufferSubspanOp->getUsers().begin());
-      if (!castOp)
-        continue;
-      return castOp.getResult();
-    }
-    return bufferSubspanOp.getResult();
-  }
-
-  // None found, create a new op.
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(subspanOp);
-  // Just change the result type of the InterfaceBindingSubspanOp.
-  Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
-      subspanOp.getBinding(), subspanOp.getByteOffset(),
-      subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
-      subspanOp.getDescriptorFlagsAttr());
-  if (useRocdlBuffers) {
-    buffer = rewriter.create<amdgpu::FatRawBufferCastOp>(
-        subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
-        /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
-        /*resetOffset=*/true);
-  }
-  rewriter.create<memref::AssumeAlignmentOp>(
-      subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
-  return buffer;
-}
-
 namespace {
 
 //===----------------------------------------------------------------------===//
 // IREE specific External models for BufferizableOpInterface.
 //===----------------------------------------------------------------------===//
-
-/// Check if the two tensor types (with their respective dynamic dimension
-/// values) have the same shape.
-static bool
-equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
-                 IREE::TensorExt::DispatchTensorType dispatchTensorType,
-                 ValueRange dispatchTensorDynSizes) {
-  return llvm::equal(tensorType.getShape(), dispatchTensorType.getShape()) &&
-         tensorDynSizes.size() == dispatchTensorDynSizes.size() &&
-         llvm::equal(tensorDynSizes, dispatchTensorDynSizes);
-}
 
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
@@ -282,6 +155,90 @@ struct DispatchTensorStoreOpInterface
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp->getLoc(), srcMemref,
                                     target)))
+      return failure();
+
+    rewriter.eraseOp(storeOp);
+    return success();
+  }
+};
+
+struct LoadFromMemrefOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          LoadFromMemrefOpInterface, IREE::Codegen::LoadFromMemrefOp> {
+  bool isWritable(Operation *op, Value value,
+                  const AnalysisState &state) const {
+    // Walk memref Value producers until a hal.interface.binding.subspan op is
+    // found, and check if the subspan is read only.
+    Operation *currentOp = op;
+    while (currentOp) {
+      if (auto subspanOp =
+              dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
+        std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+            subspanOp.getDescriptorFlags();
+        return !descriptorFlags.has_value() ||
+               descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
+      }
+      // There is expected to be only a single memref source for a given memref
+      // OpResult, because producers of memref Values are expected to be
+      // view-like or cast-like operations. If multiple operands have a memref
+      // type, then conservatively return not writable.
+      if (llvm::count_if(currentOp->getOperandTypes(),
+                         llvm::IsaPred<MemRefType>) != 1) {
+        return false;
+      }
+      // Otherwise, follow the memref operand to find the source buffer.
+      for (Value operand : currentOp->getOperands()) {
+        if (isa<MemRefType>(operand.getType())) {
+          currentOp = operand.getDefiningOp();
+          break;
+        }
+      }
+    }
+    // Conservatively default to not writable if the source of the buffer is
+    // not found.
+    return false;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
+    replaceOpWithBufferizedValues(rewriter, op, loadOp.getSource());
+    return success();
+  }
+};
+
+struct StoreToMemrefOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          StoreToMemrefOpInterface, IREE::Codegen::StoreToMemrefOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    return {};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    FailureOr<Value> maybeBuffer =
+        getBuffer(rewriter, storeOp.getValue(), options);
+    if (failed(maybeBuffer))
+      return failure();
+    Value srcMemref = *maybeBuffer;
+
+    // If everything bufferized inplace, no copy is needed. We wrote to the
+    // target buffer already. The copy folds away in that case.
+    if (failed(options.createMemCpy(rewriter, storeOp.getLoc(), srcMemref,
+                                    storeOp.getTarget())))
       return failure();
 
     rewriter.eraseOp(storeOp);
@@ -610,6 +567,87 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
   }
 };
 
+struct LoadFromMemrefOpSubsetInterface
+    : public SubsetOpInterface::ExternalModel<LoadFromMemrefOpSubsetInterface,
+                                              IREE::Codegen::LoadFromMemrefOp> {
+  bool operatesOnEquivalentSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
+    Operation *otherOp = candidate.getOperation();
+    if (auto storeOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(otherOp)) {
+      return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
+    }
+    if (auto otherLoadOp = dyn_cast<IREE::Codegen::LoadFromMemrefOp>(otherOp)) {
+      return equivalenceFn(loadOp.getSource(), otherLoadOp.getSource());
+    }
+    return false;
+  }
+
+  bool operatesOnDisjointSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // TODO: This is a new entry point and not clear it is correct.
+    return false;
+  }
+};
+
+struct StoreToMemrefOpSubsetInterface
+    : public SubsetOpInterface::ExternalModel<StoreToMemrefOpSubsetInterface,
+                                              IREE::Codegen::StoreToMemrefOp> {
+
+  bool operatesOnEquivalentSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // Returns true if the value of a `storeOp` bufferizes to an equivalent
+    // DispatchTensorLoadOp result that bufferizes inplace.
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    Operation *otherOp = candidate.getOperation();
+    if (auto otherStoreOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(otherOp)) {
+      return equivalenceFn(storeOp.getTarget(), otherStoreOp.getTarget());
+    }
+    if (auto loadOp = dyn_cast<IREE::Codegen::LoadFromMemrefOp>(otherOp)) {
+      return equivalenceFn(storeOp.getTarget(), loadOp.getSource());
+    }
+    return false;
+  }
+
+  bool operatesOnDisjointSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // TODO: This is a new entry point and not clear it is correct.
+    return false;
+  }
+};
+
+struct StoreToMemrefOpSubsetInsertionInterface
+    : public SubsetInsertionOpInterface::ExternalModel<
+          StoreToMemrefOpSubsetInsertionInterface,
+          IREE::Codegen::StoreToMemrefOp> {
+
+  OpOperand &getSourceOperand(Operation *op) const {
+    return cast<IREE::Codegen::StoreToMemrefOp>(op).getValueMutable();
+  }
+
+  OpOperand &getDestinationOperand(Operation *op) const {
+    return cast<IREE::Codegen::StoreToMemrefOp>(op).getTargetMutable();
+  }
+
+  Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
+                              Location loc) const {
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    auto loadOp = builder.create<IREE::Codegen::LoadFromMemrefOp>(
+        loc, storeOp.getValue().getType(), storeOp.getTarget());
+    return loadOp.getResult();
+  }
+
+  SmallVector<Value>
+  getValuesNeededToBuildSubsetExtraction(Operation *op) const {
+    auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
+    return {storeOp.getTarget()};
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE specific post analysis transformations.
 //===----------------------------------------------------------------------===//
@@ -639,6 +677,14 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             DispatchTensorStoreOpSubsetInterface>(*ctx);
         IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInsertionInterface>(*ctx);
+      });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
+        IREE::Codegen::LoadFromMemrefOp::attachInterface<
+            LoadFromMemrefOpInterface, LoadFromMemrefOpSubsetInterface>(*ctx);
+        IREE::Codegen::StoreToMemrefOp::attachInterface<
+            StoreToMemrefOpInterface, StoreToMemrefOpSubsetInterface,
+            StoreToMemrefOpSubsetInsertionInterface>(*ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {

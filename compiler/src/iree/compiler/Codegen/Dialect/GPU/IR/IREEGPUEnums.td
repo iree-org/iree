@@ -131,7 +131,7 @@ class IREEGPU_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cas
 //     * 0 = CDNA1
 //     * 1 = CDNA2
 //     * 2 = CDNA3
-//     * 3 = CDNA3.5
+//     * 3 = CDNA4
 //     * 8 = RDNA3
 //     * 9 = RDNA4
 // * C = element type of A-matrix:
@@ -169,7 +169,7 @@ def MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ : I32EnumAttrCase<"MFMA_F32_32x32x16
 def MFMA_I32_16x16x32_I8 : I32EnumAttrCase<"MFMA_I32_16x16x32_I8", 0x12C0>;
 def MFMA_I32_32x32x16_I8 : I32EnumAttrCase<"MFMA_I32_32x32x16_I8", 0x12C1>;
 
-// Introduced in CDNA3.5
+// Introduced in CDNA4
 def MFMA_F32_16x16x32_F16 : I32EnumAttrCase<"MFMA_F32_16x16x32_F16", 0x1320>;
 def MFMA_F32_32x32x16_F16 : I32EnumAttrCase<"MFMA_F32_32x32x16_F16", 0x1321>;
 def MFMA_F32_16x16x32_BF16 : I32EnumAttrCase<"MFMA_F32_16x16x32_BF16", 0x1322>;
@@ -244,7 +244,7 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
       MFMA_I32_16x16x32_I8,
       MFMA_I32_32x32x16_I8,
 
-      // Introduced in CDNA3.5
+      // Introduced in CDNA4
       MFMA_F32_16x16x32_F16,
       MFMA_F32_32x32x16_F16,
       MFMA_F32_16x16x32_BF16,

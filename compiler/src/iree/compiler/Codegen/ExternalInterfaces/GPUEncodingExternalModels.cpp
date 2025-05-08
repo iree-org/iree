@@ -371,7 +371,7 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
 };
 
 struct GPUHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+    : HostSerializableEncodingAttrInterfaceExternalModelBase<
           GPUHostSerializableEncodingAttrInterface, GPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
@@ -539,7 +539,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
            "Incorrect pad amount");
     assert(padBytes < cacheSetSpanBytes && "Incorrect pad amount");
     const int64_t numPadElements = (padBytes * 8) / elementBits;
-    SmallVector<int32_t> padValues(rank, 0);
+    SmallVector<int64_t> padValues(rank, 0);
     padValues[padDimensionIndex] = numPadElements;
     auto padLayout = Encoding::PadEncodingLayoutAttr::get(ctx, padValues);
     return padLayout;

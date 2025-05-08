@@ -43,6 +43,7 @@ iree_lit_test_suite(
     "pipeline_tests.mlir"
     "propagate_encodings.mlir"
     "set_encoding.mlir"
+    "set_encoding_padding.mlir"
     "set_encoding_pipeline.mlir"
     "sink_reshapes.mlir"
     "split_reduction.mlir"

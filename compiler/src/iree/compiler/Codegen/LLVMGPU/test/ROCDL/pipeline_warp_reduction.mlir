@@ -6,8 +6,7 @@
 ]>
 hal.executable private @warp_reduction {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @warp_reduction ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    hal.executable.export public @warp_reduction ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
@@ -47,8 +46,7 @@ hal.executable private @warp_reduction {
 ]>
 hal.executable public @main_dispatch_517 {
   hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @warp_reduction_large_vector ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @warp_reduction_large_vector ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }

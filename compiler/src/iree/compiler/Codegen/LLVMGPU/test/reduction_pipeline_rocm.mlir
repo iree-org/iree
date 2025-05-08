@@ -11,8 +11,7 @@
 ]>
 hal.executable @group_reduction_1d {
 hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @group_reduction_1d ordinal(0) layout(#pipeline_layout) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+  hal.executable.export public @group_reduction_1d ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
     %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
@@ -50,8 +49,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable @group_reduction_1d {
 hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @group_reduction_1d ordinal(0) layout(#pipeline_layout) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+  hal.executable.export public @group_reduction_1d ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
     %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
@@ -93,8 +91,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 ]>
 hal.executable private @i4_dequant_matvec {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @i4_dequant_matvec ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @i4_dequant_matvec ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -168,8 +165,7 @@ hal.executable private @i4_dequant_matvec {
 ]>
 hal.executable private @i4_dequant_matvec {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @i4_dequant_matvec ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @i4_dequant_matvec ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -223,8 +219,7 @@ hal.executable private @i4_dequant_matvec {
 ]>
 hal.executable private @matvec_fp16 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @matvec_fp16 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @matvec_fp16 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -284,8 +279,7 @@ hal.executable private @matvec_fp16 {
 ]>
 hal.executable private @matvec_fp16 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @matvec_fp16 ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @matvec_fp16 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
@@ -342,8 +336,7 @@ hal.executable private @matvec_fp16 {
 ]>
 hal.executable public @multi_reduction {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @multi_reduction ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @multi_reduction ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }

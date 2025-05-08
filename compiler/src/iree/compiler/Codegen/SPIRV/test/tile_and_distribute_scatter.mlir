@@ -9,7 +9,7 @@
 ]>
 hal.executable private @static_scatter_update_slice  {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @static_scatter_update_slice layout(#pipeline_layout) attributes {
+    hal.executable.export public @static_scatter_update_slice layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
@@ -36,7 +36,7 @@ hal.executable private @static_scatter_update_slice  {
             %9 = memref.cast %8 : memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>> to memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %10 = memref.subview %2[0, %arg1] [100, %5] [1, 1] : memref<100x500xi32> to memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>
             iree_linalg_ext.scatter {lowering_config = #config} dimension_map = [0] unique_indices(true) ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
-            ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
+            ^bb0(%arg2: i32, %arg3: i32):
               iree_linalg_ext.yield %arg2 : i32
             }
           }

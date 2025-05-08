@@ -318,6 +318,129 @@ GatherOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// MapScatterOp
+//===----------------------------------------------------------------------===//
+
+MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
+                                                    Location loc, Value input,
+                                                    Value output) {
+  assert(input.getType() == output.getType() &&
+         "expected input and output types to match");
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  auto mapScatterOp =
+      builder.create<MapScatterOp>(loc, resultType, input, output);
+
+  // Add the transformation block with an identity transformation.
+  Region &region = mapScatterOp.getTransformationRegion();
+  auto inputType = cast<ShapedType>(input.getType());
+  SmallVector<Location> blockArgLocs(inputType.getRank(), loc);
+  SmallVector<Type> indexTypes(inputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+  Value mask = builder.create<arith::ConstantIntOp>(loc, /*value=*/1,
+                                                    /*width=*/1);
+  yieldedValues.push_back(mask);
+  builder.create<IREE::LinalgExt::YieldOp>(loc, yieldedValues);
+  return mapScatterOp;
+}
+
+LogicalResult MapScatterOp::verify() {
+  if (getInputType().getElementType() != getOutputType().getElementType()) {
+    return emitOpError("expected input and output element types to match");
+  }
+  Region &transformRegion = getTransformationRegion();
+  Block &transformBody = transformRegion.getBlocks().front();
+  if (transformBody.getNumArguments() != getInputRank()) {
+    return emitOpError("expected number of block arguments to be equal "
+                       "to the input rank");
+  }
+  if (!llvm::all_of(transformBody.getArgumentTypes(),
+                    llvm::IsaPred<IndexType>)) {
+    return emitOpError("expected block arguments to be index types");
+  }
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  if (yieldOp->getNumOperands() != getOutputRank() + 1) {
+    return yieldOp.emitOpError("expected transformation_region to yield a "
+                               "value for each output dimension and a mask");
+  }
+  for (int operandIdx = 0; operandIdx < getOutputRank(); ++operandIdx) {
+    if (!isa<IndexType>(yieldOp.getOperandTypes()[operandIdx])) {
+      return yieldOp.emitOpError("expected yielded indices to be index types");
+    }
+  }
+  auto maskType =
+      dyn_cast<IntegerType>(yieldOp.getOperandTypes()[getOutputRank()]);
+  if (!maskType || maskType.getIntOrFloatBitWidth() != 1) {
+    return yieldOp.emitOpError("expected yielded mask to be i1 type");
+  }
+  return success();
+}
+
+void MapScatterOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numSourceIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldSourceIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numSourceIndices, builder.getIndexType());
+  SmallVector<Location> locs(numSourceIndices, getLoc());
+
+  // Create the new block arguments for the new source indices, and transform
+  // them using the callback.
+  SmallVector<BlockArgument> newSourceIndices(
+      transformBody.addArguments(indexTypes, locs));
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(&transformBody);
+  SmallVector<Value> newSourceIndicesTransformed(
+      transformationBuilder(newSourceIndices));
+
+  // Replace the old source indices with the results of the transformation on
+  // the new source indices.
+  assert(oldSourceIndices.size() == newSourceIndicesTransformed.size() &&
+         "expected transformation to produce the same number of Values as the "
+         "previous number of source indices.");
+  for (auto [oldIdx, newIdx] :
+       llvm::zip_equal(oldSourceIndices, newSourceIndicesTransformed)) {
+    SmallVector<OpOperand *> uses(llvm::make_pointer_range(oldIdx.getUses()));
+    for (OpOperand *use : uses) {
+      use->set(newIdx);
+    }
+  }
+  transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
+bool MapScatterOp::isIdentity() {
+  if (getInputType() != getOutputType()) {
+    return false;
+  }
+
+  // Check that the mask is always true.
+  Block &transformBody = getTransformationRegion().getBlocks().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  Value mask = yieldOp->getOperands().back();
+  std::optional<int64_t> constMask = getConstantIntValue(mask);
+  if (!constMask.has_value() || *constMask == 0) {
+    return false;
+  }
+
+  // Check that the block arguments are directly yielded in the order that they
+  // are defined in the block.
+  for (int i = 0; i < getOutputRank(); ++i) {
+    auto yieldedBbArg = dyn_cast<BlockArgument>(yieldOp.getOperand(i));
+    if (yieldedBbArg != transformBody.getArgument(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
 
@@ -2005,6 +2128,7 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
+DEFINE_OP_GET_EFFECTS(MapScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)

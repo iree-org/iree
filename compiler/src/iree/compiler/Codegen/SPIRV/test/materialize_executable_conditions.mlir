@@ -21,8 +21,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader, GroupNonUniform], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_assumed_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_assumed_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -54,8 +53,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [GroupNonUniformShuffle, GroupNonUniformArithmetic], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_subgroup_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_subgroup_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -87,8 +85,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [UniformAndStorageBuffer8BitAccess, StorageBuffer8BitAccess], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_8bit_storage_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_8bit_storage_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -121,8 +118,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [StorageBuffer16BitAccess, StorageUniform16], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_16bit_storage_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_16bit_storage_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -147,8 +143,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Int64, Int16, Int8], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_int_compute_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_int_compute_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -172,8 +167,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Float16, Float64], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_float_compute_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_float_compute_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -197,8 +191,7 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [DotProduct, DotProductInput4x8Bit], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_dot_product_capabilities ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_dot_product_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
@@ -222,12 +215,11 @@ hal.executable private @dispatch_executable {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [CooperativeMatrixKHR], []>, #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_cooperative_matrix_capabilities ordinal(0) layout(#pipeline_layout) attributes {
-      iree.spirv.coopmatrix.shape = array<i64: 16, 16, 16>, iree.spirv.coopmatrix.type = [f16, f16]
-    } {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_cooperative_matrix_capabilities ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
+    } attributes {
+      iree.spirv.coopmatrix.shape = array<i64: 16, 16, 16>, iree.spirv.coopmatrix.type = [f16, f16]
     }
     builtin.module {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [CooperativeMatrixKHR], []> {
@@ -257,8 +249,7 @@ hal.executable private @dispatch_executable {
                                             #spirv.resource_limits<>>
     }>
   ) {
-    hal.executable.export public @test_address_capabilities ordinal(0) layout(#indirect_pipeline_layout) {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @test_address_capabilities ordinal(0) layout(#indirect_pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }

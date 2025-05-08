@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRSupport
     MLIRTensorDialect
     iree::compiler::Dialect::Util::IR
   PUBLIC
@@ -53,6 +54,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     TensorExtDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "TensorExtOps.td"
   OUTS

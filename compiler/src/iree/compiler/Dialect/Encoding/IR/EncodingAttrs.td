@@ -56,7 +56,7 @@ def LayoutAttr :
   let mnemonic = "layout";
   let assemblyFormat = "`<` $layouts `>`";
 
-  let summary = [{Indicates potential serialized layouts}];
+  let summary = [{Indicates potential serialized layouts.}];
   let description = [{
     This attribute describes the potential layouts of the encoding. It is an
     array because a device could have multiple target layouts.
@@ -108,7 +108,7 @@ def EncodingAttr :
       ]>
     ]> {
   let mnemonic = "encoding";
-  let summary = [{information to decide how to data-tile a tensor}];
+  let summary = [{Information to decide how to data-tile a tensor.}];
   let description = [{
     This attribute describes the change in the layout for
     a given tensor to execute subsequent operations on
@@ -193,7 +193,7 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
       ]>,
     ]> {
   let mnemonic = "matmul_k";
-  let summary = [{An attribute that tracks reduction dimensions for matmul}];
+  let summary = [{An attribute that tracks reduction dimensions for matmul.}];
   let description = [{
     The attribute is specialized for tracking the matmul reduction dimensions
     only. The encoded dimensions are the reduction dimensions that will be
@@ -251,13 +251,21 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
         ]>
     ]> {
   let mnemonic = "pad_encoding_layout";
-  let assemblyFormat = "`<` $padding `>`";
+  let assemblyFormat = "`<` custom<Padding>($padding) `>`";
 
-  let summary = "An attribute that encodes padding values of tensor dimensions";
+  let summary = [{An attribute that encodes padding values of tensor dimensions.}];
   let description = [{
     Associates tensor dimensions with pad values (numbers of appended elements).
     The logical dimensions of the tensors do not change, and the elements in the
     padded regions are left uninitialized.
+
+    It is expected that the number of pad values specified is same as the rank of
+    the associated tensor.
+    - If the value is `0` no padding is done along that dimension
+    - If the value is positive static value, the tensor dimension is padded to that value
+    - If the value is `?`, the tensor dimension is padded to a value determined by the
+      backend, usually for better cache behavior.
+    Negative values for padding is illegal.
 
     This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
     to provide a hook for tensor sizeof lowering. The implementation of this
@@ -267,17 +275,19 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 
   let parameters = (ins
     // How many padding elements to add along each tensor dimension.
-    "DenseI32ArrayAttr":$padding
+    "DenseI64ArrayAttr":$padding
   );
 
   let builders = [
-    AttrBuilder<(ins "ArrayRef<int32_t>":$padding)>
+    AttrBuilder<(ins "ArrayRef<int64_t>":$padding)>
   ];
 
   let extraClassDeclaration = [{
     /// Returns a PadEncodingLayoutAttr attribute that pads zero elements.
     static PadEncodingLayoutAttr getIdentityAttr(MLIRContext *ctx, int rank);
   }];
+
+  let genVerifyDecl = 1;
 }
 
 //===---------------------------------------------------------------------===//
@@ -292,7 +302,7 @@ def IdentityEncodingAttr :
       ]>
     ]> {
   let mnemonic = "identity_encoding";
-  let summary = "A layout resolver that behaves like an identity function";
+  let summary = [{A layout resolver that behaves like an identity function.}];
   let description = [{
     A layout resolver that behaves like an identity function. I.e., it resolves
     the layout to the same layout without encodings.
@@ -313,7 +323,7 @@ def UnsupportedEncodingAttr :
       ]>
     ]> {
   let mnemonic = "unsupported_encoding";
-  let summary = "A layout resolver attribute that always fails to get layout";
+  let summary = [{A layout resolver attribute that always fails to get layout.}];
   let description = [{
     An layout resolver that never resolves the layout. I.e., it always fails on
     getting a layout. It can be used in testing or a default unknown attribute
@@ -335,7 +345,7 @@ def TestingEncodingAttr :
       ]>
     ]> {
   let mnemonic = "testing_encoding";
-  let summary = "An encoding attribute for testing purpose";
+  let summary = [{An encoding attribute for testing purposes.}];
 
   let description = [{
     An attribute for testing purpose. It is intended to be attached on
@@ -353,7 +363,7 @@ def TestingEncodingAttr :
 
 def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
   let mnemonic = "unknown_encoding";
-  let summary = "A pure encoding attribute for testing purpose";
+  let summary = [{A pure encoding attribute for testing purpose.}];
 
   let description = [{
     An attribute for testing purpose. It is intended to be attached on
@@ -366,21 +376,22 @@ def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "cloneWithSimplifiedConfig",
+        "getLayout",
       ]>
     ]> {
   let mnemonic = "unspecialized_encoding";
   let assemblyFormat = "`<` $seed `>`";
 
-  let summary = "An attribute that indicates the encoding is not yet specialized";
+  let summary = [{An attribute that indicates the encoding is not yet specialized.}];
 
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
     very basic interface methods of EncodingLayoutResolverAttrInterface that
-    converts it to the SpecializeEncodingAttr during encoding specialization.
+    returns the SpecializedEncodingAttr with the same seed as serialized layout
+    in encoding specialization. Different seed values indicate different layouts.
+
     It is mainly for testing purpose as some transformations do not depend on
     actual dialects that implement the attribute interface.
-
-    Different seed values indicate different layouts.
   }];
 
   let parameters = (ins "int32_t":$seed);
@@ -388,23 +399,19 @@ def UnspecializedEncodingAttr :
 
 def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
-        "getLayout",
-      ]>,
       IREEEncoding_SerializableEncodingAttrInterface
     ]> {
   let mnemonic = "specialized_encoding";
   let assemblyFormat = "`<` $seed (`,` $type^)? `>`";
 
-  let summary = "An attribute that indicates the encoding is specialized";
+  let summary = [{An attribute that indicates the encoding is specialized.}];
 
   let description = [{
     This attribute is similar to UnspecializedEncodingAttr, but with an optional
-    type. The attribute denotes the layout of the type. Different seed values
-    indicate different layouts, which can be used to emulate different encoding
-    attributes.
+    type. The attribute denotes the layout of the type.
 
-    Different seed values indicate different layouts.
+    Different seed values indicate different layouts, which can be used to
+    emulate different encoding attributes.
   }];
 
   let parameters = (ins

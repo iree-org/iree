@@ -30,7 +30,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   Pure,
   AllTypesMatch<["input", "output"]>
   ]> {
-  let summary = "Layout conversion operator";
+  let summary = [{Layout conversion operator.}];
   let description = [{
     The layout conversion operator takes a shaped value and a layout and
     transforms the value to have that layout.
@@ -78,7 +78,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
 
 def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
     [SameOperandsAndResultElementType, Pure]> {
-  let summary = "SIMT to SIMD conversion operation";
+  let summary = [{SIMT to SIMD conversion operation.}];
   let description = [{
     This operation is a temporary operation useful for source/target
     materializations when doing type conversions between distributed and not
@@ -97,7 +97,7 @@ def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
 
 def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
     [SameOperandsAndResultElementType, Pure]> {
-  let summary = "SIMD to SIMT conversion operation";
+  let summary = [{SIMD to SIMT conversion operation.}];
   let description = [{
     This operation is a temporary operation useful for source/target
     materializations when doing type conversions between distributed and not
@@ -131,7 +131,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
                        BoolArrayAttr:$in_bounds);
   let results = (outs AnyVectorOfAnyRank:$vector);
 
-  let summary = "Gathers a supervector from memory into an SSA vector value.";
+  let summary = [{Gathers a supervector from memory into an SSA vector value.}];
 
   let description = [{
     The iree_vector_ext.transfer_gather operation provides a structured

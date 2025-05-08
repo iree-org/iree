@@ -436,7 +436,7 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
 
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
+  if (isROCmBackend(target) && !ShapedType::isDynamicShape(bounds) &&
       isMatmulLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
@@ -458,6 +458,9 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
   }
 
   int64_t lastReductionDimSize = bounds[reductionDims.back()];
+  if (ShapedType::isDynamic(lastReductionDimSize)) {
+    return failure();
+  }
   if (lastReductionDimSize % threadLoads != 0) {
     return failure();
   }
@@ -692,13 +695,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
 
+  int64_t numDynamicReductionDims = 0;
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      ++numDynamicReductionDims;
+    }
+  }
+
   int64_t subgroupSize = 0;
   for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0) {
+    if (reductionSize % s == 0 || numDynamicReductionDims > 0) {
       subgroupSize = s;
       break;
     }
   }
+
   if (subgroupSize == 0)
     return failure();
 
@@ -716,17 +727,18 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const unsigned largestLoadSizeInBits =
       maxLoadBits.has_value() ? *maxLoadBits : 128;
 
-  unsigned vectorSize = largestLoadSizeInBits / *bitWidth;
-  unsigned threadLoads = vectorSize;
-  while ((reductionSize / vectorSize) % subgroupSize != 0) {
-    vectorSize /= 2;
+  unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
+  if (numDynamicReductionDims == 0) {
+    while ((reductionSize / threadLoads) % subgroupSize != 0) {
+      threadLoads /= 2;
+    }
   }
   // Deduce the workgroup size we should use for reduction. Currently a
   // workgroup processes all elements in reduction dimensions. Need to make sure
   // the workgroup size we use can divide the total reduction size, and it's
   // also within hardware limitations.
   const int64_t maxWorkgroupSize = 1024;
-  int64_t workgroupSize = reductionSize / vectorSize;
+  int64_t workgroupSize = reductionSize / threadLoads;
   if (workgroupSize > maxWorkgroupSize) {
     workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
                         {64, static_cast<uint64_t>(workgroupSize)},
@@ -734,9 +746,13 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                         .getZExtValue();
   }
 
-  int64_t parallelSize = 1;
+  std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
-    parallelSize *= bounds[dim];
+    if (ShapedType::isDynamic(bounds[dim])) {
+      parallelSize = std::nullopt;
+      break;
+    }
+    *parallelSize *= bounds[dim];
   }
 
   // Total parallel size that can fill the GPU with enough workgorups.
@@ -744,13 +760,13 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
-  while (parallelSize > parallelThreshold &&
+  while (parallelSize && *parallelSize > parallelThreshold &&
          (workgroupSize / 2) % subgroupSize == 0 &&
-         reductionSize / (workgroupSize * vectorSize) < targetVectorCount) {
+         reductionSize / (workgroupSize * threadLoads) < targetVectorCount) {
     // Use less subgroups per workgroup..
     workgroupSize /= 2;
     // in order to host more workgroups per hardware compute unit.
-    parallelSize /= 2;
+    *parallelSize /= 2;
   }
 
   // TODO(pashu123): Currently, the threadLoads is done on the basis of
@@ -2260,7 +2276,7 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
       }
       ArrayRef<int64_t> shape =
           llvm::cast<ShapedType>(outputOperand.get().getType()).getShape();
-      if (llvm::any_of(shape, ShapedType::isDynamic)) {
+      if (ShapedType::isDynamicShape(shape)) {
         vectorSize = 1;
         break;
       }
@@ -2571,7 +2587,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
+  if (isROCmBackend(target) && !ShapedType::isDynamicShape(bounds) &&
       isMatvecLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
@@ -2842,7 +2858,7 @@ static LogicalResult setConvolutionConfig(
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
   if (ShapedType::isDynamic(inputShape[3]) ||
-      llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
+      ShapedType::isDynamicShape(outputShape.drop_front())) {
     return failure();
   }
   int64_t oh = outputShape[ohIndex], ow = outputShape[owIndex],

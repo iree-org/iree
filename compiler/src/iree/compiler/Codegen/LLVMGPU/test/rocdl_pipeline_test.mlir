@@ -12,8 +12,7 @@
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index):
+  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
@@ -27,7 +26,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
       %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>> -> tensor<16xf32>
       %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets=[0], sizes=[16], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>> -> tensor<16xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xf32>, tensor<16xf32>) outs(%3 : tensor<16xf32>) {
-      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
           %7 = arith.addf %arg0, %arg1 : f32
           linalg.yield %7 : f32
         } -> tensor<16xf32>
@@ -54,8 +53,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
@@ -106,8 +104,7 @@ hal.executable @dot_dispatch_0 {
 ]>
 hal.executable @ceildiv_expand_dispatch {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export @ceildiv_expand layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index):
+  hal.executable.export public @ceildiv_expand layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
@@ -121,7 +118,7 @@ hal.executable @ceildiv_expand_dispatch {
       %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xi32>> -> tensor<16xi32>
       %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets=[0], sizes=[16], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xi32>> -> tensor<16xi32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xi32>, tensor<16xi32>) outs(%3 : tensor<16xi32>) {
-      ^bb0(%arg0: i32, %arg1: i32, %arg2: i32):  // no predecessors
+      ^bb0(%arg0: i32, %arg1: i32, %arg2: i32):
           %7 = arith.ceildivsi %arg0, %arg1 : i32
           linalg.yield %7 : i32
         } -> tensor<16xi32>

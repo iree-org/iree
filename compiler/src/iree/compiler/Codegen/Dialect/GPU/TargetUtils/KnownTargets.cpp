@@ -140,9 +140,9 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 // to 64-bits.
 //===----------------------------------------------------------------------===//
 
-const WgpDetails *getCDNA35WgpDetails() {
-  static const MMAIntrinsic cdna35MMAOps[] = {
-      // Introduced in CDNA3.5
+const WgpDetails *getCDNA4WgpDetails() {
+  static const MMAIntrinsic cdna4MMAOps[] = {
+      // Introduced in CDNA4
       MMAIntrinsic::MFMA_F32_16x16x32_F16,
       MMAIntrinsic::MFMA_F32_32x32x16_F16,
       MMAIntrinsic::MFMA_F32_16x16x32_BF16,
@@ -178,22 +178,22 @@ const WgpDetails *getCDNA35WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
   };
-  static const WgpDetails cdna35Wgp = {allComputeBits,
-                                       allStorageBits,
-                                       allSubgroupOps,
-                                       allDotProductOps,
-                                       ARRAY_SIZE(cdna35MMAOps),
-                                       cdna35MMAOps,
-                                       {64, 64},
-                                       {1024, 1024, 1024},
-                                       1024,
-                                       // Note: upgraded from CDNA3
-                                       160 * 1024,
-                                       {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                       /*maxLoadInstructionBits=*/128,
-                                       /*simdsPerWgp=*/4,
-                                       /*vgprSpaceBits=*/512 * 32};
-  return &cdna35Wgp;
+  static const WgpDetails cdna4Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      ARRAY_SIZE(cdna4MMAOps),
+                                      cdna4MMAOps,
+                                      {64, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      // Note: upgraded from CDNA3
+                                      160 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/512 * 32};
+  return &cdna4Wgp;
 }
 
 const WgpDetails *getCDNA3WgpDetails() {
@@ -368,7 +368,7 @@ const WgpDetails *getRDNA1WgpDetails() {
 }
 
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
-  const WgpDetails *cdna35Wgp = getCDNA35WgpDetails();
+  const WgpDetails *cdna4Wgp = getCDNA4WgpDetails();
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
   const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
   const WgpDetails *cdna1Wgp = getCDNA1WgpDetails();
@@ -423,7 +423,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
-      .Cases("cdna35", "gfx950", TargetDetails{cdna35Wgp, nullptr})
+      .Cases("cdna4", "gfx950", TargetDetails{cdna4Wgp, nullptr})
       .Case("mi325x", TargetDetails{cdna3Wgp, &mi325xChip})
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})

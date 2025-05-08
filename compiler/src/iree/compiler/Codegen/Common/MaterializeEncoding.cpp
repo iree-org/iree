@@ -121,11 +121,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     LDBG("Selected LayoutAttrInterface with target configuration: "
          << layoutAttrWithTargetInfo);
 
-    MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
-    MaterializeEncodingConversionTarget target(*ctx);
     auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
-    populateMaterializeEncodingPatterns(patterns, target, typeConverter,
-                                        materializeEncodingValueFn);
+    MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo,
+                                                   materializeEncodingValueFn);
+    MaterializeEncodingConversionTarget target(*ctx);
+    populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       funcOp.emitOpError("materialization failed");

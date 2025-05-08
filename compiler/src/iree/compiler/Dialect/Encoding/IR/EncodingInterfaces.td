@@ -95,6 +95,7 @@ def IREEEncoding_SerializableEncodingAttrInterface :
     - `isSerialized`: checks if the encoding is serialized or not.
     - `cloneWithLayouts`: creates a serializable encoding with the layouts
       information.
+    - `convertType`: converts a type to materialized form.
     - The rest of methods that interpret the encodings. E.g.,
       `calculateStorageSizeInBytes` is the method to parse layouts and produce
       the storage size in bytes.
@@ -196,7 +197,22 @@ def IREEEncoding_SerializableEncodingAttrInterface :
         assert(false && "unimplemented interface method");
         return {};
       }]
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the materialized form for the provided type.
+      }],
+      /*retTy=*/"::mlir::Type",
+      /*methodName=*/"convertType",
+      /*args=*/(ins
+        "::mlir::Type":$type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return type;
+      }]
+    >,
   ];
 
   let extraClassDeclaration = [{
@@ -261,6 +277,81 @@ def IREEEncoding_EncodingTypeInterface :
       /*args=*/(ins
         "::mlir::Attribute":$encoding)
     >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// Encoding Propagation Attribute & Op Interfaces
+//===----------------------------------------------------------------------===//
+
+def IREEEncoding_PropagationAttrInterface :
+  AttrInterface<"EncodingPropagationAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query new encoding attributes that can be propagated to
+    the operands and result of the operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+        [{
+          Returns true if the encodings can be propagated across the operation.
+        }],
+        /*retTy=*/"bool",
+        /*methodName=*/"isPropagable",
+        /*args=*/(ins
+          "::mlir::Value":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+            return false;
+        }]
+    >,
+    InterfaceMethod<
+        [{
+          Returns the new encodings for operand and result types for the given
+          operation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
+        /*methodName=*/"generateEncodings",
+        /*args=*/(ins
+          "::mlir::Value":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >
+  ];
+}
+
+def IREEEncoding_PropagationOpInterface :
+  OpInterface<"EncodingPropagationOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+      Interface used to generate new operations with new encodings.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+        [{
+          Returns a list of transformed operations, set_encoding/unset_encoding
+          operations and the transformed result for further transformation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationResult>",
+        /*methodName=*/"propagateEncoding",
+        /*args=*/(ins
+          "::mlir::RewriterBase &":$builder,
+          "::mlir::iree_compiler::IREE::Encoding::PropagationEncoding":$encodings,
+          "::mlir::OpResult":$opResult
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >
   ];
 }
 

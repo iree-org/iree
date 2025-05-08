@@ -1,5 +1,5 @@
 // RUN: iree-opt --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK,CDNA3
-// RUN: iree-opt --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK,CDNA35
+// RUN: iree-opt --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK,CDNA4
 
 func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
     %arg1 : tensor<10x64x640xf16>, %arg2 : tensor<10x64x640xf16>,
@@ -69,7 +69,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
 }
 //    CHECK-LABEL: func @fused_contraction_1
 //  CDNA3-COUNT-24:   amdgpu.mfma
-// CDNA35-COUNT-12:   amdgpu.mfma
+//  CDNA4-COUNT-12:   amdgpu.mfma
 //       CHECK-NOT:   amdgpu.mfma
 // -----
 
@@ -164,7 +164,7 @@ func.func @fused_contraction_3(%arg0 : tensor<2x4096x640xi8>,
 }
 //     CHECK-LABEL: func @fused_contraction_3
 //  CDNA3-COUNT-32:   amdgpu.mfma
-// CDNA35-COUNT-16:   amdgpu.mfma
+//  CDNA4-COUNT-16:   amdgpu.mfma
 //       CHECK-NOT:   amdgpu.mfma
 
 // -----
@@ -241,5 +241,5 @@ func.func @fused_contraction_4(%arg0: tensor<2x4096x640xf16>,
 }
 //     CHECK-LABEL: func @fused_contraction_4
 //  CDNA3-COUNT-24:   amdgpu.mfma
-// CDNA35-COUNT-12:   amdgpu.mfma
+//  CDNA4-COUNT-12:   amdgpu.mfma
 //       CHECK-NOT:   amdgpu.mfma

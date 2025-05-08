@@ -648,7 +648,8 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
     FunctionLikeNest(modulePassManager).addPass(createGpuEliminateBarriers);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
+      IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();

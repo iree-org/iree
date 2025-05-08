@@ -6,6 +6,7 @@
 
 #include "iree/compiler/ExternalInterfaces/Interfaces.h"
 
+#include "iree/compiler/ExternalInterfaces/EncodingExternalModels.h"
 #include "iree/compiler/ExternalInterfaces/HALExternalModels.h"
 #include "iree/compiler/ExternalInterfaces/LinalgExtExternalModels.h"
 #include "iree/compiler/ExternalInterfaces/StreamExternalModels.h"
@@ -20,6 +21,7 @@ void registerExternalInterfaces(DialectRegistry &registry) {
   registerLinalgExtExternalModels(registry);
   registerStreamExternalModels(registry);
   registerUtilExternalModels(registry);
+  registerEncodingExternalModels(registry);
 }
 
 } // namespace mlir::iree_compiler

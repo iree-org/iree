@@ -661,6 +661,47 @@ void DeviceQueueBarrierOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Removes the condition region and fallback from an export that will always be
+/// selected. This happens if the condition region is folded using a specialized
+/// target environment that allows for compile-time query evaluation.
+struct DropTrueConditionRegion : public OpRewritePattern<ExecutableExportOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExecutableExportOp exportOp,
+                                PatternRewriter &rewriter) const override {
+    auto *block = exportOp.getConditionBody();
+    if (!block) {
+      return rewriter.notifyMatchFailure(exportOp, "no condition region");
+    }
+
+    auto returnOp =
+        dyn_cast_if_present<IREE::HAL::ReturnOp>(block->getTerminator());
+    if (!returnOp) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "invalid condition terminator");
+    }
+
+    Value conditionResult = returnOp.getOperand(0);
+    if (!matchPattern(conditionResult, m_One())) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "non-constant true condition result");
+    }
+
+    rewriter.eraseBlock(block);
+    rewriter.modifyOpInPlace(exportOp,
+                             [&]() { exportOp.removeConditionFallbackAttr(); });
+    return success();
+  }
+};
+
+} // namespace
+
+void ExecutableExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<DropTrueConditionRegion>(context);
+}
+
+namespace {
+
 // Returns a set of fused locations for each result from all return sites.
 static SmallVector<Location> gatherResultLocations(int numResults,
                                                    Region &region) {

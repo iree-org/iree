@@ -16,7 +16,11 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(IREE ASM C CXX)
+# NOTE: ASM is at the end of the list so CMake can test whether the C/CXX
+# compilers can be used for assembly.
+# See: https://cmake.org/cmake/help/latest/command/project.html#options
+project(IREE C CXX ASM)
+
 # If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
 # and we can just inform the user and then reset it.
 if(DEFINED CACHE{CMAKE_CXX_STANDARD})
@@ -126,6 +130,38 @@ set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility" ON)
+
+#-------------------------------------------------------------------------------
+# Custom runtime allocator configuration
+#-------------------------------------------------------------------------------
+# See iree/base/allocator.h for more information on `iree_allocator_system`.
+
+# A default allocator can be specified by C defines
+# (`IREE_ALLOCATOR_SYSTEM_CTL`) and linked in manually or by name with the
+# `IREE_ALLOCATOR_SYSTEM` option at the CMake level. If set in CMake additional
+# sources, copts, and dependencies can be added to iree::base in order to make
+# the allocator accessible.
+#
+# Built-in allocators available:
+# - `libc`: whatever `malloc`/`free` are defined as.
+# - `mimalloc`: https://github.com/microsoft/mimalloc (v3)
+#
+# Users adding their own allocators out of tree may define any of the following
+# CMake variables to control behavior:
+# - IREE_ALLOCATOR_{NAME}_SRCS:
+#       List of source files to add to iree::base. Must be an absolute/resolved
+#       path unless present in the iree/base/ directory. Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_COPTS:
+#       Compiler defines (`-DFOO`) private to iree::base. Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_DEPS:
+#       Dependencies (static/dynamic libraries) added to iree::base.
+#       Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_CTL:
+#       iree_allocator_ctl_fn_t name. Defaults to `iree_allocator_{NAME}_ctl`.
+# - IREE_ALLOCATOR_{NAME}_SELF:
+#       iree_allocator_t self void* name. Defaults to empty (NULL).
+set(IREE_ALLOCATOR_SYSTEM "libc" CACHE STRING
+    "Default named `iree_allocator_t` library and function base name.")
 
 #-------------------------------------------------------------------------------
 # IREE command-line tooling configuration
@@ -918,6 +954,41 @@ endif()
 
 # This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
 add_subdirectory(build_tools/third_party/flatcc)
+
+if(IREE_ALLOCATOR_SYSTEM STREQUAL "mimalloc")
+  set(IREE_ALLOCATOR_MIMALLOC_SRCS "allocator_mimalloc.c")
+  if(IREE_USE_SYSTEM_DEPS)
+    # NOTE: we don't know exactly what the user wants here and guess.
+    message(STATUS "iree_allocator_system using system mimalloc v3.*...")
+    set(MI_BUILD_STATIC ON)
+    find_package(mimalloc 3 REQUIRED)
+    set(IREE_ALLOCATOR_MIMALLOC_DEPS "mimalloc-static")
+  else()
+    # mimalloc is currently using the `dev3` branch (v3.*).
+    # Releases: https://github.com/microsoft/mimalloc/tags
+    #
+    # We directly inline the source into iree/base/allocator_mimalloc.c when
+    # fetching it ourselves and otherwise link against the static library. We
+    # do not want to override the global malloc/free implementations.
+    message(STATUS "Using fetched mimalloc v3.*...")
+    set(MI_OVERRIDE OFF)
+    set(MI_BUILD_STATIC OFF)
+    set(MI_BUILD_SHARED OFF)
+    set(MI_BUILD_OBJECT OFF)
+    set(MI_BUILD_TESTS OFF)
+    include(FetchContent)
+    FetchContent_Declare(
+      mimalloc
+      GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+      GIT_TAG        51c09e7b6a0ac5feeba998710f00c7dd7aa67bbf # v3.0.3
+    )
+    FetchContent_MakeAvailable(mimalloc)
+    list(APPEND IREE_ALLOCATOR_MIMALLOC_COPTS
+      "-I${mimalloc_SOURCE_DIR}/include"
+      "-DIREE_ALLOCATOR_MIMALLOC_STATIC_SRC=\"${mimalloc_SOURCE_DIR}/src/static.c\""
+    )
+  endif()
+endif()
 
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)

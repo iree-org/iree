@@ -184,6 +184,7 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 
 static void addBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(createGPUBubbleResourceCastsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
@@ -334,6 +335,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(createGPUBubbleResourceCastsPass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
@@ -388,6 +390,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // In the future there may be cases where we want the custom strategy run at
   // later points in the pipeline.
   funcPassManager.addPass(createLoweringConfigInterpreterPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
@@ -462,6 +466,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // hoisting and fusion pass, as well as a lack of a fallback distribution
   // pass.
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
+
+  // Drop resource casts if needed. This is the last possible place to do so
+  // before greedy fusion.
+  funcPassManager.addPass(createGPUBubbleResourceCastsPass());
   {
     OptimizeTensorInsertExtractSlicesPassOptions options;
     options.foldIdentitySlices = true;
@@ -1146,7 +1154,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic.
   modulePassManager.addPass(createLLVMGPUCastAddressSpaceFunctionPass());
-  modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+  modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass(
+      IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
   if (forROCDL) {
     // convert to ROCDL.
@@ -1288,7 +1297,8 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
   variantPassManager.addPass(createLowerAffinePass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
+      IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
                           /*forROCDL=*/true);

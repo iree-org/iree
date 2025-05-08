@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
   DEPS
+    MLIRAMDGPUDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRGPUDialect
@@ -25,6 +26,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRSupport
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 
@@ -84,6 +86,17 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    CodegenDialectGPUPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenDialectGPUPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

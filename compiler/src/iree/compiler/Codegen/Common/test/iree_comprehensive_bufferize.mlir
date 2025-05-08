@@ -2399,7 +2399,7 @@ func.func @topk() {
         dimension(1)
         ins(%input_values, %input_indices : tensor<200x8xf32> , tensor<200x8xi32>)
         outs(%out_values, %out_indices : tensor<200x3xf32>, tensor<200x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %2 : i1
         } -> tensor<200x3xf32>, tensor<200x3xi32>
@@ -2948,3 +2948,165 @@ func.func @check_no_alloc() {
 }
 // CHECK-LABEL: func @check_no_alloc
 //   CHECK-NOT:   memref.alloc
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @load_from_memref_store_to_memref() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %2 = iree_codegen.load_from_memref %0 {read_only} : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
+  iree_codegen.store_to_memref %2, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @load_from_memref_store_to_memref()
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[INPUT]] :
+//  CHECK-SAME:       outs(%[[OUTPUT]] :
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @load_from_memref_store_to_memref_in_place() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
+  %2 = iree_codegen.load_from_memref %0 : memref<128x384xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128x384xf32>
+  %3 = iree_codegen.load_from_memref %1 : memref<128x384xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128x384xf32>
+  %forall = scf.forall (%arg0) in (128) shared_outs(%arg1 = %3) -> (tensor<128x384xf32>) {
+    %input = tensor.extract_slice %2[%arg0, 0] [1, 384] [1, 1] : tensor<128x384xf32> to tensor<384xf32>
+    %init = tensor.extract_slice %arg1[%arg0, 0] [1, 384] [1, 1] : tensor<128x384xf32> to tensor<384xf32>
+    %copy = linalg.copy ins(%input : tensor<384xf32>) outs(%init : tensor<384xf32>) -> tensor<384xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %copy into %arg1[%arg0, 0] [1, 384] [1, 1] : tensor<384xf32> into tensor<128x384xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  iree_codegen.store_to_memref %forall, %1 : tensor<128x384xf32> into memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @load_from_memref_store_to_memref_in_place()
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//       CHECK:   scf.forall (%[[ARG0:.+]]) in (128)
+//   CHECK-DAG:     %[[INPUT_TILE:.+]] = memref.subview %[[INPUT]][%[[ARG0]], 0] [1, 384] [1, 1]
+//   CHECK-DAG:     %[[OUTPUT_TILE:.+]] = memref.subview %[[OUTPUT]][%[[ARG0]], 0] [1, 384] [1, 1]
+//       CHECK:     linalg.copy ins(%[[INPUT_TILE]] {{.*}} outs(%[[OUTPUT_TILE]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @load_from_memref_read_only_copy() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<2x64xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %collapse = memref.collapse_shape %0 [[0, 1]] : memref<2x64xf32, #hal.descriptor_type<storage_buffer>> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %2 = iree_codegen.load_from_memref %collapse : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
+  %copy = linalg.copy ins(%2 : tensor<128xf32>) outs(%2 : tensor<128xf32>) -> tensor<128xf32>
+  iree_codegen.store_to_memref %copy, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @load_from_memref_read_only_copy()
+//   CHECK-DAG:   %[[READ_ONLY_BUFFER:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[COLLAPSED:.+]] = memref.collapse_shape %[[READ_ONLY_BUFFER]]
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<128xf32>
+//       CHECK:   linalg.copy
+//  CHECK-SAME:       ins(%[[COLLAPSED]] :
+//  CHECK-SAME:       outs(%[[ALLOC]] :
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[ALLOC]] :
+//  CHECK-SAME:       outs(%[[OUTPUT]] :
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @simple_resource_cast() {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
+  %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
+  %1 = iree_gpu.buffer_resource_cast %0 : tensor<2xf32>
+  iree_tensor_ext.dispatch.tensor.store %1, %arg1, offsets=[0], sizes=[2], strides=[1]
+    : tensor<2xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @simple_resource_cast
+//       CHECK:   %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.*}}) binding(0)
+//       CHECK:   %[[CAST:.+]] = amdgpu.fat_raw_buffer_cast %[[INPUT]] resetOffset
+//  CHECK-SAME:     memref<2xf32, #hal.descriptor_type<storage_buffer>> to memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[CAST]] : memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>)
+//  CHECK-SAME:     outs(%{{.*}} : memref<2xf32, #hal.descriptor_type<storage_buffer>>)
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @drop_resource_cast_if_not_storage_buffer() -> tensor<2xf32> {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
+  %empty = tensor.empty() : tensor<2xf32>
+  %copy = linalg.copy ins(%0 : tensor<2xf32>) outs(%empty : tensor<2xf32>) -> tensor<2xf32>
+  %1 = iree_gpu.buffer_resource_cast %copy : tensor<2xf32>
+  return %1 : tensor<2xf32>
+}
+
+// CHECK-LABEL: func.func @drop_resource_cast_if_not_storage_buffer
+//   CHECK-NOT:   amdgpu.fat_raw_buffer_cast
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @cache_swizzle_resource_cast(%stride: index) {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
+  %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
+  %1 = iree_gpu.buffer_resource_cast %0 cacheSwizzleStride(%stride) : tensor<2xf32>
+  iree_tensor_ext.dispatch.tensor.store %1, %arg1, offsets=[0], sizes=[2], strides=[1]
+    : tensor<2xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @cache_swizzle_resource_cast
+//  CHECK-SAME:   %[[STRIDE:[A-Za-z0-9]+]]: index
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.*}}) binding(0)
+//   CHECK-DAG:   %[[TRUNC:.+]] = arith.index_cast %[[STRIDE]] : index to i14
+//       CHECK:   %[[CAST:.+]] = amdgpu.fat_raw_buffer_cast %[[INPUT]]
+//  CHECK-SAME:     cacheSwizzleStride(%[[TRUNC]]) resetOffset
+//  CHECK-SAME:     memref<2xf32, #hal.descriptor_type<storage_buffer>> to memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>

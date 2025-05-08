@@ -16,12 +16,14 @@ iree_compiler_cc_library(
     name = "ExternalModels",
     srcs = [
         "CPUEncodingExternalModels.cpp",
+        "CodegenExternalModels.cpp",
         "GPUEncodingExternalModels.cpp",
         "Interfaces.cpp",
         "Utils.cpp",
     ],
     hdrs = [
         "CPUEncodingExternalModels.h",
+        "CodegenExternalModels.h",
         "GPUEncodingExternalModels.h",
         "Interfaces.h",
         "Utils.h",
@@ -34,6 +36,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:KnownTargets",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:IR",

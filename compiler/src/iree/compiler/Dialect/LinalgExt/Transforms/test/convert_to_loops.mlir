@@ -3,7 +3,7 @@
 func.func @sort_1d(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
-  ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
+  ^bb0(%arg2: i32, %arg3: i32):
     %0 = arith.cmpi sgt, %arg2, %arg3 : i32
     iree_linalg_ext.yield %0 : i1
   }
@@ -33,7 +33,7 @@ func.func @sort_1d(%arg0: memref<128xi32>) {
 func.func @sort_2d(%arg0: memref<16x32xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<16x32xi32>) {
-  ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
+  ^bb0(%arg2: i32, %arg3: i32):
     %0 = arith.cmpi sgt, %arg2, %arg3 : i32
     iree_linalg_ext.yield %0 : i1
   }
@@ -66,7 +66,7 @@ func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
   iree_linalg_ext.sort
     dimension(0)
     outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
-  ^bb0(%arg2: f32, %arg3: f32, %arg4: i32, %arg5: i32):  // no predecessors
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: i32, %arg5: i32):
     %0 = arith.cmpf ogt, %arg2, %arg3 : f32
     iree_linalg_ext.yield %0 : i1
   }
@@ -104,7 +104,7 @@ func.func @scatter_update_scalar_1D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     iree_linalg_ext.yield %arg0 : i32
   }
   return
@@ -130,7 +130,7 @@ func.func @scatter_batch_2D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<1x3xi32>, memref<1x3x1xi32>)
     outs(%original : memref<8xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     iree_linalg_ext.yield %arg0 : i32
   }
   return
@@ -157,7 +157,7 @@ func.func @scatter_add_scalar_2D(
   iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x2xi32>)
     outs(%original : memref<4x3xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     %0 = arith.addi %arg1, %arg0 : i32
     iree_linalg_ext.yield %0 : i32
   }
@@ -188,7 +188,7 @@ func.func @scatter_update_slice_2D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     iree_linalg_ext.yield %arg0 : i32
   }
   return
@@ -218,7 +218,7 @@ func.func @scatter_add_scalar_1D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     %0 = arith.addi %arg1, %arg0 : i32
     iree_linalg_ext.yield %0 : i32
   }
@@ -247,7 +247,7 @@ func.func @scatter_add_slice_2D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     %0 = arith.addi %arg1, %arg0 : i32
     iree_linalg_ext.yield %0 : i32
   }
@@ -277,7 +277,7 @@ func.func @scatter_update_scalar_dynamic_1D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x1xi32>)
     outs(%original : memref<?xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     iree_linalg_ext.yield %arg0 : i32
   }
   return
@@ -303,7 +303,7 @@ func.func @scatter_add_scalar_dynamic_2D(
   iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x2xi32>)
     outs(%original : memref<?x?xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     %0 = arith.addi %arg1, %arg0 : i32
     iree_linalg_ext.yield %0 : i32
   }
@@ -334,7 +334,7 @@ func.func @scatter_update_slice_dynamic_2D(
   iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<?x?xi32>, memref<?x1xi32>)
     outs(%original : memref<?x?xi32>)  {
-  ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+  ^bb0(%arg0: i32, %arg1: i32):
     iree_linalg_ext.yield %arg0 : i32
   }
   return
@@ -604,7 +604,7 @@ func.func @topk_memref(%input_values: memref<2x10xf32>, %input_indices: memref<2
         dimension(1)
         ins(%input_values, %input_indices : memref<2x10xf32> , memref<2x10xi32>)
         outs(%out_values, %out_indices : memref<2x3xf32>, memref<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         }
@@ -649,7 +649,7 @@ func.func @topk_memref_dynamic(%input_values: memref<?x?xf32>, %input_indices: m
         dimension(1)
         ins(%input_values, %input_indices : memref<?x?xf32> , memref<?x?xi32>)
         outs(%out_values, %out_indices : memref<?x3xf32>, memref<?x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         }
@@ -694,7 +694,7 @@ func.func @topk_memref_optional(%input_values: memref<2x10xf32>, %out_values: me
         dimension(1)
         ins(%input_values : memref<2x10xf32>)
         outs(%out_values, %out_indices : memref<2x3xf32>, memref<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         }
@@ -1520,3 +1520,37 @@ func.func @gather_inline_region(%arg0 : memref<2x2xi32>, %arg1 : memref<2x2xi32>
 // CHECK:           %[[LOAD0:.+]] = memref.load %[[ARG0]][%[[CAST0]], %[[CAST1]]] : memref<2x2xi32>
 // CHECK:           %[[MUL:.+]] = arith.muli %[[LOAD0]], %[[C3]] : i32
 // CHECK:           memref.store %[[MUL]], %[[ARG2]][%[[I]]] : memref<2xi32>
+
+// -----
+
+func.func @map_scatter_memref(
+  %input: memref<?xf32>, %output: memref<?x?xf32>, %bound: index
+) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim0 = memref.dim %output, %c0 : memref<?x?xf32>
+  %dim1 = memref.dim %output, %c1 : memref<?x?xf32>
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.cmpi uge, %idx0, %bound : index
+      %out_idx:2 = affine.delinearize_index %idx0 into (%dim0, %dim1) : index, index
+      iree_linalg_ext.yield %out_idx#0, %out_idx#1, %mask : index, index, i1
+  } : memref<?xf32> into memref<?x?xf32>
+  return
+}
+//      CHECK: func @map_scatter_memref
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[BOUND:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[IN_D0:.+]] = memref.dim %[[INPUT]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_D0:.+]] = memref.dim %[[OUTPUT]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_D1:.+]] = memref.dim %[[OUTPUT]], %[[C1]]
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[IN_D0]] step %[[C1]]
+//  CHECK-DAG:     %[[MASK:.+]] = arith.cmpi uge, %[[IV]], %[[BOUND]] : index
+//  CHECK-DAG:     %[[OUT_IDX:.+]]:2 = affine.delinearize_index %[[IV]] into (%[[OUT_D0]], %[[OUT_D1]]) : index, index
+//      CHECK:     scf.if %[[MASK]] {
+// CHECK-NEXT:       %[[INPUT_ELEM:.+]] = memref.load %[[INPUT]][%[[IV]]]
+// CHECK-NEXT:       memref.store %[[INPUT_ELEM]], %[[OUTPUT]]
+// CHECK-SAME:         [%[[OUT_IDX]]#0, %[[OUT_IDX]]#1] : memref<?x?xf32>

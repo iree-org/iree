@@ -313,21 +313,26 @@ struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
 
 } // namespace
 
-/// Fold away following sequence of `iree_tensor_ext.dispatch.workload.ordinal`.
-///
-/// ```mlir
-/// %1 = iree_tensor_ext.dispatch.workload.ordinal %0 2
-/// %2 = iree_tensor_ext.dispatch.workload.ordinal %1 2
-/// ```
-///
-/// This can happen when the operands get deduped.
 OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
+  // If the operand being annotated is a constant then just fold to it as
+  // there's no longer any relation to the captured workload.
+  if (operands.getOperand()) {
+    return operands.getOperand();
+  }
+
+  // Fold away following sequence ordinal ops:
+  //
+  //   %1 = iree_tensor_ext.dispatch.workload.ordinal %0, 2
+  //   %2 = iree_tensor_ext.dispatch.workload.ordinal %1, 2
+  //
+  // This can happen when the operands get deduped.
   if (auto producerOrdinalOp = dyn_cast_or_null<DispatchWorkloadOrdinalOp>(
           getOperand().getDefiningOp())) {
     if (producerOrdinalOp.getOrdinal() == getOrdinal()) {
       return producerOrdinalOp.getOperand();
     }
   }
+
   return {};
 }
 

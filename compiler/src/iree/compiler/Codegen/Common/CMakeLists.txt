@@ -84,7 +84,9 @@ iree_cc_library(
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
+    "BufferizeDispatchTensorLoadStore.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "CombineLayoutTransformation.cpp"
     "ConcretizePadResultShape.cpp"
     "ConfigTrackingCanonicalizer.cpp"
     "ConvertAccGEMMToGEMMPass.cpp"
@@ -316,6 +318,17 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    CodegenCommonPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenCommonPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

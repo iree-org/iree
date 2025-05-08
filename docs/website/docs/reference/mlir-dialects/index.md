@@ -2,12 +2,13 @@
 icon: simple/llvm
 ---
 
-# MLIR dialects
+# MLIR dialects and passes
 
 These pages contain automatically generated documentation for the MLIR dialects
-defined in the IREE repository. IREE also makes extensive use of dialects from
-the upstream MLIR repository, which are documented at
-[https://mlir.llvm.org/docs/Dialects/](https://mlir.llvm.org/docs/Dialects/).
+defined in the IREE repository. IREE also makes extensive use of dialects and
+passes from the upstream MLIR repository, which are documented at
+[https://mlir.llvm.org/docs/Dialects/](https://mlir.llvm.org/docs/Dialects/) and
+[https://mlir.llvm.org/docs/Passes/](https://mlir.llvm.org/docs/Passes/).
 
 ## IREE internal dialects
 
@@ -30,6 +31,7 @@ Dialect                     | Description
 [IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 [LinalgExt](./LinalgExt.md) | Extensions to the Linalg dialect for specific operations
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
+[TensorExt](./TensorExt.md) | Extensions to the Tensor dialect for specific operations
 [Util](./Util.md)           | Types and ops common across IREE subdialects
 [VM](./VM.md)               | Represents operations against an abstract virtual machine
 [VMVX](./VMVX.md)           | Virtual Machine Vector Extensions
