@@ -244,19 +244,20 @@ static iree_status_t reference_matmul_element(
 // Reference matmul implementation, used to compare matmul results against.
 static iree_status_t reference_matmul(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
-    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, bool transpose_rhs,
-    iree_byte_span_t lhs_contents, iree_byte_span_t rhs_contents,
-    iree_byte_span_t acc_contents, iree_byte_span_t result_contents,
-    int compute_every) {
+    iree_hal_dim_t m_start, iree_hal_dim_t m_end, iree_hal_dim_t n_start,
+    iree_hal_dim_t n_end, iree_hal_element_type_t lhs_type,
+    iree_hal_element_type_t rhs_type, iree_hal_element_type_t acc_type,
+    bool transpose_rhs, iree_byte_span_t lhs_contents,
+    iree_byte_span_t rhs_contents, iree_byte_span_t acc_contents,
+    iree_byte_span_t result_contents, int compute_every) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, m_size);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, k_size);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, n_size);
 
   iree_host_size_t count = 0;
-  for (iree_hal_dim_t m = 0; m < m_size; ++m) {
-    for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+  for (iree_hal_dim_t m = m_start; m < m_end; ++m) {
+    for (iree_hal_dim_t n = n_start; n < n_end; ++n) {
       if (++count < compute_every) continue;
       count = 0;
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -497,14 +498,47 @@ static void print_matrix(FILE* file, const char* label, iree_hal_dim_t rows,
   }
 }
 
+// Coordinates of regions of matrices to dump on numerical diagnostics.
+typedef struct {
+  iree_hal_dim_t m_start;
+  iree_hal_dim_t m_end;
+  iree_hal_dim_t n_start;
+  iree_hal_dim_t n_end;
+  iree_hal_dim_t k_start;
+  iree_hal_dim_t k_end;
+} matrix_debug_window_t;
+
+// Given a position (m, n) in the result matrix given by `results`, populates
+// a `window` structure determining the region of the result matrix to be
+// printed in diagnostics.
+static void get_matrix_diagnostics_window_coords(
+    iree_hal_dim_t m, iree_hal_dim_t n, const matmul_results_t* results,
+    matrix_debug_window_t* window) {
+  auto getIntEnv = [](const char* env_var, int default_val) {
+    const char* env = getenv(env_var);
+    return env ? std::atoi(env) : default_val;
+  };
+  iree_hal_dim_t context_m = getIntEnv("IREE_MATMUL_TEST_SHOW_CONTEXT_M", 16);
+  iree_hal_dim_t context_n = getIntEnv("IREE_MATMUL_TEST_SHOW_CONTEXT_N", 16);
+  iree_hal_dim_t context_k = getIntEnv("IREE_MATMUL_TEST_SHOW_CONTEXT_K", 16);
+  window->m_start =
+      (iree_hal_dim_t)iree_max(0, (int64_t)m - (int64_t)context_m / 2);
+  window->m_end = iree_min(results->m, window->m_start + context_m);
+  window->n_start =
+      (iree_hal_dim_t)iree_max(0, (int64_t)n - (int64_t)context_n / 2);
+  window->n_end = iree_min(results->n, window->n_start + context_n);
+  window->k_start = 0;
+  window->k_end = iree_min(results->k, context_k);
+}
+
 // Helper for check_matmul_results: handler for the failure case.
 // If |file| is not NULL, detailed logging is written to it.
 static iree_status_t check_matmul_failure(
     FILE* file, const matmul_results_t* results,
     iree_test_utils_e2e_value_t actual_value,
     iree_test_utils_e2e_value_t expected_value, iree_hal_dim_t row,
-    iree_hal_dim_t col, int check_every) {
-  if (!file || check_every > 1) {
+    iree_hal_dim_t col, const matrix_debug_window_t* window) {
+  if (!file) {
     // No logging of errors with check_every>1 as most of the reference matrix
     // elements have not been computed. The caller is expected to retry with
     // check_every=1.
@@ -526,49 +560,30 @@ static iree_status_t check_matmul_failure(
   fprintf(file, "actual value: %s\n", actual_value_buf);
   fprintf(file, "expected value: %s\n", expected_value_buf);
 
-  iree_hal_dim_t context = 16;
-  const char* context_env = getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
-  if (context_env) {
-    if (1 != sscanf(context_env, "%" PRIdim, &context)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "failed to parse IREE_MATMUL_TEST_SHOW_CONTEXT "
-                              "as \"%%" PRIdim "\"; got \"%s\"",
-                              context_env);
-    }
-  }
-  iree_hal_dim_t m_start =
-      (iree_hal_dim_t)iree_max(0, (int64_t)row - (int64_t)context / 2);
-  iree_hal_dim_t m_end = iree_min(results->m, m_start + context);
-  iree_hal_dim_t n_start =
-      (iree_hal_dim_t)iree_max(0, (int64_t)col - (int64_t)context / 2);
-  iree_hal_dim_t n_end = iree_min(results->n, n_start + context);
-  iree_hal_dim_t k_start = 0;
-  iree_hal_dim_t k_end = iree_min(results->k, context);
-
   fprintf(file, "\n");
-  print_matrix(file, "left-hand side", results->m, m_start, m_end, results->k,
-               k_start, k_end, results->lhs_type, results->lhs_contents.data,
-               NULL, NULL);
+  print_matrix(file, "left-hand side", results->m, window->m_start,
+               window->m_end, results->k, window->k_start, window->k_end,
+               results->lhs_type, results->lhs_contents.data, NULL, NULL);
   fprintf(file, "\n");
-  print_matrix(file, "right-hand side", results->k, k_start, k_end, results->n,
-               n_start, n_end, results->rhs_type, results->rhs_contents.data,
-               NULL, NULL);
+  print_matrix(file, "right-hand side", results->k, window->k_start,
+               window->k_end, results->n, window->n_start, window->n_end,
+               results->rhs_type, results->rhs_contents.data, NULL, NULL);
   fprintf(file, "\n");
   if (results->acc_contents.data) {
-    print_matrix(file, "input accumulator", results->m, m_start, m_end,
-                 results->n, n_start, n_end, results->acc_type,
-                 results->acc_contents.data, NULL, NULL);
+    print_matrix(file, "input accumulator", results->m, window->m_start,
+                 window->m_end, results->n, window->n_start, window->n_end,
+                 results->acc_type, results->acc_contents.data, NULL, NULL);
     fprintf(file, "\n");
   }
-  print_matrix(file, "expected result", results->m, m_start, m_end, results->n,
-               n_start, n_end, results->result_type,
-               results->expected_contents.data, results->actual_contents.data,
-               iree_test_utils_emoji(true));
+  print_matrix(file, "expected result", results->m, window->m_start,
+               window->m_end, results->n, window->n_start, window->n_end,
+               results->result_type, results->expected_contents.data,
+               results->actual_contents.data, iree_test_utils_emoji(true));
   fprintf(file, "\n");
-  print_matrix(file, "actual result", results->m, m_start, m_end, results->n,
-               n_start, n_end, results->result_type,
-               results->actual_contents.data, results->expected_contents.data,
-               iree_test_utils_emoji(false));
+  print_matrix(file, "actual result", results->m, window->m_start,
+               window->m_end, results->n, window->n_start, window->n_end,
+               results->result_type, results->actual_contents.data,
+               results->expected_contents.data, iree_test_utils_emoji(false));
   fprintf(file, "\n");
 
   IREE_TRACE_ZONE_END(z0);
@@ -584,11 +599,12 @@ static iree_status_t check_matmul_results_impl(FILE* file,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, reference_matmul(
-              results->m, results->k, results->n, results->lhs_type,
-              results->rhs_type, results->acc_type, results->transpose_rhs,
-              results->lhs_contents, results->rhs_contents,
-              results->acc_contents, results->expected_contents, check_every));
+      z0, reference_matmul(results->m, results->k, results->n, 0, results->m, 0,
+                           results->n, results->lhs_type, results->rhs_type,
+                           results->acc_type, results->transpose_rhs,
+                           results->lhs_contents, results->rhs_contents,
+                           results->acc_contents, results->expected_contents,
+                           check_every));
 
   int count = 0;
   for (iree_hal_dim_t m = 0; m < results->m; ++m) {
@@ -604,8 +620,22 @@ static iree_status_t check_matmul_results_impl(FILE* file,
                                               results->expected_contents.data);
       if (!iree_test_utils_result_elements_agree(actual_value,
                                                  expected_value)) {
+        // Numerical error detected. Determine a window into the matrices to
+        // generate a diagnostic for.
+        matrix_debug_window_t window;
+        get_matrix_diagnostics_window_coords(m, n, results, &window);
+
+        // Compute all remaining matrix elements in that window, as we are going
+        // to print them.
+        reference_matmul(
+            results->m, results->k, results->n, window.m_start, window.m_end,
+            window.n_start, window.n_end, results->lhs_type, results->rhs_type,
+            results->acc_type, results->transpose_rhs, results->lhs_contents,
+            results->rhs_contents, results->acc_contents,
+            results->expected_contents, /*check_every=*/1);
+
         iree_status_t status = check_matmul_failure(
-            file, results, actual_value, expected_value, m, n, check_every);
+            file, results, actual_value, expected_value, m, n, &window);
         IREE_TRACE_ZONE_END(z0);
         return status;
       }
@@ -625,17 +655,6 @@ static iree_status_t check_matmul_results(FILE* file,
   int check_every = iree_test_utils_calculate_check_every(
       results->m * results->n, results->n);
   iree_status_t status = check_matmul_results_impl(file, results, check_every);
-  if (!iree_status_is_ok(status) && check_every > 1) {
-    // If we got a failure with check_every>1, that didn't log a useful
-    // numerical summary, as most of the reference matrix entries hadn't been
-    // computed. Rerun now with check_every=1 to get that numerical logging.
-    iree_status_ignore(status);
-    fprintf(file,
-            "Incorrect numerical results detected! Now computing the whole "
-            "reference matrix to log more detailed numerical error "
-            "diagnostics. This may take a while for larger matrices...\n");
-    status = check_matmul_results_impl(file, results, 1);
-  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
