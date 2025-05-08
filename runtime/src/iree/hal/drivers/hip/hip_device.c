@@ -229,6 +229,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   out_params->file_transfer_chunk_size =
       IREE_HAL_DEVICE_MAX_TRANSFER_DEFAULT_CHUNK_SIZE;
   out_params->allow_inline_execution = false;
+  out_params->enable_async_caching = true;
 }
 
 static iree_status_t iree_hal_hip_device_check_params(

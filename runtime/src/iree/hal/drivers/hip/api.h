@@ -107,7 +107,7 @@ typedef struct iree_hal_hip_device_params_t {
   // IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION bit set will use this.
   bool allow_inline_execution;
 
-  // Whether or not to disable async caching.
+  // Enable async caching on the device.
   bool enable_async_caching;
 } iree_hal_hip_device_params_t;
 
