@@ -133,7 +133,11 @@ def DumpDispatchGraphPass : Pass<"iree-flow-dump-dispatch-graph-pass"> {
     Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
            /*default=*/"true", "Print data flow edges">,
     Option<"printResultTypes", "print-result-types", "bool",
-            /*default=*/"true", "Print result types of operations">
+            /*default=*/"true", "Print result types of operations">,
+    Option<"emitDispatchBody", "emit-dispatch-body", "bool",
+            /*default=*/"false", "Emit dispatch body in label">,
+    Option<"emitInitializers", "emit-initializers", "bool",
+            /*default=*/"false", "Emit initializers">
   ];
 }
 
