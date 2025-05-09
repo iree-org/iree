@@ -531,6 +531,10 @@ static Value foldTransferGatherFromBroadcast(TransferGatherOp gatherOp) {
 
         int64_t sourceRank = getVectorRank(broadcast.getSourceType());
         int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
+        if (sourceRank == operandRank) {
+          return {operand, map, false};
+        }
+
         AffineMap newMap =
             map.getSliceMap(operandRank - sourceRank, sourceRank);
         return {broadcast.getSource(), newMap, true};
