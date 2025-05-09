@@ -499,8 +499,7 @@ static LogicalResult setPaddingEncodings(MLIRContext *context,
   memref::populateResolveRankedShapedTypeResultDimsPatterns(
       dimResolutionPatterns);
   GreedyRewriteConfig config;
-  config.fold = true;
-  config.maxIterations = GreedyRewriteConfig::kNoLimit;
+  config.enableFolding(true).setMaxIterations(GreedyRewriteConfig::kNoLimit);
   if (failed(applyPatternsGreedily(funcOp, std::move(dimResolutionPatterns),
                                    config))) {
     return funcOp.emitOpError("failed to resolve tensor.dim operations");
@@ -532,7 +531,7 @@ struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
     patterns.add<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     GreedyRewriteConfig config;
-    config.cseConstants = false;
+    config.enableConstantCSE(false);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns),
                                      config))) {
       return signalPassFailure();

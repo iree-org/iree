@@ -138,7 +138,7 @@ public:
 
     ConfigTrackingListener listener;
     GreedyRewriteConfig config;
-    config.listener = &listener;
+    config.setListener(&listener);
 
     {
       RewritePatternSet patterns(context);

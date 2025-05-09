@@ -118,7 +118,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     // producer dispatch regions, so we need to resolve tensor.dim ops., Also
     // run the canonicalization patterns to remove redundantly returned results.
     GreedyRewriteConfig config;
-    config.cseConstants = false;
+    config.enableConstantCSE(false);
     RewritePatternSet patterns(context);
     IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(patterns,
                                                               context);
