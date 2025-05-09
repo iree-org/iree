@@ -696,7 +696,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
-                                     std::nullopt) {
+                                     std::nullopt) -> int64_t {
     LDBG("Loss factor: " << lossFactor);
     // Initialize the configuration.
     flatWorkgroupSize = 1;
@@ -707,6 +707,13 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     for (int64_t loopIndex : distInfo.partitionableLoops) {
       workgroupTileSizes[loopIndex] = workgroupTileSizeMultiples[loopIndex];
       threadTileSizes[loopIndex] = 1;
+    }
+    // If the bounds are fully dynamic, try to do some distribution along the
+    // inner dimension.
+    if (llvm::all_of(distInfo.loopBounds, ShapedType::isDynamic)) {
+      workgroupTileSizes[distInfo.partitionableLoops.back()] = subgroupSize;
+      flatWorkgroupSize = subgroupSize;
+      return 1;
     }
 
     // Scan from the innermost shape dimension and try to deduce the
