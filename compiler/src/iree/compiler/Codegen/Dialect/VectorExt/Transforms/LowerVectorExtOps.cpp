@@ -181,13 +181,10 @@ static AffineMap unpackedPermutationMap(OpBuilder &b, OpTy xferOp) {
 }
 
 struct UnrollTransferGather : public OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
 
-  void initialize() {
-    // This pattern recursively unpacks one dimension at a time. The recursion
-    // bounded as the rank is strictly decreasing.
-    setHasBoundedRewriteRecursion();
-  }
+  UnrollTransferGather(MLIRContext *context, int64_t maxUnrollRank,
+                       PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit), maxUnrollRank(maxUnrollRank) {}
 
   /// Get or build the vector into which the newly created TransferReadOp
   /// results are inserted.
@@ -226,7 +223,7 @@ struct UnrollTransferGather : public OpRewritePattern<TransferGatherOp> {
   /// accesses, and broadcasts and transposes in permutation maps.
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,
                                 PatternRewriter &rewriter) const override {
-    if (xferOp.getTransferRank() < 1) {
+    if (xferOp.getTransferRank() <= maxUnrollRank) {
       return rewriter.notifyMatchFailure(xferOp, "no dim to unroll");
     }
     if (!llvm::all_of(xferOp.getInBoundsValues(), [](bool x) { return x; })) {
@@ -312,12 +309,17 @@ struct UnrollTransferGather : public OpRewritePattern<TransferGatherOp> {
 
     return success();
   }
+
+  int64_t maxUnrollRank;
 };
 
 } // namespace
 
-void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns) {
-  patterns.add<UnrollTransferGather>(patterns.getContext());
+void populateTransferGatherUnrollingPatterns(RewritePatternSet &patterns,
+                                             int64_t maxUnrollRank) {
+  TransferGatherOp::getCanonicalizationPatterns(patterns,
+                                                patterns.getContext());
+  patterns.add<UnrollTransferGather>(patterns.getContext(), maxUnrollRank);
 }
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt

@@ -18,7 +18,8 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     ArrayRef<int64_t> vectorSizes = {}, ArrayRef<bool> scalableVecDims = {},
     bool vectorizeNDExtract = false);
 
-void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
+void populateTransferGatherUnrollingPatterns(RewritePatternSet &patterns,
+                                             int64_t maxUnrollRank = 0);
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 
