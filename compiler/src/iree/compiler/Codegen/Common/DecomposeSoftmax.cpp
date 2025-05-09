@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
 
@@ -110,8 +111,14 @@ struct DecomposeSoftmaxPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
-    if (failed(convertSoftmaxToGenerics(getOperation(), useFusion)))
+    RewritePatternSet patterns(context);
+    if (failed(convertSoftmaxToGenerics(getOperation(), useFusion))) {
       return signalPassFailure();
+    }
+    linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 
