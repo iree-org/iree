@@ -152,6 +152,63 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {
 ]>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
+
+func.func @argmax_1d_bf16i64() attributes {
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+} {
+  %c32_i64 = arith.constant 32 : i64
+  %cst = arith.constant 0xFF80 : bf16  // -inf for bf16
+  %c0_i64 = arith.constant 0 : i64
+  %c0 = arith.constant 0 : index
+
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = arith.extui %0 : i32 to i64
+  %3 = arith.extui %1 : i32 to i64
+  %4 = arith.shli %3, %c32_i64 : i64
+  %5 = arith.ori %2, %4 : i64
+  %6 = arith.index_castui %5 : i64 to index
+
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  %8 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xbf16>>{%8}
+  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xbf16>>{%8} -> tensor<?xbf16>
+
+  %11 = tensor.empty() : tensor<i64>
+  %12 = tensor.empty() : tensor<bf16>
+  %13 = linalg.fill ins(%c0_i64 : i64) outs(%11 : tensor<i64>) -> tensor<i64>
+  %14 = linalg.fill ins(%cst : bf16) outs(%12 : tensor<bf16>) -> tensor<bf16>
+
+  %15:2 = linalg.generic {
+      indexing_maps = [#map, #map1, #map1],
+      iterator_types = ["reduction"]
+    } ins(%10 : tensor<?xbf16>) outs(%14, %13 : tensor<bf16>, tensor<i64>) {
+    ^bb0(%in: bf16, %out: bf16, %out_0: i64):
+      %16 = linalg.index 0 : index
+      %17 = arith.index_cast %16 : index to i64
+      %18 = arith.maximumf %in, %out : bf16
+      %19 = arith.cmpf ogt, %in, %out : bf16
+      %20 = arith.select %19, %17, %out_0 : i64
+      linalg.yield %18, %20 : bf16, i64
+  } -> (tensor<bf16>, tensor<i64>)
+
+  iree_tensor_ext.dispatch.tensor.store %15#1, %7, offsets = [], sizes = [], strides = [] : tensor<i64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  return
+}
+
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [32, 1, 1]>
+//       CHECK: func.func @argmax_1d_bf16i64()
+//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   iree_codegen.ukernel.generic "iree_uk_amdgpu_argmax_bf16i64"
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(d0) -> (d0)>
+#map1 = affine_map<(d0) -> ()>
 func.func @not_neg_inf_init_argmax_1d() attributes {
   hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 } {
