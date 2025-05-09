@@ -719,14 +719,14 @@ hal.executable @mma_fused_fp16 {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable @warp_reduction_dispatch {
+hal.executable @vector_distribute_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @warp_reduction_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+  hal.executable.export public @vector_distribute_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
-    func.func @warp_reduction_dispatch() {
+    func.func @vector_distribute_dispatch() {
       %c0 = arith.constant 0 : index
       %c1024 = arith.constant 1024 : index
       %cst = arith.constant 1.000000e+00 : f32
@@ -751,13 +751,13 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-// Check that we generate a warp reduce code sequence.
-//   CHECK-LABEL: hal.executable public @warp_reduction_dispatch
+// Check that we generate a vector distribute code sequence.
+//   CHECK-LABEL: hal.executable public @vector_distribute_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : vector<1xf32>, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
 // CHECK-COUNT-2:     nvvm.shfl.sync  bfly
 
 // -----
@@ -769,14 +769,14 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable @warp_reduction_broadcast_dispatch {
+hal.executable @vector_distribution_broadcast_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @warp_reduction_broadcast_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+  hal.executable.export public @vector_distribution_broadcast_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
-    func.func @warp_reduction_broadcast_dispatch() {
+    func.func @vector_distribution_broadcast_dispatch() {
       %c0 = arith.constant 0 : index
       %c1024 = arith.constant 1024 : index
       %cst_0 = arith.constant 3.840000e+02 : f32
@@ -811,15 +811,15 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 // Check that we generate a group reduce fused with broadcast + elementwise.
-//   CHECK-LABEL: hal.executable public @warp_reduction_broadcast_dispatch
+//   CHECK-LABEL: hal.executable public @vector_distribution_broadcast_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : vector<1xf32>, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
 // CHECK-COUNT-2:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<1>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
 
 // -----
 
