@@ -172,9 +172,84 @@ getProcIdsAndNprocs(
   return std::make_pair(procId, nprocs);
 }
 
+/// Return the procId and nprocs to use for each of the distributed loops,
+/// derived from `hal.interface.workgroup.id/count`s.
+static FailureOr<
+    std::pair<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>>>
+getDelinearizedProcIdsAndNprocs(
+    scf::ForallOp forallOp, RewriterBase &builder, Location loc,
+    SmallVector<IREE::Codegen::WorkgroupMappingAttr> workgroupMappings,
+    SmallVector<OpFoldResult> lowerBounds,
+    SmallVector<OpFoldResult> upperBounds, SmallVector<OpFoldResult> steps,
+    Value xWorkgroupId) {
+  if (workgroupMappings.size() != lowerBounds.size()) {
+    return forallOp.emitOpError(
+        "expected as many workgroup mapping attributes as number of loops");
+  }
+  OpFoldResult xWorkgroupCount =
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(forallOp.getLoc(), 0)
+          .getResult();
+  if (workgroupMappings.size() == 1) {
+    SmallVector<OpFoldResult> procId = {xWorkgroupId};
+    SmallVector<OpFoldResult> nprocs = {xWorkgroupCount};
+    return std::make_pair(procId, nprocs);
+  }
+
+  auto permutation = getMappingPermutation(workgroupMappings);
+  applyPermutationToVector(workgroupMappings, permutation);
+  applyPermutationToVector(lowerBounds, permutation);
+  applyPermutationToVector(upperBounds, permutation);
+  applyPermutationToVector(steps, permutation);
+
+  AffineExpr s0, s1, s2;
+  bindSymbols(builder.getContext(), s0, s1, s2);
+  AffineExpr extentExpr = (s1 - s0).ceilDiv(s2);
+  SmallVector<OpFoldResult> loopExtents;
+  for (auto [lb, ub, step] : llvm::zip_equal(lowerBounds, upperBounds, steps)) {
+    OpFoldResult extent = affine::makeComposedFoldedAffineApply(
+        builder, loc, extentExpr, {lb, ub, step});
+    loopExtents.push_back(extent);
+  }
+
+  // Delinearize the x-dim based on the loop extents.
+
+  SmallVector<OpFoldResult> procId(workgroupMappings.size(),
+                                   builder.getIndexAttr(0));
+  SmallVector<OpFoldResult> nprocs(workgroupMappings.size(),
+                                   builder.getIndexAttr(1));
+  Value xDimId = xWorkgroupId;
+  OpFoldResult xNprocs = xWorkgroupCount;
+  if (loopExtents.size() == 1) {
+    procId[0] = xDimId;
+    nprocs[0] = xNprocs;
+    return std::make_pair(procId, nprocs);
+  }
+  auto delinearizeOp = builder.create<affine::AffineDelinearizeIndexOp>(
+      loc, xDimId, loopExtents);
+  SmallVector<OpFoldResult> orderedDelinearizedDimIds = llvm::map_to_vector(
+      delinearizeOp.getResults(), [](Value v) -> OpFoldResult { return v; });
+  AffineMap minMap = AffineMap::get(0, 2, {s0, s1}, builder.getContext());
+  AffineExpr ceilDivExpr = s0.ceilDiv(s1);
+  for (int index = loopExtents.size() - 1; index >= 0; --index) {
+    auto extent = loopExtents[index];
+    procId[index] = delinearizeOp->getResult(index);
+    OpFoldResult currNprocs = affine::makeComposedFoldedAffineMin(
+        builder, loc, minMap, {extent, xNprocs});
+    nprocs[index] = currNprocs;
+    xNprocs = affine::makeComposedFoldedAffineApply(builder, loc, ceilDivExpr,
+                                                    {xNprocs, currNprocs});
+  }
+
+  auto inversePermutation = invertPermutationVector(permutation);
+  applyPermutationToVector(procId, inversePermutation);
+  applyPermutationToVector(nprocs, inversePermutation);
+  return std::make_pair(procId, nprocs);
+}
+
 /// Resolve scf.forall operation by using the workgroup ID and counts.
-static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
-                                            scf::ForallOp forallOp) {
+static LogicalResult
+resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
+                       std::optional<OpFoldResult> flatWorkgroupCount) {
   if (forallOp->getNumResults() != 0) {
     return forallOp.emitOpError(
         "cannot resolve for all ops with return values");
@@ -190,24 +265,33 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
 
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(forallOp);
+  Location loc = forallOp.getLoc();
 
   SmallVector<OpFoldResult> procId;
+  std::optional<Value> flatWorkgroupId;
 
   {
     FailureOr<std::pair<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>>>
-        procInfo =
-            getProcIdsAndNprocs(forallOp, rewriter, forallOp.getLoc(),
-                                workgroupMapping.value(), mixedLowerBound,
-                                mixedUpperBound, mixedStep);
+        procInfo;
+    if (flatWorkgroupCount.has_value()) {
+      Value xWorkgroupId =
+          rewriter.create<IREE::HAL::InterfaceWorkgroupIDOp>(loc, 0)
+              .getResult();
+      flatWorkgroupId = xWorkgroupId;
+      procInfo = getDelinearizedProcIdsAndNprocs(
+          forallOp, rewriter, loc, workgroupMapping.value(), mixedLowerBound,
+          mixedUpperBound, mixedStep, xWorkgroupId);
+    } else {
+      procInfo =
+          getProcIdsAndNprocs(forallOp, rewriter, loc, workgroupMapping.value(),
+                              mixedLowerBound, mixedUpperBound, mixedStep);
+    }
     if (failed(procInfo)) {
       return failure();
     }
     std::swap(procId, procInfo->first);
   }
 
-  /// For now this is assuming that number of workgroups is exactly equal to
-  /// the iterations for each loop dimension. Just inline the forall body into
-  /// the parent.
   Block *parentBlock = forallOp->getBlock();
   Block *remainingBlock =
       rewriter.splitBlock(parentBlock, Block::iterator(forallOp));
@@ -216,42 +300,96 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
     AffineExpr s0, s1;
     bindSymbols(rewriter.getContext(), s0, s1);
     AffineExpr expr = s1 * s0;
-    id = affine::makeComposedFoldedAffineApply(rewriter, forallOp.getLoc(),
-                                               expr, {id, step});
+    id = affine::makeComposedFoldedAffineApply(rewriter, loc, expr, {id, step});
   }
-  auto argReplacements =
-      getValueOrCreateConstantIndexOp(rewriter, forallOp.getLoc(), procId);
+  auto argReplacements = getValueOrCreateConstantIndexOp(rewriter, loc, procId);
   Block *loopBody = forallOp.getBody();
   rewriter.eraseOp(loopBody->getTerminator());
-  rewriter.mergeBlocks(loopBody, parentBlock, argReplacements);
+  // If the workgroup IDs are not linearized, then there is only a single
+  // forall, and the workgroup IDs will exactly equal the number of iterations
+  // for each loop dimension, so just inline the forall body.
+  if (!flatWorkgroupCount.has_value()) {
+    rewriter.mergeBlocks(loopBody, parentBlock, argReplacements);
+    rewriter.mergeBlocks(remainingBlock, parentBlock, ValueRange{});
+    rewriter.eraseOp(forallOp);
+    return success();
+  }
+  // Otherwise, we wrap the body in an scf.if, because the workgroup count
+  // should be equal to the maximum of the iteration spaces of all the foralls
+  // in the function.
+  Value ifCond = rewriter.create<arith::CmpIOp>(
+      loc, arith::CmpIPredicate::ult, *flatWorkgroupId,
+      getValueOrCreateConstantIndexOp(rewriter, loc, *flatWorkgroupCount));
+  auto ifOp = rewriter.create<scf::IfOp>(loc, ifCond, /*withElseRegion=*/false);
+  Block &thenBlock = ifOp.getThenRegion().getBlocks().front();
+  Operation *yieldOp = thenBlock.getTerminator();
+  rewriter.mergeBlocks(loopBody, &thenBlock, argReplacements);
+  rewriter.moveOpBefore(yieldOp, &thenBlock, thenBlock.end());
   rewriter.mergeBlocks(remainingBlock, parentBlock, ValueRange{});
   rewriter.eraseOp(forallOp);
   return success();
 }
 
-static LogicalResult resolveWorkgroupCount(RewriterBase &rewriter,
-                                           mlir::FunctionOpInterface funcOp,
-                                           scf::ForallOp forAllOp) {
+static LogicalResult
+resolveWorkgroupCount(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
+                      ArrayRef<scf::ForallOp> forAllOps,
+                      SmallVector<OpFoldResult> &flatWorkgroupCounts) {
+  SmallVector<SmallVector<OpFoldResult>> workgroupCounts;
   OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(forAllOp);
-  SmallVector<OpFoldResult> lowerBounds = forAllOp.getMixedLowerBound();
-  SmallVector<OpFoldResult> upperBounds = forAllOp.getMixedUpperBound();
-  SmallVector<OpFoldResult> steps = forAllOp.getMixedStep();
-  SmallVector<OpFoldResult> workgroupCount(lowerBounds.size());
-  AffineExpr s0, s1, s2;
-  bindSymbols(rewriter.getContext(), s0, s1, s2);
-  AffineExpr countExpr = (s1 - s0).ceilDiv(s2);
-  for (auto [index, lb, ub, step] :
-       llvm::enumerate(lowerBounds, upperBounds, steps)) {
-    workgroupCount[index] = affine::makeComposedFoldedAffineApply(
-        rewriter, forAllOp.getLoc(), countExpr, {lb, ub, step});
+  bool multiForall = forAllOps.size() > 1;
+  OpFoldResult maxWorkgroupCount;
+  for (scf::ForallOp forAllOp : forAllOps) {
+    rewriter.setInsertionPoint(forAllOp);
+    SmallVector<OpFoldResult> lowerBounds = forAllOp.getMixedLowerBound();
+    SmallVector<OpFoldResult> upperBounds = forAllOp.getMixedUpperBound();
+    SmallVector<OpFoldResult> steps = forAllOp.getMixedStep();
+    SmallVector<OpFoldResult> workgroupCount(lowerBounds.size());
+    AffineExpr s0, s1, s2;
+    bindSymbols(rewriter.getContext(), s0, s1, s2);
+    AffineExpr countExpr = (s1 - s0).ceilDiv(s2);
+    Location loc = forAllOp.getLoc();
+    for (auto [index, lb, ub, step] :
+         llvm::enumerate(lowerBounds, upperBounds, steps)) {
+      workgroupCount[index] = affine::makeComposedFoldedAffineApply(
+          rewriter, loc, countExpr, {lb, ub, step});
+    }
+    // If there is only a single forall op, then there is no need to linearize
+    // the workgroup counts, since the x, y, and z counts will match the ranges
+    // of the single forall.
+    if (!multiForall) {
+      auto mappingAttr =
+          llvm::map_to_vector(forAllOp.getMapping().value(), [](auto a) {
+            return cast<IREE::Codegen::WorkgroupMappingAttr>(a);
+          });
+      auto permutation = getMappingPermutation(mappingAttr);
+      workgroupCount = applyPermutation(workgroupCount, permutation);
+      return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount);
+    }
+    // If there are multiple foralls, then the workgroup counts will be
+    // linearized, and then the workgroup_count_from_slice op will be lowered
+    // with the maximum workgroup count.
+    AffineExpr prodExpr = rewriter.getAffineConstantExpr(1);
+    for (int i = 0; i < workgroupCount.size(); ++i) {
+      prodExpr = prodExpr * rewriter.getAffineSymbolExpr(i);
+    }
+    OpFoldResult flatWorkgroupCount = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, prodExpr, workgroupCount);
+    flatWorkgroupCounts.push_back(flatWorkgroupCount);
+    if (!maxWorkgroupCount) {
+      maxWorkgroupCount = flatWorkgroupCount;
+      continue;
+    }
+    maxWorkgroupCount =
+        rewriter
+            .create<arith::MaxUIOp>(loc,
+                                    getValueOrCreateConstantIndexOp(
+                                        rewriter, loc, maxWorkgroupCount),
+                                    getValueOrCreateConstantIndexOp(
+                                        rewriter, loc, flatWorkgroupCount))
+            .getResult();
   }
-  auto mappingAttr =
-      llvm::map_to_vector(forAllOp.getMapping().value(), [](auto a) {
-        return cast<IREE::Codegen::WorkgroupMappingAttr>(a);
-      });
-  auto permutation = getMappingPermutation(mappingAttr);
-  workgroupCount = applyPermutation(workgroupCount, permutation);
+  OpFoldResult one = rewriter.getIndexAttr(1);
+  SmallVector<OpFoldResult> workgroupCount = {one, one, maxWorkgroupCount};
   return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount);
 }
 
@@ -286,21 +424,30 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
     return lowerWorkgroupCountFromSliceOp(rewriter, funcOp,
                                           ArrayRef<OpFoldResult>{});
   }
-  if (!llvm::hasSingleElement(workgroupForAllOps)) {
-    return funcOp.emitOpError("unhandled resolution of zero/multiple "
-                              "scf.forall ops withing the function");
-  }
 
   if (!llvm::hasSingleElement(body)) {
     return funcOp.emitOpError("unhandled function with multiple blocks");
   }
 
-  scf::ForallOp forallOp = *forAllOps.begin();
-  if (failed(resolveWorkgroupCount(rewriter, funcOp, forallOp))) {
+  // scf::ForallOp forallOp = *forAllOps.begin();
+  SmallVector<OpFoldResult> flatWorkgroupCounts;
+  if (failed(resolveWorkgroupCount(rewriter, funcOp, workgroupForAllOps,
+                                   flatWorkgroupCounts))) {
     return failure();
   }
 
-  return resolveWorkgroupForAll(rewriter, *forAllOps.begin());
+  for (auto [idx, forallOp] : llvm::enumerate(workgroupForAllOps)) {
+    // If there are multiple foralls, then the workgroup IDs come in as a single
+    // linearized ID, because the shapes of each forall might not be compatible.
+    std::optional<OpFoldResult> flatWorkgroupCount;
+    if (!flatWorkgroupCounts.empty())
+      flatWorkgroupCount = flatWorkgroupCounts[idx];
+    if (failed(
+            resolveWorkgroupForAll(rewriter, forallOp, flatWorkgroupCount))) {
+      return failure();
+    }
+  }
+  return success();
 }
 
 //===---------------------------------------------------------------------===//
