@@ -476,6 +476,48 @@ static SmallVector<unsigned> padOperandsOfOp(RewriterBase &rewriter,
   return paddedOperands;
 }
 
+// Return a list of operands to be padded for each `op`.
+SmallVector<unsigned> shouldOperandsBePadded(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
+    return {};
+  }
+
+  // Bail out on matvec / vecmat and skinny matmul problems.
+  SmallVector<unsigned> reductionDims;
+  linalgOp.getReductionDims(reductionDims);
+  int64_t parallelDimSize = 1;
+  llvm::SmallSetVector<int32_t, 4> reductionDimsSet;
+  reductionDimsSet.insert_range(reductionDims);
+  SmallVector<int64_t, 4> loopRanges = linalgOp.getStaticLoopRanges();
+  for (auto [idx, dimSize] : llvm::enumerate(loopRanges)) {
+    if (reductionDimsSet.contains(idx)) {
+      // Bail if the reduction dimension is dynamic.
+      if (ShapedType::isDynamic(dimSize)) {
+        return {};
+      }
+      continue;
+    }
+    if (!ShapedType::isDynamic(parallelDimSize)) {
+      if (ShapedType::isDynamic(dimSize)) {
+        parallelDimSize = ShapedType::kDynamic;
+        continue;
+      }
+      parallelDimSize *= dimSize;
+    }
+  }
+
+  // TODO(MaheshRavishankar): Make this command line controllable.
+  static constexpr int64_t kSkinnyMatmulThreshold = 64;
+  if (!ShapedType::isDynamic(parallelDimSize) &&
+      parallelDimSize < kSkinnyMatmulThreshold) {
+    // This matmul is skinny, do not pad.
+    return {};
+  }
+
+  return {0, 1};
+}
+
 // Main driver method to add encodings to pad. Typically these are
 // intermediate values produced by `flow.dispatch.region`.
 static LogicalResult setPaddingEncodings(MLIRContext *context,
@@ -483,15 +525,19 @@ static LogicalResult setPaddingEncodings(MLIRContext *context,
   IRRewriter rewriter(context);
 
   // Collect all operations whose operands can be padded.
-  SmallVector<Operation *> matmulOps;
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    if (linalg::isaContractionOpInterface(linalgOp)) {
-      matmulOps.push_back(linalgOp);
+  using OpListType =
+      SmallVector<std::tuple<Operation *, SmallVector<unsigned>>>;
+  OpListType paddedOps;
+  funcOp.walk([&](Operation *op) {
+    SmallVector<unsigned> paddedOperands = shouldOperandsBePadded(op);
+    if (paddedOperands.empty()) {
+      return;
     }
+    paddedOps.emplace_back(std::tuple{op, std::move(paddedOperands)});
   });
-  for (auto op : matmulOps) {
+  for (auto opInfo : paddedOps) {
     // Only pad LHS or RHS of matmul ops.
-    padOperandsOfOp(rewriter, op, {0, 1});
+    padOperandsOfOp(rewriter, std::get<0>(opInfo), std::get<1>(opInfo));
   }
 
   // Apply the dim resolution patterns.
