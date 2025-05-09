@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -24,8 +26,24 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t>
-    splitReductionRatio("iree-dispatch-creation-split-matmul-reduction",
-                        llvm::cl::desc("split ratio"), llvm::cl::init(1));
+    splitMatmulReductionRatio("iree-dispatch-creation-split-matmul-reduction",
+                              llvm::cl::desc("split ratio"), llvm::cl::init(1));
+
+static llvm::cl::opt<bool> enableStaticArgmaxSplit(
+    "iree-dispatch-creation-enable-static-argmax-split",
+    llvm::cl::desc(
+        "Enable a static argmax split-k for known reduction patterns "
+        "with a reduction dimension of 128."),
+    llvm::cl::init(true));
+
+// Controls the tile size used when applying split-k to argmax reductions.
+// This value defines how many elements along the reduction dimension are
+// processed per tile (e.g., a value of 128 means each tile reduces over 128
+// elements).
+static llvm::cl::opt<int64_t> splitArgmaxReductionRatio(
+    "iree-dispatch-creation-split-argmax-reduction",
+    llvm::cl::desc("Ratio to split argmax. Set to 0 or 1 to disable"),
+    llvm::cl::init(1));
 
 static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-dispatch-creation-topk-split-reduction",
@@ -63,28 +81,72 @@ namespace {
 struct SplitReductionPass final
     : public impl::SplitReductionPassBase<SplitReductionPass> {
   void runOnOperation() override {
-    if (splitReductionRatio.getValue() <= 1 &&
-        topkSplitReductionRatio.empty()) {
+    if (splitMatmulReductionRatio.getValue() <= 1 &&
+        topkSplitReductionRatio.empty() &&
+        (splitArgmaxReductionRatio.getValue() <= 1 &&
+         !enableStaticArgmaxSplit)) {
       return;
+    }
+
+    if (enableStaticArgmaxSplit) {
+      // Use default split-k pattern for argmax ops: split the reduction dim
+      // (e.g., 131072) into tiles of size 128, resulting in 1024 tiles (131072
+      // / 128). So, the split ratio refers to the tile size of the reduction
+      // dimension.
+      splitArgmaxReductionRatio = 128;
     }
 
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
 
+    SmallVector<linalg::MatmulOp> matmulCandidates;
+    SmallVector<IREE::LinalgExt::TopkOp> topkCandidates;
+    SmallVector<linalg::GenericOp> argmaxCandidates;
+
+    IRRewriter rewriter(context);
+    funcOp->walk([&](Operation *op) {
+      TypeSwitch<Operation *>(op)
+          .Case<linalg::MatmulOp>([&](auto matmulOp) {
+            if (splitMatmulReductionRatio > 1) {
+              matmulCandidates.push_back(matmulOp);
+            }
+          })
+          .Case<IREE::LinalgExt::TopkOp>([&](auto topkOp) {
+            if (!topkSplitReductionRatio.empty()) {
+              topkCandidates.push_back(topkOp);
+            }
+          })
+          .Case<linalg::GenericOp>([&](auto genericOp) {
+            if (splitArgmaxReductionRatio > 1 &&
+                IREE::LinalgExt::isArgmaxOp(genericOp)) {
+              argmaxCandidates.push_back(genericOp);
+            }
+          });
+    });
+
+    // Split matmul ops.
     auto matmulSplitReductionControlFn =
         [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
       // For matmul make the new parallel dimension first so that it looks
       // like a batch_matmul and can follow the same codegen.
-      return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
+      return {int64_t(splitMatmulReductionRatio), 0, /*innerParallel=*/false};
     };
-
-    SmallVector<linalg::MatmulOp> matmulCandidates;
-    IRRewriter rewriter(context);
-    funcOp->walk([&](linalg::MatmulOp op) { matmulCandidates.push_back(op); });
     for (auto op : matmulCandidates) {
       (void)splitReductionOnMatmul(rewriter, op, matmulSplitReductionControlFn);
     }
 
+    // Split argmax ops.
+    auto argmaxSplitReductionControlFn =
+        [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
+      return {splitArgmaxReductionRatio, op.getNumLoops() - 1,
+              /*innerParallel=*/false};
+    };
+    for (auto op : argmaxCandidates) {
+      (void)IREE::LinalgExt::splitArgmaxReduction(
+          rewriter, op, argmaxSplitReductionControlFn);
+    }
+
+    // Split topk ops.
     IREE::LinalgExt::TopkSplitReductionControlFn topkSplitReductionControlFn =
         [&](int64_t splitReductionDepth) -> int64_t {
       SmallVector<int64_t> reductionRatios(topkSplitReductionRatio.begin(),
@@ -95,10 +157,6 @@ struct SplitReductionPass final
         return reductionRatios[splitReductionDepth];
       }
     };
-
-    SmallVector<IREE::LinalgExt::TopkOp> topkCandidates;
-    funcOp->walk(
-        [&](IREE::LinalgExt::TopkOp op) { topkCandidates.push_back(op); });
     for (auto op : topkCandidates) {
       (void)splitReduction(rewriter, op, topkSplitReductionControlFn);
     }

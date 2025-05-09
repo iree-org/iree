@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -69,7 +70,7 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(isArgmaxOp(op))) {
+    if (!IREE::LinalgExt::isArgmaxOp(op)) {
       return failure();
     }
     FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
