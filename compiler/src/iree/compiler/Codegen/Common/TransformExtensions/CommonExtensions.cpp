@@ -940,7 +940,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     RewritePatternSet patterns(getContext());
     patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
     GreedyRewriteConfig config;
-    config.listener = &listener;
+    config.setListener(&listener);
     // Manually gather list of ops because the other GreedyPatternRewriteDriver
     // overloads only accepts ops that are isolated from above.
     LogicalResult result =

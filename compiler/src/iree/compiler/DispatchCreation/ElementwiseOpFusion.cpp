@@ -147,7 +147,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
                                                fuseElementwiseOpsControlFn);
 
   GreedyRewriteConfig rewriteConfig;
-  rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
+  rewriteConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
   if (failed(applyPatternsGreedily(
           getOperation(), std::move(linalgFusionPatterns), rewriteConfig))) {
     getOperation()->emitOpError(

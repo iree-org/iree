@@ -1119,7 +1119,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateCommonCanonicalizationPatterns(context, bubblingPatterns);
 
     GreedyRewriteConfig config;
-    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    config.setMaxIterations(GreedyRewriteConfig::kNoLimit);
     if (failed(applyPatternsGreedily(funcOp, std::move(bubblingPatterns),
                                      config))) {
       funcOp.emitError("Transpose bubbling patterns failed");
@@ -1178,7 +1178,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     GreedyRewriteConfig config;
     // TODO: This is inefficient. Consider rewriting this pass to use a
     // worklist of just the transpose operations.
-    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    config.setMaxIterations(GreedyRewriteConfig::kNoLimit);
     if (failed(applyPatternsGreedily(funcOp, std::move(sinkingPatterns),
                                      config))) {
       funcOp.emitError("Transpose sinking patterns failed");

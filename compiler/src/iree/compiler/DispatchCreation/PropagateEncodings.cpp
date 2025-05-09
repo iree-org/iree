@@ -101,8 +101,7 @@ void PropagateEncodingsPass::runOnOperation() {
   RewritePatternSet propagationPatterns(ctx);
   propagationPatterns.insert<SwapEncodingOpWithTensorCollapseShapeOp>(ctx);
   GreedyRewriteConfig config;
-  config.fold = true;
-  config.cseConstants = false;
+  config.enableFolding(true).enableConstantCSE(false);
   if (failed(applyPatternsGreedily(funcOp, std::move(propagationPatterns),
                                    config))) {
     funcOp.emitOpError("failed to propagate encodings");

@@ -223,7 +223,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   }
 
   GreedyRewriteConfig rewriteConfig;
-  rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
+  rewriteConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
   if (failed(applyPatternsGreedily(getOperation(),
                                    std::move(bubbleExpandShapePatterns),
                                    rewriteConfig))) {

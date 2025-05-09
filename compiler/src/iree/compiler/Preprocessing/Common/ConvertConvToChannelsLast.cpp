@@ -683,7 +683,7 @@ public:
     {
       RewritePatternSet patterns(context);
       GreedyRewriteConfig config;
-      config.maxIterations = GreedyRewriteConfig::kNoLimit;
+      config.setMaxIterations(GreedyRewriteConfig::kNoLimit);
       linalg::populateDataLayoutPropagationPatterns(
           patterns, [](OpOperand *opOperand) { return true; });
       if (failed(applyPatternsGreedily(op, std::move(patterns), config))) {

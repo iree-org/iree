@@ -504,7 +504,7 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   addCanonicalizationPatterns(tensor::TensorDialect::getDialectNamespace());
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   GreedyRewriteConfig config;
-  config.listener = &customOpConfigListener;
+  config.setListener(&customOpConfigListener);
   if (failed(applyPatternsGreedily(dummyFuncOp, std::move(patterns), config))) {
     return customOp.emitOpError(
         "failed to canonicalize during custom op configuration setting");
