@@ -30,6 +30,24 @@ util.func private @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1:
 
 // -----
 
+// CHECK-LABEL: @BatchDeallocaOps
+// CHECK-SAME: (%[[AWAIT:.+]]: !stream.timepoint, %[[RESOURCE0:.+]]: !stream.resource<transient>, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[RESOURCE2:.+]]: !stream.resource<transient>, %[[RESOURCE3:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @BatchDeallocaOps(%await: !stream.timepoint, %resource0: !stream.resource<transient>, %resource1: !stream.resource<transient>, %resource2: !stream.resource<transient>, %resource3: !stream.resource<transient>, %size: index) -> !stream.timepoint {
+  // CHECK: %[[DEALLOCA0:.+]] = stream.resource.dealloca origin await(%[[AWAIT]]) => %[[RESOURCE0]]
+  %dealloca0 = stream.resource.dealloca origin await(%await) => %resource0 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[DEALLOCA1:.+]] = stream.resource.dealloca origin await(%[[AWAIT]]) => %[[RESOURCE1]]
+  %dealloca1 = stream.resource.dealloca origin await(%dealloca0) => %resource1 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[DEALLOCA2:.+]] = stream.resource.dealloca origin await(%[[AWAIT]]) => %[[RESOURCE2]]
+  %dealloca2 = stream.resource.dealloca origin await(%dealloca1) => %resource2 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[DEALLOCA3:.+]] = stream.resource.dealloca origin await(%[[AWAIT]]) => %[[RESOURCE3]]
+  %dealloca3 = stream.resource.dealloca origin await(%dealloca2) => %resource3 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA0]], %[[DEALLOCA1]], %[[DEALLOCA2]], %[[DEALLOCA3]]) => !stream.timepoint
+  // CHECK: util.return %[[JOIN]]
+  util.return %dealloca3 : !stream.timepoint
+}
+
+// -----
+
 // CHECK-LABEL: @FoldSubviewIntoLoadOp
 util.func private @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index) -> i32 {
   %c64 = arith.constant 64 : index

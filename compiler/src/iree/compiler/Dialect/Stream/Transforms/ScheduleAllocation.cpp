@@ -1853,16 +1853,21 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
 
   // Insert transient deallocations.
   SetVector<Operation *> executeTimepointUsers;
-  for (auto &release : pendingReleases) {
-    auto reservation = release.first;
-    auto reservationSize = release.second;
-    auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
-        reservation.getLoc(), reservation, reservationSize,
-        /*prefer_origin=*/false, newExecuteOp.getResultTimepoint(),
-        newExecuteOp.getAffinityAttr());
-    joinTimepoints.push_back(deallocaOp.getResultTimepoint());
-    executeTimepointUsers.insert(deallocaOp);
-  }
+  // DO NOT SUBMIT
+  // ARC needs to be tolerant to deallocas existing but currently assumes they
+  // don't. This isn't great as ARC also bails in a lot of other cases and we
+  // don't want to pessimize programs that can't do ARC more than we do today.
+  //
+  // for (auto &release : pendingReleases) {
+  //   auto reservation = release.first;
+  //   auto reservationSize = release.second;
+  //   auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
+  //       reservation.getLoc(), reservation, reservationSize,
+  //       /*prefer_origin=*/false, newExecuteOp.getResultTimepoint(),
+  //       newExecuteOp.getAffinityAttr());
+  //   joinTimepoints.push_back(deallocaOp.getResultTimepoint());
+  //   executeTimepointUsers.insert(deallocaOp);
+  // }
 
   // If we have any timepoints that we need to join with we do that now such
   // that the original timepoint dependency chain is preserved even if we make

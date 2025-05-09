@@ -381,6 +381,22 @@ def ScheduleAllocationPass :
   ];
 }
 
+def AutomaticReferenceCountingPass :
+    Pass<"iree-stream-automatic-reference-counting", "mlir::ModuleOp"> {
+  let summary = "Inserts automatic reference counting ops for resources.";
+  let description = [{
+    Identifies asynchronous allocations and based on their lifetime inserts
+    either local deallocations or reference counting ops
+    (`stream.resource.retain` and `stream.resource.release`). If analysis fails
+    for a particular resource they will be marked as having indeterminate
+    lifetime in order to prevent external users from deallocating the resources
+    while they may still be used.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def PackConstantsPass :
     InterfacePass<"iree-stream-pack-constants", "mlir::CallableOpInterface"> {
   let summary = "Packs and allocates backing storage for fused constant resources.";
