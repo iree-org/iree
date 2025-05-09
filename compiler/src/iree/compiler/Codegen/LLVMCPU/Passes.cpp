@@ -903,7 +903,7 @@ void registerCodegenLLVMCPUPasses() {
       "iree-codegen-llvmcpu-configuration-pipeline",
       "Runs the translation strategy configuration pipeline on Linalg for CPU",
       [](OpPassManager &modulePassManager) {
-        buildLLVMCPUCodegenConfigurationPassPipeline(modulePassManager);
+        buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager);
       });
 
   static PassPipelineRegistration<> LLVMCPUBufferizationPipeline(
