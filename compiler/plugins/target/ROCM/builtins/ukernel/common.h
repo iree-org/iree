@@ -122,4 +122,37 @@ static inline uint64_t __ballot(int predicate) {
       predicate, 0, 33 /*ICMP_NE from llvm/include/llvm/IR/InstrTypes.h*/);
 }
 
+//===----------------------------------------------------------------------===//
+// Local definition for bf16 (Brain Floating Point 16-bit)
+//===----------------------------------------------------------------------===//
+
+typedef uint16_t _BFloat16;
+
+// from amd_hip_bfloat16.h.
+// round upper 16 bits of IEEE float to convert to bfloat16.
+static inline _BFloat16 f32_to_bf16(float value) {
+  union {
+    float fp32;
+    uint32_t int32;
+  } u = {value};
+
+  if (~u.int32 & 0x7f800000) {
+    u.int32 += 0x7fff + ((u.int32 >> 16) & 1);
+  } else if (u.int32 & 0xffff) {
+    u.int32 |= 0x10000;
+  }
+
+  return (_BFloat16)(u.int32 >> 16);
+}
+
+// from amd_hip_bfloat16.h.
+// zero extend lower 16 bits of bfloat16 to convert to IEEE float.
+static inline float bf16_to_f32(_BFloat16 value) {
+  union {
+    uint32_t int32;
+    float fp32;
+  } u = {(uint32_t)(value) << 16};
+  return u.fp32;
+}
+
 #endif // COMPILER_PLUGINS_TARGET_ROCM_BUILTINS_UKERNEL_COMMON_H_
