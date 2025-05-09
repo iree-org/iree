@@ -68,6 +68,7 @@ iree_lit_test_suite(
             "materialize_encoding_gfx908.mlir",
             "materialize_encoding_gfx90a.mlir",
             "materialize_encoding_gfx942.mlir",
+            "materialize_encoding_gfx950.mlir",
             "materialize_encoding_into_nop.mlir",
             "materialize_encoding_into_padding.mlir",
             "materialize_encoding_riscv.mlir",
