@@ -101,6 +101,9 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
                                           linalg::CopyOp copy,
                                           ArrayRef<int64_t> workgroupSize,
                                           ArrayRef<int64_t> subgroupSize) {
+  LLVM_DEBUG(llvm::dbgs() << "==== distributing op:\n");
+  LLVM_DEBUG(llvm::dbgs() << "  " << *copy << "\n");
+
   Location loc = copy.getLoc();
   MLIRContext *context = rewriter.getContext();
 
@@ -144,9 +147,17 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto numSubgroups = workgroupSize[0] / subgroupSize[0];
   auto totalCopySize = getTotalSize(copyMemRefType.getShape());
   auto totalCopySizePerSubgroup = totalCopySize / numSubgroups;
-
   auto numCopiesPerThread =
       (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize[0];
+
+  LLVM_DEBUG(llvm::dbgs() << "-- elementsPerCopy: " << elementsPerCopy << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "-- workgroupSize: " << workgroupSize[0] << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "-- numSubgroups: " << numSubgroups << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "-- totalCopySize: " << totalCopySize << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "-- totalCopySizePerSubgroup: "
+                          << totalCopySizePerSubgroup << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "-- numCopiesPerThread: " << numCopiesPerThread
+                          << "\n");
 
   // build For loop
   SmallVector<Attribute> mapping;
@@ -169,7 +180,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   MemRefType localType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
-                                  Value indVar) -> OpFoldResult {
+                                  Value indVar) -> Value {
     SmallVector<AffineExpr> symbols(3);
     bindSymbolsList(rewriter.getContext(), MutableArrayRef{symbols});
     auto laneIdExpr = symbols[0];
@@ -181,14 +192,15 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
+    // [subgroupStartOffset + i * gatherStride + laneId]
     AffineExpr gatherOffsetExpr = subgroupIdExpr * totalCopySizeExpr +
                                   iterationExpr * strideExpr + laneIdExpr;
-
-    return affine::makeComposedFoldedAffineApply(
+    OpFoldResult result = affine::makeComposedFoldedAffineApply(
         rewriter, loc, gatherOffsetExpr, {lIdVal, sgIdVal, indVar});
+    return cast<Value>(result);
   };
 
-  auto getBaseIndex = [&](Value sgIdVal, Value indVar) -> OpFoldResult {
+  auto getSubgroupStoreBaseIndex = [&](Value sgIdVal, Value indVar) -> Value {
     SmallVector<AffineExpr> symbols(2);
     bindSymbolsList(rewriter.getContext(), MutableArrayRef{symbols});
     auto subgroupIdExpr = symbols[0];
@@ -198,11 +210,13 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
+    // [subgroupStartOffset + i * gatherStride]
     AffineExpr baseOffsetExpr =
         subgroupIdExpr * totalCopySizeExpr + iterationExpr * strideExpr;
 
-    return affine::makeComposedFoldedAffineApply(rewriter, loc, baseOffsetExpr,
-                                                 {sgIdVal, indVar});
+    OpFoldResult result = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, baseOffsetExpr, {sgIdVal, indVar});
+    return cast<Value>(result);
   };
 
   // Build for loop skeleton:
@@ -214,32 +228,31 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
       rewriter.create<arith::ConstantIndexOp>(loc, 1),
       /*outputs=*/ValueRange{});
 
+  auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
+    return rewriter.create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
+        .getMultiIndex();
+  };
+
   bool residualElements = totalCopySizePerSubgroup % subgroupSize[0];
   if (residualElements != 0) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "-- has residualElements: " << residualElements << "\n");
     auto laneIdCmp = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::slt, laneId,
         rewriter.create<arith::ConstantIndexOp>(loc, residualElements));
-
     // statically we know where to load the last elements from.
     rewriter.create<scf::IfOp>(
         loc, laneIdCmp, [&](OpBuilder &builder, Location loc) {
           auto numCopies =
               builder.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
-          auto residualStoreBase = getBaseIndex(subgroupId, numCopies);
+          auto residualStoreBase =
+              getSubgroupStoreBaseIndex(subgroupId, numCopies);
           auto delinearizedBaseIndices =
-              builder
-                  .create<affine::AffineDelinearizeIndexOp>(
-                      loc, dyn_cast<Value>(residualStoreBase),
-                      sourceType.getShape())
-                  .getMultiIndex();
+              delinearizeIndex(residualStoreBase, sourceType.getShape());
           auto laneGatherOffset =
               getGlobalGatherIndex(subgroupId, laneId, numCopies);
           auto delinearizedGatherIndices =
-              builder
-                  .create<affine::AffineDelinearizeIndexOp>(
-                      loc, dyn_cast<Value>(laneGatherOffset),
-                      sourceType.getShape())
-                  .getMultiIndex();
+              delinearizeIndex(laneGatherOffset, sourceType.getShape());
           builder.create<IREE::GPU::GlobalLoadDMAOp>(
               loc, copy.getOperand(0), delinearizedGatherIndices,
               copy.getOutputs()[0], delinearizedBaseIndices);
@@ -254,28 +267,15 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   {
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(forOp.getBody());
-
     auto inductionVar = forOp.getInductionVar();
-
-    OpFoldResult linearizedGatherIndices =
+    auto linearizedGatherIndices =
         getGlobalGatherIndex(subgroupId, laneId, inductionVar);
-
     auto delinearizedGlobalIndices =
-        rewriter
-            .create<affine::AffineDelinearizeIndexOp>(
-                loc, dyn_cast<Value>(linearizedGatherIndices),
-                sourceType.getShape())
-            .getMultiIndex();
-
-    OpFoldResult linearizedBaseIndices = getBaseIndex(subgroupId, inductionVar);
-    // subgroup's linearized storing address:
-    // [subgroupStartOffset + i * gatherStride]
+        delinearizeIndex(linearizedGatherIndices, sourceType.getShape());
+    auto linearizedBaseIndices =
+        getSubgroupStoreBaseIndex(subgroupId, inductionVar);
     auto delinearizedLocalIndices =
-        rewriter
-            .create<affine::AffineDelinearizeIndexOp>(
-                loc, dyn_cast<Value>(linearizedBaseIndices),
-                localType.getShape())
-            .getMultiIndex();
+        delinearizeIndex(linearizedBaseIndices, localType.getShape());
     rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
         loc, copy.getOperand(0), delinearizedGlobalIndices,
         copy.getOutputs()[0], delinearizedLocalIndices);
