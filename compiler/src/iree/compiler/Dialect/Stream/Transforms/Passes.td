@@ -189,6 +189,15 @@ def CloneToConsumersPass :
     interface's `preferCloneToConsumers` query is used and any ops implementing
     the interface may opt-in to the cloning.
   }];
+  let options = [
+    Option<
+      "printIterations", "print-iterations",
+      "bool",
+      /*default=*/"false",
+      "Prints the number of analysis and cloning iterations run (for testing "
+      "purposes only)"
+    >,
+  ];
   let dependentDialects = [
     "IREE::Stream::StreamDialect",
   ];
