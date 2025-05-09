@@ -35,30 +35,30 @@ namespace {
 // backends can support it.
 // TODO(#20179): It should be done by interface methods.
 static bool isFusableWithSetEncoding(Operation *op) {
-  auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
-  // Make sure the dispatch region has only one block.
-  if (!llvm::hasSingleElement(parentRegion.getBody())) {
-    return false;
-  }
-  // Check that there are no ops other than reshapes and element-wise linalg
-  // ops in the dispatch region.
-  Block &regionBlock = parentRegion.getBody().getBlocks().front();
-  for (Operation &op : regionBlock.getOperations()) {
-    if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
-      continue;
-    }
-    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
-            op)) {
-      continue;
-    }
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) {
-      return false;
-    }
-    if (linalgOp.getNumReductionLoops() != 0) {
-      return false;
-    }
-  }
+  // auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+  // // Make sure the dispatch region has only one block.
+  // if (!llvm::hasSingleElement(parentRegion.getBody())) {
+  //   return false;
+  // }
+  // // Check that there are no ops other than reshapes and element-wise linalg
+  // // ops in the dispatch region.
+  // Block &regionBlock = parentRegion.getBody().getBlocks().front();
+  // for (Operation &op : regionBlock.getOperations()) {
+  //   if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
+  //     continue;
+  //   }
+  //   if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
+  //           op)) {
+  //     continue;
+  //   }
+  //   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  //   if (!linalgOp) {
+  //     return false;
+  //   }
+  //   if (linalgOp.getNumReductionLoops() != 0) {
+  //     return false;
+  //   }
+  // }
   return true;
 }
 
