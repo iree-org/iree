@@ -518,9 +518,73 @@ void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.resource.dealloca
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Finds sequences of chained deallocas and rewrites them to batch as many as
+// possible on a single timepoint.
+//
+// Example:
+//   %d0 = dealloca await(%t)
+//   %d1 = dealloca await(%d0)
+//   %d2 = dealloca await(%d1)
+//   %d3 = dealloca await(%d2)
+//   ... await(%d3)
+// ->
+//   %d0 = dealloca await(%t)
+//   %d1 = dealloca await(%t)
+//   %d2 = dealloca await(%t)
+//   %d3 = dealloca await(%t)
+//   %j = join %d0, %d1, %d2, %d3
+//   ... await(%j)
+struct BatchDeallocaOps : public OpRewritePattern<ResourceDeallocaOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceDeallocaOp op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<IREE::Stream::ResourceDeallocaOp> deallocaOps;
+    IREE::Stream::ResourceDeallocaOp nextOp = op;
+    while (nextOp) {
+      Value resultTimepoint = nextOp.getResultTimepoint();
+      deallocaOps.push_back(nextOp);
+      if (!resultTimepoint.hasOneUse()) {
+        break;
+      }
+      nextOp = dyn_cast<IREE::Stream::ResourceDeallocaOp>(
+          *resultTimepoint.user_begin());
+    }
+    if (deallocaOps.size() <= 1) {
+      return failure();
+    }
+
+    Value awaitTimepoint = op.getAwaitTimepoint();
+    SmallVector<Location> deallocaLocs;
+    SmallVector<Value> deallocaTimepoints;
+    for (auto deallocaOp : deallocaOps) {
+      deallocaLocs.push_back(deallocaOp.getLoc());
+      deallocaTimepoints.push_back(deallocaOp.getResultTimepoint());
+    }
+
+    rewriter.setInsertionPointAfter(deallocaOps.back());
+    auto joinOp = rewriter.create<IREE::Stream::TimepointJoinOp>(
+        rewriter.getFusedLoc(deallocaLocs),
+        rewriter.getType<IREE::Stream::TimepointType>(), deallocaTimepoints);
+    for (auto deallocaOp : deallocaOps) {
+      rewriter.modifyOpInPlace(deallocaOp, [&]() {
+        deallocaOp.getAwaitTimepointMutable().assign(awaitTimepoint);
+      });
+    }
+    rewriter.replaceAllUsesExcept(deallocaOps.back().getResultTimepoint(),
+                                  joinOp.getResultTimepoint(), joinOp);
+
+    return success();
+  }
+};
+
+} // namespace
+
 void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
   // TODO(benvanik): move up to producer of timepoint.
+  results.insert<BatchDeallocaOps>(context);
   results.insert<ElideImmediateTimepointWait<ResourceDeallocaOp>>(context);
 }
 
