@@ -56,10 +56,24 @@ static void populateSourceAndTargetType(MLIRContext *ctx, Operation *op,
     LLVM_DEBUG(llvm::dbgs() << "Invalid chip name");
     return;
   }
+  constexpr amdgpu::Chipset kGfx942{9, 4, 2};
+  constexpr amdgpu::Chipset kGfx950{9, 5, 0};
+  constexpr amdgpu::Chipset kGfx10{10, 0, 0};
+  constexpr amdgpu::Chipset kGfx12{12, 0, 0};
   // Add source and target conversion types for gfx94{*} series.
-  if (maybeChipset->majorVersion == 9 && maybeChipset->minorVersion == 4) {
+  if (*maybeChipset >= kGfx942 && *maybeChipset <= kGfx950) {
     sourceTypes.insert(sourceTypes.end(), {Float8E4M3FNUZType::get(ctx),
                                            Float8E5M2FNUZType::get(ctx)});
+    targetType = Float32Type::get(ctx);
+  }
+  // gfx950 and gfx12+ support OCP FP8 conversions
+  if (*maybeChipset >= kGfx12 ||
+      (*maybeChipset <= kGfx10 && *maybeChipset >= kGfx950)) {
+    // TODO(kdrewnia): On gfx950, add fp4 or fp6 here maybe.
+    // TODO(kdrewnia): After checking for instruction avaiability, turn
+    // the target type down to f16.
+    sourceTypes.push_back(Float8E4M3FNType::get(ctx));
+    sourceTypes.push_back(Float8E5M2Type::get(ctx));
     targetType = Float32Type::get(ctx);
   }
   return;

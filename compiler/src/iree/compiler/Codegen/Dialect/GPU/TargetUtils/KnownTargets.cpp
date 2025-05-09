@@ -140,6 +140,62 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 // to 64-bits.
 //===----------------------------------------------------------------------===//
 
+const WgpDetails *getCDNA4WgpDetails() {
+  static const MMAIntrinsic cdna4MMAOps[] = {
+      // Introduced in CDNA4
+      MMAIntrinsic::MFMA_F32_16x16x32_F16,
+      MMAIntrinsic::MFMA_F32_32x32x16_F16,
+      MMAIntrinsic::MFMA_F32_16x16x32_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x16_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2,
+      MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::MFMA_F32_32x32x64_F8E5M2,
+      MMAIntrinsic::MFMA_F32_32x32x64_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_32x32x64_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_32x32x64_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::MFMA_I32_16x16x64_I8,
+      MMAIntrinsic::MFMA_I32_32x32x32_I8,
+      // Introduced in CDNA3
+      MMAIntrinsic::MFMA_F32_16x16x16_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x8_BF16,
+      // Note: use same instructions as in CDNA3 but different types
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2,
+      MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN,
+      MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::MFMA_I32_16x16x32_I8,
+      MMAIntrinsic::MFMA_I32_32x32x16_I8,
+      // Introduced in CDNA2, still present in CDNA3
+      MMAIntrinsic::MFMA_F64_16x16x4_F64,
+      // Introduced in CDNA1, still present in CDNA3
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
+      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_32x32x8_F16,
+  };
+  static const WgpDetails cdna4Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      ARRAY_SIZE(cdna4MMAOps),
+                                      cdna4MMAOps,
+                                      {64, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      // Note: upgraded from CDNA3
+                                      160 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/512 * 32};
+  return &cdna4Wgp;
+}
+
 const WgpDetails *getCDNA3WgpDetails() {
   // Note: these operations are listed in order of preference.
   static const MMAIntrinsic cdna3MMAOps[] = {
@@ -312,6 +368,7 @@ const WgpDetails *getRDNA1WgpDetails() {
 }
 
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
+  const WgpDetails *cdna4Wgp = getCDNA4WgpDetails();
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
   const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
   const WgpDetails *cdna1Wgp = getCDNA1WgpDetails();
@@ -366,6 +423,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      .Cases("cdna4", "gfx950", TargetDetails{cdna4Wgp, nullptr})
       .Case("mi325x", TargetDetails{cdna3Wgp, &mi325xChip})
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})

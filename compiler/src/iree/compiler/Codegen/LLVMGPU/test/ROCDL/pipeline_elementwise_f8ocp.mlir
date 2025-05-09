@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1201 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=RDNA4
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1201 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=OCP
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=OCP
+
 // RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
 // RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
 
@@ -42,11 +44,11 @@ hal.executable @ext_fp8_dispatch {
 
 // ERRORS: F8E5M2 and F8E4M3FN types are not supported on gfx942 (MI-300) or older chipsets; try F8E5M2FNUZ or F8E4M3FNUZ instead.
 
-//   RDNA4-LABEL: hal.executable public @ext_fp8_dispatch
-//         RDNA4:   hal.executable.variant public @rocm
-// RDNA4-COUNT-8:     rocdl.cvt.pk.f32.fp8 %{{.*}} : vector<2xf32>
-// RDNA4-COUNT-8:     rocdl.cvt.pk.f32.bf8 %{{.*}} : vector<2xf32>
-//         RDNA4:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
-//         RDNA4:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
+//   OCP-LABEL: hal.executable public @ext_fp8_dispatch
+//         OCP:   hal.executable.variant public @rocm
+// OCP-COUNT-8:     rocdl.cvt.pk.f32.fp8 %{{.*}} : vector<2xf32>
+// OCP-COUNT-8:     rocdl.cvt.pk.f32.bf8 %{{.*}} : vector<2xf32>
+//         OCP:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
+//         OCP:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
 
 // -----

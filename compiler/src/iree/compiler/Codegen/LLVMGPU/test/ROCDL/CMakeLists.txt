@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "config_user_vector_distribute.mlir"
     "config_vector_distribute_gfx1100.mlir"
     "config_vector_distribute_gfx942.mlir"
+    "config_vector_distribute_gfx950.mlir"
     "config_vector_distribute_reduction_gfx942.mlir"
     "configure_buffer_instructions.mlir"
     "lowering_scalar_dispatch.mlir"
@@ -30,6 +31,7 @@ iree_lit_test_suite(
     "pipeline_tile_and_fuse.mlir"
     "pipeline_vector_distribute_gfx1100.mlir"
     "pipeline_vector_distribute_gfx942.mlir"
+    "pipeline_vector_distribute_gfx950.mlir"
     "pipeline_vector_distribute_reduction_gfx942.mlir"
     "pipeline_warp_reduction.mlir"
   TOOLS
