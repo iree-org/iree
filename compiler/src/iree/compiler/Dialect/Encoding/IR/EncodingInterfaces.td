@@ -213,6 +213,34 @@ def IREEEncoding_SerializableEncodingAttrInterface :
         return type;
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns success if materialized `newOffsets`, `newSizes` and
+        `newStrides` can be calculated and set for the slice specified by
+        `offsets`, `sizes` and `strides` on the dispatch tensor `type` with
+        potential `dynamicDims` sizes.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"getOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder &":$builder,
+        "::mlir::Location":$loc,
+        "IREE::TensorExt::DispatchTensorType":$type,
+        "IREE::Codegen::LayoutAttrInterface":$layoutAttr,
+        "::mlir::ValueRange":$dynamicDims,
+        "ArrayRef<OpFoldResult>":$offsets,
+        "ArrayRef<OpFoldResult>":$sizes,
+        "ArrayRef<OpFoldResult>":$strides,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newOffsets,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newSizes,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newStrides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
+    >,
   ];
 
   let extraClassDeclaration = [{

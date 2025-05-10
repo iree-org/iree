@@ -108,6 +108,37 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
   return hasStaticShape() && getShape() == shape;
 }
 
+bool DispatchTensorType::doesSliceSpanWholeTensor(
+    ValueRange dispatchTypeDims, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides) const {
+  // All offsets must be zero.
+  if (!llvm::all_of(offsets, [](OpFoldResult ofr) {
+        return isConstantIntValue(ofr, 0);
+      })) {
+    return false;
+  }
+
+  // All the sizes must match the entire target size.
+  SmallVector<int64_t> staticSizes;
+  SmallVector<Value> dynamicSizes;
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  if (staticSizes != getShape() ||
+      llvm::any_of(llvm::zip_equal(dynamicSizes, dispatchTypeDims),
+                   [](std::tuple<Value, Value> en) {
+                     return std::get<0>(en) != std::get<1>(en);
+                   })) {
+    return false;
+  }
+
+  // All the strides must be 1.
+  if (!llvm::all_of(strides, [](OpFoldResult ofr) {
+        return isConstantIntValue(ofr, 1);
+      })) {
+    return false;
+  }
+  return true;
+}
+
 LogicalResult
 DispatchTensorType::verify(function_ref<InFlightDiagnostic()> emitError,
                            uint32_t access, Type boundType) {

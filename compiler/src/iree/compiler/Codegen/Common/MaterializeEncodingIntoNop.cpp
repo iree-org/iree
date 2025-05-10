@@ -36,16 +36,9 @@ struct MaterializeEncodingIntoNopPass final
     MLIRContext *context = &getContext();
     FunctionOpInterface operation = getOperation();
 
-    auto materializeEncodingValueFn =
-        [](RankedTensorType, OpBuilder &,
-           Location) -> FailureOr<MaterializeEncodingValueInfo> {
-      return failure();
-    };
-
     RewritePatternSet materializeEncodingPattern(context);
     MaterializeEncodingTypeConverter typeConverter(
-        IREE::Codegen::EncodingNopLayoutAttr::get(context),
-        materializeEncodingValueFn);
+        IREE::Codegen::EncodingNopLayoutAttr::get(context));
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(materializeEncodingPattern, target,
                                         typeConverter);
