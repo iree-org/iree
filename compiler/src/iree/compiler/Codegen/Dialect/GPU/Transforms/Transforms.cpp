@@ -1604,8 +1604,7 @@ struct LowerGlobalLoadDMAPattern
   using OpRewritePattern<IREE::GPU::GlobalLoadDMAOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
-    auto transferType =
-        cast<ShapedType>(dmaOp.getOperand(0).getType()).getElementType();
+    Type transferType = rewriter.getI32Type();
     rewriter.replaceOpWithNewOp<amdgpu::GatherToLDSOp>(
         dmaOp, dmaOp.getSource(), dmaOp.getSourceIndices(), dmaOp.getTarget(),
         dmaOp.getTargetIndices(), transferType);
