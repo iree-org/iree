@@ -178,6 +178,33 @@ struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU> {
   }
 };
 
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f6e3m2fn_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f6e2m3fn_to_f32(val);
+  }
+};
+
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f4e2m1fn_to_f32(val);
+  }
+};
+
 // Fuzzy comparison of spans.
 // The meaning of atol, rtol is explained in the comment on NumpyFuzzyCompare.
 // On failure, false is returned, and information about a specific failed
@@ -224,6 +251,9 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
     IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
     IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
     IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN)
 #undef IREE_ALMOSTEQBYTESPAN_CASE
     default:
       break;
