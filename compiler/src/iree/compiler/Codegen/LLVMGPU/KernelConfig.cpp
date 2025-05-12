@@ -359,7 +359,12 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
   // Set the configuration for the operation with no reduction dims.
   // The workgroup tile sizes are set by the reduction operation.
   if (reductionDims.empty()) {
-    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 1);
+
+    // For the shared wgp dimension, set the reduction tile sizes to be zero.
+    for (auto i : sharedWgpDims) {
+      reductionTileSizes[i] = 0;
+    }
 
     int64_t parallelSize = bounds[parallelDims.back()];
     if (ShapedType::isDynamic(parallelSize) ||
