@@ -287,6 +287,30 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
 } // namespace
 
+static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
+  // source must be global address and target must be workgroup address.
+  auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
+  auto targetType = cast<MemRefType>(copy.getOutputs().front().getType());
+  if (!sourceType.getMemorySpace() ||
+      sourceType.getMemorySpace() !=
+          gpu::AddressSpaceAttr::get(copy->getContext(),
+                                     gpu::AddressSpace::Global)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "-- Op: " << *copy
+               << "\n-- has source memory address space other than global.\n");
+    return false;
+  }
+  if (targetType.getMemorySpace() !=
+      gpu::AddressSpaceAttr::get(copy->getContext(),
+                                 gpu::GPUDialect::getWorkgroupAddressSpace())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "-- Op: " << *copy
+               << "\n-- has target memory address space other than workgroup.\n");
+    return false;
+  }
+  return true;
+}
+
 namespace {
 struct GPULowerToGlobalLoadsPass final
     : impl::GPULowerToGlobalLoadsPassBase<GPULowerToGlobalLoadsPass> {
@@ -306,9 +330,12 @@ struct GPULowerToGlobalLoadsPass final
         }
       }
       if (auto copy = dyn_cast<linalg::CopyOp>(op)) {
-        if (auto useDMAConfig =
-                getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copy)) {
+        if (checkEligibilityForGlobalLoadDMA(copy)) {
           copies.push_back(copy);
+        } else {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Skipping copy op: " << *copy
+                     << " because it is not eligible for global load DMA.\n");
         }
       }
       return WalkResult::advance();
