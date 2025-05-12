@@ -124,7 +124,7 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E4M3FNUZ(
 }
 
 iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E8M0FNU(
-    uint16_t value) {
+    uint8_t value) {
   iree_test_utils_e2e_value_t result;
   result.type = IREE_TEST_UTILS_VALUE_TYPE_F8E8M0FNU;
   result.f8_u8 = value;
