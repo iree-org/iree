@@ -124,30 +124,9 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E4M3FNUZ(
 }
 
 iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E8M0FNU(
-    uint8_t value) {
+    uint16_t value) {
   iree_test_utils_e2e_value_t result;
   result.type = IREE_TEST_UTILS_VALUE_TYPE_F8E8M0FNU;
-  result.f8_u8 = value;
-  return result;
-}
-
-iree_test_utils_e2e_value_t iree_test_utils_value_make_f6E3M2FN(uint8_t value) {
-  iree_test_utils_e2e_value_t result;
-  result.type = IREE_TEST_UTILS_VALUE_TYPE_F6E3M2FN;
-  result.f8_u8 = value;
-  return result;
-}
-
-iree_test_utils_e2e_value_t iree_test_utils_value_make_f6E2M3FN(uint8_t value) {
-  iree_test_utils_e2e_value_t result;
-  result.type = IREE_TEST_UTILS_VALUE_TYPE_F6E2M3FN;
-  result.f8_u8 = value;
-  return result;
-}
-
-iree_test_utils_e2e_value_t iree_test_utils_value_make_f4E2M1FN(uint8_t value) {
-  iree_test_utils_e2e_value_t result;
-  result.type = IREE_TEST_UTILS_VALUE_TYPE_F4E2M1FN;
   result.f8_u8 = value;
   return result;
 }
@@ -199,12 +178,6 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_f8E4M3FNUZ(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU) {
     return iree_test_utils_value_make_f8E8M0FNU(((uint8_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN) {
-    return iree_test_utils_value_make_f6E3M2FN(((uint8_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN) {
-    return iree_test_utils_value_make_f6E2M3FN(((uint8_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN) {
-    return iree_test_utils_value_make_f4E2M1FN(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     return iree_test_utils_value_make_f16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {

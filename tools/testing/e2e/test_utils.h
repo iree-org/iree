@@ -54,11 +54,6 @@ typedef enum iree_test_utils_value_type_e {
   IREE_TEST_UTILS_VALUE_TYPE_F8E5M2FNUZ = 11,
   IREE_TEST_UTILS_VALUE_TYPE_F8E4M3FNUZ = 12,
   IREE_TEST_UTILS_VALUE_TYPE_F8E8M0FNU = 13,
-  // 6-bit float types.
-  IREE_TEST_UTILS_VALUE_TYPE_F6E3M2FN = 14,
-  IREE_TEST_UTILS_VALUE_TYPE_F6E2M3FN = 15,
-  // 4-bit float types.
-  IREE_TEST_UTILS_VALUE_TYPE_F4E2M1FN = 16,
 } iree_test_utils_value_type_t;
 
 // Maximum size, in bytes, of any value type we can represent.
