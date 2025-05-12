@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/local_sync/sync_device.h"
 
-#include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -88,7 +87,7 @@ iree_status_t iree_hal_sync_device_create(
       sizeof(*device) + loader_count * sizeof(*device->loaders);
   iree_host_size_t total_size = struct_size + identifier.size;
   iree_status_t status = iree_allocator_malloc_aligned(
-      host_allocator, total_size, alignof(iree_hal_sync_device_t), 0,
+      host_allocator, total_size, iree_alignof(iree_hal_sync_device_t), 0,
       (void**)&device);
   if (iree_status_is_ok(status)) {
     memset(device, 0, total_size);
