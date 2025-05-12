@@ -21,7 +21,6 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/hal/buffer_view.h"
 #include "iree/hal/semaphore.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"

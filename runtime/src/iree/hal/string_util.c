@@ -16,7 +16,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/string_view.h"
 #include "iree/hal/buffer_view.h"
 
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
