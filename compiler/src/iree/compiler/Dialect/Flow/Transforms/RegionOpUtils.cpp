@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -797,6 +798,27 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
+// White list of operations we could ever want to clone. All clonable operations
+// must be part of this white list before any other consideration. Any operation
+// that returns `true` here is never cloned.
+static bool isUnclonableOp(Operation *op) {
+  if (!op) {
+    return true;
+  }
+  if (!isa<affine::AffineDialect, arith::ArithDialect, complex::ComplexDialect,
+           IREE::Encoding::IREEEncodingDialect,
+           IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+           tensor::TensorDialect>(op->getDialect())) {
+    return true;
+  }
+
+  // Dont clone the following ops into its consumers.
+  if (isa<tensor::InsertSliceOp>(op)) {
+    return true;
+  }
+  return false;
+}
+
 static bool isAttentionMaskGenerator(Operation *op) {
   for (OpOperand &use : op->getUses()) {
     if (auto attention =
@@ -824,7 +846,7 @@ static bool isScatterIndicesGenerator(Operation *op) {
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op,
                               ClonableIntoDispatchOptions options) {
-  if (isa<Flow::FlowDialect>(op->getDialect())) {
+  if (isUnclonableOp(op)) {
     return false;
   }
 
