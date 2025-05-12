@@ -85,6 +85,7 @@ iree_lit_test_suite(
             "propagate_dispatch_size_bounds.mlir",
             "propagate_reshapes_by_expansion.mlir",
             "reconcile_translation_info.mlir",
+            "reconcile_translation_info_linearize.mlir",
             "reductions.mlir",
             "rematerialize_parallel_ops.mlir",
             "remove_dead_allocs.mlir",

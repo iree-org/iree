@@ -265,6 +265,20 @@ def ReconcileTranslationInfoPass
       "Reconcile information (like workgroup_size, subgroup_size) across "
       "`TranslationInfo` set on each function in the dispatch and merge them"
       "and set them at the appropriate places in the surrounding HAL ops";
+  let options = [
+    Option<"distributeAlong", "distribute-along",
+           "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
+           /*default=*/"IREE::Codegen::WorkgroupId::IdZ",
+           "Constrain the workgroup distribution along grid dimensions.",
+           [{
+           ::llvm::cl::values(
+            clEnumValN(IREE::Codegen::WorkgroupId::IdX, "x",
+              "Constrain the workgroup distribution to use only workgroups along x."),
+            clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
+              "Constrain the workgroup distribution to use only workgroups along x and y."),
+            clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
+              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>
+  ];
 }
 
 def ReplaceSlowMinMaxOpsPass
