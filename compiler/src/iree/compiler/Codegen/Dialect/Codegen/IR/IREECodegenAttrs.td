@@ -419,12 +419,7 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
 //===---------------------------------------------------------------------===//
 
 def IREECodegen_EncodingNopLayoutAttr  :
-    AttrDef<IREECodegen_Dialect, "EncodingNopLayout", [
-    DeclareAttrInterfaceMethods<IREECodegen_LayoutAttrInterface, [
-        "getEncodingInfo",
-        "lowerOp"
-      ]>
-    ]> {
+    AttrDef<IREECodegen_Dialect, "EncodingNopLayout"> {
   let mnemonic = "encoding_nop_layout";
   let summary = [{An attribute with implementation that treats encoding as nop.}];
   let description = [{

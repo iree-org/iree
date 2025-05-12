@@ -95,7 +95,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       }
       LDBG("Select EncodingNopLayoutAttr attribute as the layout "
            "attribute (Encoding resolver unknown or unsupported).");
-      return IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
+      return cast<IREE::Codegen::LayoutAttrInterface>(
+          IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
 
     // The layoutAttr should come in without any target info attached to it,

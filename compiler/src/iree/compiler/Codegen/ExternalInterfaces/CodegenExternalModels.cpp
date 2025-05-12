@@ -15,6 +15,21 @@ namespace mlir::iree_compiler::IREE::Codegen {
 
 using IREE::TensorExt::DispatchTensorType;
 
+struct EncodingNopDeviceLayoutAttrInterface final
+    : IREE::Codegen::LayoutAttrInterface::ExternalModel<
+          EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
+  IREE::Codegen::MaterializeEncodingInfo
+  getEncodingInfo(Attribute attr, RankedTensorType type) const {
+    return IREE::Codegen::MaterializeEncodingInfo{};
+  }
+
+  Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
+                     TypeRange convertedResTypes,
+                     ValueRange convertedOperands) const {
+    return clone(b, op, convertedResTypes, convertedOperands);
+  }
+};
+
 struct EncodingNopHostEncodingLayoutResolverAttrInterface final
     : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
           EncodingNopHostEncodingLayoutResolverAttrInterface,
@@ -58,7 +73,8 @@ void registerCodegenExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
         EncodingNopLayoutAttr::attachInterface<
             EncodingNopHostEncodingLayoutResolverAttrInterface,
-            EncodingNopHostSerializableEncodingAttrInterface>(*ctx);
+            EncodingNopHostSerializableEncodingAttrInterface,
+            EncodingNopDeviceLayoutAttrInterface>(*ctx);
       });
 }
 
