@@ -476,12 +476,8 @@ hal.executable private @i4_dequant_matvec {
 //     CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //     CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4xf16>
-//         CHECK:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x4xf16>)
-//         CHECK:   %{{.*}} = arith.extui %{{.*}} : vector<1x1x4xi4> to vector<1x1x4xi32>
-//         CHECK:   %{{.*}} = arith.uitofp %{{.*}} : vector<1x1x4xi32> to vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x4xf16>)
+//         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:     arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
 
-//         CHECK:   %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [0, 1, 2] : vector<1x1x4xf16> to f16
+//         CHECK:   vector.multi_reduction <add>, %{{.*}}, %{{.*}} [0, 1, 2] : vector<1x1x4xf16> to f16

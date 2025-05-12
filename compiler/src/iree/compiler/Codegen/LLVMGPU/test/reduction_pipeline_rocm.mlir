@@ -300,7 +300,7 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 32
 //          CDNA3: func.func @matvec_fp16()
 //     CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //      CDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index

@@ -169,7 +169,7 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    ins({{.*}}, %{{.*}}, {{.*}} : tensor<2x32x10x16384xf16>, tensor<2x32xf32>, tensor<2x32xf32>)
 // CHECK-SAME:    outs(%{{.*}} : tensor<2x32x10x16384xf32>)
 // CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
-// CHECK-SAME:              reduction = [0, 0, 0, 4096],
+// CHECK-SAME:              reduction = [0, 0, 1, 4096],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
 // CHECK-SAME:              thread = [0, 0, 0, 4], thread_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]]
 

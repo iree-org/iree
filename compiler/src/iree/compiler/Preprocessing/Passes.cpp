@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #include "iree/compiler/Preprocessing/Passes.h"
 
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
@@ -155,6 +156,7 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   bubbleOptions.enableBubbleUpExpandShapesAcrossReductionOps = true;
   passManager.addPass(
       DispatchCreation::createBubbleUpExpandShapesPass(bubbleOptions));
+  passManager.addPass(createDecomposeSoftmaxPass(true));
   passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
       DispatchCreation::ElementwiseOpFusionPassOptions{
           /*enableElementWiseFuseMultiReduction=*/true}));
