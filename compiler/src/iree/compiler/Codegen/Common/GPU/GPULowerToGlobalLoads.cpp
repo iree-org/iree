@@ -291,10 +291,7 @@ static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
   // source must be global address and target must be workgroup address.
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
   auto targetType = cast<MemRefType>(copy.getOutputs().front().getType());
-  if (!sourceType.getMemorySpace() ||
-      sourceType.getMemorySpace() !=
-          gpu::AddressSpaceAttr::get(copy->getContext(),
-                                     gpu::AddressSpace::Global)) {
+  if (!hasGlobalMemoryAddressSpace(sourceType)) {
     LLVM_DEBUG(llvm::dbgs()
                << "-- Op: " << *copy
                << "\n-- has source memory address space other than global.\n");
