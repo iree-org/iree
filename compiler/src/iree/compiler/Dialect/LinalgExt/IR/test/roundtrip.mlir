@@ -593,11 +593,11 @@ func.func @scatter_update_slice_2D(
 // -----
 
 func.func @gather_static(
-    %source : tensor<10xf32>, %idx : tensor<1xi32>,
+    %source : tensor<10xf32>, %idx : tensor<1x1xi32>,
     %result : tensor<1xf32>) -> tensor<1xf32> {
   %0 = iree_linalg_ext.gather
     dimension_map = [0]
-    ins(%source, %idx : tensor<10xf32>, tensor<1xi32>)
+    ins(%source, %idx : tensor<10xf32>, tensor<1x1xi32>)
     outs(%result : tensor<1xf32>) -> tensor<1xf32>
   return %0 : tensor<1xf32>
 }
@@ -614,13 +614,13 @@ func.func @gather_static(
 // -----
 
 func.func @gather_static_2D_batch(
-    %source : tensor<4x3xf32>, %idx : tensor<1x1xi32>,
-    %result : tensor<1xf32>) -> tensor<1xf32> {
+    %source : tensor<4x3xf32>, %idx : tensor<1x1x2xi32>,
+    %result : tensor<1x1xf32>) -> tensor<1x1xf32> {
   %0 = iree_linalg_ext.gather
     dimension_map = [0, 1]
-    ins(%source, %idx : tensor<4x3xf32>, tensor<1x1xi32>)
-    outs(%result : tensor<1xf32>) -> tensor<1xf32>
-  return %0 : tensor<1xf32>
+    ins(%source, %idx : tensor<4x3xf32>, tensor<1x1x2xi32>)
+    outs(%result : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %0 : tensor<1x1xf32>
 }
 // CHECK-LABEL: func.func @gather_static_2D_batch(
 // CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
@@ -635,13 +635,13 @@ func.func @gather_static_2D_batch(
 // -----
 
 func.func @gather_dynamic(
-    %source : tensor<?x?xf32>, %idx : tensor<?x1xi32>,
-    %result : tensor<?xf32>) -> tensor<?xf32> {
+    %source : tensor<?x?xf32>, %idx : tensor<?x?x2xi32>,
+    %result : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.gather
     dimension_map = [0, 1]
-    ins(%source, %idx : tensor<?x?xf32>, tensor<?x1xi32>)
-    outs(%result : tensor<?xf32>) -> tensor<?xf32>
-  return %0 : tensor<?xf32>
+    ins(%source, %idx : tensor<?x?xf32>, tensor<?x?x2xi32>)
+    outs(%result : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @gather_dynamic(
 // CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
@@ -656,11 +656,11 @@ func.func @gather_dynamic(
 // -----
 
 func.func @gather_static_memref(
-    %source : memref<10xf32>, %idx : memref<1xi32>,
+    %source : memref<10xf32>, %idx : memref<1x1xi32>,
     %result : memref<1xf32>) {
   iree_linalg_ext.gather
     dimension_map = [0]
-    ins(%source, %idx : memref<10xf32>, memref<1xi32>)
+    ins(%source, %idx : memref<10xf32>, memref<1x1xi32>)
     outs(%result : memref<1xf32>)
   return
 }

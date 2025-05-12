@@ -2595,10 +2595,10 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-func.func @gather_1d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?xi32>, %arg2 : memref<?x?xi32>) {
+func.func @gather_1d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?x1xi32>, %arg2 : memref<?x?xi32>) {
   iree_linalg_ext.gather
     dimension_map = [0]
-    ins(%arg0, %arg1: memref<?x?xi32>, memref<?xi32>)
+    ins(%arg0, %arg1: memref<?x?xi32>, memref<?x1xi32>)
     outs(%arg2: memref<?x?xi32>)
   return
 }
@@ -2626,7 +2626,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-DAG:       %[[MIN0:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
 //  CHECK-DAG:       %[[MIN1:.+]] = affine.min #[[MAP1]](%[[J]])[%[[D1]]]
 //  CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]], %[[J]]] [%[[MIN0]], %[[MIN1]]] [1, 1]
-//  CHECK-DAG:       %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[MIN0]]] [1]
+//  CHECK-DAG:       %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]], 0] [%[[MIN0]], 1] [1, 1]
 //  CHECK-DAG:       %[[D2:.+]] = memref.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:       %[[SOURCE:.+]] = memref.subview %[[ARG0]][0, %[[J]]] [%[[D2]], %[[MIN1]]] [1, 1]
 //      CHECK:       iree_linalg_ext.gather
@@ -2635,11 +2635,11 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-func.func @gather_2d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?x2xi32>, %arg2 : memref<?xi32>) {
+func.func @gather_2d_indices(%arg0 : memref<?x?xi32>, %arg1 : memref<?x?x2xi32>, %arg2 : memref<?x?xi32>) {
   iree_linalg_ext.gather
     dimension_map = [0, 1]
-    ins(%arg0, %arg1: memref<?x?xi32>, memref<?x2xi32>)
-    outs(%arg2: memref<?xi32>)
+    ins(%arg0, %arg1: memref<?x?xi32>, memref<?x?x2xi32>)
+    outs(%arg2: memref<?x?xi32>)
   return
 }
 module attributes { transform.with_named_sequence } {
@@ -2658,10 +2658,11 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG2]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG2]], %[[C1]]
 //      CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C13]]
 //  CHECK-DAG:     %[[MIN:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
-//  CHECK-DAG:     %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]]] [%[[MIN]]] [1]
-//  CHECK-DAG:     %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]], 0] [%[[MIN]], 2] [1, 1]
+//  CHECK-DAG:     %[[RESULT:.+]] = memref.subview %[[ARG2]][%[[I]], 0] [%[[MIN]], %[[D1]]] [1, 1]
+//  CHECK-DAG:     %[[INDEX:.+]] = memref.subview %[[ARG1]][%[[I]], 0, 0] [%[[MIN]], %[[D1]], 2] [1, 1, 1]
 //  CHECK-DAG:     %[[D1:.+]] = memref.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:     %[[D2:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:     %[[SOURCE:.+]] = memref.subview %[[ARG0]][0, 0] [%[[D1]], %[[D2]]] [1, 1]

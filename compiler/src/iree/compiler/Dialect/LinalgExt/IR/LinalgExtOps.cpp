@@ -309,8 +309,23 @@ SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult GatherOp::verify() {
-  return verifyGatherScatter(*this, getOutputSliceRank(), getSourceType(),
-                             getOutputType(), "source", "output", nullptr);
+  if (failed(verifyGatherScatter(*this, getOutputSliceRank(), getSourceType(),
+                                 getOutputType(), "source", "output",
+                                 nullptr))) {
+    return failure();
+  }
+
+  // Enforce source and output to have the same rank.
+  if (getSourceType().getRank() != getOutputType().getRank()) {
+    return emitOpError("Expected source and output to have the same rank.");
+  }
+
+  // Enforce dimension_map is a K-D identity.
+  if (getIndexDepth() + 1 != getIndicesType().getRank()) {
+    return emitOpError("Expected indices rank to be index_depth + 1");
+  }
+
+  return success();
 }
 
 LogicalResult

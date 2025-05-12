@@ -234,19 +234,15 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
          "generateResultTileValue"]>]> {
   let summary = [{Gathers slices from a source based on a tensor of indices.}];
   let description = [{
-    Takes two inputs (`source` and `indices`) and outputs value (`output`).
-    The operation returns the value at the slices specified by `indices`.
+    Takes two inputs (`source` and `indices`) and outputs value (`output`). The
+    operation returns a gather along outer dimensions of `source` as specified
+    by `indices`, gathering contigious inner slices.
 
-    The size of the `dimension_map` attribute is used to determine how many
-    indices are used to index into `source`, i.e. `index_depth`. The
-    `dimension_map` attribute describes which index value maps to which dimension
-    in the destination.
-
-    This operation preforms the opposite operation of `iree_linalg_ext.scatter`.
-    Instead of scattering `updates` into `original`, it gathers the values from
-    `source` into `output` using the indices in `indices`. See the documentation
-    on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
-    semantics.
+    The `output` and `source` are N-D shaped tensor/memrefs. `indices` is a
+    K+1 -D shaped tensor/memref. The `dimension_map` is a minor identity of
+    size `K` describing which outer dimensions of `source` are gathered. The
+    last dimension of `indices` is always of size `K`, specifying a list of
+    indices to index the outer dimensions using.
   }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
