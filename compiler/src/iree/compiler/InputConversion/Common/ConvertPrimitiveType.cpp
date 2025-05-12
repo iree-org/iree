@@ -252,15 +252,19 @@ struct ConvertTypesPass : public Base {
     // Scan the module to detect external functions with types that would be
     // converted. This pass cannot be used with them.
     auto moduleOp = this->getOperation();
+    SmallVector<std::pair<mlir::FunctionOpInterface, FunctionType>>
+        exportedFuncOps;
     for (auto funcOp : moduleOp.template getOps<mlir::FunctionOpInterface>()) {
-      if (funcOp.isExternal() &&
-          !typeConverter.isSignatureLegal(
-              cast<FunctionType>(funcOp.getFunctionType()))) {
+      const auto funcType = cast<FunctionType>(funcOp.getFunctionType());
+      if (funcOp.isExternal() && !typeConverter.isSignatureLegal(funcType)) {
         funcOp.emitError()
             << "external functions with types that are being demoted are not "
                "allowed; do not use the pass or manually convert the function "
                "signature as required prior to running it";
         return this->signalPassFailure();
+      }
+      if (funcOp.isPublic()) {
+        exportedFuncOps.push_back({funcOp, funcType});
       }
     }
 
@@ -324,6 +328,30 @@ struct ConvertTypesPass : public Base {
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
       return this->signalPassFailure();
+    }
+
+    // Warn any public functions changed as part of the conversion.
+    bool hasWarned = false;
+    for (auto [funcOp, oldType] : exportedFuncOps) {
+      const auto newType = cast<FunctionType>(funcOp.getFunctionType());
+      if (newType != oldType) {
+        if (!hasWarned) {
+          hasWarned = true;
+          llvm::errs()
+              << "\n"
+              << "WARNING: ConvertTypesPass (--iree-input-demote-*-to-*) "
+                 "changed public function signatures; callers at runtime must "
+                 "match the new expected I/O types:\n";
+        }
+        llvm::errs() << "\n"
+                     << "  Old signature:\n"
+                     << "    @" << funcOp.getName() << oldType << "\n"
+                     << "  New signature:\n"
+                     << "    @" << funcOp.getName() << newType << "\n";
+      }
+    }
+    if (hasWarned) {
+      llvm::errs() << "\n";
     }
   }
 
