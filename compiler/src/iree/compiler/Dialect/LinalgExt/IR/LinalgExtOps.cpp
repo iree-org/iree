@@ -142,7 +142,7 @@ template <typename OpTy>
 static LogicalResult
 verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
                     ShapedType updateType, StringRef originalName,
-                    StringRef updateName) {
+                    StringRef updateName, Region *region) {
   static_assert(llvm::is_one_of<OpTy, GatherOp, ScatterOp>::value,
                 "applies to only gather or scatter operations");
   if (op.getInputs().size() != 2) {
@@ -231,41 +231,43 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
     }
   }
 
-  Region &region = op.getRegion();
-  Block *body = &region.front();
-  if (body->getNumArguments() != 2) {
-    return op->emitOpError("expected region to have two arguments");
+  if (region) {
+    Block *body = &region->front();
+    if (body->getNumArguments() != 2) {
+      return op->emitOpError("expected region to have two arguments");
+    }
+    Type arg0Type = body->getArgument(0).getType();
+    Type arg1Type = body->getArgument(1).getType();
+    if (!getComplexElementTypeOrSelf(arg0Type).isIntOrFloat() ||
+        !getComplexElementTypeOrSelf(arg1Type).isIntOrFloat()) {
+      return op->emitOpError(
+          "expected region to have scalar argument of integer or float types");
+    }
+    if (arg0Type != updateType.getElementType()) {
+      return op->emitOpError("mismatch in argument 0 of region ")
+             << arg0Type << " and element type of " + updateName + " value "
+             << updateType.getElementType();
+    }
+    if (arg1Type != originalType.getElementType()) {
+      return op->emitOpError("mismatch in argument 1 of region ")
+             << arg1Type << " and element type of " + originalName + " value "
+             << originalType.getElementType();
+    }
+    if (arg0Type != arg1Type) {
+      return op->emitOpError("mismatch in region argument types ")
+             << arg0Type << " and " << arg1Type;
+    }
+    auto yieldOp = cast<IREE::LinalgExt::YieldOp>(body->getTerminator());
+    if (yieldOp->getNumOperands() != 1) {
+      return yieldOp.emitOpError("expected region to yield a single value");
+    }
+    auto yieldedType = yieldOp->getOperand(0).getType();
+    if (yieldedType != arg0Type) {
+      return yieldOp.emitOpError("mismatch in type of yielded value ")
+             << yieldedType << " and argument of the region " << arg0Type;
+    }
   }
-  Type arg0Type = body->getArgument(0).getType();
-  Type arg1Type = body->getArgument(1).getType();
-  if (!getComplexElementTypeOrSelf(arg0Type).isIntOrFloat() ||
-      !getComplexElementTypeOrSelf(arg1Type).isIntOrFloat()) {
-    return op->emitOpError(
-        "expected region to have scalar argument of integer or float types");
-  }
-  if (arg0Type != updateType.getElementType()) {
-    return op->emitOpError("mismatch in argument 0 of region ")
-           << arg0Type << " and element type of " + updateName + " value "
-           << updateType.getElementType();
-  }
-  if (arg1Type != originalType.getElementType()) {
-    return op->emitOpError("mismatch in argument 1 of region ")
-           << arg1Type << " and element type of " + originalName + " value "
-           << originalType.getElementType();
-  }
-  if (arg0Type != arg1Type) {
-    return op->emitOpError("mismatch in region argument types ")
-           << arg0Type << " and " << arg1Type;
-  }
-  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(body->getTerminator());
-  if (yieldOp->getNumOperands() != 1) {
-    return yieldOp.emitOpError("expected region to yield a single value");
-  }
-  auto yieldedType = yieldOp->getOperand(0).getType();
-  if (yieldedType != arg0Type) {
-    return yieldOp.emitOpError("mismatch in type of yielded value ")
-           << yieldedType << " and argument of the region " << arg0Type;
-  }
+
   return success();
 }
 
@@ -275,7 +277,8 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
 
 LogicalResult ScatterOp::verify() {
   return verifyGatherScatter(*this, getUpdateSliceRank(), getOriginalType(),
-                             getUpdateType(), "original", "update");
+                             getUpdateType(), "original", "update",
+                             &getRegion());
 }
 
 LogicalResult
@@ -307,7 +310,7 @@ SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
 
 LogicalResult GatherOp::verify() {
   return verifyGatherScatter(*this, getOutputSliceRank(), getSourceType(),
-                             getOutputType(), "source", "output");
+                             getOutputType(), "source", "output", nullptr);
 }
 
 LogicalResult

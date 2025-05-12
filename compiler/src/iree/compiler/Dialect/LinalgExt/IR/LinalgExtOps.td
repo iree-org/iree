@@ -235,12 +235,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   let summary = [{Gathers slices from a source based on a tensor of indices.}];
   let description = [{
     Takes two inputs (`source` and `indices`) and outputs value (`output`).
-    The operation returns the value at the slices specified by `indices` by
-    combining the gathered value from `source` with the value in `output`
-    using the computation specified in `region`. The `region` specifies a binary
-    operation of signature `(T, T) -> T`, where `T` is the element-type of
-    `source` & `output`. The first argument is from `source` and the second is
-    from `output`.
+    The operation returns the value at the slices specified by `indices`.
 
     The size of the `dimension_map` attribute is used to determine how many
     indices are used to index into `source`, i.e. `index_depth`. The
@@ -259,12 +254,11 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       DenseI64ArrayAttr:$dimension_map
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
-  let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
-    $region (`->` type($results)^)?
+    (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
