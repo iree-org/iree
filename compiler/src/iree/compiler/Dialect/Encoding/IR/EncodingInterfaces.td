@@ -223,6 +223,33 @@ def IREEEncoding_SerializableEncodingAttrInterface :
   }];
 }
 
+def IREEEncoding_LayoutAttrInterface :
+  AttrInterface<"LayoutAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    An interface that collects a set of methods for encoding materialization.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the layout of materialized encoding for a tensor type.
+      }],
+      /*retTy=*/"::mlir::Operation *",
+      /*methodName=*/"lowerOp",
+      /*args=*/(ins "::mlir::OpBuilder &":$b,
+                    "::mlir::Operation *":$op,
+                    "::mlir::TypeRange":$convertedResTypes,
+                    "::mlir::ValueRange":$convertedOperands),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return nullptr;
+      }]
+    >
+  ];
+}
+
 def IREEEncoding_ContractionEncodingAttrInterface :
   AttrInterface<"ContractionEncodingAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";

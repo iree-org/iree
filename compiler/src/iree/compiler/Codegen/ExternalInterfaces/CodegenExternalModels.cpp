@@ -16,8 +16,9 @@ namespace mlir::iree_compiler::IREE::Codegen {
 using IREE::TensorExt::DispatchTensorType;
 
 struct EncodingNopDeviceLayoutAttrInterface final
-    : IREE::Codegen::LayoutAttrInterface::ExternalModel<
+    : IREE::Encoding::LayoutAttrInterface::ExternalModel<
           EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
+
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
