@@ -515,6 +515,76 @@ SortOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+namespace {
+struct RemoveUnusedDPSOpResults
+    : public OpRewritePattern<IREE::LinalgExt::SortOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
+                                PatternRewriter &rewriter) const override {
+    // To avoid problems in dispatches associated with unused results, prune
+    // them
+    // here.
+    Location loc = sortOp->getLoc();
+    auto operands = sortOp.getOutputs();
+    auto results = sortOp.getResults();
+
+    // If there are no results, bufferization has happened.
+    // Do not try to prune results anymore.
+    if (results.size() == 0) {
+      return failure();
+    }
+
+    // If result or associated block arg is used, do not erase.
+    Block &block = sortOp.getRegion().front();
+    auto blockArgs = block.getArguments();
+    auto used = [](Value result) { return !result.use_empty(); };
+    SmallVector<bool> isResultIdxUsed = llvm::map_to_vector(results, used);
+    SmallVector<bool> isArgIdxUsed = llvm::map_to_vector(blockArgs, used);
+
+    // Each result of this DPS op is associated to two block arguments.
+    SmallVector<Type> newResultTypes;
+    SmallVector<Value> newOperands;
+    SmallVector<Value> usedResults;
+    for (auto i : llvm::seq<unsigned>(results.size())) {
+      if (isResultIdxUsed[i] || isArgIdxUsed[2 * i] ||
+          isArgIdxUsed[2 * i + 1]) {
+        newOperands.push_back(operands[i]);
+        usedResults.push_back(results[i]);
+        newResultTypes.push_back(results[i].getType());
+        isArgIdxUsed[2 * i] = true;
+        isArgIdxUsed[2 * i + 1] = true;
+      }
+    }
+
+    // Bail out if no pruning required.
+    if (usedResults.size() == results.size()) {
+      return failure();
+    }
+
+    // Create new op using only operands associated to used results or block
+    // args.
+    auto pruned = rewriter.create<IREE::LinalgExt::SortOp>(
+        loc, newResultTypes,
+        /*inputs=*/ValueRange{}, newOperands, sortOp.getDimension());
+
+    // Prune unused block arguments from copied op.
+    rewriter.inlineRegionBefore(sortOp.getRegion(), pruned.getRegion(),
+                                pruned.getRegion().begin());
+    Block &newBlock = pruned.getRegion().front();
+    for (int i = newBlock.getNumArguments(); i > 0; --i)
+      if (!isArgIdxUsed[i - 1])
+        newBlock.eraseArgument(i - 1);
+    rewriter.replaceAllUsesWith(usedResults, pruned.getResults());
+    return success();
+  }
+};
+} // namespace
+
+void SortOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *ctx) {
+  results.add<RemoveUnusedDPSOpResults>(ctx);
+}
+
 //===----------------------------------------------------------------------===//
 // FftOp
 //===----------------------------------------------------------------------===//
