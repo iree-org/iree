@@ -36,10 +36,10 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-//         CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
+//         CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //         CDNA3: func.func @group_reduction_1d()
 //    CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
-// CDNA3-COUNT-5:     gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//         CDNA3:        gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -76,9 +76,9 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
 
 // On CDNA, we prefer wave64 with subgroup size of 64.
 
-//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //        CHECK: func.func @group_reduction_1d
-// CHECK-COUNT-5:     gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//        CHECK:     gpu.subgroup_reduce  add {{.*}} cluster(size = 64) : (f32) -> f32
 
 // -----
 
@@ -300,7 +300,7 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 32
 //          CDNA3: func.func @matvec_fp16()
 //     CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //      CDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -379,15 +379,15 @@ hal.executable public @multi_reduction {
 
 // Check that all loops are singly nested.
 //
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 64>
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [960, 1, 1] subgroup_size = 64
 //          CHECK: func.func @multi_reduction()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK-DAG:   %[[C225:.+]] = arith.constant 225 : index
-//          CHECK:   %[[RES0:.+]] = scf.for %[[ARG0:[a-zA-Z0-9]+]] = %[[C0]] to %[[C225]] step %[[C1]]
-//     CHECK-NEXT:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[ARG0]] into (15, 15) : index, index
-//          CHECK:   %[[RES1:.+]] = scf.for %[[ARG0:[a-zA-Z0-9]+]] = %[[C0]] to %[[C225]] step %[[C1]]
-//     CHECK-NEXT:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[ARG0]] into (15, 15) : index, index
-//          CHECK:   scf.for %[[ARG0:[a-zA-Z0-9]+]] = %[[C0]] to %[[C225]] step %[[C1]]
-//     CHECK-NEXT:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[ARG0]] into (15, 15) : index, index
+//      CHECK-DAG:   %[[C60:.+]] = arith.constant 60 : index
+//          CHECK:   %[[RES0:.+]] = scf.for %[[ARG0:[a-zA-Z0-9]+]] = %[[C0]] to %[[C60]] step %[[C1]]
+//      CHECK-NOT:      scf.for
+//          CHECK:    scf.yield
+//          CHECK:   %[[RES1:.+]] = scf.for %[[ARG0:[a-zA-Z0-9]+]] = %[[C0]] to %[[C60]] step %[[C1]]
+//      CHECK-NOT:      scf.for
+//          CHECK:    scf.yield
