@@ -129,39 +129,39 @@ getProcIdsAndNprocs(
 
   // Delinearize the z-dim based on the loop extents.
   if (!loopExtents.empty()) {
-    Value delinearizedDimId =
+    Value deLinearizedDimId =
         builder
             .create<IREE::HAL::InterfaceWorkgroupIDOp>(
                 loc, static_cast<unsigned>(deLinearizeFrom))
             .getResult();
-    OpFoldResult delinearizedNprocs =
+    OpFoldResult deLinearizedNprocs =
         builder
             .create<IREE::HAL::InterfaceWorkgroupCountOp>(
                 loc, static_cast<unsigned>(deLinearizeFrom))
             .getResult();
 
     if (loopExtents.size() != 1) {
-      auto delinearizeOp = builder.create<affine::AffineDelinearizeIndexOp>(
-          loc, delinearizedDimId, loopExtents);
+      auto deLinearizeOp = builder.create<affine::AffineDelinearizeIndexOp>(
+          loc, deLinearizedDimId, loopExtents);
       SmallVector<OpFoldResult> orderedDelinearizedDimIds =
-          llvm::map_to_vector(delinearizeOp.getResults(),
+          llvm::map_to_vector(deLinearizeOp.getResults(),
                               [](Value v) -> OpFoldResult { return v; });
       SmallVector<OpFoldResult> orderedDelinearizedNprocs;
       AffineMap minMap = AffineMap::get(0, 2, {s0, s1}, builder.getContext());
       AffineExpr ceilDivExpr = s0.ceilDiv(s1);
       for (int index = loopExtents.size() - 1; index >= 0; --index) {
         auto extent = loopExtents[index];
-        procId[index] = delinearizeOp->getResult(index);
+        procId[index] = deLinearizeOp->getResult(index);
         OpFoldResult currNprocs = affine::makeComposedFoldedAffineMin(
-            builder, loc, minMap, {extent, delinearizedNprocs});
+            builder, loc, minMap, {extent, deLinearizedNprocs});
         nprocs[index] = currNprocs;
-        delinearizedNprocs = affine::makeComposedFoldedAffineApply(
-            builder, loc, ceilDivExpr, {delinearizedNprocs, currNprocs});
+        deLinearizedNprocs = affine::makeComposedFoldedAffineApply(
+            builder, loc, ceilDivExpr, {deLinearizedNprocs, currNprocs});
       }
     } else {
       // If there is only one z-dim mapping, just use the ID directly.
-      procId[0] = delinearizedDimId;
-      nprocs[0] = delinearizedNprocs;
+      procId[0] = deLinearizedDimId;
+      nprocs[0] = deLinearizedNprocs;
     }
   }
 
@@ -174,7 +174,7 @@ getProcIdsAndNprocs(
 /// Resolve scf.forall operation by using the workgroup ID and counts.
 static LogicalResult
 resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
-                       IREE::Codegen::WorkgroupId delinearizeFrom) {
+                       IREE::Codegen::WorkgroupId deLinearizeFrom) {
   if (forallOp->getNumResults() != 0) {
     return forallOp.emitOpError(
         "cannot resolve for all ops with return values");
@@ -198,7 +198,7 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
         procInfo =
             getProcIdsAndNprocs(forallOp, rewriter, forallOp.getLoc(),
                                 workgroupMapping.value(), mixedLowerBound,
-                                mixedUpperBound, mixedStep, delinearizeFrom);
+                                mixedUpperBound, mixedStep, deLinearizeFrom);
     if (failed(procInfo)) {
       return failure();
     }
@@ -232,7 +232,7 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
 static LogicalResult
 resolveWorkgroupCount(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
                       scf::ForallOp forAllOp,
-                      IREE::Codegen::WorkgroupId delinearizeFrom) {
+                      IREE::Codegen::WorkgroupId deLinearizeFrom) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(forAllOp);
   SmallVector<OpFoldResult> lowerBounds = forAllOp.getMixedLowerBound();
@@ -254,12 +254,12 @@ resolveWorkgroupCount(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
   auto permutation = getMappingPermutation(mappingAttr);
   workgroupCount = applyPermutation(workgroupCount, permutation);
   return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount,
-                                        static_cast<int>(delinearizeFrom) + 1);
+                                        static_cast<int>(deLinearizeFrom) + 1);
 }
 
 static LogicalResult
 resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
-                       IREE::Codegen::WorkgroupId delinearizeFrom) {
+                       IREE::Codegen::WorkgroupId deLinearizeFrom) {
   Region &body = funcOp.getFunctionBody();
 
   if (body.empty()) {
@@ -300,11 +300,11 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
 
   scf::ForallOp forallOp = *forAllOps.begin();
   if (failed(
-          resolveWorkgroupCount(rewriter, funcOp, forallOp, delinearizeFrom))) {
+          resolveWorkgroupCount(rewriter, funcOp, forallOp, deLinearizeFrom))) {
     return failure();
   }
 
-  return resolveWorkgroupForAll(rewriter, *forAllOps.begin(), delinearizeFrom);
+  return resolveWorkgroupForAll(rewriter, *forAllOps.begin(), deLinearizeFrom);
 }
 
 //===---------------------------------------------------------------------===//
