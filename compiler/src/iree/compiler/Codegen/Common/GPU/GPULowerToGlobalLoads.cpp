@@ -192,9 +192,10 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
-    // [subgroupStartOffset + i * gatherStride + laneId]
+    // [subgroupStartOffset + i * gatherStride + laneId * elementsPerCopy]
     AffineExpr gatherOffsetExpr = subgroupIdExpr * totalCopySizeExpr +
-                                  iterationExpr * strideExpr + laneIdExpr;
+                                  iterationExpr * strideExpr +
+                                  laneIdExpr * elementsPerCopy;
     OpFoldResult result = affine::makeComposedFoldedAffineApply(
         rewriter, loc, gatherOffsetExpr, {lIdVal, sgIdVal, indVar});
     return cast<Value>(result);
@@ -206,7 +207,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     auto subgroupIdExpr = symbols[0];
     auto iterationExpr = symbols[1];
 
-    AffineExpr strideExpr = rewriter.getAffineConstantExpr(subgroupSize[0]);
+    AffineExpr strideExpr =
+        rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
@@ -300,9 +302,10 @@ static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
   if (targetType.getMemorySpace() !=
       gpu::AddressSpaceAttr::get(copy->getContext(),
                                  gpu::GPUDialect::getWorkgroupAddressSpace())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "-- Op: " << *copy
-               << "\n-- has target memory address space other than workgroup.\n");
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "-- Op: " << *copy
+        << "\n-- has target memory address space other than workgroup.\n");
     return false;
   }
   return true;
