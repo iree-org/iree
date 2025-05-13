@@ -1618,11 +1618,10 @@ func.func @mmt4d_with_large_reduction() attributes {hal.executable.target = #exe
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 func.func @pad_only() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c634816 = arith.constant 634816 : index
-  %c3846080 = arith.constant 3846080 : index
+  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c634816) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x112x112x64xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c3846080) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x114x114x64xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x112x112x64xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x114x114x64xf32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 112, 112, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x112x112x64xf32>> -> tensor<1x112x112x64xf32>
   %padded = tensor.pad %2 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg0: index, %arg1: index, %arg2: index, %arg3: index):
