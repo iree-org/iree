@@ -5635,15 +5635,10 @@ context, they will be the second and third inputs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.gather` attr-dict `dimension_map` `=` $dimension_map
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               `outs` `(` $outputs `:` type($outputs) `)`
-              $region (`-&gt;` type($results)^)?
+              (`-&gt;` type($results)^)?
 </code></pre></div>
 <p>Takes two inputs (<code>source</code> and <code>indices</code>) and outputs value (<code>output</code>).
-The operation returns the value at the slices specified by <code>indices</code> by
-combining the gathered value from <code>source</code> with the value in <code>output</code>
-using the computation specified in <code>region</code>. The <code>region</code> specifies a binary
-operation of signature <code>(T, T) -&gt; T</code>, where <code>T</code> is the element-type of
-<code>source</code> &amp; <code>output</code>. The first argument is from <code>source</code> and the second is
-from <code>output</code>.</p>
+The operation returns the value at the slices specified by <code>indices</code>.</p>
 <p>The size of the <code>dimension_map</code> attribute is used to determine how many
 indices are used to index into <code>source</code>, i.e. <code>index_depth</code>. The
 <code>dimension_map</code> attribute describes which index value maps to which dimension
