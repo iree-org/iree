@@ -33,6 +33,7 @@ LLVM_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
+        "lds_matmul.mlir",
         "index.mlir",
     ],
 )
@@ -63,6 +64,7 @@ VMVX_SRCS = enforce_glob(
     exclude = [
         "fp_to_subbyte.mlir",
         "large_linalg_matmul.mlir",
+        "lds_matmul.mlir",
         "subbyte_to_fp.mlir",
         "index.mlir",
     ],
@@ -108,6 +110,7 @@ VULKAN_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
+        "lds_matmul.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
@@ -162,6 +165,7 @@ CUDA_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "index.mlir",
+        "lds_matmul.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
         "pack.mlir",
@@ -196,6 +200,7 @@ ROCM_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
+        "lds_matmul.mlir",
         "narrow_n_matmuls.mlir",
         "subbyte_to_fp.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
