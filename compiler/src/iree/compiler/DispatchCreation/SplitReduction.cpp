@@ -29,21 +29,17 @@ static llvm::cl::opt<int64_t>
     splitMatmulReductionRatio("iree-dispatch-creation-split-matmul-reduction",
                               llvm::cl::desc("split ratio"), llvm::cl::init(1));
 
-static llvm::cl::opt<bool> enableStaticArgmaxSplit(
-    "iree-dispatch-creation-enable-static-argmax-split",
+static llvm::cl::opt<int64_t> splitArgmaxReductionThreshold(
+    "iree-dispatch-creation-split-argmax-threshold",
     llvm::cl::desc(
-        "Enable a static argmax split-k for known reduction patterns "
-        "with a reduction dimension of 128."),
-    llvm::cl::init(true));
+        "Minimum size of the reduction dimension to trigger argmax split"),
+    llvm::cl::init(128 * 1024));
 
-// Controls the tile size used when applying split-k to argmax reductions.
-// This value defines how many elements along the reduction dimension are
-// processed per tile (e.g., a value of 128 means each tile reduces over 128
-// elements).
-static llvm::cl::opt<int64_t> splitArgmaxReductionRatio(
-    "iree-dispatch-creation-split-argmax-reduction",
-    llvm::cl::desc("Ratio to split argmax. Set to 0 or 1 to disable"),
-    llvm::cl::init(1));
+static llvm::cl::opt<int64_t> splitArgmaxTileSize(
+    "iree-dispatch-creation-split-argmax-tile-size",
+    llvm::cl::desc("Tile size of the reduction dimension after splitting "
+                   "(i.e., the chunk size)"),
+    llvm::cl::init(128));
 
 static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-dispatch-creation-topk-split-reduction",
@@ -83,17 +79,9 @@ struct SplitReductionPass final
   void runOnOperation() override {
     if (splitMatmulReductionRatio.getValue() <= 1 &&
         topkSplitReductionRatio.empty() &&
-        (splitArgmaxReductionRatio.getValue() <= 1 &&
-         !enableStaticArgmaxSplit)) {
+        (splitArgmaxTileSize.getValue() <= 1 ||
+         splitArgmaxReductionThreshold.getValue() <= 1)) {
       return;
-    }
-
-    if (enableStaticArgmaxSplit) {
-      // Use default split-k pattern for argmax ops: split the reduction dim
-      // (e.g., 131072) into tiles of size 128, resulting in 1024 tiles (131072
-      // / 128). So, the split ratio refers to the tile size of the reduction
-      // dimension.
-      splitArgmaxReductionRatio = 128;
     }
 
     MLIRContext *context = &getContext();
@@ -117,9 +105,18 @@ struct SplitReductionPass final
             }
           })
           .Case<linalg::GenericOp>([&](auto genericOp) {
-            if (splitArgmaxReductionRatio > 1 &&
+            if (splitArgmaxTileSize > 1 &&
                 IREE::LinalgExt::isArgmaxOp(genericOp)) {
-              argmaxCandidates.push_back(genericOp);
+              // Due to isArgmaxOp, we support exactly one reduction dimension.
+              SmallVector<unsigned> dims;
+              genericOp.getReductionDims(dims);
+              unsigned reductionDim = dims[0];
+              SmallVector<int64_t, 4> loopRanges =
+                  genericOp.getStaticLoopRanges();
+              int64_t reductionDimSize = loopRanges[reductionDim];
+              if (reductionDimSize >= splitArgmaxReductionThreshold) {
+                argmaxCandidates.push_back(genericOp);
+              }
             }
           });
     });
@@ -138,7 +135,7 @@ struct SplitReductionPass final
     // Split argmax ops.
     auto argmaxSplitReductionControlFn =
         [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
-      return {splitArgmaxReductionRatio, op.getNumLoops() - 1,
+      return {splitArgmaxTileSize, op.getNumLoops() - 1,
               /*innerParallel=*/false};
     };
     for (auto op : argmaxCandidates) {
