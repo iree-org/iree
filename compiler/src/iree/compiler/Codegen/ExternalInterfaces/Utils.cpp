@@ -21,10 +21,11 @@
 namespace mlir::iree_compiler::IREE {
 using Codegen::MaterializeEncodingInfo;
 
-Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
-                                      OpBuilder &builder, RankedTensorType type,
-                                      ValueRange dynamicDims) {
-  auto deviceLayoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(attr);
+Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
+                                            OpBuilder &builder,
+                                            RankedTensorType type,
+                                            ValueRange dynamicDims) {
+  auto deviceLayoutAttr = cast<IREE::Codegen::PackedLayoutAttrInterface>(attr);
   MaterializeEncodingInfo encodingInfo = deviceLayoutAttr.getEncodingInfo(type);
   SmallVector<int64_t> paddedShape(type.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
@@ -92,10 +93,10 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
   return result;
 }
 
-DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type,
-                             bool addEncodingAttr) {
+DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
+                                   bool addEncodingAttr) {
   MLIRContext *ctx = attr.getContext();
-  auto deviceLayoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(attr);
+  auto deviceLayoutAttr = cast<IREE::Codegen::PackedLayoutAttrInterface>(attr);
   const MaterializeEncodingInfo info = deviceLayoutAttr.getEncodingInfo(type);
   Attribute encodingInfoAttr =
       IREE::Codegen::serializeEncodingInfo(attr.getContext(), info);

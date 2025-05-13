@@ -301,9 +301,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
   return mmaOp;
 }
 
-struct GPUDeviceEncodingLayoutResolverAttrInterface
-    : public DeviceEncodingLayoutResolverExternalModelBase<
-          GPUDeviceEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
+struct GPUDeviceEncodingPackedLayoutAttrInterface
+    : public DevicePackedLayoutAttrExternalModelBase<
+          GPUDeviceEncodingPackedLayoutAttrInterface, GPUEncodingLayoutAttr> {
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
   }
@@ -351,7 +351,11 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     info.swizzle = std::move(maybeSwizzle.value());
     return info;
   }
+};
 
+struct GPUDeviceEncodingLayoutAttrInterface
+    : public Codegen::LayoutAttrInterface::ExternalModel<
+          GPUDeviceEncodingLayoutAttrInterface, GPUEncodingLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -377,8 +381,8 @@ struct GPUHostSerializableEncodingAttrInterface final
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
-    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
-                                           dynamicDims);
+    return calculatePackedStorageSizeInBytesImpl(attr, loc, builder, type,
+                                                 dynamicDims);
   }
 };
 
@@ -402,24 +406,13 @@ struct GPUHostEncodingLayoutResolverAttrInterface final
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return GPUEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+    return GPUEncodingLayoutAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 };
 
 struct GPUPadDeviceEncodingLayoutAttrInterface final
     : Codegen::LayoutAttrInterface::ExternalModel<
           GPUPadDeviceEncodingLayoutAttrInterface, GPUPadLayoutAttr> {
-
-  // TODO(#20160): Do not implement the interface method because it is
-  // data-tiling specific. It is a workaround to reuse encoding materialization
-  // patterns, because we query types from the method in the conversion. We
-  // should really move them to interface methods, then we can delete the
-  // workaround.
-  MaterializeEncodingInfo getEncodingInfo(Attribute attr,
-                                          RankedTensorType type) const {
-    return MaterializeEncodingInfo{};
-  }
-
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -552,7 +545,8 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-            GPUDeviceEncodingLayoutResolverAttrInterface,
+            GPUDeviceEncodingPackedLayoutAttrInterface,
+            GPUDeviceEncodingLayoutAttrInterface,
             GPUHostEncodingLayoutResolverAttrInterface,
             GPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<

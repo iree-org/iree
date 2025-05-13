@@ -24,21 +24,21 @@ using IREE::TensorExt::DispatchTensorType;
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
-// This class is the base class for the external model of different encoding
-// resolver attributes. It provides a public method, `getEncodingInfo` to reduce
-// the duplicated implementations before. To inherit it, it requires the derived
-// class to implement the `getConfiguration` method and the
+// This class is the base class for the external model of different packed
+// encoding layout attributes. It provides a public method, `getEncodingInfo` to
+// reduce the duplicated implementations before. To inherit it, it requires the
+// derived class to implement the `getConfiguration` method and the
 // `getEncodingInfoImpl` method.
-template <typename DeviceEncodingLayoutResolverAttrInterface,
+template <typename DeviceEncodingPackedLayoutAttrInterface,
           typename EncodingLayoutAttr>
-struct DeviceEncodingLayoutResolverExternalModelBase
-    : public Codegen::LayoutAttrInterface::ExternalModel<
-          DeviceEncodingLayoutResolverAttrInterface, EncodingLayoutAttr> {
+struct DevicePackedLayoutAttrExternalModelBase
+    : public Codegen::PackedLayoutAttrInterface::ExternalModel<
+          DeviceEncodingPackedLayoutAttrInterface, EncodingLayoutAttr> {
 public:
   Codegen::MaterializeEncodingInfo
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
-    const DeviceEncodingLayoutResolverAttrInterface *impl =
-        static_cast<const DeviceEncodingLayoutResolverAttrInterface *>(this);
+    const DeviceEncodingPackedLayoutAttrInterface *impl =
+        static_cast<const DeviceEncodingPackedLayoutAttrInterface *>(this);
     // If the layout is already resolved, use it directly.
     if (auto config = impl->getConfiguration(attr)) {
       if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
@@ -62,7 +62,8 @@ getEncodingInfoFromLayouts(RankedTensorType type) {
   }
   ArrayRef<Attribute> layouts = layoutAttr.getLayouts().getValue();
   assert(layouts.size() == 1 && "only single layout is supported");
-  if (auto layout = dyn_cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])) {
+  if (auto layout =
+          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layouts[0])) {
     return layout.getEncodingInfo(type);
   }
   return std::nullopt;
@@ -83,7 +84,7 @@ public:
             getEncodingInfoFromLayouts(type)) {
       return maybeEncodingInfo.value();
     }
-    return cast<IREE::Codegen::LayoutAttrInterface>(layoutAttr)
+    return cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)
         .getEncodingInfo(type);
   }
 
@@ -134,12 +135,13 @@ public:
   }
 };
 
-/// Calculates the storage size in bytes for the given `type` with a layout
-/// encoding `attr`.
-/// Requirement: `attr` must implement IREE::Codegen::LayoutAttrInterface.
-Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
-                                      OpBuilder &builder, RankedTensorType type,
-                                      ValueRange dynamicDims);
+/// Calculates the storage size in bytes for the given `type` with a packed
+/// layout encoding `attr`. Requirement: `attr` must implement
+/// IREE::Codegen::PackedLayoutAttrInterface.
+Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
+                                            OpBuilder &builder,
+                                            RankedTensorType type,
+                                            ValueRange dynamicDims);
 
 /// Returns a dictionary attribute that contains the materialized encoding info,
 /// i.e., serialized MaterializeEncodingInfo struct. The EncodingAttr attribute
@@ -149,9 +151,9 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
 /// `addEncodingAttr` is mainly for VMVX ukernel path because the ukernel ops
 /// lowering requires all the information. There are no direct mappings from
 /// layouts to ukernels.
-/// Requirement: `attr` must implement IREE::Codegen::LayoutAttrInterface.
-DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type,
-                             bool addEncodingAttr = false);
+/// Requirement: `attr` must implement IREE::Codegen::PackedLayoutAttrInterface.
+DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
+                                   bool addEncodingAttr = false);
 
 /// Appends the NamedAttribute into `config` if there is a `name` NamedAttribute
 /// in the `dictAttr`.

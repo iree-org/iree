@@ -18,11 +18,6 @@ using IREE::TensorExt::DispatchTensorType;
 struct EncodingNopDeviceLayoutAttrInterface final
     : IREE::Codegen::LayoutAttrInterface::ExternalModel<
           EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
-  IREE::Codegen::MaterializeEncodingInfo
-  getEncodingInfo(Attribute attr, RankedTensorType type) const {
-    return IREE::Codegen::MaterializeEncodingInfo{};
-  }
-
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {

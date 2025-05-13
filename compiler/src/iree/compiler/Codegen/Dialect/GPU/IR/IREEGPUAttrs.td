@@ -297,8 +297,9 @@ def IREEGPU_GPUEncodingLayoutAttr :
   let mnemonic = "gpu_encoding_layout";
   let summary = [{The encoding layout attribute for GPU backend.}];
   let description = [{
-    This attribute can implement any layout interface methods for data-tiling,
-    e.g., Codegen::LayoutAttrInterface, etc. They should be implemented
+    This attribute can implement any layout interface methods for encoding
+    serialization and or materialization, e.g., Codegen::LayoutAttrInterface,
+    Codegen::PackedLayoutAttrInterface, etc. They should be implemented
     through external model mechanism because we do not want to relocate
     domain-specific logic to the dialect implementation, and we can have better
     code structure. See the implementation in

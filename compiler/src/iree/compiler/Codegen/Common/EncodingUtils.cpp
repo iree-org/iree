@@ -135,7 +135,11 @@ MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
   if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(type)) {
     return maybeEncodingInfo.value();
   }
-  return layoutAttr.getEncodingInfo(type);
+  if (auto packedLayoutAttr =
+          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)) {
+    return packedLayoutAttr.getEncodingInfo(type);
+  }
+  return IREE::Codegen::MaterializeEncodingInfo{};
 }
 
 FailureOr<SmallVector<OpFoldResult>>
@@ -183,7 +187,8 @@ getEncodingInfoFromLayouts(RankedTensorType type) {
   }
   ArrayRef<Attribute> layouts = layoutAttr.getLayouts().getValue();
   assert(layouts.size() == 1 && "only single layout is supported");
-  if (auto layout = dyn_cast<IREE::Codegen::LayoutAttrInterface>(layouts[0])) {
+  if (auto layout =
+          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layouts[0])) {
     return layout.getEncodingInfo(type);
   }
   return std::nullopt;
