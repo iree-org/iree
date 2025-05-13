@@ -36,28 +36,25 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 32>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @warp_reduction_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
-//     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+//     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
-//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %c0 to %c10240 step %c1024 iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
+//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %c0 to %c10240 step %c1024 iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<1x1x4xf32>) {
 //         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      %[[ADD:.+]] = arith.addf %[[V]], %[[A0]] : vector<4xf32>
-//         CHECK:      scf.yield %[[ADD]] : vector<4xf32>
+//         CHECK:      %[[STRIDED:.+]] = vector.insert_strided_slice %[[V]], {{.*}} : vector<4xf32> into vector<1x1x4xf32>
+//         CHECK:      %[[ADD:.+]] = arith.addf %[[STRIDED]], %[[A0]] : vector<1x1x4xf32>
+//         CHECK:      scf.yield %[[ADD]] : vector<1x1x4xf32>
 //         CHECK:    }
-// CHECK-COUNT-5:    gpu.shuffle  xor {{.*}} : f32
-//         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<8xf32, #gpu.address_space<workgroup>>
-//         CHECK:    scf.if %{{.*}} {
-//         CHECK:      memref.store %{{.*}}, %[[ALLOC]]{{.*}} : memref<8xf32, #gpu.address_space<workgroup>>
-//         CHECK:    }
+//         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<10xf32, #gpu.address_space<workgroup>>
+//         CHECK:    %[[SVIEW:.+]] = memref.subview {{.*}} : memref<10xf32, #gpu.address_space<workgroup>> to memref<8xf32, strided<[1]>, #gpu.address_space<workgroup>>
+//         CHECK:    vector.transfer_write %{{.*}}, %[[SVIEW]]{{.*}} : vector<1xf32>, memref<8xf32, strided<[1]>, #gpu.address_space<workgroup>>
 //         CHECK:    gpu.barrier
-//         CHECK:    memref.load %[[ALLOC]]{{.*}} : memref<8xf32, #gpu.address_space<workgroup>>
-// CHECK-COUNT-3:    gpu.shuffle  xor {{.*}} : f32
-//         CHECK:    gpu.shuffle  idx {{.*}} : f32
-//         CHECK:    scf.if %{{.*}} {
-//         CHECK:      vector.transfer_write {{.*}} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
-//         CHECK:    }
+//         CHECK:    vector.transfer_read %[[SVIEW]]{{.*}} : memref<8xf32,
+//         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 8) : (f32) -> f32
+//         CHECK:    vector.transfer_write {{.*}} : vector<f32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
@@ -108,23 +105,18 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [256, 1, 1] subgroup_size = 32>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @warp_reduction_broadcast_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
-//         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      arith.addf {{.*}} : vector<4xf32>
+//         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
+//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32,
+//         CHECK:      arith.addf {{.*}} : vector<1x1x4xf32>
 //         CHECK:      scf.yield
-// CHECK-COUNT-5:    gpu.shuffle  xor
-//         CHECK:    scf.if
-//         CHECK:      memref.store {{.*}} : memref<8xf32, #gpu.address_space<workgroup>>
-//         CHECK:    }
-// CHECK-COUNT-3:    gpu.shuffle  xor
-//         CHECK:    gpu.shuffle  idx
-//         CHECK:    arith.divf {{.*}} : vector<4xf32>
-//         CHECK:    scf.for
-//         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>
-//         CHECK:    }
+//         CHECK:    gpu.subgroup_reduce
+//         CHECK:    vector.transfer_write {{.*}} : vector<1xf32
+//         CHECK:    gpu.subgroup_reduce
+//         CHECK:    arith.divf {{.*}} : vector<1x1x4xf32>
+//         CHECK:    vector.transfer_write {{.*}} : vector<4xf32>, {{.*}}
 //         CHECK:    return
 
 // -----
@@ -157,75 +149,31 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [1024, 1, 1] subgroup_size = 32>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @softmax()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
-//         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      arith.maxnumf {{.*}} : vector<4xf32>
+//         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
+//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32,
+//         CHECK:      arith.maxnumf {{.*}} : vector<1x1x4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maxnumf>, %{{.*}} : vector<4xf32> into f32
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    arith.remui
-//         CHECK:    scf.if
-//         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
-//         CHECK:    }
+//         CHECK:    vector.multi_reduction <maxnumf>
+//         CHECK:    gpu.subgroup_reduce  maxnumf
+//         CHECK:    vector.transfer_write
 //         CHECK:    gpu.barrier
-//         CHECK:    arith.minui
-//         CHECK:    memref.load
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
-//         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
+//         CHECK:    gpu.subgroup_reduce  maxnumf
+//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<1x1x4xf32>
+//         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
 //         CHECK:      math.exp
 //         CHECK:      arith.addf
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    scf.if
-//         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
-//         CHECK:    }
+//         CHECK:    vector.multi_reduction <add>
+//         CHECK:    gpu.subgroup_reduce  add
+//         CHECK:    vector.transfer_write
 //         CHECK:    gpu.barrier
-//         CHECK:    memref.load
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.addf
-//         CHECK:    arith.addf
+//         CHECK:    vector.transfer_read
+//         CHECK:    gpu.subgroup_reduce  add
 //         CHECK:    vector.broadcast
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
@@ -308,12 +256,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_reduction
-//         CHECK:   %[[RD:.+]] = vector.transfer_read {{.*}} memref<8x64xf32, #hal.descriptor_type<storage_buffer>>, vector<2xf32>
-//         CHECK:   %[[ADD:.+]] = arith.addf %[[RD]]
-//         CHECK:   vector.reduction <add>, %[[ADD]]
-// CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-//         CHECK:   scf.if
-//         CHECK:     vector.transfer_write {{.*}} memref<8xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -356,14 +299,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise
-//         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
-//         CHECK:   arith.addf{{.*}} : vector<2xf32>
-//         CHECK:   arith.addf{{.*}} : vector<2xf32>
-//         CHECK:   arith.addf{{.*}} : vector<2xf32>
-// CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-//         CHECK:   %[[SQRT_VEC:.+]] = math.sqrt
-//         CHECK:   scf.if
-//         CHECK:     vector.transfer_write %[[SQRT_VEC]], {{.*}} : vector<1xf32>, memref<8xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -399,18 +335,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_reduction_larger
-// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-//         CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<8xf32, #gpu.address_space<workgroup>>
-//         CHECK: scf.if
-//         CHECK:   memref.store %{{.*}}, %[[ALLOC]][%{{.*}}] : memref<8xf32, #gpu.address_space<workgroup>>
-//         CHECK: }
-//         CHECK: arith.minui
-//         CHECK: memref.load
-// CHECK-COUNT-3: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-//         CHECK: %[[RES:.*]], %{{.*}} = gpu.shuffle  idx
-//         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<1xf32>
-//         CHECK: scf.if
-//         CHECK:   vector.transfer_write %[[RES_VEC]]
+//   CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
+//   CHECK:    gpu.subgroup_reduce  add {{.*}}
 
 // -----
 
@@ -446,7 +372,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_reduction_1d
-// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//   CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -491,7 +417,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise_4d
-// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//   CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -550,12 +476,8 @@ hal.executable private @i4_dequant_matvec {
 //     CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //     CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4xf16>
-//         CHECK:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x4xf16>)
-//         CHECK:   %{{.*}} = arith.extui %{{.*}} : vector<1x1x4xi4> to vector<1x1x4xi32>
-//         CHECK:   %{{.*}} = arith.uitofp %{{.*}} : vector<1x1x4xi32> to vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
-//         CHECK:   %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x4xf16>)
+//         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+//         CHECK:     arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
 
-//         CHECK:   %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [0, 1, 2] : vector<1x1x4xf16> to f16
+//         CHECK:   vector.multi_reduction <add>, %{{.*}}, %{{.*}} [0, 1, 2] : vector<1x1x4xf16> to f16
