@@ -30,6 +30,18 @@ def GPUCheckResourceUsagePass :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCombineLayoutTransformationPass :
+    InterfacePass<"iree-codegen-gpu-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations on the results of a dispatch into a single operation.";
+  let dependentDialects = [
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "gpu::GPUDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def GPUCombineValueBarriersPass :
     Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
   let summary = "Combines `iree_gpu.value_barrier` ops";

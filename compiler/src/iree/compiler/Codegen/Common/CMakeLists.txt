@@ -69,6 +69,7 @@ iree_cc_library(
     Common
   HDRS
     "BufferizationAnalysis.h"
+    "CombineLayoutTransformation.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "PassUtils.h"
