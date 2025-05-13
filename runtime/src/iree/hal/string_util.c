@@ -146,6 +146,9 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
   } else if (iree_string_view_equal(str_value, IREE_SV("f8E4M3FNUZ"))) {
     *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ;
     return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f8E8M0FNU"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU;
+    return iree_ok_status();
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("f"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("bf"))) {
@@ -189,6 +192,9 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
       special_name = "f8E4M3FNUZ";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
+      special_name = "f8E8M0FNU";
       break;
     default:
       break;
@@ -441,6 +447,14 @@ static iree_status_t iree_hal_parse_element_unsafe(
       *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f8e4m3fnuz(temp_float);
       return iree_ok_status();
     }
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f8e8m0fnu(temp_float);
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16: {
       float temp = 0;
       if (!iree_string_view_atof(data_str, &temp)) {
@@ -587,6 +601,10 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                    iree_math_f8e5m2fnuz_to_f32(*(const uint8_t*)data.data));
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f8e8m0fnu_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
