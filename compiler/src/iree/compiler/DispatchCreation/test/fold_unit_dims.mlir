@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-dispatch-creation-fold-unit-extent-dims)" %s --split-input-file | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-dispatch-creation-fold-unit-extent-dims)" %s --split-input-file --mlir-print-local-scope | FileCheck %s
 
 util.func public @no_fold_unit_dims_in_dispatches(%arg0 : tensor<1x1x10xf32>) -> tensor<1x1x10xf32> {
   %0 = tensor.empty() : tensor<1x1x10xf32>
@@ -148,14 +148,20 @@ util.func public @attention_mask_multi_m_dims(%arg0: tensor<8x4x1x128xf32>, %arg
   util.return %1 : tensor<8x4x1x128xf32>
 }
 // CHECK-LABEL: func public @attention_mask_multi_m_dims
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG4:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG4:[a-zA-Z0-9]+]]
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG4]]
 //  CHECK-SAME:     tensor<8x4x1x?x32xf32> into tensor<8x4x?x32xf32>
 //       CHECK:   %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d4)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d5, d6)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 //  CHECK-SAME:     ins({{.+}}, %[[COLLAPSED]]
 //       CHECK:   util.return %[[ATTN]]
 
@@ -180,13 +186,19 @@ util.func public @attention_mask_single_m_dim(%arg0 : tensor<32x1x128xf16>, %arg
   util.return %1 : tensor<32x1x128xf16>
 }
 // CHECK-LABEL: func public @attention_mask_single_m_dim
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG4:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG4:[a-zA-Z0-9]+]]
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG4]]
 //  CHECK-SAME:     tensor<32x1x?xf16> into tensor<32x?xf16>
 //       CHECK:   %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> ()>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d4)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 //  CHECK-SAME:     ins({{.+}}, %[[COLLAPSED]]
 //       CHECK:   util.return %[[ATTN]]
