@@ -7,9 +7,9 @@
 #include "compiler/plugins/target/ROCM/builtins/ukernel/common.h"
 
 [[clang::always_inline]] void
-iree_uk_amdgpu_argmax_bf16i32(const _BFloat16 *inputBuffer,
-                              int64_t input_offset, int32_t *outputBuffer,
-                              int64_t output_offset, int64_t reductionSize) {
+iree_uk_amdgpu_argmax_bf16i32(const __bf16 *inputBuffer, int64_t input_offset,
+                              int32_t *outputBuffer, int64_t output_offset,
+                              int64_t reductionSize) {
   // NOTE:
   // We convert bf16 inputs to f32 before computation because HIP/OCKL and
   // Clang/LLVM do not currently support native arithmetic or comparisons on
