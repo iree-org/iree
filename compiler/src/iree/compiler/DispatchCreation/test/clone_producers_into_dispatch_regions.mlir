@@ -710,3 +710,78 @@ util.func public @unset_encoding_elementwise_fusion(%arg0: tensor<?x?xf32, #enco
 //  CHECK-NEXT:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[UNSET_ENCODING]]
 //       CHECK:   flow.return %[[GENERIC]]
+
+// -----
+
+// Check that hal ops are never cloned into dispatches
+util.func @never_clone_hal_ops(%arg0 : !hal.buffer_view, %arg1 : !hal.fence,
+    %arg2 : index, %arg3 : index, %arg4 : index, %update : tensor<?x?xf32>,
+    %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = hal.tensor.import wait(%arg1) => %arg0 : !hal.buffer_view -> tensor<?xi32>{%arg2}
+  %1 = flow.dispatch.region -> (tensor<?x?xf32>{%arg3, %arg4}) {
+    %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+        ins(%update, %0 : tensor<?x?xf32>, tensor<?xi32>)
+        outs(%original: tensor<?x?xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        %1 = arith.addf %b0, %b1 : f32
+        iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+    flow.return %2 : tensor<?x?xf32>
+  }
+  util.return %1 : tensor<?x?xf32>
+}
+// CHECK-LABEL: @never_clone_hal_ops
+//       CHECK:   hal.tensor.import
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:   hal.tensor.import
+//       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+// Check that flow ops are never cloned into dispatches
+util.func @never_clone_flow_ops(%arg0 : tensor<?xi32>,
+    %arg2 : index, %arg3 : index, %arg4 : index, %update : tensor<?x?xf32>,
+    %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = flow.tensor.transfer %arg0 : tensor<?xi32>{%arg2} to "target"
+  %1 = flow.dispatch.region -> (tensor<?x?xf32>{%arg3, %arg4}) {
+    %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+        ins(%update, %0 : tensor<?x?xf32>, tensor<?xi32>)
+        outs(%original: tensor<?x?xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        %1 = arith.addf %b0, %b1 : f32
+        iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+    flow.return %2 : tensor<?x?xf32>
+  }
+  util.return %1 : tensor<?x?xf32>
+}
+// CHECK-LABEL: @never_clone_flow_ops
+//       CHECK:   flow.tensor.transfer
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:   flow.tensor.transfer
+//       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+// Check that insert slices are never cloned
+util.func @never_clone_insert_slice_ops(%arg0 : tensor<?xi32>, %arg1 : tensor<?xi32>,
+    %arg2 : index, %arg3 : index, %arg4 : index, %update : tensor<?x?xf32>,
+    %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = tensor.insert_slice %arg0 into %arg1[0] [%arg2] [1]: tensor<?xi32> into tensor<?xi32>
+  %1 = flow.dispatch.region -> (tensor<?x?xf32>{%arg3, %arg4}) {
+    %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+        ins(%update, %0 : tensor<?x?xf32>, tensor<?xi32>)
+        outs(%original: tensor<?x?xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        %1 = arith.addf %b0, %b1 : f32
+        iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+    flow.return %2 : tensor<?x?xf32>
+  }
+  util.return %1 : tensor<?x?xf32>
+}
+// CHECK-LABEL: @never_clone_insert_slice_ops
+//       CHECK:   tensor.insert_slice
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:   tensor.insert_slice
+//       CHECK:   return %[[DISPATCH]]
