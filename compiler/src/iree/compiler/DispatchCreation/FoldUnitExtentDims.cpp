@@ -61,29 +61,31 @@ struct FoldAttentionMaskUnitDim final
       return failure();
     }
 
-    llvm::DenseSet<int64_t> toDrop;
-    for (int64_t dim : llvm::make_filter_range(mDims, [&](int64_t dim) {
-           for (auto [i, result] : llvm::enumerate(maskMap.getResults())) {
-             if (cast<AffineDimExpr>(result).getPosition() == dim &&
-                 maskShape[i] == 1) {
-               return true;
-             }
-           }
-           return false;
-         })) {
-      toDrop.insert(dim);
+    llvm::DenseMap<int64_t, int64_t> loopToMaskDim;
+    for (auto [i, result] : llvm::enumerate(maskMap.getResults())) {
+      loopToMaskDim[cast<AffineDimExpr>(result).getPosition()] = i;
     }
-    if (toDrop.size() == 0) {
+
+    // Find unit M dims in the mask map.
+    llvm::DenseSet<int64_t> loopsToDrop;
+    for (int64_t dim : mDims) {
+      auto it = loopToMaskDim.find(dim);
+      if (it != loopToMaskDim.end() && maskShape[it->second] == 1) {
+        loopsToDrop.insert(dim);
+      }
+    }
+    if (loopsToDrop.size() == 0) {
       return rewriter.notifyMatchFailure(attentionOp, "no unit M dim");
     }
 
+    // Compute the reassociation to remove unit dims and the new shape.
     ReassociationIndices indices;
     SmallVector<ReassociationIndices> reassoc;
     SmallVector<int64_t> resultShape;
     llvm::SmallBitVector resultsToDrop(maskShape.size());
     for (auto [i, size] : llvm::enumerate(maskShape)) {
       int64_t loop = maskMap.getDimPosition(i);
-      if (!toDrop.contains(loop)) {
+      if (!loopsToDrop.contains(loop)) {
         resultShape.push_back(size);
         if (indices.size())
           reassoc.emplace_back(std::move(indices));
