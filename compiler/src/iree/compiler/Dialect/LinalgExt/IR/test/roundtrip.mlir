@@ -598,10 +598,7 @@ func.func @gather_static(
   %0 = iree_linalg_ext.gather
     dimension_map = [0]
     ins(%source, %idx : tensor<10xf32>, tensor<1xi32>)
-    outs(%result : tensor<1xf32>) {
-    ^bb0(%arg0: f32, %arg1: f32):
-      iree_linalg_ext.yield %arg0 : f32
-  } -> tensor<1xf32>
+    outs(%result : tensor<1xf32>) -> tensor<1xf32>
   return %0 : tensor<1xf32>
 }
 // CHECK-LABEL: func.func @gather_static(
@@ -612,7 +609,6 @@ func.func @gather_static(
 // CHECK-SAME:     dimension_map = [0]
 // CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
 // CHECK-SAME:     outs(%[[RESULT]]
-//      CHECK:   iree_linalg_ext.yield %{{.+}} : f32
 //      CHECK:   return %[[VAL]]
 
 // -----
@@ -623,10 +619,7 @@ func.func @gather_static_2D_batch(
   %0 = iree_linalg_ext.gather
     dimension_map = [0, 1]
     ins(%source, %idx : tensor<4x3xf32>, tensor<1x1xi32>)
-    outs(%result : tensor<1xf32>) {
-    ^bb0(%arg0: f32, %arg1: f32):
-      iree_linalg_ext.yield %arg0 : f32
-  } -> tensor<1xf32>
+    outs(%result : tensor<1xf32>) -> tensor<1xf32>
   return %0 : tensor<1xf32>
 }
 // CHECK-LABEL: func.func @gather_static_2D_batch(
@@ -637,7 +630,6 @@ func.func @gather_static_2D_batch(
 // CHECK-SAME:     dimension_map = [0, 1]
 // CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
 // CHECK-SAME:     outs(%[[RESULT]]
-//      CHECK:   iree_linalg_ext.yield %{{.+}} : f32
 //      CHECK:   return %[[VAL]]
 
 // -----
@@ -648,10 +640,7 @@ func.func @gather_dynamic(
   %0 = iree_linalg_ext.gather
     dimension_map = [0, 1]
     ins(%source, %idx : tensor<?x?xf32>, tensor<?x1xi32>)
-    outs(%result : tensor<?xf32>) {
-    ^bb0(%arg0: f32, %arg1: f32):
-      iree_linalg_ext.yield %arg0 : f32
-  } -> tensor<?xf32>
+    outs(%result : tensor<?xf32>) -> tensor<?xf32>
   return %0 : tensor<?xf32>
 }
 // CHECK-LABEL: func.func @gather_dynamic(
@@ -662,7 +651,6 @@ func.func @gather_dynamic(
 // CHECK-SAME:     dimension_map = [0, 1]
 // CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
 // CHECK-SAME:     outs(%[[RESULT]]
-//      CHECK:   iree_linalg_ext.yield %{{.+}} : f32
 //      CHECK:   return %[[VAL]]
 
 // -----
@@ -673,10 +661,7 @@ func.func @gather_static_memref(
   iree_linalg_ext.gather
     dimension_map = [0]
     ins(%source, %idx : memref<10xf32>, memref<1xi32>)
-    outs(%result : memref<1xf32>) {
-    ^bb0(%arg0: f32, %arg1: f32):
-      iree_linalg_ext.yield %arg0 : f32
-  }
+    outs(%result : memref<1xf32>)
   return
 }
 // CHECK-LABEL: func.func @gather_static_memref(
@@ -687,7 +672,6 @@ func.func @gather_static_memref(
 // CHECK-SAME:     dimension_map = [0]
 // CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
 // CHECK-SAME:     outs(%[[RESULT]]
-//      CHECK:       iree_linalg_ext.yield %{{.+}} : f32
 //      CHECK:   return
 
 
