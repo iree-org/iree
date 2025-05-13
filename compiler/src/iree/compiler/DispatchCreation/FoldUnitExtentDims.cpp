@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -34,6 +35,83 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSPASS
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSFORFUNCPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
+
+//===----------------------------------------------------------------------===//
+// Attention Pattern
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct FoldAttentionMaskUnitDim final
+    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    TypedValue<ShapedType> mask = attentionOp.getMask();
+    if (!mask) {
+      return failure();
+    }
+    auto detail = IREE::LinalgExt::AttentionOpDetail::get(
+                      attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+                      attentionOp.getValueMap(), attentionOp.getOutputMap())
+                      .value();
+    auto mDims = detail.getMDims();
+    auto maskShape = mask.getType().getShape();
+    AffineMap maskMap = attentionOp.getMaskMap().value();
+    if (!mDims.size()) {
+      return failure();
+    }
+
+    llvm::DenseSet<int64_t> toDrop;
+    for (int64_t dim : llvm::make_filter_range(mDims, [&](int64_t dim) {
+           for (auto [i, result] : llvm::enumerate(maskMap.getResults())) {
+             if (cast<AffineDimExpr>(result).getPosition() == dim &&
+                 maskShape[i] == 1) {
+               return true;
+             }
+           }
+           return false;
+         })) {
+      toDrop.insert(dim);
+    }
+    if (toDrop.size() == 0) {
+      return rewriter.notifyMatchFailure(attentionOp, "no unit M dim");
+    }
+
+    ReassociationIndices indices;
+    SmallVector<ReassociationIndices> reassoc;
+    SmallVector<int64_t> resultShape;
+    llvm::SmallBitVector resultsToDrop(maskShape.size());
+    for (auto [i, size] : llvm::enumerate(maskShape)) {
+      int64_t loop = maskMap.getDimPosition(i);
+      if (!toDrop.contains(loop)) {
+        resultShape.push_back(size);
+        if (indices.size())
+          reassoc.emplace_back(std::move(indices));
+      } else {
+        resultsToDrop.set(i);
+      }
+      indices.push_back(i);
+    }
+    if (indices.size()) {
+      reassoc.emplace_back(std::move(indices));
+    }
+
+    auto loc = attentionOp.getLoc();
+    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
+        loc, mask.getType().clone(resultShape), mask, reassoc);
+
+    rewriter.modifyOpInPlace(attentionOp, [&]() {
+      attentionOp.getMaskMutable().assign(collapseOp);
+      AffineMap newMap = maskMap.dropResults(resultsToDrop);
+      auto newMaps = attentionOp.getIndexingMapsArray();
+      newMaps[attentionOp.getMaskMutable().begin()->getOperandNumber()] =
+          newMap;
+      attentionOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(newMaps));
+    });
+    return success();
+  }
+};
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass helpers
@@ -59,6 +137,8 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
                                                       options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
+  foldUnitDimsPatterns.insert<FoldAttentionMaskUnitDim>(
+      foldUnitDimsPatterns.getContext());
 }
 
 static LogicalResult
