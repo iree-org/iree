@@ -129,7 +129,7 @@ struct SplitReductionPass final
         [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
       // For matmul make the new parallel dimension first so that it looks
       // like a batch_matmul and can follow the same codegen.
-      return {int64_t(splitMatmulReductionRatio), 0, /*innerParallel=*/false};
+      return {splitMatmulReductionRatio, 0, /*innerParallel=*/false};
     };
     for (auto op : matmulCandidates) {
       (void)splitReductionOnMatmul(rewriter, op, matmulSplitReductionControlFn);

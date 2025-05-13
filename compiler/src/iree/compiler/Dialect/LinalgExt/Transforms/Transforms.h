@@ -131,9 +131,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
 /// Returns the resulting partial and final linalg.generic ops, or failure
 /// if the pattern does not match or cannot be split.
 ///
-/// Example:
-/// ```
-/// // Original argmax op reducing over dim=512
+/// Example: original argmax op reducing over dim=512
 /// %4:2 = linalg.generic {
 ///   indexing_maps = [...],
 ///   iterator_types = ["parallel", "reduction"]
@@ -147,10 +145,10 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
 ///   %sel = arith.select %cmp, %cast, %out_0 : i64
 ///   linalg.yield %max, %sel : bf16, i64
 /// } -> (tensor<?xbf16>, tensor<?xi64>)
-/// ```
-/// To:
-/// ```
-/// // After splitting K=512 into 4 x 128
+///
+/// To: splitting K=512 into 4 x 128 + final argmax over the tile dimension
+///     (dim=1 of ?x4)
+///
 /// %expanded = tensor.expand_shape %arg0 [[0], [1, 2]] : tensor<?x512xbf16>
 ///     into tensor<?x4x128xbf16>
 /// %init_val = linalg.fill ins(%cst : bf16) outs(%empty : tensor<?x4xbf16>)
@@ -163,8 +161,6 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
 ///   // compute global index: outer_idx * 128 + inner_idx
 ///   ...
 /// }
-///
-/// // Final argmax over the tile dimension (dim=1 of ?x4)
 /// %final:2 = linalg.generic {
 ///   indexing_maps = [...],
 ///   iterator_types = ["reduction"]
@@ -173,7 +169,6 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
 ///   // same combiner: maximumf, cmpf, select
 ///   ...
 /// }
-/// ```
 FailureOr<linalg::SplitReductionResult>
 splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                      linalg::ControlSplitReductionFn controlSplitReductionFn);
