@@ -95,7 +95,6 @@ def IREEEncoding_SerializableEncodingAttrInterface :
     - `isSerialized`: checks if the encoding is serialized or not.
     - `cloneWithLayouts`: creates a serializable encoding with the layouts
       information.
-    - `convertType`: converts a type to materialized form.
     - The rest of methods that interpret the encodings. E.g.,
       `calculateStorageSizeInBytes` is the method to parse layouts and produce
       the storage size in bytes.
@@ -197,22 +196,7 @@ def IREEEncoding_SerializableEncodingAttrInterface :
         assert(false && "unimplemented interface method");
         return {};
       }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the materialized form for the provided type.
-      }],
-      /*retTy=*/"::mlir::Type",
-      /*methodName=*/"convertType",
-      /*args=*/(ins
-        "::mlir::Type":$type
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        assert(false && "unimplemented interface method");
-        return type;
-      }]
-    >,
+    >
   ];
 
   let extraClassDeclaration = [{
@@ -228,12 +212,31 @@ def IREEEncoding_LayoutAttrInterface :
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     An interface that collects a set of methods for encoding materialization.
+
+    These are the core methods:
+    - `convertType`: converts a type to its materialized form.
+    - `lowerOp`: converts an operation to its materialized form.
   }];
 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the layout of materialized encoding for a tensor type.
+        Returns the materialized form for the provided type.
+      }],
+      /*retTy=*/"::mlir::Type",
+      /*methodName=*/"convertType",
+      /*args=*/(ins
+        "::mlir::Type":$type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return type;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the materialized form for the provided operation.
       }],
       /*retTy=*/"::mlir::Operation *",
       /*methodName=*/"lowerOp",

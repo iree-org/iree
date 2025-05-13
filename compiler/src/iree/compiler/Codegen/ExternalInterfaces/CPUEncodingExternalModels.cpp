@@ -613,7 +613,7 @@ struct CPUDeviceEncodingPackedLayoutAttrInterface
 };
 
 struct CPUDeviceEncodingLayoutAttrInterface final
-    : public Encoding::LayoutAttrInterface::ExternalModel<
+    : public DeviceEncodingLayoutAttrInterfaceExternalModelBase<
           CPUDeviceEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
@@ -653,7 +653,7 @@ struct CPUHostEncodingLayoutResolverAttrInterface final
 };
 
 struct CPUHostSerializableEncodingAttrInterface final
-    : HostSerializableEncodingAttrInterfaceExternalModelBase<
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
           CPUHostSerializableEncodingAttrInterface, CPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
@@ -749,7 +749,7 @@ struct VMVXDeviceEncodingPackedLayoutAttrInterface final
 };
 
 struct VMVXDeviceEncodingLayoutAttrInterface final
-    : Encoding::LayoutAttrInterface::ExternalModel<
+    : DeviceEncodingLayoutAttrInterfaceExternalModelBase<
           VMVXDeviceEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
@@ -788,7 +788,7 @@ struct VMVXHostEncodingLayoutResolverAttrInterface final
 };
 
 struct VMVXHostSerializableEncodingAttrInterface final
-    : HostSerializableEncodingAttrInterfaceExternalModelBase<
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
           VMVXHostSerializableEncodingAttrInterface, VMVXEncodingLayoutAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,

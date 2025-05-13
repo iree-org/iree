@@ -69,11 +69,11 @@ getEncodingInfoFromLayouts(RankedTensorType type) {
   return std::nullopt;
 }
 
-template <typename DeviceSerializableEncodingAttrInterface,
+template <typename DeviceEncodingLayoutAttrInterface,
           typename EncodingLayoutAttr>
-struct HostSerializableEncodingAttrInterfaceExternalModelBase
-    : public IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
-          DeviceSerializableEncodingAttrInterface, EncodingLayoutAttr> {
+struct DeviceEncodingLayoutAttrInterfaceExternalModelBase
+    : public IREE::Encoding::LayoutAttrInterface::ExternalModel<
+          DeviceEncodingLayoutAttrInterface, EncodingLayoutAttr> {
 public:
   MaterializeEncodingInfo getEncodingInfo(EncodingLayoutAttr layoutAttr,
                                           RankedTensorType type) const {

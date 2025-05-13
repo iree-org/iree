@@ -18,6 +18,24 @@ using IREE::TensorExt::DispatchTensorType;
 struct EncodingNopDeviceLayoutAttrInterface final
     : IREE::Encoding::LayoutAttrInterface::ExternalModel<
           EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
+  Type convertType(Attribute attr, Type type) const {
+    return TypeSwitch<Type, Type>(type)
+        .Case<RankedTensorType>([&](auto rankedTensorType) {
+          return rankedTensorType.dropEncoding();
+        })
+        .Case<DispatchTensorType>([&](auto dispatchTensorType) {
+          auto boundType =
+              dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+          if (!boundType || !boundType.getEncoding()) {
+            return dispatchTensorType;
+          }
+          Type convertedBoundType = convertType(attr, boundType);
+          return DispatchTensorType::get(dispatchTensorType.getAccess(),
+                                         convertedBoundType);
+        })
+        .Default([&](auto concreteType) { return concreteType; });
+  }
+
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -39,36 +57,11 @@ struct EncodingNopHostEncodingLayoutResolverAttrInterface final
   }
 };
 
-struct EncodingNopHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
-          EncodingNopHostSerializableEncodingAttrInterface,
-          EncodingNopLayoutAttr> {
-public:
-  Type convertType(Attribute attr, Type type) const {
-    return TypeSwitch<Type, Type>(type)
-        .Case<RankedTensorType>([&](auto rankedTensorType) {
-          return rankedTensorType.dropEncoding();
-        })
-        .Case<DispatchTensorType>([&](auto dispatchTensorType) {
-          auto boundType =
-              dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-          if (!boundType || !boundType.getEncoding()) {
-            return dispatchTensorType;
-          }
-          Type convertedBoundType = convertType(attr, boundType);
-          return DispatchTensorType::get(dispatchTensorType.getAccess(),
-                                         convertedBoundType);
-        })
-        .Default([&](auto concreteType) { return concreteType; });
-  }
-};
-
 void registerCodegenExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
         EncodingNopLayoutAttr::attachInterface<
             EncodingNopHostEncodingLayoutResolverAttrInterface,
-            EncodingNopHostSerializableEncodingAttrInterface,
             EncodingNopDeviceLayoutAttrInterface>(*ctx);
       });
 }

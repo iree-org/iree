@@ -359,7 +359,7 @@ struct GPUDeviceEncodingPackedLayoutAttrInterface
 };
 
 struct GPUDeviceEncodingLayoutAttrInterface
-    : public Encoding::LayoutAttrInterface::ExternalModel<
+    : public DeviceEncodingLayoutAttrInterfaceExternalModelBase<
           GPUDeviceEncodingLayoutAttrInterface, GPUEncodingLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
@@ -380,7 +380,7 @@ struct GPUDeviceEncodingLayoutAttrInterface
 };
 
 struct GPUHostSerializableEncodingAttrInterface final
-    : HostSerializableEncodingAttrInterfaceExternalModelBase<
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
           GPUHostSerializableEncodingAttrInterface, GPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
