@@ -12,7 +12,7 @@ func.func @matmul_config_1() attributes {translation_info = #iree_codegen.transl
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 1024 + s2 * 256)>
-// CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 64)>
+// CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 256)>
 // CHECK: func.func @matmul_config_1
 
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
@@ -43,7 +43,7 @@ func.func @matmul_config_2() attributes {translation_info = #iree_codegen.transl
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 1024 + s2 * 256)>
-// CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 64)>
+// CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 256)>
 // CHECK: func.func @matmul_config_2
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
 // CHECK: %[[ALLOC:.*]] = memref.alloc()

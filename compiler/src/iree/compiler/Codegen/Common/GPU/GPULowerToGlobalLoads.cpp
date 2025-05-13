@@ -206,7 +206,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     auto subgroupIdExpr = symbols[0];
     auto iterationExpr = symbols[1];
 
-    AffineExpr strideExpr = rewriter.getAffineConstantExpr(subgroupSize[0]);
+    AffineExpr strideExpr =
+        rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
@@ -300,9 +301,10 @@ static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
   if (targetType.getMemorySpace() !=
       gpu::AddressSpaceAttr::get(copy->getContext(),
                                  gpu::GPUDialect::getWorkgroupAddressSpace())) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "-- Op: " << *copy
-               << "\n-- has target memory address space other than workgroup.\n");
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "-- Op: " << *copy
+        << "\n-- has target memory address space other than workgroup.\n");
     return false;
   }
   return true;
