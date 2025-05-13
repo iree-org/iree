@@ -88,7 +88,7 @@ static RankedTensorType getPaddedType(Attribute layoutAttr,
 struct MaterializePadEncodingTypeConverter final
     : MaterializeEncodingTypeConverter {
   MaterializePadEncodingTypeConverter(
-      IREE::Codegen::LayoutAttrInterface layoutAttr,
+      IREE::Encoding::LayoutAttrInterface layoutAttr,
       MaterializeEncodingValueFn materializeEncodingValueFn)
       : MaterializeEncodingTypeConverter(layoutAttr,
                                          materializeEncodingValueFn) {
@@ -306,17 +306,17 @@ struct MaterializeEncodingIntoPaddingPass final
     // access the target info during materialization.
     //
     // Otherwise, fall back to the nop layout.
-    IREE::Codegen::LayoutAttrInterface layoutAttr;
+    IREE::Encoding::LayoutAttrInterface layoutAttr;
     if (targetConfig &&
         targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
-      layoutAttr = targetConfig.getAs<IREE::Codegen::LayoutAttrInterface>(
+      layoutAttr = targetConfig.getAs<IREE::Encoding::LayoutAttrInterface>(
           IREE::Encoding::kEncodingResolverAttrName);
       auto resolverAttr =
           cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
-      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+      layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(
           resolverAttr.cloneWithSimplifiedConfig(targetConfig));
     } else {
-      layoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(
+      layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(
           IREE::Codegen::EncodingNopLayoutAttr::get(context));
     }
 

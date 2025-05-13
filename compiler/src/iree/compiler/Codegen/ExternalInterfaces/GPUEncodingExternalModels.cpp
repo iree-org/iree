@@ -5,8 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //===- GPUEncodingExternalModels.cpp --------------------------------------===//
 //
-// This file implements the IREE::Codegen::LayoutAttrInterface and
-// IREE::Encoding::EncodingLayoutResolverAttrInterface for GPU backends.
+// This file implements the following interfaces for GPU backends:
+//
+// - IREE::Encoding::EncodingLayoutResolverAttrInterface
+// - IREE::Encoding::SerializableEncodingAttrInterface
+// - IREE::Encoding::LayoutAttrInterface
+// - IREE::Encoding::PackedLayoutAttrInterface
+//
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
 //
@@ -354,7 +359,7 @@ struct GPUDeviceEncodingPackedLayoutAttrInterface
 };
 
 struct GPUDeviceEncodingLayoutAttrInterface
-    : public Codegen::LayoutAttrInterface::ExternalModel<
+    : public Encoding::LayoutAttrInterface::ExternalModel<
           GPUDeviceEncodingLayoutAttrInterface, GPUEncodingLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
@@ -411,7 +416,7 @@ struct GPUHostEncodingLayoutResolverAttrInterface final
 };
 
 struct GPUPadDeviceEncodingLayoutAttrInterface final
-    : Codegen::LayoutAttrInterface::ExternalModel<
+    : Encoding::LayoutAttrInterface::ExternalModel<
           GPUPadDeviceEncodingLayoutAttrInterface, GPUPadLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,

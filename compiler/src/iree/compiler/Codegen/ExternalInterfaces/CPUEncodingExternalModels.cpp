@@ -5,8 +5,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //===- CPUEncodingExternalModels.cpp --------------------------------------===//
 //
-// This file implements the IREE::Codegen::LayoutAttrInterface for CPU backends
-// and the VMVX backend. In these backends, we transpose narrow-N into narrow-M
+// This file implements the following interfaces for CPU backends and the VMVX
+// backend:
+//
+// - IREE::Encoding::EncodingLayoutResolverAttrInterface
+// - IREE::Encoding::SerializableEncodingAttrInterface
+// - IREE::Encoding::LayoutAttrInterface
+// - IREE::Encoding::PackedLayoutAttrInterface
+//
+// In these backends, we transpose narrow-N into narrow-M
 // for a combination of reasons:
 //
 //   1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
@@ -31,7 +38,6 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
@@ -245,7 +251,7 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
 FailureOr<Operation *>
 lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                ValueRange operands,
-                               IREE::Codegen::LayoutAttrInterface layoutAttr) {
+                               IREE::Encoding::LayoutAttrInterface layoutAttr) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -607,7 +613,7 @@ struct CPUDeviceEncodingPackedLayoutAttrInterface
 };
 
 struct CPUDeviceEncodingLayoutAttrInterface final
-    : public Codegen::LayoutAttrInterface::ExternalModel<
+    : public Encoding::LayoutAttrInterface::ExternalModel<
           CPUDeviceEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
@@ -621,7 +627,7 @@ struct CPUDeviceEncodingLayoutAttrInterface final
 
     FailureOr<Operation *> newOp = lowerContractionOpWithEncoding(
         b, linalgOp, convertedOperands,
-        cast<IREE::Codegen::LayoutAttrInterface>(layoutAttr));
+        cast<IREE::Encoding::LayoutAttrInterface>(layoutAttr));
     return newOp.value_or(nullptr);
   }
 };
@@ -743,7 +749,7 @@ struct VMVXDeviceEncodingPackedLayoutAttrInterface final
 };
 
 struct VMVXDeviceEncodingLayoutAttrInterface final
-    : Codegen::LayoutAttrInterface::ExternalModel<
+    : Encoding::LayoutAttrInterface::ExternalModel<
           VMVXDeviceEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
@@ -757,7 +763,7 @@ struct VMVXDeviceEncodingLayoutAttrInterface final
 
     FailureOr<Operation *> newOp = lowerContractionOpWithEncoding(
         b, linalgOp, convertedOperands,
-        cast<IREE::Codegen::LayoutAttrInterface>(layoutAttr));
+        cast<IREE::Encoding::LayoutAttrInterface>(layoutAttr));
     return newOp.value_or(nullptr);
   }
 };

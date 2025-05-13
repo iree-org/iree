@@ -10,7 +10,6 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -920,7 +919,7 @@ public:
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
 
-    IREE::Codegen::LayoutAttrInterface layoutAttr = converter->getLayoutAttr();
+    IREE::Encoding::LayoutAttrInterface layoutAttr = converter->getLayoutAttr();
     SmallVector<Type> convertedResTypes;
     for (auto init : op.getDpsInits()) {
       convertedResTypes.push_back(converter->convertType(init.getType()));

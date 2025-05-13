@@ -7,8 +7,7 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -36,10 +35,10 @@ using MaterializeEncodingValueFn =
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
   MaterializeEncodingTypeConverter(
-      IREE::Codegen::LayoutAttrInterface layoutAttr,
+      IREE::Encoding::LayoutAttrInterface layoutAttr,
       MaterializeEncodingValueFn materializeEncodingValueFn);
 
-  const IREE::Codegen::LayoutAttrInterface &getLayoutAttr() const {
+  const IREE::Encoding::LayoutAttrInterface &getLayoutAttr() const {
     return layoutAttr;
   }
 
@@ -52,7 +51,7 @@ public:
       const;
 
 private:
-  const IREE::Codegen::LayoutAttrInterface layoutAttr;
+  const IREE::Encoding::LayoutAttrInterface layoutAttr;
   const MaterializeEncodingValueFn materializeEncodingValueFn;
 };
 
