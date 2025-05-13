@@ -216,13 +216,6 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
         outputShape[0] = affine::makeComposedFoldedAffineApply(
             rewriter, loc, addExpr, {outputShape[0], inputShape[0]});
 
-        auto isDynamic = [](mlir::OpFoldResult dim) {
-          if (auto cst = mlir::getConstantIntValue(dim)) {
-            return mlir::ShapedType::isDynamic(*cst);
-          }
-          return true;
-        };
-
         // Any dims outside of concatenation axis (only `0` supported currently)
         // should be equal. Fill in any dynamic dims in `outputShape` known from
         // other inputs.
@@ -230,7 +223,9 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
         for (auto [dimIdx, outDim] :
              llvm::drop_begin(llvm::enumerate(outputShape))) {
           OpFoldResult inDim = inputShape[dimIdx];
-          if (isDynamic(outDim) && !isDynamic(inDim)) {
+          bool outDimIsDynamic = isa<Value>(outDim);
+          bool inDimIsDynamic = isa<Value>(inDim);
+          if (outDimIsDynamic && !inDimIsDynamic) {
             outputShape[dimIdx] = inDim;
           }
         }
