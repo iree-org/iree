@@ -385,13 +385,13 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
             .getZExtValue();
 
     if (!(sharedWgpDims.size() == op.getNumLoops())) {
-      while (lastDimReductionTileSize % (threadBasis * threadLoads) != 0) {
+      int subgroupStride = threadBasis * threadLoads;
+      while (lastDimReductionTileSize % subgroupStride != 0) {
         threadBasis >>= 1;
+        subgroupStride = threadBasis * threadLoads;
       }
-      subgroupBasis =
-          lastDimReductionTileSize / (threadLoads * threadBasis) == 0
-              ? 1
-              : lastDimReductionTileSize / (threadLoads * threadBasis);
+      int subgroup = lastDimReductionTileSize / subgroupStride;
+      subgroupBasis = (subgroup == 0) ? 1 : subgroup;
     }
 
     // Since all the dimensions are contained within the shared parallel
@@ -475,13 +475,13 @@ getVectorDistributeReductionConfig(linalg::LinalgOp op,
                              .getZExtValue();
 
   int64_t threadBasis = subgroupSize;
-  while (partialReductionSize % (threadBasis * threadLoads) != 0)
+  int subgroupStride = threadBasis * threadLoads;
+  while (partialReductionSize % subgroupStride != 0) {
     threadBasis >>= 1;
-
-  int64_t subgroupBasis =
-      partialReductionSize / (threadLoads * threadBasis) == 0
-          ? 1
-          : partialReductionSize / (threadLoads * threadBasis);
+    subgroupStride = threadBasis * threadLoads;
+  }
+  int subgroup = partialReductionSize / subgroupStride;
+  int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
 
   partialReductionTileSizes[lastReductionDim] = partialReductionSize;
   threadTileSizes[lastReductionDim] = threadLoads;
@@ -545,6 +545,8 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
           return failure();
         }
         setLoweringConfig(linalgOp, *loweringConfig);
+        // If the config is set on the op, no need to iterate
+        // over other operands.
         break;
       }
     }
