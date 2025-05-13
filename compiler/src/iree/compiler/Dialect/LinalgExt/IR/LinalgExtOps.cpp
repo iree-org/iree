@@ -231,8 +231,24 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
     }
   }
 
-  Region &region = op.getRegion();
-  Block *body = &region.front();
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ScatterOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ScatterOp::verify() {
+  ShapedType originalType = getOriginalType();
+  ShapedType updateType = getUpdateType();
+  ScatterOp op = *this;
+
+  if (failed(verifyGatherScatter(op, getUpdateSliceRank(), originalType,
+                                 updateType, "original", "update"))) {
+    return failure();
+  }
+
+  Block *body = &getRegion().front();
   if (body->getNumArguments() != 2) {
     return op->emitOpError("expected region to have two arguments");
   }
@@ -245,12 +261,12 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
   }
   if (arg0Type != updateType.getElementType()) {
     return op->emitOpError("mismatch in argument 0 of region ")
-           << arg0Type << " and element type of " + updateName + " value "
+           << arg0Type << " and element type of update value "
            << updateType.getElementType();
   }
   if (arg1Type != originalType.getElementType()) {
     return op->emitOpError("mismatch in argument 1 of region ")
-           << arg1Type << " and element type of " + originalName + " value "
+           << arg1Type << " and element type of original value "
            << originalType.getElementType();
   }
   if (arg0Type != arg1Type) {
@@ -266,16 +282,8 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
     return yieldOp.emitOpError("mismatch in type of yielded value ")
            << yieldedType << " and argument of the region " << arg0Type;
   }
+
   return success();
-}
-
-//===----------------------------------------------------------------------===//
-// ScatterOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult ScatterOp::verify() {
-  return verifyGatherScatter(*this, getUpdateSliceRank(), getOriginalType(),
-                             getUpdateType(), "original", "update");
 }
 
 LogicalResult
