@@ -129,6 +129,7 @@ def CombineLayoutTransformationPass :
     "Combines layout transformation operations on the results of a dispatch into a single operation.";
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "scf::SCFDialect",
     "tensor::TensorDialect"
   ];
 }
