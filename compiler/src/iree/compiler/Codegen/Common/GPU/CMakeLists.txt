@@ -73,6 +73,7 @@ iree_cc_library(
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
+    "GPUPruneDPSOps.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUReuseSharedMemoryAllocs.cpp"
     "GPUTensorAlloc.cpp"
