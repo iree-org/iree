@@ -20,8 +20,9 @@ def IREECPU_CPUEncodingLayoutAttr :
   let mnemonic = "cpu_encoding_layout";
   let summary = [{The encoding layout attribute for CPU backends.}];
   let description = [{
-    This attribute can implement any layout interface methods for data-tiling,
-    e.g., Codegen::LayoutAttrInterface, etc. They are implemented through
+    This attribute can implement any layout interface methods for encoding
+    serialization and or materialization, e.g., Codegen::LayoutAttrInterface,
+    Codegen::PackedLayoutAttrInterface, etc. They are implemented through
     external model mechanism See the implementation in
     compiler/Codegen/ExternalInterfaces/*.
   }];
@@ -39,8 +40,9 @@ def IREECPU_VMVXEncodingLayoutAttr :
   let mnemonic = "vmvx_encoding_layout";
   let summary = [{The encoding layout attribute for VMVX backend.}];
   let description = [{
-    This attribute can implement any layout interface methods for data-tiling,
-    e.g., Codegen::LayoutAttrInterface, etc. They are implemented through
+    This attribute can implement any layout interface methods for encoding
+    serialization and or materialization, e.g., Codegen::LayoutAttrInterface,
+    Codegen::PackedLayoutAttrInterface, etc. They are implemented through
     external model mechanism See the implementation in
     compiler/Codegen/ExternalInterfaces/*.
   }];

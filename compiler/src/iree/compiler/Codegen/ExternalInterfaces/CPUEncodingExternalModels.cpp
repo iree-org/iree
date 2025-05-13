@@ -270,8 +270,12 @@ lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  MaterializeEncodingInfo encodingInfo = layoutAttr.getEncodingInfo(
-      cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+  MaterializeEncodingInfo encodingInfo = {};
+  if (auto packedLayoutAttr =
+          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)) {
+    encodingInfo = packedLayoutAttr.getEncodingInfo(
+        cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+  }
 
   if (isIdentityLayout(encodingInfo)) {
     return dropEncodingAndCloneOp(builder, linalgOp,
@@ -552,9 +556,9 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
-struct CPUDeviceEncodingLayoutResolverAttrInterface
-    : public DeviceEncodingLayoutResolverExternalModelBase<
-          CPUDeviceEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
+struct CPUDeviceEncodingPackedLayoutAttrInterface
+    : public DevicePackedLayoutAttrExternalModelBase<
+          CPUDeviceEncodingPackedLayoutAttrInterface, CPUEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
@@ -600,6 +604,11 @@ struct CPUDeviceEncodingLayoutResolverAttrInterface
     }
     return info;
   }
+};
+
+struct CPUDeviceEncodingLayoutAttrInterface final
+    : public Codegen::LayoutAttrInterface::ExternalModel<
+          CPUDeviceEncodingLayoutAttrInterface, CPUEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
@@ -633,7 +642,7 @@ struct CPUHostEncodingLayoutResolverAttrInterface final
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return CPUEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+    return CPUEncodingLayoutAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 };
 
@@ -644,8 +653,8 @@ struct CPUHostSerializableEncodingAttrInterface final
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
-    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
-                                           dynamicDims);
+    return calculatePackedStorageSizeInBytesImpl(attr, loc, builder, type,
+                                                 dynamicDims);
   }
 };
 
@@ -683,10 +692,9 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   };
 }
 
-struct VMVXDeviceEncodingLayoutResolverAttrInterface final
-    : DeviceEncodingLayoutResolverExternalModelBase<
-          VMVXDeviceEncodingLayoutResolverAttrInterface,
-          VMVXEncodingLayoutAttr> {
+struct VMVXDeviceEncodingPackedLayoutAttrInterface final
+    : DevicePackedLayoutAttrExternalModelBase<
+          VMVXDeviceEncodingPackedLayoutAttrInterface, VMVXEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
@@ -732,6 +740,11 @@ struct VMVXDeviceEncodingLayoutResolverAttrInterface final
     }
     return info;
   }
+};
+
+struct VMVXDeviceEncodingLayoutAttrInterface final
+    : Codegen::LayoutAttrInterface::ExternalModel<
+          VMVXDeviceEncodingLayoutAttrInterface, VMVXEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
@@ -764,7 +777,7 @@ struct VMVXHostEncodingLayoutResolverAttrInterface final
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
     return VMVXEncodingLayoutAttr::get(
-        ctx, getLayoutImpl(attr, type, /*addEncodingAttr=*/true));
+        ctx, getPackedLayoutImpl(attr, type, /*addEncodingAttr=*/true));
   }
 };
 
@@ -774,8 +787,8 @@ struct VMVXHostSerializableEncodingAttrInterface final
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
-    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
-                                           dynamicDims);
+    return calculatePackedStorageSizeInBytesImpl(attr, loc, builder, type,
+                                                 dynamicDims);
   }
 };
 
@@ -785,11 +798,13 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUDeviceEncodingLayoutResolverAttrInterface,
+            CPUDeviceEncodingPackedLayoutAttrInterface,
+            CPUDeviceEncodingLayoutAttrInterface,
             CPUHostEncodingLayoutResolverAttrInterface,
             CPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXDeviceEncodingLayoutResolverAttrInterface,
+            VMVXDeviceEncodingPackedLayoutAttrInterface,
+            VMVXDeviceEncodingLayoutAttrInterface,
             VMVXHostEncodingLayoutResolverAttrInterface,
             VMVXHostSerializableEncodingAttrInterface>(*ctx);
       });
