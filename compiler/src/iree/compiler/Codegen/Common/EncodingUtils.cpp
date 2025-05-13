@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -33,7 +32,7 @@ using IREE::Encoding::SerializableEncodingAttrInterface;
 // Returns the layout as a SerializableEncodingAttrInterface, or nullptr if this
 // is not the only layout or if there's no encoding at all.
 static SerializableEncodingAttrInterface
-getSerializableEncodingAttr(IREE::Codegen::LayoutAttrInterface layoutAttr,
+getSerializableEncodingAttr(IREE::Encoding::LayoutAttrInterface layoutAttr,
                             RankedTensorType type) {
   if (!type.getEncoding()) {
     return nullptr;
@@ -59,7 +58,7 @@ getSerializableEncodingAttr(IREE::Codegen::LayoutAttrInterface layoutAttr,
 }
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
-    IREE::Codegen::LayoutAttrInterface layoutAttr,
+    IREE::Encoding::LayoutAttrInterface layoutAttr,
     MaterializeEncodingValueFn materializeEncodingValueFn)
     : layoutAttr(layoutAttr),
       materializeEncodingValueFn(materializeEncodingValueFn) {

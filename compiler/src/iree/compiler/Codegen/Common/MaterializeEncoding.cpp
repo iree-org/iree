@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
@@ -83,11 +84,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     }
 
     auto getTestTargetOrNopLayout =
-        [&]() -> IREE::Codegen::LayoutAttrInterface {
+        [&]() -> IREE::Encoding::LayoutAttrInterface {
       if (testCLGPUTarget) {
         LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
              "(testCLGPUTarget)");
-        return cast<IREE::Codegen::LayoutAttrInterface>(
+        return cast<IREE::Encoding::LayoutAttrInterface>(
             IREE::GPU::GPUEncodingLayoutAttr::get(
                 ctx,
                 DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
@@ -95,7 +96,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       }
       LDBG("Select EncodingNopLayoutAttr attribute as the layout "
            "attribute (Encoding resolver unknown or unsupported).");
-      return cast<IREE::Codegen::LayoutAttrInterface>(
+      return cast<IREE::Encoding::LayoutAttrInterface>(
           IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
 
@@ -106,16 +107,16 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // If the layoutAttr was not found, or if it does not implement the layout
     // resolver interface, fall back to the resolver for getCLGPUTarget. If
     // there is also no test target set, fall back to the nop layout.
-    IREE::Codegen::LayoutAttrInterface layoutAttr =
-        targetConfig ? targetConfig.getAs<IREE::Codegen::LayoutAttrInterface>(
+    IREE::Encoding::LayoutAttrInterface layoutAttr =
+        targetConfig ? targetConfig.getAs<IREE::Encoding::LayoutAttrInterface>(
                            IREE::Encoding::kEncodingResolverAttrName)
                      : nullptr;
     auto resolverAttr = llvm::dyn_cast_or_null<
         IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
 
-    IREE::Codegen::LayoutAttrInterface layoutAttrWithTargetInfo =
+    IREE::Encoding::LayoutAttrInterface layoutAttrWithTargetInfo =
         layoutAttr && resolverAttr
-            ? cast<IREE::Codegen::LayoutAttrInterface>(
+            ? cast<IREE::Encoding::LayoutAttrInterface>(
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
             : getTestTargetOrNopLayout();
 
