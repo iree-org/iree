@@ -8,7 +8,6 @@
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1) -> (d0 + d1 * 257)>
 func.func @main_dispatch_77_generic_1x257x257x21() attributes {hal.executable.target = #executable_target_system_elf_riscv_64_} {
-  %c1115136 = arith.constant 1115136 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 2.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -17,7 +16,7 @@ func.func @main_dispatch_77_generic_1x257x257x21() attributes {hal.executable.ta
   %c32_i32 = arith.constant 32 : i32
   %cst_2 = arith.constant 1.000000e+00 : f32
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c1115136) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33x33x21xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33x33x21xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x257x257x21xf32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 33, 33, 21], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33x33x21xf32>> -> tensor<1x33x33x21xf32>
   %3 = tensor.empty() : tensor<1x257x257x21xf32>
