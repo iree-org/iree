@@ -17,6 +17,8 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/Support/Casting.h"
+#include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 
@@ -362,77 +364,108 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   auto variantOp = getOperation();
   auto innerModuleOp = variantOp.getInnerModule();
 
+  // Get the symbol table of the inner module to lookup exported functions.
+  SymbolTable symbolTable(innerModuleOp);
+
+  // Construct the call-graph for the inner module. We traverse this when
+  // reconciling translation info.
+  CallGraph callGraph(innerModuleOp);
+
+  IRRewriter rewriter(&getContext());
   auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
 
-  // reconciliation for multiple export ops is unsupported.
-  if (!llvm::hasSingleElement(exportOps)) {
-    return;
-  }
-  auto exportOp = *exportOps.begin();
-  IRRewriter rewriter(&getContext());
+  for (auto exportOp : exportOps) {
+    SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
+    auto rootFuncOp = llvm::dyn_cast_if_present<FunctionOpInterface>(
+        symbolTable.lookup(exportOp.getSymNameAttr()));
+    if (!rootFuncOp || rootFuncOp.isExternal()) {
+      // Skip external functions.
+      continue;
+    }
+    // Resolve workgroup distribution related `scf.forall` ops. Today only a
+    // single loop in the exported function is supported.
+    if (failed(resolveWorkgroupForAll(rewriter, rootFuncOp, distributeAlong))) {
+      variantOp.emitOpError(
+          "failed in iree-codegen-reconcile-translation-info pass");
+      return signalPassFailure();
+    }
 
-  SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
-  auto walkResult =
-      innerModuleOp->walk([&](FunctionOpInterface funcOp) -> WalkResult {
-        // Resolve workgroup distribution related `scf.forall` ops.
-        if (failed(resolveWorkgroupForAll(rewriter, funcOp, distributeAlong))) {
-          return failure();
+    std::queue<FunctionOpInterface> nodeQueue;
+    nodeQueue.push(rootFuncOp);
+
+    llvm::SmallDenseSet<FunctionOpInterface> visitedFunctions;
+
+    while (!nodeQueue.empty()) {
+      FunctionOpInterface funcOp = nodeQueue.front();
+      if (!visitedFunctions.insert(funcOp).second) {
+        rootFuncOp.emitOpError(
+            "recursive function call in translation info reconciliation");
+        return signalPassFailure();
+      }
+
+      if (CallGraphNode *node =
+              callGraph.lookupNode(&funcOp.getFunctionBody())) {
+        for (CallGraphNode::Edge callEdge : *node) {
+          auto calledFunc = callEdge.getTarget()
+                                ->getCallableRegion()
+                                ->getParentOfType<FunctionOpInterface>();
+          nodeQueue.push(calledFunc);
         }
+      }
+      nodeQueue.pop();
 
-        auto translationInfo = getTranslationInfo(funcOp);
-        if (!translationInfo) {
-          return WalkResult::advance();
-        }
+      auto translationInfo = getTranslationInfo(funcOp);
+      if (!translationInfo) {
+        // No translation info means nothing to reconcile.
+        continue;
+      }
+      translationInfos.push_back(translationInfo);
 
-        translationInfos.push_back(translationInfo);
-        // The following is moving the target-func-attrs specification from
-        // translation info into the func-like op. This is not the best
-        // place to do this, but the intent is after this pass all the
-        // lowering configs and translation infos will be deleted.
-        DictionaryAttr targetFuncAttrs = getTargetFuncAttrs(translationInfo);
-        if (targetFuncAttrs) {
-          funcOp->setAttr("llvm_func_attrs", targetFuncAttrs);
-        }
-        return WalkResult::advance();
-      });
-  if (walkResult.wasInterrupted()) {
-    variantOp.emitOpError(
-        "failed in iree-codegen-reconcile-translation-info pass");
-    return signalPassFailure();
-  }
+      // The following is moving the target-func-attrs specification from
+      // translation info into the func-like op. This is not the best
+      // place to do this, but the intent is after this pass all the
+      // lowering configs and translation infos will be deleted.
+      DictionaryAttr targetFuncAttrs = getTargetFuncAttrs(translationInfo);
+      if (targetFuncAttrs) {
+        funcOp->setAttr("llvm_func_attrs", targetFuncAttrs);
+      }
+    }
 
-  // Reconcile workgroup sizes.
-  FailureOr<SmallVector<int64_t>> reconciledWorkgroupSize =
-      reconcileWorkgroupSize(translationInfos);
-  if (failed(reconciledWorkgroupSize)) {
-    exportOp.emitOpError("failed to reconcile workgroup sizes");
-    return signalPassFailure();
-  }
-  if (reconciledWorkgroupSize->size() > 3) {
-    exportOp.emitOpError(
-        "reconciled workgroup size is greater than 3 (illegal)");
-    return signalPassFailure();
-  }
-  std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-  for (auto [index, size] : llvm::enumerate(reconciledWorkgroupSize.value())) {
-    workgroupSize[index] = size;
-  }
-  auto workgroupSizeArrayAttr = rewriter.getIndexArrayAttr(workgroupSize);
-  exportOp.setWorkgroupSizeAttr(workgroupSizeArrayAttr);
+    // Reconcile workgroup sizes.
+    FailureOr<SmallVector<int64_t>> reconciledWorkgroupSize =
+        reconcileWorkgroupSize(translationInfos);
+    if (failed(reconciledWorkgroupSize)) {
+      exportOp.emitOpError("failed to reconcile workgroup sizes");
+      return signalPassFailure();
+    }
+    if (reconciledWorkgroupSize->size() > 3) {
+      exportOp.emitOpError(
+          "reconciled workgroup size is greater than 3 (illegal)");
+      return signalPassFailure();
+    }
+    std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+    for (auto [index, size] :
+         llvm::enumerate(reconciledWorkgroupSize.value())) {
+      workgroupSize[index] = size;
+    }
+    auto workgroupSizeArrayAttr = rewriter.getIndexArrayAttr(workgroupSize);
+    exportOp.setWorkgroupSizeAttr(workgroupSizeArrayAttr);
 
-  // Reconcile subgroup sizes.
-  FailureOr<int64_t> reconciledSubgroupSize =
-      reconcileSubgroupSize(translationInfos);
-  if (failed(reconciledSubgroupSize)) {
-    exportOp.emitOpError("failed to reconcile subgroup size");
-    return signalPassFailure();
-  }
-  if (reconciledSubgroupSize.value() != int64_t()) {
-    exportOp.setSubgroupSizeAttr(
-        rewriter.getIndexAttr(reconciledSubgroupSize.value()));
+    // Reconcile subgroup sizes.
+    FailureOr<int64_t> reconciledSubgroupSize =
+        reconcileSubgroupSize(translationInfos);
+    if (failed(reconciledSubgroupSize)) {
+      exportOp.emitOpError("failed to reconcile subgroup size");
+      return signalPassFailure();
+    }
+    if (reconciledSubgroupSize.value() != int64_t()) {
+      exportOp.setSubgroupSizeAttr(
+          rewriter.getIndexAttr(reconciledSubgroupSize.value()));
+    }
   }
 
-  // Erase all the lowering configs and translation infos.
+  // Erase all the lowering configs and translation infos after we have finished
+  // processing all exported functions.
   innerModuleOp->walk([](Operation *op) {
     if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
       eraseTranslationInfo(funcOp);
