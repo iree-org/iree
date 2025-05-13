@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -34,6 +35,85 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSPASS
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSFORFUNCPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
+
+//===----------------------------------------------------------------------===//
+// Attention Pattern
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct FoldAttentionMaskUnitDim final
+    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    TypedValue<ShapedType> mask = attentionOp.getMask();
+    if (!mask) {
+      return failure();
+    }
+    auto detail = IREE::LinalgExt::AttentionOpDetail::get(
+                      attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+                      attentionOp.getValueMap(), attentionOp.getOutputMap())
+                      .value();
+    auto mDims = detail.getMDims();
+    auto maskShape = mask.getType().getShape();
+    AffineMap maskMap = attentionOp.getMaskMap().value();
+    if (!mDims.size()) {
+      return failure();
+    }
+
+    llvm::DenseMap<int64_t, int64_t> loopToMaskDim;
+    for (auto [i, result] : llvm::enumerate(maskMap.getResults())) {
+      loopToMaskDim[cast<AffineDimExpr>(result).getPosition()] = i;
+    }
+
+    // Find unit M dims in the mask map.
+    llvm::DenseSet<int64_t> loopsToDrop;
+    for (int64_t dim : mDims) {
+      auto it = loopToMaskDim.find(dim);
+      if (it != loopToMaskDim.end() && maskShape[it->second] == 1) {
+        loopsToDrop.insert(dim);
+      }
+    }
+    if (loopsToDrop.size() == 0) {
+      return rewriter.notifyMatchFailure(attentionOp, "no unit M dim");
+    }
+
+    // Compute the reassociation to remove unit dims and the new shape.
+    ReassociationIndices indices;
+    SmallVector<ReassociationIndices> reassoc;
+    SmallVector<int64_t> resultShape;
+    llvm::SmallBitVector resultsToDrop(maskShape.size());
+    for (auto [i, size] : llvm::enumerate(maskShape)) {
+      int64_t loop = maskMap.getDimPosition(i);
+      if (!loopsToDrop.contains(loop)) {
+        resultShape.push_back(size);
+        if (indices.size())
+          reassoc.emplace_back(std::move(indices));
+      } else {
+        resultsToDrop.set(i);
+      }
+      indices.push_back(i);
+    }
+    if (indices.size()) {
+      reassoc.emplace_back(std::move(indices));
+    }
+
+    auto loc = attentionOp.getLoc();
+    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
+        loc, mask.getType().clone(resultShape), mask, reassoc);
+
+    rewriter.modifyOpInPlace(attentionOp, [&]() {
+      attentionOp.getMaskMutable().assign(collapseOp);
+      AffineMap newMap = maskMap.dropResults(resultsToDrop);
+      auto newMaps = attentionOp.getIndexingMapsArray();
+      newMaps[attentionOp.getMaskMutable().begin()->getOperandNumber()] =
+          newMap;
+      attentionOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(newMaps));
+    });
+    return success();
+  }
+};
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass helpers
@@ -59,6 +139,8 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
                                                       options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
+  foldUnitDimsPatterns.insert<FoldAttentionMaskUnitDim>(
+      foldUnitDimsPatterns.getContext());
 }
 
 static LogicalResult
