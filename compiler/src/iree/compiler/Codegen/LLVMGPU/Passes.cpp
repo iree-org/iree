@@ -81,6 +81,24 @@ static llvm::cl::opt<bool> clDistributeToWorkgroupsUsingForall(
     llvm::cl::desc("Use scf.forall for distribution to workgroups"),
     llvm::cl::init(false), llvm::cl::Hidden);
 
+static llvm::cl::opt<IREE::Codegen::WorkgroupId>
+    clSetWorkgroupDistributionAlong(
+        "iree-llvmgpu-set-workgroup-distribution-along",
+        llvm::cl::desc(
+            "Constrain the workgroup distribution along grid dimensions."),
+        llvm::cl::values(clEnumValN(IREE::Codegen::WorkgroupId::IdX, "x",
+                                    "Constrain the workgroup distribution to "
+                                    "use only workgroups along x."),
+                         clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
+                                    "Constrain the workgroup distribution to "
+                                    "use only workgroups along x and y."),
+                         clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
+                                    "Constrain the workgroup distribution to "
+                                    "use only workgroups along x, y and z.")),
+        llvm::cl::init(IREE::Codegen::WorkgroupId::IdZ)
+
+    );
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -1226,7 +1244,11 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
         .addPass(createLLVMGPULowerExecutableTargetPass)
         .addPass(createVerifyWorkgroupDistributionPass);
   }
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
+  {
+    ReconcileTranslationInfoPassOptions options;
+    options.distributeAlong = clSetWorkgroupDistributionAlong;
+    variantPassManager.addPass(createReconcileTranslationInfoPass(options));
+  }
 
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
