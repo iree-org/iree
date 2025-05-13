@@ -85,7 +85,7 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
     clSetWorkgroupDistributionAlong(
         "iree-llvmgpu-set-workgroup-distribution-along",
         llvm::cl::desc(
-            "Contrain the workgroup distribution along grid dimensions"),
+            "Constrain the workgroup distribution along grid dimensions."),
         llvm::cl::values(clEnumValN(IREE::Codegen::WorkgroupId::IdX, "x",
                                     "Constrain the workgroup distribution to "
                                     "use only workgroups along x."),
