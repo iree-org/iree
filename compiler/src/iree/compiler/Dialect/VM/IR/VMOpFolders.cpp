@@ -668,15 +668,15 @@ static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
     return op.getLhs();
   }
   if (auto subOp = dyn_cast_or_null<SUB>(op.getLhs().getDefiningOp())) {
-    if (subOp.getLhs() == op.getRhs())
-      return subOp.getRhs();
-    if (subOp.getRhs() == op.getRhs())
-      return subOp.getLhs();
+    // t = vm.sub x, y
+    //   = vm.add t, z
+    if (subOp.getRhs() == op.getRhs()) // y == z:
+      return subOp.getLhs();           // (x - y) + y = x
   } else if (auto subOp = dyn_cast_or_null<SUB>(op.getRhs().getDefiningOp())) {
-    if (subOp.getLhs() == op.getLhs())
-      return subOp.getRhs();
-    if (subOp.getRhs() == op.getLhs())
-      return subOp.getLhs();
+    // t = vm.sub x, y
+    //   = vm.add z, t
+    if (subOp.getRhs() == op.getLhs()) // y == z:
+      return subOp.getLhs();           // y + (x - y) = x
   }
   return constFoldBinaryOp<AttrElementT>(
       lhs, rhs,
@@ -714,15 +714,12 @@ static OpFoldResult foldSubOp(SUB op, Attribute lhs, Attribute rhs) {
     return op.getLhs();
   }
   if (auto addOp = dyn_cast_or_null<ADD>(op.getLhs().getDefiningOp())) {
-    if (addOp.getLhs() == op.getRhs())
-      return addOp.getRhs();
-    if (addOp.getRhs() == op.getRhs())
-      return addOp.getLhs();
-  } else if (auto addOp = dyn_cast_or_null<ADD>(op.getRhs().getDefiningOp())) {
-    if (addOp.getLhs() == op.getLhs())
-      return addOp.getRhs();
-    if (addOp.getRhs() == op.getLhs())
-      return addOp.getLhs();
+    // t = vm.add x, y
+    //   = vm.sub t, z
+    if (addOp.getLhs() == op.getRhs()) // x == z:
+      return addOp.getRhs();           // (x + y) - x = y
+    if (addOp.getRhs() == op.getRhs()) // y == z:
+      return addOp.getLhs();           // (x + y) - y = x
   }
   return constFoldBinaryOp<AttrElementT>(
       lhs, rhs,
