@@ -55,3 +55,49 @@ module {
 // CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00>
 // CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]][%[[ARG1]], %[[ARG1]]]
 // CHECK: %[[SELECT:.+]] = arith.select %[[MASK]], %[[LOAD]], %[[CST]]
+
+// -----
+
+func.func @paged_gather(%indices: vector<4xindex>,
+  %source: memref<4096x512x8xf16>)
+  -> vector<1x1x4x8xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+  [None, %indices: vector<4xindex>, None], %cst0 { indexed_maps = [
+                                             affine_map<(d0, d1, d2) -> (d1)>],
+    permutation_map = affine_map<(d0, d1, d2) -> (d0, 0, d1, d2)>,
+    in_bounds = [true, true, true, true] }
+  : memref<4096x512x8xf16>, vector<1x1x4x8xf16>
+
+  return %out : vector<1x1x4x8xf16>
+}
+
+// CHECK-LABEL: func.func @paged_gather
+// CHECK-COUNT-4: vector.load
+
+// -----
+
+func.func @paged_masked_gather(%indices: vector<4xindex>,
+%source: memref<4096x512x8xf16>, %mask : vector<1x4x8xi1>)
+  -> vector<1x1x4x8xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+  [None, %indices: vector<4xindex>, None], %cst0, %mask { indexed_maps = [
+                                             affine_map<(d0, d1, d2) -> (d1)>],
+    permutation_map = affine_map<(d0, d1, d2) -> (d0, 0, d1, d2)>,
+    in_bounds = [true, true, true, true] }
+  : memref<4096x512x8xf16>, vector<1x1x4x8xf16>
+
+  return %out : vector<1x1x4x8xf16>
+}
+
+// CHECK-LABEL: func.func @paged_masked_gather
+// CHECK-COUNT-4: vector.maskedload
