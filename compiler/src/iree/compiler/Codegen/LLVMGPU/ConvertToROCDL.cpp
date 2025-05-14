@@ -339,9 +339,10 @@ struct ConvertToROCDLPass final
     }
 
     LDBG("After converting to rocdl\n" << m);
-    ConvertToDynamicSharedMemory(m);
 
-    LDBG("After converting to dynamic shared memory\n" << m);
+    setSharedMemoryAlignment(m, 16);
+
+    LDBG("After updating shared memory alignments\n" << m);
   }
 };
 } // namespace mlir::iree_compiler
