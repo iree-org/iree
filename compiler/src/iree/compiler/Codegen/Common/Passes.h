@@ -111,6 +111,47 @@ createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);
 void populateConcretizePadResultShapePatterns(
     RewritePatternSet &patterns, ArrayRef<int64_t> numWorkgroups = {});
 
+/// Consider an energy (E) defined on a func.func `f` as the sum of energies
+/// over nested ops:
+///    E = sum_{op nested in f} e(op).
+///
+/// The op specific energy function (e) is specific to the op type:
+///
+/// if op is a vector.shape_cast,
+///   e(op) = 0.
+///
+/// otherwise,
+///   e(op) = sum_{v : operands(op}} rank(v) + sum_{v : results(op)} rank(v).
+///
+/// All patterns added in this pattern reduce E, or if E is unchanged they
+/// reduce the total number of operations.
+///
+/// This is a 'best effort' set of patterns, there is no guarantee that after
+/// this pattern has run that all operations will not contain operands of rank
+/// greater than 1.
+///
+/// Note that these patterns should only be used with a GreedyRewriteConfig
+/// with folding disabled. This is because vector.extract has a folder which
+/// increases E by folding a shape_cast into a vector.extract, resulting in a
+/// higher-rank operand.
+///
+/// TODO(newling) can use these directly:
+///
+void populateFlattenVectorExtractInsertPatterns(RewritePatternSet &,
+                                                PatternBenefit = 1);
+
+/// -- populateFlattenVectorTransferPatterns
+/// -- populateDropUnitDimWithShapeCastPatterns
+/// -- populateVectorTransferDropUnitDimsPatterns
+/// -- populateCastAwayVectorLeadingOneDimPatterns
+
+/// Patterns that convert operations that are semantically equivalent to
+/// shape_cast, to shape_cast. Currently this includes patterns for converting
+/// transpose, extract, broadcast, and extract_strided_slice operations to
+/// shape_cast.
+void populateConvertToShapeCastPatterns(RewritePatternSet &,
+                                        PatternBenefit = 1);
+
 /// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
 /// distributed loops.
 void populateFoldAffineMinInDistributedLoopsPatterns(
