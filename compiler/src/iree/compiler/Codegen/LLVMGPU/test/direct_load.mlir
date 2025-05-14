@@ -17,7 +17,7 @@ func.func @matmul_config_1() attributes {translation_info = #iree_codegen.transl
 // each subgroup load 64 * (32 / bitwidth(i8)) = 256 elements
 // number of loads per subgroup: 1024 / 256 = 4
 
-// CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 1024 + s2 * 256)>
+// CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 1024 + s2 * 256)>
 // CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 256)>
 // CHECK: func.func @matmul_config_1
 
@@ -48,7 +48,7 @@ func.func @matmul_config_2() attributes {translation_info = #iree_codegen.transl
 }
 }
 
-// CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 1024 + s2 * 256)>
+// CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 1024 + s2 * 256)>
 // CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 256)>
 // CHECK: func.func @matmul_config_2
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
@@ -84,7 +84,7 @@ func.func @matmul_config_3() attributes {translation_info = #iree_codegen.transl
 // each subgroup load 32 * (32 / bitwidth(i16)) = 64 elements
 // number of loads per subgroup: 1024 / 64 = 16
 
-// CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 1024 + s2 * 64)>
+// CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 2 + s1 * 1024 + s2 * 64)>
 // CHECK: #[[MAP1:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 64)>
 // CHECK: func.func @matmul_config_3
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast

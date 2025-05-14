@@ -192,9 +192,10 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     AffineExpr totalCopySizeExpr =
         rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
 
-    // [subgroupStartOffset + i * gatherStride + laneId]
+    // [subgroupStartOffset + i * gatherStride + laneId * elementsPerCopy]
     AffineExpr gatherOffsetExpr = subgroupIdExpr * totalCopySizeExpr +
-                                  iterationExpr * strideExpr + laneIdExpr;
+                                  iterationExpr * strideExpr +
+                                  laneIdExpr * elementsPerCopy;
     OpFoldResult result = affine::makeComposedFoldedAffineApply(
         rewriter, loc, gatherOffsetExpr, {lIdVal, sgIdVal, indVar});
     return cast<Value>(result);
