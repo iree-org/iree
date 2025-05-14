@@ -122,12 +122,4 @@ static inline uint64_t __ballot(int predicate) {
       predicate, 0, 33 /*ICMP_NE from llvm/include/llvm/IR/InstrTypes.h*/);
 }
 
-//===----------------------------------------------------------------------===//
-// Utility functions for bf16 (Brain Floating Point 16-bit)
-//===----------------------------------------------------------------------===//
-
-__attribute__((used)) static inline float bf16_to_f32(__bf16 x) { return x; }
-
-__attribute__((used)) static inline __bf16 f32_to_bf16(float x) { return x; }
-
 #endif // COMPILER_PLUGINS_TARGET_ROCM_BUILTINS_UKERNEL_COMMON_H_

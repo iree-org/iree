@@ -20,7 +20,7 @@ iree_uk_amdgpu_argmax_bf16i32(const __bf16 *inputBuffer, int64_t input_offset,
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax = laneID >= reductionSize
                       ? -FLT_MAX
-                      : bf16_to_f32(inputBuffer[input_offset + laneID]);
+                      : (float)(inputBuffer[input_offset + laneID]);
   int32_t laneResult = laneID;
 
   // NOTE: On F32 kernels with clang, reductionSize/blockDim.x has numerical
@@ -30,7 +30,7 @@ iree_uk_amdgpu_argmax_bf16i32(const __bf16 *inputBuffer, int64_t input_offset,
     int32_t idx = warpSize * i + laneID;
     float newIn = idx >= reductionSize
                       ? -FLT_MAX
-                      : bf16_to_f32(inputBuffer[input_offset + idx]);
+                      : (float)(inputBuffer[input_offset + idx]);
     if (newIn == laneMax)
       continue;
     laneMax = __builtin_fmaxf(newIn, laneMax);
