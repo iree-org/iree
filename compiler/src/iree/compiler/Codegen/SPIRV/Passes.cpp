@@ -79,8 +79,10 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
                                                     unsigned alignment) {
   std::optional<unsigned> space =
       spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Function);
-  MemRefType allocType = MemRefType::get(
-      memRefType.getShape(), memRefType.getElementType(), {}, *space);
+  auto memSpace = builder.getI64IntegerAttr(*space);
+  MemRefType allocType =
+      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                      MemRefLayoutAttrInterface{}, memSpace);
   auto allocaOp = builder.create<memref::AllocaOp>(
       loc, allocType, dynamicSizes, builder.getI64IntegerAttr(alignment));
   return allocaOp.getResult();

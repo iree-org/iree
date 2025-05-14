@@ -179,9 +179,9 @@ static Value getTargetMemref(T op) {
   } else if constexpr (std::is_same_v<T, vector::MaskedStoreOp>) {
     return op.getBase();
   } else if constexpr (std::is_same_v<T, vector::TransferReadOp>) {
-    return op.getSource();
+    return op.getBase();
   } else if constexpr (std::is_same_v<T, vector::TransferWriteOp>) {
-    return op.getSource();
+    return op.getBase();
   }
   return {};
 }
