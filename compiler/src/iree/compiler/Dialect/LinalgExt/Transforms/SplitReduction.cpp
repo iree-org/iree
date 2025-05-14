@@ -447,11 +447,14 @@ static Value expandValue(OpBuilder &builder, Location loc, Value value,
 
   auto reassociation =
       mlir::getReassociationIndicesForReshape(originalType, expandedType);
-  assert(reassociation && "invalid reassociation for expand_shape");
+  assert(reassociation && "failed to infer reassociation indices from types");
   return builder.create<tensor::ExpandShapeOp>(loc, expandedType, value,
                                                *reassociation);
 }
 
+// Returns an expanded input AffineMap by splitting the given reduction
+// dimension into [parallel, reduction] or [reduction, parallel], inserting a
+// new dimension at `insertSplitDim`.
 static AffineMap getExpandedInputIndexingMap(AffineMap oldMap,
                                              unsigned reductionDim,
                                              unsigned insertSplitDim,
@@ -460,21 +463,21 @@ static AffineMap getExpandedInputIndexingMap(AffineMap oldMap,
   SmallVector<AffineExpr> exprs;
   for (unsigned idx = 0; idx < oldMap.getNumResults(); ++idx) {
     unsigned dim = oldMap.getDimPosition(idx);
-    if (dim == reductionDim) {
-      // Expand the reduction dimension into [reduction, parallel] or [parallel,
-      // reduction].
-      if (innerParallel) {
-        exprs.push_back(
-            getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
-        exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
-      } else {
-        exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
-        exprs.push_back(
-            getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
-      }
-    } else {
+    if (dim != reductionDim) {
       unsigned shifted = (dim < insertSplitDim) ? dim : dim + 1;
       exprs.push_back(getAffineDimExpr(shifted, ctx));
+      continue;
+    }
+    // Expand the reduction dimension into [reduction, parallel] or [parallel,
+    // reduction].
+    if (innerParallel) {
+      exprs.push_back(
+          getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+    } else {
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+      exprs.push_back(
+          getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
     }
   }
 
@@ -482,6 +485,8 @@ static AffineMap getExpandedInputIndexingMap(AffineMap oldMap,
                         ctx);
 }
 
+// Returns an expanded output AffineMap with a dimension inserted at
+// `insertSplitDim`.
 static AffineMap getExpandedOutputIndexingMap(AffineMap oldMap,
                                               unsigned insertSplitDim,
                                               MLIRContext *ctx) {
@@ -499,6 +504,21 @@ static AffineMap getExpandedOutputIndexingMap(AffineMap oldMap,
 
   return AffineMap::get(oldMap.getNumDims() + 1, oldMap.getNumSymbols(), exprs,
                         ctx);
+}
+
+static Value getSplitReductionInit(OpBuilder &builder, Location loc,
+                                   Value origInit, Attribute identityAttr,
+                                   int64_t insertDimSize,
+                                   unsigned insertSplitIndex) {
+  Type elemType = getElementTypeOrSelf(origInit.getType());
+  SmallVector<OpFoldResult> shape =
+      tensor::getMixedSizes(builder, loc, origInit);
+  shape.insert(shape.begin() + insertSplitIndex,
+               builder.getIndexAttr(insertDimSize));
+  Value identityVal = builder.create<arith::ConstantOp>(
+      loc, elemType, llvm::cast<TypedAttr>(identityAttr));
+  Value empty = builder.create<tensor::EmptyOp>(loc, shape, elemType);
+  return builder.create<linalg::FillOp>(loc, identityVal, empty).getResult(0);
 }
 
 FailureOr<linalg::SplitReductionResult>
@@ -538,7 +558,6 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
 
   SmallVector<int64_t, 4> loopRanges = genericOp.getStaticLoopRanges();
   int64_t reductionDimSize = loopRanges[reductionDim];
-
   if (ShapedType::isDynamic(reductionDimSize) ||
       reductionDimSize % ratio != 0) {
     return rewriter.notifyMatchFailure(
@@ -554,7 +573,6 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
 
   ArgmaxCombinerOps combinerOps = collectArgmaxCombinerOps(genericOp);
   Operation *reductionOp = combinerOps.maxOp;
-
   std::optional<TypedAttr> identity = arith::getNeutralElement(reductionOp);
   if (!identity.has_value())
     return rewriter.notifyMatchFailure(
@@ -564,12 +582,14 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
     AffineMap map = genericOp.getMatchingIndexingMap(operand);
     ArrayRef<int64_t> oldShape = genericOp.getShape(operand);
-    Type elementType =
-        cast<RankedTensorType>(operand->get().getType()).getElementType();
-
+    Type elementType = getElementTypeOrSelf(operand->get().getType());
     SmallVector<int64_t> expandedShape;
     for (unsigned idx : llvm::seq<unsigned>(0u, map.getNumResults())) {
       unsigned dim = map.getDimPosition(idx);
+      if (dim != reductionDim) {
+        expandedShape.push_back(oldShape[idx]);
+        continue;
+      }
       if (dim == reductionDim) {
         int64_t orig = oldShape[idx];
         int64_t outer = orig / ratio;
@@ -580,70 +600,28 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
           expandedShape.push_back(outer); // parallel.
           expandedShape.push_back(ratio); // reduction.
         }
-      } else {
-        expandedShape.push_back(oldShape[idx]);
       }
     }
 
-    RankedTensorType expandedType =
-        RankedTensorType::get(expandedShape, elementType);
+    auto expandedType = RankedTensorType::get(expandedShape, elementType);
     Value expanded = expandValue(rewriter, loc, operand->get(), expandedType);
     newInputs.push_back(expanded);
   }
 
-  //  The total number of output elements along this new dimension is
-  //  reductionDimSize / ratio.
-  int64_t outputDimsize = reductionDimSize / ratio;
+  // The total number of output elements along this new dimension is
+  // reductionDimSize / ratio.
+  int64_t outputDimSize = reductionDimSize / ratio;
   OpOperand *valueInit = genericOp.getDpsInitOperand(0);
   OpOperand *indexInit = genericOp.getDpsInitOperand(1);
   // Value identity.
-  Type valueElemType = genericOp.getRegionOutputArgs()[0].getType();
-  ArrayRef<int64_t> origValueShape = genericOp.getShape(valueInit);
-  SmallVector<int64_t> expandedValueShape;
-  for (unsigned i = 0; i <= origValueShape.size(); ++i) {
-    if (i == insertSplitIndex)
-      expandedValueShape.push_back(outputDimsize);
-    if (i < origValueShape.size())
-      expandedValueShape.push_back(origValueShape[i]);
-  }
-  SmallVector<Value> dynValueDims;
-  for (size_t i = 0; i < expandedValueShape.size(); ++i) {
-    if (ShapedType::isDynamic(expandedValueShape[i])) {
-      unsigned sourceIdx = (i < insertSplitIndex) ? i : i - 1;
-      dynValueDims.push_back(
-          rewriter.create<tensor::DimOp>(loc, valueInit->get(), sourceIdx));
-    }
-  }
-  Value valueConst = rewriter.create<arith::ConstantOp>(loc, *identity);
-  Value emptyValue = rewriter.create<tensor::EmptyOp>(
-      loc, expandedValueShape, valueElemType, dynValueDims);
   Value identityValue =
-      rewriter.create<linalg::FillOp>(loc, valueConst, emptyValue).getResult(0);
-
+      getSplitReductionInit(rewriter, loc, valueInit->get(), *identity,
+                            outputDimSize, insertSplitIndex);
   // Index identity.
   Type indexElemType = genericOp.getRegionOutputArgs()[1].getType();
-  ArrayRef<int64_t> origIndexShape = genericOp.getShape(indexInit);
-  SmallVector<int64_t> expandedIndexShape;
-  for (unsigned i = 0; i <= origIndexShape.size(); ++i) {
-    if (i == insertSplitIndex)
-      expandedIndexShape.push_back(outputDimsize);
-    if (i < origIndexShape.size())
-      expandedIndexShape.push_back(origIndexShape[i]);
-  }
-  SmallVector<Value> dynIdxDims;
-  for (unsigned i = 0; i < expandedIndexShape.size(); ++i) {
-    if (ShapedType::isDynamic(expandedIndexShape[i])) {
-      unsigned sourceIdx = (i < insertSplitIndex) ? i : i - 1;
-      dynIdxDims.push_back(
-          rewriter.create<tensor::DimOp>(loc, indexInit->get(), sourceIdx));
-    }
-  }
-  Value zeroIdx = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(indexElemType));
-  Value emptyIdx = rewriter.create<tensor::EmptyOp>(loc, expandedIndexShape,
-                                                    indexElemType, dynIdxDims);
-  Value identityIndex =
-      rewriter.create<linalg::FillOp>(loc, zeroIdx, emptyIdx).getResult(0);
+  Value identityIndex = getSplitReductionInit(
+      rewriter, loc, indexInit->get(), rewriter.getZeroAttr(indexElemType),
+      outputDimSize, insertSplitIndex);
 
   SmallVector<utils::IteratorType> newIteratorTypes =
       genericOp.getIteratorTypesArray();
@@ -697,7 +675,8 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   selectOp.setOperand(1, newIdx);
   rewriter.setInsertionPointAfter(partialOp);
 
-  unsigned intermRank = expandedValueShape.size();
+  unsigned intermRank =
+      cast<RankedTensorType>(identityValue.getType()).getRank();
   AffineMap valueMap = rewriter.getMultiDimIdentityMap(intermRank);
   AffineMap indexMap = valueMap;
 
@@ -705,9 +684,10 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   SmallVector<utils::IteratorType> reductionIteratorTypes(
       intermRank, utils::IteratorType::parallel);
   reductionIteratorTypes[insertSplitIndex] = utils::IteratorType::reduction;
-  for (unsigned i : llvm::seq<unsigned>(0, intermRank)) {
-    if (i != insertSplitIndex)
+  for (auto i : llvm::seq<unsigned>(0, intermRank)) {
+    if (i != insertSplitIndex) {
       resultExprs.push_back(rewriter.getAffineDimExpr(i));
+    }
   }
 
   AffineMap outputMap =
