@@ -45,9 +45,11 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   Block &block = body.front();
   auto whitelistedOps = [&](Operation *op) {
     auto dialect = op->getDialect();
-    if (isa<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
-            tensor::TensorDialect>(dialect)) {
+    if (isa<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect>(dialect)) {
       return true;
+    }
+    if (isa<tensor::TensorDialect>(dialect)) {
+      return !isa<tensor::EmptyOp>(op);
     }
     if (isa<arith::ArithDialect>(dialect)) {
       return !isa<arith::ConstantOp>(op);
