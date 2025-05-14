@@ -406,6 +406,10 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       if (CallGraphNode *node =
               callGraph.lookupNode(&funcOp.getFunctionBody())) {
         for (CallGraphNode::Edge callEdge : *node) {
+          if (callEdge.getTarget()->isExternal()) {
+            // Skip external calls.
+            continue;
+          }
           auto calledFunc = callEdge.getTarget()
                                 ->getCallableRegion()
                                 ->getParentOfType<FunctionOpInterface>();
