@@ -68,7 +68,7 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: %[[FINALIDX_EMPTY:.+]] = tensor.empty(%[[ARG1]]) : tensor<?xi64>
 // CHECK: %[[FINALIDX:.+]] = linalg.fill ins(%[[ZERO]] : i64) outs(%[[FINALIDX_EMPTY]] : tensor<?xi64>) -> tensor<?xi64>
 
-// Check partial reduction
+// Check partial reduction.
 // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %arg0 {{\[}}[0], [1, 2]] output_shape [%{{.+}}, 1024, 128] : tensor<?x131072xbf16> into tensor<?x1024x128xbf16>
 // CHECK: %[[INITVAL:.+]] = tensor.empty(%{{.+}}) : tensor<?x1024xbf16>
 // CHECK: %[[FILLVAL:.+]] = linalg.fill ins(%{{.+}} : bf16) outs(%[[INITVAL]] : tensor<?x1024xbf16>) -> tensor<?x1024xbf16>
@@ -91,7 +91,7 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: %[[SEL:.+]] = arith.select %[[CMP]], %[[CAST]], %[[IDX]] : i64
 // CHECK: linalg.yield %[[MAX]], %[[SEL]] : bf16, i64
 
-// Final reduction
+// Check Final reduction.
 // CHECK: %[[FINAL:.+]]:2 = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[$MAP2]], #[[$MAP2]], #[[$MAP3]], #[[$MAP3]]]
 // CHECK-SAME: iterator_types = ["parallel", "reduction"]
@@ -103,7 +103,7 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: %[[SEL2:.+]] = arith.select %[[CMP2]], %[[I1]], %[[I2]] : i64
 // CHECK: linalg.yield %[[MAX2]], %[[SEL2]] : bf16, i64
 
-// Final return
+// Check final return.
 // CHECK: util.return %[[FINAL]]#1 : tensor<?xi64>
 
 // -----

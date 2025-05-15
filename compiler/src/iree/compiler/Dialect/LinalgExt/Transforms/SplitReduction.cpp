@@ -442,11 +442,11 @@ static ArgmaxCombinerOps collectArgmaxCombinerOps(linalg::GenericOp genericOp) {
 static Value expandValue(OpBuilder &builder, Location loc, Value value,
                          RankedTensorType expandedType) {
   RankedTensorType originalType = cast<RankedTensorType>(value.getType());
-  if (originalType == expandedType)
+  if (originalType == expandedType) {
     return value;
-
+  }
   auto reassociation =
-      mlir::getReassociationIndicesForReshape(originalType, expandedType);
+      getReassociationIndicesForReshape(originalType, expandedType);
   assert(reassociation && "failed to infer reassociation indices from types");
   return builder.create<tensor::ExpandShapeOp>(loc, expandedType, value,
                                                *reassociation);
@@ -516,7 +516,7 @@ static Value getSplitReductionInit(OpBuilder &builder, Location loc,
   shape.insert(shape.begin() + insertSplitIndex,
                builder.getIndexAttr(insertDimSize));
   Value identityVal = builder.create<arith::ConstantOp>(
-      loc, elemType, llvm::cast<TypedAttr>(identityAttr));
+      loc, elemType, cast<TypedAttr>(identityAttr));
   Value empty = builder.create<tensor::EmptyOp>(loc, shape, elemType);
   return builder.create<linalg::FillOp>(loc, identityVal, empty).getResult(0);
 }
@@ -574,9 +574,10 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   ArgmaxCombinerOps combinerOps = collectArgmaxCombinerOps(genericOp);
   Operation *reductionOp = combinerOps.maxOp;
   std::optional<TypedAttr> identity = arith::getNeutralElement(reductionOp);
-  if (!identity.has_value())
+  if (!identity.has_value()) {
     return rewriter.notifyMatchFailure(
         genericOp, "Unknown identity value for the reduction");
+  }
 
   SmallVector<Value> newInputs;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
@@ -584,22 +585,20 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     ArrayRef<int64_t> oldShape = genericOp.getShape(operand);
     Type elementType = getElementTypeOrSelf(operand->get().getType());
     SmallVector<int64_t> expandedShape;
-    for (unsigned idx : llvm::seq<unsigned>(0u, map.getNumResults())) {
+    for (auto idx : llvm::seq<unsigned>(0, map.getNumResults())) {
       unsigned dim = map.getDimPosition(idx);
       if (dim != reductionDim) {
         expandedShape.push_back(oldShape[idx]);
         continue;
       }
-      if (dim == reductionDim) {
-        int64_t orig = oldShape[idx];
-        int64_t outer = orig / ratio;
-        if (control.innerParallel) {
-          expandedShape.push_back(ratio); // reduction.
-          expandedShape.push_back(outer); // parallel.
-        } else {
-          expandedShape.push_back(outer); // parallel.
-          expandedShape.push_back(ratio); // reduction.
-        }
+      int64_t orig = oldShape[idx];
+      int64_t outer = orig / ratio;
+      if (control.innerParallel) {
+        expandedShape.push_back(ratio); // reduction.
+        expandedShape.push_back(outer); // parallel.
+      } else {
+        expandedShape.push_back(outer); // parallel.
+        expandedShape.push_back(ratio); // reduction.
       }
     }
 
