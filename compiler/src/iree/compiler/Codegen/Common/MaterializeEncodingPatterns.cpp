@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -31,37 +32,6 @@ namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileSwizzle;
-
-//===---------------------------------------------------------------------===//
-// Utility methods
-//===---------------------------------------------------------------------===//
-
-// Utility to apply a tile-swizzling to a packed shape.
-static SmallVector<OpFoldResult>
-getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
-                 MaterializeEncodingInfo encodingInfo) {
-  if (packedShape.empty() || !encodingInfo.swizzle) {
-    return SmallVector<OpFoldResult>(packedShape);
-  }
-
-  int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
-  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
-  for (auto i : encodingInfo.swizzle->permutation) {
-    perm.push_back(i + srcRank);
-  }
-
-  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
-  SmallVector<int64_t> expandedTileShape =
-      IREE::Codegen::getExpandedTileShape(encodingInfo.swizzle->expandShape);
-  MLIRContext *ctx = packedShape[0].getContext();
-  Builder b(ctx);
-  for (int64_t d : expandedTileShape) {
-    newShape.push_back(b.getIndexAttr(d));
-  }
-  applyPermutationToVector(newShape, perm);
-
-  return newShape;
-}
 
 //===---------------------------------------------------------------------===//
 // Methods to convert `set_encoding` and `unset_encoding` operations
@@ -450,46 +420,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
-/// returns the materialized shape of the `dispatchTensorType`. The
-/// dynamic dimensions of the `dispatchTensorType` are provided in
-/// `dynamicDims`.
-static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
-    OpBuilder &builder, Location loc,
-    const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::TensorExt::DispatchTensorType dispatchTensorType,
-    ValueRange dynamicDims) {
-  auto boundTensorType =
-      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-  if (!boundTensorType) {
-    return failure();
-  }
-
-  MaterializeEncodingInfo encodingInfo;
-  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
-    encodingInfo = maybeEncodingInfo.value();
-  } else {
-    encodingInfo = typeConverter.getEncodingInfo(boundTensorType);
-  }
-
-  if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-    return failure();
-  }
-
-  SmallVector<OpFoldResult> targetShape =
-      getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
-  auto innerTileSizes = typeConverter.getInnerTileSizesOfr(
-      builder, loc, boundTensorType, encodingInfo);
-  if (failed(innerTileSizes)) {
-    return failure();
-  }
-  SmallVector<OpFoldResult> convertedTargetShape =
-      linalg::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
-                                     encodingInfo.innerDimsPos,
-                                     encodingInfo.outerDimsPerm);
-  return getSwizzledShape(convertedTargetShape, encodingInfo);
-}
-
-/// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the dynamic dimensions of the materialized shape of the
 /// `dispatchTensorType`. The dynamic dimensions of the `dispatchTensorType` are
 /// provided in `dynamicDims`.
@@ -499,8 +429,8 @@ static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
     IREE::TensorExt::DispatchTensorType dispatchTensorType,
     ValueRange dynamicDims) {
   FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
-      getPackedDimsForDispatchTensor(builder, loc, typeConverter,
-                                     dispatchTensorType, dynamicDims);
+      typeConverter.getPackedDimsForDispatchTensor(
+          builder, loc, dispatchTensorType, dynamicDims);
   if (failed(convertedTargetShape)) {
     return failure();
   }
@@ -593,26 +523,19 @@ struct MaterializeTensorExtDispatchTensorLoadOp
       return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
     }
 
-    Location loc = loadOp.getLoc();
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
-    FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
-        getPackedDimsForDispatchTensor(rewriter, loc, *typeConverter,
-                                       sourceType, loadOp.getSourceDims());
-    if (succeeded(convertedMixedSizes)) {
-      newMixedSizes = convertedMixedSizes.value();
+    SmallVector<OpFoldResult> newOffsets, newMixedSizes, newStrides;
+    if (failed(typeConverter->getOffsetsSizesStrides(
+            rewriter, loadOp.getLoc(), sourceType, loadOp.getSourceDims(),
+            loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+            loadOp.getMixedStrides(), newOffsets, newMixedSizes, newStrides))) {
+      return failure();
     }
-    SmallVector<OpFoldResult> newOffsets(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(1));
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
         loadOp, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
         newStrides);
-
     return success();
   }
 };
@@ -644,19 +567,14 @@ struct MaterializeTensorExtDispatchTensorStoreOp
       return rewriter.notifyMatchFailure(storeOp, "bound type already valid");
     }
 
-    Location loc = storeOp.getLoc();
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        boundTensorType.getShape(), storeOp.getTargetDims(), rewriter);
-    FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
-        getPackedDimsForDispatchTensor(rewriter, loc, *typeConverter,
-                                       targetType, storeOp.getTargetDims());
-    if (succeeded(convertedMixedSizes)) {
-      newMixedSizes = convertedMixedSizes.value();
+    SmallVector<OpFoldResult> newOffsets, newMixedSizes, newStrides;
+    if (failed(typeConverter->getOffsetsSizesStrides(
+            rewriter, storeOp.getLoc(), targetType, storeOp.getTargetDims(),
+            storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+            storeOp.getMixedStrides(), newOffsets, newMixedSizes,
+            newStrides))) {
+      return failure();
     }
-    SmallVector<OpFoldResult> newOffsets(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(1));
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);

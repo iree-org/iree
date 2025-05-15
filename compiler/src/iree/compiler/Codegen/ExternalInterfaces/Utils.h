@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -132,6 +133,40 @@ public:
                                          convertedBoundType);
         })
         .Default([&](auto concreteType) { return concreteType; });
+  }
+
+  LogicalResult getOffsetsSizesStrides(
+      Attribute attr, OpBuilder &builder, Location loc,
+      IREE::TensorExt::DispatchTensorType type, ValueRange dynamicDims,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+      ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
+      SmallVectorImpl<OpFoldResult> &newSizes,
+      SmallVectorImpl<OpFoldResult> &newStrides) const {
+    auto layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(attr);
+    // Only handle cases where the slice spans the whole
+    // `!iree_tensor_ext.dispatch.tensor` type.
+    // TODO(jornt): Enable partial slices.
+    if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
+      return failure();
+    }
+    auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
+    MaterializeEncodingInfo encodingInfo;
+    if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
+      encodingInfo = maybeEncodingInfo.value();
+    } else if (auto packedLayoutAttr =
+                   dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(attr)) {
+      encodingInfo = packedLayoutAttr.getEncodingInfo(boundTensorType);
+    }
+    newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
+    FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
+        getPackedDimsForDispatchTensorImpl(builder, loc, type, dynamicDims,
+                                           layoutAttr, encodingInfo);
+    if (succeeded(convertedMixedSizes)) {
+      newSizes = convertedMixedSizes.value();
+    }
+    newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
+    newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
+    return success();
   }
 };
 
