@@ -54,22 +54,6 @@ public:
   }
 };
 
-static std::optional<MaterializeEncodingInfo>
-getEncodingInfoFromLayouts(RankedTensorType type) {
-  auto layoutAttr =
-      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
-  if (!layoutAttr) {
-    return std::nullopt;
-  }
-  ArrayRef<Attribute> layouts = layoutAttr.getLayouts().getValue();
-  assert(layouts.size() == 1 && "only single layout is supported");
-  if (auto layout =
-          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layouts[0])) {
-    return layout.getEncodingInfo(type);
-  }
-  return std::nullopt;
-}
-
 template <typename DeviceEncodingLayoutAttrInterface,
           typename EncodingLayoutAttr>
 struct DeviceEncodingLayoutAttrInterfaceExternalModelBase
@@ -78,15 +62,8 @@ struct DeviceEncodingLayoutAttrInterfaceExternalModelBase
 public:
   MaterializeEncodingInfo getEncodingInfo(EncodingLayoutAttr layoutAttr,
                                           RankedTensorType type) const {
-    // If the layout is present in the encoding, use it directly. It means that
-    // the layout is already resolved and some information could be dropped
-    // during the lowering. Thus, we prioritize the resolved layout.
-    if (std::optional<MaterializeEncodingInfo> maybeEncodingInfo =
-            getEncodingInfoFromLayouts(type)) {
-      return maybeEncodingInfo.value();
-    }
-    return cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)
-        .getEncodingInfo(type);
+    return getEncodingInfoFromLayout(
+        type, cast<IREE::Encoding::LayoutAttrInterface>(layoutAttr));
   }
 
   Type convertType(Attribute attr, Type type) const {
@@ -150,13 +127,8 @@ public:
       return failure();
     }
     auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
-    MaterializeEncodingInfo encodingInfo;
-    if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
-      encodingInfo = maybeEncodingInfo.value();
-    } else if (auto packedLayoutAttr =
-                   dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(attr)) {
-      encodingInfo = packedLayoutAttr.getEncodingInfo(boundTensorType);
-    }
+    MaterializeEncodingInfo encodingInfo =
+        getEncodingInfoFromLayout(boundTensorType, layoutAttr);
     newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
         getPackedDimsForDispatchTensorImpl(builder, loc, type, dynamicDims,
