@@ -551,6 +551,13 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   wrapperOp.setAllArgAttrs(argAttrDict);
   wrapperOp.setAllResultAttrs(resultAttrDict);
 
+  // Check if the import op has a preprocessing_pipeline. If so add it to the
+  // wrapped op.
+  if (Attribute attrBasedPassPipelines =
+          IREE::Util::getPassPipelinesAttribute(exportOp)) {
+    IREE::Util::setPassPipelinesAttribute(wrapperOp, attrBasedPassPipelines);
+  }
+
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
   exportOp->removeAttr("iree.reflection");

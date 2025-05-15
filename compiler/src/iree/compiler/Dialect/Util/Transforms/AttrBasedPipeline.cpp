@@ -30,8 +30,6 @@ struct AttrBasedPipelinePass
 };
 } // namespace
 
-static const char kPipelinesAttrName[] = "util.pipelines";
-
 // Method to get the pass manager nested on a particular operation. There does
 // not seem to be a way to do this without specializing on the op itself.
 // When possible to do so, this method could be deleted.
@@ -52,7 +50,8 @@ void AttrBasedPipelinePass::runOnOperation() {
   });
 
   for (auto funcLikeOp : funcLikeOps) {
-    auto attr = funcLikeOp->getAttrOfType<DictionaryAttr>(kPipelinesAttrName);
+    auto attr = dyn_cast_or_null<DictionaryAttr>(
+        IREE::Util::getPassPipelinesAttribute(funcLikeOp));
     if (!attr) {
       continue;
     }
