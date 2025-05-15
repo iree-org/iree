@@ -239,9 +239,6 @@ Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
                                   ValueRange convertedInputOperands,
                                   ValueRange convertedOutputOperands);
 
-/// Check if a linalg.generic is representing an argmax operation.
-LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
-
 /// Replace the uses of memref value `origValue` with the given
 /// `replacementValue`. Some uses of the memref value might require changes to
 /// the operation itself. Create new operations which can carry the change, and
