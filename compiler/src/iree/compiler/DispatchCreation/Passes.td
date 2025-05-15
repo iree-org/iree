@@ -35,14 +35,6 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
-def CollapseReductionDimensionsPass :
-    Pass<"iree-dispatch-creation-collapse-reduction-dimensions", ""> {
-  let summary = "Collapse reduction dimensions when possible.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-  ];
-}
-
 def ElementwiseOpFusionPass :
     Pass<"iree-dispatch-creation-elementwise-op-fusion", ""> {
   let summary = "Fuse elementwise operations.";
