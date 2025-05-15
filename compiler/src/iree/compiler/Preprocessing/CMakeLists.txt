@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::DispatchCreation
     iree::compiler::GlobalOptimization
     iree::compiler::Pipelines::Options

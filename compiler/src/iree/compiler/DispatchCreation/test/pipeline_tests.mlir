@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-attr-based-pipeline, iree-dispatch-creation-fold-unit-extent-dims, iree-dispatch-creation-pipeline)" --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-util-attr-based-pipeline{pipeline-name=\"preprocessing\"}, iree-dispatch-creation-fold-unit-extent-dims, iree-dispatch-creation-pipeline)" --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -304,7 +304,7 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0: ind
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 util.func public @make_single_dispatch(%arg0: tensor<16x8x32x2048xbf16>, %arg1: tensor<16x8x32x4096xbf16>) -> tensor<4096x1x1x2048xf32>
- attributes {preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-make-single-dispatch">} {
+ attributes {util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-make-single-dispatch">}} {
     %cst = arith.constant 0.000000e+00 : f32
     %2 = tensor.empty() : tensor<4096x1x1x2048xf32>
     %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<4096x1x1x2048xf32>) -> tensor<4096x1x1x2048xf32>
