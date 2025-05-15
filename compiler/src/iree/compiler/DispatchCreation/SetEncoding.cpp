@@ -476,6 +476,55 @@ static SmallVector<unsigned> padOperandsOfOp(RewriterBase &rewriter,
   return paddedOperands;
 }
 
+// Return a list of operands to be padded for each `op`.
+SmallVector<unsigned> getOperandsToPad(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
+    return {};
+  }
+
+  // Bail out on matvec / vecmat and skinny matmul problems.
+  // TODO(MaheshRavishankar): There is a possibility to use a more specialized
+  // encoding for making this decision late and using `SpecializeEncoding`
+  // as the place where this gets resolved to the pad encoding. That was
+  // initially tried, but rolled back cause the design of the encoding needs to
+  // be flushed out a bit more. So currently moving this logic during set
+  // encoding itself. Also this logic might require clean up (see
+  // https://github.com/iree-org/iree/pull/20732/files#r2087241983)
+  SmallVector<unsigned> reductionDims;
+  linalgOp.getReductionDims(reductionDims);
+  int64_t parallelDimSize = 1;
+  llvm::SmallSetVector<int32_t, 4> reductionDimsSet;
+  reductionDimsSet.insert_range(reductionDims);
+  SmallVector<int64_t, 4> loopRanges = linalgOp.getStaticLoopRanges();
+  for (auto [idx, dimSize] : llvm::enumerate(loopRanges)) {
+    if (reductionDimsSet.contains(idx)) {
+      // Bail if the reduction dimension is dynamic.
+      if (ShapedType::isDynamic(dimSize)) {
+        return {};
+      }
+      continue;
+    }
+    if (!ShapedType::isDynamic(parallelDimSize)) {
+      if (ShapedType::isDynamic(dimSize)) {
+        parallelDimSize = ShapedType::kDynamic;
+        continue;
+      }
+      parallelDimSize *= dimSize;
+    }
+  }
+
+  // TODO(MaheshRavishankar): Make this command line controllable.
+  static constexpr int64_t kSkinnyMatmulThreshold = 64;
+  if (!ShapedType::isDynamic(parallelDimSize) &&
+      parallelDimSize < kSkinnyMatmulThreshold) {
+    // This matmul is skinny, do not pad.
+    return {};
+  }
+
+  return {0, 1};
+}
+
 // Main driver method to add encodings to pad. Typically these are
 // intermediate values produced by `flow.dispatch.region`.
 static LogicalResult setPaddingEncodings(MLIRContext *context,
@@ -483,15 +532,19 @@ static LogicalResult setPaddingEncodings(MLIRContext *context,
   IRRewriter rewriter(context);
 
   // Collect all operations whose operands can be padded.
-  SmallVector<Operation *> matmulOps;
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    if (linalg::isaContractionOpInterface(linalgOp)) {
-      matmulOps.push_back(linalgOp);
+  using OpListType =
+      SmallVector<std::tuple<Operation *, SmallVector<unsigned>>>;
+  OpListType paddedOps;
+  funcOp.walk([&](Operation *op) {
+    SmallVector<unsigned> paddedOperands = getOperandsToPad(op);
+    if (paddedOperands.empty()) {
+      return;
     }
+    paddedOps.emplace_back(std::tuple{op, std::move(paddedOperands)});
   });
-  for (auto op : matmulOps) {
+  for (auto [op, operandsNums] : paddedOps) {
     // Only pad LHS or RHS of matmul ops.
-    padOperandsOfOp(rewriter, op, {0, 1});
+    padOperandsOfOp(rewriter, op, operandsNums);
   }
 
   // Apply the dim resolution patterns.
