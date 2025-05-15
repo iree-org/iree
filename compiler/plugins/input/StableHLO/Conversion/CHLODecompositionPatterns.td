@@ -38,6 +38,9 @@ def ConstantLikePosInfValue : NativeCodeCall<
 def ConstantLikeNegInfValue : NativeCodeCall<
     "::mlir::iree_compiler::stablehlo::getConstantLikeInfValue($_builder, $_loc, $0, /*negative=*/true)">;
 
+def STABLEHLO_DEFAULT_RESULT_ACCURACY :
+  ConstantAttr<StableHLO_ResultAccuracyAttr, "::mlir::stablehlo::ResultAccuracyMode::DEFAULT">;
+
 //===----------------------------------------------------------------------===//
 // Unary op patterns.
 //===----------------------------------------------------------------------===//
@@ -64,7 +67,8 @@ def : Pat<(CHLO_AcosOp NonComplexElementType:$input),
           (StableHLO_SubtractOp
             (ConstantLike<"1"> $input),
             (StableHLO_MulOp $input, $input)
-          )
+          ),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         ),
         (StableHLO_AddOp
           (ConstantLike<"1"> $input),
@@ -96,15 +100,16 @@ def : Pat<(CHLO_AcoshOp NonComplexElementType:$input),
       (StableHLO_CompareOp
         $input,
         (StableHLO_SqrtOp
-          (ConstantLikeMaxFiniteValue $input)
+          (ConstantLikeMaxFiniteValue $input),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY,
         ),
         StableHLO_ComparisonDirectionValue<"GE">,
         (STABLEHLO_DEFAULT_COMPARISON_TYPE)
       ),
       (StableHLO_AddOp
-        (StableHLO_LogOp $input),
+        (StableHLO_LogOp $input, STABLEHLO_DEFAULT_RESULT_ACCURACY),
         (StableHLO_LogOp
-          (ConstantLike<"2"> $input)
+          (ConstantLike<"2"> $input, STABLEHLO_DEFAULT_RESULT_ACCURACY)
         )
       ),
       (StableHLO_LogOp
@@ -120,9 +125,11 @@ def : Pat<(CHLO_AcoshOp NonComplexElementType:$input),
                 (ConstantLike<"-1"> $input),
                 $input
               )
-            )
+            ),
+            STABLEHLO_DEFAULT_RESULT_ACCURACY
           )
-        )
+        ),
+        STABLEHLO_DEFAULT_RESULT_ACCURACY
       )
     )
   )>;
@@ -148,9 +155,11 @@ def : Pat<(CHLO_AcoshOp ComplexElementType:$input),
             $input,
             (ConstantLike<"1"> $input)
           )
-        )
+        ),
+        STABLEHLO_DEFAULT_RESULT_ACCURACY
       )
-    )
+    ),
+    STABLEHLO_DEFAULT_RESULT_ACCURACY
   )>;
 
 
@@ -167,7 +176,8 @@ def : Pat<(CHLO_AsinOp $input),
           (StableHLO_SubtractOp
             (ConstantLike<"1"> $input),
             (StableHLO_MulOp $input, $input)
-          )
+          ),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         )
       )
     )
@@ -200,17 +210,20 @@ def : Pat<(CHLO_AsinhOp NonComplexElementType:$input),
       (StableHLO_CompareOp
         (StableHLO_AbsOp $input),
         (StableHLO_SqrtOp
-          (ConstantLikeMaxFiniteValue $input)
+          (ConstantLikeMaxFiniteValue $input),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         ),
         StableHLO_ComparisonDirectionValue<"GE">,
         (STABLEHLO_DEFAULT_COMPARISON_TYPE)
       ),
       (StableHLO_AddOp
         (StableHLO_LogOp
-          (StableHLO_AbsOp $input)
+          (StableHLO_AbsOp $input),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         ),
         (StableHLO_LogOp
-          (ConstantLike<"2"> $input)
+          (ConstantLike<"2"> $input),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         )
       ),
       (StableHLO_SelectOp
@@ -236,12 +249,14 @@ def : Pat<(CHLO_AsinhOp NonComplexElementType:$input),
                         (StableHLO_AbsOp $input)
                       ),
                       (ConstantLike<"1"> $input)
-                    )
+                    ),
+                    STABLEHLO_DEFAULT_RESULT_ACCURACY
                   )
                 )
               )
             )
-          )
+          ),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         ),
         (StableHLO_LogOp
           (StableHLO_AddOp
@@ -253,9 +268,11 @@ def : Pat<(CHLO_AsinhOp NonComplexElementType:$input),
                   (StableHLO_AbsOp $input)
                 ),
                 (ConstantLike<"1"> $input)
-              )
+              ),
+              STABLEHLO_DEFAULT_RESULT_ACCURACY
             )
-          )
+          ),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         )
       )
     )
@@ -276,9 +293,11 @@ def : Pat<(CHLO_AsinhOp ComplexElementType:$input),
         (StableHLO_AddOp
           (StableHLO_MulOp $input, $input),
           (ConstantLike<"1"> $input)
-        )
+        ),
+        STABLEHLO_DEFAULT_RESULT_ACCURACY
       )
-    )
+    ),
+    STABLEHLO_DEFAULT_RESULT_ACCURACY
   )>;
 
 // Express `atan` as
@@ -303,9 +322,10 @@ def : Pat<(CHLO_AtanhOp NonComplexElementType:$input),
     (ConstantLike<"NAN"> $input),
     (StableHLO_MulOp
       (StableHLO_SubtractOp
-        (StableHLO_Log1pOp $input),
+        (StableHLO_Log1pOp $input, STABLEHLO_DEFAULT_RESULT_ACCURACY),
         (StableHLO_Log1pOp
-          (StableHLO_NegOp $input)
+          (StableHLO_NegOp $input),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         )
       ),
       (ConstantLike<"0.5"> $input)
@@ -321,9 +341,10 @@ def : Pat<(CHLO_AtanhOp NonComplexElementType:$input),
 def : Pat<(CHLO_AtanhOp ComplexElementType:$input),
   (StableHLO_MulOp
     (StableHLO_SubtractOp
-      (StableHLO_Log1pOp $input),
+      (StableHLO_Log1pOp $input, STABLEHLO_DEFAULT_RESULT_ACCURACY),
       (StableHLO_Log1pOp
-        (StableHLO_NegOp $input)
+        (StableHLO_NegOp $input),
+        STABLEHLO_DEFAULT_RESULT_ACCURACY
       )
     ),
     (ConstantLike<"0.5"> $input)
@@ -363,20 +384,20 @@ def : Pat<(CHLO_IsNegInfOp NonComplexElementType:$input),
 
 // Express `tan` as
 //   sine(x) / cosine(x)
-def : Pat<(CHLO_TanOp NonComplexElementType:$input),
+def : Pat<(CHLO_TanOp NonComplexElementType:$input, $accuracy),
   (StableHLO_DivOp
-    (StableHLO_SineOp $input),
-    (StableHLO_CosineOp $input)
+    (StableHLO_SineOp $input, $accuracy),
+    (StableHLO_CosineOp $input, $accuracy)
   )>;
 
 
 // Express `tan(a + bi)` as
 //   (tan(a) + i tanh(b)) / (1 - i tan(a) * tanh(b))
-def : Pat<(CHLO_TanOp ComplexElementType:$input),
+def : Pat<(CHLO_TanOp ComplexElementType:$input, $accuracy),
   (StableHLO_DivOp
     (StableHLO_ComplexOp
-      (CHLO_TanOp:$tan (StableHLO_RealOp $input)),
-      (StableHLO_TanhOp:$tanh (StableHLO_ImagOp $input))),
+      (CHLO_TanOp:$tan (StableHLO_RealOp $input), $accuracy),
+      (StableHLO_TanhOp:$tanh (StableHLO_ImagOp $input), $accuracy)),
     (StableHLO_ComplexOp
       (ConstantLike<"1.0"> $tan),
       (StableHLO_NegOp (StableHLO_MulOp $tan, $tanh)))
