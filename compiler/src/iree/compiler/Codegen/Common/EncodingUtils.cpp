@@ -88,17 +88,7 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
 
 IREE::Codegen::MaterializeEncodingInfo
 MaterializeEncodingTypeConverter::getEncodingInfo(RankedTensorType type) const {
-  // If the layout is present in the encoding, use it directly. It means that
-  // the layout is already resolved and some information could be dropped during
-  // the lowering. Thus, we prioritize the resolved layout.
-  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(type)) {
-    return maybeEncodingInfo.value();
-  }
-  if (auto packedLayoutAttr =
-          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)) {
-    return packedLayoutAttr.getEncodingInfo(type);
-  }
-  return IREE::Codegen::MaterializeEncodingInfo{};
+  return getEncodingInfoFromLayout(type, layoutAttr);
 }
 
 FailureOr<SmallVector<OpFoldResult>>
@@ -121,12 +111,8 @@ MaterializeEncodingTypeConverter::getPackedDimsForDispatchTensor(
   if (!boundTensorType) {
     return failure();
   }
-  MaterializeEncodingInfo encodingInfo;
-  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
-    encodingInfo = maybeEncodingInfo.value();
-  } else {
-    encodingInfo = getEncodingInfo(boundTensorType);
-  }
+  MaterializeEncodingInfo encodingInfo =
+      getEncodingInfoFromLayout(boundTensorType, layoutAttr);
   return getPackedDimsForDispatchTensorImpl(
       builder, loc, dispatchTensorType, dynamicDims, layoutAttr, encodingInfo);
 }

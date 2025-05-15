@@ -16,10 +16,13 @@
 
 namespace mlir::iree_compiler {
 
-/// Extracts encoding info for materialization from the layout attribute of a
-/// tensor type.
-std::optional<IREE::Codegen::MaterializeEncodingInfo>
-getEncodingInfoFromLayouts(RankedTensorType type);
+/// Returns the deserialized MaterializeEncodingInfo if the `layouts` field is
+/// present in encodings and it only has a single layout. Otherwise, tries to
+/// retrieve it from `layoutAttr`. Returns an identity MaterializeEncodingInfo
+/// otherwise.
+IREE::Codegen::MaterializeEncodingInfo
+getEncodingInfoFromLayout(RankedTensorType type,
+                          IREE::Encoding::LayoutAttrInterface layoutAttr);
 
 /// Returns the inner tile sizes to be used for the given tensor type.
 FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
