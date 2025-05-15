@@ -286,7 +286,6 @@ struct ConvertBf16ToUInt16BuffersPass final
     MLIRContext *ctx = &getContext();
 
     Bf16EmulationConverter typeConverter;
-    typeConverter.addArgumentMaterialization(materializeArithBitcast);
     typeConverter.addTargetMaterialization(materializeArithBitcast);
     typeConverter.addSourceMaterialization(materializeArithBitcast);
 
