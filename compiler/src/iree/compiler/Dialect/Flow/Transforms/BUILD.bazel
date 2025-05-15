@@ -37,7 +37,7 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "AnnotateDispatches.cpp",
-        "Canonicalizer.cpp",
+        "Canonicalize.cpp",
         "CaptureDynamicDims.cpp",
         "CleanupTensorShapes.cpp",
         "ConvertMeshToFlow.cpp",

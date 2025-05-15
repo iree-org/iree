@@ -15,12 +15,12 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_dispatches.mlir"
+    "canonicalize.mlir"
     "capture_dispatch_dynamic_dims.mlir"
     "capture_scf_for_dynamic_dims.mlir"
     "cleanup_tensor_shapes.mlir"
     "deduplicate_executables.mlir"
     "export_benchmark_funcs.mlir"
-    "flow_canonicalize.mlir"
     "initialize_empty_tensors.mlir"
     "inject_dispatch_tracing.mlir"
     "inject_tensor_tracing.mlir"

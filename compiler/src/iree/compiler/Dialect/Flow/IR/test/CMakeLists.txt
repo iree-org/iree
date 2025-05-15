@@ -15,9 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "call_ops.mlir"
+    "dispatch_folding.mlir"
     "dispatch_ops.mlir"
-    "dispatch_workgroups.mlir"
-    "dispatch_workgroups_folding.mlir"
     "executable_ops.mlir"
     "resolve_dim_ops.mlir"
     "tensor_folding.mlir"

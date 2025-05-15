@@ -22,7 +22,7 @@ def AnnotateDispatchesPass :
   let summary = "Annotates executable dispatches based on their contents.";
 }
 
-def CanonicalizerPass :
+def CanonicalizePass :
     Pass<"iree-flow-canonicalize", ""> {
   let summary = "Flow specific canonicalization pass";
   let options = [

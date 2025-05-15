@@ -30,7 +30,7 @@ iree_cc_library(
     "RegionOpUtils.h"
   SRCS
     "AnnotateDispatches.cpp"
-    "Canonicalizer.cpp"
+    "Canonicalize.cpp"
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
     "ConvertMeshToFlow.cpp"
