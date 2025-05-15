@@ -447,9 +447,9 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
         loc, input, gpuReduceKind, /*uniform=*/false, numLaneToReduce);
   }
 
-  // Always perform the shuffles over the supported scalar type. For inputs of
-  // smaller bitwidth, perform packing and unpacking via the supported integer
-  // type.
+  // Otherwise, perform the shuffles over the supported scalar type. For inputs
+  // of smaller bitwidth, perform packing and unpacking via the supported
+  // integer type.
   auto unpack = [loc, &builder, needsPacking, equivIntType,
                  origInputType](Value packedVal) -> Value {
     if (!needsPacking)
