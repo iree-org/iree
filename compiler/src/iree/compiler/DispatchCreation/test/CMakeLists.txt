@@ -20,7 +20,6 @@ iree_lit_test_suite(
     "clone_producers_into_dispatch_regions.mlir"
     "collapse_dimensions.mlir"
     "collapse_linalg_generic_on_tensors.mlir"
-    "collapse_reduction.mlir"
     "convert_encoding_to_flow.mlir"
     "convert_region_to_workgroups.mlir"
     "dispatch_linalg_ext_fusion.mlir"

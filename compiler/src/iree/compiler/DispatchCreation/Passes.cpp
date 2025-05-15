@@ -53,11 +53,6 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clCollapseReductionDims(
-    "iree-dispatch-creation-collapse-reduction-dims",
-    llvm::cl::desc("Enable collapsing of reduction dims"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool>
     clEnableFuseMultiUse("iree-dispatch-creation-fuse-multi-use",
                          llvm::cl::desc("Fuse multi-use ops."),
@@ -182,19 +177,11 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
-      //    b. For ops with multiple reduction dimensions, collapse the
-      //       reduction dimension.
-      //       TODO: This pass is only needed till all backends can handle
-      //       multiple reduction dimensions.
-      .addPredicatedPass(
-          clCollapseReductionDims,
-          DispatchCreation::createCollapseReductionDimensionsPass)
-
-      //     c. Split reduction operations into parallel and reduction, i.e
+      //     b. Split reduction operations into parallel and reduction, i.e
       //        .
       .addPass(DispatchCreation::createSplitReductionPass)
 
-      //     d. Transpose generic ops to
+      //     c. Transpose generic ops to
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
       .addPass(DispatchCreation::createTransposeGenericOpsPass);
