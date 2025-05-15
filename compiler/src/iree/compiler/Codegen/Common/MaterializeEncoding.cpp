@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -42,25 +41,6 @@ namespace mlir::iree_compiler {
 using namespace IREE::Encoding;
 
 namespace {
-
-static FailureOr<MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc) {
-  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
-  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
-      loc, resultTypes, TypeAttr::get(tensorType));
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getResults();
-  return result;
-}
-
-static MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
-    return chooseDynamicEncodingInfoVMVXMicrokernels;
-  }
-  return {};
-}
 
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
@@ -123,9 +103,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     LDBG("Selected LayoutAttrInterface with target configuration: "
          << layoutAttrWithTargetInfo);
 
-    auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
-    MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo,
-                                                   materializeEncodingValueFn);
+    MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 

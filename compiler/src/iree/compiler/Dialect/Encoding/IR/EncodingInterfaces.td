@@ -215,6 +215,8 @@ def IREEEncoding_LayoutAttrInterface :
 
     These are the core methods:
     - `convertType`: converts a type to its materialized form.
+    - `getOffsetsSizesStrides`: to retrieve the materialized new
+      offsets, sizes and strides for load/store type operations.
     - `lowerOp`: converts an operation to its materialized form.
   }];
 
@@ -232,6 +234,33 @@ def IREEEncoding_LayoutAttrInterface :
       /*defaultImplementation=*/[{
         assert(false && "unimplemented interface method");
         return type;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns success if materialized `newOffsets`, `newSizes` and
+        `newStrides` can be calculated and set for the slice specified by
+        `offsets`, `sizes` and `strides` on the dispatch tensor `type` with
+        potential `dynamicDims` sizes.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"getOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder &":$builder,
+        "::mlir::Location":$loc,
+        "IREE::TensorExt::DispatchTensorType":$type,
+        "::mlir::ValueRange":$dynamicDims,
+        "ArrayRef<OpFoldResult>":$offsets,
+        "ArrayRef<OpFoldResult>":$sizes,
+        "ArrayRef<OpFoldResult>":$strides,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newOffsets,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newSizes,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newStrides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
       }]
     >,
     InterfaceMethod<
