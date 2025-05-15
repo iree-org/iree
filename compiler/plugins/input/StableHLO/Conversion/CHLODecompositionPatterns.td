@@ -109,7 +109,8 @@ def : Pat<(CHLO_AcoshOp NonComplexElementType:$input),
       (StableHLO_AddOp
         (StableHLO_LogOp $input, STABLEHLO_DEFAULT_RESULT_ACCURACY),
         (StableHLO_LogOp
-          (ConstantLike<"2"> $input, STABLEHLO_DEFAULT_RESULT_ACCURACY)
+          (ConstantLike<"2"> $input),
+          STABLEHLO_DEFAULT_RESULT_ACCURACY)
         )
       ),
       (StableHLO_LogOp
