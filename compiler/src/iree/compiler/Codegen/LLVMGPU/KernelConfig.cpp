@@ -559,23 +559,13 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
 /// compute ops.
 static FailureOr<SetVector<linalg::LinalgOp>>
 checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
-  Operation *storeOp = nullptr;
-  int64_t numStores = 0;
+  SmallVector<Operation *> storeOps;
 
-  // TODO(pashu123): Check for multiple stores.
-  entryPoint.walk([&](Operation *op) {
-    if (auto firstStore =
-            dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
-      numStores += 1;
-      if (numStores > 1) {
-        return WalkResult::interrupt();
-      }
-      storeOp = firstStore;
-    }
-    return WalkResult::advance();
+  entryPoint.walk([&](IREE::TensorExt::DispatchTensorStoreOp op) {
+    storeOps.push_back(op.getOperation());
   });
 
-  if (!storeOp || numStores > 1) {
+  if (storeOps.empty()) {
     return failure();
   }
 
@@ -585,7 +575,9 @@ checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
   sliceOptions.omitUsesFromAbove = false;
   SetVector<Operation *> slice;
 
-  getBackwardSlice(storeOp, &slice, sliceOptions);
+  for (Operation *op : storeOps) {
+    getBackwardSlice(op, &slice, sliceOptions);
+  }
 
   SetVector<linalg::LinalgOp> computeOps;
   bool containsValidReductionOp = true;
