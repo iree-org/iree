@@ -15,7 +15,7 @@ func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
 //       CHECK:     %[[LINEARIZE:.+]] = affine.linearize_index
 //  CHECK-SAME:       [%[[IDX0]], %[[IDX1]]] by (2, 4)
-//       CHECK:     iree_linalg_ext.yield %[[LINEARIZE]], %[[IDX2]], %[[TRUE]] : index, index, i1
+//       CHECK:     iree_linalg_ext.yield %[[LINEARIZE]], %[[IDX2]], %[[TRUE]]
 //       CHECK:   } : tensor<2x4x16xf32> into tensor<8x16xf32> -> tensor<8x16xf32>
 //       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<8x16xf32> into memref<8x16xf32>
 
@@ -34,8 +34,7 @@ func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4
 //       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
 //  CHECK-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
-//       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index
-//  CHECK-SAME:       %[[IDX0]] into (2, 4) : index, index
+//       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX0]] into (2, 4)
 //       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1, %[[IDX1]], %[[TRUE]]
 //       CHECK:   } : tensor<8x16xf32> into tensor<2x4x16xf32> -> tensor<2x4x16xf32>
 //       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x4x16xf32> into memref<2x4x16xf32>
@@ -75,7 +74,7 @@ func.func @fold_extract_slice_op(%source : tensor<64xf32>, %result : memref<63xf
 //       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
 //  CHECK-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index):
-//       CHECK:     %[[MASK:.+]] = arith.cmpi ult, %[[IDX0]], %[[C63]] : index
+//       CHECK:     %[[MASK:.+]] = arith.cmpi ult, %[[IDX0]], %[[C63]]
 //       CHECK:     iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
 //       CHECK:   } : tensor<64xf32> into tensor<63xf32> -> tensor<63xf32>
 //       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<63xf32> into memref<63xf32>
@@ -133,8 +132,8 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 //       CHECK:   scf.forall (%[[WG_IV:.+]]) = (0) to (256) step (64) {
 //       CHECK:     %[[WG_TILE_UB:.+]] = affine.min #[[$MAP]](%[[WG_IV]])
 //       CHECK:     scf.for %[[IDX:.+]] = %[[WG_IV]] to %[[WG_TILE_UB]] step %[[C1]] {
-//   CHECK-DAG:       %[[IS_LOW_PAD:.+]] = arith.cmpi ult, %[[IDX]], %[[C2]] : index
-//   CHECK-DAG:       %[[IS_HIGH_PAD:.+]] = arith.cmpi uge, %[[IDX]], %[[C252]] : index
+//   CHECK-DAG:       %[[IS_LOW_PAD:.+]] = arith.cmpi ult, %[[IDX]], %[[C2]]
+//   CHECK-DAG:       %[[IS_HIGH_PAD:.+]] = arith.cmpi uge, %[[IDX]], %[[C252]]
 //   CHECK-DAG:       %[[IS_PAD:.+]] = arith.ori %[[IS_LOW_PAD]], %[[IS_HIGH_PAD]] : i1
 //       CHECK:       scf.if %[[IS_PAD]] {
 //  CHECK-NEXT:         memref.store %[[PAD_VAL]], %[[RESULT]][%[[IDX]]] : memref<256xf32>
@@ -176,11 +175,11 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
 //  CHECK-SAME:       [%[[IDX0]], %[[IDX2]], %[[IDX1]], %[[IDX3]]]
 //  CHECK-SAME:       by (%[[SRC_D0]], 128, %[[SRC_D1]], 128)
 //       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[LINEARIZE]]
-//  CHECK-SAME:       into (%[[COLLAPSE_SIZE0]], %[[COLLAPSE_SIZE1]]) : index, index
-//       CHECK:     %[[BOUND0:.+]] = arith.cmpi ult, %[[DELINEARIZE]]#0, %[[RES_D0]] : index
-//       CHECK:     %[[BOUND1:.+]] = arith.cmpi ult, %[[DELINEARIZE]]#1, %[[RES_D1]] : index
+//  CHECK-SAME:       into (%[[COLLAPSE_SIZE0]], %[[COLLAPSE_SIZE1]])
+//       CHECK:     %[[BOUND0:.+]] = arith.cmpi ult, %[[DELINEARIZE]]#0, %[[RES_D0]]
+//       CHECK:     %[[BOUND1:.+]] = arith.cmpi ult, %[[DELINEARIZE]]#1, %[[RES_D1]]
 //       CHECK:     %[[MASK:.+]] = arith.andi %[[BOUND0]], %[[BOUND1]] : i1
-//       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1, %[[MASK]] : index, index, i1
+//       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1, %[[MASK]]
 //       CHECK:   } : tensor<?x?x128x128xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
 //       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<?x?xf32> into memref<?x?xf32>
 
@@ -210,9 +209,9 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
 //  CHECK-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
 //       CHECK:     %[[DELINEARIZE0:.+]]:2 = affine.delinearize_index %[[IDX0]]
-//  CHECK-SAME:       into (2, 128) : index, index
+//  CHECK-SAME:       into (2, 128)
 //       CHECK:     %[[DELINEARIZE1:.+]]:2 = affine.delinearize_index %[[IDX1]]
-//  CHECK-SAME:       into (2, 128) : index, index
+//  CHECK-SAME:       into (2, 128)
 //       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE0]]#0, %[[DELINEARIZE1]]#0, %[[DELINEARIZE0]]#1, %[[DELINEARIZE1]]#1, %[[TRUE]]
 //       CHECK:   } : tensor<250x250xf32> into tensor<2x2x128x128xf32> -> tensor<2x2x128x128xf32>
 //       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
@@ -222,13 +221,13 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
 //   CHECK-DAG:     %[[WG_TILE_UB1:.+]] = affine.min #[[$MAP1]](%[[WG_IV1]])
 //       CHECK:     scf.for %[[IDX0:.+]] = %[[WG_IV0]] to %[[WG_TILE_UB0]] step %[[C1]] {
 //       CHECK:       scf.for %[[IDX1:.+]] = %[[WG_IV1]] to %[[WG_TILE_UB1]] step %[[C1]] {
-//   CHECK-DAG:         %[[EXPANDED_IDX0:.+]]:2 = affine.delinearize_index %[[IDX0]] into (2, 128) : index, index
-//   CHECK-DAG:         %[[EXPANDED_IDX1:.+]]:2 = affine.delinearize_index %[[IDX1]] into (2, 128) : index, index
-//   CHECK-DAG:         %[[IDX0_IS_LOW_PAD:.+]] = arith.cmpi ult, %[[IDX0]], %[[C0]] : index
-//   CHECK-DAG:         %[[IDX0_IS_HIGH_PAD:.+]] = arith.cmpi uge, %[[IDX0]], %[[C250]] : index
+//   CHECK-DAG:         %[[EXPANDED_IDX0:.+]]:2 = affine.delinearize_index %[[IDX0]] into (2, 128)
+//   CHECK-DAG:         %[[EXPANDED_IDX1:.+]]:2 = affine.delinearize_index %[[IDX1]] into (2, 128)
+//   CHECK-DAG:         %[[IDX0_IS_LOW_PAD:.+]] = arith.cmpi ult, %[[IDX0]], %[[C0]]
+//   CHECK-DAG:         %[[IDX0_IS_HIGH_PAD:.+]] = arith.cmpi uge, %[[IDX0]], %[[C250]]
 //   CHECK-DAG:         %[[IDX0_IS_PAD:.+]] = arith.ori %[[IDX0_IS_LOW_PAD]], %[[IDX0_IS_HIGH_PAD]] : i1
-//   CHECK-DAG:         %[[IDX1_IS_LOW_PAD:.+]] = arith.cmpi ult, %[[IDX1]], %[[C0]] : index
-//   CHECK-DAG:         %[[IDX1_IS_HIGH_PAD:.+]] = arith.cmpi uge, %[[IDX1]], %[[C250]] : index
+//   CHECK-DAG:         %[[IDX1_IS_LOW_PAD:.+]] = arith.cmpi ult, %[[IDX1]], %[[C0]]
+//   CHECK-DAG:         %[[IDX1_IS_HIGH_PAD:.+]] = arith.cmpi uge, %[[IDX1]], %[[C250]]
 //   CHECK-DAG:         %[[IDX1_IS_PAD:.+]] = arith.ori %[[IDX1_IS_LOW_PAD]], %[[IDX1_IS_HIGH_PAD]] : i1
 //   CHECK-DAG:         %[[IS_PAD:.+]] = arith.ori %[[IDX0_IS_PAD]], %[[IDX1_IS_PAD]] : i1
 //       CHECK:         scf.if %[[IS_PAD]] {

@@ -216,10 +216,8 @@ static void buildNestedDistributionLoops(
     ArrayRef<DistributionConfig> distConfigs,
     function_ref<void(OpBuilder &, Location, ValueRange)> innerLoopBuilder) {
   DistributionConfig distConfig = distConfigs[distributionLevel];
-  SmallVector<OpFoldResult> steps = llvm::map_to_vector(
-      distConfig.tileSizes, [&](int64_t size) -> OpFoldResult {
-        return rewriter.getIndexAttr(size);
-      });
+  SmallVector<OpFoldResult> steps =
+      getAsIndexOpFoldResult(rewriter.getContext(), distConfig.tileSizes);
   rewriter.create<scf::ForallOp>(
       loc, lbs, ubs, steps, /*outputs=*/ValueRange(),
       rewriter.getArrayAttr(distConfig.mapping),
@@ -265,7 +263,7 @@ static void buildNestedDistributionLoops(
 static FailureOr<MapScatterOp>
 foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                       MapScatterOp mapScatterOp,
-                      DistributionConfigFn distributionConfigFn) {
+                      PadDistributionConfigFn padDistributionConfigFn) {
   // Find the output buffer that the mapScatterOp is stored into.
   if (!mapScatterOp->hasOneUse()) {
     return rewriter.notifyMatchFailure(
@@ -278,9 +276,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
         mapScatterOp,
         "map_scatter user is not an iree_codegen.store_to_memref op");
   }
-  Value outputBuffer = storeOp.getTarget();
 
-  // Write the padding values directly into the outputBuffer.
   rewriter.setInsertionPointAfter(storeOp);
   Location loc = padOp->getLoc();
   SmallVector<OpFoldResult> padSrcSizes =
@@ -288,9 +284,11 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   SmallVector<OpFoldResult> ubs =
       tensor::getMixedSizes(rewriter, loc, padOp.getResult());
   SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
-  SmallVector<DistributionConfig> distConfigs = distributionConfigFn(
+  SmallVector<DistributionConfig> distConfigs = padDistributionConfigFn(
       padOp.getSourceType().getShape(), rewriter.getContext());
 
+  // Write the padding values directly into the outputBuffer.
+  Value outputBuffer = storeOp.getTarget();
   auto innerLoopBuilder = [&](OpBuilder &b, Location loopLoc, ValueRange ivs) {
     // We need to scatter the padding values according to the existing
     // mapScatterOp transformation, so clone the transformation into the
@@ -309,27 +307,21 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     // write the padding values. Padding values must obey the existing mask
     // of the current mapScatterOp, and also be in the low or high pad
     // range of the padOp.
-    SmallVector<OpFoldResult> low = padOp.getMixedLowPad();
-    Value writeCond = nullptr;
-    for (auto [l, srcSize, idx] : llvm::zip_equal(low, padSrcSizes, ivs)) {
-      Value lowVal = getValueOrCreateConstantIndexOp(rewriter, loc, l);
-      auto isLowPad = rewriter
-                          .create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult,
-                                                 idx, lowVal)
-                          ->getResult(0);
+    SmallVector<OpFoldResult> mixedLows = padOp.getMixedLowPad();
+    Value writeCond;
+    for (auto [low, srcSize, idx] :
+         llvm::zip_equal(mixedLows, padSrcSizes, ivs)) {
+      Value lowVal = getValueOrCreateConstantIndexOp(rewriter, loc, low);
+      Value isLowPad = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::ult, idx, lowVal);
       Value highPadStart = getValueOrCreateConstantIndexOp(
-          rewriter, loc, IREE::LinalgExt::addOfrs(b, loopLoc, l, srcSize));
-      auto isHighPad =
-          rewriter
-              .create<arith::CmpIOp>(loc, arith::CmpIPredicate::uge, idx,
-                                     highPadStart)
-              ->getResult(0);
+          rewriter, loc, IREE::LinalgExt::addOfrs(b, loopLoc, low, srcSize));
+      Value isHighPad = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::uge, idx, highPadStart);
       Value isPad = rewriter.create<arith::OrIOp>(loc, isLowPad, isHighPad);
-      if (!writeCond) {
-        writeCond = isPad;
-        continue;
-      }
-      writeCond = rewriter.create<arith::OrIOp>(loc, writeCond, isPad);
+      writeCond = !writeCond
+                      ? isPad
+                      : rewriter.create<arith::OrIOp>(loc, writeCond, isPad);
     }
     SmallVector<Value> storeIndices(yieldOp.getOperands());
     rewriter.eraseOp(yieldOp);
@@ -344,8 +336,8 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     b.create<scf::IfOp>(loopLoc, writeCond, thenBuilder);
   };
 
-  buildNestedDistributionLoops(rewriter, loc, 0, lbs, ubs, distConfigs,
-                               innerLoopBuilder);
+  buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs, ubs,
+                               distConfigs, innerLoopBuilder);
 
   // Now that the padding values are being written to the outputBuffer, the
   // padOp becomes a no-op with respect to the index transformation on the
@@ -358,11 +350,12 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
 
 /// Fold the `op` into the `mapScatterOp`, if possible. The resulting
 /// map_scatter op is returned, if the `op` was folded. Otherwise, return
-/// failure.
+/// failure. For `PadOp`s, use the `padDistributionConfigFn` to distribute
+/// the writing of padding values to the corresponding output buffer.
 static FailureOr<MapScatterOp>
 foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
                    MapScatterOp mapScatterOp,
-                   DistributionConfigFn distributionConfigFn) {
+                   PadDistributionConfigFn padDistributionConfigFn) {
   return llvm::TypeSwitch<Operation *, FailureOr<MapScatterOp>>(op)
       .Case<linalg::CopyOp>([&](linalg::CopyOp copyOp) {
         return foldIdentityLikeOpIntoMapScatter(rewriter, copyOp, mapScatterOp);
@@ -382,7 +375,7 @@ foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
       })
       .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
         return foldPadIntoMapScatter(rewriter, padOp, mapScatterOp,
-                                     distributionConfigFn);
+                                     padDistributionConfigFn);
       })
       .Default([](Operation *) { return failure(); });
 }
@@ -391,9 +384,9 @@ foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
 /// into a single iree_linalg_ext.map_scatter op. An identity map_scatter op
 /// is inserted before the root, and then the producers of the map_scatter op
 /// are folded into the map_scatter until an unsupported op is reached.
-static void combineRelayoutOpChain(RewriterBase &rewriter,
-                                   MapScatterOp mapScatterOp,
-                                   DistributionConfigFn distributionConfigFn) {
+static void
+combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
+                       PadDistributionConfigFn padDistributionConfigFn) {
   Operation *relayoutOp = mapScatterOp.getInput().getDefiningOp();
   if (!relayoutOp) {
     return;
@@ -404,7 +397,7 @@ static void combineRelayoutOpChain(RewriterBase &rewriter,
                                << " into map_scatter op:\n"
                                << *relayoutOp);
     FailureOr<MapScatterOp> maybeCombinedRelayoutOp = foldIntoMapScatter(
-        rewriter, relayoutOp, combinedRelayoutOp, distributionConfigFn);
+        rewriter, relayoutOp, combinedRelayoutOp, padDistributionConfigFn);
     if (failed(maybeCombinedRelayoutOp)) {
       LDBG("Failed to fold " << relayoutOp->getName()
                              << " into map_scatter op");
@@ -442,14 +435,44 @@ insertIdentityMapScatter(RewriterBase &rewriter,
   return mapScatterOp;
 }
 
+LogicalResult
+combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
+                            PadDistributionConfigFn padDistributionConfigFn) {
+  // Apply some preprocessing to convert complex layout transformation
+  // ops like pack and unpack into simpler supported ops.
+  IRRewriter rewriter(ctx);
+  simplifyComplexRelayoutOps(rewriter, funcOp);
+
+  // Start from iree_codegen.store_to_memref ops, and combine producer
+  // relayout ops into a single map_scatter.
+  SmallVector<IREE::Codegen::StoreToMemrefOp> dispatchResults(
+      funcOp.getFunctionBody().getOps<IREE::Codegen::StoreToMemrefOp>());
+  for (IREE::Codegen::StoreToMemrefOp dispatchResult : dispatchResults) {
+    MapScatterOp mapScatterOp =
+        insertIdentityMapScatter(rewriter, dispatchResult);
+    combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);
+  }
+
+  // Cleanup any tensor.dim ops that may be present after relayout
+  // combination.
+  RewritePatternSet cleanupPatterns(ctx);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanupPatterns);
+  if (failed(applyPatternsGreedily(funcOp, std::move(cleanupPatterns)))) {
+    return failure();
+  }
+  return success();
+}
+
+/// TODO(Max191): Improve heuristic for tile size selection.
 static SmallVector<DistributionConfig>
-defaultWorkgroupDistributionConfigFn(ArrayRef<int64_t> sizes,
-                                     MLIRContext *ctx) {
+defaultPadWorkgroupDistributionConfigFn(ArrayRef<int64_t> iterationBounds,
+                                        MLIRContext *ctx) {
   DistributionConfig workgroupDistributionConfig;
-  workgroupDistributionConfig.tileSizes = SmallVector<int64_t>(sizes.size(), 1);
+  workgroupDistributionConfig.tileSizes.assign(iterationBounds.size(), 1);
   workgroupDistributionConfig.tileSizes.back() = 64;
   workgroupDistributionConfig.mapping = llvm::map_to_vector(
-      llvm::seq<int64_t>(sizes.size()), [&](int64_t dim) -> Attribute {
+      llvm::seq<int64_t>(iterationBounds.size()),
+      [&](int64_t dim) -> Attribute {
         switch (dim) {
         case 0:
         case 1:
@@ -466,34 +489,6 @@ defaultWorkgroupDistributionConfigFn(ArrayRef<int64_t> sizes,
   return {workgroupDistributionConfig};
 }
 
-LogicalResult
-combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
-                            DistributionConfigFn distributionConfigFn) {
-  // Apply some preprocessing to convert complex layout transformation
-  // ops like pack and unpack into simpler supported ops.
-  IRRewriter rewriter(ctx);
-  simplifyComplexRelayoutOps(rewriter, funcOp);
-
-  // Start from iree_codegen.store_to_memref ops, and combine producer
-  // relayout ops into a single map_scatter.
-  SmallVector<IREE::Codegen::StoreToMemrefOp> dispatchResults(
-      funcOp.getFunctionBody().getOps<IREE::Codegen::StoreToMemrefOp>());
-  for (IREE::Codegen::StoreToMemrefOp dispatchResult : dispatchResults) {
-    MapScatterOp mapScatterOp =
-        insertIdentityMapScatter(rewriter, dispatchResult);
-    combineRelayoutOpChain(rewriter, mapScatterOp, distributionConfigFn);
-  }
-
-  // Cleanup any tensor.dim ops that may be present after relayout
-  // combination.
-  RewritePatternSet cleanupPatterns(ctx);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanupPatterns);
-  if (failed(applyPatternsGreedily(funcOp, std::move(cleanupPatterns)))) {
-    return failure();
-  }
-  return success();
-}
-
 namespace {
 
 struct CombineLayoutTransformationPass final
@@ -505,7 +500,7 @@ struct CombineLayoutTransformationPass final
   void runOnOperation() override {
     if (failed(combineLayoutTransformation(
             &getContext(), getOperation(),
-            defaultWorkgroupDistributionConfigFn))) {
+            defaultPadWorkgroupDistributionConfigFn))) {
       return signalPassFailure();
     }
   }
