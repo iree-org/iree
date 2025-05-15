@@ -26,6 +26,9 @@
 #include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
+// Attribute name for specifying preprocessing pass-pipeline on func-like ops.
+static const char kPreprocessingPipelineAttrName[] = "preprocessing_pipeline";
+
 namespace mlir::iree_compiler::IREE::Util {
 
 static llvm::cl::opt<bool> clZeroFillElidedAttrs(
@@ -966,6 +969,19 @@ void UtilDialect::registerAttributes() {
       SerializableDenseResourceElementsAttrModel>(context);
   StringAttr::attachInterface<SizedStorageStringAttrModel,
                               SerializableStringAttrModel>(context);
+}
+
+PreprocessingPassPipelineAttr
+getPreprocessingPassPipelineAttribute(FunctionOpInterface funclikeOp) {
+  return dyn_cast_or_null<PreprocessingPassPipelineAttr>(
+      funclikeOp->getAttr(kPreprocessingPipelineAttrName));
+}
+
+void setPreprocessingPassPipelineAttribute(
+    FunctionOpInterface funclikeOp,
+    PreprocessingPassPipelineAttr preprocessingPassPipeline) {
+  funclikeOp->setAttr(kPreprocessingPipelineAttrName,
+                      preprocessingPassPipeline);
 }
 
 } // namespace mlir::iree_compiler::IREE::Util

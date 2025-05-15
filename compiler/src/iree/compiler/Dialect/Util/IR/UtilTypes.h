@@ -22,6 +22,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 #include <numeric>
 
@@ -408,6 +409,18 @@ static inline int64_t getRoundedPhysicalStorageSize(ShapedType type) {
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc" // IWYU pragma: keep
 // clang-format on
+
+namespace mlir::iree_compiler::IREE::Util {
+// Returns the preprocessing pass pipeline attribute set on an operation.
+PreprocessingPassPipelineAttr
+getPreprocessingPassPipelineAttribute(FunctionOpInterface funclikeOp);
+
+// Method to set a preprocessing pass pipeline attribute on an operation.
+// Overrides preprocessing pipeline set on the `funclikeOp`.
+void setPreprocessingPassPipelineAttribute(FunctionOpInterface funclikeOp,
+    PreprocessingPassPipelineAttr pipelineAttr);
+
+} // namespace mlir::iree_compiler::IREE::Util
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_TYPEDEF_CLASSES

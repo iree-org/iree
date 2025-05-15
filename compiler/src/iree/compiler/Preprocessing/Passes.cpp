@@ -111,7 +111,7 @@ void buildPreprocessingPassPipeline(
 
   // 3. Run any pass pipelines specified through the use of
   //    `preprocessing_pipeline` attribute.
-  FunctionLikeNest(passManager).addPass(createAttrBasedPipelinePass);
+  passManager.addPass(createAttrBasedPipelinePass());
 }
 
 static void
