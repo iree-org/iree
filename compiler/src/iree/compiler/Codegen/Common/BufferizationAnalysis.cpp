@@ -581,7 +581,7 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
-              tensor::GenerateOp, tensor::PadOp, bufferization::ToBufferOp,
+              tensor::GenerateOp, tensor::PadOp, bufferization::ToMemrefOp,
               bufferization::AllocTensorOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {

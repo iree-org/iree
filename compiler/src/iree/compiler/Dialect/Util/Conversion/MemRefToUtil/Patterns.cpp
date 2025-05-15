@@ -316,7 +316,7 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
       });
 
   patterns
-      .insert<FoldAsNoOp<bufferization::ToBufferOp>,
+      .insert<FoldAsNoOp<bufferization::ToMemrefOp>,
               ElideNoOp<memref::AssumeAlignmentOp>, FoldAsNoOp<memref::CastOp>>(
           typeConverter, context);
   patterns

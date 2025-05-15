@@ -746,7 +746,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - unrealized_conversion_cast with the same source and target type.
   patterns.add<
       FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
-      FoldAsNoOp<bufferization::ToBufferOp>, RemoveIdentityConversionCast>(
+      FoldAsNoOp<bufferization::ToMemrefOp>, RemoveIdentityConversionCast>(
       typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
