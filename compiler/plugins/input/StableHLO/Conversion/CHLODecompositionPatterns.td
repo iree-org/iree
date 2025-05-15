@@ -101,7 +101,7 @@ def : Pat<(CHLO_AcoshOp NonComplexElementType:$input),
         $input,
         (StableHLO_SqrtOp
           (ConstantLikeMaxFiniteValue $input),
-          STABLEHLO_DEFAULT_RESULT_ACCURACY,
+          STABLEHLO_DEFAULT_RESULT_ACCURACY
         ),
         StableHLO_ComparisonDirectionValue<"GE">,
         (STABLEHLO_DEFAULT_COMPARISON_TYPE)
