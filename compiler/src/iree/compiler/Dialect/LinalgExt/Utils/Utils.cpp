@@ -826,4 +826,98 @@ bool isaHorizontallyFusedContraction(Operation *op) {
   return true;
 }
 
+bool isArgmaxOp(linalg::GenericOp genericOp) {
+  // Check for 2 results(value, index), and 1 input
+  if (genericOp.getNumDpsInits() != 2) {
+    return false;
+  }
+
+  if (genericOp.getNumDpsInputs() != 1) {
+    return false;
+  }
+
+  // If max value is being used, it is not a pure argmax.
+  if (!genericOp.getResults()[0].use_empty()) {
+    return false;
+  }
+
+  // Argmax will require 1D reduction.
+  if (genericOp.getNumReductionLoops() != 1) {
+    return false;
+  }
+
+  // TODO: Add better affine map checks.
+  auto indexing_maps = genericOp.getIndexingMapsArray();
+  if (!indexing_maps[0].isIdentity())
+    return false;
+
+  // Check that initial value is negative Infinite.
+  // TODO: Move this check to ukernel once we implement
+  //       variant to handle non neg-Inf initial value.
+  Value initVal = genericOp.getDpsInitOperand(0)->get();
+  auto fillOp = initVal.getDefiningOp<linalg::FillOp>();
+  if (!fillOp)
+    return false;
+  Value fillVal = fillOp.getDpsInputOperand(0)->get();
+  if (!matchPattern(fillVal, m_NegInfFloat()))
+    return false;
+
+  // Work back from linalg.yield and check body of genericOp.
+  // The genericOp should yield the result of an arith.select,
+  // preceded by an arith.cmpf, arith.maximumf, and arith.extui
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  Value producerOutput;
+  Operation *producer;
+
+  // Producer of linalg.yield 1st arg is arith.maximumf
+  {
+    producerOutput = yieldOp->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return false;
+    }
+    if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
+      return false;
+    }
+  }
+
+  // Producer of linalg.yield op 2nd arg is arith.select
+  // TODO: Add check that select is selecting between linalg.index and index of
+  // current max.
+  {
+    producerOutput = yieldOp->getOperand(1);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return false;
+    }
+    if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
+      return false;
+    }
+  }
+
+  // Producer of arith.select op is arith.cmpf
+  {
+    producerOutput = producer->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return false;
+    }
+    auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
+    if (!producerCmpFOp ||
+        producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
+      return false;
+    }
+
+    // Check that in and out of cmpf are loop variables.
+    // Currently first operand is disabled because it may be mixed type
+    // which would lead it to be extf(%arg0).
+    // TODO: Add better mixed type support check.
+    if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt

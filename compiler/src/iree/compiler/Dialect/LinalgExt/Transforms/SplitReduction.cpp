@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -387,6 +388,333 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   }
 
   return success();
+}
+
+struct ArgmaxCombinerOps {
+  Operation *maxOp = nullptr;    // arith.maximumf
+  Operation *selectOp = nullptr; // arith.select
+  Operation *cmpOp = nullptr;    // arith.cmpf
+};
+
+// Matches the combiner pattern in a linalg.generic argmax-style reduction:
+// Example MLIR:
+// %4:2 = linalg.generic {
+//     indexing_maps = [...],
+//     iterator_types = ["parallel", "reduction"]
+//   } ins(%arg0 : tensor<?x128xbf16>) outs(%1, %3 : tensor<?xbf16>,
+//   tensor<?xi64>) {
+// ^bb0(%in: bf16, %out: bf16, %out_0: i64):
+//   %5 = linalg.index 1 : index
+//   %6 = arith.index_cast %5 : index to i64
+//   %7 = arith.maximumf %in, %out : bf16
+//   %8 = arith.cmpf ogt, %in, %out : bf16
+//   %9 = arith.select %8, %6, %out_0 : i64
+//   linalg.yield %7, %9 : bf16, i64
+// } -> (tensor<?xbf16>, tensor<?xi64>)
+//
+// This function extracts the `arith.maximumf`, `arith.cmpf`, and `arith.select`
+// operations from the body to facilitate transformations such as split
+// reduction.
+static ArgmaxCombinerOps collectArgmaxCombinerOps(linalg::GenericOp genericOp) {
+  assert(isArgmaxOp(genericOp) && "expected operation to be an argmax op");
+
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+
+  // Extract max value producer: arith.maximumf.
+  Value maxResult = yieldOp.getOperand(0);
+  auto maxOp = cast<arith::MaximumFOp>(maxResult.getDefiningOp());
+
+  // Extract index result producer: arith.select.
+  Value indexResult = yieldOp.getOperand(1);
+  auto selectOp = cast<arith::SelectOp>(indexResult.getDefiningOp());
+
+  // Extract the condition of the select, expected to be arith.cmpf with
+  // predicate OGT.
+  auto cmpOp = cast<arith::CmpFOp>(selectOp.getCondition().getDefiningOp());
+
+  ArgmaxCombinerOps ops;
+  ops.maxOp = maxOp;
+  ops.selectOp = selectOp;
+  ops.cmpOp = cmpOp;
+  return ops;
+}
+
+static Value expandValue(OpBuilder &builder, Location loc, Value value,
+                         RankedTensorType expandedType) {
+  RankedTensorType originalType = cast<RankedTensorType>(value.getType());
+  if (originalType == expandedType) {
+    return value;
+  }
+  auto reassociation =
+      getReassociationIndicesForReshape(originalType, expandedType);
+  assert(reassociation && "failed to infer reassociation indices from types");
+  return builder.create<tensor::ExpandShapeOp>(loc, expandedType, value,
+                                               *reassociation);
+}
+
+// Returns an expanded input AffineMap by splitting the given reduction
+// dimension into [parallel, reduction] or [reduction, parallel], inserting a
+// new dimension at `insertSplitDim`.
+static AffineMap getExpandedInputIndexingMap(AffineMap oldMap,
+                                             unsigned reductionDim,
+                                             unsigned insertSplitDim,
+                                             bool innerParallel,
+                                             MLIRContext *ctx) {
+  SmallVector<AffineExpr> exprs;
+  for (unsigned idx = 0; idx < oldMap.getNumResults(); ++idx) {
+    unsigned dim = oldMap.getDimPosition(idx);
+    if (dim != reductionDim) {
+      unsigned shifted = (dim < insertSplitDim) ? dim : dim + 1;
+      exprs.push_back(getAffineDimExpr(shifted, ctx));
+      continue;
+    }
+    // Expand the reduction dimension into [reduction, parallel] or [parallel,
+    // reduction].
+    if (innerParallel) {
+      exprs.push_back(
+          getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+    } else {
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+      exprs.push_back(
+          getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
+    }
+  }
+
+  return AffineMap::get(oldMap.getNumDims() + 1, oldMap.getNumSymbols(), exprs,
+                        ctx);
+}
+
+// Returns an expanded output AffineMap with a dimension inserted at
+// `insertSplitDim`.
+static AffineMap getExpandedOutputIndexingMap(AffineMap oldMap,
+                                              unsigned insertSplitDim,
+                                              MLIRContext *ctx) {
+  SmallVector<AffineExpr> exprs;
+  for (unsigned idx = 0; idx <= oldMap.getNumResults(); ++idx) {
+    if (idx == insertSplitDim) {
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+    }
+    if (idx < oldMap.getNumResults()) {
+      unsigned dim = oldMap.getDimPosition(idx);
+      unsigned shifted = (dim < insertSplitDim) ? dim : dim + 1;
+      exprs.push_back(getAffineDimExpr(shifted, ctx));
+    }
+  }
+
+  return AffineMap::get(oldMap.getNumDims() + 1, oldMap.getNumSymbols(), exprs,
+                        ctx);
+}
+
+static Value getSplitReductionInit(OpBuilder &builder, Location loc,
+                                   Value origInit, Attribute identityAttr,
+                                   int64_t insertDimSize,
+                                   unsigned insertSplitIndex) {
+  Type elemType = getElementTypeOrSelf(origInit.getType());
+  SmallVector<OpFoldResult> shape =
+      tensor::getMixedSizes(builder, loc, origInit);
+  shape.insert(shape.begin() + insertSplitIndex,
+               builder.getIndexAttr(insertDimSize));
+  Value identityVal = builder.create<arith::ConstantOp>(
+      loc, elemType, cast<TypedAttr>(identityAttr));
+  Value empty = builder.create<tensor::EmptyOp>(loc, shape, elemType);
+  return builder.create<linalg::FillOp>(loc, identityVal, empty).getResult(0);
+}
+
+FailureOr<linalg::SplitReductionResult>
+splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
+                     linalg::ControlSplitReductionFn controlSplitReductionFn) {
+  assert(isArgmaxOp(genericOp) && "expected operation to be an argmax op");
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(genericOp);
+  Location loc = genericOp->getLoc();
+
+  linalg::SplitReductionOptions control = controlSplitReductionFn(genericOp);
+  if (control.innerParallel) {
+    // TODO(Bangtian): Currently bail out when innerParallel is true.
+    // Much of the logic is already in place based on the upstream
+    // implementation, but full support requires early detection and additional
+    // handling before performing the split. Will revisit when support becomes
+    // necessary.
+    return rewriter.notifyMatchFailure(
+        genericOp, "innerParallel split is not supported yet");
+  }
+
+  int64_t ratio = control.ratio;
+  unsigned insertSplitIndex = control.index;
+  unsigned insertSplitDimension = control.index;
+  if (ratio <= 1) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "split ratio needs to be greater than 1");
+  }
+
+  SmallVector<unsigned> dims;
+  genericOp.getReductionDims(dims);
+  unsigned reductionDim = dims[0];
+  if (control.innerParallel) {
+    insertSplitDimension = reductionDim + 1;
+  }
+
+  SmallVector<int64_t, 4> loopRanges = genericOp.getStaticLoopRanges();
+  int64_t reductionDimSize = loopRanges[reductionDim];
+  if (ShapedType::isDynamic(reductionDimSize) ||
+      reductionDimSize % ratio != 0) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "Reduction dimension not divisible by split ratio");
+  }
+
+  if (insertSplitIndex >
+      genericOp.getShape(genericOp.getDpsInitOperand(0)).size()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "Insert dimension position too large "
+                                       "compared to intermediate tensor size");
+  }
+
+  ArgmaxCombinerOps combinerOps = collectArgmaxCombinerOps(genericOp);
+  Operation *reductionOp = combinerOps.maxOp;
+  std::optional<TypedAttr> identity = arith::getNeutralElement(reductionOp);
+  if (!identity.has_value()) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "Unknown identity value for the reduction");
+  }
+
+  SmallVector<Value> newInputs;
+  for (OpOperand *operand : genericOp.getDpsInputOperands()) {
+    AffineMap map = genericOp.getMatchingIndexingMap(operand);
+    ArrayRef<int64_t> oldShape = genericOp.getShape(operand);
+    Type elementType = getElementTypeOrSelf(operand->get().getType());
+    SmallVector<int64_t> expandedShape;
+    for (auto idx : llvm::seq<unsigned>(0, map.getNumResults())) {
+      unsigned dim = map.getDimPosition(idx);
+      if (dim != reductionDim) {
+        expandedShape.push_back(oldShape[idx]);
+        continue;
+      }
+      int64_t orig = oldShape[idx];
+      int64_t outer = orig / ratio;
+      if (control.innerParallel) {
+        expandedShape.push_back(ratio); // reduction.
+        expandedShape.push_back(outer); // parallel.
+      } else {
+        expandedShape.push_back(outer); // parallel.
+        expandedShape.push_back(ratio); // reduction.
+      }
+    }
+
+    auto expandedType = RankedTensorType::get(expandedShape, elementType);
+    Value expanded = expandValue(rewriter, loc, operand->get(), expandedType);
+    newInputs.push_back(expanded);
+  }
+
+  // The total number of output elements along this new dimension is
+  // reductionDimSize / ratio.
+  int64_t outputDimSize = reductionDimSize / ratio;
+  OpOperand *valueInit = genericOp.getDpsInitOperand(0);
+  OpOperand *indexInit = genericOp.getDpsInitOperand(1);
+  // Value identity.
+  Value identityValue =
+      getSplitReductionInit(rewriter, loc, valueInit->get(), *identity,
+                            outputDimSize, insertSplitIndex);
+  // Index identity.
+  Type indexElemType = genericOp.getRegionOutputArgs()[1].getType();
+  Value identityIndex = getSplitReductionInit(
+      rewriter, loc, indexInit->get(), rewriter.getZeroAttr(indexElemType),
+      outputDimSize, insertSplitIndex);
+
+  SmallVector<utils::IteratorType> newIteratorTypes =
+      genericOp.getIteratorTypesArray();
+  newIteratorTypes.insert(newIteratorTypes.begin() + insertSplitDimension,
+                          utils::IteratorType::parallel);
+
+  SmallVector<AffineMap> newMaps;
+  unsigned numInputs = genericOp.getNumDpsInputs();
+  for (OpOperand &operand : genericOp->getOpOperands()) {
+    AffineMap map = genericOp.getMatchingIndexingMap(&operand);
+    if (operand.getOperandNumber() < numInputs) {
+      newMaps.push_back(getExpandedInputIndexingMap(
+          map, reductionDim, insertSplitDimension, control.innerParallel,
+          rewriter.getContext()));
+    } else {
+      newMaps.push_back(getExpandedOutputIndexingMap(map, insertSplitDimension,
+                                                     rewriter.getContext()));
+    }
+  }
+
+  // Create partial linalg.generic op with global index computation.
+  Value tileSize = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
+  auto partialOp = rewriter.create<linalg::GenericOp>(
+      loc, TypeRange{identityValue.getType(), identityIndex.getType()},
+      newInputs, ValueRange{identityValue, identityIndex}, newMaps,
+      newIteratorTypes);
+
+  rewriter.inlineRegionBefore(genericOp.getRegion(), partialOp.getRegion(),
+                              partialOp.getRegion().begin());
+
+  Block &body = partialOp.getRegion().front();
+  rewriter.setInsertionPointToStart(&body);
+
+  unsigned innerIdxDim = reductionDim + 1;
+  unsigned outerIdxDim = insertSplitDimension;
+
+  // Compute global index (gidx) for reduction when the original reduction
+  // dimension is split into [outerIdx, innerIdx] using `ratio`. This is used to
+  // correctly compute the global index for comparisons and index selection.
+  Value outerIdx = rewriter.create<linalg::IndexOp>(loc, outerIdxDim);
+  Value innerIdx = rewriter.create<linalg::IndexOp>(loc, innerIdxDim);
+  Value offset = rewriter.create<arith::MulIOp>(loc, outerIdx, tileSize);
+  Value gidx = rewriter.create<arith::AddIOp>(loc, offset, innerIdx);
+
+  auto selectOp = dyn_cast<arith::SelectOp>(combinerOps.selectOp);
+  Value oldIdx = selectOp.getTrueValue();
+  Value newIdx = gidx;
+  if (oldIdx.getType() != gidx.getType()) {
+    newIdx = rewriter.create<arith::IndexCastOp>(loc, oldIdx.getType(), gidx);
+  }
+  selectOp.setOperand(1, newIdx);
+  rewriter.setInsertionPointAfter(partialOp);
+
+  unsigned intermRank =
+      cast<RankedTensorType>(identityValue.getType()).getRank();
+  AffineMap valueMap = rewriter.getMultiDimIdentityMap(intermRank);
+  AffineMap indexMap = valueMap;
+
+  SmallVector<AffineExpr> resultExprs;
+  SmallVector<utils::IteratorType> reductionIteratorTypes(
+      intermRank, utils::IteratorType::parallel);
+  reductionIteratorTypes[insertSplitIndex] = utils::IteratorType::reduction;
+  for (auto i : llvm::seq<unsigned>(0, intermRank)) {
+    if (i != insertSplitIndex) {
+      resultExprs.push_back(rewriter.getAffineDimExpr(i));
+    }
+  }
+
+  AffineMap outputMap =
+      AffineMap::get(intermRank, 0, resultExprs, rewriter.getContext());
+  SmallVector<AffineMap> finalReductionMaps = {valueMap, indexMap, outputMap,
+                                               outputMap};
+
+  // Create block for final reduction region.
+  auto finalReduction = rewriter.create<linalg::GenericOp>(
+      loc, genericOp.getResultTypes(),
+      ValueRange{partialOp.getResult(0), partialOp.getResult(1)},
+      genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
+      [combinerOps](OpBuilder &b, Location loc, ValueRange inputs) {
+        Operation *clonedMax = b.clone(*combinerOps.maxOp);
+        clonedMax->setOperands({inputs[0], inputs[2]});
+        Operation *clonedCmp = b.clone(*combinerOps.cmpOp);
+        clonedCmp->setOperands({inputs[0], inputs[2]});
+        Operation *clonedSel = b.clone(*combinerOps.selectOp);
+        clonedSel->setOperands({clonedCmp->getResult(0), inputs[1], inputs[3]});
+        b.create<linalg::YieldOp>(
+            loc, ValueRange{clonedMax->getResult(0), clonedSel->getResult(0)});
+      });
+
+  rewriter.replaceOp(genericOp, finalReduction.getResults());
+  // Init or alloc and fillOp are not applicable for argmax op; set to nullptr.
+  return linalg::SplitReductionResult{
+      /*initOrAlloc=*/nullptr, /*fillOp=*/nullptr,
+      cast<linalg::LinalgOp>(partialOp.getOperation()), finalReduction};
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
