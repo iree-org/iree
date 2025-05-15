@@ -14,7 +14,7 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_CANONICALIZERPASS
+#define GEN_PASS_DEF_CANONICALIZEPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
@@ -84,10 +84,9 @@ struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
 };
 
 /// Canonicalize operations in nested regions.
-struct CanonicalizerPass
-    : public impl::CanonicalizerPassBase<CanonicalizerPass> {
-  using IREE::Flow::impl::CanonicalizerPassBase<
-      CanonicalizerPass>::CanonicalizerPassBase;
+struct CanonicalizePass : public impl::CanonicalizePassBase<CanonicalizePass> {
+  using IREE::Flow::impl::CanonicalizePassBase<
+      CanonicalizePass>::CanonicalizePassBase;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {
