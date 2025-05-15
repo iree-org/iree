@@ -16,7 +16,7 @@
     "device": "hip",
     "golden_time_ms": {
         "mi250": 260.0,
-        "mi300": 62.0,
+        "mi300": 69.0,
         "mi308": 146
     },
     "golden_dispatch": {
