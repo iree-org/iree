@@ -250,7 +250,8 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool vectorizeCopies = true,
-                                      bool enableMasking = false) {
+                                      bool enableMasking = false,
+                                      bool enableTransferGather = false) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -265,6 +266,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
   options.enableVectorMasking = enableMasking;
+  options.vectorizeToTransferGather = true;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -919,7 +921,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
-  addGPUVectorizationPasses(funcPassManager);
+  addGPUVectorizationPasses(funcPassManager, true, false, true);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());

@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
@@ -168,6 +169,14 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
+  if (IREE::LinalgExt::isGatherlikeOp(op)) {
+    // Do not collapse gather like operations, as this can throw away contiguity
+    // information. We can enable this if we see a dimension being collapsed
+    // that is coming from 2 linalg.index operations and collapsing that
+    // dimension on the tensor.extract source as well.
+    return false;
+  }
+
   if (isa<IREE::LinalgExt::AttentionOp>(op)) {
     return true;
   }

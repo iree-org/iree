@@ -714,10 +714,10 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
-    // Disable all other producer fusion. TODO: Enable some producer fusions.
-    return false;
-  }
+  // if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+  //   // Disable all other producer fusion. TODO: Enable some producer fusions.
+  //   return false;
+  // }
 
   if (isPackLikeOp(consumer)) {
     return TypeSwitch<Operation *, bool>(producer)

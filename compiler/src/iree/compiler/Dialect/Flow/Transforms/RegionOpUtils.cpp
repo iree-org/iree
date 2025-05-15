@@ -831,6 +831,26 @@ static bool isAttentionMaskGenerator(Operation *op) {
   return false;
 }
 
+static bool isAttentionKVGather(Operation *op) {
+  if (!LinalgExt::isGatherlikeOp(op)) {
+    return false;
+  }
+
+  for (OpOperand &use : op->getUses()) {
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::AttentionOp>(use.getOwner())) {
+      if (attention.getKey() == use.get()) {
+        return true;
+      }
+      if (attention.getValue() == use.get()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 static bool isScatterIndicesGenerator(Operation *op) {
   for (OpOperand &use : op->getUses()) {
     if (auto scatter = dyn_cast<IREE::LinalgExt::ScatterOp>(use.getOwner())) {
@@ -861,6 +881,11 @@ bool isClonableIntoDispatchOp(Operation *op,
   if (LinalgExt::isBitExtendOp(op)) {
     return true;
   }
+
+  if (isAttentionKVGather(op)) {
+    return true;
+  }
+
   if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
     return true;
   }
@@ -939,17 +964,6 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
       if (insertSliceUser.getDest() == v)
         return true;
-    }
-
-    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
-      // Only clone if used by Query, Mask, or scale.
-      if (!LinalgExt::isBitExtendOp(v.getDefiningOp()) &&
-          !llvm::is_contained<Value>(
-              {attentionOp.getQuery(), attentionOp.getMask(),
-               attentionOp.getScale(), attentionOp.getOutput()},
-              v)) {
-        return true;
-      }
     }
   }
   return false;
