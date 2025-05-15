@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-linalgExt-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -918,6 +919,25 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   return true;
+}
+
+bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
+  // Check if there are any non-scalar inputs or non-scalar captures in the
+  // region.
+  for (Value input : linalgOp.getDpsInputs()) {
+    if (isa<ShapedType>(input.getType())) {
+      return false;
+    }
+  }
+
+  bool foundNonScalar = false;
+  visitUsedValuesDefinedAbove(linalgOp.getRegion(), [&](OpOperand *operand) {
+    if (isa<ShapedType>(operand->get().getType())) {
+      foundNonScalar = true;
+    }
+  });
+
+  return !foundNonScalar;
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

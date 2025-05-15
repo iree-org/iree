@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    MLIRTransformUtils
   PUBLIC
 )
 
