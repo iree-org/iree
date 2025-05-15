@@ -561,19 +561,19 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
               if (llvm::isa<RankedTensorType>(
-                      transferReadOp.getSource().getType())) {
-                plan.insert(transferReadOp.getSource());
+                      transferReadOp.getBase().getType())) {
+                plan.insert(transferReadOp.getBase());
               }
               return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
               if (!llvm::isa<RankedTensorType>(
-                      transferWriteOp.getSource().getType())) {
+                      transferWriteOp.getBase().getType())) {
                 return success();
               }
               return analyseDestructiveUpdateOp(
-                  transferWriteOp, nullptr, transferWriteOp.getSource(),
+                  transferWriteOp, nullptr, transferWriteOp.getBase(),
                   transferWriteOp.getResult(), plan);
             })
         .Case<scf::IfOp>(
