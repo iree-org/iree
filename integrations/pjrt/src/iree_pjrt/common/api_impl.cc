@@ -103,19 +103,19 @@ iree_status_t MapElementTypeToMlirType(iree_hal_element_type_t element_type,
       *ty = "i1";
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_4:
-      *ty = "si4";
+      *ty = "i4";
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      *ty = "si8";
+      *ty = "i8";
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      *ty = "si16";
+      *ty = "i16";
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      *ty = "si32";
+      *ty = "i32";
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      *ty = "si64";
+      *ty = "i64";
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_UINT_4:
       *ty = "ui4";
