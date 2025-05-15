@@ -25,7 +25,7 @@ namespace {
 /// This pass is a hack to get around other work that can be done to improve
 /// the bufferization algorithm.
 /// For such cases, need to make Flow preserve the unused result as a
-// result of the dispatch
+/// result of the dispatch.
 struct GPUPruneDPSOpsPass final
     : impl::GPUPruneDPSOpsPassBase<GPUPruneDPSOpsPass> {
   void runOnOperation() override;
@@ -57,8 +57,9 @@ void GPUPruneDPSOpsPass::runOnOperation() {
     auto shapedType = cast<ShapedType>(typ);
     int allocSize = 1;
     for (auto dimSize : shapedType.getShape()) {
-      if (ShapedType::isDynamic(dimSize))
+      if (ShapedType::isDynamic(dimSize)) {
         continue;
+      }
       allocSize *= dimSize;
     }
     return allocSize >= 32;
@@ -67,13 +68,13 @@ void GPUPruneDPSOpsPass::runOnOperation() {
   // Iterate over all DPS ops and their inits, collecting ops to add a
   // tensor_alloc for.
   // There are 3 conditions of interest:
-  // 1) The result associated to the current init is unused
-  // 2) The allocation size if appropriately small
+  // 1) The result associated to the current init is unused.
+  // 2) The allocation size if appropriately small.
   // 3) The reverse use-def chain of this op is a global load followed by ops
   //    that do not change the address space.
   // The 3rd condition is not strictly necessary but this is just a precation
   // given the hacky nature of this fix.
-  SmallVector<std::pair<DestinationStyleOpInterface, int>> worklist;
+  SmallVector<OpOperand *> worklist;
   funcOp.walk([&](DestinationStyleOpInterface dpsOp) {
     for (int idx = 0; idx < dpsOp.getNumDpsInits(); ++idx) {
       OpOperand *value = dpsOp.getDpsInitOperand(idx);
@@ -104,26 +105,23 @@ void GPUPruneDPSOpsPass::runOnOperation() {
         return isPassThroughOp(op) || isGlobalLoadOp(op);
       };
       bool globalProducer = all_of(producers, arePartOfGlobalChain);
-      if (!globalProducer)
+      if (!globalProducer) {
         continue;
-      worklist.push_back({dpsOp, idx});
+      }
+      worklist.push_back(value);
     }
   });
-  // Create alloc in private space for each dps op and set it as the new
-  // in-place result.
-  for (auto [dpsOp, idx] : worklist) {
-    OpOperand *value = dpsOp.getDpsInitOperand(idx);
-    PatternRewriter rewriter(dpsOp->getContext());
-    rewriter.setInsertionPoint(dpsOp);
+  // Create alloc for each dps op and set it as the new in-place result.
+  for (auto value : worklist) {
+    auto dpsOp = value->getOwner();
+    PatternRewriter rewriter(context);
+    rewriter.setInsertionPoint(value->getOwner());
     FailureOr<Value> copy = allocateTensorForShapedValue(
         rewriter, dpsOp->getLoc(), value->get(), options, true);
-    if (failed(copy))
+    if (failed(copy)) {
       return signalPassFailure();
-    auto alloc = cast<bufferization::AllocTensorOp>(copy->getDefiningOp());
-    alloc.setMemorySpaceAttr(privSpace);
-    rewriter.modifyOpInPlace(dpsOp, [&, &dpsOp = dpsOp, &idx = idx]() {
-      dpsOp.setDpsInitOperand(idx, *copy);
-    });
+    }
+    value->set(*copy);
   }
 }
 
