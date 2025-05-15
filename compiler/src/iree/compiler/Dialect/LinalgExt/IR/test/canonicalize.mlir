@@ -21,7 +21,7 @@ func.func @pack_canonicalize(%arg0 : tensor<?x?xi32>,
 
 // -----
 
-func.func @sort_canonicalize(%arg0 : tensor<?x10xf32>,
+func.func @sort_drop_unused_results(%arg0 : tensor<?x10xf32>,
     %arg1 : tensor<?x10xi64>) -> tensor<?x10xf32> {
   %0:2 = iree_linalg_ext.sort dimension(1) outs(%arg0, %arg1: tensor<?x10xf32>,
       tensor<?x10xi64>) {
@@ -31,7 +31,7 @@ func.func @sort_canonicalize(%arg0 : tensor<?x10xf32>,
   } -> tensor<?x10xf32>, tensor<?x10xi64>
   return %0#0 : tensor<?x10xf32>
 }
-// CHECK-LABEL: func.func @sort_canonicalize
+// CHECK-LABEL: func.func @sort_drop_unused_results
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x10xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?x10xi64>
 //       CHECK:   %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<?x10xf32>)

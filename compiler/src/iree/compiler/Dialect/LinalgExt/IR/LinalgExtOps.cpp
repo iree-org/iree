@@ -516,65 +516,81 @@ SortOp::reifyResultShapes(OpBuilder &b,
 }
 
 namespace {
-struct RemoveUnusedDPSOpResults
+
+/// This pattern removes unused results from SortOp. The SortOp uses the
+/// Destination Passing Style interface so it's results are tied to it's
+/// operands as well as it's comparitor block arguments. So, to remove unused
+/// results we must also remove the associated operands and block arguments.
+///
+/// For example:
+///
+/// %0:2 = iree_linalg_ext.sort dimension(1) outs(%arg0, %arg1:
+/// tensor<?x10xf32>, tensor<?x10xi64>) {
+///   ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
+///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
+///    iree_linalg_ext.yield %42 : i1
+/// } -> tensor<?x10xf32>, tensor<?x10xi64>
+///
+/// ->
+///
+/// %0 = iree_linalg_ext.sort dimension(1) outs(%arg0: tensor<?x10xf32>) {
+///   ^bb0(%arg2: f32, %arg3: f32):
+///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
+///    iree_linalg_ext.yield %42 : i1
+/// } -> tensor<?x10xf32>
+///
+/// Note: that we will not remove unused results if their associated block
+/// arguments are used within the comparitor because that's needed for op
+/// functionality.
+struct RemoveUnusedSortOpResults
     : public OpRewritePattern<IREE::LinalgExt::SortOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
                                 PatternRewriter &rewriter) const override {
     // To avoid problems in dispatches associated with unused results, prune
-    // them
-    // here.
+    // them here.
     Location loc = sortOp->getLoc();
     auto operands = sortOp.getOutputs();
     auto results = sortOp.getResults();
+    unsigned numRes = sortOp.getNumResults();
 
-    // If there are no results, bufferization has happened.
-    // Do not try to prune results anymore.
-    if (results.size() == 0) {
+    // # TODO(#20831): Implement a way to remove unused results when using
+    // buffer semantics.
+    if (numRes == 0) {
       return failure();
     }
 
-    // If result or associated block arg is used, do not erase.
     Block &block = sortOp.getRegion().front();
     auto blockArgs = block.getArguments();
-    auto used = [](Value result) { return !result.use_empty(); };
-    SmallVector<bool> isResultIdxUsed = llvm::map_to_vector(results, used);
-    SmallVector<bool> isArgIdxUsed = llvm::map_to_vector(blockArgs, used);
-
-    // Each result of this DPS op is associated to two block arguments.
-    SmallVector<Type> newResultTypes;
-    SmallVector<Value> newOperands;
-    SmallVector<Value> usedResults;
-    for (auto i : llvm::seq<unsigned>(results.size())) {
-      if (isResultIdxUsed[i] || isArgIdxUsed[2 * i] ||
-          isArgIdxUsed[2 * i + 1]) {
-        newOperands.push_back(operands[i]);
-        usedResults.push_back(results[i]);
-        newResultTypes.push_back(results[i].getType());
-        isArgIdxUsed[2 * i] = true;
-        isArgIdxUsed[2 * i + 1] = true;
+    SmallVector<Value> usedBlockArgs, usedOperands, usedResults;
+    SmallVector<Type> usedResultTypes;
+    BitVector eraseArg(numRes * 2, false);
+    for (auto idx : llvm::seq<unsigned>(numRes)) {
+      // If result or associated block arg is used, do not erase.
+      if (!results[idx].use_empty() || !blockArgs[2 * idx].use_empty() ||
+          !blockArgs[2 * idx + 1].use_empty()) {
+        usedOperands.push_back(operands[idx]);
+        usedResults.push_back(results[idx]);
+        usedResultTypes.push_back(results[idx].getType());
+        continue;
       }
+      eraseArg.set(2 * idx, 2 * idx + 2);
     }
 
     // Bail out if no pruning required.
-    if (usedResults.size() == results.size()) {
+    if (eraseArg.none()) {
       return failure();
     }
 
     // Create new op using only operands associated to used results or block
     // args.
-    auto pruned = rewriter.create<IREE::LinalgExt::SortOp>(
-        loc, newResultTypes,
-        /*inputs=*/ValueRange{}, newOperands, sortOp.getDimension());
-
-    // Prune unused block arguments from copied op.
-    rewriter.inlineRegionBefore(sortOp.getRegion(), pruned.getRegion(),
-                                pruned.getRegion().begin());
-    Block &newBlock = pruned.getRegion().front();
-    for (int i = newBlock.getNumArguments(); i > 0; --i)
-      if (!isArgIdxUsed[i - 1])
-        newBlock.eraseArgument(i - 1);
-    rewriter.replaceAllUsesWith(usedResults, pruned.getResults());
+    auto newSortOp = rewriter.create<IREE::LinalgExt::SortOp>(
+        loc, usedResultTypes,
+        /*inputs=*/ValueRange{}, usedOperands, sortOp.getDimension());
+    newSortOp.getRegion().takeBody(sortOp.getRegion());
+    newSortOp.getRegion().front().eraseArguments(eraseArg);
+    rewriter.replaceAllUsesWith(usedResults, newSortOp.getResults());
+    rewriter.eraseOp(sortOp);
     return success();
   }
 };
@@ -582,7 +598,7 @@ struct RemoveUnusedDPSOpResults
 
 void SortOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *ctx) {
-  results.add<RemoveUnusedDPSOpResults>(ctx);
+  results.add<RemoveUnusedSortOpResults>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
