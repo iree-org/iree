@@ -147,3 +147,20 @@ util.func public @drop_unused_dispatch_region_result(
   // CHECK: util.return %[[r]]
   util.return %r#0 : tensor<?x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: util.func public @remove_redundant_results
+//  CHECK-SAME: (%[[ARG0:.+]]: tensor<?xf32>)
+util.func @remove_redundant_results(%arg0 : tensor<?xf32>) -> (tensor<?xf32>, tensor<?xf32>) {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[DIM:.+]] = tensor.dim %[[ARG0]]
+  %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
+  // CHECK: %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?xf32>{%[[DIM]]}
+  %0:3 = flow.dispatch.region -> (tensor<?xf32>{%d0}, tensor<?xf32>{%d0}, tensor<?xf32>{%d0}) {
+    // CHECK-NEXT: flow.return %[[ARG0]] : tensor<?xf32>
+    flow.return %arg0, %arg0, %arg0 : tensor<?xf32>, tensor<?xf32>, tensor<?xf32>
+  }
+  // CHECK: util.return %[[DISPATCH]], %[[DISPATCH]]
+  util.return %0#0, %0#2 : tensor<?xf32>, tensor<?xf32>
+}
