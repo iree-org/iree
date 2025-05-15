@@ -50,8 +50,8 @@ void AttrBasedPipelinePass::runOnOperation() {
   });
 
   for (auto funcLikeOp : funcLikeOps) {
-    IREE::Util::PreprocessingPassPipelineAttr passPipelineAttr
-     = IREE::Util::getPreprocessingPassPipelineAttribute(funcLikeOp);
+    IREE::Util::PreprocessingPassPipelineAttr passPipelineAttr =
+        IREE::Util::getPreprocessingPassPipelineAttribute(funcLikeOp);
     if (!passPipelineAttr) {
       continue;
     }

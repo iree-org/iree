@@ -417,8 +417,8 @@ getPreprocessingPassPipelineAttribute(FunctionOpInterface funclikeOp);
 
 // Method to set a preprocessing pass pipeline attribute on an operation.
 // Overrides preprocessing pipeline set on the `funclikeOp`.
-void setPreprocessingPassPipelineAttribute(FunctionOpInterface funclikeOp,
-    PreprocessingPassPipelineAttr pipelineAttr);
+void setPreprocessingPassPipelineAttribute(
+    FunctionOpInterface funclikeOp, PreprocessingPassPipelineAttr pipelineAttr);
 
 } // namespace mlir::iree_compiler::IREE::Util
 
