@@ -74,10 +74,11 @@ builtin.module @uninitialized attributes {
 
 // -----
 
-// CHECK-LABEL: @preprocessing_pipeline
-builtin.module @preprocessing_pipeline {
-  // CHECK: util.func public @main() attributes {preprocessing_pipeline = #util.preprocessing_pipeline<"some-iree-preprocessing-pass-pipeline">}
-  util.func public @main() attributes {preprocessing_pipeline = #util.preprocessing_pipeline<"some-iree-preprocessing-pass-pipeline">} {
+// CHECK-LABEL: @attribute_based_pipeline
+builtin.module @attribute_based_pipeline {
+  //      CHECK: util.func public @main()
+  // CHECK-SAME:     util.pipelines = {preprocessing = #util.pipeline<"some-iree-preprocessing-pass-pipeline">}
+  util.func public @main() attributes {util.pipelines = {preprocessing = #util.pipeline<"some-iree-preprocessing-pass-pipeline">}} {
     util.return
   }
 }
