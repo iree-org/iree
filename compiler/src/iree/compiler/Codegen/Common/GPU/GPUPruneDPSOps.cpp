@@ -24,7 +24,8 @@ namespace {
 /// So, the allocations must be made earlier to avoid failed bufferization.
 /// This pass is a hack to get around other work that can be done to improve
 /// the bufferization algorithm.
-/// TODO: Fix this.
+/// For such cases, need to make Flow preserve the unused result as a
+// result of the dispatch
 struct GPUPruneDPSOpsPass final
     : impl::GPUPruneDPSOpsPassBase<GPUPruneDPSOpsPass> {
   void runOnOperation() override;
@@ -34,7 +35,7 @@ void GPUPruneDPSOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FunctionOpInterface funcOp = getOperation();
 
-  gpu::AddressSpaceAttr privSpace = gpu::AddressSpaceAttr::get(
+  auto privSpace = gpu::AddressSpaceAttr::get(
       context, gpu::GPUDialect::getPrivateAddressSpace());
 
   bufferization::BufferizationOptions options;
@@ -45,20 +46,44 @@ void GPUPruneDPSOpsPass::runOnOperation() {
   // Check if this is an op that doesn't change the address space
   // and is neither a consumer nor producer.
   auto isPassThroughOp = [](Operation *op) -> bool {
-    return llvm::isa<linalg::PackOp, tensor::ExtractSliceOp, tensor::DimOp,
-                     tensor::PadOp>(op);
+    return isa<linalg::PackOp, tensor::ExtractSliceOp, tensor::DimOp,
+               tensor::PadOp>(op);
   };
   auto isGlobalLoadOp = [](Operation *op) -> bool {
-    return llvm::isa<IREE::TensorExt::DispatchTensorLoadOp>(op);
+    return isa<IREE::TensorExt::DispatchTensorLoadOp>(op);
+  };
+  // An arbitrary choice of too big.
+  auto isAllocSizeTooBig = [](Type typ) -> bool {
+    auto shapedType = cast<ShapedType>(typ);
+    int allocSize = 1;
+    for (auto dimSize : shapedType.getShape()) {
+      if (ShapedType::isDynamic(dimSize))
+        continue;
+      allocSize *= dimSize;
+    }
+    return allocSize >= 32;
   };
 
-  // Iterate over all DPS ops, collecting ops to modify.
+  // Iterate over all DPS ops and their inits, collecting ops to add a
+  // tensor_alloc for.
+  // There are 3 conditions of interest:
+  // 1) The result associated to the current init is unused
+  // 2) The allocation size if appropriately small
+  // 3) The reverse use-def chain of this op is a global load followed by ops
+  //    that do not change the address space.
+  // The 3rd condition is not strictly necessary but this is just a precation
+  // given the hacky nature of this fix.
   SmallVector<std::pair<DestinationStyleOpInterface, int>> worklist;
-  WalkResult res = funcOp.walk([&](DestinationStyleOpInterface dpsOp) {
+  funcOp.walk([&](DestinationStyleOpInterface dpsOp) {
     for (int idx = 0; idx < dpsOp.getNumDpsInits(); ++idx) {
       OpOperand *value = dpsOp.getDpsInitOperand(idx);
       // If the associated result is used, do nothing.
       if (!dpsOp->getResult(idx).use_empty()) {
+        continue;
+      }
+
+      // If the buffer allocation is too large for private space, do nothing.
+      if (isAllocSizeTooBig(value->get().getType())) {
         continue;
       }
 
@@ -78,16 +103,12 @@ void GPUPruneDPSOpsPass::runOnOperation() {
         auto op = a.getDefiningOp();
         return isPassThroughOp(op) || isGlobalLoadOp(op);
       };
-      bool globalProducer = llvm::all_of(producers, arePartOfGlobalChain);
+      bool globalProducer = all_of(producers, arePartOfGlobalChain);
       if (!globalProducer)
         continue;
       worklist.push_back({dpsOp, idx});
     }
-    return WalkResult::advance();
   });
-  if (res.wasInterrupted()) {
-    return signalPassFailure();
-  }
   // Create alloc in private space for each dps op and set it as the new
   // in-place result.
   for (auto [dpsOp, idx] : worklist) {
@@ -97,13 +118,12 @@ void GPUPruneDPSOpsPass::runOnOperation() {
     FailureOr<Value> copy = allocateTensorForShapedValue(
         rewriter, dpsOp->getLoc(), value->get(), options, true);
     if (failed(copy))
-      WalkResult::interrupt();
-    auto alloc = dyn_cast<bufferization::AllocTensorOp>(copy->getDefiningOp());
+      return signalPassFailure();
+    auto alloc = cast<bufferization::AllocTensorOp>(copy->getDefiningOp());
     alloc.setMemorySpaceAttr(privSpace);
-    rewriter.modifyOpInPlace(dpsOp,
-                             [&idx = idx, &dpsOp = dpsOp, &copy = copy]() {
-                               dpsOp.setDpsInitOperand(idx, *copy);
-                             });
+    rewriter.modifyOpInPlace(dpsOp, [&, &dpsOp = dpsOp, &idx = idx]() {
+      dpsOp.setDpsInitOperand(idx, *copy);
+    });
   }
 }
 
