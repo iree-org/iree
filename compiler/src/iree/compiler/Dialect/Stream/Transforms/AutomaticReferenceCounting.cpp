@@ -525,6 +525,20 @@ static void processFuncOp(FunctionOpInterface funcOp) {
         }
       }
 
+      // Alloca ops may have been assigned as indeterminate when created.
+      if (auto allocaOp = dyn_cast<IREE::Stream::ResourceAllocaOp>(op)) {
+        if (allocaOp.getIndeterminateLifetime()) {
+          Value allocaResource = allocaOp.getResult();
+          LLVM_DEBUG({
+            llvm::dbgs() << "[arc] alloca producer explicitly states lifetime "
+                            "is indeterminate for ";
+            allocaResource.printAsOperand(llvm::dbgs(), *asmState);
+            llvm::dbgs() << "; marking as indeterminate\n";
+          });
+          indeterminateResources.insert(allocaResource);
+        }
+      }
+
       // If a resource has a deallocation on it already then we cannot insert
       // another. This can arise when the pass is run twice or when an earlier
       // pass explicitly inserts deallocations to ensure they happen where they

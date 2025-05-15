@@ -289,6 +289,18 @@ util.func private @ignoreGlobalStore(%input_timepoint: !stream.timepoint, %size:
 
 // -----
 
+// Tests that allocations explicitly marked as indeterminate don't get
+// deallocated as if analysis decided so.
+
+// CHECK-LABEL: @explicitIndeterminateAlloca
+util.func private @explicitIndeterminateAlloca(%input_timepoint: !stream.timepoint, %size: index) -> () {
+  %resource, %alloca_timepoint = stream.resource.alloca uninitialized indeterminate await(%input_timepoint) => !stream.resource<variable>{%size} => !stream.timepoint
+  // CHECK-NOT: stream.resource.dealloca
+  util.return
+}
+
+// -----
+
 // Tests that resources loaded from parameters (or any other function that may
 // allocate) are treated as indeterminate. This is not a strict requirement and
 // we may want to support this in the future for parameter streaming.
