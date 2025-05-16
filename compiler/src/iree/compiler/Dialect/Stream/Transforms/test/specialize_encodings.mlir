@@ -145,6 +145,26 @@ util.func public @with_pad_encoding(%arg0: index, %arg1: index, %scalar_f32 : f3
 
 // -----
 
+// Creates an nop encoding if no `iree.gpu.target` is provided.
+
+#map0 = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (n, k)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#executable_target_rocm_bytecode_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_pad_layout<> }>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_bytecode_fb]> : !hal.device
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map0, #map1, #map2]>
+
+util.global private @device_a = #device_target_local_0_
+util.func public @create_pad_nop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
+  %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK: #[[$NOP:.+]] = #iree_encoding.layout<[#iree_codegen.encoding_nop_layout]
+// CHECK-LABEL: @create_pad_nop_encoding
+// CHECK: stream.tensor.empty {{.*}} :  tensor<?x0xf32, #[[$NOP]]>
+
+// -----
+
 //------------------------------------------------------------------------------
 // Stream ops that have TensorPhaseOp trait. This test suite tests that the
 // encoding is updated that carries resolved layouts.
