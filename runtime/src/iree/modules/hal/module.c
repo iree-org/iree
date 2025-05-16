@@ -47,15 +47,24 @@ typedef struct iree_hal_module_t {
   (iree_hal_module_t*)((uint8_t*)(module) + iree_vm_native_module_size());
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
 
-  if (module->debug_sink.destroy.fn) {
-    module->debug_sink.destroy.fn(module->debug_sink.destroy.user_data);
+  // Release the debug sink prior to releasing devices as it may be caching
+  // device-specific information that will be unavailable once the devices are
+  // released.
+  if (module->debug_sink.release.fn) {
+    module->debug_sink.release.fn(module->debug_sink.release.user_data);
   }
 
+  // Release all devices. The module may be the last retainer and the devices
+  // (and their corresponding drivers) may be immediately unloaded.
   for (iree_host_size_t i = 0; i < module->device_count; ++i) {
     iree_hal_device_release(module->devices[i]);
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 typedef struct iree_hal_module_state_t {

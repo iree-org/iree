@@ -1137,10 +1137,10 @@ iree_hal_module_debug_sink_t HalModuleDebugSink::AsIreeHalModuleDebugSink()
     const {
   iree_hal_module_debug_sink_t res;
   memset(&res, 0, sizeof(res));
+  res.release.fn = HalModuleDebugSink::ReleaseCallback;
+  res.release.user_data = const_cast<HalModuleDebugSink*>(this);
   res.buffer_view_trace.fn = HalModuleDebugSink::IreeHalModuleBufferViewTrace;
   res.buffer_view_trace.user_data = const_cast<HalModuleDebugSink*>(this);
-  res.destroy.fn = HalModuleDebugSink::DestroyCallback;
-  res.destroy.user_data = const_cast<HalModuleDebugSink*>(this);
   return res;
 }
 
@@ -1161,11 +1161,10 @@ static std::vector<HalBufferView> CreateHalBufferViewVector(
   return res;
 }
 
-iree_status_t HalModuleDebugSink::DestroyCallback(void* user_data) {
+void HalModuleDebugSink::ReleaseCallback(void* user_data) {
   HalModuleDebugSink* debug_sink =
       reinterpret_cast<HalModuleDebugSink*>(user_data);
   debug_sink->dec_ref();
-  return iree_ok_status();
 }
 
 iree_status_t HalModuleDebugSink::IreeHalModuleBufferViewTrace(

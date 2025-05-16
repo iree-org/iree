@@ -152,9 +152,18 @@ typedef struct iree_hal_inline_module_state_t {
 } iree_hal_inline_module_state_t;
 
 static void IREE_API_PTR iree_hal_inline_module_destroy(void* base_module) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_inline_module_t* module = IREE_HAL_INLINE_MODULE_CAST(base_module);
+
+  if (module->debug_sink.release.fn) {
+    module->debug_sink.release.fn(module->debug_sink.release.user_data);
+  }
+
   iree_hal_allocator_release(module->device_allocator);
   module->device_allocator = NULL;
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t IREE_API_PTR
