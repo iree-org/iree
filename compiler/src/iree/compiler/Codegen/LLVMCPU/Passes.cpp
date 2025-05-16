@@ -24,6 +24,7 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToArmSME/VectorToArmSME.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -779,9 +780,10 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       // (HAL, IREE, Linalg, CF) -> LLVM
-      .addPass(arith::createArithExpandOpsPass)
       .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
+      .addPass(affine::createAffineExpandIndexOpsPass)
+      .addPass(arith::createArithExpandOpsPass)
       .addPass(createEmulateNarrowTypePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)

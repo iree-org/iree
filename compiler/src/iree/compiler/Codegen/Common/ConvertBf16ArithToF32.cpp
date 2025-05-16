@@ -104,7 +104,6 @@ template <typename SourceType, typename TargetType>
 struct FloatTypeConverter
     : public PrimitiveTypeConverter<SourceType, TargetType> {
   explicit FloatTypeConverter() {
-    this->addArgumentMaterialization(convertRankedFloat);
     this->addSourceMaterialization(convertRankedFloat);
     this->addTargetMaterialization(convertRankedFloat);
   }

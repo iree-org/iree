@@ -23,12 +23,12 @@ func.func @memref_i4_to_i8_dynamic(%arg0 : index, %arg1 : index, %arg2 : index) 
   %1 = memref.load %0[%c0, %c0] : memref<?x?xi4, strided<[?, 1], offset: ?>>
   return %1 : i4
 }
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> ((s0 * s1) floordiv 2)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> ((s0 * s1) floordiv 2, s0 floordiv 2)>
 //      CHECK: func.func @memref_i4_to_i8_dynamic
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
-//      CHECK:   %[[SIZE:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]], %[[ARG2]]]
+//      CHECK:   %[[SIZE:.+]] = affine.max #[[MAP1]]()[%[[ARG2]], %[[ARG1]]]
 //      CHECK:   hal.interface.binding.subspan
 // CHECK-SAME:       offset(%[[ARG0]])
 // CHECK-SAME:       memref<?xi8, strided<[1], offset: ?>>{%[[SIZE]]}

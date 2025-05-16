@@ -61,10 +61,10 @@ static bool isContiguousRead(Operation *read) {
 
 static Value getMemrefOperand(Operation *op) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(op)) {
-    return transferWrite.getSource();
+    return transferWrite.getBase();
   }
   if (auto transferRead = dyn_cast<vector::TransferReadOp>(op)) {
-    return transferRead.getSource();
+    return transferRead.getBase();
   }
   if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
     return storeOp.getBase();

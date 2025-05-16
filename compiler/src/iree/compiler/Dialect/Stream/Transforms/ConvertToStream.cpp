@@ -261,10 +261,10 @@ struct ConvertToStreamPass final
           resultTypes.push_back(indexType);
           return success();
         });
-    typeConverter.addArgumentMaterialization([](OpBuilder &builder,
-                                                TensorType resultType,
-                                                ValueRange inputs,
-                                                Location loc) -> Value {
+    typeConverter.addTargetMaterialization([](OpBuilder &builder,
+                                              TensorType resultType,
+                                              ValueRange inputs,
+                                              Location loc) -> Value {
       assert(inputs.size() >= 2);
       auto resourceValue = inputs[0];
       auto resourceSize = inputs[1];

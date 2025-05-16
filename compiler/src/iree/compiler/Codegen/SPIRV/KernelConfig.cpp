@@ -803,7 +803,7 @@ bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) {
     while (auto subviewOp = input.getDefiningOp<memref::SubViewOp>()) {
       input = subviewOp.getViewSource();
     }
-    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToMemrefOp>()) {
+    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToBufferOp>()) {
       if (matchPattern(toMemrefOp.getTensor(), m_Constant()))
         return false;
     }

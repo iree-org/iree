@@ -571,19 +571,19 @@ struct LinearizeTransferReadIndices final
           transferReadOp, "cannot convert op with non-minor identity "
                           "map");
     }
-    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getBase().getType())) {
       return rewriter.notifyMatchFailure(
           transferReadOp, "expected converted memref of rank <= 1");
     }
-    Value linearIndex = linearizeIndices(transferReadOp.getSource(),
-                                         transferReadOp.getIndices(),
-                                         transferReadOp.getLoc(), rewriter);
+    Value linearIndex =
+        linearizeIndices(transferReadOp.getBase(), transferReadOp.getIndices(),
+                         transferReadOp.getLoc(), rewriter);
     if (!linearIndex) {
       return transferReadOp.emitOpError() << "failed to linearize index";
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        transferReadOp, transferReadOp.getVectorType(), adaptor.getSource(),
+        transferReadOp, transferReadOp.getVectorType(), adaptor.getBase(),
         linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
         transferReadOp.getPadding(), /*mask=*/Value(),
         transferReadOp.getInBoundsAttr());
@@ -604,11 +604,11 @@ struct LinearizeTransferWriteIndices final
           transferWriteOp, "cannot convert op with non-minor identity "
                            "map");
     }
-    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getBase().getType())) {
       return rewriter.notifyMatchFailure(
           transferWriteOp, "expected converted memref of rank <= 1");
     }
-    Value linearIndex = linearizeIndices(transferWriteOp.getSource(),
+    Value linearIndex = linearizeIndices(transferWriteOp.getBase(),
                                          transferWriteOp.getIndices(),
                                          transferWriteOp.getLoc(), rewriter);
     if (!linearIndex) {
@@ -616,7 +616,7 @@ struct LinearizeTransferWriteIndices final
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        transferWriteOp, adaptor.getValueToStore(), adaptor.getSource(),
+        transferWriteOp, adaptor.getValueToStore(), adaptor.getBase(),
         linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
         transferWriteOp.getInBoundsAttr());
     return success();
@@ -849,12 +849,12 @@ struct FlattenMemRefSubspanPass final
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
           return isRankZeroOrOneMemRef(
-              llvm::cast<MemRefType>(readOp.getSource().getType()));
+              llvm::cast<MemRefType>(readOp.getBase().getType()));
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
           return isRankZeroOrOneMemRef(
-              llvm::cast<MemRefType>(writeOp.getSource().getType()));
+              llvm::cast<MemRefType>(writeOp.getBase().getType()));
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {

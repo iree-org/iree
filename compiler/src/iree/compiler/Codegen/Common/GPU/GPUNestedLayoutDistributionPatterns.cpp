@@ -306,7 +306,7 @@ struct DistributeTransferRead final
 
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
     // to tensors or memrefs.
-    if (!isa<MemRefType>(readOp.getSource().getType())) {
+    if (!isa<MemRefType>(readOp.getBase().getType())) {
       return rewriter.notifyMatchFailure(readOp,
                                          "distribution expects memrefs");
     }
@@ -315,7 +315,7 @@ struct DistributeTransferRead final
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     int64_t rank = vectorLayout.getRank();
 
-    Type elementType = readOp.getSource().getType().getElementType();
+    Type elementType = readOp.getBase().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
     // The shape of the vector we read is pre-permutation. The permutation is
     // a transpose on the resulting read vector.
@@ -366,7 +366,7 @@ struct DistributeTransferRead final
       }
 
       VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
-          readOp.getLoc(), innerVectorType, readOp.getSource(), slicedIndices,
+          readOp.getLoc(), innerVectorType, readOp.getBase(), slicedIndices,
           readOp.getPermutationMapAttr(), readOp.getPadding(), slicedMask,
           readOp.getInBoundsAttr());
 
@@ -409,7 +409,7 @@ struct DistributeTransferWrite final
                                          "non-nested transfer_write layout");
     }
 
-    if (!isa<MemRefType>(writeOp.getSource().getType())) {
+    if (!isa<MemRefType>(writeOp.getBase().getType())) {
       return rewriter.notifyMatchFailure(writeOp,
                                          "distribution expects memrefs");
     }
@@ -485,7 +485,7 @@ struct DistributeTransferWrite final
       }
 
       rewriter.create<vector::TransferWriteOp>(
-          writeOp.getLoc(), slicedVector, writeOp.getSource(), slicedIndices,
+          writeOp.getLoc(), slicedVector, writeOp.getBase(), slicedIndices,
           writeOp.getPermutationMapAttr(), slicedMask,
           writeOp.getInBoundsAttr());
     }

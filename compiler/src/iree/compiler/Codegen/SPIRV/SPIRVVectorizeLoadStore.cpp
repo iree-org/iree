@@ -350,8 +350,8 @@ public:
 
     Location loc = read.getLoc();
 
-    auto scalarMemrefType = dyn_cast<MemRefType>(read.getSource().getType());
-    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto scalarMemrefType = dyn_cast<MemRefType>(read.getBase().getType());
+    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getBase().getType());
     auto memrefVectorType = cast<VectorType>(vectorMemrefType.getElementType());
     auto readVectorType = read.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) {
@@ -373,7 +373,7 @@ public:
     // LoadOp and cast back to the original type.
     if (*vectorMemrefElemSize == *readVecSize) {
       Value newLoad = rewriter.create<memref::LoadOp>(
-          loc, memrefVectorType, adaptor.getSource(), indices.value());
+          loc, memrefVectorType, adaptor.getBase(), indices.value());
       rewriter.replaceOpWithNewOp<vector::BitCastOp>(read, readVectorType,
                                                      newLoad);
       return success();
@@ -405,7 +405,7 @@ public:
       indices->back() = rewriter.create<affine::AffineApplyOp>(
           loc, addMap, ValueRange{oldIndex, iVal});
       vectors.push_back(
-          rewriter.create<memref::LoadOp>(loc, adaptor.getSource(), *indices));
+          rewriter.create<memref::LoadOp>(loc, adaptor.getBase(), *indices));
     }
 
     // If there is only two component vectors, we can use ShuffleOp, which is a
@@ -453,8 +453,8 @@ public:
 
     Location loc = write.getLoc();
 
-    auto scalarMemrefType = dyn_cast<MemRefType>(write.getSource().getType());
-    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto scalarMemrefType = dyn_cast<MemRefType>(write.getBase().getType());
+    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getBase().getType());
     auto memrefVectorType = cast<VectorType>(vectorMemrefType.getElementType());
     auto writeVectorType = write.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) {
@@ -478,7 +478,7 @@ public:
       Value data = rewriter.create<vector::BitCastOp>(
           loc, memrefVectorType, adaptor.getValueToStore());
       rewriter.replaceOpWithNewOp<memref::StoreOp>(
-          write, data, adaptor.getSource(), indices.value());
+          write, data, adaptor.getBase(), indices.value());
       return success();
     }
 
@@ -512,7 +512,7 @@ public:
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
       indices->back() = rewriter.create<affine::AffineApplyOp>(
           loc, addMap, ValueRange{oldIndex, iVal});
-      rewriter.create<memref::StoreOp>(loc, component, adaptor.getSource(),
+      rewriter.create<memref::StoreOp>(loc, component, adaptor.getBase(),
                                        *indices);
     }
 
@@ -793,8 +793,7 @@ struct ScalarizeVectorTransferRead final
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
         return b
-            .create<memref::LoadOp>(loc, readOp.getSource(),
-                                    readOp.getIndices())
+            .create<memref::LoadOp>(loc, readOp.getBase(), readOp.getIndices())
             .getResult();
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {
@@ -835,8 +834,7 @@ struct ScalarizeVectorTransferRead final
       auto thenCond = [&](OpBuilder &b, Location loc) {
         indices[dimPos] = b.create<affine::AffineApplyOp>(
             loc, addMap, ValueRange{oldIndex, iVal});
-        Value scalar =
-            b.create<memref::LoadOp>(loc, readOp.getSource(), indices);
+        Value scalar = b.create<memref::LoadOp>(loc, readOp.getBase(), indices);
         return scalar;
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {
@@ -919,7 +917,7 @@ struct ScalarizeVectorTransferWrite final
       auto thenCond = [&](OpBuilder &b, Location loc) {
         Value scalar =
             b.create<vector::ExtractElementOp>(loc, writeOp.getVector());
-        b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
+        b.create<memref::StoreOp>(loc, scalar, writeOp.getBase(),
                                   writeOp.getIndices());
         return Value();
       };
@@ -955,7 +953,7 @@ struct ScalarizeVectorTransferWrite final
         indices[dimPos] = b.create<affine::AffineApplyOp>(
             loc, addMap, ValueRange{oldIndex, iVal});
         Value scalar = b.create<vector::ExtractOp>(loc, writeOp.getVector(), i);
-        b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(), indices);
+        b.create<memref::StoreOp>(loc, scalar, writeOp.getBase(), indices);
         return Value();
       };
       (void)predicateMaybeMaskedScalarTransfer(rewriter, loc, maybeMaskBit,

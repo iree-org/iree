@@ -532,8 +532,14 @@ static bool applyFuncChanges(FuncAnalysis &analysis,
   // Erase dead args/results - args uses should have either been unused or
   // replaced with constants above. Note that because results may be using args
   // we need to drop those first above.
-  funcOp.eraseArguments(deadArgs);
-  funcOp.eraseResults(deadResults);
+  if (failed(funcOp.eraseArguments(deadArgs))) {
+    funcOp.emitOpError("can't happen: removing arguments can't make function "
+                       "type conversion fail");
+  }
+  if (failed(funcOp.eraseResults(deadResults))) {
+    funcOp.emitOpError(
+        "can't happen: removing results made function type conversion fail");
+  }
 
   return true;
 }

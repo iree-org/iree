@@ -86,7 +86,7 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
     if (!readOp)
       continue;
 
-    auto sourceType = dyn_cast<MemRefType>(readOp.getSource().getType());
+    auto sourceType = dyn_cast<MemRefType>(readOp.getBase().getType());
     // only supported for fat raw buffers.
     if (!sourceType || !hasAMDGPUFatRawBufferAddressSpace(sourceType))
       continue;
@@ -104,7 +104,7 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
         loc, readOp.getVectorType(), readOp.getPadding());
 
     auto newReadOp = rewriter.create<vector::TransferReadOp>(
-        loc, readOp.getVectorType(), readOp.getSource(), readOp.getIndices(),
+        loc, readOp.getVectorType(), readOp.getBase(), readOp.getIndices(),
         readOp.getPadding(), ArrayRef<bool>{inBounds});
     auto selectOp = rewriter.create<arith::SelectOp>(loc, selectValue,
                                                      newReadOp, constantValue);

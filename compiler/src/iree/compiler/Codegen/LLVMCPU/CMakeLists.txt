@@ -87,6 +87,7 @@ iree_cc_library(
     LLVMTargetParser
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
