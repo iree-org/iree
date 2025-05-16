@@ -581,7 +581,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
                        return dominanceInfo.properlyDominates(tilableOp, user);
                      }) &&
         (llvm::count_if(op->getUsers(), [&](Operation *user) {
-           return tiledAndFusedOps.contains(user);
+           return !user->isBeforeInBlock(tilableOp) &&
+                  tiledAndFusedOps.contains(user);
          }) < 2)) {
       yieldReplacementsFor.insert(op);
     }
