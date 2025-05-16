@@ -465,6 +465,53 @@ util.func public @ElideIntermediateTransferFourTransfers(%operand: tensor<1xf16>
 
 // -----
 
+// CHECK-LABEL: @SinkCastLikeOpAcrossBarrier
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossBarrier(%origin: tensor<?x4xf16>, %dim: index) -> tensor<4x?xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[BARRIER:.+]] = flow.tensor.barrier %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.barrier %source : tensor<4x?xf16>{%dim} on "foo"
+  // CHECK: %[[RESHAPE:.+]] = flow.tensor.reshape %[[BARRIER]] : tensor<?x4xf16>{%[[DIM]]} -> tensor<4x?xf16>{%[[DIM]]}
+  // CHECK: util.return %[[RESHAPE]]
+  util.return %transfer : tensor<4x?xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @SinkCastLikeOpAcrossTransfer
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossTransfer(%origin: tensor<?x4xf16>, %dim: index) -> tensor<4x?xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[TRANSFER:.+]] = flow.tensor.transfer %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.transfer %source : tensor<4x?xf16>{%dim} to "foo"
+  // CHECK: %[[RESHAPE:.+]] = flow.tensor.reshape %[[TRANSFER]] : tensor<?x4xf16>{%[[DIM]]} -> tensor<4x?xf16>{%[[DIM]]}
+  // CHECK: util.return %[[RESHAPE]]
+  util.return %transfer : tensor<4x?xf16>
+}
+
+// -----
+
+// Tests that a sandwich of cast -> transfer -> cast from/to the same type is
+// folded away. This example is a combination of SinkCastLikeOpAcrossTransfer
+// and simple reshape-reshape fold.
+
+// CHECK-LABEL: @SinkCastLikeOpAcrossTransferSandwich
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossTransferSandwich(%origin: tensor<?x4xf16>, %dim: index) -> tensor<?x4xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[TARGET:.+]] = flow.tensor.transfer %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.transfer %source : tensor<4x?xf16>{%dim} to "foo"
+  // CHECK-NOT: flow.tensor.reshape
+  %target = flow.tensor.reshape %transfer : tensor<4x?xf16>{%dim} -> tensor<?x4xf16>{%dim}
+  // CHECK: util.return %[[TARGET]]
+  util.return %target : tensor<?x4xf16>
+}
+
+// -----
+
 // CHECK-LABEL: @sliceConst0D
 util.func public @sliceConst0D() -> tensor<i32> {
   %0 = arith.constant dense<0> : tensor<i32>

@@ -572,7 +572,6 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
       source = sourceOp.getSource();
       sourceDims = sourceOp.getSourceDims();
     }
-
     if (!source) {
       return failure();
     }
@@ -838,8 +837,61 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Moves (or clones) cast-like ops after a transfer operation and possibly
+// updates the transfer op to match the new type.
+//
+// The cast-like behavior makes more sense near consumers: the producer does not
+// need the information as it has already extracted it if required before
+// converting into flow ops and if there are no consumers of the transfer that
+// cast-like op would have been removed anyway.
+//
+// Example:
+//  %reshape = flow.tensor.reshape %source : tensor<1x2xf32> -> tensor<2x1xf32>
+//  %target = flow.tensor.transfer %reshape : tensor<2x1xf32> to "foo"
+// ->
+//  %target = flow.tensor.transfer %source : tensor<1x2xf32> to "foo"
+//  %reshape = flow.tensor.reshape %target : tensor<1x2xf32> -> tensor<2x1xf32>
+template <typename TransferOpT, typename CastOpT>
+struct SinkCastLikeOpAcrossTransfer final : OpRewritePattern<TransferOpT> {
+  using OpRewritePattern<TransferOpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TransferOpT transferOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_if_present<CastOpT>(transferOp.getOperand().getDefiningOp());
+    if (!sourceOp) {
+      return rewriter.notifyMatchFailure(
+          transferOp, "source op not available or does not match");
+    }
+    Value originValue = sourceOp.getSource();
+    ValueRange originDims = sourceOp.getSourceDims();
+    auto newOp =
+        rewriter.create<TransferOpT>(transferOp.getLoc(), originValue,
+                                     originDims, transferOp.getTargetAttr());
+    IRMapping mapper;
+    mapper.map(originValue, newOp.getResult());
+    rewriter.setInsertionPointAfter(newOp);
+    auto clonedOp =
+        cast<CastOpT>(rewriter.clone(*sourceOp.getOperation(), mapper));
+    rewriter.replaceAllUsesExcept(transferOp.getResult(), clonedOp.getResult(),
+                                  newOp);
+    rewriter.eraseOp(transferOp);
+    return success();
+  }
+};
+
+} // namespace
+
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {}
+                                                  MLIRContext *context) {
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorBarrierOp,
+                                           IREE::Flow::TensorBitCastOp>>(
+      context);
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorBarrierOp,
+                                           IREE::Flow::TensorReshapeOp>>(
+      context);
+}
 
 //===----------------------------------------------------------------------===//
 // flow.tensor.transfer
@@ -895,7 +947,14 @@ struct ElideIntermediateTransfer final : OpRewritePattern<TensorTransferOp> {
 
 void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
-  results.add<ElideRedundantTransfer, ElideIntermediateTransfer>(context);
+  results.add<ElideRedundantTransfer>(context);
+  results.add<ElideIntermediateTransfer>(context);
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorTransferOp,
+                                           IREE::Flow::TensorBitCastOp>>(
+      context);
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorTransferOp,
+                                           IREE::Flow::TensorReshapeOp>>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//
