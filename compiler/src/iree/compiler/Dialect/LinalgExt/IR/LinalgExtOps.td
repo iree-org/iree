@@ -451,6 +451,8 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
       return getOutputsMutable();
     }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
