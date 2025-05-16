@@ -136,7 +136,7 @@ static void printTransferAttrs(OpAsmPrinter &p, VectorTransferOpInterface op,
 }
 
 void TransferGatherOp::print(OpAsmPrinter &p) {
-  p << " " << getSource() << "[" << getIndices() << "]";
+  p << " " << getBase() << "[" << getIndices() << "]";
   printIndexVecs(p, *this, getIndexVecs(), getIndexVecs().getTypes(),
                  getIndexedAttr());
   if (getMask())
