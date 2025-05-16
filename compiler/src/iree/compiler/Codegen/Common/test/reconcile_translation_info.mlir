@@ -172,20 +172,19 @@ hal.executable private @llvm_func_attrs {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"some-llvm-attr" = "2"}}>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"some-llvm-attr" = "4"}}>} {
         return
       }
     }
   }
 }
 
-// TODO: This test makes no sense if fn1 and fn2 are called together.
 // CHECK-LABEL: hal.executable private @llvm_func_attrs
-//       CHECK:   func.func @fn1() attributes {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}
-//       CHECK:   func.func @fn2() attributes {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}
+//       CHECK:   func.func @fn1() attributes {llvm_func_attrs = {"some-llvm-attr" = "2"}}
+//       CHECK:   func.func @fn2() attributes {llvm_func_attrs = {"some-llvm-attr" = "4"}}
 
 // -----
 
@@ -523,7 +522,7 @@ hal.executable private @multi_export_scf_forall {
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 //  CHECK-DAG:   %[[WG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
 //  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]]]
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //      CHECK:   hal.return %[[WG_X]], %[[WG_Y]], %[[C1]]
 //      CHECK: hal.executable.export public @entry_point1 layout
 // CHECK-SAME:     %[[ARG1_1:[a-zA-z0-9]+]]: index
@@ -531,7 +530,7 @@ hal.executable private @multi_export_scf_forall {
 // CHECK-SAME:     %[[ARG3_1:[a-zA-z0-9]+]]: index
 //  CHECK-DAG:   %[[WG_Y_1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1_1]]]
 //  CHECK-DAG:   %[[WG_X_1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2_1]]]
-//  CHECK-DAG:   %[[C1_1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C1_1:.+]] = arith.constant 1
 //      CHECK:   hal.return %[[WG_X_1]], %[[WG_Y_1]], %[[C1_1]]
 
 //      CHECK: func @entry_point0()

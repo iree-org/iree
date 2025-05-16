@@ -334,7 +334,7 @@ static FailureOr<SmallVector<int64_t>> reconcileWorkgroupSize(
 static FailureOr<int64_t> reconcileSubgroupSize(
     ArrayRef<IREE::Codegen::TranslationInfoAttr> translationInfos) {
   if (translationInfos.empty()) {
-    return int64_t();
+    return 0;
   }
   int64_t subgroupSize = translationInfos.front().getSubgroupSize();
   for (auto translationInfo : translationInfos.drop_front()) {
@@ -382,8 +382,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       // Skip external functions.
       continue;
     }
-    // Resolve workgroup distribution related `scf.forall` ops. Today only a
-    // single loop in the exported function is supported.
+    // Resolve workgroup distribution related `scf.forall` ops.
     if (failed(resolveWorkgroupForAll(rewriter, rootFuncOp, distributeAlong))) {
       variantOp.emitOpError(
           "failed in iree-codegen-reconcile-translation-info pass");
@@ -395,6 +394,8 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
     llvm::SmallDenseSet<FunctionOpInterface> visitedFunctions;
 
+    // Walk the callgraph from the export root to find all translation info
+    // attributes and determine whether they are consistent.
     while (!nodeQueue.empty()) {
       FunctionOpInterface funcOp = nodeQueue.front();
       if (!visitedFunctions.insert(funcOp).second) {
@@ -462,7 +463,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       exportOp.emitOpError("failed to reconcile subgroup size");
       return signalPassFailure();
     }
-    if (reconciledSubgroupSize.value() != int64_t()) {
+    if (reconciledSubgroupSize.value() != 0) {
       exportOp.setSubgroupSizeAttr(
           rewriter.getIndexAttr(reconciledSubgroupSize.value()));
     }
