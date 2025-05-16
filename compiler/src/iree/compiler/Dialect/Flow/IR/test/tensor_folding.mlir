@@ -465,6 +465,20 @@ util.func public @ElideIntermediateTransferFourTransfers(%operand: tensor<1xf16>
 
 // -----
 
+// CHECK-LABEL: @SinkCastLikeOpAcrossBarrier
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossBarrier(%origin: tensor<?x4xf16>, %dim: index) -> tensor<4x?xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[BARRIER:.+]] = flow.tensor.barrier %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.barrier %source : tensor<4x?xf16>{%dim} on "foo"
+  // CHECK: %[[RESHAPE:.+]] = flow.tensor.reshape %[[BARRIER]] : tensor<?x4xf16>{%[[DIM]]} -> tensor<4x?xf16>{%[[DIM]]}
+  // CHECK: util.return %[[RESHAPE]]
+  util.return %transfer : tensor<4x?xf16>
+}
+
+// -----
+
 // CHECK-LABEL: @SinkCastLikeOpAcrossTransfer
 //  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
 util.func public @SinkCastLikeOpAcrossTransfer(%origin: tensor<?x4xf16>, %dim: index) -> tensor<4x?xf16> {
