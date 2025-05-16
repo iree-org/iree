@@ -169,20 +169,20 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
-  if (IREE::LinalgExt::isGatherlikeOp(op)) {
-    // Do not collapse gather like operations, as this can throw away contiguity
-    // information. We can enable this if we see a dimension being collapsed
-    // that is coming from 2 linalg.index operations and collapsing that
-    // dimension on the tensor.extract source as well.
-    return false;
-  }
-
   if (isa<IREE::LinalgExt::AttentionOp>(op)) {
     return true;
   }
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) {
+    return false;
+  }
+
+  if (!genericOp.getBody()->getOps<tensor::ExtractOp>().empty()) {
+    // Do not collapse gather like operations, as this can throw away contiguity
+    // information. We can enable this if we see a dimension being collapsed
+    // that is coming from 2 linalg.index operations and collapsing that
+    // dimension on the tensor.extract source as well.
     return false;
   }
 
