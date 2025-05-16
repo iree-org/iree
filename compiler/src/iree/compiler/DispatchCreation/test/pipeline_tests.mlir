@@ -329,10 +329,7 @@ util.func public @gather_matmul(%source : tensor<2x2x100x100xi32>, %indices : te
   %empty = tensor.empty() : tensor<100x100xi32>
   %result = iree_linalg_ext.gather dimension_map = [1, 0]
                           ins(%source, %indices : tensor<2x2x100x100xi32>, tensor<2xi32>)
-                          outs(%empty: tensor<100x100xi32>) {
-                    ^bb0(%arg0: i32, %arg1: i32):
-                      iree_linalg_ext.yield %arg0 : i32
-  } -> tensor<100x100xi32>
+                          outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
   %mm = linalg.matmul_transpose_b ins(%result, %arg2 : tensor<100x100xi32>, tensor<100x100xi32>) outs(%arg3 : tensor<100x100xi32>) -> tensor<100x100xi32>
   util.return %mm : tensor<100x100xi32>
 }
@@ -341,24 +338,21 @@ util.func public @gather_matmul(%source : tensor<2x2x100x100xi32>, %indices : te
 //       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
 //       CHECK:     %[[MATMUL:.+]] = linalg.matmul_transpose_b
 //  CHECK-SAME:       ins(%[[GATHER]]
-//       CHECK:     flow.dispatch.tensor.store %[[MATMUL]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
 //       CHECK:   util.return %[[DISPATCH]]
 
 // -----
 
-util.func public @gather_matmul(%source : tensor<2x2x100x100xi32>, %indices : tensor<2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+util.func public @single_gather(%source : tensor<2x2x100x100xi32>, %indices : tensor<2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
   %empty = tensor.empty() : tensor<100x100xi32>
   %result = iree_linalg_ext.gather dimension_map = [1, 0]
                           ins(%source, %indices : tensor<2x2x100x100xi32>, tensor<2xi32>)
-                          outs(%empty: tensor<100x100xi32>) {
-                    ^bb0(%arg0: i32, %arg1: i32):
-                      iree_linalg_ext.yield %arg0 : i32
-  } -> tensor<100x100xi32>
+                          outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
   util.return %result : tensor<100x100xi32>
 }
 // Make sure single gather gets wrapped in dispatch.
-// CHECK-LABEL: util.func public @gather_matmul
+// CHECK-LABEL: util.func public @single_gather
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
-//       CHECK:     flow.dispatch.tensor.store %[[GATHER]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GATHER]]
 //       CHECK:   util.return %[[DISPATCH]]
