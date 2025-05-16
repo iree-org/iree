@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
@@ -135,6 +136,10 @@ static void processRegion(RewriterBase &rewriter, Region *region) {
 
       // If an op implements the tiling interface, try to greedily tile + fuse.
       if (auto tilableOp = dyn_cast<TilingInterface>(op)) {
+        // Do not distribute to threads of an op wants to use DMA.
+        if (auto useDMAConfig =
+                getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op))
+          continue;
         tileToThreads(rewriter, tilableOp);
         continue;
       }
