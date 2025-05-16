@@ -438,9 +438,18 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   const bool needsPacking = kShuffleBitWidth != origBitWidth;
   IntegerType equivIntType = builder.getIntegerType(origBitWidth);
 
-  // Always perform the shuffles over the supported scalar type. For inputs of
-  // smaller bitwidth, perform packing and unpacking via the supported integer
-  // type.
+  // Defer expansion of subgroup reduction until later in pass pipeline to
+  // enable conditional lowering to DPP ops, for potential perf gains over
+  // gpu.shuffle ops.
+  if (numLaneToReduce <= warpSize && warpSize % numLaneToReduce == 0) {
+    auto gpuReduceKind = combiningKindToAllReduce(kind);
+    return builder.create<gpu::SubgroupReduceOp>(
+        loc, input, gpuReduceKind, /*uniform=*/false, numLaneToReduce);
+  }
+
+  // Otherwise, perform the shuffles over the supported scalar type. For inputs
+  // of smaller bitwidth, perform packing and unpacking via the supported
+  // integer type.
   auto unpack = [loc, &builder, needsPacking, equivIntType,
                  origInputType](Value packedVal) -> Value {
     if (!needsPacking)
