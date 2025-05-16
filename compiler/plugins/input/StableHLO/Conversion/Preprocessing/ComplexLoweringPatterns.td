@@ -121,8 +121,8 @@ class StableHLO_ComparisonDirectionValue<string enumStr> :
 def : Pat<(StableHLO_ExpOp HLO_ComplexTensor:$val, $accuracy),
           (StableHLO_ComplexOp
            (StableHLO_MulOp
-            (StableHLO_CosineOp (StableHLO_ImagOp:$imag $val, $accuracy)),
-            (StableHLO_ExpOp:$exp (StableHLO_RealOp:$real $val, $accuracy))),
+            (StableHLO_CosineOp (StableHLO_ImagOp:$imag $val), $accuracy),
+            (StableHLO_ExpOp:$exp (StableHLO_RealOp:$real $val), $accuracy)),
            (StableHLO_MulOp (StableHLO_SineOp $imag, $accuracy), $exp))>;
 
 foreach pair = [[StableHLO_ComparisonDirectionValue<"NE">, StableHLO_OrOp],
