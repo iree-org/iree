@@ -72,7 +72,7 @@ func.func @both_workgroup_and_workitem() {
   %c32 = arith.constant 32 : index
   %c112 = arith.constant 112 : index
   %workgroup_id_x = hal.interface.workgroup.id[0] upper_bound 1 : index
-  // Any hal.interface.workgroup.count op in a function liket his should have
+  // Any hal.interface.workgroup.count op in a function like this should have
   // have been -iree-codegen-propagate-dispatch-size-bounds 'd away before
   // this pass is called.
   %workgroup_count_x = arith.constant 1 : index
