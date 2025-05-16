@@ -84,8 +84,8 @@ def : Pat<(StableHLO_SineOp HLO_ComplexTensor:$val, $accuracy),
                 (StableHLO_MulOp
                   (StableHLO_SineOp (StableHLO_RealOp:$real $val), $accuracy),
                   (StableHLO_AddOp
-                    (StableHLO_ExpOp:$exp (StableHLO_ImagOp:$imag $val)),
-                    (StableHLO_ExpOp:$nexp (StableHLO_NegOp $imag)))),
+                    (StableHLO_ExpOp:$exp (StableHLO_ImagOp:$imag $val), $accuracy),
+                    (StableHLO_ExpOp:$nexp (StableHLO_NegOp $imag), $accuracy))),
                  (StableHLO_ConstantOp : $two (ConstantSplat<"2.0"> $real))),
               (StableHLO_DivOp
                 (StableHLO_MulOp
@@ -102,8 +102,8 @@ def : Pat<(StableHLO_CosineOp HLO_ComplexTensor:$val, $accuracy),
                 (StableHLO_MulOp
                   (StableHLO_CosineOp (StableHLO_RealOp:$real $val), $accuracy),
                   (StableHLO_AddOp
-                    (StableHLO_ExpOp:$exp (StableHLO_ImagOp:$imag $val)),
-                    (StableHLO_ExpOp:$nexp (StableHLO_NegOp $imag)))),
+                    (StableHLO_ExpOp:$exp (StableHLO_ImagOp:$imag $val), $accuracy),
+                    (StableHLO_ExpOp:$nexp (StableHLO_NegOp $imag), $accuracy))),
                  (StableHLO_ConstantOp : $two (ConstantSplat<"2.0"> $real))),
               (StableHLO_DivOp
                 (StableHLO_MulOp
