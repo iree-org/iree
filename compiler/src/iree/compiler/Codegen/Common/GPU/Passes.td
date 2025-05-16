@@ -209,9 +209,9 @@ def GPUPromoteMatmulOperandsPass :
   ];
 }
 
-def GPUPruneDPSOpsPass :
-    InterfacePass<"iree-codegen-gpu-prune-dps-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to add private memory allocations to DPS interface ops.";
+def GPUAllocPrivateMemoryForDPSOpsPass :
+    InterfacePass<"iree-codegen-gpu-alloc-private-memory-for-dps-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to add private memory allocations prior to DPS interface ops.";
   let description = [{
     Creates a `bufferization.alloc_tensor` in private space for all DPS ops
     with unused results that can't be removed. These unused results, if

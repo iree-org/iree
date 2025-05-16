@@ -354,7 +354,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUInferMemorySpacePass());
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
   funcPassManager.addPass(createGPUBubbleResourceCastsPass());
-  funcPassManager.addPass(createGPUPruneDPSOpsPass());
+  funcPassManager.addPass(createGPUAllocPrivateMemoryForDPSOpsPass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,

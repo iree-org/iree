@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "decompose_horizontally_fused_gemms.mlir",
+            "gpu_alloc_private_memory_for_dps_ops.mlir",
             "gpu_apply_derived_thread_config.mlir",
             "gpu_apply_tiling_level.mlir",
             "gpu_bubble_resource_casts.mlir",
@@ -44,7 +45,6 @@ iree_lit_test_suite(
             "gpu_pad_operands.mlir",
             "gpu_pipeline.mlir",
             "gpu_promote_matmul_operands.mlir",
-            "gpu_prune_dps_ops.mlir",
             "gpu_reorder_workgroups_static.mlir",
             "gpu_reorder_workgroups.mlir",
             "gpu_reuse_shared_memory_allocs.mlir",
