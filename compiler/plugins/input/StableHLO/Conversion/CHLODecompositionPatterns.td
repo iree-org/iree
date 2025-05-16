@@ -385,20 +385,20 @@ def : Pat<(CHLO_IsNegInfOp NonComplexElementType:$input),
 
 // Express `tan` as
 //   sine(x) / cosine(x)
-def : Pat<(CHLO_TanOp NonComplexElementType:$input, $accuracy),
+def : Pat<(CHLO_TanOp NonComplexElementType:$input),
   (StableHLO_DivOp
-    (StableHLO_SineOp $input, $accuracy),
-    (StableHLO_CosineOp $input, $accuracy)
+    (StableHLO_SineOp $input, STABLEHLO_DEFAULT_RESULT_ACCURACY),
+    (StableHLO_CosineOp $input, STABLEHLO_DEFAULT_RESULT_ACCURACY)
   )>;
 
 
 // Express `tan(a + bi)` as
 //   (tan(a) + i tanh(b)) / (1 - i tan(a) * tanh(b))
-def : Pat<(CHLO_TanOp ComplexElementType:$input, $accuracy),
+def : Pat<(CHLO_TanOp ComplexElementType:$input),
   (StableHLO_DivOp
     (StableHLO_ComplexOp
-      (CHLO_TanOp:$tan (StableHLO_RealOp $input), $accuracy),
-      (StableHLO_TanhOp:$tanh (StableHLO_ImagOp $input), $accuracy)),
+      (CHLO_TanOp:$tan (StableHLO_RealOp $input)),
+      (StableHLO_TanhOp:$tanh (StableHLO_ImagOp $input), STABLEHLO_DEFAULT_RESULT_ACCURACY)),
     (StableHLO_ComplexOp
       (ConstantLike<"1.0"> $tan),
       (StableHLO_NegOp (StableHLO_MulOp $tan, $tanh)))
