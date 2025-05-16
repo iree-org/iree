@@ -334,7 +334,7 @@ class HalModuleDebugSink : public py::intrusive_base {
  private:
   HalModuleBufferViewTraceCallback buffer_view_trace_callback_;
 
-  static iree_status_t DestroyCallback(void* user_data);
+  static void ReleaseCallback(void* user_data);
 
   static iree_status_t IreeHalModuleBufferViewTrace(
       void* user_data, iree_string_view_t key,
