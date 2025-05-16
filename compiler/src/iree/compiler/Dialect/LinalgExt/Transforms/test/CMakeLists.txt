@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "distribution.mlir"
     "fold_unit_dims.mlir"
     "pad_contraction_to_block_size.mlir"
+    "reshape_fusion.mlir"
     "split_reduction.mlir"
     "tiling.mlir"
   TOOLS
