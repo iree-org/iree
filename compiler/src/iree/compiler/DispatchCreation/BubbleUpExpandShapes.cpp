@@ -174,6 +174,13 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
+        // HACK: Do not bubble rope into attention.
+        if (auto att = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+          if (att.getQuery() == fusedOperand->get()) {
+            return false;
+          }
+        }
+
         // If producer generic op is elementwise op, bubble up the expand shape
         // past this operation.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
