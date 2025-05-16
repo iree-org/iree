@@ -107,7 +107,7 @@ def : Pat<(StableHLO_CosineOp HLO_ComplexTensor:$val, $accuracy),
                  (StableHLO_ConstantOp : $two (ConstantSplat<"2.0"> $real))),
               (StableHLO_DivOp
                 (StableHLO_MulOp
-                  (StableHLO_SineOp $real),
+                  (StableHLO_SineOp $real, $accuracy),
                   (StableHLO_SubtractOp $nexp, $exp)), $two))>;
 
 // Exponential can be lowered to an exponential on the real component and a
