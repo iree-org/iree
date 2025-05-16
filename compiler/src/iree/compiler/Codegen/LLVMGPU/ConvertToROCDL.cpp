@@ -340,6 +340,10 @@ struct ConvertToROCDLPass final
 
     LDBG("After converting to rocdl\n" << m);
 
+    // 16 is the maximum relevant alignment for all AMD GPUs. Unceremoniously
+    // set it to 16 as all of our allocations almost always have much greater
+    // alignment than this.
+    // TODO(qedawkins): Set this much earlier when we introduce the allocations.
     setSharedMemoryAlignment(m, 16);
 
     LDBG("After updating shared memory alignments\n" << m);
