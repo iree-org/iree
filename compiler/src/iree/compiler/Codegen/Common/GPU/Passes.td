@@ -209,6 +209,22 @@ def GPUPromoteMatmulOperandsPass :
   ];
 }
 
+def GPUAllocPrivateMemoryForDPSOpsPass :
+    InterfacePass<"iree-codegen-gpu-alloc-private-memory-for-dps-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to add private memory allocations prior to DPS interface ops.";
+  let description = [{
+    Creates a `bufferization.alloc_tensor` in private space for all DPS ops
+    with unused results that can't be removed. These unused results, if
+    originating from loads from global memory, trigger allocations in global
+    memory space during bufferization, which will fail. So, the allocations
+    must be made earlier to avoid failed bufferization.
+  }];
+  let dependentDialects = [
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::gpu::GPUDialect"
+  ];
+}
+
 def GPUReduceBankConflictsPass :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
