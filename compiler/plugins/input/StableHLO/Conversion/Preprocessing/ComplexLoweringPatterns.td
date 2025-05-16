@@ -96,7 +96,7 @@ def : Pat<(StableHLO_SineOp HLO_ComplexTensor:$val, $accuracy),
 //   cos(a) * cosh(b) - isin(a) * sinh(b)
 //   sinh(b) = (e^x - e^-x) / 2
 //   cosh(b) = (e^x + e^-x) / 2
-def : Pat<(StableHLO_CosineOp HLO_ComplexTensor:$val $accuracy),
+def : Pat<(StableHLO_CosineOp HLO_ComplexTensor:$val, $accuracy),
             (StableHLO_ComplexOp
               (StableHLO_DivOp
                 (StableHLO_MulOp
