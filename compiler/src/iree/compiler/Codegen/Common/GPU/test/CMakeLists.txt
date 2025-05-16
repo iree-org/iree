@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "decompose_horizontally_fused_gemms.mlir"
+    "gpu_alloc_private_memory_for_dps_ops.mlir"
     "gpu_apply_derived_thread_config.mlir"
     "gpu_apply_tiling_level.mlir"
     "gpu_bubble_resource_casts.mlir"

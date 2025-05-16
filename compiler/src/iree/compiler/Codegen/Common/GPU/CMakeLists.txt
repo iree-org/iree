@@ -50,6 +50,7 @@ iree_cc_library(
     "AMDGPUDistributeContract.cpp"
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
+    "GPUAllocPrivateMemoryForDPSOps.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUBubbleResourceCasts.cpp"
     "GPUCheckResourceUsage.cpp"
