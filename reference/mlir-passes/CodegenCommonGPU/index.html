@@ -2797,6 +2797,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-gpu-alloc-private-memory-for-dps-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-gpu-alloc-private-memory-for-dps-ops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-gpu-apply-tiling-level" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-gpu-apply-tiling-level
@@ -4964,6 +4973,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-gpu-alloc-private-memory-for-dps-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-gpu-alloc-private-memory-for-dps-ops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-gpu-apply-tiling-level" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-gpu-apply-tiling-level
@@ -5400,6 +5418,13 @@
 
 <h3 id="-iree-codegen-expand-gpu-ops"><code>-iree-codegen-expand-gpu-ops</code><a class="headerlink" href="#-iree-codegen-expand-gpu-ops" title="Permanent link">link</a></h3>
 <p><em>Expands high-level GPU ops, such as clustered gpu.subgroup_reduce.</em></p>
+<h3 id="-iree-codegen-gpu-alloc-private-memory-for-dps-ops"><code>-iree-codegen-gpu-alloc-private-memory-for-dps-ops</code><a class="headerlink" href="#-iree-codegen-gpu-alloc-private-memory-for-dps-ops" title="Permanent link">link</a></h3>
+<p><em>Pass to add private memory allocations prior to DPS interface ops.</em></p>
+<p>Creates a <code>bufferization.alloc_tensor</code> in private space for all DPS ops
+with unused results that can't be removed. These unused results, if
+originating from loads from global memory, trigger allocations in global
+memory space during bufferization, which will fail. So, the allocations
+must be made earlier to avoid failed bufferization.</p>
 <h3 id="-iree-codegen-gpu-apply-tiling-level"><code>-iree-codegen-gpu-apply-tiling-level</code><a class="headerlink" href="#-iree-codegen-gpu-apply-tiling-level" title="Permanent link">link</a></h3>
 <p><em>Pass to tile tensor ops based on tiling configs</em></p>
 <h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
