@@ -371,7 +371,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return insertSliceOp.getDest();
     }
     if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-      return transferWriteOp.getSource();
+      return transferWriteOp.getBase();
     }
     return nullptr;
   };
@@ -380,7 +380,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return extractSliceOp.getSource();
     }
     if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
-      return transferReadOp.getSource();
+      return transferReadOp.getBase();
     }
     return nullptr;
   };
@@ -561,19 +561,19 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
               if (llvm::isa<RankedTensorType>(
-                      transferReadOp.getSource().getType())) {
-                plan.insert(transferReadOp.getSource());
+                      transferReadOp.getBase().getType())) {
+                plan.insert(transferReadOp.getBase());
               }
               return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
               if (!llvm::isa<RankedTensorType>(
-                      transferWriteOp.getSource().getType())) {
+                      transferWriteOp.getBase().getType())) {
                 return success();
               }
               return analyseDestructiveUpdateOp(
-                  transferWriteOp, nullptr, transferWriteOp.getSource(),
+                  transferWriteOp, nullptr, transferWriteOp.getBase(),
                   transferWriteOp.getResult(), plan);
             })
         .Case<scf::IfOp>(
@@ -581,7 +581,7 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
-              tensor::GenerateOp, tensor::PadOp, bufferization::ToMemrefOp,
+              tensor::GenerateOp, tensor::PadOp, bufferization::ToBufferOp,
               bufferization::AllocTensorOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
@@ -609,8 +609,8 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
-      if (isa<RankedTensorType>(vectorWriteOp.getSource().getType())) {
-        hasDestructiveUpdatePattern(vectorWriteOp.getSource(), plan);
+      if (isa<RankedTensorType>(vectorWriteOp.getBase().getType())) {
+        hasDestructiveUpdatePattern(vectorWriteOp.getBase(), plan);
       }
     }
   });

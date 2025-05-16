@@ -120,7 +120,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
     AttrSizedOperandSegments
   ]> {
-  let arguments = (ins AnyShaped:$source,
+  let arguments = (ins AnyShaped:$base,
                        Variadic<Index>:$indices,
                        Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
                        BoolArrayAttr:$indexed,
@@ -144,7 +144,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     operation.
 
     The operation can be thought of as:
-      1. A contiguous slice gathered from the source as described by the operation
+      1. A contiguous slice gathered from the base address as described by the operation
       2. A `vector.transfer_read` on the contiguous slice
 
     The operation defines `permutation_map`, `padding`, `mask`, `in_bounds` in
@@ -152,13 +152,13 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     contiguous slice.
 
     The other parameters of the operation define how the contiguous slice is
-    gathered from the source. `indices` define a base to offset the source by.
+    gathered from the base . `indices` define an offset applied to the base.
     `indexed` defines for each dimension if the dimension is gathered or
     contiguous.
 
-    The `indices` contains a base to offset the source by. The `indexed` array
-    defines if a dimension is gathered or not. For example, for the following
-    gather:
+    The `indices` contains an offset to be applied to the base address. The 
+    `indexed` array defines if a dimension is gathered or not. For example, for
+    the following gather:
 
     ```
     slice[i, j, k] = source[i + i_offset][j][indices[i][j][k]]
@@ -178,7 +178,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     indexed. For example, for the following gather:
 
     ```
-    slice[i, j, k] = source[i][indices0[i] + offset][indices1[j, k]]
+    slice[i, j, k] = base[i][indices0[i] + offset][indices1[j, k]]
     ```
 
     The indexing would be described by:
@@ -197,18 +197,18 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     read from a non-contiguous slice. For example:
 
     ```
-    source: memref<8192x8x16xf32>
+    base: memref<8192x8x16xf32>
     indices0 : vector<2xindex>
     indices1 : vector<4x8xindex>
 
-    slice[i, j, k] = source[indices0[k]][j][indices1[i, j]]
+    slice[i, j, k] = base[indices0[k]][j][indices1[i, j]]
     vector = read(slice) : memref<8192x8x16xf32> -> vector<16x8x2xf32>
     ```
 
     Can be represented by:
 
     ```
-    %vector = vector.transfer_gather %source[0, 0, 0](%indices0, %indices1) {
+    %vector = vector.transfer_gather %base[0, 0, 0](%indices0, %indices1) {
       gather_dims = [0, 2],
       index_maps = [
         affine_map<(i, j, k) -> (k)>,
