@@ -19,7 +19,14 @@ extern "C" {
 // Debug Sink
 //===----------------------------------------------------------------------===//
 
-// Receives a
+typedef void(IREE_API_PTR* iree_hal_module_debug_sink_release_callback_fn_t)(
+    void* user_data);
+
+typedef struct iree_hal_module_debug_sink_release_callback_t {
+  iree_hal_module_debug_sink_release_callback_fn_t fn;
+  void* user_data;
+} iree_hal_module_debug_sink_release_callback_t;
+
 typedef iree_status_t(
     IREE_API_PTR* iree_hal_module_buffer_view_trace_callback_fn_t)(
     void* user_data, iree_string_view_t key, iree_host_size_t buffer_view_count,
@@ -30,23 +37,16 @@ typedef struct iree_hal_module_buffer_view_trace_callback_t {
   void* user_data;
 } iree_hal_module_buffer_view_trace_callback_t;
 
-typedef iree_status_t(
-    IREE_API_PTR* iree_hal_module_debug_sink_destroy_callback_fn_t)(
-    void* user_data);
-
-// Called by the runtime when the HAL module no longer needs the debug sink.
-typedef struct iree_hal_module_debug_sink_destroy_callback_t {
-  iree_hal_module_debug_sink_destroy_callback_fn_t fn;
-  void* user_data;
-} iree_hal_module_debug_sink_destroy_callback_t;
-
 // Interface for a HAL module debug event sink.
-// Any referenced user data must remain live for the lifetime of the HAL module
-// the sink is provided to.
+// Any referenced user data must remain live until all users of the sink have
+// released it via the release callback.
 typedef struct iree_hal_module_debug_sink_t {
+  // Called once per HAL module that has been provided the debug sink when it
+  // will no longer be used. Optional if there's no lifetime management of user
+  // data required.
+  iree_hal_module_debug_sink_release_callback_t release;
   // Called on each hal.buffer_view.trace.
   iree_hal_module_buffer_view_trace_callback_t buffer_view_trace;
-  iree_hal_module_debug_sink_destroy_callback_t destroy;
 } iree_hal_module_debug_sink_t;
 
 // Returns a default debug sink that outputs nothing.
