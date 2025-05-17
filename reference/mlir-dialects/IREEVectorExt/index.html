@@ -4973,7 +4973,7 @@ slice from which the read is performed is not guranteed to be contiguous,
 and instead how the slice is gathered is defined explicitly in the
 operation.</p>
 <p>The operation can be thought of as:
-  1. A contiguous slice gathered from the source as described by the operation
+  1. A contiguous slice gathered from the base as described by the operation
   2. A <code>vector.transfer_read</code> on the contiguous slice</p>
 <p>The operation defines <code>permutation_map</code>, <code>padding</code>, <code>mask</code>, <code>in_bounds</code> in
 the same way as <code>vector.transfer_read</code> defines, but on the inferred
@@ -4985,7 +4985,7 @@ contiguous.</p>
 <p>The <code>indices</code> contains a base to offset the source by. The <code>indexed</code> array
 defines if a dimension is gathered or not. For example, for the following
 gather:</p>
-<div class="highlight"><pre><span></span><code>slice[i, j, k] = source[i + i_offset][j][indices[i][j][k]]
+<div class="highlight"><pre><span></span><code>slice[i, j, k] = base[i + i_offset][j][indices[i][j][k]]
 </code></pre></div>
 <p>The operation would represent this as:</p>
 <div class="highlight"><pre><span></span><code>indices = %i_offset, 0, 0
@@ -4996,7 +4996,7 @@ gathered. For each gathered dimension, the operation expects a vector of
 indices in <code>index_vecs</code> to act as a source of indices for that dimension
 and an AffineMap in <code>index_maps</code> describing how this source of indices is
 indexed. For example, for the following gather:</p>
-<div class="highlight"><pre><span></span><code>slice[i, j, k] = source[i][indices0[i] + offset][indices1[j, k]]
+<div class="highlight"><pre><span></span><code>slice[i, j, k] = base[i][indices0[i] + offset][indices1[j, k]]
 </code></pre></div>
 <p>The indexing would be described by:</p>
 <div class="highlight"><pre><span></span><code>indices      = 0, %offset, 0
@@ -5009,15 +5009,15 @@ index_maps = [
 </code></pre></div>
 <p>With these additional parameters, the operation can define a supervector
 read from a non-contiguous slice. For example:</p>
-<div class="highlight"><pre><span></span><code>source: memref&lt;8192x8x16xf32&gt;
+<div class="highlight"><pre><span></span><code>base: memref&lt;8192x8x16xf32&gt;
 indices0 : vector&lt;2xindex&gt;
 indices1 : vector&lt;4x8xindex&gt;
 
-slice[i, j, k] = source[indices0[k]][j][indices1[i, j]]
+slice[i, j, k] = base[indices0[k]][j][indices1[i, j]]
 vector = read(slice) : memref&lt;8192x8x16xf32&gt; -&gt; vector&lt;16x8x2xf32&gt;
 </code></pre></div>
 <p>Can be represented by:</p>
-<div class="highlight"><pre><span></span><code>%vector = vector.transfer_gather %source[0, 0, 0](%indices0, %indices1) {
+<div class="highlight"><pre><span></span><code>%vector = vector.transfer_gather %base[0, 0, 0](%indices0, %indices1) {
   gather_dims = [0, 2],
   index_maps = [
     affine_map&lt;(i, j, k) -&gt; (k)&gt;,
@@ -5052,7 +5052,7 @@ to contiguous dimensions.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>source</code></td>
+<td style="text-align: center;"><code>base</code></td>
 <td>shaped of any type values</td>
 </tr>
 <tr>
