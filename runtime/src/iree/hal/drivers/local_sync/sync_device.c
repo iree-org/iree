@@ -86,8 +86,9 @@ iree_status_t iree_hal_sync_device_create(
   iree_host_size_t struct_size =
       sizeof(*device) + loader_count * sizeof(*device->loaders);
   iree_host_size_t total_size = struct_size + identifier.size;
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, total_size, (void**)&device);
+  iree_status_t status = iree_allocator_malloc_aligned(
+      host_allocator, total_size, iree_alignof(iree_hal_sync_device_t), 0,
+      (void**)&device);
   if (iree_status_is_ok(status)) {
     memset(device, 0, total_size);
     iree_hal_resource_initialize(&iree_hal_sync_device_vtable,
@@ -134,7 +135,7 @@ static void iree_hal_sync_device_destroy(iree_hal_device_t* base_device) {
 
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
 
-  iree_allocator_free(host_allocator, device);
+  iree_allocator_free_aligned(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
 }
