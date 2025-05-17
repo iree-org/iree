@@ -15,6 +15,17 @@ namespace mlir::iree_compiler::IREE::Codegen {
 
 using IREE::TensorExt::DispatchTensorType;
 
+struct EncodingNopSerializableEncodingAttrInterface final
+    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
+          EncodingNopSerializableEncodingAttrInterface, EncodingNopLayoutAttr> {
+  Attribute cloneWithLayouts(Attribute attr,
+                             ArrayRef<Attribute> layouts) const {
+    // Discard the layouts.
+    return attr;
+  }
+  bool isSerialized(Attribute attr) const { return true; }
+};
+
 struct EncodingNopDeviceLayoutAttrInterface final
     : IREE::Encoding::LayoutAttrInterface::ExternalModel<
           EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
@@ -82,6 +93,7 @@ void registerCodegenExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
         EncodingNopLayoutAttr::attachInterface<
             EncodingNopHostEncodingLayoutResolverAttrInterface,
+            EncodingNopSerializableEncodingAttrInterface,
             EncodingNopDeviceLayoutAttrInterface>(*ctx);
       });
 }
