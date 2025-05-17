@@ -4,16 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <algorithm>
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
 
@@ -82,8 +85,183 @@ struct PromoteContractOperands final
   }
 };
 
+void processBlock(Block *block, IRRewriter &rewriter) {
+
+  // A map from vectors in the values that are inserted into them.
+  DenseMap<Value, SmallVector<std::pair<Value, int>>> values;
+
+  auto processSlice = [&](vector::InsertStridedSliceOp insertSlice) {
+    VectorType smallType = insertSlice.getSourceVectorType();
+    VectorType largeType = insertSlice.getDestVectorType();
+    if (smallType.getRank() != 1 || largeType.getRank() != 1)
+      return;
+
+    Value dst = insertSlice.getDest();
+    Value src = insertSlice.getValueToStore();
+    Value res = insertSlice.getResult();
+
+    auto offsets = insertSlice.getOffsets();
+    if (offsets.size() != 1)
+      return;
+    mlir::Attribute offsetAttr = *offsets.begin();
+    auto intAttr = dyn_cast<IntegerAttr>(offsetAttr);
+    if (!intAttr) {
+      return;
+    }
+    int offset = intAttr.getInt();
+
+    int64_t nElmsSmall = smallType.getNumElements();
+    int64_t nElmsLarge = largeType.getNumElements();
+
+    auto it = values.find(dst);
+    if (it != values.end()) {
+      // TODO(newling) efficiency here
+      values.insert({res, it->second});
+      // values.erase(dst);
+      // values.erase(it);
+    } else {
+      values.insert(
+          {res, SmallVector<std::pair<Value, int>>(nElmsLarge, {nullptr, -1})});
+    }
+
+    auto &vec = values[res];
+    for (int i = 0; i < nElmsSmall; ++i) {
+      vec[i + offset] = {src, i};
+    }
+  };
+
+  auto processShuffle = [&](vector::ShuffleOp shuffleOp) {
+    VectorType outType = shuffleOp.getType();
+    VectorType lhsType = shuffleOp.getV1VectorType();
+    if (outType.getRank() != 1 || lhsType.getRank() != 1)
+      return;
+
+    int64_t nLhsElms = lhsType.getNumElements();
+    ArrayRef<int64_t> indices = shuffleOp.getMask();
+    if (std::any_of(indices.begin(), indices.end(),
+                    [&](int64_t i) { return i >= nLhsElms; }))
+      return;
+
+    auto it = values.find(shuffleOp.getV1());
+    if (it == values.end())
+      return;
+
+    auto &vec = it->second;
+    if (std::any_of(indices.begin(), indices.end(),
+                    [&](int64_t i) { return !vec[i].first; }))
+      return;
+
+    SmallVector<Value> fromElms;
+    fromElms.reserve(indices.size());
+
+    for (auto index : indices) {
+      auto backtracked = vec[index];
+      Value backtracedSrc = backtracked.first;
+      assert(backtracedSrc && "already checked no?");
+      auto localIndex = backtracked.second;
+      rewriter.setInsertionPoint(shuffleOp);
+      // Create a vector.extract from the rank-1 source to a scalar.
+      auto scalar = rewriter.create<vector::ExtractOp>(
+          shuffleOp.getLoc(), backtracedSrc, SmallVector<int64_t>{localIndex});
+
+      fromElms.push_back(scalar);
+    }
+
+    auto replacement = rewriter.create<vector::FromElementsOp>(
+        shuffleOp.getLoc(), outType, fromElms);
+
+    rewriter.replaceOp(shuffleOp, replacement.getResult());
+  };
+
+  SmallVector<Operation *> toProcess;
+
+  for (const Operation &op : block->getOperations()) {
+    if (isa<vector::InsertStridedSliceOp, vector::ShuffleOp>(op)) {
+      toProcess.push_back(const_cast<Operation *>(&op));
+    }
+  }
+  for (auto op : toProcess) {
+    if (auto slice = dyn_cast<vector::InsertStridedSliceOp>(op)) {
+      processSlice(slice);
+    }
+    if (auto shuffleOp = dyn_cast<vector::ShuffleOp>(op)) {
+      processShuffle(shuffleOp);
+    }
+  }
+}
+
+LogicalResult localExtractInsertOptimizations(Operation *funcOp) {
+
+  IRRewriter rewriter(funcOp->getContext());
+
+  // Let's start surgically, go straight for what we know is the optimization.
+  SmallVector<vector::ShuffleOp> shuffleOps;
+  DenseSet<Block *> blocksWithShuffles;
+  funcOp->walk([&](vector::ShuffleOp shuffleOp) {
+    blocksWithShuffles.insert(shuffleOp->getBlock());
+  });
+
+  for (auto block : blocksWithShuffles) {
+    processBlock(block, rewriter);
+  }
+
+  return success();
+}
+
+std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
+
+  // Elementwise operations.
+  // Set the native shape by setting all but the final non-1 to 1.
+  //
+  // Example: <100x100x4x1xf32> -> <1x1x4x1xf32>
+  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
+    if (auto vectorType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
+      int64_t rank = vectorType.getRank();
+      ArrayRef<int64_t> shape = vectorType.getShape();
+      //  auto bitWidth  = vectorType.getElementTypeBitWidth();
+      //  int factor = 1;
+      //  if (bitWidth == 32) factor = 1;
+      //  else if (bitWidth == 16) factor = 2;
+      //  else if (bitWidth == 8) factor = 4;
+
+      auto iter = std::find_if_not(shape.rbegin(), shape.rend(),
+                                   [](int64_t dim) { return dim == 1; });
+      SmallVector<int64_t> nativeSize(rank, 1);
+      if (iter != shape.rend()) {
+        // Found a non-1 dimension, so we can keep it.
+        auto val = *iter;
+        val = 1;
+        //  if (val % factor == 0) val = factor;
+        //  else val = 1;
+        nativeSize[rank - 1 - std::distance(shape.rbegin(), iter)] = val;
+      }
+      return nativeSize;
+    }
+  }
+
+  // Unroll vector.transpose in all but the inner-most dimension of result.
+  // Example: A transpose `vector<2x4xf32> to vector<4x2xf32>` results in 4
+  // extract->insert_strided_slice pairs.
+  //
+  // An alternative is to use `populateVectorTransposeLoweringPatterns`
+  // which always creates scalar extract-insert pairs.
+  //
+  // TODO(newling) reconsider the optimal strategy for this.
+  if (auto transposeOp = llvm::dyn_cast<vector::TransposeOp>(op)) {
+    VectorType vectorType = transposeOp.getType();
+    SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
+    if (vectorType.getRank() > 0) {
+      nativeSize.back() = vectorType.getShape().back();
+    }
+    return nativeSize;
+  }
+  return std::nullopt;
+}
+
 struct LLVMGPUVectorLoweringPass final
     : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
+  using impl::LLVMGPUVectorLoweringPassBase<
+      LLVMGPUVectorLoweringPass>::LLVMGPUVectorLoweringPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect>();
     registry.insert<memref::MemRefDialect>();
@@ -93,45 +271,159 @@ struct LLVMGPUVectorLoweringPass final
   void runOnOperation() override {
     auto funcOp = getOperation();
 
+    auto addVectorCanonicalizationPatterns = [](RewritePatternSet &patterns) {
+      MLIRContext *ctx = patterns.getContext();
+      vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::InsertOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::InsertStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::TransposeOp::getCanonicalizationPatterns(patterns, ctx);
+      populateConvertToShapeCastPatterns(patterns);
+    };
+
+    MLIRContext *context = funcOp.getContext();
+
+    // Remove permutation_map, replace with explict broadcast and transpose ops
+    // (which we immediately try to canonicalize away).
     {
-      // Lower high level vector operations like contract or multidim reduce ops
-      // to lower level vector ops.
-      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct);
-      vector::populateVectorTransferPermutationMapLoweringPatterns(
-          contractLoweringPatterns);
-      vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
-                                                       funcOp.getContext());
-      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns, options.vectorContractLowering);
-      contractLoweringPatterns.add<PromoteContractOperands>(
-          funcOp->getContext());
-      vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMultiReductionLoweringPatterns(
-          contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerParallel);
-      if (failed(applyPatternsGreedily(funcOp,
-                                       std::move(contractLoweringPatterns)))) {
+      RewritePatternSet patterns(context);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+      addVectorCanonicalizationPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
-    RewritePatternSet vectorToLoopsPatterns(&getContext());
-    VectorTransferToSCFOptions vectorToSCFOptions;
-    vectorToSCFOptions.enableFullUnroll();
-    populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
-                                          vectorToSCFOptions);
-    memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
-    amdgpu::populateAmdgpuTransferReadToLoadPatterns(vectorToLoopsPatterns);
-    vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
-    if (failed(
-            applyPatternsGreedily(funcOp, std::move(vectorToLoopsPatterns)))) {
-      return signalPassFailure();
+    // vector->vector conversions, and unrolling.
+    {
+      RewritePatternSet patterns(context);
+
+      // Unroll broadcast, leaving rank-1 broadcast.
+      vector::populateVectorBroadcastLoweringPatterns(patterns);
+
+      // Unroll gather, leaving rank-1 gathers.
+      vector::populateVectorGatherLoweringPatterns(patterns);
+
+      // Unroll create_mask, leaving rank-1 create_masks.
+      vector::populateVectorMaskOpLoweringPatterns(patterns);
+
+      // Convert contract to fma.
+      vector::populateVectorContractLoweringPatterns(
+          patterns, vector::VectorContractLowering::OuterProduct);
+      patterns.add<PromoteContractOperands>(context);
+
+      // Convert multi_reduce to arith ops.
+      vector::populateVectorMultiReductionLoweringPatterns(
+          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+
+      // Unroll remaining vops. Currently transpose and elementwise ops are
+      // handled here.
+      auto opts = vector::UnrollVectorOptions().setNativeShapeFn(
+          [=](auto op) { return getNativeVectorShape(op); });
+      vector::populateVectorUnrollPatterns(patterns, opts);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // transfer_read -> load and transfer_write -> store.
+    {
+      RewritePatternSet patterns(context);
+      VectorTransferToSCFOptions vectorToSCFOptions;
+      vectorToSCFOptions.enableFullUnroll();
+      populateVectorToSCFConversionPatterns(patterns, vectorToSCFOptions);
+      memref::populateFoldMemRefAliasOpPatterns(patterns);
+      amdgpu::populateAmdgpuTransferReadToLoadPatterns(patterns);
+      vector::populateVectorTransferLoweringPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+    //  {
+    //    RewritePatternSet patterns(context);
+    //    vector::populateVectorTransferLoweringPatterns(patterns);
+    //    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+    //      return signalPassFailure();
+    //    }
+    //  }
+
+    // Canonicalize.
+    {
+      RewritePatternSet patterns(context);
+      vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      addVectorCanonicalizationPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // TODO(newling) it's the flattening which is causing the increase in
+    // memory. Flatten!
+    {
+      RewritePatternSet patterns(context);
+      GreedyRewriteConfig config;
+      config.fold = false;
+
+      // TODO(newling) this is very clearly defined set of patterns --
+
+      // energy function that the patterns try to minimize is
+      // sum(operations in vector and arith dialects of) energy(op)
+      // - energy(shape_cast) = 0
+      // - energy(other_op) = sum of ranks of vector operands.
+
+      // IREE uses this as a late stage canonicaliazation before lowering to
+      // LLVM, only after unrolling of single-threaded code. Any pattern which
+      // decreases this object should be added. Any pattern that increases this
+      // objective should definitely not be added to avoid cycles. Any pattern
+      // that leaves the energy unchanged -- the energy function can be extended
+      // (lexicographically).
+
+      populateFlattenVectorExtractInsertPatterns(patterns);
+      populateForOpInductionVarShapePatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Canonicalize.
+    {
+      RewritePatternSet patterns(context);
+      addVectorCanonicalizationPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+//     if (failed(localExtractInsertOptimizations(funcOp)))
+//       return signalPassFailure();
+
+
+  //   bool shapesRemain = false;
+  //   funcOp->walk([&](vector::ShapeCastOp shapeCastOp) { shapesRemain = true; });
+  //   if (shapesRemain) {
+  //     return signalPassFailure();
+  //   }
+
+    // Less desirable unrolls, delayed till here in case previous
+    // canonicalization can eliminate them.
+    {
+      RewritePatternSet patterns(context);
+      // shape_cast to extract-like and insert-like ops.
+      vector::populateVectorShapeCastLoweringPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Canonicalize.
+    {
+      RewritePatternSet patterns(context);
+      addVectorCanonicalizationPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };
