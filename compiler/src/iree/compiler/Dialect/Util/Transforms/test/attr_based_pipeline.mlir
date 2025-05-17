@@ -1,13 +1,13 @@
-// RUN: iree-opt --iree-preprocessing-attr-based-pipeline --mlir-print-local-scope --split-input-file --verify-diagnostics --iree-dispatch-creation-propagate-collapse-across-expands=true %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-util-attr-based-pipelines{pipeline-name=\"preprocessing\"}))" --mlir-print-local-scope --split-input-file --verify-diagnostics --iree-dispatch-creation-propagate-collapse-across-expands=true %s | FileCheck %s
 
-func.func @single_dispatch_dropunitdims(%lhs : tensor<1x26x18x288xbf16>, %rhs :  tensor<288x288x3x3xbf16>, %outs : tensor<1x288x26x18xbf16>,
+util.func @single_dispatch_dropunitdims(%lhs : tensor<1x26x18x288xbf16>, %rhs :  tensor<288x288x3x3xbf16>, %outs : tensor<1x288x26x18xbf16>,
     %outs2 : tensor<1x288x24x16xf32>) -> tensor<1x288x24x16xf32> attributes {
-    preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-make-single-dispatch">} {
+    util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-make-single-dispatch">}} {
   %transposed = linalg.transpose ins(%lhs : tensor<1x26x18x288xbf16>) outs(%outs : tensor<1x288x26x18xbf16>) permutation = [0, 3, 1, 2]
   %conv = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
     ins(%transposed, %rhs : tensor<1x288x26x18xbf16>, tensor<288x288x3x3xbf16>)
     outs(%outs2 : tensor<1x288x24x16xf32>) -> tensor<1x288x24x16xf32>
-  return %conv : tensor<1x288x24x16xf32>
+  util.return %conv : tensor<1x288x24x16xf32>
 }
 // CHECK-LABEL: @single_dispatch_dropunitdims
 //  CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<1x26x18x288xbf16>
@@ -19,9 +19,9 @@ func.func @single_dispatch_dropunitdims(%lhs : tensor<1x26x18x288xbf16>, %rhs : 
 //       CHECK:   return %[[DISPATCH]]
 
 // -----
-func.func @single_dispatch_fusion(%lhs : tensor<18x288xf32>, %rhs :  tensor<18x288xbf16>, %outs : tensor<18x288xbf16>)
+util.func @single_dispatch_fusion(%lhs : tensor<18x288xf32>, %rhs :  tensor<18x288xbf16>, %outs : tensor<18x288xbf16>)
     -> tensor<18x288xbf16> attributes {
-    preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-make-single-dispatch">} {
+    util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-make-single-dispatch">}} {
   %first = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0, d1)>],
@@ -41,7 +41,7 @@ func.func @single_dispatch_fusion(%lhs : tensor<18x288xf32>, %rhs :  tensor<18x2
     %2 = arith.addf %in, %in_3 : bf16
     linalg.yield %2 : bf16
   } -> tensor<18x288xbf16>
-  return %final : tensor<18x288xbf16>
+  util.return %final : tensor<18x288xbf16>
 }
 
 // CHECK-LABEL: @single_dispatch_fusion
@@ -54,25 +54,25 @@ func.func @single_dispatch_fusion(%lhs : tensor<18x288xf32>, %rhs :  tensor<18x2
 // -----
 
 module {
-func.func @function1(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
+util.func @function1(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
     %outs : tensor<10x40xf16>) -> tensor<10x40xf16> attributes {
-    preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-generalize-linalg-matmul-experimental">} {
+    util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-generalize-linalg-matmul-experimental">}} {
   %matmul = linalg.matmul ins(%lhs, %rhs : tensor<10x20xf16>, tensor<20x40xf16>)
       outs(%outs : tensor<10x40xf16>) -> tensor<10x40xf16>
-  return %matmul : tensor<10x40xf16>
+  util.return %matmul : tensor<10x40xf16>
 }
-func.func @function2(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
+util.func @function2(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
     %outs : tensor<10x40xf16>) -> tensor<10x40xf16> attributes {
-    preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-pad-linalg-ops">} {
+    util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-pad-linalg-ops">}} {
   %matmul = linalg.matmul ins(%lhs, %rhs : tensor<10x20xf16>, tensor<20x40xf16>)
       outs(%outs : tensor<10x40xf16>) -> tensor<10x40xf16>
-  return %matmul : tensor<10x40xf16>
+  util.return %matmul : tensor<10x40xf16>
 }
 }
-// CHECK-LABEL: func @function1
+// CHECK-LABEL: @function1
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   return %[[GENERIC]]
-// CHECK-LABEL: func @function2
+// CHECK-LABEL: @function2
 //   CHECK-DAG:   %[[PAD1:.+]] = tensor.pad
 //   CHECK-DAG:   %[[PAD2:.+]] = tensor.pad
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
@@ -83,14 +83,14 @@ func.func @function2(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
 
 // -----
 
-func.func @function(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
+util.func @function(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
     %outs : tensor<10x40xf16>) -> tensor<10x40xf16> attributes {
-    preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-pad-linalg-ops,iree-preprocessing-generalize-linalg-matmul-experimental">} {
+    util.pipelines = {preprocessing= #util.pipeline<"iree-preprocessing-pad-linalg-ops,iree-preprocessing-generalize-linalg-matmul-experimental">}} {
   %matmul = linalg.matmul ins(%lhs, %rhs : tensor<10x20xf16>, tensor<20x40xf16>)
       outs(%outs : tensor<10x40xf16>) -> tensor<10x40xf16>
-  return %matmul : tensor<10x40xf16>
+  util.return %matmul : tensor<10x40xf16>
 }
-// CHECK-LABEL: func @function
+// CHECK-LABEL: @function
 //   CHECK-DAG:   %[[PAD1:.+]] = tensor.pad
 //   CHECK-DAG:   %[[PAD2:.+]] = tensor.pad
 //       CHECK:   %[[MATMUL:.+]] = linalg.generic
@@ -102,7 +102,7 @@ func.func @function(%lhs : tensor<10x20xf16>, %rhs : tensor<20x40xf16>,
 // -----
 
 // expected-remark@+1 {{expected preprocessing_pipeline attribute to be a `StringAttr` that specifies the pass pipeline to apply}}
-func.func @function() attributes {
-    preprocessing_pipeline = "iree-preprocessing-pad-linalg-ops"} {
-  return
+util.func @function() attributes {
+    util.pipelines = {preprocessing = "iree-preprocessing-pad-linalg-ops"}} {
+  util.return
 }

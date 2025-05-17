@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_op_ordinals.mlir"
+    "attr_based_pipeline.mlir"
     "combine_initializers.mlir"
     "drop_compiler_hints.mlir"
     "fold_globals.mlir"
