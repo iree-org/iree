@@ -30,8 +30,6 @@ struct AttrBasedPipelinePass
 };
 } // namespace
 
-static const char kPreprocessingPipelineAttrName[] = "preprocessing_pipeline";
-
 // Method to get the pass manager nested on a particular operation. There does
 // not seem to be a way to do this without specializing on the op itself.
 // When possible to do so, this method could be deleted.
@@ -52,16 +50,9 @@ void AttrBasedPipelinePass::runOnOperation() {
   });
 
   for (auto funcLikeOp : funcLikeOps) {
-    auto attr = funcLikeOp->getAttr(kPreprocessingPipelineAttrName);
-    if (!attr) {
-      continue;
-    }
-    auto passPipelineAttr =
-        dyn_cast<IREE::Util::PreprocessingPassPipelineAttr>(attr);
+    IREE::Util::PreprocessingPassPipelineAttr passPipelineAttr =
+        IREE::Util::getPreprocessingPassPipelineAttribute(funcLikeOp);
     if (!passPipelineAttr) {
-      funcLikeOp.emitRemark(
-          "expected preprocessing_pipeline attribute to be a `StringAttr` that "
-          "specifies the pass pipeline to apply");
       continue;
     }
     LLVM_DEBUG({ llvm::dbgs() << "Parsed Attribute : " << passPipelineAttr; });
