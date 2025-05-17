@@ -432,6 +432,17 @@ PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
   return get(ctx, zeros);
 }
 
+Attribute
+PadEncodingLayoutAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+  MLIRContext *ctx = getContext();
+  return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+}
+
+bool PadEncodingLayoutAttr::isSerialized() const {
+  return llvm::all_of(getPadding().asArrayRef(),
+                      [](int64_t val) { return val != ShapedType::kDynamic; });
+}
+
 bool PadEncodingLayoutAttr::isIdentityLayout() const {
   ArrayRef<int64_t> padding = getPadding().asArrayRef();
   return llvm::all_of(padding, [](int64_t val) { return val == 0; });
