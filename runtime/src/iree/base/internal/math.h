@@ -593,14 +593,19 @@ static inline uint8_t iree_math_f32_to_f8e8m0fnu(float value) {
   if (!isfinite(value)) {
     return 0xFF;
   }
-  if (value <= 0.f) {
+  // drop sign
+  float abs = fabs(value);
+  // under flow zero to minimum to smallest normalized value.
+  if (abs == 0.f) {
     return 0;
   }
+
   int exp = 0;
-  // Normalized is in the interval [0.5, 1.0).
-  float normalized = frexpf(value, &exp);
+  // Normalized is in the interval [0.5, 1.0) for values not equal to 0.
+  float normalized = frexpf(abs, &exp);
   // If the normalized value is closer to 0.5 than to 1.0, decrement the
   // exponent.
+  printf("%f\n", normalized);
   int rounded = exp - (normalized < 0.75f);
   int biased = rounded + 127;
   // The clamping below is to 0xFF, mapping to NaN any value that is larger than
