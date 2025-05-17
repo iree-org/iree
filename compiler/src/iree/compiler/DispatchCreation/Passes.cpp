@@ -53,11 +53,6 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clCollapseReductionDims(
-    "iree-dispatch-creation-collapse-reduction-dims",
-    llvm::cl::desc("Enable collapsing of reduction dims"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool>
     clEnableFuseMultiUse("iree-dispatch-creation-fuse-multi-use",
                          llvm::cl::desc("Fuse multi-use ops."),
@@ -100,7 +95,7 @@ using FunctionLikeNest =
 static void addCleanupPatterns(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       // Standard MLIR cleanup.
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
       // Simplify util.global accesses; this can help with data flow tracking as
@@ -134,7 +129,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             ElementwiseOpFusionPassOptions{
                 clEnableElementWiseFuseMultiReduction});
       })
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
@@ -143,7 +138,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
       .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
       .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
       // 3. Perform elementwise operation fusion again (now with higher
@@ -153,19 +148,19 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             ElementwiseOpFusionPassOptions{
                 clEnableElementWiseFuseMultiReduction});
       })
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
       // 4. After elementwise operation fusion sink reshapes that block
       //    producer-consumer fusion.
       .addPass(DispatchCreation::createSinkReshapesPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
   if (clEnableFuseHorizontalContractions) {
     FunctionLikeNest(passManager)
         .addPass(createFuseHorizontalContractionsPass)
-        .addPass(mlir::createCanonicalizerPass)
+        .addPass(IREE::Flow::createCanonicalizePass)
         .addPass(mlir::createCSEPass);
   }
 
@@ -179,22 +174,14 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       //       TODO: This is probably not in the right place.
       .addPredicatedPass(clDetensoring,
                          [&]() { return mlir::createLinalgDetensorizePass(); })
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
-      //    b. For ops with multiple reduction dimensions, collapse the
-      //       reduction dimension.
-      //       TODO: This pass is only needed till all backends can handle
-      //       multiple reduction dimensions.
-      .addPredicatedPass(
-          clCollapseReductionDims,
-          DispatchCreation::createCollapseReductionDimensionsPass)
-
-      //     c. Split reduction operations into parallel and reduction, i.e
+      //     b. Split reduction operations into parallel and reduction, i.e
       //        .
       .addPass(DispatchCreation::createSplitReductionPass)
 
-      //     d. Transpose generic ops to
+      //     c. Transpose generic ops to
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
       .addPass(DispatchCreation::createTransposeGenericOpsPass);
@@ -209,7 +196,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
   FunctionLikeNest(passManager)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 }
 
@@ -253,9 +240,9 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
     FunctionLikeNest(passManager)
         // Run canonicalizer first to make propagation easier.
         .addPass([&]() {
-          IREE::Flow::CanonicalizerPassOptions options;
+          IREE::Flow::CanonicalizePassOptions options;
           options.cseConstants = false;
-          return IREE::Flow::createCanonicalizerPass(options);
+          return IREE::Flow::createCanonicalizePass(options);
         })
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
@@ -325,7 +312,7 @@ void buildDispatchCreationPassPipeline(
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion.
       .addPass(DispatchCreation::createFusionPreprocessingPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
@@ -339,7 +326,7 @@ void buildDispatchCreationPassPipeline(
       // - Apply tensor -> flow patterns
       .addPass(DispatchCreation::createConvertTensorToFlowPass)
       .addPass(createCSEPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       /// Creates the workgroup count region where the materialized computation
       /// is derived as a program slice of the body of the dispatch. This method
       /// - Computes the `workload` to use for the `workgroupsOp`, which are

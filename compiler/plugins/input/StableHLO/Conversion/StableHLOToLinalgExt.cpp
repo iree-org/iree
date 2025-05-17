@@ -105,7 +105,6 @@ struct StableHloToStdTypeConverter final : TypeConverter {
     addConversion(convertRank0TensorToScalar);
     addConversion(convertIntegerToSignless);
 
-    addArgumentMaterialization(materializeCast);
     addSourceMaterialization(materializeCast);
     addTargetMaterialization(materializeCast);
   }

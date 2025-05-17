@@ -371,13 +371,10 @@ struct HoistableLinalgOpInterface
       return !isa<linalg::FillOp>(op);
     }
 
-    // Don't hoist ops with no inputs, their result is defined by `linalg.index`
-    // ops and should be fused with their consumers.
-    if (genericOp.getNumDpsInputs() == 0) {
-      return false;
-    }
-
-    if (linalg::isaFillOpInterface(genericOp).has_value()) {
+    // Don't hoist ops with no tensor inputs. They are likely to be fill-like
+    // or sequences (from `linalg.index`) which can be fused with their
+    // consumers.
+    if (IREE::LinalgExt::hasOnlyScalarInputs(genericOp)) {
       return false;
     }
 

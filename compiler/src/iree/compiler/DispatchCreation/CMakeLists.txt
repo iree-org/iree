@@ -21,7 +21,6 @@ iree_cc_library(
     "BubbleUpExtractSlices.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
-    "CollapseReductionDimensions.cpp"
     "ConvertDispatchRegionsToWorkgroups.cpp"
     "ConvertEncodingToFlow.cpp"
     "ConvertTensorToFlow.cpp"

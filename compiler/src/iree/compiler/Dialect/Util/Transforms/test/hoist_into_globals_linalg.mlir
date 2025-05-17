@@ -104,8 +104,8 @@ module @nested_consumer {
 
 // -----
 
-// CHECK-LABEL: @do_not_hoist_sequence
-module @do_not_hoist_sequence {
+// CHECK-LABEL: @do_not_hoist_sequence_basic
+module @do_not_hoist_sequence_basic {
   // CHECK-NOT: util.initializer
   //     CHECK: util.func public @main
   //     CHECK:   linalg.generic
@@ -126,5 +126,93 @@ module @do_not_hoist_sequence {
       linalg.yield %5 : f64
     } -> tensor<128xf64>
     util.return %3 : tensor<128xf64>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_sequence_cst_from_above
+module @do_not_hoist_sequence_cst_from_above {
+  // CHECK-NOT: util.initializer
+  //     CHECK: util.func public @main
+  //     CHECK:   %[[V0:.+]] = linalg.generic
+  //     CHECK:   util.return %[[V0]]
+  util.func @main() -> (tensor<128xi64>){
+    %0 = arith.constant dense<0> : tensor<128xi64>
+    %cst = arith.constant 10 : i64
+    %1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%0 : tensor<128xi64>) {
+    ^bb0(%out: i64):
+      %00 = linalg.index 0 : index
+      %01 = arith.index_cast %00 : index to i64
+      %02 = arith.addi %cst, %01 : i64
+      linalg.yield %02 : i64
+    } -> tensor<128xi64>
+    util.return %1 : tensor<128xi64>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_sequence_cst_argument
+module @do_not_hoist_sequence_cst_argument {
+  // CHECK-NOT: util.initializer
+  //     CHECK: util.func public @main
+  //     CHECK:   %[[V0:.+]] = linalg.generic
+  //     CHECK:   util.return %[[V0]]
+  util.func @main() -> (tensor<128xi64>){
+    %0 = arith.constant dense<0> : tensor<128xi64>
+    %cst = arith.constant 10 : i64
+    %1 = linalg.generic {indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%cst : i64) outs(%0 : tensor<128xi64>) {
+    ^bb0(%in : i64, %out : i64):
+      %00 = linalg.index 0 : index
+      %01 = arith.index_cast %00 : index to i64
+      %02 = arith.addi %cst, %01 : i64
+      linalg.yield %02 : i64
+    } -> tensor<128xi64>
+    util.return %1 : tensor<128xi64>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_bit_extend
+#map = affine_map<(d0) -> (d0)>
+module @do_not_hoist_bit_extend {
+  // CHECK-NOT: util.initializer
+  //     CHECK: util.func public @main
+  //     CHECK:   %[[V0:.+]] = linalg.generic
+  //     CHECK:   util.return %[[V0]]
+  util.func @main() -> (tensor<1024xf32>){
+    %0 = arith.constant dense<3.14> : tensor<1024xf16>
+    %1 = tensor.empty() : tensor<1024xf32>
+    %cst = arith.constant 10 : i64
+    %2 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%0 : tensor<1024xf16>) outs(%1 : tensor<1024xf32>) {
+    ^bb0(%in: f16, %out: f32):
+      %4 = arith.extf %in : f16 to f32
+      linalg.yield %4 : f32
+    } -> tensor<1024xf32>
+    util.return %2 : tensor<1024xf32>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @do_hoist_bit_truncate
+#map = affine_map<(d0) -> (d0)>
+module @do_hoist_bit_truncate {
+  //     CHECK: util.initializer
+  //     CHECK: util.func public @main
+  //     CHECK:   %[[V0:.+]] = util.global.load
+  //     CHECK:   util.return %[[V0]]
+  util.func @main() -> (tensor<1024xf16>){
+    %0 = arith.constant dense<3.14> : tensor<1024xf32>
+    %1 = tensor.empty() : tensor<1024xf16>
+    %cst = arith.constant 10 : i64
+    %2 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%0 : tensor<1024xf32>) outs(%1 : tensor<1024xf16>) {
+    ^bb0(%in: f32, %out: f16):
+      %4 = arith.truncf %in : f32 to f16
+      linalg.yield %4 : f16
+    } -> tensor<1024xf16>
+    util.return %2 : tensor<1024xf16>
   }
 }

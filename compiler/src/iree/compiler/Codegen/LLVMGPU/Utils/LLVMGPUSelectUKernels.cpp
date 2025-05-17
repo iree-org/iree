@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
@@ -52,7 +53,7 @@ getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.
 static UKernelNameAndSuffix getUKernelNameAndSuffix(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    if (succeeded(isArgmaxOp(genericOp))) {
+    if (IREE::LinalgExt::isArgmaxOp(genericOp)) {
       return getUKernelNameAndSuffixForArgmax(genericOp);
     }
   } else if (auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op)) {

@@ -896,7 +896,8 @@ struct DropUnusedExecutableConstantBlockDeviceArg
     if (!deviceArg.use_empty())
       return failure();
     rewriter.modifyOpInPlace(blockOp, [&]() {
-      blockOp.eraseArgument(0);
+      // Type conversion here shouldn't fail.
+      (void)blockOp.eraseArgument(0);
       blockOp.setFunctionTypeAttr(TypeAttr::get(
           rewriter.getFunctionType(/*inputs=*/{}, blockOp.getResultTypes())));
     });

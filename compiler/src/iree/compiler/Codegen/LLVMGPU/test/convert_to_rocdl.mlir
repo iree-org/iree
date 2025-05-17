@@ -305,3 +305,30 @@ module {
 //   CHECK-NEXT:    rocdl.s.setprio 3
 //   CHECK:         rocdl.mfma
 //   CHECK-NEXT:    rocdl.s.setprio 4
+
+// -----
+
+builtin.module {
+  func.func @shared_memory_lowering() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
+    %0 = memref.alloc() : memref<1x16x32xf32, #gpu.address_space<workgroup>>
+    %1 = memref.alloc() : memref<1x32x16xf32, #gpu.address_space<workgroup>>
+    %2 = memref.alloc() : memref<1x8x16xf32, #gpu.address_space<workgroup>>
+    vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    return
+  }
+}
+
+// CHECK-DAG: llvm.mlir.global private @__shared_memory___1() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<16 x array<32 x f32>>>
+// CHECK-DAG: llvm.mlir.global private @__shared_memory___0() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<32 x array<16 x f32>>>
+// CHECK-DAG: llvm.mlir.global private @__shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<8 x array<16 x f32>>>
+// CHECK-LABEL: llvm.func @shared_memory_lowering() {
+//   CHECK-DAG: %[[A1:.+]] = llvm.mlir.addressof @__shared_memory___1
+//   CHECK-DAG: llvm.getelementptr %[[A1]][0, 0, 0, 0]
+//   CHECK-DAG: %[[A0:.+]] = llvm.mlir.addressof @__shared_memory___0
+//   CHECK-DAG: llvm.getelementptr %[[A0]][0, 0, 0, 0]
+//   CHECK-DAG: %[[A:.+]] = llvm.mlir.addressof @__shared_memory__
+//   CHECK-DAG: llvm.getelementptr %[[A]][0, 0, 0, 0]

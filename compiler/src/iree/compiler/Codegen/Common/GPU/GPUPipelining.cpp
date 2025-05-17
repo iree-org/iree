@@ -216,13 +216,13 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
     auto ld = dyn_cast<vector::TransferReadOp>(op);
     if (!ld)
       continue;
-    auto ldSrcType = llvm::cast<MemRefType>(ld.getSource().getType());
+    auto ldSrcType = llvm::cast<MemRefType>(ld.getBase().getType());
     if (!hasGlobalMemoryAddressSpace(ldSrcType) || !ld->hasOneUse())
       continue;
     auto st = dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
     if (!st)
       continue;
-    auto stSrcType = llvm::cast<MemRefType>(st.getSource().getType());
+    auto stSrcType = llvm::cast<MemRefType>(st.getBase().getType());
     if (!hasSharedMemoryAddressSpace(stSrcType))
       continue;
     copyToWorkgroupMemory = true;
