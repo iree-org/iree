@@ -1027,15 +1027,20 @@ TEST(F8E8M0FNUConversionTest, F32ToF8E8M0FNU) {
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
   for (int exp = -127; exp <= 127; ++exp) {
     EXPECT_EQ(127 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.0f, exp)));
+    EXPECT_EQ(127 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(-1.0f, exp)));
+
     // 1.5 Should get rounded to the next exponent value or to NaN if that
     // overflows.
     EXPECT_EQ(128 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.5f, exp)));
+    EXPECT_EQ(128 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(-1.5f, exp)));
   }
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(+INFINITY));
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(-INFINITY));
-  EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(-1.0f));
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e8m0fnu(1.0f));
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e8m0fnu(-1.0f));
   EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(0.0f));
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e8m0fnu(-0.0f));
   EXPECT_EQ(0x01, iree_math_f32_to_f8e8m0fnu(FLT_MIN));
   // Overflow to NaN
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(FLT_MAX));
