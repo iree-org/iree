@@ -17,6 +17,7 @@ ALL_SRCS = enforce_glob(
     [
         "attention.mlir",
         "gather.mlir",
+        "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -101,6 +102,7 @@ LLVM_GPU_SRCS = enforce_glob(
     exclude = [
         "attention.mlir",
         "attention_i1_mask.mlir",
+        "map_scatter.mlir",
     ],
 )
 
@@ -135,6 +137,7 @@ ROCM_HIP_SRCS = enforce_glob(
         "top-k.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
+        "map_scatter.mlir",
     ],
 )
 
@@ -184,6 +187,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "map_scatter.mlir",
             "top-k.mlir",
         ],
     ),
