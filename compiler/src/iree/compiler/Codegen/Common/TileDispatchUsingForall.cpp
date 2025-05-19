@@ -571,22 +571,15 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
-    // Yield a replacement if:
-    //  a) All users of fused op are dominated by the tiling root.
-    //  b) There is at most a single tiled user. If there is more than one
-    //     then yielding a replacement may result in multiple incompatible
-    //     consumer fusions.
-    if (llvm::any_of(op->getUsers(),
-                     [&](Operation *user) {
-                       return dominanceInfo.properlyDominates(tilableOp, user);
-                     }) &&
-        (llvm::count_if(op->getUsers(), [&](Operation *user) {
-           return tiledAndFusedOps.contains(user);
-         }) < 2)) {
+    // If tiledAndFused ops doesn't contain the user; add an replacement
+    // for that.
+    if (llvm::any_of(op->getUsers(), [&](Operation *user) {
+          return dominanceInfo.properlyDominates(tilableOp, user) &&
+                 !tiledAndFusedOps.contains(user);
+        })) {
       yieldReplacementsFor.insert(op);
     }
   }
-
   scf::SCFTilingOptions tilingOptions;
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
