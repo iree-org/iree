@@ -664,12 +664,12 @@ util.func @never_clone_insert_slice_ops(%arg0 : tensor<?xi32>, %arg1 : tensor<?x
 
 util.func @clone_gather_elementwise(%source : tensor<2x2x2048xi32>,
                                    %indices : tensor<2xi32>) -> tensor<2048xi32> {
+  %empty = tensor.empty() : tensor<2048xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0, 1]
+                          ins(%source, %indices : tensor<2x2x2048xi32>, tensor<2xi32>)
+                          outs(%empty: tensor<2048xi32>) -> tensor<2048xi32>
   %dispatch = flow.dispatch.region -> (tensor<2048xi32>) {
     %cst = arith.constant 2 : i32
-    %empty = tensor.empty() : tensor<2048xi32>
-    %result = iree_linalg_ext.gather dimension_map = [0, 1]
-                            ins(%source, %indices : tensor<2x2x2048xi32>, tensor<2xi32>)
-                            outs(%empty: tensor<2048xi32>) -> tensor<2048xi32>
     %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%result : tensor<2048xi32>) outs(%empty: tensor<2048xi32>) {
       ^bb0(%arg0: i32, %arg1: i32):
         %0 = arith.muli %arg0, %cst : i32
