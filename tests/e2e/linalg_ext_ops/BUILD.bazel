@@ -66,6 +66,7 @@ VMVX_SRCS = enforce_glob(
     # keep sorted
     [
         "gather.mlir",
+        "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
