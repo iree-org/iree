@@ -4934,7 +4934,7 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 <p><em>Workgroup count computed based on iteration range of the root of the DAG
     for ops within the dispatch.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict $operands
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict ($operands^)?
 </code></pre></div>
 <p>When using tile + distribution of the root of the DAG (Directed Acyclic
 Graph) of ops within the dispatch to split the work amongst workgroups. The
@@ -4987,7 +4987,7 @@ and distribute the root of the DAG).</p>
 <h3 id="iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop"><code>iree_tensor_ext.dispatch.workgroup_count_from_slice</code> (TensorExt::DispatchWorkgroupCountFromSliceOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" title="Permanent link">link</a></h3>
 <p><em>Place holder to signify default workgroup count calculation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict $operands
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict ($operands^)?
 </code></pre></div>
 <p>The default computation of the number of workgroups (or workgroup count)
 assumes that the dispatch + captured values is enough to compute the
