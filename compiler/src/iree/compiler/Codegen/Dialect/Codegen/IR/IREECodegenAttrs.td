@@ -82,6 +82,9 @@ def Custom
 def EXSLERATEV2_Conv2D 
     : I32EnumAttrCase<"Exsleratev2Conv2D", 1002>;
 
+def EXSLERATEV2_Pool
+    : I32EnumAttrCase<"Exsleratev2Pool", 1004>;
+
 def EXSLERATEV2_MatMul
     : I32EnumAttrCase<"Exsleratev2MatMul", 1003>;
 
@@ -124,6 +127,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     EXSLERATEV2_Conv2D,
 
     EXSLERATEV2_MatMul,
+
+    EXSLERATEV2_Pool,
 
     // None to specify no in-built pipelines to use.
     None
