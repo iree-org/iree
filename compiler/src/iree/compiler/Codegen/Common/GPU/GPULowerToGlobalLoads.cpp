@@ -27,7 +27,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-lower-to-global-loads"
+#define DEBUG_TYPE "iree-llvmgpu-lower-to-global-loads"
 
 #define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
@@ -61,14 +61,9 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   SmallVector<Value> offsets = {rewriter.create<arith::MulIOp>(
       loc, index, rewriter.create<arith::ConstantIndexOp>(loc, numParts))};
 
-  SmallVector<int64_t> strides;
-  for (auto i = tensorType.getRank() - 1; i >= 0; --i) {
-    if (i == 0) {
-      strides.push_back(1);
-    } else {
-      strides.push_back(tensorType.getDimSize(i));
-    }
-  }
+  SmallVector<int64_t> strides =
+      llvm::to_vector(llvm::reverse(tensorType.getShape().drop_back()));
+  strides.push_back(1);
 
   auto newSliceType =
       RankedTensorType::get(newShape, tensorType.getElementType());
@@ -146,6 +141,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto totalCopySizePerSubgroup = totalCopySize / numSubgroups;
   auto numCopiesPerThread =
       (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize[0];
+  auto residualElements =
+      totalCopySizePerSubgroup % (subgroupSize[0] * elementsPerCopy);
 
   LDBG("-- elementsPerCopy: " << elementsPerCopy << "\n");
   LDBG("-- workgroupSize: " << workgroupSize[0] << "\n");
@@ -153,6 +150,13 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   LDBG("-- totalCopySize: " << totalCopySize << "\n");
   LDBG("-- totalCopySizePerSubgroup: " << totalCopySizePerSubgroup << "\n");
   LDBG("-- numCopiesPerThread: " << numCopiesPerThread << "\n");
+  LDBG("-- residualElements: " << residualElements << "\n");
+
+  if (residualElements != 0) {
+    copy.emitOpError(
+        "Cannot proceed: Cannot handle copying residual elements.");
+    return false;
+  }
 
   // build For loop
   SmallVector<Attribute> mapping;
@@ -219,32 +223,6 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     return rewriter.create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
         .getMultiIndex();
   };
-
-  bool residualElements = totalCopySizePerSubgroup % subgroupSize[0];
-  if (residualElements != 0) {
-    LDBG("-- has residualElements: " << residualElements << "\n");
-    auto laneIdCmp = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::slt, laneId,
-        rewriter.create<arith::ConstantIndexOp>(loc, residualElements));
-    // statically we know where to load the last elements from.
-    rewriter.create<scf::IfOp>(
-        loc, laneIdCmp, [&](OpBuilder &builder, Location loc) {
-          auto numCopies =
-              builder.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
-          auto residualStoreBase =
-              getSubgroupStoreBaseIndex(subgroupId, numCopies);
-          auto delinearizedBaseIndices =
-              delinearizeIndex(residualStoreBase, sourceType.getShape());
-          auto laneGatherOffset =
-              getGlobalGatherIndex(subgroupId, laneId, numCopies);
-          auto delinearizedGatherIndices =
-              delinearizeIndex(laneGatherOffset, sourceType.getShape());
-          builder.create<IREE::GPU::GlobalLoadDMAOp>(
-              loc, copy.getOperand(0), delinearizedGatherIndices,
-              copy.getOutputs()[0], delinearizedBaseIndices);
-          builder.create<scf::YieldOp>(loc);
-        });
-  }
 
   // sync at the end of the loop across threads
   rewriter.create<gpu::BarrierOp>(loc);
