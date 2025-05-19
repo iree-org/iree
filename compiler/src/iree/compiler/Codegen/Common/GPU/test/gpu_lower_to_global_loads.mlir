@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-global-loads))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-lower-to-global-loads))" %s | FileCheck %s
 
 func.func @matmul_config_1() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
   %c0 = arith.constant 0 : index
@@ -8,8 +8,6 @@ func.func @matmul_config_1() attributes {translation_info = #iree_codegen.transl
   linalg.copy {lowering_config = #iree_gpu.use_global_load_dma} ins(%1 : memref<16x64xi8, #amdgpu.address_space<fat_raw_buffer>>) outs(%alloc : memref<16x64xi8, #gpu.address_space<workgroup>>)
   return
 }
-
-// -----
 
 // To gather a memref<16x64xi8> buffer:
 // number of subgroups: 64 / 64 = 1
