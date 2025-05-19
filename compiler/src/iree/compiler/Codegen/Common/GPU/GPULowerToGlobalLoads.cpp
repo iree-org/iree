@@ -29,6 +29,8 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-lower-to-global-loads"
 
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_GPULOWERTOGLOBALLOADSPASS
@@ -55,11 +57,6 @@ static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
   newShape[0] = outermostDimSize / numParts;
 
   auto loc = tensor.getLoc();
-  SmallVector<Value> newShapeOfSlice;
-  for (auto dim : newShape) {
-    newShapeOfSlice.push_back(
-        rewriter.create<arith::ConstantIndexOp>(loc, dim));
-  }
 
   SmallVector<Value> offsets = {rewriter.create<arith::MulIOp>(
       loc, index, rewriter.create<arith::ConstantIndexOp>(loc, numParts))};
@@ -101,8 +98,8 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
                                           linalg::CopyOp copy,
                                           ArrayRef<int64_t> workgroupSize,
                                           ArrayRef<int64_t> subgroupSize) {
-  LLVM_DEBUG(llvm::dbgs() << "==== distributing op:\n");
-  LLVM_DEBUG(llvm::dbgs() << "  " << *copy << "\n");
+  LDBG("==== distributing op:\n"
+       << "\t" << *copy << "\n");
 
   Location loc = copy.getLoc();
   MLIRContext *context = rewriter.getContext();
@@ -150,25 +147,21 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   auto numCopiesPerThread =
       (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize[0];
 
-  LLVM_DEBUG(llvm::dbgs() << "-- elementsPerCopy: " << elementsPerCopy << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "-- workgroupSize: " << workgroupSize[0] << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "-- numSubgroups: " << numSubgroups << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "-- totalCopySize: " << totalCopySize << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "-- totalCopySizePerSubgroup: "
-                          << totalCopySizePerSubgroup << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "-- numCopiesPerThread: " << numCopiesPerThread
-                          << "\n");
+  LDBG("-- elementsPerCopy: " << elementsPerCopy << "\n");
+  LDBG("-- workgroupSize: " << workgroupSize[0] << "\n");
+  LDBG("-- numSubgroups: " << numSubgroups << "\n");
+  LDBG("-- totalCopySize: " << totalCopySize << "\n");
+  LDBG("-- totalCopySizePerSubgroup: " << totalCopySizePerSubgroup << "\n");
+  LDBG("-- numCopiesPerThread: " << numCopiesPerThread << "\n");
 
   // build For loop
   SmallVector<Attribute> mapping;
-  int idx = 0;
   for (int64_t i = 0, e = rank; i < e; ++i) {
-    unsigned mappingId =
-        static_cast<unsigned>(gpu::MappingId::LinearDim0) + idx++;
+    unsigned mappingId = static_cast<unsigned>(gpu::MappingId::LinearDim0) + i;
     mapping.push_back(gpu::GPUThreadMappingAttr::get(
         context, static_cast<gpu::MappingId>(mappingId)));
   }
-  mapping = llvm::to_vector(llvm::reverse(mapping));
+  std::reverse(mapping.begin(), mapping.end());
 
   Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
   Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
@@ -181,11 +174,9 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                   Value indVar) -> Value {
-    SmallVector<AffineExpr> symbols(3);
-    bindSymbolsList(rewriter.getContext(), MutableArrayRef{symbols});
-    auto laneIdExpr = symbols[0];
-    auto subgroupIdExpr = symbols[1];
-    auto iterationExpr = symbols[2];
+    auto laneIdExpr = rewriter.getAffineSymbolExpr(0);
+    auto subgroupIdExpr = rewriter.getAffineSymbolExpr(1);
+    auto iterationExpr = rewriter.getAffineSymbolExpr(2);
 
     AffineExpr strideExpr =
         rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
@@ -196,16 +187,14 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     AffineExpr gatherOffsetExpr = subgroupIdExpr * totalCopySizeExpr +
                                   iterationExpr * strideExpr +
                                   laneIdExpr * elementsPerCopy;
-    OpFoldResult result = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, gatherOffsetExpr, {lIdVal, sgIdVal, indVar});
-    return cast<Value>(result);
+    return affine::makeComposedAffineApply(rewriter, loc, gatherOffsetExpr,
+                                           {lIdVal, sgIdVal, indVar})
+        .getResult();
   };
 
   auto getSubgroupStoreBaseIndex = [&](Value sgIdVal, Value indVar) -> Value {
-    SmallVector<AffineExpr> symbols(2);
-    bindSymbolsList(rewriter.getContext(), MutableArrayRef{symbols});
-    auto subgroupIdExpr = symbols[0];
-    auto iterationExpr = symbols[1];
+    auto subgroupIdExpr = rewriter.getAffineSymbolExpr(0);
+    auto iterationExpr = rewriter.getAffineSymbolExpr(1);
 
     AffineExpr strideExpr =
         rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
@@ -215,20 +204,16 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
     // [subgroupStartOffset + i * gatherStride]
     AffineExpr baseOffsetExpr =
         subgroupIdExpr * totalCopySizeExpr + iterationExpr * strideExpr;
-
-    OpFoldResult result = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, baseOffsetExpr, {sgIdVal, indVar});
-    return cast<Value>(result);
+    return affine::makeComposedAffineApply(rewriter, loc, baseOffsetExpr,
+                                           {sgIdVal, indVar})
+        .getResult();
   };
 
   // Build for loop skeleton:
   scf::ForOp forOp = rewriter.create<scf::ForOp>(
-      loc, /*lb = */ rewriter.create<arith::ConstantIndexOp>(loc, 0),
-      /*ub = */
-      rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread),
-      /*steps = */
-      rewriter.create<arith::ConstantIndexOp>(loc, 1),
-      /*outputs=*/ValueRange{});
+      loc, /*lb=*/rewriter.create<arith::ConstantIndexOp>(loc, 0),
+      /*ub=*/rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread),
+      /*steps=*/rewriter.create<arith::ConstantIndexOp>(loc, 1));
 
   auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
     return rewriter.create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
@@ -237,8 +222,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
 
   bool residualElements = totalCopySizePerSubgroup % subgroupSize[0];
   if (residualElements != 0) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "-- has residualElements: " << residualElements << "\n");
+    LDBG("-- has residualElements: " << residualElements << "\n");
     auto laneIdCmp = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::slt, laneId,
         rewriter.create<arith::ConstantIndexOp>(loc, residualElements));
@@ -294,20 +278,20 @@ static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
   auto targetType = cast<MemRefType>(copy.getOutputs().front().getType());
   if (!hasGlobalMemoryAddressSpace(sourceType)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "-- Op: " << *copy
-               << "\n-- has source memory address space other than global.\n");
+    LDBG("-- Op: "
+         << *copy
+         << "\n-- has source memory address space other than global.\n");
     return false;
   }
   if (targetType.getMemorySpace() !=
       gpu::AddressSpaceAttr::get(copy->getContext(),
                                  gpu::GPUDialect::getWorkgroupAddressSpace())) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "-- Op: " << *copy
-        << "\n-- has target memory address space other than workgroup.\n");
+    LDBG("-- Op: "
+         << *copy
+         << "\n-- has target memory address space other than workgroup.\n");
     return false;
   }
+  // TODO: check that the copy's target memref is not a subview.
   return true;
 }
 
@@ -315,12 +299,18 @@ namespace {
 struct GPULowerToGlobalLoadsPass final
     : impl::GPULowerToGlobalLoadsPassBase<GPULowerToGlobalLoadsPass> {
 
-  SmallVector<linalg::CopyOp> collectCopies(Operation *funcOp) {
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    auto funcOp = getOperation();
+
+    // we will do this before/at the time of tiling, we need:
+    // 1. tiling configurations, to compute how many to generate.
+
     SmallVector<linalg::CopyOp> copies;
-    // Walk in PreOrder so that parent operations are visited before children,
-    // thus allowing all operations contained within thread/warp/lane foralls
-    // to be skipped.
     funcOp->walk<WalkOrder::PreOrder>([&](Operation *op) {
+      // Walk in PreOrder so that parent operations are visited before children,
+      // thus allowing all operations contained within thread/warp/lane foralls
+      // to be skipped.
       if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
         // Skip ops contained within forall ops with thread/warp/lane mappings.
         if (forallOpHasMappingType<IREE::GPU::LaneIdAttr,
@@ -333,23 +323,13 @@ struct GPULowerToGlobalLoadsPass final
         if (checkEligibilityForGlobalLoadDMA(copy)) {
           copies.push_back(copy);
         } else {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Skipping copy op: " << *copy
-                     << " because it is not eligible for global load DMA.\n");
+          LDBG("Skipping copy op: "
+               << *copy
+               << " because it is not eligible for global load DMA.\n");
         }
       }
       return WalkResult::advance();
     });
-    return copies;
-  }
-
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
-
-    // we will do this before/at the time of tiling, we need:
-    // 1. tiling configurations, to compute how many to generate.
-    SmallVector<linalg::CopyOp> copies = collectCopies(funcOp);
 
     std::optional<SmallVector<int64_t>> workgroupSize =
         mlir::iree_compiler::getWorkgroupSize(funcOp);
@@ -367,7 +347,6 @@ struct GPULowerToGlobalLoadsPass final
 
     IRRewriter rewriter(context);
     for (auto copy : copies) {
-      // TODO: check that the copy's target memref is not a subview.
       rewriter.setInsertionPoint(copy);
       if (!distributeLinalgCopyToThreads(rewriter, copy, *workgroupSize,
                                          *subgroupSize)) {

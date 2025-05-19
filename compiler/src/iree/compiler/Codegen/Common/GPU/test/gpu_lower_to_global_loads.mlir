@@ -1,6 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-codegen-gpu-use-direct-load --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-global-loads))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-global-loads))" %s | FileCheck %s
 
-module {
 func.func @matmul_config_1() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<16x64xi8, #hal.descriptor_type<storage_buffer>>
@@ -9,7 +8,8 @@ func.func @matmul_config_1() attributes {translation_info = #iree_codegen.transl
   linalg.copy {lowering_config = #iree_gpu.use_global_load_dma} ins(%1 : memref<16x64xi8, #amdgpu.address_space<fat_raw_buffer>>) outs(%alloc : memref<16x64xi8, #gpu.address_space<workgroup>>)
   return
 }
-}
+
+// -----
 
 // To gather a memref<16x64xi8> buffer:
 // number of subgroups: 64 / 64 = 1
@@ -37,7 +37,6 @@ func.func @matmul_config_1() attributes {translation_info = #iree_codegen.transl
 
 // -----
 
-module {
 func.func @matmul_config_2() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<64x16xi8, #hal.descriptor_type<storage_buffer>>
@@ -45,7 +44,6 @@ func.func @matmul_config_2() attributes {translation_info = #iree_codegen.transl
   %alloc = memref.alloc() : memref<64x16xi8, #gpu.address_space<workgroup>>
   linalg.copy {lowering_config = #iree_gpu.use_global_load_dma} ins(%1 : memref<64x16xi8, #amdgpu.address_space<fat_raw_buffer>>) outs(%alloc : memref<64x16xi8, #gpu.address_space<workgroup>>)
   return
-}
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 1024 + s2 * 256)>
@@ -67,7 +65,6 @@ func.func @matmul_config_2() attributes {translation_info = #iree_codegen.transl
 
 // -----
 
-module {
 func.func @matmul_config_3() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<32x64xi16, #hal.descriptor_type<storage_buffer>>
@@ -75,7 +72,6 @@ func.func @matmul_config_3() attributes {translation_info = #iree_codegen.transl
   %alloc = memref.alloc() : memref<32x64xi16, #gpu.address_space<workgroup>>
   linalg.copy {lowering_config = #iree_gpu.use_global_load_dma} ins(%1 : memref<32x64xi16, #amdgpu.address_space<fat_raw_buffer>>) outs(%alloc : memref<32x64xi16, #gpu.address_space<workgroup>>)
   return
-}
 }
 
 // To gather a memref<32x64xi16> buffer:

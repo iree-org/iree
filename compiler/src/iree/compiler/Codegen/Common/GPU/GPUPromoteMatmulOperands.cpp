@@ -118,7 +118,7 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   }
 
   rewriter.setInsertionPointAfterValue(replacement);
-  replacement = promoteValue(rewriter, loc, replacement, false);
+  replacement = promoteValue(rewriter, loc, replacement, /*useDirectLoad=*/false);
   valueToReplace.replaceUsesWithIf(replacement, [&](OpOperand &use) {
     return opsToReplaceUseIn.contains(use.getOwner());
   });
