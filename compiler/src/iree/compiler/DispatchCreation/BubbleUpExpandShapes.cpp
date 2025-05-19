@@ -130,7 +130,11 @@ struct BubbleExpandThroughExtract final
 /// on propagating infinitely.
 static bool canCauseReshapingLoopByExpansion(Operation *producer,
                                              Operation *consumer) {
-  bool isExpandingToUnitDims = false;
+  bool isMultiUse = !llvm::hasSingleElement(producer->getUses());
+  if (!isMultiUse) {
+    return false;
+  }
+
   if (auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(consumer)) {
     // If the expand_shape is only expanding unit dimensions and the producer
     // has multiple users, there is a possibility of an infinite loop.
@@ -140,18 +144,16 @@ static bool canCauseReshapingLoopByExpansion(Operation *producer,
       if (indices.size() == 1) {
         continue;
       }
-      // Check if the output shape at any of the reassociation indices is 1.
-      for (int64_t ind : indices) {
-        if (outputShape[ind] == 1) {
-          isExpandingToUnitDims = true;
-        }
-      }
-    }
+      // Check if the output shape of reassociations is only doing unit dim
+      // expands.
+      int64_t numUnitDimExpands =
+          llvm::count_if(outputShape, [](int64_t ind) { return ind == 1; });
 
-    // Check for multiple uses. The producer has at least 1 use: the
-    // expand_shape.
-    if (isExpandingToUnitDims && !llvm::hasSingleElement(producer->getUses())) {
-      return true;
+      // Check for multiple uses. The producer has at least 1 use: the
+      // expand_shape.
+      if (numUnitDimExpands >= outputShape.size() - 1 && isMultiUse) {
+        return true;
+      }
     }
   }
 
