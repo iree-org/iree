@@ -100,8 +100,8 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
     );
 
 static llvm::cl::opt<bool>
-    clUseDirectLoad("iree-codegen-gpu-use-direct-load",
-                    llvm::cl::desc("Use global load DMA for direct load ops"),
+    clUseDirectLoad("iree-llvmgpu-use-direct-load",
+                    llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//

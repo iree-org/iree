@@ -1422,8 +1422,7 @@ UseGlobalLoadDMAAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
     return {};
   }
   SmallVector<int64_t> sizes = globalLoadDMATileSizes(op);
-  return llvm::map_to_vector(
-      sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
+  return getAsIndexOpFoldResult(b.getContext(), sizes);
 }
 
 bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
