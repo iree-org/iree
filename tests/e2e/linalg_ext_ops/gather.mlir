@@ -54,3 +54,20 @@ func.func @gather_perm_map() {
   check.expect_eq_const(%result, dense<[2]> : tensor<1xi32>) : tensor<1xi32>
   return
 }
+
+func.func @gather_fuse_elementwise() {
+  %cst = arith.constant 2 : i32
+  %source = util.unfoldable_constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
+  %empty = tensor.empty() : tensor<2xi32>
+  %indices = util.unfoldable_constant dense<[1]> : tensor<1xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+                          ins(%source, %indices : tensor<2x2xi32>, tensor<1xi32>)
+                          outs(%empty: tensor<2xi32>) -> tensor<2xi32>
+  %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%result : tensor<2xi32>) outs(%empty: tensor<2xi32>) {
+    ^bb0(%arg0: i32, %arg1: i32):
+      %0 = arith.muli %arg0, %cst : i32
+      linalg.yield %0 : i32
+  } -> tensor<2xi32>
+  check.expect_eq_const(%generic, dense<[4, 6]> : tensor<2xi32>) : tensor<2xi32>
+  return
+}

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Iterators.h"
@@ -46,7 +47,7 @@ struct CloneProducersIntoDispatchRegionsPass final
 
     funcOp->walk([&](Operation *op) {
       if (!IREE::Flow::isNonNullAndOutsideDispatch(op) ||
-          !isa<linalg::GenericOp>(op)) {
+          !isa<linalg::GenericOp, IREE::LinalgExt::GatherOp>(op)) {
         return;
       }
       if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, op))) {
