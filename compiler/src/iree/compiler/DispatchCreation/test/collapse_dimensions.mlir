@@ -863,3 +863,51 @@ util.func public @multi_reduction(%arg0 : tensor<32x16x16384xf32>, %arg1 : tenso
 //       CHECK:   %[[GEN2:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[GEN1]] : tensor<32xf32>)
 //       CHECK:   flow.return %[[GEN2]]
+
+// -----
+
+util.func public @collapse_single_fill(%arg0: tensor<11x470x725x224xf32>) -> tensor<11x470x725x224xf32> {
+  %0 = flow.dispatch.region -> (tensor<11x470x725x224xf32>) {
+    %cst = arith.constant 0.000000e+00 : f32
+    %1 = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<11x470x725x224xf32>) -> tensor<11x470x725x224xf32>
+    flow.return %1 : tensor<11x470x725x224xf32>
+  }
+  util.return %0 : tensor<11x470x725x224xf32>
+}
+// CHECK-LABEL: util.func public @collapse_single_fill
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//   CHECK-DAG:   %[[COLLAPSE0:.+]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:   flow.dispatch.region
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:     outs(%[[COLLAPSE0]] : tensor<839608000xf32>)
+//       CHECK:   flow.return %[[FILL]]
+
+// -----
+
+util.func public @collapse_fill_of_arg(%arg0: tensor<224x32xf32>, %arg1: tensor<11x470x725x224xf32>, %arg2: tensor<11x470x725x32xf32>) -> tensor<11x470x725x224xf32> {
+  %0 = flow.dispatch.region -> (tensor<11x470x725x224xf32>) {
+    %cst = arith.constant 0.000000e+00 : f32
+    %1 = linalg.fill ins(%cst : f32) outs(%arg1 : tensor<11x470x725x224xf32>) -> tensor<11x470x725x224xf32>
+    %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%arg2, %arg0 : tensor<11x470x725x32xf32>, tensor<224x32xf32>) outs(%1 : tensor<11x470x725x224xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %3 = arith.mulf %in, %in_0 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+    } -> tensor<11x470x725x224xf32>
+    flow.return %2 : tensor<11x470x725x224xf32>
+  }
+  util.return %0 : tensor<11x470x725x224xf32>
+}
+// CHECK-LABEL: util.func public @collapse_fill_of_arg
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//  CHECK-SAME:   %[[ARG1:[0-9a-zA-Z]+]]
+//  CHECK-SAME:   %[[ARG2:[0-9a-zA-Z]+]]
+//   CHECK-DAG:   %[[COLLAPSE1:.+]] = tensor.collapse_shape %[[ARG1]]
+//   CHECK-DAG:   %[[COLLAPSE2:.+]] = tensor.collapse_shape %[[ARG2]]
+//       CHECK:   flow.dispatch.region
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:     outs(%[[COLLAPSE1]] : tensor<3748250x224xf32>)
+//       CHECK:   %[[GEN0:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[COLLAPSE2]], %[[ARG0]] : tensor<3748250x32xf32>, tensor<224x32xf32>)
+//  CHECK-SAME:     outs(%[[FILL]] : tensor<3748250x224xf32>)
+//       CHECK:   flow.return %[[GEN0]]
