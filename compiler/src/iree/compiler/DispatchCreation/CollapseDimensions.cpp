@@ -168,7 +168,7 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
-  if (isa<IREE::LinalgExt::AttentionOp>(op)) {
+  if (isa<IREE::LinalgExt::AttentionOp, linalg::FillOp>(op)) {
     return true;
   }
 
@@ -964,7 +964,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     using ResultsType = FailureOr<SmallVector<Value>>;
     auto maybeReplacements =
         llvm::TypeSwitch<Operation *, ResultsType>(opToCollapse)
-            .Case<linalg::GenericOp>(
+            .Case<linalg::LinalgOp>(
                 [&, &info = info](auto genericOp) -> ResultsType {
                   FailureOr<linalg::CollapseResult> maybeReplacements =
                       mlir::linalg::collapseOpIterationDims(
