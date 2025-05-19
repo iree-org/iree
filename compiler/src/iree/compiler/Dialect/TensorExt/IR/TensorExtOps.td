@@ -263,7 +263,7 @@ class IREETensorExt_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits
   let results = (outs Index:$x, Index:$y, Index:$z);
 
   let assemblyFormat = [{
-    attr-dict $operands
+    attr-dict ($operands^)?
   }];
 }
 
