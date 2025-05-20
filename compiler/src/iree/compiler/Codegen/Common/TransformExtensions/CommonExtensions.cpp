@@ -1256,6 +1256,7 @@ DiagnosedSilenceableFailure transform_dialect::FuseConsumerOp::apply(
 void transform_dialect::FuseConsumerOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTargetMutable(), effects);
+  transform::consumesHandle(getLoopsMutable(), effects);
   transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
