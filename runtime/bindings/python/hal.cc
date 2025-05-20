@@ -1112,11 +1112,12 @@ VmModule CreateHalModule(
     iree_hal_module_debug_sink = (*debug_sink)->AsIreeHalModuleDebugSink();
   }
 
-  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
-                                        devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
-                                        iree_hal_module_debug_sink,
-                                        iree_allocator_system(), &module),
-                 "Error creating hal module");
+  CheckApiStatus(
+      iree_hal_module_create(
+          instance->raw_ptr(), iree_hal_module_device_policy_default(),
+          device_count, devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
+          iree_hal_module_debug_sink, iree_allocator_system(), &module),
+      "Error creating hal module");
   VmModule vm_module = VmModule::StealFromRawPtr(module);
   if (debug_sink) {
     // Retain a reference. We want the callback to be valid after
