@@ -57,8 +57,8 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v,
         IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext());
     setLoweringConfig(copy, globalLoadDMAAttr);
   } else {
-    setLoweringConfig(copy, IREE::GPU::DerivedThreadConfigAttr::get(
-                                builder.getContext()));
+    setLoweringConfig(
+        copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
   }
   return copy.getResult(0);
 }
@@ -118,7 +118,8 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   }
 
   rewriter.setInsertionPointAfterValue(replacement);
-  replacement = promoteValue(rewriter, loc, replacement, /*useDirectLoad=*/false);
+  replacement =
+      promoteValue(rewriter, loc, replacement, /*useDirectLoad=*/false);
   valueToReplace.replaceUsesWithIf(replacement, [&](OpOperand &use) {
     return opsToReplaceUseIn.contains(use.getOwner());
   });
