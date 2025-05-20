@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "LowerVectorExtOps.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
     "VectorizeIREEVectorExtOps.cpp"

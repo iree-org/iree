@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
@@ -129,6 +131,8 @@ struct LLVMGPUVectorLoweringPass final
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
     amdgpu::populateAmdgpuTransferReadToLoadPatterns(vectorToLoopsPatterns);
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
+    IREE::VectorExt::populateTransferGatherUnrollingPatterns(
+        vectorToLoopsPatterns, /*maxUnrollRank=*/0);
     if (failed(
             applyPatternsGreedily(funcOp, std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();
