@@ -57,8 +57,6 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   Location loc = copy.getLoc();
   MLIRContext *context = rewriter.getContext();
 
-  OpBuilder::InsertionGuard guard(rewriter);
-
   auto getTotalSize = [](ArrayRef<int64_t> sizes) {
     return std::accumulate(sizes.begin(), sizes.end(), 1,
                            std::multiplies<int64_t>());
@@ -176,8 +174,6 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   }
 
   // sync at the end of the loop across threads
-  // rewriter.create<gpu::BarrierOp>(loc);
-
   rewriter.replaceOpWithNewOp<gpu::BarrierOp>(copy);
   return success();
 }
