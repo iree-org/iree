@@ -2848,6 +2848,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-gpu-combine-layout-transformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-gpu-combine-layout-transformation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-gpu-combine-value-barriers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-gpu-combine-value-barriers
@@ -5024,6 +5033,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-gpu-combine-layout-transformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-gpu-combine-layout-transformation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-gpu-combine-value-barriers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-gpu-combine-value-barriers
@@ -5435,6 +5453,14 @@ must be made earlier to avoid failed bufferization.</p>
 <p><em>Bubbles iree_gpu.buffer_resource_cast ops upwards.</em></p>
 <h3 id="-iree-codegen-gpu-check-resource-usage"><code>-iree-codegen-gpu-check-resource-usage</code><a class="headerlink" href="#-iree-codegen-gpu-check-resource-usage" title="Permanent link">link</a></h3>
 <p><em>Checks GPU specific resource usage constraints like shared memory limits</em></p>
+<h3 id="-iree-codegen-gpu-combine-layout-transformation"><code>-iree-codegen-gpu-combine-layout-transformation</code><a class="headerlink" href="#-iree-codegen-gpu-combine-layout-transformation" title="Permanent link">link</a></h3>
+<p><em>Combines layout transformation operations into a single map_scatter operation.</em></p>
+<p>Starting from iree_codegen.store_to_memref ops, iteratively combine producer
+layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
+etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
+ops, the writing of pad values is distributed to workgroups and threads, and
+then the padding values are written directly to the output buffer of the
+store_to_memref op.</p>
 <h3 id="-iree-codegen-gpu-combine-value-barriers"><code>-iree-codegen-gpu-combine-value-barriers</code><a class="headerlink" href="#-iree-codegen-gpu-combine-value-barriers" title="Permanent link">link</a></h3>
 <p><em>Combines <code>iree_gpu.value_barrier</code> ops</em></p>
 <h3 id="-iree-codegen-gpu-create-fast-slow-path"><code>-iree-codegen-gpu-create-fast-slow-path</code><a class="headerlink" href="#-iree-codegen-gpu-create-fast-slow-path" title="Permanent link">link</a></h3>
