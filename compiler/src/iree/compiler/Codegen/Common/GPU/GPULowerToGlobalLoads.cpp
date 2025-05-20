@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -26,6 +27,8 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-lower-to-global-loads"
 
@@ -43,58 +46,12 @@ namespace {
 
 static constexpr int kNumBitsPerCopy = 32;
 
-// Slice the tensor into numParts parts, and return the i-th part.
-static std::optional<Value> sliceTensor(RewriterBase &rewriter, Value tensor,
-                                        size_t numParts, Value index) {
-  auto tensorType = cast<RankedTensorType>(tensor.getType());
-  auto outermostDimSize = tensorType.getDimSize(0);
-  if (outermostDimSize % numParts != 0) {
-    return std::nullopt;
-  }
-
-  // Create an extract slice
-  SmallVector<int64_t> newShape(tensorType.getShape());
-  newShape[0] = outermostDimSize / numParts;
-
-  auto loc = tensor.getLoc();
-
-  SmallVector<Value> offsets = {rewriter.create<arith::MulIOp>(
-      loc, index, rewriter.create<arith::ConstantIndexOp>(loc, numParts))};
-
-  SmallVector<int64_t> strides =
-      llvm::to_vector(llvm::reverse(tensorType.getShape().drop_back()));
-  strides.push_back(1);
-
-  auto newSliceType =
-      RankedTensorType::get(newShape, tensorType.getElementType());
-  auto noVals = ValueRange{};
-  return rewriter.create<tensor::ExtractSliceOp>(
-      loc, newSliceType, tensor, offsets, noVals, noVals,
-      /*static_offset =*/ArrayRef<int64_t>{INT64_MIN, 0},
-      /*static_shape =*/newShape, /*static_strides =*/strides);
-}
-
-static std::optional<int64_t> getMemRefTypeNumElements(MemRefType memRefType) {
-  auto shape = memRefType.getShape();
-  if (shape.empty()) {
-    return std::nullopt;
-  }
-  int64_t numElements = 1;
-  for (int64_t dim : shape) {
-    if (dim == ShapedType::kDynamic) {
-      return std::nullopt;
-    }
-    numElements *= dim;
-  }
-  return numElements;
-}
-
-static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
-                                          linalg::CopyOp copy,
-                                          ArrayRef<int64_t> workgroupSize,
-                                          ArrayRef<int64_t> subgroupSize) {
+static LogicalResult
+distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
+                              ArrayRef<int64_t> workgroupSize,
+                              ArrayRef<int64_t> subgroupSize) {
   LDBG("==== distributing op:\n"
-       << "\t" << *copy << "\n");
+       << "\t" << *copy);
 
   Location loc = copy.getLoc();
   MLIRContext *context = rewriter.getContext();
@@ -119,7 +76,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   if (!memref::isStaticShapeAndContiguousRowMajor(copyMemRefType)) {
     copy.emitOpError("Cannot proceed: copy to non-static or non-contiguous, "
                      "non-row major memref.");
-    return false;
+    return failure();
   }
   auto rank = copyMemRefType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
@@ -128,7 +85,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   if (kNumBitsPerCopy % elementBitWidth != 0) {
     copy.emitOpError("Cannot proceed: preferred copy size is not a multiple of "
                      "element bit width.");
-    return false;
+    return failure();
   }
   size_t elementsPerCopy = kNumBitsPerCopy / elementBitWidth;
 
@@ -155,7 +112,7 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
   if (residualElements != 0) {
     copy.emitOpError(
         "Cannot proceed: Cannot handle copying residual elements.");
-    return false;
+    return failure();
   }
 
   // build For loop
@@ -224,9 +181,6 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
         .getMultiIndex();
   };
 
-  // sync at the end of the loop across threads
-  rewriter.create<gpu::BarrierOp>(loc);
-
   // For loop body:
   {
     OpBuilder::InsertionGuard guard(rewriter);
@@ -245,13 +199,16 @@ static bool distributeLinalgCopyToThreads(RewriterBase &rewriter,
         copy.getOutputs()[0], delinearizedLocalIndices);
   }
 
-  copy->erase();
-  return true;
+  // sync at the end of the loop across threads
+  // rewriter.create<gpu::BarrierOp>(loc);
+
+  rewriter.replaceOpWithNewOp<gpu::BarrierOp>(copy);
+  return success();
 }
 
 } // namespace
 
-static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
+static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
   // source must be global address and target must be workgroup address.
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
   auto targetType = cast<MemRefType>(copy.getOutputs().front().getType());
@@ -259,7 +216,7 @@ static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
     LDBG("-- Op: "
          << *copy
          << "\n-- has source memory address space other than global.\n");
-    return false;
+    return failure();
   }
   if (targetType.getMemorySpace() !=
       gpu::AddressSpaceAttr::get(copy->getContext(),
@@ -267,11 +224,36 @@ static bool checkEligibilityForGlobalLoadDMA(linalg::CopyOp copy) {
     LDBG("-- Op: "
          << *copy
          << "\n-- has target memory address space other than workgroup.\n");
-    return false;
+    return failure();
   }
   // TODO: check that the copy's target memref is not a subview.
-  return true;
+  return success();
 }
+
+struct LowerToDMAPattern : public OpRewritePattern<linalg::CopyOp> {
+  LowerToDMAPattern(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
+                    ArrayRef<int64_t> subgroupSize)
+      : OpRewritePattern<linalg::CopyOp>(context), workgroupSize(workgroupSize),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(linalg::CopyOp copy,
+                                PatternRewriter &rewriter) const override {
+    if (failed(isEligibleForGlobalDMA(copy))) {
+      return failure();
+    }
+    auto result = distributeLinalgCopyToThreads(rewriter, copy, workgroupSize,
+                                                subgroupSize);
+    if (succeeded(result)) {
+      return success();
+    } else {
+      return failure();
+    }
+  }
+
+private:
+  ArrayRef<int64_t> workgroupSize;
+  ArrayRef<int64_t> subgroupSize;
+};
 
 namespace {
 struct GPULowerToGlobalLoadsPass final
@@ -280,34 +262,6 @@ struct GPULowerToGlobalLoadsPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
-
-    // we will do this before/at the time of tiling, we need:
-    // 1. tiling configurations, to compute how many to generate.
-
-    SmallVector<linalg::CopyOp> copies;
-    funcOp->walk<WalkOrder::PreOrder>([&](Operation *op) {
-      // Walk in PreOrder so that parent operations are visited before children,
-      // thus allowing all operations contained within thread/warp/lane foralls
-      // to be skipped.
-      if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
-        // Skip ops contained within forall ops with thread/warp/lane mappings.
-        if (forallOpHasMappingType<IREE::GPU::LaneIdAttr,
-                                   gpu::GPUWarpMappingAttr,
-                                   gpu::GPUThreadMappingAttr>(forallOp)) {
-          return WalkResult::skip();
-        }
-      }
-      if (auto copy = dyn_cast<linalg::CopyOp>(op)) {
-        if (checkEligibilityForGlobalLoadDMA(copy)) {
-          copies.push_back(copy);
-        } else {
-          LDBG("Skipping copy op: "
-               << *copy
-               << " because it is not eligible for global load DMA.\n");
-        }
-      }
-      return WalkResult::advance();
-    });
 
     std::optional<SmallVector<int64_t>> workgroupSize =
         mlir::iree_compiler::getWorkgroupSize(funcOp);
@@ -323,15 +277,9 @@ struct GPULowerToGlobalLoadsPass final
       return signalPassFailure();
     }
 
-    IRRewriter rewriter(context);
-    for (auto copy : copies) {
-      rewriter.setInsertionPoint(copy);
-      if (!distributeLinalgCopyToThreads(rewriter, copy, *workgroupSize,
-                                         *subgroupSize)) {
-        copy.emitOpError("failed to lower linalg.copy to global loads");
-        return signalPassFailure();
-      }
-    }
+    RewritePatternSet patterns(context);
+    patterns.add<LowerToDMAPattern>(context, *workgroupSize, *subgroupSize);
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
 };
 } // namespace
