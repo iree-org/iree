@@ -165,6 +165,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "map_scatter.mlir",
             "top-k.mlir",
         ],
     ),
