@@ -717,3 +717,16 @@ func.func @multi_extract(%storage : !storage, %storage2: !storage, %ind0: !ind0,
 
 // CHECK-GATHER-LABEL: @multi_extract
 // CHECK-GATHER-COUNT-2: transfer_gather
+
+// -----
+
+func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<10xi32>) -> (tensor<10x128xi32>) {
+  %empty = tensor.empty() : tensor<10x128xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+                          ins(%source, %indices : tensor<1024x128xi32>, tensor<10xi32>)
+                          outs(%empty: tensor<10x128xi32>) -> tensor<10x128xi32>
+  return %result : tensor<10x128xi32>
+}
+
+// CHECK-LABEL: @linalg_ext_gather
+//       CHECK:   transfer_gather
