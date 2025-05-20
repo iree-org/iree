@@ -240,6 +240,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::TensorExt::Transforms

@@ -145,6 +145,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
