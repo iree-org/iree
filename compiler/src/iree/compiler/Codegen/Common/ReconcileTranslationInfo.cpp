@@ -206,7 +206,6 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
 
   // Scale the process IDs and counts to account for the forall op steps. These
   // are the forall offsets for each process, and the bounds of these offsets.
-  rewriter.setInsertionPoint(forallOp);
   SmallVector<Value> procOffsets, procOffsetBounds;
   for (auto [id, count, step] : llvm::zip_equal(procIds, nProcs, mixedStep)) {
     Value procOffset = getValueOrCreateConstantIndexOp(
@@ -244,6 +243,10 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   return success();
 }
 
+/// Resolve the workgroup counts for the function based on the extents of the
+/// `forAllOps`. When there are multiple foralls, the worker counts of the
+/// foralls are linearized, and the maximum count is chosen as the workgroup X
+/// count for the dispatch.
 static LogicalResult
 resolveWorkgroupCounts(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
                        ArrayRef<scf::ForallOp> forAllOps,

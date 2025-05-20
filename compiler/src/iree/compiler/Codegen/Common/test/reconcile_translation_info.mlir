@@ -635,3 +635,57 @@ hal.executable private @multiple_scf_forall_ops {
 //      CHECK:       "use"(%[[I]], %[[J]])
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
+hal.executable private @different_rank_scf_forall_ops {
+  hal.executable.variant public @different_rank_scf_forall_ops target(#hal.executable.target<"", "", {}>) {
+    hal.executable.export public @different_rank_scf_forall_ops layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @different_rank_scf_forall_ops() {
+        scf.forall (%arg0, %arg1) = (0, 0) to (2, 42) step(1, 1) {
+          "use"(%arg0, %arg1) : (index, index) -> ()
+          scf.forall.in_parallel {}
+        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+        scf.forall (%arg0, %arg1, %arg2) = (0, 0, 0) to (4, 2, 8) step(1, 1, 1) {
+          "use"(%arg0, %arg1, %arg2) : (index, index, index) -> ()
+          scf.forall.in_parallel {}
+        } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+    }
+  }
+}
+//      CHECK: hal.executable.export public @different_rank_scf_forall_ops
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[WG_X:.+]] = arith.constant 84
+//      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
+//      CHECK: func @different_rank_scf_forall_ops
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
+//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4
+//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8
+//  CHECK-DAG:   %[[C42:.+]] = arith.constant 42
+//  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
+//  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
+
+//  CHECK-DAG:   %[[WG_IDS_1ST:.+]]:2 = affine.delinearize_index %[[WG_ID_X]] into (2, 42)
+//  CHECK-NOT:   scf.forall
+//      CHECK:   scf.for %[[I:.+]] = %[[WG_IDS_1ST]]#0 to %[[C2]]
+//      CHECK:     scf.for %[[J:.+]] = %[[WG_IDS_1ST]]#1 to %[[C42]]
+//      CHECK:       "use"(%[[I]], %[[J]])
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+
+//  CHECK-DAG:   %[[WG_IDS_2ND:.+]]:3 = affine.delinearize_index %[[WG_ID_X]] into (4, 2, 8)
+//      CHECK:   scf.for %[[I:.+]] = %[[WG_IDS_2ND]]#0 to %[[C4]]
+//      CHECK:     scf.for %[[J:.+]] = %[[WG_IDS_2ND]]#1 to %[[C2]]
+//      CHECK:       scf.for %[[K:.+]] = %[[WG_IDS_2ND]]#2 to %[[C8]]
+//      CHECK:         "use"(%[[I]], %[[J]], %[[K]])
+// CHECK-NEXT:       }
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
