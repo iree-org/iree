@@ -1254,7 +1254,16 @@ setInsertionPointAfterLastNeededValue(OpBuilder &builder,
       definingOp =
           &cast<BlockArgument>(val).getOwner()->getOperations().front();
     }
-    if (!definingOp || (lastOp && domInfo.dominates(definingOp, lastOp)))
+    if (!definingOp)
+      continue;
+    if (lastOp && definingOp == lastOp) {
+      // Combine 'setInsertionPointBefore' by ANDing because we only want to set
+      // the insertion point before the last op if all values this operation is
+      // derived from are block arguments.
+      setInsertionPointBefore &= isa<BlockArgument>(val);
+      continue;
+    }
+    if (lastOp && domInfo.dominates(definingOp, lastOp))
       continue;
     lastOp = definingOp;
 
