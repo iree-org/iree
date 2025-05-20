@@ -149,6 +149,15 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
   } else if (iree_string_view_equal(str_value, IREE_SV("f8E8M0FNU"))) {
     *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU;
     return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f6E3M2FN"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f6E2M3FN"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f4E2M1FN"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN;
+    return iree_ok_status();
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("f"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("bf"))) {
@@ -195,6 +204,15 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
       special_name = "f8E8M0FNU";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN:
+      special_name = "f6E3M2FN";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN:
+      special_name = "f6E2M3FN";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN:
+      special_name = "f4E2M1FN";
       break;
     default:
       break;
@@ -415,6 +433,30 @@ static iree_status_t iree_hal_parse_element_unsafe(
       return iree_string_view_atoi_uint64(data_str, (uint64_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f4e2m1fn(temp_float);
+      return iree_ok_status();
+    }
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f6e2m3fn(temp_float);
+      return iree_ok_status();
+    }
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f6e3m2fn(temp_float);
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2: {
       float temp_float = 0;
       if (!iree_string_view_atof(data_str, &temp_float)) {
@@ -585,6 +627,18 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
                    *(const uint64_t*)data.data);
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f4e2m1fn_to_f32(*(const uint8_t*)data.data));
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f6e2m3fn_to_f32(*(const uint8_t*)data.data));
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_f6e3m2fn_to_f32(*(const uint8_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",

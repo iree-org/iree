@@ -95,6 +95,24 @@ func.func @expect_almost_eq_const_f8E4M3FNUZ() {
   return
 }
 
+func.func @expect_almost_eq_const_f6E3M2FN() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf6E3M2FN>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 28.0]> : tensor<2xf6E3M2FN>, atol 0.3, rtol 0.1) : tensor<2xf6E3M2FN>
+  return
+}
+
+func.func @expect_almost_eq_const_f6E2M3FN() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf6E2M3FN>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 7.5]> : tensor<2xf6E2M3FN>, atol 0.3, rtol 0.1) : tensor<2xf6E2M3FN>
+  return
+}
+
+func.func @expect_almost_eq_const_f4E2M1FN() {
+  %const0 = util.unfoldable_constant dense<[0.0, 100.0]> : tensor<2xf4E2M1FN>
+  check.expect_almost_eq_const(%const0, dense<[0.2, 6.0]> : tensor<2xf4E2M1FN>, atol 0.3, rtol 0.1) : tensor<2xf4E2M1FN>
+  return
+}
+
 func.func @add() {
   %c5 = util.unfoldable_constant dense<5> : tensor<i32>
   %result = arith.addi %c5, %c5 : tensor<i32>

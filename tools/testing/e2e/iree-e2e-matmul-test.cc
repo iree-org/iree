@@ -141,6 +141,9 @@ REFERENCE_MATMUL_F8(f8e5m2, f8e5m2)
 REFERENCE_MATMUL_F8(f8e4m3fn, f8e4m3fn)
 REFERENCE_MATMUL_F8(f8e5m2fnuz, f8e5m2fnuz)
 REFERENCE_MATMUL_F8(f8e4m3fnuz, f8e4m3fnuz)
+REFERENCE_MATMUL_F8(f6e3m2fn, f6e3m2fn)
+REFERENCE_MATMUL_F8(f6e2m3fn, f6e2m3fn)
+REFERENCE_MATMUL_F8(f4e2m1fn, f4e2m1fn)
 
 // Helper for reference_matmul.
 // Computes one element in the result matrix.
@@ -231,6 +234,27 @@ static iree_status_t reference_matmul_element(
              rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_matmul_f8e4m3fnuz_f8e4m3fnuz_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f6e3m2fn_f6e3m2fn_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f6e2m3fn_f6e2m3fn_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f4e2m1fn_f4e2m1fn_f32_f32(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
         (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);

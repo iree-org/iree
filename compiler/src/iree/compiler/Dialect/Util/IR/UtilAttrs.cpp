@@ -331,6 +331,55 @@ static LogicalResult serializeSubByteIntegerElements(Location loc,
   }
 }
 
+static LogicalResult serializeSubByteFPElements(Location loc,
+                                                DenseFPElementsAttr attr,
+                                                llvm::endianness endian,
+                                                llvm::raw_ostream &os) {
+  const unsigned logicalBitWidth =
+      attr.getElementType().getIntOrFloatBitWidth();
+  // Round up to the next power of two (unless already a power of two) of the
+  // 8-bit aligned logical bit width.
+  const unsigned physicalBitWidth =
+      getTypePhysicalStorageBitWidth(attr.getElementType());
+  switch (physicalBitWidth) {
+  case 8: {
+    PackedWriter<uint8_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APFloat>()) {
+      writer.write(value.convertToFloat());
+    }
+    writer.flush();
+    return success();
+  }
+  case 16: {
+    PackedWriter<uint16_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APFloat>()) {
+      writer.write(value.convertToFloat());
+    }
+    writer.flush();
+    return success();
+  }
+  case 32: {
+    PackedWriter<uint32_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APFloat>()) {
+      writer.write(value.convertToFloat());
+    }
+    writer.flush();
+    return success();
+  }
+  case 64: {
+    PackedWriter<uint64_t> writer(logicalBitWidth, endian, os);
+    for (const auto &value : attr.getValues<APFloat>()) {
+      writer.write(value.convertToDouble());
+    }
+    writer.flush();
+    return success();
+  }
+  default:
+    return emitError(loc) << "unhandled packed integer physical bit width "
+                          << physicalBitWidth << " for type " << attr.getType();
+  }
+}
+
 template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
 static LogicalResult serializeGenericIntegerElements(DenseIntElementsAttr attr,
                                                      llvm::endianness endian,
@@ -430,6 +479,12 @@ static LogicalResult serializeGenericElementData(Location loc,
     case 64:
       return serializeGenericFloatElements<uint64_t>(attr, endian, os);
     default:
+      if (bitWidth < 64) {
+        // Special case for bit-packing of sub-byte aligned types.
+        // This could be extended to handle larger widths (i33, etc) but they
+        // are rare today.
+        return serializeSubByteFPElements(loc, attr, endian, os);
+      }
       return emitError(loc) << "unhandled float element bit width " << bitWidth
                             << " for type " << elementsAttr.getType();
     }

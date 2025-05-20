@@ -7,6 +7,7 @@
 #include "iree/hal/buffer_view.h"
 
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer_view_util.h"
 #include "iree/hal/resource.h"
@@ -52,13 +53,17 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_retain(buffer_view->buffer);
     buffer_view->element_type = element_type;
     buffer_view->encoding_type = encoding_type;
-    buffer_view->byte_length =
-        iree_hal_element_dense_byte_count(buffer_view->element_type);
+    // Round element bit width to the next power of 2. This enables some subbyte
+    // packing for easy cases: two FP4 values can share one byte, but a FP6
+    // value still occupies a full byte.
+    iree_device_size_t bit_length = iree_math_round_up_to_pow2_u32(
+        iree_hal_element_bit_count(buffer_view->element_type));
     buffer_view->shape_rank = shape_rank;
     for (iree_host_size_t i = 0; i < shape_rank; ++i) {
       buffer_view->shape[i] = shape[i];
-      buffer_view->byte_length *= shape[i];
+      bit_length *= shape[i];
     }
+    buffer_view->byte_length = (bit_length + 7) / 8;
     *out_buffer_view = buffer_view;
   }
 

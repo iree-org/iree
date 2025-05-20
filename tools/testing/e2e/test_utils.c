@@ -131,6 +131,27 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E8M0FNU(
   return result;
 }
 
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f6E3M2FN(uint8_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F6E3M2FN;
+  result.f8_u8 = value;
+  return result;
+}
+
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f6E2M3FN(uint8_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F6E2M3FN;
+  result.f8_u8 = value;
+  return result;
+}
+
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f4E2M1FN(uint8_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F4E2M1FN;
+  result.f8_u8 = value;
+  return result;
+}
+
 iree_test_utils_e2e_value_t iree_test_utils_value_make_f16(uint16_t value) {
   iree_test_utils_e2e_value_t result;
   result.type = IREE_TEST_UTILS_VALUE_TYPE_F16;
@@ -168,6 +189,12 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_i16(((int16_t*)data)[index]);
   } else if (iree_hal_element_type_is_integer(result_type, 32)) {
     return iree_test_utils_value_make_i32(((int32_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN) {
+    return iree_test_utils_value_make_f4E2M1FN(((uint8_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN) {
+    return iree_test_utils_value_make_f6E2M3FN(((uint8_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN) {
+    return iree_test_utils_value_make_f6E3M2FN(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2) {
     return iree_test_utils_value_make_f8E5M2(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN) {
@@ -208,6 +235,15 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
       return snprintf(buf, bufsize, "%" PRIi32, value.i32);
     case IREE_TEST_UTILS_VALUE_TYPE_I64:
       return snprintf(buf, bufsize, "%" PRIi64, value.i64);
+    case IREE_TEST_UTILS_VALUE_TYPE_F4E2M1FN:
+      return snprintf(buf, bufsize, "%.2g",
+                      iree_math_f4e2m1fn_to_f32(value.f8_u8));
+    case IREE_TEST_UTILS_VALUE_TYPE_F6E2M3FN:
+      return snprintf(buf, bufsize, "%.3g",
+                      iree_math_f6e2m3fn_to_f32(value.f8_u8));
+    case IREE_TEST_UTILS_VALUE_TYPE_F6E3M2FN:
+      return snprintf(buf, bufsize, "%.3g",
+                      iree_math_f6e3m2fn_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F8E5M2:
       return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e5m2_to_f32(value.f8_u8));
@@ -323,13 +359,16 @@ void iree_test_utils_write_element(iree_hal_element_type_t element_type,
     WRITE_ELEMENT_CASE(UINT_32, uint32_t)
     WRITE_ELEMENT_CASE(UINT_64, uint64_t)
       // clang-format off
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN:
+      *(uint8_t*)dst = iree_math_f32_to_f4e2m1fn((float)value);
       break;
-    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
-      *(uint16_t*)dst = iree_math_f32_to_bf16((float)value);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN:
+      *(uint8_t*)dst = iree_math_f32_to_f6e2m3fn((float)value);
       break;
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN:
+      *(uint8_t*)dst = iree_math_f32_to_f6e3m2fn((float)value);
+      break;
+      case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
       *(uint8_t*)dst = iree_math_f32_to_f8e5m2((float)value);
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
@@ -341,7 +380,14 @@ void iree_test_utils_write_element(iree_hal_element_type_t element_type,
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
       *(uint8_t*)dst = iree_math_f32_to_f8e4m3fnuz((float)value);
       break;
-    WRITE_ELEMENT_CASE(FLOAT_32, float)
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
+      break;
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_bf16((float)value);
+      break;
+    
+      WRITE_ELEMENT_CASE(FLOAT_32, float)
     WRITE_ELEMENT_CASE(FLOAT_64, double)
     // clang-format on
     default:
@@ -380,6 +426,9 @@ void iree_test_utils_get_min_max_for_element_type(
       *max = +4;
       break;
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:

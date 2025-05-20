@@ -33,6 +33,9 @@ class MatrixElemTypeId(enum.Enum):
     F8E4M3FN = "f8E4M3FN"
     F8E5M2FNUZ = "f8E5M2FNUZ"
     F8E4M3FNUZ = "f8E4M3FNUZ"
+    F6E3M2FN = "f6E3M2FN"
+    F6E2M3FN = "f6E2M3FN"
+    F4E2M1FN = "f4E2M1FN"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -928,6 +931,9 @@ def parse_arguments():
             "f8E4M3FN",
             "f8E5M2FNUZ",
             "f8E4M3FNUZ",
+            "f6E3M2FN",
+            "f6E2M3FN",
+            "f4E2M1FN",
         ],
         help="Numeric type of input LHS and RHS matrices",
         required=True,

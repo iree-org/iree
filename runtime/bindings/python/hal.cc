@@ -1363,6 +1363,9 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("FLOAT_8_E5M2", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
       .value("FLOAT_8_E5M2_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
       .value("FLOAT_8_E8M0_FNU", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU)
+      .value("FLOAT_6_E3M2_FN", IREE_HAL_ELEMENT_TYPE_FLOAT_6_E3M2_FN)
+      .value("FLOAT_6_E2M3_FN", IREE_HAL_ELEMENT_TYPE_FLOAT_6_E2M3_FN)
+      .value("FLOAT_4_E2M1_FN", IREE_HAL_ELEMENT_TYPE_FLOAT_4_E2M1_FN)
       .export_values()
       .def("__int__",
            [](enum iree_hal_element_types_t self) { return (uint64_t)self; });

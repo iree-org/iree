@@ -1006,6 +1006,9 @@ enum class NumericalType : uint32_t {
   kFloat8E5M2FNUZ = kFloat | 0x06,
   kFloat8E4M3FNUZ = kFloat | 0x07,
   kFloat8E8M0FNU = kFloat | 0x08,
+  kFloat6E3M2FN = kFloat | 0x09,
+  kFloat6E2M3N = kFloat | 0x0A,
+  kFloat4E2M1FN = kFloat | 0x0B,
 };
 
 constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
@@ -1043,6 +1046,12 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
       return makeElementTypeValue(NumericalType::kFloat8E4M3FNUZ, 8);
     case APFloat::S_Float8E8M0FNU:
       return makeElementTypeValue(NumericalType::kFloat8E8M0FNU, 8);
+    case APFloat::S_Float6E3M2FN:
+      return makeElementTypeValue(NumericalType::kFloat6E3M2FN, 6);
+    case APFloat::S_Float6E2M3FN:
+      return makeElementTypeValue(NumericalType::kFloat6E2M3N, 6);
+    case APFloat::S_Float4E2M1FN:
+      return makeElementTypeValue(NumericalType::kFloat4E2M1FN, 4);
     case APFloat::S_IEEEhalf:
     case APFloat::S_IEEEsingle:
     case APFloat::S_IEEEdouble:
