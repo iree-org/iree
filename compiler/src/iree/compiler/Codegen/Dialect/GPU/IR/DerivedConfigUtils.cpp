@@ -8,6 +8,7 @@
 #include <numeric>
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -181,12 +182,12 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
       .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 
-static const int64_t kDefaultSubgroupSize = 64; // TODO: can we query this?
 static const int64_t kDefaultGlobalLoadBitSizePerThread =
     32; // TODO: make it a query.
 SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
-  std::optional<SmallVector<int64_t>> workgroupSize =
-      getWorkgroupSize(op->getParentOfType<FunctionOpInterface>());
+  auto funcOp = op->getParentOfType<FunctionOpInterface>();
+
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
   if (!workgroupSize) {
     return {};
   }
@@ -197,15 +198,15 @@ SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
   auto linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
 
+  const int64_t targetSubgroupSize =
+      getGPUTargetAttr(op).getPreferredSubgroupSize();
   int64_t subgroupLoadSize =
-      (kDefaultGlobalLoadBitSizePerThread * kDefaultSubgroupSize) /
+      (kDefaultGlobalLoadBitSizePerThread * targetSubgroupSize) /
       getElementTypeOrSelf(linalgOp->getResultTypes()[0])
           .getIntOrFloatBitWidth();
   SmallVector<int64_t> tileSizes = getVectorTileSizesFromLoopRanges(
       loopRanges, numThreads, subgroupLoadSize);
-
-  // For now, faking it.
-  return {1, 4};
+  return tileSizes;
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

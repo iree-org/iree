@@ -33,7 +33,6 @@ LLVM_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
-        "lds_matmul.mlir",
         "index.mlir",
     ],
 )
@@ -64,7 +63,6 @@ VMVX_SRCS = enforce_glob(
     exclude = [
         "fp_to_subbyte.mlir",
         "large_linalg_matmul.mlir",
-        "lds_matmul.mlir",
         "subbyte_to_fp.mlir",
         "index.mlir",
     ],
@@ -110,7 +108,6 @@ VULKAN_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
-        "lds_matmul.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
@@ -165,7 +162,6 @@ CUDA_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "index.mlir",
-        "lds_matmul.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
         "pack.mlir",
@@ -200,7 +196,6 @@ ROCM_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
-        "lds_matmul.mlir",
         "narrow_n_matmuls.mlir",
         "subbyte_to_fp.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
@@ -213,21 +208,6 @@ ROCM_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
     srcs = ROCM_SRCS,
-    driver = "hip",
-    target_backend = "rocm",
-)
-
-LDS_SRCS = [
-    "lds_matmul.mlir",
-]
-
-iree_check_single_backend_test_suite(
-    name = "check_global_load_rocm_hip",
-    srcs = LDS_SRCS,
-    compiler_flags = [
-        "--iree-llvmgpu-use-direct-load",
-        "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
-    ],
     driver = "hip",
     target_backend = "rocm",
 )

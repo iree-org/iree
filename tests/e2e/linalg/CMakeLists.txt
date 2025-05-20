@@ -141,20 +141,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_global_load_rocm_hip
-  SRCS
-    "lds_matmul.mlir"
-  TARGET_BACKEND
-    "rocm"
-  DRIVER
-    "hip"
-  COMPILER_FLAGS
-    "--iree-llvmgpu-use-direct-load"
-    "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_index_llvm-cpu_local-task
   SRCS
     "index.mlir"

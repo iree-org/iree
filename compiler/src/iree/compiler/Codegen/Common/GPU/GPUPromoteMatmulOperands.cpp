@@ -38,24 +38,9 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v,
                                                 tensorType.getElementType());
   auto copy = builder.create<linalg::CopyOp>(loc, v, empty);
 
-  /*
   if (useDirectLoad) {
-    Attribute addressSpace = gpu::AddressSpaceAttr::get(
-        builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-    auto alloc = builder.create<bufferization::AllocTensorOp>(loc, tensorType,
-                                                              ValueRange{});
-    alloc.setMemorySpaceAttr(addressSpace);
-    auto copy = builder.create<linalg::CopyOp>(loc, v, alloc.getResult());
-    auto globalLoadDMAAttr =
-        IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext());
-    setLoweringConfig(copy, globalLoadDMAAttr);
-    return copy.getResult(0);
-  }
-  */
-  if (useDirectLoad) {
-    auto globalLoadDMAAttr =
-        IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext());
-    setLoweringConfig(copy, globalLoadDMAAttr);
+    setLoweringConfig(
+        copy, IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext()));
   } else {
     setLoweringConfig(
         copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
