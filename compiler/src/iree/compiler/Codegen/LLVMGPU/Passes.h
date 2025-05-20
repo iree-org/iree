@@ -69,9 +69,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy);
 
-/// Lowering reductions to warp reductions.
-void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager);
-
 /// Default pass pipeline on GPU, currently used only for the ukernel path.
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const GPUPipelineOptions &options);

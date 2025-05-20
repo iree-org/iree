@@ -1,49 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s --check-prefix=CDNA3
 
-#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @dynamic_batch_matvec() {
-  %c32_i64 = arith.constant 32 : i64
-  %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
-  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
-  %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
-  %5 = arith.index_castui %0 : i32 to index
-  %6 = arith.index_castui %1 : i32 to index
-  %7 = arith.index_castui %2 : i32 to index
-  %8 = arith.index_castui %3 : i32 to index
-  %9 = arith.index_castui %4 : i32 to index
-  %10 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%7) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
-  %11 = iree_tensor_ext.dispatch.workload.ordinal %8, 0 : index
-  %12 = iree_tensor_ext.dispatch.workload.ordinal %9, 1 : index
-  %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%5) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x?xf16>>{%11}
-  %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%6) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12}
-  %15 = iree_tensor_ext.dispatch.tensor.load %13, offsets = [0, 0, 0], sizes = [32, 1, %11], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x?xf16>>{%11} -> tensor<32x1x?xf16>
-  %16 = iree_tensor_ext.dispatch.tensor.load %14, offsets = [0, 0, 0], sizes = [32, %12, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12} -> tensor<32x?x128xf16>
-  %17 = tensor.empty() : tensor<32x1x128xf16>
-  %18 = linalg.fill ins(%cst : f16) outs(%17 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
-  %19 = linalg.batch_matmul ins(%15, %16 : tensor<32x1x?xf16>, tensor<32x?x128xf16>) outs(%18 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
-  iree_tensor_ext.dispatch.tensor.store %19, %10, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
-  return
-}
-
-//   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32]{{\]}}>
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
-// CDNA3-LABEL: func.func @dynamic_batch_matvec()
-//  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
-//       CDNA3:   linalg.batch_matmul
-//  CDNA3-SAME:       lowering_config = #[[$CONFIG]]
-
-// -----
-
 // This test uses special heuristics that needs to check the backend in the #hal.executable.target.
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -169,7 +127,6 @@ func.func @matvec_unit_n_dim() attributes {hal.executable.target = #executable_t
 // -----
 
 // This test uses special heuristics that needs to check the backend in the #hal.executable.target.
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -256,7 +213,6 @@ func.func @i4_dequant_matvec() {
 }
 
 // TODO: We should process multiple rows per subgroup.
-
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //       CHECK: func.func @i4_dequant_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
@@ -267,68 +223,6 @@ func.func @i4_dequant_matvec() {
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
 //  CHECK-SAME:               thread = [0, 1, 2], thread_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
 //  CHECK-SAME:               workgroup = [8, 0, 0]
-
-// -----
-
-// Send 2xNxK mmt to the warp reduction pipeline.
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @skinny_mmt() {
-  %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32000xf16>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>> -> tensor<2x4096xf16>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
-  %5 = tensor.empty() : tensor<2x32000xf16>
-  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2x32000xf16>) -> tensor<2x32000xf16>
-  %7 = linalg.matmul_transpose_b ins(%3, %4 : tensor<2x4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<2x32000xf16>) -> tensor<2x32000xf16>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2, 32000], strides = [1, 1] : tensor<2x32000xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32000xf16>>
-  return
-}
-
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @skinny_mmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul_transpose_b
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
-
-// -----
-
-// Send Mx2xK mmt to the warp reduction pipeline.
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @skinny_mmt() {
-  %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000x2xf16>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>> -> tensor<2x4096xf16>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
-  %5 = tensor.empty() : tensor<32000x2xf16>
-  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32000x2xf16>) -> tensor<32000x2xf16>
-  %7 = linalg.matmul_transpose_b ins(%4, %3 : tensor<32000x4096xf16>, tensor<2x4096xf16>) outs(%6 : tensor<32000x2xf16>) -> tensor<32000x2xf16>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [32000, 2], strides = [1, 1] : tensor<32000x2xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000x2xf16>>
-  return
-}
-
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @skinny_mmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul_transpose_b
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
 
@@ -383,19 +277,25 @@ func.func @dynamic_parallel_dims(%dynsize : index, %input : tensor<4x?x4096xf16>
     } -> tensor<4x?xf32>
   return %2 : tensor<4x?xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
 //      CHECK: func @dynamic_parallel_dims
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 4096],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 16], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 4], thread_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [1, 1, 0]
 
-//  CDNA3-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}
-//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
+//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
 //      CDNA3: func @dynamic_parallel_dims
 // CDNA3-SAME:     translation_info = #[[TRANSLATION]]
 //      CDNA3:   linalg.generic
-// CDNA3-SAME:       lowering_config = #[[CONFIG]]
+// CDNA3-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+// CDNA3-SAME:               partial_reduction = [0, 0, 4096],
+// CDNA3-SAME:               subgroup_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
+// CDNA3-SAME:               thread = [0, 0, 4], thread_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
+// CDNA3-SAME:               workgroup = [1, 1, 0]
 
 // -----
 
@@ -432,9 +332,12 @@ func.func @test_dyn_reduction(%arg0: tensor<128x?x32xf8E4M3FNUZ>, %arg1: tensor<
   } -> tensor<128x128xf8E4M3FNUZ>
   return %4 : tensor<128x128xf8E4M3FNUZ>
 }
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 1, 64]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [16, 1, 1] subgroup_size = 64
 //       CHECK: func.func @test_dyn_reduction
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 1, 32],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]],
+//  CHECK-SAME:               thread = [0, 0, 1, 4], thread_basis = {{\[}}[1, 1, 1, 8], [0, 1, 2, 3]],
+//  CHECK-SAME:               workgroup = [1, 1, 0, 0]

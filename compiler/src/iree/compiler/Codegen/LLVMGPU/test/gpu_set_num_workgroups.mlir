@@ -147,15 +147,16 @@ func.func @reduction_aligned2() {
   return
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //      CHECK: func.func @reduction_aligned2()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.fill
 //      CHECK: linalg.generic
-// CHECK-SAME:   lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:     reduction = [0, 0, 4]
-// CHECK-SAME:     thread = [1, 4, 0]
-// CHECK-SAME:     workgroup = [1, 128, 0]
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 4],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 1], thread_basis = {{\[}}[1, 1, 4], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [1, 1, 0]
 
 // -----
 
@@ -429,7 +430,7 @@ func.func @contract_reduction() {
   return
 }
 
-//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //      SM80: func.func @contract_reduction()
 // SM80-SAME:     translation_info = #[[TRANSLATION]]
 
