@@ -712,6 +712,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
     IREE::LinalgExt::AttentionOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
+    IREE::LinalgExt::MapScatterOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::MapScatterOp>>(*ctx);
   });
   registry.insert<linalg::LinalgDialect>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
