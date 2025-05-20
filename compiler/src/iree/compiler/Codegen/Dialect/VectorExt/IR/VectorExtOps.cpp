@@ -139,11 +139,11 @@ void TransferGatherOp::print(OpAsmPrinter &p) {
   p << " " << getBase() << "[" << getIndices() << "]";
   printIndexVecs(p, *this, getIndexVecs(), getIndexVecs().getTypes(),
                  getIndexedAttr());
+  p << ", " << getPadding();
   if (getMask())
     p << ", " << getMask();
   printTransferAttrs(p, *this, {"indexed"});
-  p << " : " << getShapedType() << ", "
-    << llvm::interleaved(getIndexVecs().getType()) << ", " << getType();
+  p << " : " << getShapedType() << ", " << getType();
 }
 
 static LogicalResult
