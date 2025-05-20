@@ -31,12 +31,14 @@ func.func @argmax_f32i64_with_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tenso
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xf32>
 //  CHECK-DAG:   %[[C1_index:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C0_i64:.+]] = arith.constant 0
-//  CHECK-DAG:   %[[FILL:.+]] = linalg.fill ins(%[[C0_i64]]
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic
-//  CHECK-SAME:      "some_ukernel"
+//  CHECK-DAG:   %[[NEG_INF:.+]] = arith.constant 0xFF800000 : f32
+//  CHECK-DAG:   %[[FILL_IDX:.+]] = linalg.fill ins(%[[C0_i64]]
+//  CHECK-DAG:   %[[FILL_VAL:.+]] = linalg.fill ins(%[[NEG_INF]]
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic
+// CHECK-SAME:      "some_ukernel"
 // CHECK-SAME:       ins(%[[ARG0]] :
-// CHECK-SAME:       outs(%[[FILL]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+// CHECK-SAME:       outs(%[[FILL_VAL]], %[[FILL_IDX]] :
+//      CHECK:   return %[[MICRO_KERNEL]]#1
 
 // -----
 
@@ -77,12 +79,14 @@ func.func @argmax_bf16i64_with_selected_ukernel(%arg0 : tensor<1x?xbf16>) -> ten
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xbf16>
 //  CHECK-DAG:   %[[C1_index:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C0_i64:.+]] = arith.constant 0
-//  CHECK-DAG:   %[[FILL:.+]] = linalg.fill ins(%[[C0_i64]]
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic
-//  CHECK-SAME:      "some_ukernel"
+//  CHECK-DAG:   %[[NEG_INF:.+]] = arith.constant 0xFF80 : bf16
+//  CHECK-DAG:   %[[FILL_IDX:.+]] = linalg.fill ins(%[[C0_i64]]
+//  CHECK-DAG:   %[[FILL_VAL:.+]] = linalg.fill ins(%[[NEG_INF]]
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic
+// CHECK-SAME:      "some_ukernel"
 // CHECK-SAME:       ins(%[[ARG0]] :
-// CHECK-SAME:       outs(%[[FILL]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+// CHECK-SAME:       outs(%[[FILL_VAL]], %[[FILL_IDX]] :
+//      CHECK:   return %[[MICRO_KERNEL]]#1
 
 // -----
 

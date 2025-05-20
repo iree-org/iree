@@ -60,38 +60,17 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   StringRef kernelName = ukernelAttr.getName();
   SmallVector<Type> resultTypes;
   SmallVector<Value> outputs;
-  if (isPureArgmax) {
-    Value val = op.getDpsInitOperand(0)->get();
-    Type valType = val.getType();
-    IREE::Codegen::NullPointerType nullPointerType =
-        IREE::Codegen::NullPointerType::get(rewriter.getContext());
-    Value nullVal =
-        rewriter.create<IREE::Codegen::NullPointerOp>(loc, nullPointerType);
-    outputs = {nullVal, index};
-    resultTypes = {valType, indexType};
-  } else {
-    Value val = op.getDpsInitOperand(0)->get();
-    Type valType = val.getType();
-    outputs = {val, index};
-    resultTypes = {valType, indexType};
-  }
-
-  // auto resultType = resultTypes.size() == 1
-  //                       ? resultTypes[0]
-  //                       : rewriter.getTupleType(resultTypes);
-
-  // Value writeValueFlag = rewriter.create<arith::ConstantOp>(
-  //     loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
+  Value val = op.getDpsInitOperand(0)->get();
+  Type valType = val.getType();
+  outputs = {val, index};
+  resultTypes = {valType, indexType};
+  Value writeMaxValueFlag = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
 
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, resultTypes, kernelName, ValueRange{input}, outputs,
-      ValueRange{reductionDimSize}, ukernelAttr.getDefAttrs(),
-      rewriter.getIndexAttr(0));
-  // auto genericMicroKernelOp =
-  // rewriter.create<IREE::Codegen::UKernelGenericOp>(
-  //     loc, indexType, ukernelAttr.getName(), ValueRange{input}, index,
-  //     ValueRange{reductionDimSize}, ukernelAttr.getDefAttrs(),
-  //     /*strided_outer_dims=*/rewriter.getIndexAttr(0));
+      ValueRange{reductionDimSize, writeMaxValueFlag},
+      ukernelAttr.getDefAttrs(), rewriter.getIndexAttr(0));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -130,11 +109,6 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
                                   ukernelOp.value()->getResults()[1]);
     }
 
-    if (Operation *moduleOp =
-            ukernelOp->getOperation()->getParentOfType<ModuleOp>()) {
-      llvm::dbgs() << "\n--- Dumping parent module of ukernelOp ---\n";
-      moduleOp->dump();
-    }
     return success();
   }
 };
