@@ -226,6 +226,14 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
          << "\n-- has target memory address space other than workgroup.\n");
     return failure();
   }
+  auto useDMAConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copy);
+  if (!useDMAConfig) {
+    LDBG("-- Op: "
+         << *copy
+         << "\n-- does not have use_global_load_dma attribute.\n");
+    return failure();
+  }
+
   // TODO: check that the copy's target memref is not a subview.
   return success();
 }
