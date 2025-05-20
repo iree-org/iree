@@ -1016,7 +1016,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
 
   // vector -> simt gpu + vector
   funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/true));
+      /*expandSubgroupReduction=*/false));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(affine::createLoopCoalescingPass());

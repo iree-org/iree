@@ -426,7 +426,8 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 /// Emit warp reduction code sequence for a given scalar input value.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
-                           uint32_t numLaneToReduce) {
+                           uint32_t numLaneToReduce,
+                           bool expandSubgroupReduce) {
   assert(llvm::isPowerOf2_32(numLaneToReduce));
   assert((llvm::isa<IntegerType, FloatType>(input.getType())) &&
          "Input must be a scalar");
@@ -441,7 +442,8 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   // Defer expansion of subgroup reduction until later in pass pipeline to
   // enable conditional lowering to DPP ops, for potential perf gains over
   // gpu.shuffle ops.
-  if (numLaneToReduce <= warpSize && warpSize % numLaneToReduce == 0) {
+  if (!expandSubgroupReduce && numLaneToReduce <= warpSize &&
+      warpSize % numLaneToReduce == 0) {
     auto gpuReduceKind = combiningKindToAllReduce(kind);
     return builder.create<gpu::SubgroupReduceOp>(
         loc, input, gpuReduceKind, /*uniform=*/false, numLaneToReduce);
@@ -586,20 +588,18 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
 
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize,
+                          expandSubgroupReduce);
+
+  // Simple case -- emit `gpu.subgroup_reduce` directly.
   if (!expandSubgroupReduce && size == warpSize) {
-    auto gpuReduceKind = combiningKindToAllReduce(kind);
-    // Simple case -- emit `gpu.subgroup_reduce` directly.
-    Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-    return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, gpuReduceKind,
-                                                 /*uniform=*/false);
+    return laneVal;
   }
 
   // More-involved case -- generate `gpu.shuffle` ops over i32 values (using the
   // butterfly shuffle algorithm).
-  //
-  // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
     uint32_t numWarp = size / warpSize;
@@ -643,7 +643,8 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
                                                 identity, loadVal);
     }
-    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
+    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
+                            expandSubgroupReduce);
   }
 
   return laneVal;

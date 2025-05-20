@@ -335,7 +335,18 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 
 // Finish the first reduction.
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK:         gpu.subgroup_reduce maxnumf
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.maxnumf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.maxnumf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.maxnumf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.maxnumf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.maxnumf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.maxnumf %{{.*}}: f16
 
 // Do the elementwise scaling and second local reduction.
 // CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
@@ -350,7 +361,18 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:           gpu.barrier
 
 // Finish the second reduction.
-// CHECK:         gpu.subgroup_reduce add {{.*}} : (f16) -> f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.addf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.addf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.addf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.addf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.addf %{{.*}}: f16
+// CHECK:         gpu.shuffle  xor %{{.*}}: i32
+// CHECK:         arith.addf %{{.*}}: f16
 
 // Store the result back to global memory in a loop, recomputing the
 // elementwise part.
