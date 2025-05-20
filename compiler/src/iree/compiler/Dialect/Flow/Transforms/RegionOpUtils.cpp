@@ -936,17 +936,6 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
       if (insertSliceUser.getDest() == v)
         return true;
     }
-
-    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
-      // Only clone if used by Query, Mask, or scale.
-      if (!LinalgExt::isBitExtendOp(v.getDefiningOp()) &&
-          !llvm::is_contained<Value>(
-              {attentionOp.getQuery(), attentionOp.getMask(),
-               attentionOp.getScale(), attentionOp.getOutput()},
-              v)) {
-        return true;
-      }
-    }
   }
   return false;
 }
