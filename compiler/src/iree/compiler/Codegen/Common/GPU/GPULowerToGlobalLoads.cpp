@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -74,31 +75,31 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   // Get the copy size:
   auto copyMemRefType = cast<MemRefType>(copy.getOperand(1).getType());
   if (!memref::isStaticShapeAndContiguousRowMajor(copyMemRefType)) {
-    copy.emitOpError("Cannot proceed: copy to non-static or non-contiguous, "
-                     "non-row major memref.");
-    return failure();
+    return rewriter.notifyMatchFailure(
+        copy, "Cannot proceed: copy to non-static or non-contiguous, "
+              "non-row major memref.");
   }
   auto rank = copyMemRefType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
 
-  size_t elementBitWidth = copyMemRefType.getElementTypeBitWidth();
+  int64_t elementBitWidth = copyMemRefType.getElementTypeBitWidth();
   if (kNumBitsPerCopy % elementBitWidth != 0) {
-    copy.emitOpError("Cannot proceed: preferred copy size is not a multiple of "
-                     "element bit width.");
-    return failure();
+    return rewriter.notifyMatchFailure(
+        copy, "Cannot proceed: preferred copy size is not a multiple of "
+              "element bit width.");
   }
-  size_t elementsPerCopy = kNumBitsPerCopy / elementBitWidth;
+  int64_t elementsPerCopy = kNumBitsPerCopy / elementBitWidth;
 
   // divide the copy by subgroup:
   assert(subgroupSize.size() == 1); // only 1-D
   assert(workgroupSize[0] % subgroupSize[0] == 0);
 
-  auto numSubgroups = workgroupSize[0] / subgroupSize[0];
-  auto totalCopySize = getTotalSize(copyMemRefType.getShape());
-  auto totalCopySizePerSubgroup = totalCopySize / numSubgroups;
-  auto numCopiesPerThread =
+  int64_t numSubgroups = workgroupSize[0] / subgroupSize[0];
+  int64_t totalCopySize = getTotalSize(copyMemRefType.getShape());
+  int64_t totalCopySizePerSubgroup = totalCopySize / numSubgroups;
+  int64_t numCopiesPerThread =
       (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize[0];
-  auto residualElements =
+  int64_t residualElements =
       totalCopySizePerSubgroup % (subgroupSize[0] * elementsPerCopy);
 
   LDBG("-- elementsPerCopy: " << elementsPerCopy << "\n");
@@ -110,9 +111,8 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   LDBG("-- residualElements: " << residualElements << "\n");
 
   if (residualElements != 0) {
-    copy.emitOpError(
-        "Cannot proceed: Cannot handle copying residual elements.");
-    return failure();
+    return rewriter.notifyMatchFailure(
+        copy, "Cannot proceed: cannot handle copying residual elements.");
   }
 
   // build For loop
@@ -127,47 +127,23 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
   Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
 
-  // TODO: make it multidimensional.
-
   // compute number of loads per thread
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
   MemRefType localType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                   Value indVar) -> Value {
-    auto laneIdExpr = rewriter.getAffineSymbolExpr(0);
-    auto subgroupIdExpr = rewriter.getAffineSymbolExpr(1);
-    auto iterationExpr = rewriter.getAffineSymbolExpr(2);
-
-    AffineExpr strideExpr =
-        rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
-    AffineExpr totalCopySizeExpr =
-        rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
-
-    // [subgroupStartOffset + i * gatherStride + laneId * elementsPerCopy]
-    AffineExpr gatherOffsetExpr = subgroupIdExpr * totalCopySizeExpr +
-                                  iterationExpr * strideExpr +
-                                  laneIdExpr * elementsPerCopy;
-    return affine::makeComposedAffineApply(rewriter, loc, gatherOffsetExpr,
-                                           {lIdVal, sgIdVal, indVar})
-        .getResult();
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    return rewriter.create<affine::AffineLinearizeIndexOp>(
+        loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
+        ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize[0],
+                          elementsPerCopy},
+        /*disjoint=*/true);
   };
 
   auto getSubgroupStoreBaseIndex = [&](Value sgIdVal, Value indVar) -> Value {
-    auto subgroupIdExpr = rewriter.getAffineSymbolExpr(0);
-    auto iterationExpr = rewriter.getAffineSymbolExpr(1);
-
-    AffineExpr strideExpr =
-        rewriter.getAffineConstantExpr(subgroupSize[0] * elementsPerCopy);
-    AffineExpr totalCopySizeExpr =
-        rewriter.getAffineConstantExpr(totalCopySizePerSubgroup);
-
-    // [subgroupStartOffset + i * gatherStride]
-    AffineExpr baseOffsetExpr =
-        subgroupIdExpr * totalCopySizeExpr + iterationExpr * strideExpr;
-    return affine::makeComposedAffineApply(rewriter, loc, baseOffsetExpr,
-                                           {sgIdVal, indVar})
-        .getResult();
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    return getGlobalGatherIndex(sgIdVal, zero, indVar);
   };
 
   // Build for loop skeleton:
@@ -228,9 +204,8 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
   }
   auto useDMAConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copy);
   if (!useDMAConfig) {
-    LDBG("-- Op: "
-         << *copy
-         << "\n-- does not have use_global_load_dma attribute.\n");
+    LDBG("-- Op: " << *copy
+                   << "\n-- does not have use_global_load_dma attribute.\n");
     return failure();
   }
 

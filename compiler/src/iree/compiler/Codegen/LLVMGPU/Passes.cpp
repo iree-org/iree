@@ -370,8 +370,11 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
 
-  // Convert linalg.copy to direct loads. This has to be before any canonicalization.
-  funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
+  if (clUseDirectLoad) {
+    // Convert linalg.copy to direct loads. This has to be before any
+    // canonicalization.
+    funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
+  }
 
   addIREEPostBufferizationPasses(funcPassManager);
 
