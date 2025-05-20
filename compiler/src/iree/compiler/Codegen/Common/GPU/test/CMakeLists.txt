@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "gpu_apply_tiling_level.mlir"
     "gpu_bubble_resource_casts.mlir"
     "gpu_check_resource_usage.mlir"
+    "gpu_combine_layout_transformation.mlir"
     "gpu_combine_value_barriers.mlir"
     "gpu_create_fast_slow_path.mlir"
     "gpu_distribute.mlir"
