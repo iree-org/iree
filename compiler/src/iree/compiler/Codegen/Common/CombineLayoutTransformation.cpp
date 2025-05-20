@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-combine-layout-transformation"
@@ -293,14 +294,17 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     // We need to scatter the padding values according to the existing
     // mapScatterOp transformation, so clone the transformation into the
     // loop nest.
-    auto clonedMapScatterOp = cast<MapScatterOp>(b.clone(*mapScatterOp));
-    Block &clonedTransformBody =
-        clonedMapScatterOp.getTransformationRegion().getBlocks().front();
+    IRMapping mapping;
+    Region &transformRegion = mapScatterOp.getTransformationRegion();
+    Block *loopBody = rewriter.getInsertionBlock();
+    transformRegion.cloneInto(loopBody->getParent(), mapping);
+    Block *clonedTransformBody =
+        mapping.lookup(&transformRegion.getBlocks().front());
     // Get a pointer to the YieldOp before inlining the Block.
     auto yieldOp =
-        cast<IREE::LinalgExt::YieldOp>(clonedTransformBody.getTerminator());
-    rewriter.inlineBlockBefore(&clonedTransformBody, clonedMapScatterOp, ivs);
-    rewriter.eraseOp(clonedMapScatterOp);
+        cast<IREE::LinalgExt::YieldOp>(clonedTransformBody->getTerminator());
+    rewriter.inlineBlockBefore(clonedTransformBody, loopBody, loopBody->begin(),
+                               ivs);
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(yieldOp);
     // Compute the indices into the outputBuffer, and the if condition to
@@ -463,7 +467,7 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   return success();
 }
 
-/// TODO(Max191): Improve heuristic for tile size selection.
+/// TODO(#20530): Improve heuristic for tile size selection.
 static SmallVector<DistributionConfig>
 defaultPadWorkgroupDistributionConfigFn(ArrayRef<int64_t> iterationBounds,
                                         MLIRContext *ctx) {

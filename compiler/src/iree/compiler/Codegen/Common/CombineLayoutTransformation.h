@@ -15,7 +15,7 @@ namespace mlir::iree_compiler {
 /// space. The rank of `tileSizes` and `mapping` should match the rank of the
 /// iteration space for which the DistributionConfig is described.
 struct DistributionConfig {
-  /// The tileSizes for each worker of the distribution. The strides of the
+  /// The tile sizes for each worker of the distribution. The strides of the
   /// tiles are expected to be 1.
   SmallVector<int64_t> tileSizes;
   /// Distribution mapping for the distributed loops (e.g., the `mapping`
