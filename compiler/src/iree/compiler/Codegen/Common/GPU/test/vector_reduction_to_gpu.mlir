@@ -270,7 +270,7 @@ module {
 //       CDNA3:     arith.mulf %{{.*}}, %{{.*}} : vector<4x8xf16>
 //       CDNA3:     arith.addf %{{.*}}, %{{.*}} : vector<4x8xf16>
 //       CDNA3:   }
-// CDNA3-COUNT-4: gpu.subgroup_reduce  add
+// CDNA3-COUNT-12: gpu.shuffle xor
 //       CDNA3:   scf.if {{.*}} {
 //       CDNA3:     vector.transfer_write {{.*}} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
 //       CDNA3:   }
