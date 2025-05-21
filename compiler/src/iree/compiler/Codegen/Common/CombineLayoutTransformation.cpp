@@ -289,7 +289,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
       padOp.getSourceType().getShape(), rewriter.getContext());
 
   // Write the padding values directly into the outputBuffer.
-  Value outputBuffer = storeOp.getTarget();
+  Value outputBuffer = storeOp.getBuffer();
   auto innerLoopBuilder = [&](OpBuilder &b, Location loopLoc, ValueRange ivs) {
     // We need to scatter the padding values according to the existing
     // mapScatterOp transformation, so clone the transformation into the
@@ -427,13 +427,13 @@ insertIdentityMapScatter(RewriterBase &rewriter,
   auto mapScatterDest =
       rewriter
           .create<tensor::EmptyOp>(
-              loc, memref::getMixedSizes(rewriter, loc, storeOp.getTarget()),
-              storeOp.getValue().getType().getElementType())
+              loc, memref::getMixedSizes(rewriter, loc, storeOp.getBuffer()),
+              storeOp.getTensor().getType().getElementType())
           .getResult();
   auto mapScatterOp = MapScatterOp::createIdentityMapScatter(
-      rewriter, loc, storeOp.getValue(), mapScatterDest);
+      rewriter, loc, storeOp.getTensor(), mapScatterDest);
   rewriter.modifyOpInPlace(storeOp, [&]() {
-    storeOp.getValueMutable().assign(mapScatterOp.getResult(0));
+    storeOp.getTensorMutable().assign(mapScatterOp.getResult(0));
   });
   LDBG("Created identity map_scatter:\n" << mapScatterOp);
   return mapScatterOp;

@@ -71,12 +71,12 @@ void ExtractStridedMetadataOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 
 LogicalResult LoadFromMemrefOp::verify() {
-  RankedTensorType resultType = getResult().getType();
-  MemRefType sourceType = getSource().getType();
-  if (failed(verifyCompatibleShape(resultType.getShape(),
-                                   sourceType.getShape())) ||
-      resultType.getElementType() != sourceType.getElementType()) {
-    return emitOpError("source and result shapes must be compatible and "
+  RankedTensorType tensorType = getTensor().getType();
+  MemRefType memrefType = getBuffer().getType();
+  if (failed(verifyCompatibleShape(tensorType.getShape(),
+                                   memrefType.getShape())) ||
+      tensorType.getElementType() != memrefType.getElementType()) {
+    return emitOpError("buffer and tensor shapes must be compatible and "
                        "element types must match");
   }
   return success();
@@ -85,7 +85,7 @@ LogicalResult LoadFromMemrefOp::verify() {
 void LoadFromMemrefOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
+  effects.emplace_back(MemoryEffects::Read::get(), &getBufferMutable(),
                        SideEffects::DefaultResource::get());
 }
 
@@ -94,13 +94,13 @@ void LoadFromMemrefOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 LogicalResult StoreToMemrefOp::verify() {
-  RankedTensorType valueType = getValue().getType();
-  MemRefType targetType = getTarget().getType();
-  if (failed(
-          verifyCompatibleShape(valueType.getShape(), targetType.getShape())) ||
-      valueType.getElementType() != targetType.getElementType()) {
-    return emitOpError("value and target shapes must be compatible and element "
-                       "types must match");
+  RankedTensorType tensorType = getTensor().getType();
+  MemRefType memrefType = getBuffer().getType();
+  if (failed(verifyCompatibleShape(tensorType.getShape(),
+                                   memrefType.getShape())) ||
+      tensorType.getElementType() != memrefType.getElementType()) {
+    return emitOpError("tensor and buffer shapes must be compatible and "
+                       "element types must match");
   }
   return success();
 }
@@ -108,6 +108,6 @@ LogicalResult StoreToMemrefOp::verify() {
 void StoreToMemrefOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  effects.emplace_back(MemoryEffects::Write::get(), &getTargetMutable(),
+  effects.emplace_back(MemoryEffects::Write::get(), &getBufferMutable(),
                        SideEffects::DefaultResource::get());
 }

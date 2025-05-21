@@ -202,7 +202,7 @@ struct LoadFromMemrefOpInterface
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
     auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
-    replaceOpWithBufferizedValues(rewriter, op, loadOp.getSource());
+    replaceOpWithBufferizedValues(rewriter, op, loadOp.getBuffer());
     return success();
   }
 };
@@ -230,7 +230,7 @@ struct StoreToMemrefOpInterface
                           const BufferizationOptions &options) const {
     auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
     FailureOr<Value> maybeBuffer =
-        getBuffer(rewriter, storeOp.getValue(), options);
+        getBuffer(rewriter, storeOp.getTensor(), options);
     if (failed(maybeBuffer))
       return failure();
     Value srcMemref = *maybeBuffer;
@@ -238,7 +238,7 @@ struct StoreToMemrefOpInterface
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp.getLoc(), srcMemref,
-                                    storeOp.getTarget())))
+                                    storeOp.getBuffer())))
       return failure();
 
     rewriter.eraseOp(storeOp);
@@ -576,10 +576,10 @@ struct LoadFromMemrefOpSubsetInterface
     auto loadOp = cast<IREE::Codegen::LoadFromMemrefOp>(op);
     Operation *otherOp = candidate.getOperation();
     if (auto storeOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(otherOp)) {
-      return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
+      return equivalenceFn(loadOp.getBuffer(), storeOp.getBuffer());
     }
     if (auto otherLoadOp = dyn_cast<IREE::Codegen::LoadFromMemrefOp>(otherOp)) {
-      return equivalenceFn(loadOp.getSource(), otherLoadOp.getSource());
+      return equivalenceFn(loadOp.getBuffer(), otherLoadOp.getBuffer());
     }
     return false;
   }
@@ -604,10 +604,10 @@ struct StoreToMemrefOpSubsetInterface
     auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
     Operation *otherOp = candidate.getOperation();
     if (auto otherStoreOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(otherOp)) {
-      return equivalenceFn(storeOp.getTarget(), otherStoreOp.getTarget());
+      return equivalenceFn(storeOp.getBuffer(), otherStoreOp.getBuffer());
     }
     if (auto loadOp = dyn_cast<IREE::Codegen::LoadFromMemrefOp>(otherOp)) {
-      return equivalenceFn(storeOp.getTarget(), loadOp.getSource());
+      return equivalenceFn(storeOp.getBuffer(), loadOp.getBuffer());
     }
     return false;
   }
@@ -626,25 +626,25 @@ struct StoreToMemrefOpSubsetInsertionInterface
           IREE::Codegen::StoreToMemrefOp> {
 
   OpOperand &getSourceOperand(Operation *op) const {
-    return cast<IREE::Codegen::StoreToMemrefOp>(op).getValueMutable();
+    return cast<IREE::Codegen::StoreToMemrefOp>(op).getTensorMutable();
   }
 
   OpOperand &getDestinationOperand(Operation *op) const {
-    return cast<IREE::Codegen::StoreToMemrefOp>(op).getTargetMutable();
+    return cast<IREE::Codegen::StoreToMemrefOp>(op).getBufferMutable();
   }
 
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
     auto loadOp = builder.create<IREE::Codegen::LoadFromMemrefOp>(
-        loc, storeOp.getValue().getType(), storeOp.getTarget());
+        loc, storeOp.getTensor().getType(), storeOp.getBuffer());
     return loadOp.getResult();
   }
 
   SmallVector<Value>
   getValuesNeededToBuildSubsetExtraction(Operation *op) const {
     auto storeOp = cast<IREE::Codegen::StoreToMemrefOp>(op);
-    return {storeOp.getTarget()};
+    return {storeOp.getBuffer()};
   }
 };
 
