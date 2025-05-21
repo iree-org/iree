@@ -336,8 +336,12 @@ Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 }
 
 std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
+  if (!getUserIndexingMaps()) {
+    return std::nullopt;
+  }
+  SmallVector<AffineMap> indexingMaps = getRootMaps();
   FailureOr<linalg::ContractionDimensions> contractionDims =
-      getEncodingContractionDims(*this);
+      linalg::inferContractionDims(indexingMaps);
   if (failed(contractionDims)) {
     return std::nullopt;
   }

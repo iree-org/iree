@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -275,7 +276,7 @@ FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
   MaterializeEncodingInfo encodingInfo;
   FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(encoding);
+      Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims)) {
     return failure();
   }
