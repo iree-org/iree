@@ -63,8 +63,6 @@ func.func @dynamic_softmax() {
 
 
 // Finer details of this lowering are captured by the spirv pipeline test. Just
-// verify that warp reduction triggers. Note that excess reductions will be
-// removed later in the pipeline.
+// verify that warp reduction triggers.
 //    CHECK-LABEL: func.func @dynamic_softmax
-// CHECK-DAG: gpu.subgroup_reduce  maxnumf {{.*}}
-// CHECK-DAG: gpu.subgroup_reduce  add {{.*}}
+// CHECK-COUNT-10: gpu.shuffle  xor {{.*}} : i32
