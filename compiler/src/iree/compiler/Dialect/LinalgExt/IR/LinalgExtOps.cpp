@@ -363,7 +363,7 @@ struct ConvertGatherToExtract
     int64_t sourceRank = gatherOp.getSourceType().getRank();
     offsets.resize(sourceRank, rewriter.getIndexAttr(0));
 
-    // Create the new `tensor.extract_slice`
+    // Create the new `tensor.extract_slice`.
     SmallVector<OpFoldResult> strides(sourceRank, rewriter.getIndexAttr(1));
     SmallVector<int64_t> resultShape(gatherOp.getIndexDepth(), 1);
     SmallVector<OpFoldResult> sizes(gatherOp.getIndexDepth(),
@@ -384,8 +384,7 @@ struct ConvertGatherToExtract
     int64_t gatherRank = gatherOp.getOutputType().getRank();
     if (sliceRank < gatherRank) {
       SmallVector<ReassociationIndices> reassoc(1);
-      llvm::append_range(reassoc[0],
-                         llvm::seq<int64_t>(0, gatherOp.getBatchRank()));
+      llvm::append_range(reassoc[0], llvm::seq(gatherOp.getBatchRank()));
       for (int64_t i = 0; i < sourceRank - 1; i++) {
         reassoc.emplace_back(1, i + gatherOp.getBatchRank());
       }
@@ -394,8 +393,7 @@ struct ConvertGatherToExtract
           gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
     } else if (sliceRank > gatherRank) {
       SmallVector<ReassociationIndices> reassoc(1);
-      llvm::append_range(reassoc[0],
-                         llvm::seq<int64_t>(0, sliceRank - gatherRank + 1));
+      llvm::append_range(reassoc[0], llvm::seq(sliceRank - gatherRank + 1));
       for (int64_t i = sliceRank - gatherRank + 1; i < sliceRank; i++) {
         reassoc.emplace_back(1, i);
       }

@@ -45,7 +45,6 @@ func.func @gather_to_extract_slice_expand(%source : tensor<1024x128xi32>, %indic
     outs(%empty: tensor<1x1x128xi32>) -> tensor<1x1x128xi32>
   return %result : tensor<1x1x128xi32>
 }
-
 // CHECK-LABEL: @gather_to_extract_slice_expand
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
@@ -56,7 +55,7 @@ func.func @gather_to_extract_slice_expand(%source : tensor<1024x128xi32>, %indic
 //  CHECK-SAME:     [%[[CAST]], 0] [1, 128] [1, 1]
 //  CHECK-SAME:     tensor<1024x128xi32> to tensor<1x128xi32>
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]]
-//       CHECK:   return %[[EXPAND]] : tensor<1x1x128xi32>
+//  CHECK-SAME:     tensor<1x128xi32> into tensor<1x1x128xi32>
 
 // -----
 
@@ -67,7 +66,6 @@ func.func @gather_to_extract_slice_no_reshape(%source : tensor<1024x128xi32>, %i
     outs(%empty: tensor<1x128xi32>) -> tensor<1x128xi32>
   return %result : tensor<1x128xi32>
 }
-
 // CHECK-LABEL: @gather_to_extract_slice_no_reshape
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
@@ -77,7 +75,6 @@ func.func @gather_to_extract_slice_no_reshape(%source : tensor<1024x128xi32>, %i
 //       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
 //  CHECK-SAME:     [%[[CAST]], 0] [1, 128] [1, 1]
 //  CHECK-SAME:     tensor<1024x128xi32> to tensor<1x128xi32>
-//       CHECK:   return %[[SLICE]] : tensor<1x128xi32>
 
 // -----
 
@@ -88,7 +85,6 @@ func.func @gather_to_extract_slice_perm(%source : tensor<10x1024x128xi32>, %indi
     outs(%empty: tensor<1x1x128xi32>) -> tensor<1x1x128xi32>
   return %result : tensor<1x1x128xi32>
 }
-
 // CHECK-LABEL: @gather_to_extract_slice_perm
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
@@ -101,7 +97,6 @@ func.func @gather_to_extract_slice_perm(%source : tensor<10x1024x128xi32>, %indi
 //       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
 //  CHECK-SAME:     [%[[CAST1]], %[[CAST0]], 0] [1, 1, 128] [1, 1, 1]
 //  CHECK-SAME:     tensor<10x1024x128xi32> to tensor<1x1x128xi32>
-//       CHECK:   return %[[SLICE]] : tensor<1x1x128xi32>
 
 // -----
 
@@ -112,7 +107,6 @@ func.func @gather_to_extract_slice_full_collapse(%source : tensor<2x2x1xi32>, %i
     outs(%empty: tensor<1xi32>) -> tensor<1xi32>
   return %result : tensor<1xi32>
 }
-
 // CHECK-LABEL: @gather_to_extract_slice_full_collapse
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
@@ -127,7 +121,6 @@ func.func @gather_to_extract_slice_full_collapse(%source : tensor<2x2x1xi32>, %i
 //  CHECK-SAME:     tensor<2x2x1xi32> to tensor<1x1x1xi32>
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]]
 //  CHECK-SAME:     tensor<1x1x1xi32> into tensor<1xi32>
-//       CHECK:   return %[[COLLAPSE]] : tensor<1xi32>
 
 // -----
 
@@ -138,7 +131,6 @@ func.func @gather_to_extract_slice_partial_collapse(%source : tensor<2x2x100x100
     outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
   return %result : tensor<100x100xi32>
 }
-
 // CHECK-LABEL: @gather_to_extract_slice_partial_collapse
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
@@ -153,4 +145,3 @@ func.func @gather_to_extract_slice_partial_collapse(%source : tensor<2x2x100x100
 //  CHECK-SAME:     tensor<2x2x100x100xi32> to tensor<1x1x100x100xi32>
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]]
 //  CHECK-SAME:     tensor<1x1x100x100xi32> into tensor<100x100xi32>
-//       CHECK:   return %[[COLLAPSE]] : tensor<100x100xi32>

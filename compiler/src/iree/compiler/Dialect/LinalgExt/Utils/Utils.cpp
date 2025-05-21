@@ -104,26 +104,6 @@ Operation *getSlice(OpBuilder &b, Location loc, Value src,
       });
 }
 
-Operation *getElement(OpBuilder &b, Location loc, Value src,
-                      ArrayRef<OpFoldResult> indices) {
-  SmallVector<Value> valueIndices =
-      llvm::map_to_vector(indices, [&](OpFoldResult ofr) {
-        return getValueOrCreateConstantIndexOp(b, loc, ofr);
-      });
-
-  return TypeSwitch<Type, Operation *>(src.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Operation * {
-        return b.create<tensor::ExtractOp>(loc, src, valueIndices);
-      })
-      .Case<MemRefType>([&](MemRefType type) -> Operation * {
-        return b.create<memref::LoadOp>(loc, src, valueIndices);
-      })
-      .Default([&](Type t) -> Operation * {
-        assert(false && "invalid type");
-        return nullptr;
-      });
-}
-
 Value castValue(OpBuilder &b, Location loc, Value src, ShapedType type) {
   return TypeSwitch<Type, Value>(src.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
