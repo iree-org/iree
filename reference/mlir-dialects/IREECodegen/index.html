@@ -4877,7 +4877,7 @@ This makes lowering more progressive and brings the following benefits:
 <h3 id="iree_codegenload_from_memref-codegenloadfrommemrefop"><code>iree_codegen.load_from_memref</code> (Codegen::LoadFromMemrefOp)<a class="headerlink" href="#iree_codegenload_from_memref-codegenloadfrommemrefop" title="Permanent link">link</a></h3>
 <p><em>Loads a tensor from a memref.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_memref` $source attr-dict `:` type($source) `-&gt;` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_memref` $buffer attr-dict `:` type($buffer) `-&gt;` type($tensor)
 </code></pre></div>
 <p>Loads a tensor from a memref with a compatible shape and the same element
 type.</p>
@@ -4892,7 +4892,7 @@ type.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>source</code></td>
+<td style="text-align: center;"><code>buffer</code></td>
 <td>strided memref of any type values</td>
 </tr>
 </tbody>
@@ -4907,7 +4907,7 @@ type.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>result</code></td>
+<td style="text-align: center;"><code>tensor</code></td>
 <td>ranked tensor of any type values</td>
 </tr>
 </tbody>
@@ -4971,8 +4971,8 @@ to VMVX.</p>
 <h3 id="iree_codegenstore_to_memref-codegenstoretomemrefop"><code>iree_codegen.store_to_memref</code> (Codegen::StoreToMemrefOp)<a class="headerlink" href="#iree_codegenstore_to_memref-codegenstoretomemrefop" title="Permanent link">link</a></h3>
 <p><em>Stores a tensor into a memref.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_memref` $value `,` $target
-              attr-dict `:` type($value) `into` type($target)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_memref` $tensor `,` $buffer
+              attr-dict `:` type($tensor) `into` type($buffer)
 </code></pre></div>
 <p>Stores a tensor into a memref with a compatible shape and the same element
 type.</p>
@@ -4987,11 +4987,11 @@ type.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>value</code></td>
+<td style="text-align: center;"><code>tensor</code></td>
 <td>ranked tensor of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>target</code></td>
+<td style="text-align: center;"><code>buffer</code></td>
 <td>strided memref of any type values</td>
 </tr>
 </tbody>
