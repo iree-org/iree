@@ -81,9 +81,9 @@ bufferizeDispatchTensorStore(RewriterBase &rewriter,
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides());
 
-  Value value = storeOp.getValue();
+  Value tensor = storeOp.getValue();
   rewriter.setInsertionPoint(storeOp);
-  rewriter.replaceOpWithNewOp<IREE::Codegen::StoreToMemrefOp>(storeOp, value,
+  rewriter.replaceOpWithNewOp<IREE::Codegen::StoreToMemrefOp>(storeOp, tensor,
                                                               outputBuffer);
 }
 
