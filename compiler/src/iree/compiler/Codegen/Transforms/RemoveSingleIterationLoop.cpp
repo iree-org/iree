@@ -38,6 +38,23 @@ static void replaceOpWithRegion(PatternRewriter &rewriter, Operation *op,
   rewriter.eraseOp(terminator);
 }
 
+static void replaceForWithIf(PatternRewriter &rewriter, Operation *op,
+                             scf::IfOp ifOp, Region &region,
+                             ValueRange initArgs, ValueRange blockArgs = {}) {
+  assert(llvm::hasSingleElement(region) && "expected single-region block");
+  Block *block = &region.front();
+  Operation *terminator = block->getTerminator();
+  rewriter.inlineBlockBefore(block, &ifOp.getThenRegion().front(),
+                             ifOp.getThenRegion().front().begin(), blockArgs);
+  if (initArgs.size() == 0) {
+    rewriter.eraseOp(terminator);
+  } else {
+    rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+    rewriter.create<scf::YieldOp>(ifOp.getLoc(), initArgs);
+  }
+  rewriter.replaceOp(op, ifOp);
+}
+
 /// Return true if we can prove that the we always run at least the first
 /// iteration of the ForOp.
 static bool alwaysRunsFirstIteration(scf::ForOp op) {
@@ -56,16 +73,28 @@ static bool neverRunsSecondIteration(scf::ForOp op) {
   // Can't perform the analysis if the loops's bounds aren't index-typed.
   if (!op.getInductionVar().getType().isIndex())
     return false;
-  // If the upper bound (ub) is less than or equal to the loop step, then
-  // lower bound  + step must be greater than the upper bound, assuming the
-  // lower bound is non-negative.
+  // Calculate loop bounds that allow for maximum iterations.
+  auto lb = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::LB, op.getLowerBound());
+  auto step = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::LB, op.getStep());
+  auto ub = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::UB, op.getUpperBound(),
+      /*stopCondition=*/nullptr,
+      /*closedUB=*/true);
+  if (failed(lb) || failed(step) || failed(ub)) {
+    return false;
+  }
+  // If the upper bound is less than or equal to lower bound  + step then the
+  // loop cannot run for a second iteration assuming the step is positive.
   FailureOr<bool> isUbUnderStep = ValueBoundsConstraintSet::compare(
-      getAsOpFoldResult(op.getUpperBound()), ValueBoundsConstraintSet::LE,
-      getAsOpFoldResult(op.getStep()));
-  FailureOr<bool> isLbNonNegative = ValueBoundsConstraintSet::compare(
-      getAsOpFoldResult(op.getLowerBound()), ValueBoundsConstraintSet::GE,
+      getAsIndexOpFoldResult(op.getContext(), *ub),
+      ValueBoundsConstraintSet::LE,
+      getAsIndexOpFoldResult(op.getContext(), *step + *lb));
+  FailureOr<bool> isStepNonNegative = ValueBoundsConstraintSet::compare(
+      getAsOpFoldResult(op.getStep()), ValueBoundsConstraintSet::GE,
       getAsIndexOpFoldResult(op.getContext(), 0));
-  return isUbUnderStep.value_or(false) && isLbNonNegative.value_or(false);
+  return isUbUnderStep.value_or(false) && isStepNonNegative.value_or(false);
 }
 
 namespace {
@@ -75,20 +104,29 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
 
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
-    // TODO: Handle the case where we know that the loop doesn't run more than
-    // once but the loop may not run at least once by replace the `loop` with an
-    // `if`.
-    if (!(alwaysRunsFirstIteration(op) && neverRunsSecondIteration(op))) {
+    if (!(neverRunsSecondIteration(op))) {
       return failure();
     }
 
-    // The first iteration is always run and the second iteration is never run
-    // so the loop always have 1 iteration. Inline its body and remove the loop.
+    // The second iteration is never run
+    // so the loop atmost can have 1 iteration. Inline its body and remove the
+    // loop.
     SmallVector<Value> blockArgs;
     blockArgs.reserve(op.getInitArgs().size() + 1);
     blockArgs.push_back(op.getLowerBound());
     llvm::append_range(blockArgs, op.getInitArgs());
-    replaceOpWithRegion(rewriter, op, op.getRegion(), blockArgs);
+    if (alwaysRunsFirstIteration(op)) {
+      replaceOpWithRegion(rewriter, op, op.getRegion(), blockArgs);
+    } else {
+      Value count = rewriter.create<arith::CmpIOp>(
+          op->getLoc(), arith::CmpIPredicate::sgt, op.getUpperBound(),
+          op.getLowerBound());
+      auto ifOp = rewriter.create<scf::IfOp>(
+          op->getLoc(), op.getResultTypes(), count,
+          /*withElseRegion=*/op.getInitArgs().size() != 0);
+      replaceForWithIf(rewriter, op, ifOp, op.getRegion(), op.getInitArgs(),
+                       blockArgs);
+    }
     return success();
   }
 };
