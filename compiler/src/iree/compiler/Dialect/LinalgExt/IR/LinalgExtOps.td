@@ -311,6 +311,8 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       return getOutputsMutable();
     }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
