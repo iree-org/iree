@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "bufferize_copy_only_dispatches.mlir"
     "bufferize_dispatch_tensor_load_store.mlir"
     "canonicalize_interface_load_store.mlir"
+    "canonicalize_early_bufferization_ops.mlir"
     "check_for_config.mlir"
     "combine_layout_transformation.mlir"
     "convert_accgemm_to_gemm.mlir"

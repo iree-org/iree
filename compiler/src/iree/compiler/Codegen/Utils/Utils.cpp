@@ -1241,11 +1241,9 @@ Value findOrCreateSubspanBuffer(
 // Misc. utility functions
 //===---------------------------------------------------------------------===//
 
-Operation *
-setInsertionPointAfterLastNeededValue(OpBuilder &builder,
-                                      SubsetInsertionOpInterface subsetOp) {
+Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
+                                           ArrayRef<Value> values) {
   DominanceInfo domInfo;
-  SmallVector<Value> values = subsetOp.getValuesNeededToBuildSubsetExtraction();
   Operation *lastOp = nullptr;
   bool setInsertionPointBefore = false;
   for (auto val : values) {
@@ -1278,6 +1276,13 @@ setInsertionPointAfterLastNeededValue(OpBuilder &builder,
     builder.setInsertionPointAfter(lastOp);
   }
   return lastOp;
+}
+
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp) {
+  return setInsertionPointAfterLastValue(
+      builder, subsetOp.getValuesNeededToBuildSubsetExtraction());
 }
 
 bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
