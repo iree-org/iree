@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "Utils.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
