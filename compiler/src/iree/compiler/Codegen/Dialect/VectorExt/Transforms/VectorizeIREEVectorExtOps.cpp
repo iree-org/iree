@@ -522,12 +522,14 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
       VectorType::get(indicesTy.getShape().take_front(gatherOp.getBatchRank()),
                       rewriter.getIndexType());
 
-  // Read `indices` tensor via `vector.transfer_read` into a vector of index
-  // elem type.
+  // Read `indices` tensor via `vector.transfer_read` and cast from int to
+  // index.
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value indicesVec = rewriter.create<vector::TransferReadOp>(
-      loc, indicesVecTy, gatherOp.getIndices(),
-      SmallVector<Value>(indicesTy.getRank(), zero));
+      loc, indicesVecTy.clone(indicesTy.getElementType()),
+      gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero));
+  indicesVec =
+      rewriter.create<arith::IndexCastOp>(loc, indicesVecTy, indicesVec);
 
   // Create transfer_gather op
   SmallVector<Value> baseIndices(sourceTy.getRank(), zero);
