@@ -69,24 +69,24 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 //   DISTRIBUTEX-DAG:     %[[SIZE1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>()[%[[ARG0]], %[[ARG2]], %[[ARG4]]]
 //   DISTRIBUTEX-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
 //   DISTRIBUTEX-DAG:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX]] into (%[[SIZE1]], %[[SIZE0]])
-//   DISTRIBUTEX-DAG:     %[[IV0:.+]] = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%[[DELINEARIZE]]#0, %[[ARG4]]]
-//   DISTRIBUTEX-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%[[DELINEARIZE]]#1, %[[ARG5]]]
+//   DISTRIBUTEX-DAG:     %[[IV0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DELINEARIZE]]#0, %[[ARG4]]]
+//   DISTRIBUTEX-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DELINEARIZE]]#1, %[[ARG5]]]
 //       DISTRIBUTEX:     "use"(%[[IV0]], %[[IV1]])
 
 //   DISTRIBUTEY-DAG:     %[[ARG4:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
 //   DISTRIBUTEY-DAG:     %[[ARG5:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
 //   DISTRIBUTEY-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
 //   DISTRIBUTEY-DAG:     %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
-//   DISTRIBUTEY-DAG:     %[[IV0:.+]] = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%[[IDY]], %[[ARG4]]]
-//   DISTRIBUTEY-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%[[IDX]], %[[ARG5]]]
+//   DISTRIBUTEY-DAG:     %[[IV0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[IDY]], %[[ARG4]]]
+//   DISTRIBUTEY-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[IDX]], %[[ARG5]]]
 //       DISTRIBUTEY:     "use"(%[[IV0]], %[[IV1]])
 
 //   DISTRIBUTEZ-DAG:     %[[ARG4:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
 //   DISTRIBUTEZ-DAG:     %[[ARG5:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
 //   DISTRIBUTEZ-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
 //   DISTRIBUTEZ-DAG:     %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
-//   DISTRIBUTEZ-DAG:     %[[IV0:.+]] = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%[[IDY]], %[[ARG4]]]
-//   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%[[IDX]], %[[ARG5]]]
+//   DISTRIBUTEZ-DAG:     %[[IV0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[IDY]], %[[ARG4]]]
+//   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[IDX]], %[[ARG5]]]
 //       DISTRIBUTEZ:     "use"(%[[IV0]], %[[IV1]])
 
 // // -----
