@@ -325,10 +325,10 @@ util.func public @make_single_dispatch(%arg0: tensor<16x8x32x2048xbf16>, %arg1: 
 
 // -----
 
-util.func public @gather_matmul(%source : tensor<2x2x100x100xi32>, %indices : tensor<2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+util.func public @gather_matmul(%source : tensor<20x20x100xi32>, %indices : tensor<100x2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
   %empty = tensor.empty() : tensor<100x100xi32>
   %result = iree_linalg_ext.gather dimension_map = [1, 0]
-                          ins(%source, %indices : tensor<2x2x100x100xi32>, tensor<2xi32>)
+                          ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
                           outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
   %mm = linalg.matmul_transpose_b ins(%result, %arg2 : tensor<100x100xi32>, tensor<100x100xi32>) outs(%arg3 : tensor<100x100xi32>) -> tensor<100x100xi32>
   util.return %mm : tensor<100x100xi32>
@@ -343,10 +343,10 @@ util.func public @gather_matmul(%source : tensor<2x2x100x100xi32>, %indices : te
 
 // -----
 
-util.func public @single_gather(%source : tensor<2x2x100x100xi32>, %indices : tensor<2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+util.func public @single_gather(%source : tensor<20x20x100xi32>, %indices : tensor<100x2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
   %empty = tensor.empty() : tensor<100x100xi32>
   %result = iree_linalg_ext.gather dimension_map = [1, 0]
-                          ins(%source, %indices : tensor<2x2x100x100xi32>, tensor<2xi32>)
+                          ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
                           outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
   util.return %result : tensor<100x100xi32>
 }
