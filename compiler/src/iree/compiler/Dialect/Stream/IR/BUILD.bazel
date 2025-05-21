@@ -65,6 +65,7 @@ iree_compiler_cc_library(
         ":StreamOpsGen",
         ":StreamTypesGen",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
