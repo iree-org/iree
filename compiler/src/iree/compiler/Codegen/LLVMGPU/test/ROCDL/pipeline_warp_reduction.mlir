@@ -35,7 +35,7 @@ hal.executable private @warp_reduction {
 }
 
 //   CHECK-LABEL: llvm.func @warp_reduction
-// CHECK-COUNT-8:   rocdl.ds_bpermute
+// CHECK-COUNT-8:   rocdl.ds_{{swizzle|bpermute}}
 
 // -----
 
@@ -76,4 +76,4 @@ hal.executable public @main_dispatch_517 {
 // TODO: we probably need to revisit the configuration heuristics here.
 
 //     CHECK-LABEL: llvm.func @warp_reduction_large_vector
-// CHECK-COUNT-640:   rocdl.ds_bpermute
+// CHECK-COUNT-640:   rocdl.ds_{{swizzle|bpermute}}
