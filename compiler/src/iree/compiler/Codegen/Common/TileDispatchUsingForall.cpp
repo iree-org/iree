@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -61,15 +62,12 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   // level. Currently, it selects the last compute op that has workgroup tiling
   // level.
   Operation *tilableOp = nullptr;
-  for (Operation *op : llvm::reverse(computeOps)) {
-    if (getLoweringConfig(op)) {
-      if (!getLoweringConfig(op).hasWorkgroupTilingLevel()) {
-        continue;
-      }
-      tilableOp = op;
-      break;
-    }
+  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  if (failed(rootOp)) {
+    // There is no lowering config. Return `null`.
+    return TilingInfo{nullptr, {}, {}};
   }
+  tilableOp = rootOp.value();
   if (!tilableOp) {
     // There is no lowering config. Return `null`.
     return TilingInfo{nullptr, {}, {}};
