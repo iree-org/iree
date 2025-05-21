@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_DERIVEDCONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_DERIVEDCONFIGUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
@@ -15,5 +16,9 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op);
 SmallVector<int64_t> globalLoadDMATileSizes(Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::GPU
+
+namespace mlir::iree_compiler {
+IREE::GPU::TargetAttr getGPUTargetAttr(Operation *);
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_DERIVEDCONFIGUTILS_H_
