@@ -90,9 +90,10 @@ func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<1
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   %[[READ:.+]] = vector.transfer_read %[[ARG1]]
-//  CHECK-SAME:     : tensor<10xi32>, vector<10xindex>
+//  CHECK-SAME:     : tensor<10xi32>, vector<10xi32>
+//       CHECK:   %[[CAST:.+]] = arith.index_cast %[[READ]]
 //       CHECK:   %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-//  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[READ]]: vector<10xindex>, None]
+//  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[CAST]]: vector<10xindex>, None]
 
 // -----
 
@@ -141,6 +142,7 @@ func.func @linalg_ext_gather_unit_dim(%source : tensor<1024x128xi32>, %indices :
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   %[[READ:.+]] = vector.transfer_read %[[ARG1]]
-//  CHECK-SAME:     : tensor<10x1xi32>, vector<10xindex>
+//  CHECK-SAME:     : tensor<10x1xi32>, vector<10xi32>
+//       CHECK:   %[[CAST:.+]] = arith.index_cast %[[READ]]
 //       CHECK:   %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-//  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[READ]]: vector<10xindex>, None]
+//  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[CAST]]: vector<10xindex>, None]
