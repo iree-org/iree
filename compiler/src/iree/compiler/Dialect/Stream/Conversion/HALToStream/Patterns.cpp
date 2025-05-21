@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/Conversion/HALToStream/Patterns.h"
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
