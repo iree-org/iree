@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "decompose_im2col.mlir"
     "decompose_winograd.mlir"
     "distribution.mlir"
+    "fold_unit_dims.mlir"
     "pad_contraction_to_block_size.mlir"
     "split_reduction.mlir"
     "tiling.mlir"
