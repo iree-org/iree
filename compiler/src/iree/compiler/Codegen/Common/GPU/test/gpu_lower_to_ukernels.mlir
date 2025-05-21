@@ -31,12 +31,62 @@ func.func @argmax_f32i64_with_selected_ukernel(%arg0 : tensor<1x?xf32>) -> tenso
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xf32>
 //  CHECK-DAG:   %[[C1_index:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C0_i64:.+]] = arith.constant 0
-//  CHECK-DAG:   %[[FILL:.+]] = linalg.fill ins(%[[C0_i64]]
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic
-//  CHECK-SAME:      "some_ukernel"
+//  CHECK-DAG:   %[[NEG_INF:.+]] = arith.constant 0xFF800000 : f32
+//  CHECK-DAG:   %[[FILL_IDX:.+]] = linalg.fill ins(%[[C0_i64]]
+//  CHECK-DAG:   %[[FILL_VAL:.+]] = linalg.fill ins(%[[NEG_INF]]
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic
+// CHECK-SAME:      "some_ukernel"
 // CHECK-SAME:       ins(%[[ARG0]] :
-// CHECK-SAME:       outs(%[[FILL]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+// CHECK-SAME:       outs(%[[FILL_VAL]], %[[FILL_IDX]] :
+//      CHECK:   return %[[MICRO_KERNEL]]#1
+
+// -----
+
+#config = #iree_gpu.lowering_config<{
+  ukernel = #iree_gpu.ukernel_config<name = "some_ukernel", def_attrs = {vm.import.module = "rocm"}>
+}>
+
+func.func @argmax_bf16i64_with_selected_ukernel(%arg0 : tensor<1x?xbf16>) -> tensor<1xi64> {
+  %c0_i64 = arith.constant 0 : i64
+  %cst = arith.constant 0xFF80 : bf16
+  %0 = tensor.empty() : tensor<1xi64>
+  %1 = linalg.fill ins(%c0_i64 : i64) outs(%0 : tensor<1xi64>) -> tensor<1xi64>
+  %2 = tensor.empty() : tensor<1xbf16>
+  %3 = linalg.fill ins(%cst : bf16) outs(%2 : tensor<1xbf16>) -> tensor<1xbf16>
+  %4:2 = linalg.generic {
+        indexing_maps = [
+          affine_map<(d0, d1) -> (d0, d1)>,
+          affine_map<(d0, d1) -> (d0)>,
+          affine_map<(d0, d1) -> (d0)>
+        ],
+        iterator_types = ["parallel", "reduction"]
+      }
+      ins(%arg0 : tensor<1x?xbf16>)
+      outs(%3, %1 : tensor<1xbf16>, tensor<1xi64>)
+      attrs = {lowering_config = #config} {
+  ^bb0(%in: bf16, %out: bf16, %out_0: i64):
+    %5 = linalg.index 1 : index
+    %6 = arith.index_cast %5 : index to i64
+    %7 = arith.maximumf %in, %out : bf16
+    %8 = arith.cmpf ogt, %in, %out : bf16
+    %9 = arith.select %8, %6, %out_0 : i64
+    linalg.yield %7, %9 : bf16, i64
+  } -> (tensor<1xbf16>, tensor<1xi64>)
+  return %4#1 : tensor<1xi64>
+}
+
+//CHECK-LABEL: func @argmax_bf16i64_with_selected_ukernel(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xbf16>
+//  CHECK-DAG:   %[[C1_index:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C0_i64:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[NEG_INF:.+]] = arith.constant 0xFF80 : bf16
+//  CHECK-DAG:   %[[FILL_IDX:.+]] = linalg.fill ins(%[[C0_i64]]
+//  CHECK-DAG:   %[[FILL_VAL:.+]] = linalg.fill ins(%[[NEG_INF]]
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic
+// CHECK-SAME:      "some_ukernel"
+// CHECK-SAME:       ins(%[[ARG0]] :
+// CHECK-SAME:       outs(%[[FILL_VAL]], %[[FILL_IDX]] :
+//      CHECK:   return %[[MICRO_KERNEL]]#1
 
 // -----
 

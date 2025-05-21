@@ -837,11 +837,6 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
     return false;
   }
 
-  // If max value is being used, it is not a pure argmax.
-  if (!genericOp.getResults()[0].use_empty()) {
-    return false;
-  }
-
   // Argmax will require 1D reduction.
   if (genericOp.getNumReductionLoops() != 1) {
     return false;

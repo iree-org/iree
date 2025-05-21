@@ -37,6 +37,8 @@ gpu_archs = [
 
 # Element type combinations for the argmax ukernel.
 argmax_types = [
+    "bf16i32",
+    "bf16i64",
     "f16i32",
     "f16i64",
     "f32i32",

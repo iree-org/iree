@@ -56,10 +56,21 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   const int kReductionDim = op.getNumLoops() - 1;
   Value reductionDimSize =
       rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
+  bool isPureArgmax = op.getResults()[0].use_empty();
+  StringRef kernelName = ukernelAttr.getName();
+  SmallVector<Type> resultTypes;
+  SmallVector<Value> outputs;
+  Value val = op.getDpsInitOperand(0)->get();
+  Type valType = val.getType();
+  outputs = {val, index};
+  resultTypes = {valType, indexType};
+  Value writeMaxValueFlag = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
+
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, indexType, ukernelAttr.getName(), ValueRange{input}, index,
-      ValueRange{reductionDimSize}, ukernelAttr.getDefAttrs(),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(0));
+      loc, resultTypes, kernelName, ValueRange{input}, outputs,
+      ValueRange{reductionDimSize, writeMaxValueFlag},
+      ukernelAttr.getDefAttrs(), rewriter.getIndexAttr(0));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -79,8 +90,25 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
       return rewriter.notifyMatchFailure(
           op, "failed to find microkernel op to replace with");
     }
-    rewriter.replaceAllUsesWith(op.getResults()[1],
-                                ukernelOp.value()->getResults());
+
+    bool isPureArgmax = op.getResults()[0].use_empty();
+
+    if (isPureArgmax) {
+      rewriter.replaceAllUsesWith(op.getResults()[1],
+                                  ukernelOp.value()->getResults()[1]);
+    } else {
+      auto origResults = op.getResults();
+      auto newResults = ukernelOp.value()->getResults();
+      if (origResults.size() != newResults.size()) {
+        return rewriter.notifyMatchFailure(op, "result count mismatch");
+      }
+      // rewriter.replaceAllUsesWith(origResults, newResults);
+      rewriter.replaceAllUsesWith(op.getResults()[0],
+                                  ukernelOp.value()->getResults()[0]);
+      rewriter.replaceAllUsesWith(op.getResults()[1],
+                                  ukernelOp.value()->getResults()[1]);
+    }
+
     return success();
   }
 };
