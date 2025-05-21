@@ -51,7 +51,7 @@ declare -a CMAKE_ARGS=(
   "-DIREE_ENABLE_LLD=ON"
 
   # Potential workaround for 4GiB PDB limit
-  "-DIREE_LINK_COMPILER_SHARED_LIBRARY=OFF"
+  "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
 
   # Enable docs build on the CI. The additional builds are pretty fast and
   # give us early warnings for some types of website publication errors.
