@@ -1418,7 +1418,7 @@ UseGlobalLoadDMAAttr::getStaticTilingLevelSizes(unsigned level,
 SmallVector<OpFoldResult>
 UseGlobalLoadDMAAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
                                           Operation *op) const {
-  if (level > llvm::to_underlying(GPU::TilingLevel::Thread)) {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Subgroup)) {
     return {};
   }
   SmallVector<int64_t> sizes = globalLoadDMATileSizes(op);

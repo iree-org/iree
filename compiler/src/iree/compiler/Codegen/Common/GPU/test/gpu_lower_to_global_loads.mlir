@@ -1,6 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-lower-to-global-loads))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-global-loads))" %s | FileCheck %s
 
-func.func @matmul_config_1() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64,
+                                                  {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                                                                     no_reduce_shared_memory_bank_conflicts = false,
+                                                                                                     use_igemm_convolution = false>}>
+
+func.func @matmul_config_1() attributes {translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<16x64xi8, #hal.descriptor_type<storage_buffer>>
   %1 = amdgpu.fat_raw_buffer_cast %0 resetOffset : memref<16x64xi8, #hal.descriptor_type<storage_buffer>> to memref<16x64xi8, #amdgpu.address_space<fat_raw_buffer>>
@@ -22,18 +27,23 @@ func.func @matmul_config_1() attributes {translation_info = #iree_codegen.transl
 // CHECK: %[[C0:.*]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
 // CHECK: %[[ALLOC:.*]] = memref.alloc()
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id : index
+// CHECK: %[[SGID:.*]] = gpu.subgroup_id
 // CHECK: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C4]] step %[[C1]] {
-// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (1, 4, 64, 4) : index
-// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (16, 64) : index, index
-// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (1, 4, 64, 4) : index
-// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (16, 64) : index, index
+// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (1, 4, 64, 4)
+// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (16, 64)
+// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (1, 4, 64, 4)
+// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (16, 64)
 // CHECK:   iree_gpu.global_load_dma %[[BUFFER]][%[[DELI_GATHER]]#0, %[[DELI_GATHER]]#1] -> %[[ALLOC]][%[[DELI_STORE]]#0, %[[DELI_STORE]]#1]
 
 // -----
 
-func.func @matmul_config_2() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64,
+                                                  {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                                                                     no_reduce_shared_memory_bank_conflicts = false,
+                                                                                                     use_igemm_convolution = false>}>
+
+func.func @matmul_config_2() attributes {translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<64x16xi8, #hal.descriptor_type<storage_buffer>>
   %1 = amdgpu.fat_raw_buffer_cast %0 resetOffset : memref<64x16xi8, #hal.descriptor_type<storage_buffer>> to memref<64x16xi8, #amdgpu.address_space<fat_raw_buffer>>
@@ -48,18 +58,25 @@ func.func @matmul_config_2() attributes {translation_info = #iree_codegen.transl
 // CHECK: %[[C0:.*]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
 // CHECK: %[[ALLOC:.*]] = memref.alloc()
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id : index
+// CHECK: %[[SGID:.*]] = gpu.subgroup_id
 // CHECK: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C4]] step %[[C1]] {
-// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (1, 4, 64, 4) : index
-// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (64, 16) : index, index
-// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (1, 4, 64, 4) : index
-// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (64, 16) : index, index
+// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (1, 4, 64, 4)
+// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (64, 16)
+// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (1, 4, 64, 4)
+// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (64, 16)
 // CHECK:   iree_gpu.global_load_dma %[[BUFFER]][%[[DELI_GATHER]]#0, %[[DELI_GATHER]]#1] -> %[[ALLOC]][%[[DELI_STORE]]#0, %[[DELI_STORE]]#1]
 
 // -----
 
-func.func @matmul_config_3() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+                                                   workgroup_size = [64, 1, 1]
+                                                   subgroup_size = 32,
+                                                   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                                                                      no_reduce_shared_memory_bank_conflicts = false,
+                                                                                                      use_igemm_convolution = false>}>
+
+func.func @matmul_config_3() attributes {translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<32x64xi16, #hal.descriptor_type<storage_buffer>>
   %1 = amdgpu.fat_raw_buffer_cast %0 resetOffset : memref<32x64xi16, #hal.descriptor_type<storage_buffer>> to memref<32x64xi16, #amdgpu.address_space<fat_raw_buffer>>
@@ -81,18 +98,25 @@ func.func @matmul_config_3() attributes {translation_info = #iree_codegen.transl
 // CHECK: %[[C0:.*]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
 // CHECK: %[[ALLOC:.*]] = memref.alloc()
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id : index
+// CHECK: %[[SGID:.*]] = gpu.subgroup_id
 // CHECK: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C16]] step %[[C1]] {
-// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (2, 16, 32, 2) : index
-// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (32, 64) : index, index
-// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (2, 16, 32, 2) : index
-// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (32, 64) : index, index
+// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (2, 16, 32, 2)
+// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (32, 64)
+// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (2, 16, 32, 2)
+// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (32, 64)
 // CHECK:   iree_gpu.global_load_dma %[[BUFFER]][%[[DELI_GATHER]]#0, %[[DELI_GATHER]]#1] -> %[[ALLOC]][%[[DELI_STORE]]#0, %[[DELI_STORE]]#1]
 
 // -----
 
-func.func @matmul_config_4() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+                                                   workgroup_size = [64, 1, 1]
+                                                   subgroup_size = 32,
+                                                   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+                                                                                                      no_reduce_shared_memory_bank_conflicts = false,
+                                                                                                      use_igemm_convolution = false>}>
+
+func.func @matmul_config_4() attributes {translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<32x128xi16, #hal.descriptor_type<storage_buffer>>
   %1 = amdgpu.fat_raw_buffer_cast %0 resetOffset : memref<32x128xi16, #hal.descriptor_type<storage_buffer>> to memref<32x128xi16, #amdgpu.address_space<fat_raw_buffer>>
@@ -114,11 +138,11 @@ func.func @matmul_config_4() attributes {translation_info = #iree_codegen.transl
 // CHECK: %[[C0:.*]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast
 // CHECK: %[[ALLOC:.*]] = memref.alloc()
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id : index
+// CHECK: %[[SGID:.*]] = gpu.subgroup_id
 // CHECK: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C32]] step %[[C1]] {
-// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (2, 32, 32, 2) : index
-// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (32, 128) : index, index
-// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (2, 32, 32, 2) : index
-// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (32, 128) : index, index
+// CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (2, 32, 32, 2)
+// CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (32, 128)
+// CHECK:   %[[STORE_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[C0]], %[[C0]]] by (2, 32, 32, 2)
+// CHECK:   %[[DELI_STORE:.*]]:2 = affine.delinearize_index %[[STORE_ADDR]] into (32, 128)
 // CHECK:   iree_gpu.global_load_dma %[[BUFFER]][%[[DELI_GATHER]]#0, %[[DELI_GATHER]]#1] -> %[[ALLOC]][%[[DELI_STORE]]#0, %[[DELI_STORE]]#1]

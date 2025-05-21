@@ -71,7 +71,7 @@ def GPUDistributeCopyUsingForallPass :
 }
 
 def GPULowerToGlobalLoadsPass :
-    InterfacePass<"iree-llvmgpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-codegen-gpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
   let summary = "Emit direct global loads instructions.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",

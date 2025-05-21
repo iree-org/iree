@@ -42,7 +42,7 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
     if (auto linalgCopy = dyn_cast<linalg::CopyOp>(user)) {
       if (auto useDMAConfig =
               getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(linalgCopy))
-        return true;
+        continue;
     }
 
     auto forallOp = dyn_cast<scf::ForallOp>(user);

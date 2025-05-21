@@ -76,11 +76,10 @@ struct GPUVerifyDistributionPass final
               continue;
             }
 
-            // Backdoor: linalg.copy
-            if (isa<linalg::CopyOp>(op)) {
-              if (auto useDMAConfig =
-                      getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op))
-                continue;
+            // Allow DMA copies.
+            if (isa<linalg::CopyOp>(op) &&
+                getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op)) {
+              continue;
             }
 
             op->emitOpError(
