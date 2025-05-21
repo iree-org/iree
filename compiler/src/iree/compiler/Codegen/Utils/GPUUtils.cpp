@@ -643,8 +643,8 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
                                                 identity, loadVal);
     }
-    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
-                            expandSubgroupReduce);
+    laneVal =
+        warpReduction(loc, builder, loadVal, kind, warpSize, numWarp, true);
   }
 
   return laneVal;
