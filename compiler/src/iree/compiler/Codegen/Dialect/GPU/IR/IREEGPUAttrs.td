@@ -92,10 +92,12 @@ def IREEGPU_UseGlobalLoadDma :
     ]> {
   let mnemonic = "use_global_load_dma";
   let summary = [{
-    drive lowering of an operation by using global load DMA.
+    Drive lowering of an operation by using global load DMA.
   }];
   let description = [{
-    TODO: Add description.
+    Lowering config for when using global load DMA is needed. This is intended for
+    tagging operations that are known to be able to use global load DMA, which might
+    also have its own cofiguration.
   }];
   let assemblyFormat = "";
   let parameters = (ins);

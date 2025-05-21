@@ -200,6 +200,9 @@ struct GPUPromoteMatmulOperandsPass final
 
       builder.setInsertionPoint(op);
       for (auto operand : promotedOperands.value()) {
+        // TODO: move switch `useDirectLoad` to the promotion attr list.
+        // Here using a command line option should be only a temporary
+        // solution.
         promoteOperand(builder, op, operand, useDirectLoad);
       }
     });
