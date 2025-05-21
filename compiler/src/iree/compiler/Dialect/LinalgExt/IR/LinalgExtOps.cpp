@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -323,6 +324,93 @@ GatherOp::reifyResultShapes(OpBuilder &b,
                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+namespace {
+struct ConvertGatherToExtract
+    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
+                                PatternRewriter &rewriter) const override {
+    // TODO: support memref case.
+    if (!gatherOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    auto loc = gatherOp.getLoc();
+    ArrayRef<int64_t> indicesShape = gatherOp.getIndicesType().getShape();
+    ArrayRef<int64_t> batchShape =
+        indicesShape.take_front(gatherOp.getBatchRank());
+    if (!llvm::all_of(batchShape, [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+
+    // Get all `indexDepth` indices as scalars.
+    SmallVector<Value> indices(indicesShape.size(),
+                               rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    SmallVector<OpFoldResult> offsets(gatherOp.getIndexDepth());
+    for (int64_t i = 0; i < gatherOp.getIndexDepth(); ++i) {
+      indices.back() = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value elem = rewriter.create<tensor::ExtractOp>(
+          loc, gatherOp.getIndices(), indices);
+      offsets[i] =
+          rewriter
+              .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
+              .getResult();
+    }
+
+    applyPermutationToVector(offsets, gatherOp.getDimensionMap());
+    int64_t sourceRank = gatherOp.getSourceType().getRank();
+    offsets.resize(sourceRank, rewriter.getIndexAttr(0));
+
+    // Create the new `tensor.extract_slice`.
+    SmallVector<OpFoldResult> strides(sourceRank, rewriter.getIndexAttr(1));
+    SmallVector<int64_t> resultShape(gatherOp.getIndexDepth(), 1);
+    SmallVector<OpFoldResult> sizes(gatherOp.getIndexDepth(),
+                                    rewriter.getIndexAttr(1));
+    for (int64_t i = gatherOp.getIndexDepth(); i < sourceRank; ++i) {
+      sizes.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, gatherOp.getSource(), i));
+      resultShape.push_back(gatherOp.getSourceType().getDimSize(i));
+    }
+    auto resultType =
+        cast<RankedTensorType>(gatherOp.getSourceType()).clone(resultShape);
+    auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
+        loc, resultType, gatherOp.getSource(), offsets, sizes, strides);
+
+    // `sliceOp` may differ from the expected result type by leading unit
+    // dimensions. Reshape so that the types match.
+    int64_t sliceRank = sliceOp.getResultType().getRank();
+    int64_t gatherRank = gatherOp.getOutputType().getRank();
+    if (sliceRank < gatherRank) {
+      SmallVector<ReassociationIndices> reassoc(1);
+      llvm::append_range(reassoc[0], llvm::seq(gatherOp.getBatchRank()));
+      for (int64_t i = 0; i < sourceRank - 1; ++i) {
+        reassoc.emplace_back(1, i + gatherOp.getBatchRank());
+      }
+
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
+          gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
+    } else if (sliceRank > gatherRank) {
+      SmallVector<ReassociationIndices> reassoc(1);
+      llvm::append_range(reassoc[0], llvm::seq(sliceRank - gatherRank + 1));
+      for (int64_t i = sliceRank - gatherRank + 1; i < sliceRank; ++i) {
+        reassoc.emplace_back(1, i);
+      }
+
+      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
+          gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
+    } else {
+      rewriter.replaceOp(gatherOp, sliceOp);
+    }
+    return success();
+  }
+};
+} // namespace
+
+void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *ctx) {
+  results.add<ConvertGatherToExtract>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
