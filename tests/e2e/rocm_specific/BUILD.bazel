@@ -32,10 +32,3 @@ iree_check_single_backend_test_suite(
     driver = "hip",
     target_backend = "rocm",
 )
-
-test_suite(
-    name = "check",
-    tests = [
-        ":check_global_load_rocm_hip",
-    ],
-)
