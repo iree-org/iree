@@ -7,6 +7,7 @@
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -644,8 +645,9 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     auto aliasOp = entryBuilder.create<IREE::HAL::TensorAliasOp>(
         exportOp.getLoc(), source.getType(), source, sourceDims,
         resultStorages[resultIndex], waitFence,
-        fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
-                 defaultAffinityAttr));
+        dyn_cast_or_null<IREE::Stream::AffinityAttr>(
+            fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
+                     defaultAffinityAttr)));
     asyncResults[resultIndex] = cast<OpResult>(aliasOp.getResult());
   }
 

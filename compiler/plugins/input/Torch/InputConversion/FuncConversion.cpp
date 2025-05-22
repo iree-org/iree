@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -317,7 +318,8 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
             postambleBuilder.create<IREE::HAL::TensorAliasOp>(
                 barrierInput.getLoc(), barrierInput.getType(), barrierInput,
                 barrierInputDims, meta.storage, waitFence,
-                storageAffinityAttr));
+                dyn_cast_or_null<IREE::Stream::AffinityAttr>(
+                    storageAffinityAttr)));
       } else {
         aliasedResults.push_back(barrierInput);
       }

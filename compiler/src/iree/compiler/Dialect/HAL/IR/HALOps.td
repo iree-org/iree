@@ -243,6 +243,7 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
     "getTiedResultOperandIndex",
     "getTiedResultOperandIndices",
   ]>,
+  Stream_AffinityOp,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Hints that tensor storage should alias a HAL buffer view.}];
@@ -283,7 +284,7 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
     HAL_ShapeDynamicDims:$source_dims,
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$storage,
     Optional<HAL_Fence>:$wait_fence,
-    OptionalAttr<AnyAttr>:$affinity
+    OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
     AnyTensor:$result
