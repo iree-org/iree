@@ -281,6 +281,14 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
+  // Once allocations have been inserted insert the deallocations or referencing
+  // counting ops. Since a bulk of usage has been moved into stream execution
+  // regions at this point there is far less in the program to analyze.
+  passManager.addPass(IREE::Stream::createAutomaticReferenceCountingPass());
+  // TODO(benvanik): run another cleanup after ARC? Today the pass does not
+  // generate much garbage and what it does (mostly around timepoints) will be
+  // handled during the optimization pipeline below.
+
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());
 }
@@ -317,6 +325,11 @@ void buildStreamOptimizationPassPipeline(
 
     // TODO(#9747): elide timepoints that are know-reached due to host
     // synchronization via stream.timepoint.await.
+
+    // Try to reuse transient allocations that would not increase resource
+    // lifetimes.
+    FunctionLikeNest(passManager)
+        .addPass(IREE::Stream::createReuseAllocationsPass);
 
     // Elide timepoints in dependency chains where one is known to have been
     // reached by the time another is (A -> B -> A|C).

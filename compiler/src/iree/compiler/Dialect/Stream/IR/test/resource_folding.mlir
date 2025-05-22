@@ -30,6 +30,73 @@ util.func private @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1:
 
 // -----
 
+// Erases allocation ops that have no users of their allocated resource.
+
+// CHECK-LABEL: @ElideUnusedAllocaOp
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func private @ElideUnusedAllocaOp(%await_timepoint: !stream.timepoint, %size: index) -> (!stream.timepoint, !stream.timepoint) {
+  // CHECK-NOT: stream.resource.alloca
+  // CHECK: %[[IMMEDIATE_TIMEPOINT:.+]] = stream.timepoint.immediate
+  %resource0, %immediate_timepoint = stream.resource.alloca uninitialized : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK-NOT: stream.resource.alloca
+  %resource1, %alloca_timepoint = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: util.return %[[IMMEDIATE_TIMEPOINT]], %[[AWAIT_TIMEPOINT]]
+  util.return %immediate_timepoint, %alloca_timepoint : !stream.timepoint, !stream.timepoint
+}
+
+// -----
+
+// Erases allocation ops that are only ever used by a deallocation.
+
+// CHECK-LABEL: @ElideAllocaDeallocaOp
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func private @ElideAllocaDeallocaOp(%await_timepoint: !stream.timepoint, %size: index) -> (!stream.timepoint, !stream.timepoint) {
+  // CHECK-NOT: stream.resource.alloca
+  %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK-NOT: stream.resource.dealloca
+  %dealloca_timepoint = stream.resource.dealloca origin await(%alloca_timepoint) => %resource : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: util.return %[[AWAIT_TIMEPOINT]], %[[AWAIT_TIMEPOINT]]
+  util.return %alloca_timepoint, %dealloca_timepoint : !stream.timepoint, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @BatchAllocaOps
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func private @BatchAllocaOps(%await_timepoint: !stream.timepoint, %size: index) -> (!stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+  // CHECK: %[[ALLOCA0:.+]], %[[ALLOCA0_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]])
+  %alloca0, %alloca0_timepoint = stream.resource.alloca uninitialized await(%await_timepoint) =>  !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[ALLOCA1:.+]], %[[ALLOCA1_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]])
+  %alloca1, %alloca1_timepoint = stream.resource.alloca uninitialized await(%alloca0_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[ALLOCA2:.+]], %[[ALLOCA2_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]])
+  %alloca2, %alloca2_timepoint = stream.resource.alloca uninitialized await(%alloca1_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[ALLOCA3:.+]], %[[ALLOCA3_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]])
+  %alloca3, %alloca3_timepoint = stream.resource.alloca uninitialized await(%alloca2_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[JOIN_TIMEPOINT:.+]] = stream.timepoint.join max(%[[ALLOCA0_TIMEPOINT]], %[[ALLOCA1_TIMEPOINT]], %[[ALLOCA2_TIMEPOINT]], %[[ALLOCA3_TIMEPOINT]]) => !stream.timepoint
+  // CHECK: util.return %[[ALLOCA0]], %[[ALLOCA1]], %[[ALLOCA2]], %[[ALLOCA3]], %[[JOIN_TIMEPOINT]]
+  util.return %alloca0, %alloca1, %alloca2, %alloca3, %alloca3_timepoint : !stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @BatchDeallocaOps
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[RESOURCE0:.+]]: !stream.resource<transient>, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[RESOURCE2:.+]]: !stream.resource<transient>, %[[RESOURCE3:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @BatchDeallocaOps(%await_timepoint: !stream.timepoint, %resource0: !stream.resource<transient>, %resource1: !stream.resource<transient>, %resource2: !stream.resource<transient>, %resource3: !stream.resource<transient>, %size: index) -> !stream.timepoint {
+  // CHECK: %[[DEALLOCA0_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[AWAIT_TIMEPOINT]]) => %[[RESOURCE0]]
+  %dealloca0_timepoint = stream.resource.dealloca origin await(%await_timepoint) => %resource0 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[DEALLOCA1_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[AWAIT_TIMEPOINT]]) => %[[RESOURCE1]]
+  %dealloca1_timepoint = stream.resource.dealloca origin await(%dealloca0_timepoint) => %resource1 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[DEALLOCA2_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[AWAIT_TIMEPOINT]]) => %[[RESOURCE2]]
+  %dealloca2_timepoint = stream.resource.dealloca origin await(%dealloca1_timepoint) => %resource2 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[DEALLOCA3_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[AWAIT_TIMEPOINT]]) => %[[RESOURCE3]]
+  %dealloca3_timepoint = stream.resource.dealloca origin await(%dealloca2_timepoint) => %resource3 : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[JOIN_TIMEPOINT:.+]] = stream.timepoint.join max(%[[DEALLOCA0_TIMEPOINT]], %[[DEALLOCA1_TIMEPOINT]], %[[DEALLOCA2_TIMEPOINT]], %[[DEALLOCA3_TIMEPOINT]]) => !stream.timepoint
+  // CHECK: util.return %[[JOIN_TIMEPOINT]]
+  util.return %dealloca3_timepoint : !stream.timepoint
+}
+
+// -----
+
 // CHECK-LABEL: @FoldSubviewIntoLoadOp
 util.func private @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index) -> i32 {
   %c64 = arith.constant 64 : index
