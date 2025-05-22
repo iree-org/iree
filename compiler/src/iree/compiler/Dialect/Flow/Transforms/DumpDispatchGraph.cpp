@@ -12,7 +12,9 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -477,6 +479,13 @@ private:
         }
       } else {
         os << op->getName() << "\n";
+      }
+      if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+        os << affinityOp.getAffinityAttr() << "\n";
+      } else if (auto transferOp = dyn_cast<IREE::Flow::TensorTransferOp>(op)) {
+        os << transferOp.getTarget() << "\n";
+      } else if (auto barrierOp = dyn_cast<IREE::Flow::TensorBarrierOp>(op)) {
+        os << barrierOp.getTarget() << "\n";
       }
 
       if (printResultTypes) {
