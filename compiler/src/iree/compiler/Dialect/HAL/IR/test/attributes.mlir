@@ -1,5 +1,5 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s
-// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=CHECK-INLINE
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope -verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INLINE
 
 // CHECK-LABEL: descriptor_set_layout_binding.basic
 "descriptor_set_layout_binding.basic"() {
@@ -171,3 +171,35 @@ builtin.module attributes {
     util.return %c1 : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: "device.topology"
+"device.topology"() {
+  // CHECK: topology = #hal.device.topology<links = [
+  // CHECK-SAME: {[@device_a, @device_b], transfer_required = false},
+  // CHECK-SAME: {[@device_c, @device_d], transfer_required = true}
+  // CHECK-SAME: ]>
+  topology = #hal.device.topology<links = [
+    {[@device_a, @device_b], transfer_required = false},
+    {[@device_c, @device_d], transfer_required = true}
+  ]>
+} : () -> ()
+
+// -----
+
+"device.topology.duplicate"() {
+  // expected-error @+1 {{conflicting transfer_required values for device link between @device_a and @device_b}}
+  topology = #hal.device.topology<links = [
+    {[@device_a, @device_b], transfer_required = false},
+    {[@device_a, @device_b], transfer_required = true}
+  ]>
+} : () -> ()
+
+// -----
+
+"device.topology.count.error"() {
+  // expected-error @+1 {{device link must have exactly 2 devices, got 3}}
+  link = #hal.device.link{[@device_a, @device_b, @device_c], transfer_required = false}
+
+} : () -> ()

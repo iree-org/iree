@@ -1040,6 +1040,89 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+bool DeviceTopologyAttr::requiresTransfer(
+    IREE::Stream::AffinityAttr source,
+    IREE::Stream::AffinityAttr target) const {
+
+  auto sourceDevice = mlir::dyn_cast_if_present<DeviceAffinityAttr>(source);
+  auto targetDevice = mlir::dyn_cast_if_present<DeviceAffinityAttr>(target);
+
+  if (!sourceDevice || !targetDevice)
+    return true;
+  if (sourceDevice == targetDevice)
+    return false;
+
+  SymbolRefAttr sourceRef = sourceDevice.getDevice();
+  SymbolRefAttr targetRef = targetDevice.getDevice();
+
+  // Check if our topology has a link between the two devices
+  for (DeviceLinkAttr link : getLinks()) {
+    llvm::ArrayRef<FlatSymbolRefAttr> devices = link.getDevices();
+    if ((devices[0] == sourceRef && devices[1] == targetRef) ||
+        (devices[0] == targetRef && devices[1] == sourceRef)) {
+      return link.getTransferRequired().getValue();
+    }
+  }
+  return true;
+}
+
+LogicalResult
+DeviceLinkAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       ArrayRef<FlatSymbolRefAttr> devices,
+                       BoolAttr transferRequired) {
+  if (devices.size() != 2) {
+    return emitError() << "device link must have exactly 2 devices, got "
+                       << devices.size();
+  }
+  return success();
+}
+
+LogicalResult
+DeviceTopologyAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                           ArrayRef<DeviceLinkAttr> links) {
+  // Map to detect duplicate links
+  llvm::SmallDenseMap<std::pair<SymbolRefAttr, SymbolRefAttr>, BoolAttr, 4>
+      linkMap;
+
+  for (DeviceLinkAttr link : links) {
+    llvm::ArrayRef<FlatSymbolRefAttr> devices = link.getDevices();
+
+    // Create a canonical representation of the device pair by sorting them
+    SymbolRefAttr firstDevice, secondDevice;
+    if (devices[0].getValue() < devices[1].getValue()) {
+      firstDevice = devices[0];
+      secondDevice = devices[1];
+    } else {
+      firstDevice = devices[1];
+      secondDevice = devices[0];
+    }
+
+    std::pair<SymbolRefAttr, SymbolRefAttr> devicePair(firstDevice,
+                                                       secondDevice);
+
+    // Check if this device pair already exists
+    auto it = linkMap.find(devicePair);
+    if (it != linkMap.end()) {
+      // If it exists with a different transfer_required value, emit an error
+      if (it->second != link.getTransferRequired()) {
+        return emitError() << "conflicting transfer_required values for device "
+                              "link between "
+                           << firstDevice << " and " << secondDevice;
+      }
+      // Otherwise it's a duplicate with the same transfer_required value,
+      // which is redundant but not an error
+    }
+
+    linkMap[devicePair] = link.getTransferRequired();
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::HAL::HALDialect
 //===----------------------------------------------------------------------===//
 

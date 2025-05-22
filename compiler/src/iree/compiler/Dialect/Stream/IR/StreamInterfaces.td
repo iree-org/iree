@@ -326,4 +326,33 @@ def Stream_TimelineOp : OpInterface<"TimelineOpInterface"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// IREE::Stream::AffinityTopologyAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_AffinityTopologyAttr : AttrInterface<"AffinityTopologyAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
+  let summary = [{Defines device-device link topology for transfer elision.}];
+  let description = [{
+      Implementations can use this to query the connection topology between devices.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether transfers between source and target affinity can be elided.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"requiresTransfer",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$source, "IREE::Stream::AffinityAttr":$target),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false; // By default, assume transfers are needed
+      }]
+    >
+  ];
+}
+
+
 #endif  // IREE_DIALECT_STREAM_INTERFACES

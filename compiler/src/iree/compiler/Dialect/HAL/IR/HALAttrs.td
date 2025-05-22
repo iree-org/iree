@@ -1011,4 +1011,67 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   let hasCustomAssemblyFormat = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
+  DeclareAttrInterfaceMethods<Stream_AffinityTopologyAttr, [
+    "requiresTransfer",
+  ]>
+]> {
+  let mnemonic = "device.topology";
+  let summary = [{Device connection topology specification.}];
+  let description = [{
+    Specifies the topology of connections between devices, including
+    information about which devices can share data without transfers.
+
+    This attribute is attached to the top-level module as `stream.topology`
+    to inform Stream dialect passes about device connectivity.
+
+    Example:
+    ```mlir
+    module {
+      stream.topology = #hal.device.topology<
+        links = [
+          {[@device_a, @device_b], transfer_required = false},
+          {[@device_a, @device_c], transfer_required = true}
+        ]
+      >
+    }
+    ```
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"DeviceLinkAttr", "links">:$links
+  );
+
+  let assemblyFormat = [{
+    `<` `links` `=` `[` $links `]` `>`
+  }];
+
+  let genVerifyDecl = 1;
+}
+
+def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
+  let mnemonic      = "device.link";
+  let summary       = [{Bidirectional connection between two devices.}];
+  let description   = [{
+    Describes the relationship between two devices in terms of
+    transfer requirements.
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"FlatSymbolRefAttr", "devices">:$devices,
+    AttrParameter<"BoolAttr", "transfer_required">:$transferRequired
+  );
+
+  let assemblyFormat = [{
+    `{` `[` $devices `]` `,`
+        `transfer_required` `=` $transferRequired `}`
+  }];
+
+  let genVerifyDecl = 1;
+}
+
 #endif  // IREE_DIALECT_HAL_IR_HAL_ATTRS
