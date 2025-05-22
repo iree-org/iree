@@ -417,6 +417,7 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
+    "/pdbpagesize:32768"
 )
 
 if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
