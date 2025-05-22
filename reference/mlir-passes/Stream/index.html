@@ -2473,6 +2473,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-automatic-reference-counting" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-automatic-reference-counting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-clone-to-consumers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-clone-to-consumers
@@ -2653,6 +2662,15 @@
   <a href="#-iree-stream-refine-usage" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-refine-usage
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-stream-reuse-allocations" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-reuse-allocations
     </span>
   </a>
   
@@ -4895,6 +4913,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-automatic-reference-counting" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-automatic-reference-counting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-clone-to-consumers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-clone-to-consumers
@@ -5081,6 +5108,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-reuse-allocations" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-reuse-allocations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-schedule-allocation" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-schedule-allocation
@@ -5253,6 +5289,14 @@ act on it as it sees fit.</p>
 <p>Note that this pass largely replaces the <code>AnnotateDispatchArgumentsPass</code>
 above and can eventually subsume it entirely. However, as the mechanism is
 new and needs to be phased in, both exist in parallel for the moment.</p>
+<h3 id="-iree-stream-automatic-reference-counting"><code>-iree-stream-automatic-reference-counting</code><a class="headerlink" href="#-iree-stream-automatic-reference-counting" title="Permanent link">link</a></h3>
+<p><em>Inserts automatic reference counting ops for resources.</em></p>
+<p>Identifies asynchronous allocations and based on their lifetime inserts
+either local deallocations or reference counting ops
+(<code>stream.resource.retain</code> and <code>stream.resource.release</code>). If analysis fails
+for a particular resource they will be marked as having indeterminate
+lifetime in order to prevent external users from deallocating the resources
+while they may still be used.</p>
 <h3 id="-iree-stream-clone-to-consumers"><code>-iree-stream-clone-to-consumers</code><a class="headerlink" href="#-iree-stream-clone-to-consumers" title="Permanent link">link</a></h3>
 <p><em>Clones operations that opt-in to consumer affinities.</em></p>
 <p>Performs whole-program analysis to identify operations that are used on
@@ -5440,6 +5484,16 @@ staging, constants, etc). Upon completion all resources have a fixed
 lifetime and any new resources introduced into the program with an
 unspecified lifetime (<code>!stream.resource&lt;*&gt;</code>) will require the pass to be
 run again prior to continued lowering.</p>
+<h3 id="-iree-stream-reuse-allocations"><code>-iree-stream-reuse-allocations</code><a class="headerlink" href="#-iree-stream-reuse-allocations" title="Permanent link">link</a></h3>
+<p><em>Reuses transient allocations when doing so will not increase lifetime.</em></p>
+<p>Tries to reduce allocation overhead by reusing allocations from a
+deallocation-to-allocation sequence on a compatible affinity.</p>
+<p>This relies on timeline ordering and the guarantees (or lack thereof) of
+timeline operations: deallocations <em>may</em> happen as late as immediately prior
+to their timepoint being signaled and allocations <em>may</em> happen as early as
+immediately after their await timepoint has been reached. With this
+allowance the compiler is allowed to treat any allocation on the same
+affinity as an atomic reallocation of the resource for reuse.</p>
 <h3 id="-iree-stream-schedule-allocation"><code>-iree-stream-schedule-allocation</code><a class="headerlink" href="#-iree-stream-schedule-allocation" title="Permanent link">link</a></h3>
 <p><em>Allocates resources and converts to explicit stream commands.</em></p>
 <p>Schedules allocation of resources and converts the program from the implicit
