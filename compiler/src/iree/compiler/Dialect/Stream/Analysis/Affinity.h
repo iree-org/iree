@@ -86,9 +86,14 @@ public:
   // If all affinities are compatible one will be chosen in an unspecified way.
   IREE::Stream::AffinityAttr lookupResourceAffinity(Value value);
 
-  // Populates all potential affinities of |value| in |affinities|.
+  // Populates all potential producer affinities of |value| in |affinities|.
   // Returns false if analysis failed and the set of affinities is unknown.
   bool tryLookupResourceAffinity(
+      Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
+
+  // Populates all potential consumer affinities of |value| in |affinities|.
+  // Returns false if analysis failed and the set of affinities is unknown.
+  bool tryLookupResourceUsageAffinity(
       Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
 
 private:
