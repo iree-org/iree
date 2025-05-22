@@ -214,6 +214,11 @@ Value findOrCreateSubspanBuffer(RewriterBase &rewriter,
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//
 
+/// Given a list of `Value`s, set the insertion point to the last (least
+/// dominant) of these values.
+Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
+                                           ArrayRef<Value> values);
+
 /// Given a SubsetInsertionOpInterface, find all values that are needed to
 /// build an equivalent subset extraction, and set the insertion point to the
 /// last of these values.
