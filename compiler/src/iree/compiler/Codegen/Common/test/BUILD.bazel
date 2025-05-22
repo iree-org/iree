@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "bubble_up_ordinal_ops.mlir",
             "bufferize_copy_only_dispatches.mlir",
             "bufferize_dispatch_tensor_load_store.mlir",
+            "canonicalize_early_bufferization_ops.mlir",
             "canonicalize_interface_load_store.mlir",
             "check_for_config.mlir",
             "combine_layout_transformation.mlir",

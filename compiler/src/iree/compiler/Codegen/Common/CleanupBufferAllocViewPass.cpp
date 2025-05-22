@@ -35,6 +35,7 @@ struct CleanupBufferAllocViewPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateReshapeToInterfaceTensorPatterns(patterns);
+    populateFoldTensorReshapeIntoBufferPatterns(patterns);
     populateRemoveDeadMemAllocPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();

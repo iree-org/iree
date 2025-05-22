@@ -1221,6 +1221,196 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
 }
 
 //===--------------------------------------------------------------------====//
+// Patterns to fold ops into iree_codegen.store_to/load_from_memref
+//===--------------------------------------------------------------------====//
+
+namespace {
+
+/// Given an iree_codegen.load_from_memref op or iree_codegen.store_to_memref
+/// op, and a list of reassociation indices, replace the memref operand of the
+/// load_from_memref or store_to_memref op with a collapsed memref according to
+/// the reassociations. The `tensorToMemrefOp` will be modified in place without
+/// updating users or producers. The caller of this function is responsible for
+/// updating producers and consumers to maintain valid IR.
+template <typename OpTy>
+static LogicalResult
+collapseMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
+                      ArrayRef<ReassociationIndices> reassociations) {
+  Value memref = tensorToMemrefOp.getBuffer();
+  auto memrefType = cast<MemRefType>(memref.getType());
+  if (!memref::CollapseShapeOp::isGuaranteedCollapsible(memrefType,
+                                                        reassociations)) {
+    return failure();
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfterValue(memref);
+  Location loc = tensorToMemrefOp.getLoc();
+  Value collapsedMemref =
+      rewriter.create<memref::CollapseShapeOp>(loc, memref, reassociations);
+  rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
+    tensorToMemrefOp.getBufferMutable().assign(collapsedMemref);
+  });
+  return success();
+}
+
+/// Given an iree_codegen.load_from_memref op or iree_codegen.store_to_memref
+/// op, a list of reassociation indices, and an output shape, replace the memref
+/// operand of the load_from_memref or store_to_memref op with an expanded
+/// memref according to the reassociations. The `tensorToMemrefOp` will be
+/// modified in place without updating users or producers. The caller of this
+/// function is responsible for updating producers and consumers to maintain
+/// valid IR.
+template <typename OpTy>
+static LogicalResult
+expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
+                    ArrayRef<ReassociationIndices> reassociations,
+                    SmallVector<OpFoldResult> &mixedOutputShape) {
+  Value memref = tensorToMemrefOp.getBuffer();
+  auto memrefType = cast<MemRefType>(memref.getType());
+  SmallVector<int64_t> expandedShape;
+  SmallVector<Value> dynamicValues;
+  std::tie(expandedShape, dynamicValues) =
+      decomposeMixedValues(mixedOutputShape);
+  FailureOr<MemRefType> expandedMemrefType =
+      memref::ExpandShapeOp::computeExpandedType(memrefType, expandedShape,
+                                                 reassociations);
+  if (failed(expandedMemrefType)) {
+    return failure();
+  }
+  Location loc = tensorToMemrefOp.getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  dynamicValues.push_back(memref);
+  setInsertionPointAfterLastValue(rewriter, dynamicValues);
+  Value expandedMemref = rewriter.create<memref::ExpandShapeOp>(
+      loc, *expandedMemrefType, memref, reassociations, mixedOutputShape);
+  rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
+    tensorToMemrefOp.getBufferMutable().assign(expandedMemref);
+  });
+  return success();
+}
+
+/// Fold a tensor.expand_shape into a consumer iree_codegen.store_to_memref op
+/// by collapsing the memref operand of the store_to_memref, and replacing the
+/// tensor operand with the source of the expand_shape.
+struct FoldExpandShapeIntoStoreToMemref
+    : OpRewritePattern<IREE::Codegen::StoreToMemrefOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToMemrefOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToMemrefOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto expandOp = storeOp.getTensor().getDefiningOp<tensor::ExpandShapeOp>();
+    if (!expandOp) {
+      return failure();
+    }
+    if (failed(collapseMemrefOperand(rewriter, storeOp,
+                                     expandOp.getReassociationIndices()))) {
+      return rewriter.notifyMatchFailure(storeOp, "memref is not collapsible");
+    }
+    rewriter.modifyOpInPlace(storeOp, [&]() {
+      storeOp.getTensorMutable().assign(expandOp.getSrc());
+    });
+    return success();
+  }
+};
+
+/// Fold a tensor.collapse_shape into a consumer iree_codegen.store_to_memref op
+/// by expanding the memref operand of the store_to_memref, and replacing the
+/// tensor operand with the source of the collapse_shape.
+struct FoldCollapseShapeIntoStoreToMemref
+    : OpRewritePattern<IREE::Codegen::StoreToMemrefOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToMemrefOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToMemrefOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto collapseOp =
+        storeOp.getTensor().getDefiningOp<tensor::CollapseShapeOp>();
+    if (!collapseOp) {
+      return failure();
+    }
+    Value collapseSrc = collapseOp.getSrc();
+    SmallVector<OpFoldResult> mixedOutputShape =
+        tensor::getMixedSizes(rewriter, collapseSrc.getLoc(), collapseSrc);
+    if (failed(expandMemrefOperand(rewriter, storeOp,
+                                   collapseOp.getReassociationIndices(),
+                                   mixedOutputShape))) {
+      return rewriter.notifyMatchFailure(storeOp, "memref is not expandable");
+    }
+    rewriter.modifyOpInPlace(
+        storeOp, [&]() { storeOp.getTensorMutable().assign(collapseSrc); });
+    return success();
+  }
+};
+
+/// Fold a tensor.collapse_shape into a producer iree_codegen.load_from_memref
+/// op by collapsing the memref operand of the load_from_memref, and replacing
+/// the collapse_shape with the collapsed load_from_memref op.
+struct FoldCollapseShapeIntoLoadFromMemref
+    : OpRewritePattern<IREE::Codegen::LoadFromMemrefOp> {
+  using OpRewritePattern<IREE::Codegen::LoadFromMemrefOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromMemrefOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    if (!loadOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(loadOp, "load op has multiple uses");
+    }
+    auto collapseOp =
+        dyn_cast<tensor::CollapseShapeOp>(*loadOp->getUsers().begin());
+    if (!collapseOp) {
+      return failure();
+    }
+    if (failed(collapseMemrefOperand(rewriter, loadOp,
+                                     collapseOp.getReassociationIndices()))) {
+      return rewriter.notifyMatchFailure(loadOp, "memref is not collapsible");
+    }
+    rewriter.modifyOpInPlace(loadOp, [&]() {
+      loadOp->getOpResult(0).setType(collapseOp.getResultType());
+    });
+    rewriter.replaceOp(collapseOp, loadOp);
+    return success();
+  }
+};
+
+/// Fold a tensor.expand_shape into a producer iree_codegen.load_from_memref op
+/// by expanding the memref operand of the load_from_memref, and replacing the
+/// expand_shape with the expanded load_from_memref op.
+struct FoldExpandShapeIntoLoadFromMemref
+    : OpRewritePattern<IREE::Codegen::LoadFromMemrefOp> {
+  using OpRewritePattern<IREE::Codegen::LoadFromMemrefOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromMemrefOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    if (!loadOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(loadOp, "load op has multiple uses");
+    }
+    auto expandOp =
+        dyn_cast<tensor::ExpandShapeOp>(*loadOp->getUsers().begin());
+    if (!expandOp) {
+      return failure();
+    }
+    SmallVector<OpFoldResult> mixedOutputShape = expandOp.getMixedOutputShape();
+    if (failed(expandMemrefOperand(rewriter, loadOp,
+                                   expandOp.getReassociationIndices(),
+                                   mixedOutputShape))) {
+      return rewriter.notifyMatchFailure(loadOp, "memref is not expandable");
+    }
+    rewriter.modifyOpInPlace(loadOp, [&]() {
+      loadOp->getOpResult(0).setType(expandOp.getResultType());
+    });
+    rewriter.replaceOp(expandOp, loadOp);
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns) {
+  patterns.insert<
+      FoldCollapseShapeIntoLoadFromMemref, FoldExpandShapeIntoLoadFromMemref,
+      FoldCollapseShapeIntoStoreToMemref, FoldExpandShapeIntoStoreToMemref>(
+      patterns.getContext());
+}
+
+//===--------------------------------------------------------------------====//
 // Pattern to remove dead allocations
 //===--------------------------------------------------------------------====//
 
