@@ -385,6 +385,15 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
           return TraversalResult::INCOMPLETE;
         }
       })
+      .Case([&](IREE::Stream::YieldOp op) {
+        auto parentOp = op->getParentOp();
+        auto &resultPVS = solver.getElementFor<ValueConsumerAffinityPVS>(
+            *this,
+            Position::forValue(parentOp->getResult(operand.getOperandNumber())),
+            DFX::Resolution::REQUIRED);
+        newState ^= resultPVS.getState();
+        return TraversalResult::COMPLETE;
+      })
       .Case([&](IREE::Util::ReturnOp op) {
         return solver.getExplorer().walkIncomingCalls(
             op->getParentOfType<mlir::CallableOpInterface>(),
@@ -985,6 +994,41 @@ bool AffinityAnalysis::tryLookupResourceAffinity(
   return true;
 }
 
+bool AffinityAnalysis::tryLookupResourceUsageAffinity(
+    Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  auto producerPVS = solver.lookupElementFor<ValueProducerAffinityPVS>(
+      Position::forValue(value));
+  if (producerPVS && producerPVS->isValidState() &&
+      !producerPVS->isUndefContained()) {
+    if (!producerPVS->getAssumedSet().empty()) {
+      llvm::append_range(affinities, producerPVS->getAssumedSet());
+    }
+  }
+  auto consumerPVS = solver.lookupElementFor<ValueConsumerAffinityPVS>(
+      Position::forValue(value));
+  if (consumerPVS && consumerPVS->isValidState() &&
+      !consumerPVS->isUndefContained()) {
+    if (!consumerPVS->getAssumedSet().empty()) {
+      // There's probably a better way to do this but the template f*ckery
+      // required is too painful. I suspect a concat + sort + unique would do
+      // it, but not be any more efficient as we'd have to do the sort twice. We
+      // should probably change the functions to take a SetVectorImpl instead.
+      for (auto affinity : consumerPVS->getAssumedSet()) {
+        if (!producerPVS->getAssumedSet().contains(affinity)) {
+          affinities.push_back(affinity);
+        }
+      }
+    }
+  }
+  if (affinities.empty()) {
+    // Analysis completed but no affinity was specified; try to find a default.
+    return tryLookupDefaultAffinity(value.getParentBlock()->getParentOp(),
+                                    affinities);
+  }
+  sortAffinities(affinities);
+  return true;
+}
+
 LogicalResult AffinityAnalysis::run() {
   // Initialize globals so that we can assign them affinity.
   explorer.forEachGlobal([&](const auto *globalInfo) {
@@ -1028,6 +1072,8 @@ LogicalResult AffinityAnalysis::run() {
       for (auto result : op->getResults()) {
         if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
           solver.getOrCreateElementFor<ValueProducerAffinityPVS>(
+              Position::forValue(result));
+          solver.getOrCreateElementFor<ValueConsumerAffinityPVS>(
               Position::forValue(result));
         }
       }
