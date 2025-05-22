@@ -22,7 +22,6 @@ namespace mlir::iree_compiler::IREE::Stream {
 #define GEN_PASS_DEF_ELIDETRANSFEROPSPASS
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
-
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -34,10 +33,9 @@ struct ElideCompatibleTransferPattern
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp transferOp,
-                               PatternRewriter &rewriter) const override {
-    LLVM_DEBUG({
-        llvm::dbgs() << "[elide-transfers] Op: " << transferOp << "\n";
-    });
+                                PatternRewriter &rewriter) const override {
+    LLVM_DEBUG(
+        { llvm::dbgs() << "[elide-transfers] Op: " << transferOp << "\n"; });
 
     auto source = transferOp.getSource();
     auto result = transferOp.getResult();
@@ -47,9 +45,10 @@ struct ElideCompatibleTransferPattern
     // Don't elide transfers that change lifetime (usage casts)
     if (sourceType.getLifetime() != resultType.getLifetime()) {
       LLVM_DEBUG({
-        llvm::dbgs() << "[elide-transfers] not eliding lifetime-changing transfer: "
-                    << sourceType.getLifetime() << " -> "
-                    << resultType.getLifetime() << "\n";
+        llvm::dbgs()
+            << "[elide-transfers] not eliding lifetime-changing transfer: "
+            << sourceType.getLifetime() << " -> " << resultType.getLifetime()
+            << "\n";
       });
       return failure();
     }
@@ -72,7 +71,9 @@ struct ElideCompatibleTransferPattern
     }
 
     // Get the topology attribute from the module
-    auto topologyAttr = moduleOp->getAttrOfType<IREE::Stream::AffinityTopologyAttrInterface>("stream.topology");
+    auto topologyAttr =
+        moduleOp->getAttrOfType<IREE::Stream::AffinityTopologyAttrInterface>(
+            "stream.topology");
     if (!topologyAttr) {
       LLVM_DEBUG({
         llvm::dbgs() << "[elide-transfers] no topology information found\n";
@@ -83,13 +84,15 @@ struct ElideCompatibleTransferPattern
     // Check if we need to keep the transfer based on topology
     if (topologyAttr.requiresTransfer(sourceAffinityAttr, resultAffinityAttr)) {
       LLVM_DEBUG({
-        llvm::dbgs() << "[elide-transfers] not eliding , transfer required by topology\n";
+        llvm::dbgs() << "[elide-transfers] not eliding , transfer required by "
+                        "topology\n";
       });
       return failure();
     }
 
     LLVM_DEBUG({
-        llvm::dbgs() << "[elide-transfers] eliding transfer between compatible devices\n";
+      llvm::dbgs()
+          << "[elide-transfers] eliding transfer between compatible devices\n";
     });
 
     rewriter.replaceOp(transferOp, source);
