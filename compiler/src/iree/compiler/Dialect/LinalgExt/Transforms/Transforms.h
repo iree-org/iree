@@ -31,7 +31,10 @@ void populateBubbleTransposeFromLinalgExtOps(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFusionFn);
 
-/// Drop unit extent dims from linalg ext ops
+/// Drop unit extent dims from linalg ext ops. Uses reshapes to fold scatter
+/// and slices to fold gather operations.
+/// TODO: Respect the rank reduction strategy specified in ControlDropUnitDims
+/// options.
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options);
 
