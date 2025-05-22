@@ -1,5 +1,28 @@
 // RUN: iree-opt --split-input-file --canonicalize --iree-vm-conversion %s | FileCheck %s
 
+// CHECK-LABEL: vm.func private @allocatorSelect
+// CHECK-SAME: (%[[DEVICE_A:.+]]: !vm.ref<!hal.device>, %[[AFFINITY_A:.+]]: i64, %[[DEVICE_B:.+]]: !vm.ref<!hal.device>, %[[AFFINITY_B:.+]]: i64)
+util.func public @allocatorSelect(%device_a: !hal.device, %affinity_a: i64, %device_b: !hal.device, %affinity_b: i64) -> (!hal.device, i64) {
+  // CHECK-DAG: %[[TYPE:.+]] = vm.const.i32 2
+  %type = arith.constant 2 : i32
+  // CHECK-DAG: %[[USAGE:.+]] = vm.const.i32 3
+  %usage = arith.constant 3 : i32
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: %[[DEVICE_AFFINITY:.+]]:2 = vm.call.variadic @hal.allocator.select(
+  // CHECK-SAME: %[[TYPE]], %[[USAGE]], %[[FLAGS]],
+  // CHECK-SAME: [(%[[DEVICE_A]], %[[AFFINITY_A]]), (%[[DEVICE_B]], %[[AFFINITY_B]])]
+  %device, %queue_affinity = hal.allocator.select
+      from([
+        (%device_a, %affinity_a : !hal.device, i64),
+        (%device_b, %affinity_b : !hal.device, i64)
+      ])
+      type(%type) usage(%usage) : !hal.device, i64
+  // CHECK: vm.return %[[DEVICE_AFFINITY]]#0, %[[DEVICE_AFFINITY]]#1
+  util.return %device, %queue_affinity : !hal.device, i64
+}
+
+// -----
+
 // CHECK-LABEL: vm.func private @allocatorAllocate
 util.func public @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   // CHECK-DAG: %[[SIZE:.+]] = vm.const.i64 1024

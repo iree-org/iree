@@ -45,7 +45,8 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
     IREE_ASSERT_OK(iree_hal_module_create(
-        instance_, /*device_count=*/1, &device_, IREE_HAL_MODULE_FLAG_NONE,
+        instance_, iree_hal_module_device_policy_default(), /*device_count=*/1,
+        &device_, IREE_HAL_MODULE_FLAG_NONE,
         iree_hal_module_debug_sink_stdio(stderr), iree_allocator_system(),
         &hal_module_));
     iree_hal_driver_release(hal_driver);

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "allocator_folding.mlir"
     "allocator_ops.mlir"
     "attributes.mlir"
     "buffer_ops.mlir"

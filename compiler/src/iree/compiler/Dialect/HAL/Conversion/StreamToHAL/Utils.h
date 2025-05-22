@@ -25,13 +25,21 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder);
 std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          OpBuilder &builder);
 
+// Returns a !hal.device and queue affinity i64 for the affinity specified on
+// |op| for use as an allocation. This may insert a runtime device selection
+// op to resolve the responsible allocator.
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
+    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
+    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder);
+
 // Returns the !hal.allocator for the affinity specified on |op|.
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder);
 
 // Returns a !hal.allocator and queue affinity i64 for the affinity specified on
 // |op|.
-std::tuple<Value, Value> lookupAllocatorAndQueueAffinityFor(Operation *op,
-                                                            OpBuilder &builder);
+std::tuple<Value, Value> lookupAllocatorAndQueueAffinityFor(
+    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
+    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder);
 
 // Returns the |timepointFence| or a util.null if the wait is to be ignored.
 Value getOrCreateWaitFence(Location loc, Value timepointFence,

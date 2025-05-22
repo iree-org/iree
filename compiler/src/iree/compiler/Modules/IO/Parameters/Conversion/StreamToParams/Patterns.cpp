@@ -29,14 +29,6 @@ struct ParameterLoadOpPattern
   matchAndRewrite(IREE::Stream::ParameterLoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = loadOp.getLoc();
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(loadOp, rewriter);
-
-    // Gather wait/signal fence, which are optional.
-    Value waitFence =
-        getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = getOrCreateSignalFence(
-        loc, device, loadOp.getResultTimepoint(), rewriter);
 
     // Derive the allocation requirements.
     auto resourceType =
@@ -47,6 +39,17 @@ struct ParameterLoadOpPattern
                                                bufferUsage))) {
       return failure();
     }
+
+    // Lookup the appropriate device/queue for allocation based on the buffer
+    // propreties.
+    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
+        loadOp, memoryTypes, bufferUsage, rewriter);
+
+    // Gather wait/signal fence, which are optional.
+    Value waitFence =
+        getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
+    Value signalFence = getOrCreateSignalFence(
+        loc, device, loadOp.getResultTimepoint(), rewriter);
 
     // Queue operation, which acts like an allocation.
     SmallVector<Type> newResultTypes(loadOp.getResults().size(),

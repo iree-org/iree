@@ -469,10 +469,11 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   // Create hal module.
   if (iree_status_is_ok(status)) {
     std::array<iree_hal_device_t *, 1> devices = {device.get()};
-    status = iree_hal_module_create(runtime.instance.get(), devices.size(),
-                                    devices.data(), IREE_HAL_MODULE_FLAG_NONE,
-                                    iree_hal_module_debug_sink_stdio(stderr),
-                                    iree_allocator_system(), &hal_module);
+    status = iree_hal_module_create(
+        runtime.instance.get(), iree_hal_module_device_policy_default(),
+        devices.size(), devices.data(), IREE_HAL_MODULE_FLAG_NONE,
+        iree_hal_module_debug_sink_stdio(stderr), iree_allocator_system(),
+        &hal_module);
   }
 
   // Bytecode module.

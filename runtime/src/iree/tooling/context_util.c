@@ -170,6 +170,42 @@ iree_status_t iree_tooling_load_modules_from_flags(
 }
 
 //===----------------------------------------------------------------------===//
+// HAL module device selection policy
+//===----------------------------------------------------------------------===//
+
+IREE_FLAG(int32_t, device_lead_allocator, 0,
+          "Device ordinal of the lead device that will be used for allocations "
+          "when more than one device is available. Only functions when there "
+          "are selection requests including all devices and otherwise the "
+          "first device in the list will be selected.");
+
+static iree_status_t iree_hal_module_device_allocator_select_specific(
+    void* user_data, iree_host_size_t device_count,
+    const iree_hal_device_queue_affinity_pair_t* devices,
+    iree_hal_memory_type_t memory_types, iree_hal_buffer_usage_t buffer_usage,
+    iree_hal_module_device_allocator_select_flags_t flags,
+    iree_host_size_t* out_selection) {
+  for (iree_host_size_t i = 0; i < device_count; ++i) {
+    if (devices[i].device == user_data) {
+      *out_selection = i;
+      return iree_ok_status();
+    }
+  }
+  *out_selection = 0;
+  return iree_ok_status();
+}
+
+static iree_hal_module_device_policy_t iree_hal_module_device_policy_from_flags(
+    const iree_hal_device_list_t* device_list) {
+  iree_hal_module_device_policy_t policy =
+      iree_hal_module_device_policy_default();
+  policy.allocator_select.fn = iree_hal_module_device_allocator_select_specific;
+  policy.allocator_select.user_data =
+      device_list->devices[FLAG_device_lead_allocator];
+  return policy;
+}
+
+//===----------------------------------------------------------------------===//
 // HAL execution model management
 //===----------------------------------------------------------------------===//
 
@@ -219,7 +255,8 @@ static iree_status_t iree_tooling_load_hal_async_module(
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_hal_module_create(
-      instance, device_list->count, device_list->devices, flags,
+      instance, iree_hal_module_device_policy_from_flags(device_list),
+      device_list->count, device_list->devices, flags,
       iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
 
   iree_hal_device_list_free(device_list);

@@ -59,8 +59,6 @@ static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
   return prefixedName.str();
 }
 
-// NOTE: this implementation is just for a single active device. As we start to
-// support multiple devices we'll need to change this to be per-device.
 struct MemoizeDeviceQueriesPass
     : public IREE::HAL::impl::MemoizeDeviceQueriesPassBase<
           MemoizeDeviceQueriesPass> {

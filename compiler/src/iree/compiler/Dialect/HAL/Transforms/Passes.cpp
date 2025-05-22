@@ -510,8 +510,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Device management and specialization
   //----------------------------------------------------------------------------
 
-  // Memoize device queries such that we don't need to repeatedly ask the same
-  // information at runtime.
+  // Memoize device queries and selection such that we don't need to repeatedly
+  // ask the same information at runtime.
+  passManager.addPass(IREE::HAL::createMemoizeDeviceSelectionPass());
   passManager.addPass(IREE::HAL::createMemoizeDeviceQueriesPass());
 
   // Big cleanup after all our conversion and materialization.

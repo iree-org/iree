@@ -61,9 +61,10 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
       (int)driver_name.size, driver_name.data);
 
   IREE_RETURN_IF_ERROR(iree_hal_module_create(
-      interpreter->instance, /*device_count=*/1, &interpreter->device,
-      IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink_stdio(stderr),
-      interpreter->allocator, &interpreter->hal_module));
+      interpreter->instance, iree_hal_module_device_policy_default(),
+      /*device_count=*/1, &interpreter->device, IREE_HAL_MODULE_FLAG_NONE,
+      iree_hal_module_debug_sink_stdio(stderr), interpreter->allocator,
+      &interpreter->hal_module));
 
   return iree_ok_status();
 }

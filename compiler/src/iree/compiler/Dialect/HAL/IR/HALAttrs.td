@@ -1011,4 +1011,48 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   let hasCustomAssemblyFormat = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// #hal.device.optimal<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceOptimalAttr : AttrDef<HAL_Dialect, "DeviceOptimal", [
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
+  Util_HoistableAttrInterface,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
+]> {
+  let mnemonic = "device.optimal";
+  let summary = [{Selects an optimal device for the assigned operation.}];
+  let description = [{
+    Specifies that an annotated operation or scope may execute on one device
+    in the provided affinity set based on whichever is "optimal" for the
+    operation. Resolution of the specific device may happen during compilation
+    if required information is available or be deferred to runtime.
+
+    Example:
+    ```mlir
+    // Run on either @device_a (any queue) or @device_b (queues 4 and 5).
+    #hal.device.optimal<[
+      #hal.device.affinity<@device_a>,
+      #hal.device.affinity<@device_b, [4, 5]>
+    ]>
+    ```
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"IREE::Stream::AffinityAttr", "">:$affinities
+  );
+
+  let assemblyFormat = [{
+    `<` `[` $affinities `]` `>`
+  }];
+
+  let genVerifyDecl = 1;
+}
+
 #endif  // IREE_DIALECT_HAL_IR_HAL_ATTRS

@@ -60,6 +60,25 @@ util.func public @resourceAllocaAwait(%size: index, %await_timepoint: !stream.ti
 
 // -----
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK-LABEL: @resourceAllocaOptimal
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+util.func public @resourceAllocaOptimal(%size: index) -> (!stream.resource<transient>, !stream.timepoint) {
+  // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select.attr
+  // CHECK-SAME: from(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
+  // CHECK-SAME: type("DeviceVisible|DeviceLocal")
+  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}DispatchStorage")
+  // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
+  // CHECK-SAME: <%[[DEVICE]] : !hal.device>
+  // CHECK-SAME: affinity(%[[QUEUE_AFFINITY]])
+  %0:2 = stream.resource.alloca uninitialized on(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>) : !stream.resource<transient>{%size} => !stream.timepoint
+  util.return %0#0, %0#1 : !stream.resource<transient>, !stream.timepoint
+}
+
+// -----
+
 util.global private @device : !hal.device
 
 // CHECK-LABEL: @resourceDealloca

@@ -24,6 +24,16 @@ vm.import private @ex.file.from_memory(
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
+// Selects a device and queue affinity pair from the provided list based on a
+// runtime-provided policy for handling the given memory type and usage.
+vm.import private @allocator.select(
+  %memory_types : i32,
+  %buffer_usage : i32,
+  %flags : i64,
+  %from : tuple<!vm.ref<!hal.device>, i64>...
+) -> (!vm.ref<!hal.device>, i64)
+attributes {nosideeffects}
+
 // Allocates a buffer from the allocator. The resulting buffer will have a
 // length of at least that requested.
 vm.import private @allocator.allocate(

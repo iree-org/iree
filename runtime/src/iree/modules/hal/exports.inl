@@ -26,6 +26,7 @@
 
 EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, rIiiI, r)
 EXPORT_FN("allocator.import", iree_hal_module_allocator_import, riIiirII, r)
+EXPORT_FN("allocator.select", iree_hal_module_allocator_select, iiICrID, rI)
 
 EXPORT_FN("buffer.allocation.discard", iree_hal_module_buffer_allocation_discard, r, i)
 EXPORT_FN("buffer.allocation.is_terminal", iree_hal_module_buffer_allocation_is_terminal, r, i)
