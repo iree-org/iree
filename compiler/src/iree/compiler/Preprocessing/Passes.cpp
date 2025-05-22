@@ -6,6 +6,7 @@
 #include "iree/compiler/Preprocessing/Passes.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
@@ -109,9 +110,15 @@ void buildPreprocessingPassPipeline(
     pipelineExtensions->extendPreprocessingPassPipeline(passManager);
   }
 
-  // 3. Run any pass pipelines specified through the use of
-  //    `preprocessing_pipeline` attribute.
-  FunctionLikeNest(passManager).addPass(createAttrBasedPipelinePass);
+  // 3. Run preprocessing pipeline specified through the use of
+  //    `util.pipelines` attribute.
+  {
+    IREE::Util::AttrBasedPipelinePassOptions options;
+    options.pipelineName = "preprocessing";
+    FunctionLikeNest(passManager).addPass([&options]() {
+      return IREE::Util::createAttrBasedPipelinePass(options);
+    });
+  }
 }
 
 static void

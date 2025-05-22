@@ -223,3 +223,16 @@ util.func private @importEncodingsCaller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi
   %0 = util.call @importEncodings(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
   util.return %0 : tensor<2x?xi32>
 }
+
+// -----
+
+// Test that `preprocessing_pipeline` attribute is preserved on the wrapped function
+// CHECK-LABEL: util.func public @exportOpWithAttr()
+//  CHECK-SAME:     util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-make-single-dispatch">}
+// CHECK-LABEL: util.func private @_exportOpWithAttr()
+//  CHECK-SAME:     util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-make-single-dispatch">}
+util.func public @exportOpWithAttr() -> tensor<42xf32> attributes {
+    util.pipelines = {preprocessing = #util.pipeline<"iree-preprocessing-make-single-dispatch">}} {
+  %0 = tensor.empty() : tensor<42xf32>
+  util.return %0 : tensor<42xf32>
+}

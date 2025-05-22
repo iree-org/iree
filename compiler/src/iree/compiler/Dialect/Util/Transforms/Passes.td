@@ -17,6 +17,19 @@ def ApplyPatternsPass : Pass<"iree-util-apply-patterns", ""> {
   let summary = "Applies some risky/IREE-specific canonicalization patterns.";
 }
 
+def AttrBasedPipelinePass : Pass<"iree-util-attr-based-pipeline", ""> {
+  let summary = "Run a pass pipeline specified as an attribute on any function-like operation";
+  let description = [{
+    The textual representation of the pass pipeline specified in the attribute
+    `util.pipelines = {"preprocessing", pipeline=#util.ipeline<...>}` is to be run on the
+    function-like operation.
+  }];
+  let options = [
+    Option<"pipelineName", "pipeline-name", "std::string", /*default=*/"",
+            "Name of the pipeline in `util.pipelines` attribute to be run">
+  ];
+}
+
 def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::ModuleOp"> {
   let summary = "Combines global initializers into one.";
 }
