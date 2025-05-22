@@ -217,6 +217,22 @@ def OutlineMemoizeRegionsPass :
   ];
 }
 
+def MemoizeDeviceSelectionPass :
+    Pass<"iree-hal-memoize-device-selection", "mlir::ModuleOp"> {
+  let summary = "Finds !hal.device selection ops and creates variables initialized on startup.";
+  let description = [{
+    Finds all `hal.*.select`-related ops that are hoistable and moves them
+    into globals that are initialized on startup. This prevents repeated queries
+    at runtime and allows for optimization as queries are CSEd across the entire
+    program.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::HAL::HALDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
 def MemoizeDeviceQueriesPass :
     Pass<"iree-hal-memoize-device-queries", "mlir::ModuleOp"> {
   let summary = "Finds hal.device.query ops and creates variables initialized on startup.";

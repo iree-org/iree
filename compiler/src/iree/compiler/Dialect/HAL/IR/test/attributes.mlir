@@ -134,6 +134,15 @@ util.global private @device : !hal.device
 
 // -----
 
+"device.optimal"() {
+  // CHECK: device_1 = #hal.device.optimal<[#hal.device.affinity<@device>]>
+  device_1 = #hal.device.optimal<[#hal.device.affinity<@device>]>,
+  // CHECK: device_2 = #hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>
+  device_2 = #hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>
+} : () -> ()
+
+// -----
+
 // Tests that differing device affinities blocks inlining.
 // Here the @inline_target is using the default affinity specified on the
 // module and only functions also using the default affinity or a matching

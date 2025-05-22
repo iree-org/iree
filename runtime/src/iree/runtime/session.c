@@ -95,8 +95,9 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_create(
         iree_runtime_instance_vm_instance(instance),
-        /*device_count=*/1, &device, IREE_HAL_MODULE_FLAG_NONE,
-        iree_hal_module_debug_sink_stdio(stderr), host_allocator, &hal_module);
+        iree_hal_module_device_policy_default(), /*device_count=*/1, &device,
+        IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink_stdio(stderr),
+        host_allocator, &hal_module);
   }
   if (iree_status_is_ok(status)) {
     status = iree_vm_context_register_modules(

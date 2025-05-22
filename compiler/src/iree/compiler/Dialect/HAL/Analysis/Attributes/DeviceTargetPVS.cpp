@@ -171,6 +171,26 @@ void DeviceTargetValuePVS::initializeValue(Value value, DFX::Solver &solver) {
       }
     }
   }
+
+  // If the value is defined by a select op we can initialize the set and
+  // finalize the attribute immediately.
+  if (auto selectOp = dyn_cast_if_present<IREE::HAL::AllocatorSelectAttrOp>(
+          value.getDefiningOp())) {
+    for (auto affinityAttr : selectOp.getOptimalSet().getAffinities()) {
+      if (auto deviceAffinityAttr =
+              dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
+        auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
+            deviceAffinityAttr.getDevice().getLeafReference(), selectOp);
+        assert(globalInfo && "must have global defined");
+        auto &globalPVS = solver.getElementFor<DeviceTargetGlobalPVS>(
+            *this, Position::forOperation(globalInfo->op),
+            DFX::Resolution::REQUIRED);
+        unionAssumed(globalPVS.getState());
+      }
+    }
+    indicateOptimisticFixpoint();
+    return;
+  }
 }
 
 ChangeStatus DeviceTargetValuePVS::updateValue(Value value,
