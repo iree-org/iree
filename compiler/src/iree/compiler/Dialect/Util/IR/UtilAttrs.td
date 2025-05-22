@@ -207,19 +207,21 @@ def Util_NullAttr : AttrDef<Util_Dialect, "Null", [
 // #util.uninitialized
 //===----------------------------------------------------------------------===//
 
-def Util_PreprocessingPipelineAttr : AttrDef<Util_Dialect,
-    "PreprocessingPassPipeline"> {
-  let mnemonic = "preprocessing_pipeline";
+def Util_PipelineAttr : AttrDef<Util_Dialect, "Pipeline"> {
+  let mnemonic = "pipeline";
   let summary = "[{Preprocessing pass-pipeline to run on the function.}]";
   let description = [{
     Textual description of the preprocessing pass-pipeline to run on the
     function-like object that the attribute is specified on. Note that the
-    string pipeline is implicitly nested to `builtin.module(func-lik(..))`
+    string pipeline is implicitly nested to `builtin.module(func-like(..))`
     operation. For example to run the transpose convolution pipeline, the
     attribute is specified as
 
-    ```preprocess_pipeline = #util.preprocess_pipeline<
-        "iree-preprocessing-transpose-convolution-pipeline">```
+    ```
+    pipelines = {
+        preprocessing :
+        #util.pipeline<"iree-preprocessing-transpose-convolution-pipeline">}
+    ```
   }];
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$pipelineString
