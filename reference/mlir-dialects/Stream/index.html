@@ -12812,8 +12812,9 @@ or out of the program entry points. Though external values are managed
 during an invocation the same as other stream values the visibility into
 them does not extend outside of the invocation they are provided to.</p>
 <p>Stream values are not usable directly outside of a stream execution or
-transfer operation. If the contents of the value are needed they must first
-be transferred via <code>stream.transfer</code> - which may incur a copy.</p>
+transfer operation. If the contents of the value are needed for host access
+or access from a device without memory compatibility they must first
+be transferred via a transfer operation (e.g. <code>stream.async.transfer</code>).</p>
 <h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
