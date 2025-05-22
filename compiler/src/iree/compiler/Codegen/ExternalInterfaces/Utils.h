@@ -20,9 +20,6 @@
 
 namespace mlir::iree_compiler::IREE {
 
-using IREE::Codegen::MaterializeEncodingInfo;
-using IREE::TensorExt::DispatchTensorType;
-
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
 // This class is the base class for the external model of different packed
@@ -33,18 +30,18 @@ static const char kEncodingInfoAttrName[] = "encoding_info";
 template <typename DeviceEncodingPackedLayoutAttrInterface,
           typename EncodingLayoutAttr>
 struct DevicePackedLayoutAttrExternalModelBase
-    : public Codegen::PackedLayoutAttrInterface::ExternalModel<
+    : public IREE::Codegen::PackedLayoutAttrInterface::ExternalModel<
           DeviceEncodingPackedLayoutAttrInterface, EncodingLayoutAttr> {
 public:
-  Codegen::MaterializeEncodingInfo
+  IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
     const DeviceEncodingPackedLayoutAttrInterface *impl =
         static_cast<const DeviceEncodingPackedLayoutAttrInterface *>(this);
     // If the layout is already resolved, use it directly.
     if (auto config = impl->getConfiguration(attr)) {
       if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<Codegen::MaterializeEncodingInfo> info =
-            Codegen::deserializeEncodingInfo(
+        std::optional<IREE::Codegen::MaterializeEncodingInfo> info =
+            IREE::Codegen::deserializeEncodingInfo(
                 cast<DictionaryAttr>(namedAttr->getValue()));
         assert(info && "encoding_info is invalid");
         return info.value();
@@ -60,8 +57,8 @@ struct DeviceEncodingLayoutAttrInterfaceExternalModelBase
     : public IREE::Encoding::LayoutAttrInterface::ExternalModel<
           DeviceEncodingLayoutAttrInterface, EncodingLayoutAttr> {
 public:
-  MaterializeEncodingInfo getEncodingInfo(EncodingLayoutAttr layoutAttr,
-                                          RankedTensorType type) const {
+  IREE::Codegen::MaterializeEncodingInfo
+  getEncodingInfo(EncodingLayoutAttr layoutAttr, RankedTensorType type) const {
     return getEncodingInfoFromLayout(
         type, cast<IREE::Encoding::LayoutAttrInterface>(layoutAttr));
   }
@@ -73,7 +70,7 @@ public:
           // For a given tensor type with an encoding, return the materialized
           // type to use for it. If no encoding is set, then return the tensor
           // type itself.
-          MaterializeEncodingInfo encodingInfo =
+          IREE::Codegen::MaterializeEncodingInfo encodingInfo =
               getEncodingInfo(layoutAttr, type);
           if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
             return type.dropEncoding();
@@ -100,15 +97,16 @@ public:
           newShape.append(swizzledTileShape);
           return RankedTensorType::get(newShape, packedType.getElementType());
         })
-        .template Case<DispatchTensorType>([&](auto dispatchTensorType) {
-          Type boundType = dispatchTensorType.getBoundType();
-          Type convertedBoundType = convertType(attr, boundType);
-          if (convertedBoundType == boundType) {
-            return dispatchTensorType;
-          }
-          return DispatchTensorType::get(dispatchTensorType.getAccess(),
-                                         convertedBoundType);
-        })
+        .template Case<IREE::TensorExt::DispatchTensorType>(
+            [&](auto dispatchTensorType) {
+              Type boundType = dispatchTensorType.getBoundType();
+              Type convertedBoundType = convertType(attr, boundType);
+              if (convertedBoundType == boundType) {
+                return dispatchTensorType;
+              }
+              return IREE::TensorExt::DispatchTensorType::get(
+                  dispatchTensorType.getAccess(), convertedBoundType);
+            })
         .Default([&](auto concreteType) { return concreteType; });
   }
 
@@ -127,7 +125,7 @@ public:
       return failure();
     }
     auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
-    MaterializeEncodingInfo encodingInfo =
+    IREE::Codegen::MaterializeEncodingInfo encodingInfo =
         getEncodingInfoFromLayout(boundTensorType, layoutAttr);
     newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
