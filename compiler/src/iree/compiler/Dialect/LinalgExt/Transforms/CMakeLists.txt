@@ -33,6 +33,7 @@ iree_cc_library(
     "DecomposeAttention.cpp"
     "DecomposeIm2col.cpp"
     "DecomposeWinogradPass.cpp"
+    "FoldUnitExtentDims.cpp"
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"
