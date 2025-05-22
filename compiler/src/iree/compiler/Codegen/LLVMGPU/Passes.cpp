@@ -910,6 +910,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   if (!usePadToModelSharedMemcpy) {
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
+    funcPassManager.addPass(IREE::LinalgExt::createFoldUnitExtentDimsPass());
     funcPassManager.addPass(
         IREE::VectorExt::createVectorExtFoldUnitExtentDimsPass());
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
