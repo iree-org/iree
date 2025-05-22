@@ -417,6 +417,10 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
+
+    # Added to fix "LNK1318" error when "IREECompiler.pdb" exceeds 4GiB per:
+    # https://github.com/iree-org/iree/issues/20763#issuecomment-2902057042
+    "-pdbpagesize:32768"
 )
 
 if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
