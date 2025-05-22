@@ -2776,6 +2776,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-hal-memoize-device-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-hal-memoize-device-selection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-hal-outline-memoize-regions" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-hal-outline-memoize-regions
@@ -5525,6 +5534,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-hal-memoize-device-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-hal-memoize-device-selection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-hal-outline-memoize-regions" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-hal-outline-memoize-regions
@@ -6017,6 +6035,12 @@ be specified to assign to ops that do not have a default device specified.</p>
 <h3 id="-iree-hal-memoize-device-queries"><code>-iree-hal-memoize-device-queries</code><a class="headerlink" href="#-iree-hal-memoize-device-queries" title="Permanent link">link</a></h3>
 <p><em>Finds hal.device.query ops and creates variables initialized on startup.</em></p>
 <p>Finds all <code>hal.device.query</code>-related ops that are hoistable and moves them
+into globals that are initialized on startup. This prevents repeated queries
+at runtime and allows for optimization as queries are CSEd across the entire
+program.</p>
+<h3 id="-iree-hal-memoize-device-selection"><code>-iree-hal-memoize-device-selection</code><a class="headerlink" href="#-iree-hal-memoize-device-selection" title="Permanent link">link</a></h3>
+<p><em>Finds !hal.device selection ops and creates variables initialized on startup.</em></p>
+<p>Finds all <code>hal.*.select</code>-related ops that are hoistable and moves them
 into globals that are initialized on startup. This prevents repeated queries
 at runtime and allows for optimization as queries are CSEd across the entire
 program.</p>
