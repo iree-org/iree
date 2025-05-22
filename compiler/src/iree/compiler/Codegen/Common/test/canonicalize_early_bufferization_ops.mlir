@@ -16,9 +16,9 @@ func.func @fold_reshape_load() {
   return
 }
 // CHECK-LABEL: @fold_reshape_load
-//   CHECK-DAG:   %[[SRC_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(0)
-//   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[SRC_SUBSPAN]]
-//   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]
+//   CHECK-DAG:   %[[SRC_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(0){{.*}} memref<3x3x1x96xf32
+//   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[SRC_SUBSPAN]]{{.*}} into memref<864xf32
+//   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]{{.*}} into memref<3x3x96xf32
 //   CHECK-DAG:   %[[DEST_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(1)
 //       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_memref %[[EXPAND]]
 //  CHECK-SAME:     memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x96xf32>
@@ -43,9 +43,9 @@ func.func @fold_reshape_store() {
 }
 // CHECK-LABEL: @fold_reshape_store
 //   CHECK-DAG:   %[[SRC_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(0)
-//   CHECK-DAG:   %[[DEST_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(1)
-//   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[DEST_SUBSPAN]]
-//   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]
+//   CHECK-DAG:   %[[DEST_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(1){{.*}} memref<3x3x96xf32
+//   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[DEST_SUBSPAN]]{{.*}} into memref<864xf32
+//   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]{{.*}} into memref<3x3x1x96xf32
 //       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_memref %[[SRC_SUBSPAN]]
 //       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[LOAD]]
 //       CHECK:   iree_codegen.store_to_memref %[[BARRIER]], %[[EXPAND]]
