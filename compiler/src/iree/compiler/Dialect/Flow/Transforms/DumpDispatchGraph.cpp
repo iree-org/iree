@@ -481,7 +481,7 @@ private:
         os << op->getName() << "\n";
       }
       if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-        os << affinityOp.getAffinityAttr();
+        os << affinityOp.getAffinityAttr() << "\n";
       } else if (auto transferOp = dyn_cast<IREE::Flow::TensorTransferOp>(op)) {
         os << transferOp.getTarget() << "\n";
       } else if (auto barrierOp = dyn_cast<IREE::Flow::TensorBarrierOp>(op)) {
