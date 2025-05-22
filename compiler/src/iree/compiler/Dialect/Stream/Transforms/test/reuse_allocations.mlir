@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-stream-reuse-allocations))' %s | FileCheck %s
 
-// Tests that a direct reuse of a deallocated resource.
+// Tests that a direct reuse of a deallocated resource is reused.
 
 // CHECK-LABEL: @reuseResourceDirect
 // CHECK-SAME: (%[[INPUT_TIMEPOINT:.+]]: !stream.timepoint, %[[INPUT_RESOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
