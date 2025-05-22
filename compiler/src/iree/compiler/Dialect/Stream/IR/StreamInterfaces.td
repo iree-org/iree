@@ -348,11 +348,10 @@ def Stream_AffinityTopologyAttr : AttrInterface<"AffinityTopologyAttrInterface">
       /*args=*/(ins "IREE::Stream::AffinityAttr":$source, "IREE::Stream::AffinityAttr":$target),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return false; // By default, assume transfers are needed
+        return true; // By default, assume transfers are needed
       }]
     >
   ];
 }
-
 
 #endif  // IREE_DIALECT_STREAM_INTERFACES

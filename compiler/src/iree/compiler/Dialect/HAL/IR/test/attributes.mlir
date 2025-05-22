@@ -177,29 +177,22 @@ builtin.module attributes {
 // CHECK-LABEL: "device.topology"
 "device.topology"() {
   // CHECK: topology = #hal.device.topology<links = [
-  // CHECK-SAME: {[@device_a, @device_b], transfer_required = false},
-  // CHECK-SAME: {[@device_c, @device_d], transfer_required = true}
+  // CHECK-SAME:   (@device_a -> @device_b = {}),
+  // CHECK-SAME:   (@device_c <-> @device_d = {transparent_access}),
+  // CHECK-SAME:   (@device_e <-> @device_f = {unified_memory}),
+  // CHECK-SAME:   (@device_g -> @device_h = {transparent_access, unified_memory}),
   // CHECK-SAME: ]>
   topology = #hal.device.topology<links = [
-    {[@device_a, @device_b], transfer_required = false},
-    {[@device_c, @device_d], transfer_required = true}
+    (@device_a -> @device_b = {}),
+    (@device_c <-> @device_d = {transparent_access}),
+    (@device_e <-> @device_f = {unified_memory}),
+    (@device_g -> @device_h = {transparent_access, unified_memory}),
   ]>
 } : () -> ()
 
 // -----
 
-"device.topology.duplicate"() {
-  // expected-error @+1 {{conflicting transfer_required values for device link between @device_a and @device_b}}
-  topology = #hal.device.topology<links = [
-    {[@device_a, @device_b], transfer_required = false},
-    {[@device_a, @device_b], transfer_required = true}
-  ]>
-} : () -> ()
-
-// -----
-
-"device.topology.count.error"() {
-  // expected-error @+1 {{device link must have exactly 2 devices, got 3}}
-  link = #hal.device.link{[@device_a, @device_b, @device_c], transfer_required = false}
-
+"device.link.error"() {
+  // expected-error @+1 {{unsupported property: discrete_memory}}
+  link = #hal.device.link(@device_a -> @device_b = {discrete_memory})
 } : () -> ()

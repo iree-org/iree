@@ -1024,7 +1024,7 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
   let summary = [{Device connection topology specification.}];
   let description = [{
     Specifies the topology of connections between devices, including
-    information about which devices can share data without transfers.
+    information about memory sharing and access characteristics between devices.
 
     This attribute is attached to the top-level module as `stream.topology`
     to inform Stream dialect passes about device connectivity.
@@ -1034,8 +1034,11 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
     module {
       stream.topology = #hal.device.topology<
         links = [
-          {[@device_a, @device_b], transfer_required = false},
-          {[@device_a, @device_c], transfer_required = true}
+          (@device_gpu_0 -> @device_cpu = {transparent_access, unified_memory}),
+          (@device_gpu_1 -> @device_cpu = {transparent_access}),
+          (@device_cpu -> @device_gpu_0 = {unified_memory}),
+          (@device_cpu -> @device_gpu_1 = {}),
+          (@device_gpu_0 <-> @device_gpu_1 = {transparent_access})
         ]
       >
     }
@@ -1049,26 +1052,58 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
   let assemblyFormat = [{
     `<` `links` `=` `[` $links `]` `>`
   }];
-
-  let genVerifyDecl = 1;
 }
 
 def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
   let mnemonic      = "device.link";
-  let summary       = [{Bidirectional connection between two devices.}];
+  let summary       = [{Connection between devices.}];
   let description   = [{
-    Describes the relationship between two devices in terms of
-    transfer requirements.
+    Describes a directional relationship between devices in terms of memory
+    and access properties.
+
+    Currently the following properties are supported:
+    - `unified_memory`: Whether the devices share a unified memory space
+    - `transparent_access`: Whether the source device can access the target device's memory without staging
+
+    The assembly format supports both directional and bidirectional links:
+    ```mlir
+    // Directional links (source can access target memory with given properties)
+    (@device_gpu -> @device_cpu = {transparent_access})  // GPU can access CPU memory transparently
+    (@device_cpu -> @device_gpu = {})  // CPU needs explicit transfers to access GPU memory
+
+    // Bidirectional link (both devices can access each other's memory with given properties)
+    (@device_gpu_0 <-> @device_gpu_1 = {transparent_access})  // Both GPUs can access each other
+    ```
+
+    Properties use flag-style specification where presence implies true:
+    ```mlir
+    {transparent_access}  // transparent_access is true
+    {}  // No properties (all false)
+    {unified_memory}  // Only unified_memory is true
+    ```
+
+    Future extensions may include properties like bandwidth, latency, and target-specific
+    information for specialized connections (e.g., GPUs sharing an SoC, InfiniBand, PCIe).
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"FlatSymbolRefAttr", "devices">:$devices,
-    AttrParameter<"BoolAttr", "transfer_required">:$transferRequired
+    AttrParameter<"FlatSymbolRefAttr", "source_device">:$sourceDevice,
+    AttrParameter<"FlatSymbolRefAttr", "target_device">:$targetDevice,
+    AttrParameter<"DictionaryAttr", "properties">:$properties,
+    AttrParameter<"BoolAttr", "bidirectional">:$bidirectional
   );
 
-  let assemblyFormat = [{
-    `{` `[` $devices `]` `,`
-        `transfer_required` `=` $transferRequired `}`
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    // Returns whether the devices have unified memory
+    bool hasUnifiedMemory();
+
+    // Returns whether the source can transparently access target memory
+    bool hasTransparentAccess();
+
+    // Returns whether the link is bidirectional
+    bool isBidirectional();
   }];
 
   let genVerifyDecl = 1;

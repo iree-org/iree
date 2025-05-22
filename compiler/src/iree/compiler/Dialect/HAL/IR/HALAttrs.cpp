@@ -1046,7 +1046,6 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 bool DeviceTopologyAttr::requiresTransfer(
     IREE::Stream::AffinityAttr source,
     IREE::Stream::AffinityAttr target) const {
-
   auto sourceDevice = mlir::dyn_cast_if_present<DeviceAffinityAttr>(source);
   auto targetDevice = mlir::dyn_cast_if_present<DeviceAffinityAttr>(target);
 
@@ -1057,68 +1056,160 @@ bool DeviceTopologyAttr::requiresTransfer(
 
   SymbolRefAttr sourceRef = sourceDevice.getDevice();
   SymbolRefAttr targetRef = targetDevice.getDevice();
-
-  // Check if our topology has a link between the two devices
+  // Search for a matching link and check if it has transparent access
+  // or unified memory.
   for (DeviceLinkAttr link : getLinks()) {
-    llvm::ArrayRef<FlatSymbolRefAttr> devices = link.getDevices();
-    if ((devices[0] == sourceRef && devices[1] == targetRef) ||
-        (devices[0] == targetRef && devices[1] == sourceRef)) {
-      return link.getTransferRequired().getValue();
+    FlatSymbolRefAttr sourceDevice = link.getSourceDevice();
+    FlatSymbolRefAttr targetDevice = link.getTargetDevice();
+    if (link.isBidirectional()) {
+      if ((sourceDevice == sourceRef && targetDevice == targetRef) ||
+          (sourceDevice == targetRef && targetDevice == sourceRef)) {
+        return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
+      }
+    } else {
+      if ((sourceDevice == sourceRef && targetDevice == targetRef)) {
+        return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
+      }
     }
   }
   return true;
 }
 
-LogicalResult
-DeviceLinkAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                       ArrayRef<FlatSymbolRefAttr> devices,
-                       BoolAttr transferRequired) {
-  if (devices.size() != 2) {
-    return emitError() << "device link must have exactly 2 devices, got "
-                       << devices.size();
+// Example format: (@device_a -> @device_b = {transparent_access,
+// unified_memory})
+// Example format: (@device_a <-> @device_b = {transparent_access})
+Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
+  MLIRContext *context = parser.getContext();
+  FlatSymbolRefAttr sourceDevice;
+  FlatSymbolRefAttr targetDevice;
+  bool isBidirectional;
+  DictionaryAttr properties;
+
+  // Parse '('
+  if (parser.parseLParen())
+    return {};
+
+  // Parse source device: @device_a
+  if (parser.parseAttribute(sourceDevice)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "expected source device symbol");
+    return {};
   }
-  return success();
+
+  // Parse arrow: '->' or '<->'
+  SMLoc arrowLoc = parser.getCurrentLocation();
+  if (succeeded(parser.parseOptionalKeyword("<->"))) {
+    isBidirectional = true;
+  } else if (succeeded(parser.parseOptionalKeyword("->"))) {
+    isBidirectional = false;
+  } else {
+    parser.emitError(arrowLoc, "expected '->' or '<->' arrow");
+    return {};
+  }
+
+  // Parse target device: @device_b
+  if (parser.parseAttribute(targetDevice)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "expected target device symbol");
+    return {};
+  }
+
+  if (parser.parseEqual())
+    return {};
+
+  // Parse properties: '{prop1, prop2}'
+  if (parser.parseLBrace())
+    return {};
+
+  SmallVector<NamedAttribute> propEntries;
+  // Check for empty properties: {}
+  if (failed(parser.parseOptionalRBrace())) {
+    // Not empty, parse comma-separated property flags.
+    do {
+      llvm::StringRef propName;
+      SMLoc propNameLoc = parser.getCurrentLocation();
+
+      // Parse property flag identifier (e.g., 'transparent_access')
+      if (parser.parseKeyword(&propName)) {
+        parser.emitError(
+            propNameLoc,
+            "expected property flag identifier (e.g., 'transparent_access')");
+        return {};
+      }
+      // Flag implies true.
+      propEntries.push_back(NamedAttribute(StringAttr::get(context, propName),
+                                           BoolAttr::get(context, true)));
+    } while (succeeded(parser.parseOptionalComma()));
+
+    if (parser.parseRBrace())
+      return {};
+  }
+  properties = DictionaryAttr::get(context, propEntries);
+
+  // Parse ')'
+  if (parser.parseRParen())
+    return {};
+
+  return DeviceLinkAttr::get(context, sourceDevice, targetDevice, properties,
+                             BoolAttr::get(context, isBidirectional));
 }
 
-LogicalResult
-DeviceTopologyAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                           ArrayRef<DeviceLinkAttr> links) {
-  // Map to detect duplicate links
-  llvm::SmallDenseMap<std::pair<SymbolRefAttr, SymbolRefAttr>, BoolAttr, 4>
-      linkMap;
+void DeviceLinkAttr::print(AsmPrinter &printer) const {
+  printer << "(";
+  printer.printAttribute(getSourceDevice());
 
-  for (DeviceLinkAttr link : links) {
-    llvm::ArrayRef<FlatSymbolRefAttr> devices = link.getDevices();
-
-    // Create a canonical representation of the device pair by sorting them
-    SymbolRefAttr firstDevice, secondDevice;
-    if (devices[0].getValue() < devices[1].getValue()) {
-      firstDevice = devices[0];
-      secondDevice = devices[1];
-    } else {
-      firstDevice = devices[1];
-      secondDevice = devices[0];
-    }
-
-    std::pair<SymbolRefAttr, SymbolRefAttr> devicePair(firstDevice,
-                                                       secondDevice);
-
-    // Check if this device pair already exists
-    auto it = linkMap.find(devicePair);
-    if (it != linkMap.end()) {
-      // If it exists with a different transfer_required value, emit an error
-      if (it->second != link.getTransferRequired()) {
-        return emitError() << "conflicting transfer_required values for device "
-                              "link between "
-                           << firstDevice << " and " << secondDevice;
-      }
-      // Otherwise it's a duplicate with the same transfer_required value,
-      // which is redundant but not an error
-    }
-
-    linkMap[devicePair] = link.getTransferRequired();
+  if (getBidirectional().getValue()) {
+    printer << " <-> ";
+  } else {
+    printer << " -> ";
   }
 
+  printer.printAttribute(getTargetDevice());
+  printer << " = {";
+
+  bool firstProperty = true;
+  for (const NamedAttribute &prop : getProperties()) {
+    // Only print if the property (flag) is true.
+    if (auto boolAttr = dyn_cast<BoolAttr>(prop.getValue())) {
+      if (boolAttr.getValue()) {
+        if (!firstProperty) {
+          printer << ", ";
+        }
+        printer.printKeywordOrString(prop.getName().getValue());
+        firstProperty = false;
+      }
+    }
+  }
+  printer << "})";
+}
+
+bool DeviceLinkAttr::hasUnifiedMemory() {
+  if (auto attr = getProperties().getAs<BoolAttr>("unified_memory"))
+    return attr.getValue();
+  return false;
+}
+
+bool DeviceLinkAttr::hasTransparentAccess() {
+  if (auto attr = getProperties().getAs<BoolAttr>("transparent_access"))
+    return attr.getValue();
+  return false;
+}
+
+bool DeviceLinkAttr::isBidirectional() { return getBidirectional().getValue(); }
+
+LogicalResult
+DeviceLinkAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       FlatSymbolRefAttr sourceDevice,
+                       FlatSymbolRefAttr targetDevice,
+                       DictionaryAttr properties, BoolAttr bidirectional) {
+  // currently only transparent_access and unified_memory are supported.
+  for (const NamedAttribute &prop : properties) {
+    if (prop.getName().getValue() != "transparent_access" &&
+        prop.getName().getValue() != "unified_memory") {
+      return emitError() << "unsupported property: "
+                         << prop.getName().getValue();
+    }
+  }
   return success();
 }
 
