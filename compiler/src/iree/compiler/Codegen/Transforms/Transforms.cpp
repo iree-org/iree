@@ -1221,14 +1221,14 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
 }
 
 //===--------------------------------------------------------------------====//
-// Patterns to fold ops into iree_codegen.store_to/load_from_memref
+// Patterns to fold ops into iree_codegen.store_to/load_from_buffer
 //===--------------------------------------------------------------------====//
 
 namespace {
 
-/// Given an iree_codegen.load_from_memref op or iree_codegen.store_to_memref
+/// Given an iree_codegen.load_from_buffer op or iree_codegen.store_to_buffer
 /// op, and a list of reassociation indices, replace the memref operand of the
-/// load_from_memref or store_to_memref op with a collapsed memref according to
+/// load_from_buffer or store_to_buffer op with a collapsed memref according to
 /// the reassociations. The `tensorToMemrefOp` will be modified in place without
 /// updating users or producers. The caller of this function is responsible for
 /// updating producers and consumers to maintain valid IR.
@@ -1253,9 +1253,9 @@ collapseMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
   return success();
 }
 
-/// Given an iree_codegen.load_from_memref op or iree_codegen.store_to_memref
+/// Given an iree_codegen.load_from_buffer op or iree_codegen.store_to_buffer
 /// op, a list of reassociation indices, and an output shape, replace the memref
-/// operand of the load_from_memref or store_to_memref op with an expanded
+/// operand of the load_from_buffer or store_to_buffer op with an expanded
 /// memref according to the reassociations. The `tensorToMemrefOp` will be
 /// modified in place without updating users or producers. The caller of this
 /// function is responsible for updating producers and consumers to maintain
@@ -1289,14 +1289,14 @@ expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
   return success();
 }
 
-/// Fold a tensor.expand_shape into a consumer iree_codegen.store_to_memref op
-/// by collapsing the memref operand of the store_to_memref, and replacing the
+/// Fold a tensor.expand_shape into a consumer iree_codegen.store_to_buffer op
+/// by collapsing the memref operand of the store_to_buffer, and replacing the
 /// tensor operand with the source of the expand_shape.
-struct FoldExpandShapeIntoStoreToMemref
-    : OpRewritePattern<IREE::Codegen::StoreToMemrefOp> {
-  using OpRewritePattern<IREE::Codegen::StoreToMemrefOp>::OpRewritePattern;
+struct FoldExpandShapeIntoStoreToBuffer
+    : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::Codegen::StoreToMemrefOp storeOp,
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto expandOp = storeOp.getTensor().getDefiningOp<tensor::ExpandShapeOp>();
     if (!expandOp) {
@@ -1313,14 +1313,14 @@ struct FoldExpandShapeIntoStoreToMemref
   }
 };
 
-/// Fold a tensor.collapse_shape into a consumer iree_codegen.store_to_memref op
-/// by expanding the memref operand of the store_to_memref, and replacing the
+/// Fold a tensor.collapse_shape into a consumer iree_codegen.store_to_buffer op
+/// by expanding the memref operand of the store_to_buffer, and replacing the
 /// tensor operand with the source of the collapse_shape.
-struct FoldCollapseShapeIntoStoreToMemref
-    : OpRewritePattern<IREE::Codegen::StoreToMemrefOp> {
-  using OpRewritePattern<IREE::Codegen::StoreToMemrefOp>::OpRewritePattern;
+struct FoldCollapseShapeIntoStoreToBuffer
+    : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::Codegen::StoreToMemrefOp storeOp,
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto collapseOp =
         storeOp.getTensor().getDefiningOp<tensor::CollapseShapeOp>();
@@ -1341,14 +1341,14 @@ struct FoldCollapseShapeIntoStoreToMemref
   }
 };
 
-/// Fold a tensor.collapse_shape into a producer iree_codegen.load_from_memref
-/// op by collapsing the memref operand of the load_from_memref, and replacing
-/// the collapse_shape with the collapsed load_from_memref op.
-struct FoldCollapseShapeIntoLoadFromMemref
-    : OpRewritePattern<IREE::Codegen::LoadFromMemrefOp> {
-  using OpRewritePattern<IREE::Codegen::LoadFromMemrefOp>::OpRewritePattern;
+/// Fold a tensor.collapse_shape into a producer iree_codegen.load_from_buffer
+/// op by collapsing the memref operand of the load_from_buffer, and replacing
+/// the collapse_shape with the collapsed load_from_buffer op.
+struct FoldCollapseShapeIntoLoadFromBuffer
+    : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
+  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromMemrefOp loadOp,
+  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
     if (!loadOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(loadOp, "load op has multiple uses");
@@ -1370,14 +1370,14 @@ struct FoldCollapseShapeIntoLoadFromMemref
   }
 };
 
-/// Fold a tensor.expand_shape into a producer iree_codegen.load_from_memref op
-/// by expanding the memref operand of the load_from_memref, and replacing the
-/// expand_shape with the expanded load_from_memref op.
-struct FoldExpandShapeIntoLoadFromMemref
-    : OpRewritePattern<IREE::Codegen::LoadFromMemrefOp> {
-  using OpRewritePattern<IREE::Codegen::LoadFromMemrefOp>::OpRewritePattern;
+/// Fold a tensor.expand_shape into a producer iree_codegen.load_from_buffer op
+/// by expanding the memref operand of the load_from_buffer, and replacing the
+/// expand_shape with the expanded load_from_buffer op.
+struct FoldExpandShapeIntoLoadFromBuffer
+    : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
+  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromMemrefOp loadOp,
+  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
     if (!loadOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(loadOp, "load op has multiple uses");
@@ -1405,8 +1405,8 @@ struct FoldExpandShapeIntoLoadFromMemref
 
 void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns) {
   patterns.insert<
-      FoldCollapseShapeIntoLoadFromMemref, FoldExpandShapeIntoLoadFromMemref,
-      FoldCollapseShapeIntoStoreToMemref, FoldExpandShapeIntoStoreToMemref>(
+      FoldCollapseShapeIntoLoadFromBuffer, FoldExpandShapeIntoLoadFromBuffer,
+      FoldCollapseShapeIntoStoreToBuffer, FoldExpandShapeIntoStoreToBuffer>(
       patterns.getContext());
 }
 

@@ -6,7 +6,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
   ^bb0(%arg0: index):
     tensor.yield %cst : f32
   } : tensor<250xf32> to tensor<256xf32>
-  iree_codegen.store_to_memref %padded, %result : tensor<256xf32> into memref<256xf32>
+  iree_codegen.store_to_buffer %padded, %result : tensor<256xf32> into memref<256xf32>
   return
 }
 //       CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (256, d0 + 64)>
@@ -25,7 +25,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index):
 //       CHECK:     iree_linalg_ext.yield %[[IDX0]], %[[TRUE]]
 //       CHECK:   } : tensor<250xf32> into tensor<256xf32> -> tensor<256xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<256xf32> into memref<256xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<256xf32> into memref<256xf32>
 
 //       CHECK:   scf.forall (%[[WG_IV:.+]]) = (0) to (256) step (64) {
 //       CHECK:     %[[WG_TILE_UB:.+]] = affine.min #[[$MAP]](%[[WG_IV]])
