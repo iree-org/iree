@@ -961,7 +961,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 }
 
-void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
+void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
+                                     bool forROCDL) {
   tileAndDistributeToWorkgroup(
       funcPassManager, /*useForall=*/clDistributeToWorkgroupsUsingForall);
   funcPassManager.addPass(createRematerializeParallelOpsPass());
@@ -1001,8 +1002,9 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
 
   // vector -> simt gpu + vector
-  funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/true));
+  VectorReductionToGPUPassOptions options;
+  options.expandSubgroupReduction = !forROCDL;
+  funcPassManager.addPass(createVectorReductionToGPUPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(affine::createLoopCoalescingPass());
@@ -1242,8 +1244,11 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
+    LLVMGPULowerExecutableTargetPassOptions options;
+    options.forROCDL = useROCM;
     FunctionLikeNest(modulePassManager)
-        .addPass(createLLVMGPULowerExecutableTargetPass)
+        .addPass(
+            [&]() { return createLLVMGPULowerExecutableTargetPass(options); })
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   {
