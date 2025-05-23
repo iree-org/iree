@@ -19,9 +19,9 @@ func.func @dispatch_tensor_load_and_store() {
 // CHECK-SAME:        binding(0) : memref<16xf32, #hal.descriptor_type<storage_buffer>>
 // CHECK:         %[[OUTPUT:.+]] = hal.interface.binding.subspan
 // CHECK-SAME:        binding(1) : memref<16xf32, #hal.descriptor_type<storage_buffer>>
-// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_memref %[[INPUT]]
+// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[INPUT]]
 // CHECK-SAME:        : memref<16xf32, #hal.descriptor_type<storage_buffer>> -> tensor<16xf32>
-// CHECK:         iree_codegen.store_to_memref %[[LOAD]], %[[OUTPUT]]
+// CHECK:         iree_codegen.store_to_buffer %[[LOAD]], %[[OUTPUT]]
 // CHECK-SAME:        : tensor<16xf32> into memref<16xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -51,9 +51,9 @@ func.func @dispatch_tensor_load_and_store_slices() {
 // CHECK:         %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]][2] [12] [1]
 // CHECK-SAME:        : memref<16xf32, #hal.descriptor_type<storage_buffer>> to
 // CHECK-SAME:          memref<12xf32, strided<[1], offset: 2>, #hal.descriptor_type<storage_buffer>>
-// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_memref %[[INPUT_SUBVIEW]]
+// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[INPUT_SUBVIEW]]
 // CHECK-SAME:        : memref<12xf32, strided<[1], offset: 2>, #hal.descriptor_type<storage_buffer>> -> tensor<12xf32>
-// CHECK:         iree_codegen.store_to_memref %[[LOAD]], %[[OUTPUT_SUBVIEW]]
+// CHECK:         iree_codegen.store_to_buffer %[[LOAD]], %[[OUTPUT_SUBVIEW]]
 // CHECK-SAME:        : tensor<12xf32> into memref<12xf32, strided<[1], offset: 4>, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -81,10 +81,10 @@ func.func @dispatch_tensor_load_and_store_with_compute_op() {
 // CHECK-SAME:        binding(1) : memref<16xf32, #hal.descriptor_type<storage_buffer>>
 // CHECK:         %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]][4] [12] [1]
 // CHECK:         %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]][2] [12] [1]
-// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_memref %[[INPUT_SUBVIEW]]
+// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[INPUT_SUBVIEW]]
 // CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<12xf32>
 // CHECK:         %[[COPY:.+]] = linalg.copy ins(%[[LOAD]]{{.*}} outs(%[[INIT]]
-// CHECK:         iree_codegen.store_to_memref %[[COPY]], %[[OUTPUT_SUBVIEW]]
+// CHECK:         iree_codegen.store_to_buffer %[[COPY]], %[[OUTPUT_SUBVIEW]]
 
 // -----
 
@@ -117,9 +117,9 @@ func.func @dynamic_dispatch_tensor_load_and_store(%offset: index, %size: index, 
 // CHECK:         %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]][%[[OFFSET]]] [%[[SIZE]]] [%[[STRIDE]]]
 // CHECK-SAME:        : memref<?xf32, #hal.descriptor_type<storage_buffer>> to
 // CHECK-SAME:          memref<?xf32, strided<[?], offset: ?>, #hal.descriptor_type<storage_buffer>>
-// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_memref %[[INPUT_SUBVIEW]]
+// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[INPUT_SUBVIEW]]
 // CHECK-SAME:        : memref<?xf32, strided<[?], offset: ?>, #hal.descriptor_type<storage_buffer>> -> tensor<?xf32>
-// CHECK:         iree_codegen.store_to_memref %[[LOAD]], %[[OUTPUT_SUBVIEW]]
+// CHECK:         iree_codegen.store_to_buffer %[[LOAD]], %[[OUTPUT_SUBVIEW]]
 // CHECK-SAME:        : tensor<?xf32> into memref<?xf32, strided<[?], offset: ?>, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -149,7 +149,7 @@ func.func @rank_reducing_slices() {
 // CHECK:         %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]][0, 2] [1, 12] [1, 1]
 // CHECK-SAME:        : memref<8x16xf32, #hal.descriptor_type<storage_buffer>> to
 // CHECK-SAME:          memref<12xf32, strided<[1], offset: 2>, #hal.descriptor_type<storage_buffer>>
-// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_memref %[[INPUT_SUBVIEW]]
+// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[INPUT_SUBVIEW]]
 // CHECK-SAME:        : memref<12xf32, strided<[1], offset: 2>, #hal.descriptor_type<storage_buffer>> -> tensor<12xf32>
-// CHECK:         iree_codegen.store_to_memref %[[LOAD]], %[[OUTPUT_SUBVIEW]]
+// CHECK:         iree_codegen.store_to_buffer %[[LOAD]], %[[OUTPUT_SUBVIEW]]
 // CHECK-SAME:        : tensor<12xf32> into memref<12xf32, strided<[1], offset: 4>, #hal.descriptor_type<storage_buffer>>

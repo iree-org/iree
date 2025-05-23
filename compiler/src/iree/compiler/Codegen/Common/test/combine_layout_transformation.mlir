@@ -2,7 +2,7 @@
 
 func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref<8x16xf32>) {
   %collapse = tensor.collapse_shape %source [[0, 1], [2]] : tensor<2x4x16xf32> into tensor<8x16xf32>
-  iree_codegen.store_to_memref %collapse, %result : tensor<8x16xf32> into memref<8x16xf32>
+  iree_codegen.store_to_buffer %collapse, %result : tensor<8x16xf32> into memref<8x16xf32>
   return
 }
 // CHECK-LABEL: @fold_collapse_shape_op
@@ -17,13 +17,13 @@ func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref
 //  CHECK-SAME:       [%[[IDX0]], %[[IDX1]]] by (2, 4)
 //       CHECK:     iree_linalg_ext.yield %[[LINEARIZE]], %[[IDX2]], %[[TRUE]]
 //       CHECK:   } : tensor<2x4x16xf32> into tensor<8x16xf32> -> tensor<8x16xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<8x16xf32> into memref<8x16xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<8x16xf32> into memref<8x16xf32>
 
 // -----
 
 func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4x16xf32>) {
   %expand = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 4, 16] : tensor<8x16xf32> into tensor<2x4x16xf32>
-  iree_codegen.store_to_memref %expand, %result : tensor<2x4x16xf32> into memref<2x4x16xf32>
+  iree_codegen.store_to_buffer %expand, %result : tensor<2x4x16xf32> into memref<2x4x16xf32>
   return
 }
 // CHECK-LABEL: @fold_expand_shape_op
@@ -37,14 +37,14 @@ func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4
 //       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX0]] into (2, 4)
 //       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1, %[[IDX1]], %[[TRUE]]
 //       CHECK:   } : tensor<8x16xf32> into tensor<2x4x16xf32> -> tensor<2x4x16xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x4x16xf32> into memref<2x4x16xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x4x16xf32> into memref<2x4x16xf32>
 
 // -----
 
 func.func @fold_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16x2xf32>) {
   %init = tensor.empty() : tensor<4x16x2xf32>
   %transposed = linalg.transpose ins(%source : tensor<2x4x16xf32>) outs(%init : tensor<4x16x2xf32>) permutation = [1, 2, 0]
-  iree_codegen.store_to_memref %transposed, %result : tensor<4x16x2xf32> into memref<4x16x2xf32>
+  iree_codegen.store_to_buffer %transposed, %result : tensor<4x16x2xf32> into memref<4x16x2xf32>
   return
 }
 // CHECK-LABEL: @fold_transpose_op
@@ -57,13 +57,13 @@ func.func @fold_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
 //       CHECK:     iree_linalg_ext.yield %[[IDX1]], %[[IDX2]], %[[IDX0]], %[[TRUE]]
 //       CHECK:   } : tensor<2x4x16xf32> into tensor<4x16x2xf32> -> tensor<4x16x2xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<4x16x2xf32> into memref<4x16x2xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<4x16x2xf32> into memref<4x16x2xf32>
 
 // -----
 
 func.func @fold_extract_slice_op(%source : tensor<64xf32>, %result : memref<63xf32>) {
   %slice = tensor.extract_slice %source[0] [63] [1] : tensor<64xf32> to tensor<63xf32>
-  iree_codegen.store_to_memref %slice, %result : tensor<63xf32> into memref<63xf32>
+  iree_codegen.store_to_buffer %slice, %result : tensor<63xf32> into memref<63xf32>
   return
 }
 // CHECK-LABEL: @fold_extract_slice_op
@@ -77,13 +77,13 @@ func.func @fold_extract_slice_op(%source : tensor<64xf32>, %result : memref<63xf
 //       CHECK:     %[[MASK:.+]] = arith.cmpi ult, %[[IDX0]], %[[C63]]
 //       CHECK:     iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
 //       CHECK:   } : tensor<64xf32> into tensor<63xf32> -> tensor<63xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<63xf32> into memref<63xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<63xf32> into memref<63xf32>
 
 // -----
 
 func.func @no_fold_offset_extract_slice_op(%source : tensor<64xf32>, %result : memref<4xf32>) {
   %slice = tensor.extract_slice %source[42] [4] [1] : tensor<64xf32> to tensor<4xf32>
-  iree_codegen.store_to_memref %slice, %result : tensor<4xf32> into memref<4xf32>
+  iree_codegen.store_to_buffer %slice, %result : tensor<4xf32> into memref<4xf32>
   return
 }
 // CHECK-LABEL: @no_fold_offset_extract_slice_op
@@ -94,7 +94,7 @@ func.func @no_fold_offset_extract_slice_op(%source : tensor<64xf32>, %result : m
 
 func.func @no_fold_strided_extract_slice_op(%source : tensor<64xf32>, %result : memref<16xf32>) {
   %slice = tensor.extract_slice %source[0] [16] [4] : tensor<64xf32> to tensor<16xf32>
-  iree_codegen.store_to_memref %slice, %result : tensor<16xf32> into memref<16xf32>
+  iree_codegen.store_to_buffer %slice, %result : tensor<16xf32> into memref<16xf32>
   return
 }
 // CHECK-LABEL: @no_fold_strided_extract_slice_op
@@ -109,7 +109,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
   ^bb0(%arg0: index):
     tensor.yield %cst : f32
   } : tensor<250xf32> to tensor<256xf32>
-  iree_codegen.store_to_memref %padded, %result : tensor<256xf32> into memref<256xf32>
+  iree_codegen.store_to_buffer %padded, %result : tensor<256xf32> into memref<256xf32>
   return
 }
 //       CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (256, d0 + 64)>
@@ -127,7 +127,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index):
 //       CHECK:     iree_linalg_ext.yield %[[IDX0]], %[[TRUE]]
 //       CHECK:   } : tensor<250xf32> into tensor<256xf32> -> tensor<256xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<256xf32> into memref<256xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<256xf32> into memref<256xf32>
 
 //       CHECK:   scf.forall (%[[WG_IV:.+]]) = (0) to (256) step (64) {
 //       CHECK:     %[[WG_TILE_UB:.+]] = affine.min #[[$MAP]](%[[WG_IV]])
@@ -152,7 +152,7 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
   %unpack = linalg.unpack %source
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
       into %dest : tensor<?x?x128x128xf32> -> tensor<?x?xf32>
-  iree_codegen.store_to_memref %unpack, %result : tensor<?x?xf32> into memref<?x?xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<?x?xf32> into memref<?x?xf32>
   return
 }
 //       CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>
@@ -181,7 +181,7 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
 //       CHECK:     %[[MASK:.+]] = arith.andi %[[BOUND0]], %[[BOUND1]] : i1
 //       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1, %[[MASK]]
 //       CHECK:   } : tensor<?x?x128x128xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<?x?xf32> into memref<?x?xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<?x?xf32> into memref<?x?xf32>
 
 // -----
 
@@ -191,7 +191,7 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
   %unpack = linalg.pack %source padding_value(%cst : f32)
       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
       into %dest : tensor<250x250xf32> -> tensor<2x2x128x128xf32>
-  iree_codegen.store_to_memref %unpack, %result : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
   return
 }
 //       CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (256, d0 + 1)>
@@ -214,7 +214,7 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
 //  CHECK-SAME:       into (2, 128)
 //       CHECK:     iree_linalg_ext.yield %[[DELINEARIZE0]]#0, %[[DELINEARIZE1]]#0, %[[DELINEARIZE0]]#1, %[[DELINEARIZE1]]#1, %[[TRUE]]
 //       CHECK:   } : tensor<250x250xf32> into tensor<2x2x128x128xf32> -> tensor<2x2x128x128xf32>
-//       CHECK:   iree_codegen.store_to_memref %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
 
 //       CHECK:   scf.forall (%[[WG_IV0:.+]], %[[WG_IV1:.+]]) = (0, 0) to (256, 256) step (1, 64) {
 //   CHECK-DAG:     %[[WG_TILE_UB0:.+]] = affine.min #[[$MAP]](%[[WG_IV0]])
