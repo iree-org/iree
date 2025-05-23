@@ -611,8 +611,8 @@ struct ConvertHALInstrumentMemoryLoadOp
             (loadSize << 8) | IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_LOAD));
 
     Value loadPtr = getStridedElementPtr(
-        loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
-        operands.getBase(), operands.getIndices(), rewriter);
+        rewriter, loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
+        operands.getBase(), operands.getIndices());
     Value addressI64 = rewriter.create<LLVM::PtrToIntOp>(loc, i64Type, loadPtr);
 
     appendInstrumentationEntry(loc, instrumentOp.getBuffer(),
@@ -658,8 +658,8 @@ struct ConvertHALInstrumentMemoryStoreOp
             (storeSize << 8) | IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_STORE));
 
     Value storePtr = getStridedElementPtr(
-        loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
-        operands.getBase(), operands.getIndices(), rewriter);
+        rewriter, loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
+        operands.getBase(), operands.getIndices());
     Value addressI64 =
         rewriter.create<LLVM::PtrToIntOp>(loc, i64Type, storePtr);
 
