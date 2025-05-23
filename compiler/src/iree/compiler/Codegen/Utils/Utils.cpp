@@ -1283,6 +1283,28 @@ setInsertionPointAfterLastNeededValue(OpBuilder &builder,
       builder, subsetOp.getValuesNeededToBuildSubsetExtraction());
 }
 
+void moveOpAfterLastOperand(RewriterBase &rewriter, DominanceInfo &domInfo,
+                            Operation *op) {
+  auto getDefiningOrContainingOp = [](Value v) -> Operation * {
+    return isa<BlockArgument>(v)
+               ? cast<BlockArgument>(v).getOwner()->getParentOp()
+               : v.getDefiningOp();
+  };
+  Value lastOperand = op->getOperand(0);
+  for (Value operand : op->getOperands()) {
+    Operation *operandDefiningOp = getDefiningOrContainingOp(operand);
+    Operation *lastValueDefiningOp = getDefiningOrContainingOp(lastOperand);
+    if (domInfo.dominates(lastValueDefiningOp, operandDefiningOp)) {
+      lastOperand = operand;
+    }
+  }
+  if (auto blockArg = dyn_cast<BlockArgument>(lastOperand)) {
+    rewriter.moveOpBefore(op, &blockArg.getOwner()->front());
+    return;
+  }
+  rewriter.moveOpAfter(op, lastOperand.getDefiningOp());
+}
+
 bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
                       IREE::TensorExt::DispatchTensorType dispatchTensorType,
                       ValueRange dispatchTensorDynSizes) {
