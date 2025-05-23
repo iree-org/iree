@@ -1084,18 +1084,15 @@ Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
   FlatSymbolRefAttr targetDevice;
   bool isBidirectional;
   DictionaryAttr properties;
-
   // Parse '('
   if (parser.parseLParen())
     return {};
-
   // Parse source device: @device_a
   if (parser.parseAttribute(sourceDevice)) {
     parser.emitError(parser.getCurrentLocation(),
                      "expected source device symbol");
     return {};
   }
-
   // Parse arrow: '->' or '<->'
   SMLoc arrowLoc = parser.getCurrentLocation();
   if (succeeded(parser.parseOptionalKeyword("<->"))) {
@@ -1106,7 +1103,6 @@ Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
     parser.emitError(arrowLoc, "expected '->' or '<->' arrow");
     return {};
   }
-
   // Parse target device: @device_b
   if (parser.parseAttribute(targetDevice)) {
     parser.emitError(parser.getCurrentLocation(),
@@ -1116,7 +1112,6 @@ Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
 
   if (parser.parseEqual())
     return {};
-
   // Parse properties: '{prop1, prop2}'
   if (parser.parseLBrace())
     return {};
@@ -1145,7 +1140,6 @@ Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
       return {};
   }
   properties = DictionaryAttr::get(context, propEntries);
-
   // Parse ')'
   if (parser.parseRParen())
     return {};
