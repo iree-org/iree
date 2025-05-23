@@ -102,7 +102,7 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
 
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
-  MemRefType localType = cast<MemRefType>(copy.getOutputs().front().getType());
+  auto localType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                   Value indVar) -> Value {
@@ -165,7 +165,7 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
   }
 
   if (!hasGlobalMemoryAddressSpace(sourceType) ||
-      hasSharedMemoryAddressSpace(targetType)) {
+      !hasSharedMemoryAddressSpace(targetType)) {
     LDBG("-- Op: " << *copy);
     LDBG("-- incompatible source or target memory address space.");
     return failure();
