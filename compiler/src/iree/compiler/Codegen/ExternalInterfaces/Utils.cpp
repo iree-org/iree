@@ -19,7 +19,7 @@
 #include "mlir/IR/MLIRContext.h"
 
 namespace mlir::iree_compiler::IREE {
-using Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingInfo;
 
 Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             OpBuilder &builder,

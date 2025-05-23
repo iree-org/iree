@@ -53,8 +53,8 @@
 
 namespace mlir::iree_compiler::IREE::CPU {
 
-using Codegen::MaterializeEncodingInfo;
-using Codegen::TileMxNxK;
+using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileMxNxK;
 
 namespace {
 
@@ -606,7 +606,7 @@ struct CPUDeviceEncodingPackedLayoutAttrInterface
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (Encoding::isNarrowNResult(encoding)) {
+    if (IREE::Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
     return info;
@@ -742,7 +742,7 @@ struct VMVXDeviceEncodingPackedLayoutAttrInterface final
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (Encoding::isNarrowNResult(encoding)) {
+    if (IREE::Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
     return info;
