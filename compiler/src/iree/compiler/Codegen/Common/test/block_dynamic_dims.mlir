@@ -353,6 +353,48 @@ func.func @fold_reshapes_with_bindings() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @block_dims_with_early_bufferization_ops() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = util.assume.int %0<umin = 16, umax = 4080, udiv = 16> : index
+  %2 = iree_tensor_ext.dispatch.workload.ordinal %1, 0 : index
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<?xf32, #hal.descriptor_type<storage_buffer>>{%2}
+  memref.assume_alignment %3, 64 : memref<?xf32, #hal.descriptor_type<storage_buffer>>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : memref<?xf32, #hal.descriptor_type<storage_buffer>>{%2}
+  memref.assume_alignment %4, 64 : memref<?xf32, #hal.descriptor_type<storage_buffer>>
+  %5 = iree_codegen.load_from_buffer %3 : memref<?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?xf32>
+  %6 = tensor.empty(%2) : tensor<?xf32>
+  %7 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%5 : tensor<?xf32>) outs(%6 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?xf32>
+  iree_codegen.store_to_buffer %7, %4 : tensor<?xf32> into memref<?xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+// Check that the reshapes are able to be folded into load_from_buffer and
+// store_to_buffer ops.
+//
+// CHECK-LABEL: func @block_dims_with_early_bufferization_ops()
+//       CHECK:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(0)
+//  CHECK-SAME:       memref<?xf32, #hal.descriptor_type<storage_buffer>>{%[[DIM:.+]]}
+//       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(1)
+//  CHECK-SAME:       memref<?xf32, #hal.descriptor_type<storage_buffer>>{%[[DIM]]}
+//   CHECK-DAG:   %[[INPUT_EXPAND:.+]] = memref.expand_shape %[[INPUT_BINDING]]
+//   CHECK-DAG:   %[[OUTPUT_EXPAND:.+]] = memref.expand_shape %[[OUTPUT_BINDING]]
+//       CHECK:   %[[INPUT_TENSOR:.+]] = iree_codegen.load_from_buffer %[[INPUT_EXPAND]]
+//  CHECK-SAME:       memref<?x16xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x16xf32>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?x16xf32>)
+//       CHECK:   iree_codegen.store_to_buffer %[[GENERIC]], %[[OUTPUT_EXPAND]]
+//  CHECK-SAME:       tensor<?x16xf32> into memref<?x16xf32, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
 // Check that patterns that bubble expand shapes past collapse shape kick in.
 func.func @check_bubble_up_patterns(%arg0 : tensor<4x32x?x32x?x32xf32>, %arg1 : index)
     -> tensor<4x32x?x32x?xf32> {

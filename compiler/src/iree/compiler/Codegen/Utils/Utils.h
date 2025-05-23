@@ -226,6 +226,11 @@ Operation *
 setInsertionPointAfterLastNeededValue(OpBuilder &builder,
                                       SubsetInsertionOpInterface subsetOp);
 
+/// Moves the op to right after its last (most dominant) operand. If the operand
+/// is a block argument, then the op is moved to the start of the block.
+void moveOpAfterLastOperand(RewriterBase &rewriter, DominanceInfo &domInfo,
+                            Operation *op);
+
 /// Check if the two tensor types (with their respective dynamic dimension
 /// values) have the same shape.
 bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,

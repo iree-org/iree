@@ -1396,6 +1396,8 @@ struct FoldExpandShapeIntoLoadFromBuffer
     rewriter.modifyOpInPlace(loadOp, [&]() {
       loadOp->getOpResult(0).setType(expandOp.getResultType());
     });
+    DominanceInfo domInfo;
+    moveOpAfterLastOperand(rewriter, domInfo, loadOp);
     rewriter.replaceOp(expandOp, loadOp);
     return success();
   }
