@@ -1093,8 +1093,8 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 bool DeviceTopologyAttr::requiresTransfer(
     IREE::Stream::AffinityAttr source,
     IREE::Stream::AffinityAttr target) const {
-  auto sourceDevice = mlir::dyn_cast_if_present<DeviceAffinityAttr>(source);
-  auto targetDevice = mlir::dyn_cast_if_present<DeviceAffinityAttr>(target);
+  auto sourceDevice = getAffinityDevice(source);
+  auto targetDevice = getAffinityDevice(target);
 
   if (!sourceDevice || !targetDevice)
     return true;
