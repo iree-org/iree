@@ -82,6 +82,27 @@ def IREEGPU_DerivedThreadConfig :
   let parameters = (ins);
 }
 
+def IREEGPU_UseGlobalLoadDma :
+    AttrDef<IREEGPU_Dialect, "UseGlobalLoadDMA", [
+      DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+        "hasTilingLevel",
+      ]>
+    ]> {
+  let mnemonic = "use_global_load_dma";
+  let summary = [{
+    Drive lowering of an operation by using global load DMA.
+  }];
+  let description = [{
+    Lowering config for when using global load DMA is needed. This is intended for
+    tagging operations that are known to be able to use global load DMA, which might
+    also have its own cofiguration.
+  }];
+  let assemblyFormat = "";
+  let parameters = (ins);
+}
+
 //===----------------------------------------------------------------------===//
 // GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//

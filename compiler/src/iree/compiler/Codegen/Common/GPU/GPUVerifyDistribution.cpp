@@ -76,6 +76,12 @@ struct GPUVerifyDistributionPass final
               continue;
             }
 
+            // Allow DMA copies.
+            if (isa<linalg::CopyOp>(op) &&
+                getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op)) {
+              continue;
+            }
+
             op->emitOpError(
                 "write affecting operations on shared resources are restricted "
                 "to lane or thread distributed contexts.");
