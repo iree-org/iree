@@ -94,10 +94,14 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
                    "LLVMCPUMmt4dVectorLowering pass."),
     llvm::cl::init(false));
 
+// TODO(#20723): Enable the scf.forall distribution by default after pack op can
+// always be fused, while it is a common case when ops do not have aligned
+// shapes. Otherwise, we don't have enough coverage in CPU backends when
+// data-tiling is enabled by default.
 static llvm::cl::opt<bool> clTileDispatchUsingForall(
     "iree-llvmcpu-tile-dispatch-using-forall",
     llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 // By default, IREE does not enable the Armv9-A streaming SVE mode in the
 // presence of scalable vectors (even when using `+sme`), as currently there's
