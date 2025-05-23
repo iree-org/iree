@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/Support/Debug.h"
@@ -30,7 +31,11 @@ namespace {
 
 struct ElideCompatibleTransferPattern
     : public OpRewritePattern<IREE::Stream::AsyncTransferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  AffinityAnalysis &affinityAnalysis;
+
+  ElideCompatibleTransferPattern(MLIRContext *context,
+                                 AffinityAnalysis &affinityAnalysis)
+      : OpRewritePattern(context), affinityAnalysis(affinityAnalysis) {}
 
   LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
@@ -53,9 +58,17 @@ struct ElideCompatibleTransferPattern
       return failure();
     }
 
-    // Get source and result affinities
+    // Get source and result affinities, either from explicit attributes or
+    // from affinity analysis.
     auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
     auto resultAffinityAttr = transferOp.getResultAffinityAttr();
+
+    if (!sourceAffinityAttr) {
+      sourceAffinityAttr = affinityAnalysis.lookupResourceAffinity(source);
+    }
+    if (!resultAffinityAttr) {
+      resultAffinityAttr = affinityAnalysis.lookupResourceAffinity(result);
+    }
 
     if (!sourceAffinityAttr || !resultAffinityAttr) {
       LLVM_DEBUG({
@@ -84,7 +97,7 @@ struct ElideCompatibleTransferPattern
     // Check if we need to keep the transfer based on topology
     if (topologyAttr.requiresTransfer(sourceAffinityAttr, resultAffinityAttr)) {
       LLVM_DEBUG({
-        llvm::dbgs() << "[elide-transfers] not eliding , transfer required by "
+        llvm::dbgs() << "[elide-transfers] not eliding, transfer required by "
                         "topology\n";
       });
       return failure();
@@ -116,8 +129,16 @@ struct ElideTransferOpsPass
       return;
     }
 
+    // Run affinity analysis on the whole module.
+    AffinityAnalysis affinityAnalysis(moduleOp);
+    if (failed(affinityAnalysis.run())) {
+      moduleOp.emitError() << "failed to run affinity analysis";
+      return signalPassFailure();
+    }
+
     RewritePatternSet patterns(&getContext());
-    patterns.add<ElideCompatibleTransferPattern>(&getContext());
+    patterns.add<ElideCompatibleTransferPattern>(&getContext(),
+                                                 affinityAnalysis);
 
     if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
       moduleOp.emitError() << "failed to elide transfer operations";
