@@ -570,6 +570,80 @@ def OpGroupAllocatorOps : OpDocGroup {
 
 let opDocGroup = OpGroupAllocatorOps in {
 
+// TODO(benvanik): fix the name to something less wonky or make the op support
+// exclusively an attribute _or_ a set of variadic operands.
+def HAL_AllocatorSelectAttrOp : HAL_PureOp<"allocator.select.attr", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Selects a device/queue from the given set for allocations.}];
+  let description = [{
+    Chooses one device and queue affinity pair from the given optimal set that
+    can service the requested memory type and usage for all devices in the set.
+    Returns a null device if no pair is able to satisfy the conditions.
+
+    This variant of the op selects from an optimal device affinity set without
+    capturing any SSA values to more easily allow it to be hoisted/memoized.
+    After devices have been materialized and hoisting performed it will be
+    turned into the lower-level `hal.allocator.select` op.
+  }];
+
+  let arguments = (ins
+    HAL_DeviceOptimalAttr:$optimal_set,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage
+  );
+  let results = (outs
+    HAL_Device:$selected_device,
+    HAL_DeviceQueueAffinity:$selected_queue_affinity
+  );
+
+  // TODO(benvanik): change type/usage to ref params.
+  let assemblyFormat = [{
+    `from` `(` qualified($optimal_set) `)`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
+    `:`
+    type($selected_device) `,` type($selected_queue_affinity)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_AllocatorSelectOp : HAL_PureOp<"allocator.select", [
+  SameVariadicOperandSize,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Selects a device/queue from the given set for allocations.}];
+  let description = [{
+    Chooses one device and queue affinity pair from the given optimal set that
+    can service the requested memory type and usage for all devices in the set.
+    Returns a null device if no pair is able to satisfy the conditions.
+  }];
+
+  let arguments = (ins
+    Variadic<HAL_Device>:$devices,
+    Variadic<HAL_DeviceQueueAffinity>:$queue_affinities,
+    I32:$memory_types,
+    I32:$buffer_usage
+  );
+  let results = (outs
+    HAL_Device:$selected_device,
+    HAL_DeviceQueueAffinity:$selected_queue_affinity
+  );
+
+  let assemblyFormat = [{
+    `from` `(` custom<DeviceQueueAffinityList>($devices, type($devices), $queue_affinities) `)`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
+    `:`
+    type($selected_device) `,` type($selected_queue_affinity)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
@@ -1766,7 +1840,7 @@ def HAL_DeviceResolveOp : HAL_PureOp<"device.resolve", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
+    (`on` `(` qualified($affinity)^ `)`)?
     attr-dict `:` type($results)
   }];
 }

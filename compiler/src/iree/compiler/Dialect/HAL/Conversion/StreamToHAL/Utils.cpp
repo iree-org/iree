@@ -24,6 +24,10 @@ namespace mlir::iree_compiler {
 
 Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  if (isa<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+    llvm::report_fatal_error("#hal.device.optimal not supported on op type " +
+                             op->getName().getStringRef());
+  }
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{
@@ -36,6 +40,10 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
 std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  if (isa<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+    llvm::report_fatal_error("#hal.device.optimal not supported on op type " +
+                             op->getName().getStringRef());
+  }
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{
@@ -46,8 +54,27 @@ std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
   return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
 }
 
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
+    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
+    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder) {
+  // Emit a select op to let the runtime decide which device/queue affinity to
+  // use if required.
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  if (auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+    auto selectOp = builder.create<IREE::HAL::AllocatorSelectAttrOp>(
+        op->getLoc(), optimalAttr, memoryTypes, bufferUsage);
+    return {selectOp.getResult(0), selectOp.getResult(1)};
+  }
+  // Unconditionally routed affinities go down the normal resolve path.
+  return lookupDeviceAndQueueAffinityFor(op, builder);
+}
+
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  if (isa<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+    llvm::report_fatal_error("#hal.device.optimal not supported on op type " +
+                             op->getName().getStringRef());
+  }
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{
@@ -57,17 +84,14 @@ Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   return resolveOp.getResult(0);
 }
 
-std::tuple<Value, Value>
-lookupAllocatorAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
-      TypeRange{
-          builder.getType<IREE::HAL::AllocatorType>(),
-          builder.getI64Type(),
-      },
-      affinityAttr);
-  return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
+std::tuple<Value, Value> lookupAllocatorAndQueueAffinityFor(
+    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
+    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder) {
+  auto [device, queueAffinity] =
+      lookupDeviceAndQueueAffinityFor(op, memoryTypes, bufferUsage, builder);
+  Value allocator =
+      builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
+  return {allocator, queueAffinity};
 }
 
 Value getOrCreateWaitFence(Location loc, Value timepointFence,

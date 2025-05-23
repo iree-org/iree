@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -12,6 +13,51 @@
 namespace mlir::iree_compiler {
 
 namespace {
+
+class AllocatorSelectOpConversion
+    : public OpConversionPattern<IREE::HAL::AllocatorSelectOp> {
+public:
+  AllocatorSelectOpConversion(TypeConverter &typeConverter,
+                              MLIRContext *context, SymbolTable &importSymbols)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>("hal.allocator.select");
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::AllocatorSelectOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getFunctionType();
+    auto i32Type = rewriter.getI32Type();
+
+    SmallVector<Value> callOperands = {
+        castToImportType(adaptor.getMemoryTypes(), i32Type, rewriter),
+        castToImportType(adaptor.getBufferUsage(), i32Type, rewriter),
+        getFlagsI64(op.getLoc(), {}, rewriter),
+    };
+    SmallVector<int16_t> segmentSizes = {
+        /*memory_types=*/-1,
+        /*buffer_usage=*/-1,
+        /*flags=*/-1,
+        /*from=*/
+        static_cast<int16_t>(adaptor.getDevices().size()),
+    };
+    for (auto [device, queueAffinity] :
+         llvm::zip_equal(adaptor.getDevices(), adaptor.getQueueAffinities())) {
+      callOperands.push_back(device);
+      callOperands.push_back(queueAffinity);
+    }
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(), segmentSizes,
+        importType.getInputs(), callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
 
 class AllocatorAllocateOpConversion
     : public OpConversionPattern<IREE::HAL::AllocatorAllocateOp> {
@@ -103,6 +149,8 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       SymbolTable &importSymbols,
                                       TypeConverter &typeConverter,
                                       RewritePatternSet &patterns) {
+  patterns.insert<AllocatorSelectOpConversion>(typeConverter, context,
+                                               importSymbols);
   patterns.insert<AllocatorAllocateOpConversion>(typeConverter, context,
                                                  importSymbols);
   patterns.insert<AllocatorImportOpConversion>(typeConverter, context,

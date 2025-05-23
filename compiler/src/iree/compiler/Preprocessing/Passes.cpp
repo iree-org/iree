@@ -158,6 +158,9 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
       DispatchCreation::ElementwiseOpFusionPassOptions{
           /*enableElementWiseFuseMultiReduction=*/true}));
+  // After elementwise operation fusion sink reshapes that block
+  // producer-consumer fusion.
+  passManager.addPass(DispatchCreation::createSinkReshapesPass());
   passManager.addPass(createMakeSingleDispatchForFunctionPass());
 }
 
