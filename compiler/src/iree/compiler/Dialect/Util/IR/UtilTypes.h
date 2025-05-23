@@ -255,6 +255,11 @@ using SetIntDivisibilityFn =
 // value. Returns None if the shape cannot be found.
 std::optional<ValueRange> findDynamicDims(Value shapedValue);
 
+// Walks the SSA use-def chain upwards to find the requested dimension of the
+// value if the dimension is dynamic. Returns the static size if the dim is
+// static, and null if the walk fails.
+OpFoldResult findDim(Value shapedValue, int64_t dim);
+
 // Walks the SSA use-def chain to find the dynamic dimensions of the value.
 // Returns None if the shape cannot be found or if it is defined after
 // {|block|, |insertionPoint|}.

@@ -658,6 +658,11 @@ def ResolveSwizzleHintsPass :
   ];
 }
 
+def SpecializeExportsPass :
+    Pass<"iree-codegen-specialize-exports", "IREE::HAL::ExecutableVariantOp">{
+   let summary = "Specializes exported functions based on annotated ranges";
+}
+
 def StripCompilationInfoPass :
     Pass<"iree-codegen-strip-compilation-info", "">{
    let summary = "Remove all the the lowering configuration and translation info attributes.";
