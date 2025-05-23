@@ -1090,31 +1090,42 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 // #hal.device.topology<...>
 //===----------------------------------------------------------------------===//
 
+// Returns the device attribute from the given HAL affinity attribute.
+static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
+  if (auto deviceAffinityAttr =
+          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
+    return deviceAffinityAttr.getDevice();
+  } else if (auto devicePromiseAttr =
+                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
+    return devicePromiseAttr.getDevice();
+  }
+  return {};
+}
+
 bool DeviceTopologyAttr::requiresTransfer(
     IREE::Stream::AffinityAttr source,
     IREE::Stream::AffinityAttr target) const {
-  auto sourceDevice = getAffinityDevice(source);
-  auto targetDevice = getAffinityDevice(target);
+  Attribute sourceDevice = getAffinityDevice(source);
+  Attribute targetDevice = getAffinityDevice(target);
 
   if (!sourceDevice || !targetDevice)
     return true;
   if (sourceDevice == targetDevice)
     return false;
 
-  SymbolRefAttr sourceRef = sourceDevice.getDevice();
-  SymbolRefAttr targetRef = targetDevice.getDevice();
   // Search for a matching link and check if it has transparent access
   // or unified memory.
   for (DeviceLinkAttr link : getLinks()) {
-    FlatSymbolRefAttr sourceDevice = link.getSourceDevice();
-    FlatSymbolRefAttr targetDevice = link.getTargetDevice();
     if (link.isBidirectional()) {
-      if ((sourceDevice == sourceRef && targetDevice == targetRef) ||
-          (sourceDevice == targetRef && targetDevice == sourceRef)) {
+      if ((sourceDevice == link.getSourceDevice() &&
+           targetDevice == link.getTargetDevice()) ||
+          (sourceDevice == link.getTargetDevice() &&
+           targetDevice == link.getSourceDevice())) {
         return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
       }
     } else {
-      if ((sourceDevice == sourceRef && targetDevice == targetRef)) {
+      if ((sourceDevice == link.getSourceDevice() &&
+           targetDevice == link.getTargetDevice())) {
         return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
       }
     }
@@ -1300,18 +1311,6 @@ bool DeviceOptimalAttr::isExecutableWith(
     }
     return true;
   }
-}
-
-// Returns the device attribute from the given HAL affinity attribute.
-static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
-  if (auto deviceAffinityAttr =
-          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    return deviceAffinityAttr.getDevice();
-  } else if (auto devicePromiseAttr =
-                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
-    return devicePromiseAttr.getDevice();
-  }
-  return {};
 }
 
 using DeviceAffinitySet =
