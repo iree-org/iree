@@ -202,9 +202,15 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(createSimplifyPackUnpackPass());
     FunctionLikeNest(mainPassManager).addPass(createDataLayoutPropagationPass);
   }
-  // Generalize transposes and any other remaining named linalg ops that can
-  // now be represented as generics.
-  FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
+  FunctionLikeNest(mainPassManager)
+      // Generalize transposes and any other remaining named linalg ops that can
+      // now be represented as generics.
+      .addPass(createGeneralizeLinalgNamedOpsPass)
+      // Fuse elementwise operations to improve hoisting analysis for leaf-like
+      // operations (operations that would be hoistable without fusion, but are
+      // not hoistable after fusion, for example, elementwise operations with
+      // sequence-like operations as input).
+      .addPass(DispatchCreation::createElementwiseOpFusionPass);
 
   // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
   FunctionLikeNest(mainPassManager)
