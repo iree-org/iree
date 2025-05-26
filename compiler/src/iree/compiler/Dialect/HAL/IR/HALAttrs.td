@@ -1081,8 +1081,7 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
           (@device_gpu_0 -> @device_cpu = {transparent_access, unified_memory}),
           (@device_gpu_1 -> @device_cpu = {transparent_access}),
           (@device_cpu -> @device_gpu_0 = {unified_memory}),
-          (@device_cpu -> @device_gpu_1 = {}),
-          (@device_gpu_0 <-> @device_gpu_1 = {transparent_access})
+          (@device_cpu -> @device_gpu_1 = {})
         ]
       >
     }
@@ -1109,14 +1108,11 @@ def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
     - `unified_memory`: Whether the devices share a unified memory space
     - `transparent_access`: Whether the source device can access the target device's memory without staging
 
-    The assembly format supports both directional and bidirectional links:
+    The assembly format supports only directional links:
     ```mlir
     // Directional links (source can access target memory with given properties)
     (@device_gpu -> @device_cpu = {transparent_access})  // GPU can access CPU memory transparently
     (@device_cpu -> @device_gpu = {})  // CPU needs explicit transfers to access GPU memory
-
-    // Bidirectional link (both devices can access each other's memory with given properties)
-    (@device_gpu_0 <-> @device_gpu_1 = {transparent_access})  // Both GPUs can access each other
     ```
 
     Properties use flag-style specification where presence implies true:
@@ -1131,10 +1127,9 @@ def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
   }];
 
   let parameters = (ins
-    AttrParameter<"FlatSymbolRefAttr", "source_device">:$sourceDevice,
-    AttrParameter<"FlatSymbolRefAttr", "target_device">:$targetDevice,
-    AttrParameter<"DictionaryAttr", "properties">:$properties,
-    AttrParameter<"BoolAttr", "bidirectional">:$bidirectional
+    AttrParameter<"SymbolRefAttr", "source_device">:$sourceDevice,
+    AttrParameter<"SymbolRefAttr", "target_device">:$targetDevice,
+    AttrParameter<"DictionaryAttr", "properties">:$properties
   );
 
   let hasCustomAssemblyFormat = 1;
@@ -1145,9 +1140,6 @@ def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
 
     // Returns whether the source can transparently access target memory
     bool hasTransparentAccess();
-
-    // Returns whether the link is bidirectional
-    bool isBidirectional();
   }];
 
   let genVerifyDecl = 1;

@@ -1116,18 +1116,9 @@ bool DeviceTopologyAttr::requiresTransfer(
   // Search for a matching link and check if it has transparent access
   // or unified memory.
   for (DeviceLinkAttr link : getLinks()) {
-    if (link.isBidirectional()) {
-      if ((sourceDevice == link.getSourceDevice() &&
-           targetDevice == link.getTargetDevice()) ||
-          (sourceDevice == link.getTargetDevice() &&
-           targetDevice == link.getSourceDevice())) {
-        return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
-      }
-    } else {
-      if ((sourceDevice == link.getSourceDevice() &&
-           targetDevice == link.getTargetDevice())) {
-        return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
-      }
+    if ((sourceDevice == link.getSourceDevice() &&
+         targetDevice == link.getTargetDevice())) {
+      return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
     }
   }
   return true;
@@ -1135,13 +1126,12 @@ bool DeviceTopologyAttr::requiresTransfer(
 
 // Example format: (@device_a -> @device_b = {transparent_access,
 // unified_memory})
-// Example format: (@device_a <-> @device_b = {transparent_access})
 Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
   MLIRContext *context = parser.getContext();
   FlatSymbolRefAttr sourceDevice;
   FlatSymbolRefAttr targetDevice;
-  bool isBidirectional;
   DictionaryAttr properties;
+  SMLoc startLoc = parser.getCurrentLocation();
   // Parse '('
   if (parser.parseLParen())
     return {};
@@ -1151,14 +1141,9 @@ Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
                      "expected source device symbol");
     return {};
   }
-  // Parse arrow: '->' or '<->'
-  SMLoc arrowLoc = parser.getCurrentLocation();
-  if (succeeded(parser.parseOptionalKeyword("<->"))) {
-    isBidirectional = true;
-  } else if (succeeded(parser.parseOptionalKeyword("->"))) {
-    isBidirectional = false;
-  } else {
-    parser.emitError(arrowLoc, "expected '->' or '<->' arrow");
+  // Parse '->'
+  if (failed(parser.parseArrow())) {
+    parser.emitError(parser.getCurrentLocation(), "expected '->' arrow");
     return {};
   }
   // Parse target device: @device_b
@@ -1202,20 +1187,14 @@ Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
   if (parser.parseRParen())
     return {};
 
-  return DeviceLinkAttr::get(context, sourceDevice, targetDevice, properties,
-                             BoolAttr::get(context, isBidirectional));
+  return getChecked([&]() { return parser.emitError(startLoc); }, context,
+                    sourceDevice, targetDevice, properties);
 }
 
 void DeviceLinkAttr::print(AsmPrinter &printer) const {
   printer << "(";
   printer.printAttribute(getSourceDevice());
-
-  if (getBidirectional().getValue()) {
-    printer << " <-> ";
-  } else {
-    printer << " -> ";
-  }
-
+  printer << " -> ";
   printer.printAttribute(getTargetDevice());
   printer << " = {";
 
@@ -1247,13 +1226,10 @@ bool DeviceLinkAttr::hasTransparentAccess() {
   return false;
 }
 
-bool DeviceLinkAttr::isBidirectional() { return getBidirectional().getValue(); }
-
 LogicalResult
 DeviceLinkAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                       FlatSymbolRefAttr sourceDevice,
-                       FlatSymbolRefAttr targetDevice,
-                       DictionaryAttr properties, BoolAttr bidirectional) {
+                       SymbolRefAttr sourceDevice, SymbolRefAttr targetDevice,
+                       DictionaryAttr properties) {
   // currently only transparent_access and unified_memory are supported.
   for (const NamedAttribute &prop : properties) {
     if (prop.getName().getValue() != "transparent_access" &&
