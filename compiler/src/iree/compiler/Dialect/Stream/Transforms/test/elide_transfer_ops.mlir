@@ -2,7 +2,8 @@
 
 module @test attributes {
   stream.topology = #hal.device.topology<links = [
-    (@dev_a <-> @dev_b = {unified_memory}),
+    (@dev_a -> @dev_b = {unified_memory}),
+    (@dev_b -> @dev_a = {unified_memory}),
     (@dev_a -> @dev_c = {})
   ]>
 } {
