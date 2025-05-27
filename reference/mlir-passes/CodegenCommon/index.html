@@ -6602,20 +6602,20 @@ then be used by backends to handle appropriately.</p>
 <h3 id="-iree-codegen-bufferize-dispatch-tensor-load-store"><code>-iree-codegen-bufferize-dispatch-tensor-load-store</code><a class="headerlink" href="#-iree-codegen-bufferize-dispatch-tensor-load-store" title="Permanent link">link</a></h3>
 <p><em>Bufferize the iree_tensor_ext.dispatch.tensor.load/store ops at dispatch boundaries</em></p>
 <p>Pass to bufferize the edges of dispatch regions, converting
-iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_memref, and
-iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_memref.</p>
+iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_buffer, and
+iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_buffer.</p>
 <h3 id="-iree-codegen-canonicalize-scf-for"><code>-iree-codegen-canonicalize-scf-for</code><a class="headerlink" href="#-iree-codegen-canonicalize-scf-for" title="Permanent link">link</a></h3>
 <p><em>Adhoc canonicalization of selected loop-carried values/dependencies for scf.for ops</em></p>
 <h3 id="-iree-codegen-cleanup-buffer-alloc-view"><code>-iree-codegen-cleanup-buffer-alloc-view</code><a class="headerlink" href="#-iree-codegen-cleanup-buffer-alloc-view" title="Permanent link">link</a></h3>
 <p><em>Performs cleanups over HAL interface/buffer allocation/view operations</em></p>
 <h3 id="-iree-codegen-combine-layout-transformation"><code>-iree-codegen-combine-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-layout-transformation" title="Permanent link">link</a></h3>
 <p><em>Combines layout transformation operations into a single map_scatter operation.</em></p>
-<p>Starting from iree_codegen.store_to_memref ops, iteratively combine producer
+<p>Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
 layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
 etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
 ops, the writing of pad values is distributed to workgroups, and then the
 padding values are written directly to the output buffer of the
-store_to_memref op.</p>
+store_to_buffer op.</p>
 <h3 id="-iree-codegen-concretize-pad-result-shape"><code>-iree-codegen-concretize-pad-result-shape</code><a class="headerlink" href="#-iree-codegen-concretize-pad-result-shape" title="Permanent link">link</a></h3>
 <p><em>Concretizes tensor.pad op's result shape if its source opimplements OffsetSizeAndStrideOpInterface.</em></p>
 <h3 id="-iree-codegen-config-tracking-canonicalize"><code>-iree-codegen-config-tracking-canonicalize</code><a class="headerlink" href="#-iree-codegen-config-tracking-canonicalize" title="Permanent link">link</a></h3>

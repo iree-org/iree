@@ -1952,9 +1952,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_codegenload_from_memref-codegenloadfrommemrefop" class="md-nav__link">
+  <a href="#iree_codegenload_from_buffer-codegenloadfrombufferop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_codegen.load_from_memref (Codegen::LoadFromMemrefOp)
+      iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)
     </span>
   </a>
   
@@ -1979,9 +1979,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_codegenstore_to_memref-codegenstoretomemrefop" class="md-nav__link">
+  <a href="#iree_codegenstore_to_buffer-codegenstoretobufferop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_codegen.store_to_memref (Codegen::StoreToMemrefOp)
+      iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)
     </span>
   </a>
   
@@ -4656,9 +4656,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_codegenload_from_memref-codegenloadfrommemrefop" class="md-nav__link">
+  <a href="#iree_codegenload_from_buffer-codegenloadfrombufferop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_codegen.load_from_memref (Codegen::LoadFromMemrefOp)
+      iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)
     </span>
   </a>
   
@@ -4683,9 +4683,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_codegenstore_to_memref-codegenstoretomemrefop" class="md-nav__link">
+  <a href="#iree_codegenstore_to_buffer-codegenstoretobufferop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_codegen.store_to_memref (Codegen::StoreToMemrefOp)
+      iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)
     </span>
   </a>
   
@@ -4772,10 +4772,10 @@ within a backend.</p>
 <li><a href="#iree_codegen-dialect">'iree_codegen' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
-<li><a href="#iree_codegenload_from_memref-codegenloadfrommemrefop">iree_codegen.load_from_memref (Codegen::LoadFromMemrefOp)</a></li>
+<li><a href="#iree_codegenload_from_buffer-codegenloadfrombufferop">iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)</a></li>
 <li><a href="#iree_codegennull_pointer-codegennullpointerop">iree_codegen.null_pointer (Codegen::NullPointerOp)</a></li>
 <li><a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop">iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)</a></li>
-<li><a href="#iree_codegenstore_to_memref-codegenstoretomemrefop">iree_codegen.store_to_memref (Codegen::StoreToMemrefOp)</a></li>
+<li><a href="#iree_codegenstore_to_buffer-codegenstoretobufferop">iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)</a></li>
 <li><a href="#iree_codegenswizzle_hint-codegenswizzlehintop">iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)</a></li>
 </ul>
 </li>
@@ -4874,10 +4874,10 @@ This makes lowering more progressive and brings the following benefits:
 </tr>
 </tbody>
 </table>
-<h3 id="iree_codegenload_from_memref-codegenloadfrommemrefop"><code>iree_codegen.load_from_memref</code> (Codegen::LoadFromMemrefOp)<a class="headerlink" href="#iree_codegenload_from_memref-codegenloadfrommemrefop" title="Permanent link">link</a></h3>
+<h3 id="iree_codegenload_from_buffer-codegenloadfrombufferop"><code>iree_codegen.load_from_buffer</code> (Codegen::LoadFromBufferOp)<a class="headerlink" href="#iree_codegenload_from_buffer-codegenloadfrombufferop" title="Permanent link">link</a></h3>
 <p><em>Loads a tensor from a memref.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_memref` $buffer attr-dict `:` type($buffer) `-&gt;` type($tensor)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_buffer` $buffer attr-dict `:` type($buffer) `-&gt;` type($tensor)
 </code></pre></div>
 <p>Loads a tensor from a memref with a compatible shape and the same element
 type.</p>
@@ -4968,10 +4968,10 @@ to VMVX.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_codegenstore_to_memref-codegenstoretomemrefop"><code>iree_codegen.store_to_memref</code> (Codegen::StoreToMemrefOp)<a class="headerlink" href="#iree_codegenstore_to_memref-codegenstoretomemrefop" title="Permanent link">link</a></h3>
+<h3 id="iree_codegenstore_to_buffer-codegenstoretobufferop"><code>iree_codegen.store_to_buffer</code> (Codegen::StoreToBufferOp)<a class="headerlink" href="#iree_codegenstore_to_buffer-codegenstoretobufferop" title="Permanent link">link</a></h3>
 <p><em>Stores a tensor into a memref.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_memref` $tensor `,` $buffer
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_buffer` $tensor `,` $buffer
               attr-dict `:` type($tensor) `into` type($buffer)
 </code></pre></div>
 <p>Stores a tensor into a memref with a compatible shape and the same element
