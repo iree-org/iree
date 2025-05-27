@@ -32,15 +32,15 @@ using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
     ArrayRef<int64_t> iterationBounds, MLIRContext *)>;
 
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
-/// Finds `iree_codegen.store_to_memref` ops in the `funcOp`, and combines any
+/// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any
 /// layout transformation ops (like expand_shape, transpose, pack, etc.) that
 /// produce the tensor being stored into a single `iree_linalg_ext.map_scatter`
 /// op.
 ///
 /// This transformation will also combine `tensor.pad` ops into the map_scatter
-/// op, by moving the writing of the padding values to after the store_to_memref
+/// op, by moving the writing of the padding values to after the store_to_buffer
 /// op, and writing the padding values directly to the output buffer of the
-/// store_to_memref. The writes of the pad values will be distributed based on
+/// store_to_buffer. The writes of the pad values will be distributed based on
 /// the `DistributionConfig`s returned by `padDistributionConfigFn`, and then
 /// the inner distributed tile will be tiled to a loop nest of memref.store ops.
 LogicalResult

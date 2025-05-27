@@ -8,11 +8,11 @@ func.func @fold_reshape_load() {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
+  %2 = iree_codegen.load_from_buffer %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
   %collapsed = tensor.collapse_shape %2 [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1, 2]] output_shape [3, 3, 96] : tensor<864xf32> into tensor<3x3x96xf32>
   %barrier = util.optimization_barrier %expanded : tensor<3x3x96xf32>
-  iree_codegen.store_to_memref %barrier, %1 : tensor<3x3x96xf32> into memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %barrier, %1 : tensor<3x3x96xf32> into memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 // CHECK-LABEL: @fold_reshape_load
@@ -20,10 +20,10 @@ func.func @fold_reshape_load() {
 //   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[SRC_SUBSPAN]]{{.*}} into memref<864xf32
 //   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]{{.*}} into memref<3x3x96xf32
 //   CHECK-DAG:   %[[DEST_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(1)
-//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_memref %[[EXPAND]]
+//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[EXPAND]]
 //  CHECK-SAME:     memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x96xf32>
 //       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[LOAD]]
-//       CHECK:   iree_codegen.store_to_memref %[[BARRIER]], %[[DEST_SUBSPAN]]
+//       CHECK:   iree_codegen.store_to_buffer %[[BARRIER]], %[[DEST_SUBSPAN]]
 
 // -----
 
@@ -34,11 +34,11 @@ func.func @fold_reshape_load() {
 func.func @fold_reshape_store() {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
+  %2 = iree_codegen.load_from_buffer %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
   %barrier = util.optimization_barrier %2 : tensor<3x3x1x96xf32>
   %collapsed = tensor.collapse_shape %barrier [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1, 2]] output_shape [3, 3, 96] : tensor<864xf32> into tensor<3x3x96xf32>
-  iree_codegen.store_to_memref %expanded, %1 : tensor<3x3x96xf32> into memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %expanded, %1 : tensor<3x3x96xf32> into memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 // CHECK-LABEL: @fold_reshape_store
@@ -46,9 +46,9 @@ func.func @fold_reshape_store() {
 //   CHECK-DAG:   %[[DEST_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(1){{.*}} memref<3x3x96xf32
 //   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[DEST_SUBSPAN]]{{.*}} into memref<864xf32
 //   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]{{.*}} into memref<3x3x1x96xf32
-//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_memref %[[SRC_SUBSPAN]]
+//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[SRC_SUBSPAN]]
 //       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[LOAD]]
-//       CHECK:   iree_codegen.store_to_memref %[[BARRIER]], %[[EXPAND]]
+//       CHECK:   iree_codegen.store_to_buffer %[[BARRIER]], %[[EXPAND]]
 //  CHECK-SAME:     tensor<3x3x1x96xf32> into memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -61,11 +61,11 @@ func.func @fold_reshape_with_slice_load() {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<6x3x1x96xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
   %subview = memref.subview %0[3, 0, 0, 0] [3, 3, 1, 96] [1, 1, 1, 1] : memref<6x3x1x96xf32, #hal.descriptor_type<storage_buffer>> to memref<3x3x1x96xf32, strided<[288, 96, 96, 1], offset: 864>, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %subview : memref<3x3x1x96xf32, strided<[288, 96, 96, 1], offset: 864>, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
+  %2 = iree_codegen.load_from_buffer %subview : memref<3x3x1x96xf32, strided<[288, 96, 96, 1], offset: 864>, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
   %collapsed = tensor.collapse_shape %2 [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1, 2]] output_shape [3, 3, 96] : tensor<864xf32> into tensor<3x3x96xf32>
   %barrier = util.optimization_barrier %expanded : tensor<3x3x96xf32>
-  iree_codegen.store_to_memref %barrier, %1 : tensor<3x3x96xf32> into memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %barrier, %1 : tensor<3x3x96xf32> into memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 // CHECK-LABEL: @fold_reshape_with_slice_load
@@ -76,7 +76,7 @@ func.func @fold_reshape_with_slice_load() {
 //  CHECK-SAME:     into memref<864xf32, strided<[1], offset: 864>
 //       CHECK:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]
 //  CHECK-SAME:     into memref<3x3x96xf32, strided<[288, 96, 1], offset: 864>
-//       CHECK:   iree_codegen.load_from_memref %[[EXPAND]]
+//       CHECK:   iree_codegen.load_from_buffer %[[EXPAND]]
 
 // -----
 
@@ -88,11 +88,11 @@ func.func @fold_reshape_with_slice_store() {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<6x3x96xf32, #hal.descriptor_type<storage_buffer>>
   %subview = memref.subview %1[3, 0, 0] [3, 3, 96] [1, 1, 1] : memref<6x3x96xf32, #hal.descriptor_type<storage_buffer>> to memref<3x3x96xf32, strided<[288, 96, 1], offset: 864>, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
+  %2 = iree_codegen.load_from_buffer %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
   %barrier = util.optimization_barrier %2 : tensor<3x3x1x96xf32>
   %collapsed = tensor.collapse_shape %barrier [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1, 2]] output_shape [3, 3, 96] : tensor<864xf32> into tensor<3x3x96xf32>
-  iree_codegen.store_to_memref %expanded, %subview : tensor<3x3x96xf32> into memref<3x3x96xf32, strided<[288, 96, 1], offset: 864>, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %expanded, %subview : tensor<3x3x96xf32> into memref<3x3x96xf32, strided<[288, 96, 1], offset: 864>, #hal.descriptor_type<storage_buffer>>
   return
 }
 // CHECK-LABEL: @fold_reshape_with_slice_store
@@ -103,7 +103,7 @@ func.func @fold_reshape_with_slice_store() {
 //  CHECK-SAME:     into memref<864xf32, strided<[1], offset: 864>
 //       CHECK:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]
 //  CHECK-SAME:     into memref<3x3x1x96xf32, strided<[288, 96, 96, 1], offset: 864>
-//       CHECK:   iree_codegen.store_to_memref {{.*}}, %[[EXPAND]]
+//       CHECK:   iree_codegen.store_to_buffer {{.*}}, %[[EXPAND]]
 
 // -----
 
@@ -121,11 +121,11 @@ func.func @fold_dynamic_reshape_load() {
   memref.assume_alignment %4, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>{%2, %3}
   memref.assume_alignment %5, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
-  %6 = iree_codegen.load_from_memref %4 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x?xf32>
+  %6 = iree_codegen.load_from_buffer %4 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x?xf32>
   %collapsed = tensor.collapse_shape %6 [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1]] output_shape [%2, %3] : tensor<?xf32> into tensor<?x?xf32>
   %barrier = util.optimization_barrier %expanded : tensor<?x?xf32>
-  iree_codegen.store_to_memref %barrier, %5 : tensor<?x?xf32> into memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %barrier, %5 : tensor<?x?xf32> into memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 // CHECK-LABEL: @fold_dynamic_reshape_load
@@ -135,10 +135,10 @@ func.func @fold_dynamic_reshape_load() {
 //   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[SRC_SUBSPAN]]
 //   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]
 //  CHECK-SAME:     output_shape [%[[D0]], %[[D1]]]
-//   CHECK-DAG:   %[[LOAD:.+]] = iree_codegen.load_from_memref %[[EXPAND]]
+//   CHECK-DAG:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[EXPAND]]
 //   CHECK-DAG:   %[[DEST_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(1)
 //   CHECK-DAG:   %[[BARRIER:.+]] = util.optimization_barrier %[[LOAD]]
-//       CHECK:   iree_codegen.store_to_memref %[[BARRIER]], %[[DEST_SUBSPAN]]
+//       CHECK:   iree_codegen.store_to_buffer %[[BARRIER]], %[[DEST_SUBSPAN]]
 
 // -----
 
@@ -156,18 +156,18 @@ func.func @fold_dynamic_reshape_store() {
   memref.assume_alignment %4, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>{%2, %3}
   memref.assume_alignment %5, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
-  %6 = iree_codegen.load_from_memref %4 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x?xf32>
+  %6 = iree_codegen.load_from_buffer %4 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x?xf32>
   %barrier = util.optimization_barrier %6 : tensor<?x?xf32>
   %collapsed = tensor.collapse_shape %barrier [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1]] output_shape [%2, %3] : tensor<?xf32> into tensor<?x?xf32>
-  iree_codegen.store_to_memref %expanded, %5 : tensor<?x?xf32> into memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %expanded, %5 : tensor<?x?xf32> into memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 // CHECK-LABEL: @fold_dynamic_reshape_store
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //   CHECK-DAG:   %[[SRC_SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(0)
-//   CHECK-DAG:   %[[LOAD:.+]] = iree_codegen.load_from_memref %[[SRC_SUBSPAN]]
+//   CHECK-DAG:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[SRC_SUBSPAN]]
 //   CHECK-DAG:   %[[BARRIER:.+]] = util.optimization_barrier %[[LOAD]]
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[BARRIER]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[BARRIER]], %[[C1]]
@@ -175,4 +175,4 @@ func.func @fold_dynamic_reshape_store() {
 //   CHECK-DAG:   %[[COLLAPSE:.+]] = memref.collapse_shape %[[DEST_SUBSPAN]]
 //   CHECK-DAG:   %[[EXPAND:.+]] = memref.expand_shape %[[COLLAPSE]]
 //  CHECK-SAME:     output_shape [%[[D0]], %[[D1]]]
-//       CHECK:   iree_codegen.store_to_memref %[[BARRIER]], %[[EXPAND]]
+//       CHECK:   iree_codegen.store_to_buffer %[[BARRIER]], %[[EXPAND]]

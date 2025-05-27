@@ -51,8 +51,8 @@ def BufferizeDispatchTensorLoadStorePass :
       "Bufferize the iree_tensor_ext.dispatch.tensor.load/store ops at dispatch boundaries";
   let description = [{
     Pass to bufferize the edges of dispatch regions, converting
-    iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_memref, and
-    iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_memref.
+    iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_buffer, and
+    iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_buffer.
   }];
   let dependentDialects = [
     "IREE::Codegen::IREECodegenDialect",
@@ -128,12 +128,12 @@ def CombineLayoutTransformationPass :
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
-    Starting from iree_codegen.store_to_memref ops, iteratively combine producer
+    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
     layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
     etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
     ops, the writing of pad values is distributed to workgroups, and then the
     padding values are written directly to the output buffer of the
-    store_to_memref op.
+    store_to_buffer op.
   }];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",

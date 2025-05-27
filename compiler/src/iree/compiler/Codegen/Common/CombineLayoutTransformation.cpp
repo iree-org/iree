@@ -259,7 +259,7 @@ static void buildNestedDistributionLoops(
 /// the writing of padding values into a separate operation on the buffer that
 /// the map_scatter op is ultimately written into. The result buffer is taken
 /// from the direct consumer of the `mapScatterOp`, which is expected to be an
-/// `iree_codegen.store_to_memref` op. Return failure if the result buffer is
+/// `iree_codegen.store_to_buffer` op. Return failure if the result buffer is
 /// not found.
 static FailureOr<MapScatterOp>
 foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
@@ -270,12 +270,12 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     return rewriter.notifyMatchFailure(
         mapScatterOp, "map_scatter does not have a single user");
   }
-  auto storeOp = dyn_cast<IREE::Codegen::StoreToMemrefOp>(
+  auto storeOp = dyn_cast<IREE::Codegen::StoreToBufferOp>(
       *mapScatterOp->getUsers().begin());
   if (!storeOp) {
     return rewriter.notifyMatchFailure(
         mapScatterOp,
-        "map_scatter user is not an iree_codegen.store_to_memref op");
+        "map_scatter user is not an iree_codegen.store_to_buffer op");
   }
 
   rewriter.setInsertionPointAfter(storeOp);
@@ -420,7 +420,7 @@ combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
 
 static MapScatterOp
 insertIdentityMapScatter(RewriterBase &rewriter,
-                         IREE::Codegen::StoreToMemrefOp storeOp) {
+                         IREE::Codegen::StoreToBufferOp storeOp) {
   Location loc = storeOp->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(storeOp);
@@ -447,11 +447,11 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   IRRewriter rewriter(ctx);
   simplifyComplexRelayoutOps(rewriter, funcOp);
 
-  // Start from iree_codegen.store_to_memref ops, and combine producer
+  // Start from iree_codegen.store_to_buffer ops, and combine producer
   // relayout ops into a single map_scatter.
-  SmallVector<IREE::Codegen::StoreToMemrefOp> dispatchResults(
-      funcOp.getFunctionBody().getOps<IREE::Codegen::StoreToMemrefOp>());
-  for (IREE::Codegen::StoreToMemrefOp dispatchResult : dispatchResults) {
+  SmallVector<IREE::Codegen::StoreToBufferOp> dispatchResults(
+      funcOp.getFunctionBody().getOps<IREE::Codegen::StoreToBufferOp>());
+  for (IREE::Codegen::StoreToBufferOp dispatchResult : dispatchResults) {
     MapScatterOp mapScatterOp =
         insertIdentityMapScatter(rewriter, dispatchResult);
     combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);

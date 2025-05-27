@@ -67,10 +67,10 @@ void ExtractStridedMetadataOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// LoadFromMemrefOp
+// LoadFromBufferOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult LoadFromMemrefOp::verify() {
+LogicalResult LoadFromBufferOp::verify() {
   RankedTensorType tensorType = getTensor().getType();
   MemRefType memrefType = getBuffer().getType();
   if (failed(verifyCompatibleShape(tensorType.getShape(),
@@ -82,7 +82,7 @@ LogicalResult LoadFromMemrefOp::verify() {
   return success();
 }
 
-void LoadFromMemrefOp::getEffects(
+void LoadFromBufferOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
   effects.emplace_back(MemoryEffects::Read::get(), &getBufferMutable(),
@@ -90,10 +90,10 @@ void LoadFromMemrefOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
-// StoreToMemrefOp
+// StoreToBufferOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult StoreToMemrefOp::verify() {
+LogicalResult StoreToBufferOp::verify() {
   RankedTensorType tensorType = getTensor().getType();
   MemRefType memrefType = getBuffer().getType();
   if (failed(verifyCompatibleShape(tensorType.getShape(),
@@ -105,7 +105,7 @@ LogicalResult StoreToMemrefOp::verify() {
   return success();
 }
 
-void StoreToMemrefOp::getEffects(
+void StoreToBufferOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
   effects.emplace_back(MemoryEffects::Write::get(), &getBufferMutable(),

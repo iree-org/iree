@@ -38,21 +38,21 @@ func.func @eliminate_empty_tensors_with_store_op() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @eliminate_empty_tensors_with_store_to_memref_op() {
+func.func @eliminate_empty_tensors_with_store_to_buffer_op() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
+  %2 = iree_codegen.load_from_buffer %0 : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
   %3 = tensor.empty() : tensor<128xf32>
   %copy = linalg.copy ins(%2 : tensor<128xf32>) outs(%3 : tensor<128xf32>) -> tensor<128xf32>
-  iree_codegen.store_to_memref %copy, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %copy, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 
-// CHECK-LABEL: @eliminate_empty_tensors_with_store_to_memref_op
+// CHECK-LABEL: @eliminate_empty_tensors_with_store_to_buffer_op
 //     CHECK: %[[INPUT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(0)
 //     CHECK: %[[RESULT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(1)
-// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_memref %[[INPUT_SPAN]]
-// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_memref %[[RESULT_SPAN]]
+// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_buffer %[[INPUT_SPAN]]
+// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_SPAN]]
 //     CHECK: %[[COPY:.+]] = linalg.copy ins(%[[INPUT]] : tensor<128xf32>) outs(%[[INIT]] : tensor<128xf32>)
-//     CHECK: iree_codegen.store_to_memref %[[COPY]], %[[RESULT_SPAN]]
+//     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_SPAN]]
