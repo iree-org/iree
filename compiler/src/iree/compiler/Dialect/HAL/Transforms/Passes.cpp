@@ -455,7 +455,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
 
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
-  passManager.addPass(IREE::HAL::createConvertToHALPass());
+  passManager.addPass(IREE::HAL::createConvertToHALPass({targetRegistry}));
 
   // If memoization is disabled then inline any regions that were created during
   // conversion.

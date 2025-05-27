@@ -60,6 +60,8 @@ static void stripExportRegions(ModuleOp moduleOp) {
 
 struct ConvertToHALPass
     : public IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
+  using IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass>::ConvertToHALPassBase;
+
   void runOnOperation() override {
     auto *context = &getContext();
     auto moduleOp = getOperation();
@@ -85,8 +87,12 @@ struct ConvertToHALPass
                               patterns);
     populateStandardToHALPatterns(context, conversionTarget, typeConverter,
                                   patterns);
+    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run())) {
+      return signalPassFailure();
+    }
     populateStreamToHALPatterns(context, conversionTarget, typeConverter,
-                                patterns);
+                                patterns, deviceAnalysis, *targetRegistry.value);
 
     // Gather all HAL dialect conversion patterns from custom dialects.
     // These will perform the tensor->buffer mapping for their ops.

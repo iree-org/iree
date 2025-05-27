@@ -75,6 +75,24 @@ public:
                                             configAttr, executableTargetAttrs);
   }
 
+  LogicalResult
+  setSharedUsageBits(const SetVector<IREE::HAL::DeviceTargetAttr> &targets,
+                     IREE::HAL::BufferUsageBitfield &bufferUsage) const override {
+    for (auto targetAttr : targets) {
+      // if the target is metal, we dont need to add any usage bits
+      if (targetAttr.getDeviceID().getValue() == "metal") {
+        continue;
+      }
+      // if the target is local, we need to add the mapping persistent usage bit
+      if (targetAttr.getDeviceID().getValue() == "local") {
+        bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::MappingPersistent;
+      }
+      // interop with other targets is not supported yet
+      return failure();
+    }
+    return success();
+  }
+
 private:
   const MetalSPIRVOptions &options;
 };

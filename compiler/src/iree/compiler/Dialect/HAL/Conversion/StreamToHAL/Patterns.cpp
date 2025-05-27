@@ -7,10 +7,12 @@
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
 
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -81,9 +83,44 @@ struct ContextResolveOpPattern
   }
 };
 
+// try to add usage bits for allocations that are used on multiple devices
+LogicalResult
+trySetSharedUsageBits(Operation *op,
+                      IREE::HAL::BufferUsageBitfield &bufferUsage,
+                      const IREE::HAL::TargetRegistry &targetRegistry,
+                      IREE::HAL::DeviceAnalysis &deviceAnalysis) {
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  // if its no device.optimal attr we dont need to do anything
+  if (auto optimalAttr =
+          dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+    // use the DeviceAnalysis to get all DeviceTargetAttrs for the operation
+    SetVector<IREE::HAL::DeviceTargetAttr> targetAttrs;
+    deviceAnalysis.gatherDeviceAffinityTargets(affinityAttr, op, targetAttrs);
+    for (auto targetAttr : targetAttrs) {
+      // use the registry to get the the instance of the TargetDevice
+      // and let it add the usage bits.
+      StringRef deviceID = targetAttr.getDeviceID().getValue();
+      std::shared_ptr<IREE::HAL::TargetDevice> targetDevice =
+          targetRegistry.getTargetDevice(deviceID);
+      if (!targetDevice) {
+        return failure();
+      }
+      return targetDevice->setSharedUsageBits(targetAttrs, bufferUsage);
+    }
+  }
+  return success();
+}
+
 struct ResourceAllocOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceAllocOp> {
   using StreamConversionPattern::StreamConversionPattern;
+
+  ResourceAllocOpPattern(std::shared_ptr<StreamConversionMapping> mapping,
+                         TypeConverter &typeConverter, MLIRContext *context,
+                         IREE::HAL::DeviceAnalysis &deviceAnalysis,
+                         const IREE::HAL::TargetRegistry &targetRegistry)
+      : StreamConversionPattern(mapping, typeConverter, context),
+        deviceAnalysis(deviceAnalysis), targetRegistry(targetRegistry) {}
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -97,6 +134,12 @@ struct ResourceAllocOpPattern
       return failure();
     }
 
+    // try to add usage bits for allocations that are used on multiple devices.
+    if (failed(trySetSharedUsageBits(allocOp, bufferUsage, targetRegistry,
+                                     deviceAnalysis))) {
+      return failure();
+    }
+
     // Lookup the appropriate allocator/queue for allocation based on the buffer
     // propreties.
     auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
@@ -107,11 +150,23 @@ struct ResourceAllocOpPattern
         adaptor.getStorageSize());
     return success();
   }
+
+private:
+  IREE::HAL::DeviceAnalysis &deviceAnalysis;
+  const IREE::HAL::TargetRegistry &targetRegistry;
 };
 
 struct ResourceAllocaOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceAllocaOp> {
   using StreamConversionPattern::StreamConversionPattern;
+
+  ResourceAllocaOpPattern(std::shared_ptr<StreamConversionMapping> mapping,
+                          TypeConverter &typeConverter, MLIRContext *context,
+                          IREE::HAL::DeviceAnalysis &deviceAnalysis,
+                          const IREE::HAL::TargetRegistry &targetRegistry)
+      : StreamConversionPattern(mapping, typeConverter, context),
+        deviceAnalysis(deviceAnalysis), targetRegistry(targetRegistry) {}
+
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -122,6 +177,12 @@ struct ResourceAllocaOpPattern
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
     if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
                                                bufferUsage))) {
+      return failure();
+    }
+
+    // try to add usage bits for allocations that are used on multiple devices.
+    if (failed(trySetSharedUsageBits(allocaOp, bufferUsage, targetRegistry,
+                                     deviceAnalysis))) {
       return failure();
     }
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
@@ -152,6 +213,10 @@ struct ResourceAllocaOpPattern
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
   }
+
+private:
+  IREE::HAL::DeviceAnalysis &deviceAnalysis;
+  const IREE::HAL::TargetRegistry &targetRegistry;
 };
 
 struct ResourceDeallocaOpPattern
@@ -1686,10 +1751,11 @@ struct GlobalTimepointConversionPattern
 
 } // namespace
 
-void populateStreamToHALPatterns(MLIRContext *context,
-                                 ConversionTarget &conversionTarget,
-                                 TypeConverter &typeConverter,
-                                 RewritePatternSet &patterns) {
+void populateStreamToHALPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter, RewritePatternSet &patterns,
+    IREE::HAL::DeviceAnalysis &deviceAnalysis,
+    const IREE::HAL::TargetRegistry &targetRegistry) {
   conversionTarget.addIllegalDialect<IREE::Stream::StreamDialect>();
 
   typeConverter.addConversion(
@@ -1725,8 +1791,10 @@ void populateStreamToHALPatterns(MLIRContext *context,
 
   patterns.insert<ContextResolveOpPattern>(mapping, typeConverter, context);
 
-  patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
-                  ResourceDeallocaOpPattern, ResourceRetainOpPattern,
+  patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern>(
+      mapping, typeConverter, context, deviceAnalysis, targetRegistry);
+
+  patterns.insert<ResourceDeallocaOpPattern, ResourceRetainOpPattern,
                   ResourceReleaseOpPattern, ResourceIsTerminalOpPattern,
                   ResourceSizeOpPattern, ResourceTryMapOpPattern,
                   ResourceLoadOpPattern, ResourceStoreOpPattern,

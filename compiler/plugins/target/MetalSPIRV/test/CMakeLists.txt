@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "smoketest.mlir"
+    "heterogeneous_interop.mlir"
   TOOLS
     FileCheck
     iree-opt
