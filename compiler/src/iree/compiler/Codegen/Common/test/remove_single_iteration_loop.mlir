@@ -229,9 +229,9 @@ func.func @argument_with_assume(%arg_index : index) {
 // -----
 
 func.func @dynamic_ub_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
-  %c1 = arith.constant 1 : index
+  %c1 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
-  %0 = util.assume.int %arg_index<umin = 0, umax = 4> : index
+  %0 = util.assume.int %arg_index<umin = 0, umax = 3> : index
   scf.for %arg1 = %c1 to %0 step %c3 {
     %alloc = memref.alloc() : memref<4xf16>
     %subview = memref.subview %arg_value[%arg1][4][1] :  memref<8xf16> to memref<4xf16, strided<[1], offset: ?>>
@@ -241,12 +241,12 @@ func.func @dynamic_ub_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
 }
 // CHECK-LABEL: func.func @dynamic_ub_unittrip
 //  CHECK-SAME: (%[[ARGINDEX:.+]]: index, %[[ARGVALUE:.+]]: memref<8xf16>)
-//       CHECK: %[[C1:.+]] = arith.constant 1 : index
-//       CHECK: %[[UB:.+]] = util.assume.int %[[ARGINDEX]]<umin = 0, umax = 4> : index
-//       CHECK: %[[COND:.+]] = arith.cmpi sgt, %[[UB]], %[[C1]] : index
+//       CHECK: %[[C0:.+]] = arith.constant 0 : index
+//       CHECK: %[[UB:.+]] = util.assume.int %[[ARGINDEX]]
+//       CHECK: %[[COND:.+]] = arith.cmpi sgt, %[[UB]], %[[C0]] : index
 //       CHECK: scf.if %[[COND]] {
 //       CHECK:   memref.alloc()
-//       CHECK:   memref.subview %[[ARGVALUE]][%[[C1]]] [4] [1]
+//       CHECK:   memref.subview %[[ARGVALUE]][%[[C0]]] [4] [1]
 //       CHECK:   memref.copy
 
 // -----
@@ -266,7 +266,7 @@ func.func @dynamic_lb_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
 // CHECK-LABEL: func.func @dynamic_lb_unittrip
 //  CHECK-SAME: (%[[ARGINDEX:.+]]: index, %[[ARGVALUE:.+]]: memref<8xf16>)
 //       CHECK: %[[C3:.+]] = arith.constant 3 : index
-//       CHECK: %[[LB:.+]] = util.assume.int %[[ARGINDEX]]<umin = 0, umax = 50> : index
+//       CHECK: %[[LB:.+]] = util.assume.int %[[ARGINDEX]]
 //       CHECK: %[[COND:.+]] = arith.cmpi slt, %[[LB]], %[[C3]] : index
 //       CHECK: scf.if %[[COND]] {
 //       CHECK:   memref.alloc()
@@ -290,11 +290,11 @@ func.func @dynamic_nonunittrip(%arg_index : index, %arg_value : memref<8xf16>) {
 // -----
 
 func.func @dynamic_unittrip_with_destination(%arg_index : index, %arg_value : tensor<8xf16>) -> tensor<4xf16> {
-  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
-  %0 = util.assume.int %arg_index<umin = 0, umax = 4> : index
+  %0 = util.assume.int %arg_index<umin = 0, umax = 3> : index
   %empty = tensor.empty() : tensor<4xf16>
-  %1 = scf.for %arg1 = %c1 to %0 step %c3 iter_args(%arg2 = %empty) -> (tensor<4xf16>) {
+  %1 = scf.for %arg1 = %c0 to %0 step %c3 iter_args(%arg2 = %empty) -> (tensor<4xf16>) {
        %extract = tensor.extract_slice %arg_value[%arg1][4][1] : tensor<8xf16> to tensor<4xf16>
        %2 = arith.negf %extract : tensor<4xf16>
        scf.yield %2 : tensor<4xf16>
@@ -304,12 +304,9 @@ func.func @dynamic_unittrip_with_destination(%arg_index : index, %arg_value : te
 
 // CHECK-LABEL: func.func @dynamic_unittrip_with_destination
 //  CHECK-SAME: (%[[ARGINDEX:.+]]: index, %[[ARGTENSOR:.+]]: tensor<8xf16>)
-//       CHECK: %[[C1:.+]] = arith.constant 1 : index
-//       CHECK: %[[UB:.+]] = util.assume.int %[[ARGINDEX]]<umin = 0, umax = 4> : index
 //       CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4xf16>
-//       CHECK: %[[COND:.+]] = arith.cmpi sgt, %[[UB]], %[[C1]] : index
-//       CHECK: %[[RESULT:.+]] = scf.if %[[COND]] -> (tensor<4xf16>) {
-//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[ARGTENSOR]][%[[C1]]] [4] [1]
+//       CHECK: %[[RESULT:.+]] = scf.if
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice
 //       CHECK:   %[[NEG:.+]] = arith.negf %[[SLICE]] : tensor<4xf16>
 //       CHECK:   scf.yield %[[NEG]] : tensor<4xf16>
 //       CHECK: } else {

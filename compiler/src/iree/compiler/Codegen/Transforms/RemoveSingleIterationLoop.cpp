@@ -27,10 +27,9 @@ namespace mlir::iree_compiler {
 
 /// Replaces the given op with the contents of the given single-block region,
 /// using the operands of the block terminator to replace operation results.
-static void replaceOpWithRegion(PatternRewriter &rewriter, Operation *op,
-                                Region &region, ValueRange blockArgs = {}) {
-  assert(llvm::hasSingleElement(region) && "expected single-region block");
-  Block *block = &region.front();
+static void replaceOpWithRegion(PatternRewriter &rewriter, scf::ForOp op,
+                                ValueRange blockArgs = {}) {
+  Block *block = op.getBody();
   Operation *terminator = block->getTerminator();
   ValueRange results = terminator->getOperands();
   rewriter.inlineBlockBefore(block, op, blockArgs);
@@ -38,11 +37,17 @@ static void replaceOpWithRegion(PatternRewriter &rewriter, Operation *op,
   rewriter.eraseOp(terminator);
 }
 
-static void replaceForWithIf(PatternRewriter &rewriter, Operation *op,
-                             scf::IfOp ifOp, Region &region,
-                             ValueRange initArgs, ValueRange blockArgs = {}) {
-  assert(llvm::hasSingleElement(region) && "expected single-region block");
-  Block *block = &region.front();
+/// Same as `replaceOpWithRegion` function but within an scf.if region.
+static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
+                             ValueRange blockArgs = {}) {
+  Block *block = op.getBody();
+  ValueRange initArgs = op.getInitArgs();
+  Value count =
+      rewriter.create<arith::CmpIOp>(op->getLoc(), arith::CmpIPredicate::sgt,
+                                     op.getUpperBound(), op.getLowerBound());
+  auto ifOp =
+      rewriter.create<scf::IfOp>(op->getLoc(), op.getResultTypes(), count,
+                                 /*withElseRegion=*/initArgs.size() != 0);
   Operation *terminator = block->getTerminator();
   rewriter.inlineBlockBefore(block, &ifOp.getThenRegion().front(),
                              ifOp.getThenRegion().front().begin(), blockArgs);
@@ -73,28 +78,16 @@ static bool neverRunsSecondIteration(scf::ForOp op) {
   // Can't perform the analysis if the loops's bounds aren't index-typed.
   if (!op.getInductionVar().getType().isIndex())
     return false;
-  // Calculate loop bounds that allow for maximum iterations.
-  auto lb = ValueBoundsConstraintSet::computeConstantBound(
-      presburger::BoundType::LB, op.getLowerBound());
-  auto step = ValueBoundsConstraintSet::computeConstantBound(
-      presburger::BoundType::LB, op.getStep());
-  auto ub = ValueBoundsConstraintSet::computeConstantBound(
-      presburger::BoundType::UB, op.getUpperBound(),
-      /*stopCondition=*/nullptr,
-      /*closedUB=*/true);
-  if (failed(lb) || failed(step) || failed(ub)) {
-    return false;
-  }
-  // If the upper bound is less than or equal to lower bound  + step then the
-  // loop cannot run for a second iteration assuming the step is positive.
+  // If the upper bound (ub) is less than or equal to the loop step, then
+  // lower bound  + step must be greater than the upper bound, assuming the
+  // lower bound is non-negative.
   FailureOr<bool> isUbUnderStep = ValueBoundsConstraintSet::compare(
-      getAsIndexOpFoldResult(op.getContext(), *ub),
-      ValueBoundsConstraintSet::LE,
-      getAsIndexOpFoldResult(op.getContext(), *step + *lb));
-  FailureOr<bool> isStepNonNegative = ValueBoundsConstraintSet::compare(
-      getAsOpFoldResult(op.getStep()), ValueBoundsConstraintSet::GE,
+      getAsOpFoldResult(op.getUpperBound()), ValueBoundsConstraintSet::LE,
+      getAsOpFoldResult(op.getStep()));
+  FailureOr<bool> isLbNonNegative = ValueBoundsConstraintSet::compare(
+      getAsOpFoldResult(op.getLowerBound()), ValueBoundsConstraintSet::GE,
       getAsIndexOpFoldResult(op.getContext(), 0));
-  return isUbUnderStep.value_or(false) && isStepNonNegative.value_or(false);
+  return isUbUnderStep.value_or(false) && isLbNonNegative.value_or(false);
 }
 
 namespace {
@@ -116,16 +109,9 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     blockArgs.push_back(op.getLowerBound());
     llvm::append_range(blockArgs, op.getInitArgs());
     if (alwaysRunsFirstIteration(op)) {
-      replaceOpWithRegion(rewriter, op, op.getRegion(), blockArgs);
+      replaceOpWithRegion(rewriter, op, blockArgs);
     } else {
-      Value count = rewriter.create<arith::CmpIOp>(
-          op->getLoc(), arith::CmpIPredicate::sgt, op.getUpperBound(),
-          op.getLowerBound());
-      auto ifOp = rewriter.create<scf::IfOp>(
-          op->getLoc(), op.getResultTypes(), count,
-          /*withElseRegion=*/op.getInitArgs().size() != 0);
-      replaceForWithIf(rewriter, op, ifOp, op.getRegion(), op.getInitArgs(),
-                       blockArgs);
+      replaceForWithIf(rewriter, op, blockArgs);
     }
     return success();
   }

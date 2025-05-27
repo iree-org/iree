@@ -403,6 +403,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
 
   // Tile and distribute to GPU subgroups.
   funcPassManager.addPass(createSPIRVTileToCooperativeOpsPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
