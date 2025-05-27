@@ -219,14 +219,16 @@ void DeviceAnalysis::gatherAllDeviceTargets(
 void DeviceAnalysis::gatherDeviceAffinityTargets(
     IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
     SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
-  // We currently only know how to handle HAL device affinities.
-  // We could support other ones via an interface but instead we just fall back
-  // to default logic if no affinity or an unknown one is found.
+  // If we have a device optimal attr, we need to gather the targets for each
+  // of the affinities.
   if (auto optimalAttr =
           mlir::dyn_cast_or_null<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
     for (auto affinity : optimalAttr.getAffinities()) {
       gatherDeviceAffinityTargets(affinity, fromOp, resultSet);
     }
+  // We currently only know how to handle HAL device affinities.
+  // We could support other ones via an interface but instead we just fall back
+  // to default logic if no affinity or an unknown one is found.
   } else if (auto deviceAffinityAttr =
                  dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(
                      affinityAttr)) {

@@ -83,22 +83,22 @@ struct ContextResolveOpPattern
   }
 };
 
-// try to add usage bits for allocations that are used on multiple devices
+// Try to add usage bits for allocations that are used on multiple devices.
 LogicalResult
 trySetSharedUsageBits(Operation *op,
                       IREE::HAL::BufferUsageBitfield &bufferUsage,
                       const IREE::HAL::TargetRegistry &targetRegistry,
                       IREE::HAL::DeviceAnalysis &deviceAnalysis) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  // if its no device.optimal attr we dont need to do anything
+  // If its no device.optimal attr we dont need to do anything.
   if (auto optimalAttr =
           dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
-    // use the DeviceAnalysis to get all DeviceTargetAttrs for the operation
+    // Use the DeviceAnalysis to get all DeviceTargetAttrs for the operation.
     SetVector<IREE::HAL::DeviceTargetAttr> targetAttrs;
     deviceAnalysis.gatherDeviceAffinityTargets(affinityAttr, op, targetAttrs);
     for (auto targetAttr : targetAttrs) {
-      // use the registry to get the the instance of the TargetDevice
-      // and let it add the usage bits.
+      // Use the registry to get the instance of the TargetDevice and let it
+      // add the usage bits.
       StringRef deviceID = targetAttr.getDeviceID().getValue();
       std::shared_ptr<IREE::HAL::TargetDevice> targetDevice =
           targetRegistry.getTargetDevice(deviceID);
@@ -134,7 +134,7 @@ struct ResourceAllocOpPattern
       return failure();
     }
 
-    // try to add usage bits for allocations that are used on multiple devices.
+    // Try to add usage bits for allocations that are used on multiple devices.
     if (failed(trySetSharedUsageBits(allocOp, bufferUsage, targetRegistry,
                                      deviceAnalysis))) {
       return failure();
@@ -180,7 +180,7 @@ struct ResourceAllocaOpPattern
       return failure();
     }
 
-    // try to add usage bits for allocations that are used on multiple devices.
+    // Try to add usage bits for allocations that are used on multiple devices.
     if (failed(trySetSharedUsageBits(allocaOp, bufferUsage, targetRegistry,
                                      deviceAnalysis))) {
       return failure();

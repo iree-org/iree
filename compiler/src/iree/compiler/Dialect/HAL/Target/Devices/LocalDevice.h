@@ -40,6 +40,7 @@ public:
   Value buildDeviceTargetMatch(Location loc, Value device,
                                IREE::HAL::DeviceTargetAttr targetAttr,
                                OpBuilder &builder) const override;
+
   LogicalResult setSharedUsageBits(
       const SetVector<IREE::HAL::DeviceTargetAttr> &targets,
       IREE::HAL::BufferUsageBitfield &bufferUsage) const override;

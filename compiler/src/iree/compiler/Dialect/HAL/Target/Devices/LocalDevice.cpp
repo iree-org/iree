@@ -115,7 +115,7 @@ LogicalResult LocalDevice::setSharedUsageBits(
     const SetVector<IREE::HAL::DeviceTargetAttr> &targets,
     IREE::HAL::BufferUsageBitfield &bufferUsage) const {
   for (auto targetAttr : targets) {
-    // if the target is not local (self), we need to add the mapping persistent
+    // If the target is not local (self), we need to add the mapping persistent
     // usage bit.
     if (targetAttr.getDeviceID().getValue() != "local") {
       bufferUsage =
