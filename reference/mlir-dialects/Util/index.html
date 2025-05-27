@@ -2350,6 +2350,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#intassumptionarrayattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      IntAssumptionArrayAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiintassumptionarrayattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      MultiIntAssumptionArrayAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#nullattr" class="md-nav__link">
     <span class="md-ellipsis">
       NullAttr
@@ -5925,6 +5943,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#intassumptionarrayattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      IntAssumptionArrayAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiintassumptionarrayattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      MultiIntAssumptionArrayAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#nullattr" class="md-nav__link">
     <span class="md-ellipsis">
       NullAttr
@@ -6142,6 +6178,8 @@
 <li><a href="#inlinealwaysattr">InlineAlwaysAttr</a></li>
 <li><a href="#inlineneverattr">InlineNeverAttr</a></li>
 <li><a href="#intassumptionattr">IntAssumptionAttr</a></li>
+<li><a href="#intassumptionarrayattr">IntAssumptionArrayAttr</a></li>
+<li><a href="#multiintassumptionarrayattr">MultiIntAssumptionArrayAttr</a></li>
 <li><a href="#nullattr">NullAttr</a></li>
 <li><a href="#preprocessingpasspipelineattr">PreprocessingPassPipelineAttr</a></li>
 <li><a href="#uninitializedattr">UninitializedAttr</a></li>
@@ -8102,6 +8140,52 @@ or outside knowledge. All components of the attribute are optional.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="intassumptionarrayattr">IntAssumptionArrayAttr<a class="headerlink" href="#intassumptionarrayattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#util.int.assumption.array&lt;
+  ::llvm::ArrayRef&lt;IntAssumptionAttr&gt;   # value
+&gt;
+</code></pre></div>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;IntAssumptionAttr&gt;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="multiintassumptionarrayattr">MultiIntAssumptionArrayAttr<a class="headerlink" href="#multiintassumptionarrayattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#util.int.assumption.multi_array&lt;
+  ::llvm::ArrayRef&lt;IntAssumptionArrayAttr&gt;   # value
+&gt;
+</code></pre></div>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;IntAssumptionArrayAttr&gt;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="nullattr">NullAttr<a class="headerlink" href="#nullattr" title="Permanent link">link</a></h3>
 <p><em>An attribute specifying a null reference.</em></p>
 <p>Syntax:</p>
@@ -8110,7 +8194,7 @@ or outside knowledge. All components of the attribute are optional.</p>
 &gt;
 </code></pre></div>
 <p>A null reference value.</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8141,7 +8225,7 @@ operation. For example to run the transpose convolution pipeline, the
 attribute is specified as</p>
 <p><code>preprocess_pipeline = #util.preprocess_pipeline&lt;
     "iree-preprocessing-transpose-convolution-pipeline"&gt;</code></p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8169,7 +8253,7 @@ attribute is specified as</p>
 runtime. This is a hint to implementations that if policy allows memory
 allocated for the storage of this attribute type is allowed to have
 undefined contents upon return.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8199,7 +8283,7 @@ undefined contents upon return.</p>
 &gt;
 </code></pre></div>
 <p>Typed container supporting variant storage.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8230,7 +8314,7 @@ collected at runtime.</p>
 </code></pre></div>
 <p>A typed indirect reference to a value. These define a runtime addressable
 value that is strongly referenced.</p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
