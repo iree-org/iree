@@ -21,8 +21,8 @@
 
 #define DEBUG_TYPE "iree-codegen-specialize-exports"
 
-using RangeAttrHelper = mlir::iree_compiler::IREE::Codegen::IREECodegenDialect::
-    SpecializationRangesAttrHelper;
+using SpecializationRangesAttrHelper = mlir::iree_compiler::IREE::Codegen::
+    IREECodegenDialect::SpecializationRangesAttrHelper;
 
 namespace mlir::iree_compiler {
 
@@ -374,7 +374,8 @@ static void specializeExportedFunction(
 /// be accesses with |helper|.
 static void specializeExportedFunctionByRangeAttribute(
     IREE::HAL::ExecutableExportOp exportOp, func::FuncOp func,
-    RangeAttrHelper helper, llvm::SmallDenseSet<int64_t> &ordinals) {
+    SpecializationRangesAttrHelper helper,
+    llvm::SmallDenseSet<int64_t> &ordinals) {
   TilingInterface specializationRoot;
   IREE::Util::MultiIntAssumptionArrayAttr specializationRanges;
 
@@ -418,7 +419,7 @@ public:
 
     auto *codegenDialect =
         getContext().getLoadedDialect<IREE::Codegen::IREECodegenDialect>();
-    RangeAttrHelper helper =
+    SpecializationRangesAttrHelper helper =
         codegenDialect->getSpecializationRangesAttrHelper();
 
     ModuleOp innerModule = variant.getInnerModule();
@@ -436,6 +437,16 @@ public:
     for (auto exportOp : exports) {
       IntegerAttr ordinalAttr = exportOp.getOrdinalAttr();
       if (!ordinalAttr) {
+        // We can't add new fallback entry points if we don't have ordinals on
+        // the exports. In such cases bail out and drop all specialization
+        // annotations. Failing to specialize is not considered a failure as the
+        // IR is otherwise still valid.
+        variant.walk([&](Operation *op) {
+          // Guard for silly assert around removal of non-present attribute.
+          if (helper.isAttrPresent(op)) {
+            helper.removeAttr(op);
+          }
+        });
         return;
       }
       ordinalSet.insert(ordinalAttr.getInt());
