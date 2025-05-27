@@ -521,7 +521,6 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   op.getParallelDims(sharedParallelDims);
   llvm::SmallDenseSet<unsigned> sharedParallelSet(sharedParallelDims.begin(),
                                                   sharedParallelDims.end());
-
   for (linalg::LinalgOp linalgOp : computeOps) {
     SmallVector<unsigned> currParallelDims;
     linalgOp.getParallelDims(currParallelDims);
@@ -536,28 +535,48 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
     sharedWgpTiles[i] = 1;
   }
 
-  for (linalg::LinalgOp linalgOp : computeOps) {
-    // Check whether it's a reduction op.
-    bool reductionOp = hasReductionIterator(linalgOp);
+  // Determines if a lowering configuration should be attached to the given
+  // LinalgOp with only parallel dims. This is needed if the op cannot be fused
+  // with a reduction or introduces new loop dimensions.
+  auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
+    // If some of the users are in computeOps and some are outside of
+    // computeOps; attach lowering config, since the op can't be fused.
+    if (llvm::any_of(linalgOp->getUsers(),
+                     [&](Operation *user) {
+                       auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
+                       return linalgUser && computeOps.contains(linalgUser);
+                     }) &&
+        llvm::any_of(linalgOp->getUsers(), [&](Operation *user) {
+          auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
+          return !linalgUser;
+        })) {
+      return true;
+    }
+
+    // If the indexing map introduces new dimensions (more inputs than results),
+    // attach a lowering config.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
       int64_t operandIdx = linalgOp.getIndexingMapIndex(operand);
       AffineMap indexingMap = linalgOp.getIndexingMapsArray()[operandIdx];
-      // Set the lowering config if there's a new dim or it's a reduction op.
-      // Also, skip if there's a scalar load.
-      if (reductionOp ||
-          (indexingMap.getNumResults() > 0 &&
-           (indexingMap.getNumInputs() > indexingMap.getNumResults()))) {
-        auto loweringConfig = getVectorDistributeReductionConfig(
-            linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
-            threadLoads);
-        if (failed(loweringConfig)) {
-          return failure();
-        }
-        setLoweringConfig(linalgOp, *loweringConfig);
-        // If the config is set on the op, no need to iterate
-        // over other operands.
-        break;
+      if (indexingMap.getNumResults() > 0 &&
+          indexingMap.getNumInputs() > indexingMap.getNumResults()) {
+        return true;
       }
+    }
+
+    return false;
+  };
+
+  for (linalg::LinalgOp linalgOp : computeOps) {
+    if (hasReductionIterator(linalgOp) ||
+        shouldAttachLoweringConfig(linalgOp)) {
+      auto loweringConfig = getVectorDistributeReductionConfig(
+          linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
+          threadLoads);
+      if (failed(loweringConfig)) {
+        return failure();
+      }
+      setLoweringConfig(linalgOp, *loweringConfig);
     }
   }
   return success();
