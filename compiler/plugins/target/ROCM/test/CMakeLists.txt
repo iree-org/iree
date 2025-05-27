@@ -42,6 +42,7 @@ iree_lit_test_suite(
   SRCS
     "external_function_validation.mlir"
     "smoketest.mlir"
+    "smoketest_hsaco.mlir"
     "target_device_features.mlir"
   TOOLS
     FileCheck
