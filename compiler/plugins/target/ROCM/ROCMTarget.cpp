@@ -61,10 +61,22 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
+enum class ContainerType {
+  // Automatically detect the container type from the target ABI attribute.
+  Auto,
+  // HIP ExecutableDef flatbuffer.
+  HIP,
+  // AMDGPU ExecutableDef flatbuffer.
+  AMDGPU,
+  // Raw HSACO image (ELF).
+  HSACO,
+};
+
 // TODO(#18792): rename flags back to iree-rocm- as they are not HIP-specific.
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
+  ContainerType containerType = ContainerType::Auto;
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
@@ -80,6 +92,7 @@ struct ROCMOptions {
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
     static cl::OptionCategory category("HIP HAL Target");
+
     binder.opt<std::string>(
         "iree-hip-target", target, cl::cat(category),
         cl::desc(
@@ -93,16 +106,34 @@ struct ROCMOptions {
             "for more details."
             // clang-format on
             ));
+
     binder.opt<std::string>(
         "iree-hip-target-features", targetFeatures, cl::cat(category),
         cl::desc("HIP target features as expected by LLVM AMDGPU backend; "
                  "e.g., '+sramecc,+xnack'."));
+
+    binder.opt<ContainerType>(
+        "iree-rocm-container-type", containerType,
+        llvm::cl::desc("Serialized executable container type."),
+        llvm::cl::cat(category),
+        llvm::cl::values(clEnumValN(ContainerType::Auto, "auto",
+                                    "Automatically detect the container type "
+                                    "from the target ABI attribute."),
+                         clEnumValN(ContainerType::HIP, "hip",
+                                    "HIP ExecutableDef flatbuffer."),
+                         clEnumValN(ContainerType::AMDGPU, "amdgpu",
+                                    "AMDGPU ExecutableDef flatbuffer."),
+                         clEnumValN(ContainerType::HSACO, "hsaco",
+                                    "Raw HSACO image (ELF).")));
+
     binder.opt<std::string>("iree-hip-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of HIP Bitcode."));
+
     binder.opt<int>("iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
+
     binder.opt<std::string>(
         "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
@@ -124,6 +155,7 @@ struct ROCMOptions {
                  "to be passed to the target backend compiler during HIP "
                  "executable serialization"),
         cl::ZeroOrMore, cl::cat(category));
+
     binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
@@ -673,14 +705,44 @@ public:
                      ".hsaco", targetHSACO);
     }
 
-    // Wrap the HSACO ELF binary in a Flatbuffers container.
+    // Determine container type from the target ABI attribute.
+    ContainerType containerType = options.containerType;
+    if (containerType == ContainerType::Auto) {
+      if (getABI(targetAttr) == "amdgpu") {
+        containerType = ContainerType::AMDGPU;
+      } else {
+        containerType = ContainerType::HIP;
+      }
+    }
+
+    // Wrap the HSACO ELF binary in the requested container type (if any).
     FailureOr<DenseIntElementsAttr> binaryContainer;
-    if (getABI(targetAttr) == "amdgpu") {
+    switch (containerType) {
+    case ContainerType::Auto: {
+      // Resolved above; unreachable. Fall-through to error case.
+      assert(false && "auto container type must have resolved earlier");
+      break;
+    }
+    case ContainerType::AMDGPU: {
       binaryContainer = serializeAMDGPUBinaryContainer(
           serializationOptions, variantOp, exportOps, targetHSACO);
-    } else {
+      break;
+    }
+    case ContainerType::HIP: {
       binaryContainer = serializeHIPBinaryContainer(
           serializationOptions, variantOp, exportOps, targetHSACO);
+      break;
+    }
+    case ContainerType::HSACO: {
+      SmallVector<uint8_t> image;
+      image.resize(targetHSACO.size());
+      std::memcpy(image.data(), targetHSACO.data(), image.size());
+      binaryContainer = DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(targetHSACO.size())},
+                          executableBuilder.getI8Type()),
+          image);
+      break;
+    }
     }
     if (failed(binaryContainer) || !binaryContainer.value()) {
       return failure();
