@@ -437,17 +437,8 @@ public:
     for (auto exportOp : exports) {
       IntegerAttr ordinalAttr = exportOp.getOrdinalAttr();
       if (!ordinalAttr) {
-        // We can't add new fallback entry points if we don't have ordinals on
-        // the exports. In such cases bail out and drop all specialization
-        // annotations. Failing to specialize is not considered a failure as the
-        // IR is otherwise still valid.
-        variant.walk([&](Operation *op) {
-          // Guard for silly assert around removal of non-present attribute.
-          if (helper.isAttrPresent(op)) {
-            helper.removeAttr(op);
-          }
-        });
-        return;
+        exportOp.emitError("Missing export ordinal for specialization.");
+        return signalPassFailure();
       }
       ordinalSet.insert(ordinalAttr.getInt());
     }

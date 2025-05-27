@@ -366,38 +366,3 @@ hal.executable private @no_assume {
 //   CHECK-DAG:       util.assume.int %{{.*}}<umin = 4096, udiv = 256>
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1
 //   CHECK-NOT:       util.assume.int
-
-// -----
-
-#executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
-  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-hal.executable private @no_ordinal {
-  hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
-    hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32() {
-        %c0 = arith.constant 0 : index
-        %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-        %2 = arith.index_castui %0 : i32 to index
-        %3 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
-        %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%3}
-        %5 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0], sizes = [%3], strides = [1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%3} -> tensor<?xf32>
-        %6 = tensor.empty(%3) : tensor<?xf32>
-        %7 = linalg.copy {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
-            [<umin = 4096, udiv = 256>]]>}
-          ins(%5 : tensor<?xf32>) outs(%6 : tensor<?xf32>) -> tensor<?xf32>
-        iree_tensor_ext.dispatch.tensor.store %7, %4, offsets = [0], sizes = [%3], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xf32>>{%3}
-        return
-      }
-    }
-  }
-}
-
-// CHECK-LABEL: hal.executable private @no_ordinal
-
-//   CHECK-NOT: iree_codegen.specialization_ranges
