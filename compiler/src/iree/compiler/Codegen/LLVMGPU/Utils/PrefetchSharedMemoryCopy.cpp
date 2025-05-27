@@ -42,7 +42,7 @@ public:
   static FailureOr<LoopPrefetcher> get(scf::ForOp op) {
     if (!op.getOps<scf::ForOp>().empty()) {
       LDBG("Loop prefetcher does not support nested loops yet");
-      return failure();
+      // return failure();
     }
 
     LoopPrefetcher prefetcher;
@@ -176,6 +176,59 @@ private:
     });
   }
 
+  static void getValueDependencies(Operation *op, scf::ForOp forOp,
+                                   std::vector<Operation *> &dependencies,
+                                   DenseSet<Operation *> &visited) {
+    if (!op || visited.contains(op))
+      return;
+    visited.insert(op);
+
+    // Only consider operations that are within the scf::ForOp.
+    if (!forOp->isProperAncestor(op))
+      return;
+
+    for (Value operand : op->getOperands()) {
+      if (Operation *defOp = operand.getDefiningOp()) {
+        getValueDependencies(defOp, forOp, dependencies, visited);
+      }
+    }
+
+    dependencies.push_back(op);
+  }
+
+  void replaceIterationVariable(Operation *op, Value iterArg, Value constant) {
+    for (auto &operand : op->getOpOperands()) {
+      if (operand.get() == iterArg) {
+        operand.set(constant);
+      }
+    }
+  }
+
+  void hoistTransferReadAndDependencies(scf::ForOp forOp) {
+    OpBuilder builder(forOp.getContext());
+    std::vector<Operation *> dependencies;
+    DenseSet<Operation *> visited;
+    Value iterArg = forOp.getInductionVar();
+
+    // Find transfer_read operations and relevant dependencies within the loop.
+    forOp.walk([&](vector::TransferReadOp readOp) {
+      getValueDependencies(readOp, forOp, dependencies, visited);
+    });
+
+    builder.setInsertionPoint(forOp);
+    Value zero = builder.create<arith::ConstantIndexOp>(forOp.getLoc(), 0);
+
+    // Hoist dependencies in the order they were collected.
+    for (Operation *dep : dependencies) {
+      replaceIterationVariable(dep, iterArg, zero);
+      dep->moveBefore(forOp);
+    }
+
+    // Hoist the transfer_read op itself separately if needed.
+    forOp.walk(
+        [&](vector::TransferReadOp readOp) { readOp->moveBefore(forOp); });
+  }
+
   // We only support loops whose bodies can be divided into 3 stages (read,
   // write, compute). If there are any remaining ops with side effects (except
   // for gpu.barrier), the loop is not supported.
@@ -192,6 +245,9 @@ private:
                              /*noTransferReads=*/true);
       } else if (auto compute = dyn_cast<scf::YieldOp>(op)) {
         getValueDependencies(compute, computeDependencies);
+      } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+        hoistTransferReadAndDependencies(forOp);
+        getValueDependencies(forOp, readDependencies);
       }
     }
     // If `scf.yeild` is the only compute op then there is no value in doing

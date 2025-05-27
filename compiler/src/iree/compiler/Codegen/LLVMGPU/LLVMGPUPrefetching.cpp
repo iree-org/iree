@@ -34,7 +34,7 @@ struct LLVMGPUPrefetchSharedMemoryPass final
       // The only possible failure is the analysis failure, which does not cause
       // the pass to fail. Therefore we discard any failures at this point.
       (void)newLoop;
-      break; // TODO: Fix nested loop handling.
+      // break; // TODO: Fix nested loop handling.
     }
   }
 };
