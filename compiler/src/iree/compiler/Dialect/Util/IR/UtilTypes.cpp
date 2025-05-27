@@ -674,6 +674,29 @@ std::optional<ValueRange> findDynamicDims(Value workValue) {
   return std::nullopt;
 }
 
+OpFoldResult findDim(Value workValue, int64_t dim) {
+  auto shapedType = cast<ShapedType>(workValue.getType());
+  int64_t rank = shapedType.getRank();
+  assert(rank > dim && "querying out of range dim");
+  int64_t staticSize = shapedType.getDimSize(dim);
+  if (!ShapedType::isDynamic(staticSize)) {
+    Builder b(workValue.getContext());
+    return b.getIndexAttr(dim);
+  }
+
+  // Look up the use-def chain for the dynamic dims of the shaped value.
+  auto upwardRange = findDynamicDims(workValue);
+  if (!upwardRange.has_value()) {
+    return OpFoldResult();
+  }
+
+  // Count the number of dynamic dims before the queried dim. This is the index
+  // of the queried dim out of the range of dynamic dims.
+  int64_t dynamicIndex = llvm::count_if(
+      shapedType.getShape().drop_back(rank - dim), ShapedType::isDynamic);
+  return upwardRange.value()[dynamicIndex];
+}
+
 std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
                                           Block::iterator insertionPoint) {
   // Look up the use-def chain: always safe, as any value we reach dominates

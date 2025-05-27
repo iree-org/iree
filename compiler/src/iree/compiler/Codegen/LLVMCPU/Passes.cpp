@@ -837,6 +837,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager);
 }

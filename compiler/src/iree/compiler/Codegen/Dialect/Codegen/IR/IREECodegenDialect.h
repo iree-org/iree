@@ -9,6 +9,7 @@
 
 #include <mutex>
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/Dialect.h"

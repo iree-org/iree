@@ -44,6 +44,18 @@ def Util_MultiValueIntAssumptionAttrList : TypedArrayAttrBase<
     Util_IntAssumptionAttrList,
     "list of int attribute assumptions for multiple values">;
 
+/// Convenience array attribute for assumption lists.
+def Util_IntAssumptionAttrArray : ArrayOfAttr<
+  Util_Dialect, "IntAssumptionArray", "int.assumption.array", "IntAssumptionAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+}
+
+/// Convenience array attribute for nested assumption lists.
+def Util_MultiValueIntAssumptionAttrArray : ArrayOfAttr<
+  Util_Dialect, "MultiIntAssumptionArray", "int.assumption.multi_array", "IntAssumptionArrayAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+}
+
 //===----------------------------------------------------------------------===//
 // #util.byte_pattern
 //===----------------------------------------------------------------------===//

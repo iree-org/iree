@@ -1229,6 +1229,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   buildLLVMGPUCodegenConfigurationPassPipelineImpl(
       variantPassManager.nest<ModuleOp>());
 }
@@ -1307,6 +1308,7 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
 
 void buildROCDLCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildROCDLCodegenConfigurationPassPipelineImpl(modulePassManager);
 }
