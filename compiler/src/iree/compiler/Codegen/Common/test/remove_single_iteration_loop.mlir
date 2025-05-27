@@ -16,11 +16,14 @@ func.func @thread_tile_loop() {
        gpu.barrier
     }
   }
-  // The inner loop doesn't always execute once so it cannot be removed.
-  //     CHECK: scf.for %{{.*}} = %{{.*}} to %[[C250]] step %[[C250]]
-  //     CHECK:   gpu.barrier
   scf.for %arg3 = %tidy to %c2 step %c2 {
+  //  CHECK-NOT:  scf.for
     %0 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%tidx]
+  //      CHECK:   %[[LB:.+]] = affine.apply
+  // The inner loop doesn't always execute once so it needs an scf.if
+  //      CHECK: %[[COND:.+]] = arith.cmpi slt, %[[LB]], %[[C250]] : index
+  //      CHECK: scf.if %[[COND]] {
+  //      CHECK:   gpu.barrier
     scf.for %arg4 = %0 to %c250 step %c250 {
        gpu.barrier
     }
@@ -161,6 +164,7 @@ func.func @delinearize_linearize() {
   %c64 = arith.constant 64 : index
   %tidx = gpu.thread_id x upper_bound 128
   %ids:2 = affine.delinearize_index %tidx into (4, 32) : index, index
+  //     CHECK: %[[IDS:.+]]:2 = affine.delinearize_index
   // CHECK-NOT: scf.for
   //     CHECK: gpu.barrier
   scf.for %arg3 = %ids#0 to %c4 step %c4 {
@@ -169,8 +173,9 @@ func.func @delinearize_linearize() {
        gpu.barrier
     }
   }
-  // The loop loop doesn't always execute once so it cannot be removed.
-  //     CHECK: scf.for %{{.*}} = %{{.*}} to %[[C3]] step %{{.*}}
+  // The loop doesn't always execute once so it needs an scf.if
+  //     CHECK: %[[COND:.+]] = arith.cmpi slt, %[[IDS:.+]]#0, %[[C3]] : index
+  //     CHECK: scf.if %[[COND]] {
   //     CHECK:   gpu.barrier
   scf.for %arg3 = %ids#0 to %c3 step %c4 {
     gpu.barrier
@@ -220,3 +225,91 @@ func.func @argument_with_assume(%arg_index : index) {
   }
   return
 }
+
+// -----
+
+func.func @dynamic_ub_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
+  %c1 = arith.constant 0 : index
+  %c3 = arith.constant 3 : index
+  %0 = util.assume.int %arg_index<umin = 0, umax = 3> : index
+  scf.for %arg1 = %c1 to %0 step %c3 {
+    %alloc = memref.alloc() : memref<4xf16>
+    %subview = memref.subview %arg_value[%arg1][4][1] :  memref<8xf16> to memref<4xf16, strided<[1], offset: ?>>
+    memref.copy %alloc, %subview : memref<4xf16> to memref<4xf16, strided<[1], offset: ?>>
+  }
+  return
+}
+// CHECK-LABEL: func.func @dynamic_ub_unittrip
+//  CHECK-SAME: (%[[ARGINDEX:.+]]: index, %[[ARGVALUE:.+]]: memref<8xf16>)
+//       CHECK: %[[C0:.+]] = arith.constant 0 : index
+//       CHECK: %[[UB:.+]] = util.assume.int %[[ARGINDEX]]
+//       CHECK: %[[COND:.+]] = arith.cmpi sgt, %[[UB]], %[[C0]] : index
+//       CHECK: scf.if %[[COND]] {
+//       CHECK:   memref.alloc()
+//       CHECK:   memref.subview %[[ARGVALUE]][%[[C0]]] [4] [1]
+//       CHECK:   memref.copy
+
+// -----
+
+func.func @dynamic_lb_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %0 = util.assume.int %arg_index<umin = 0, umax = 50> : index
+  scf.for %arg1 = %0 to %c3 step %c3 {
+    %alloc = memref.alloc() : memref<4xf16>
+    %subview = memref.subview %arg_value[%arg1][4][1] :  memref<8xf16> to memref<4xf16, strided<[1], offset: ?>>
+    memref.copy %alloc, %subview : memref<4xf16> to memref<4xf16, strided<[1], offset: ?>>
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @dynamic_lb_unittrip
+//  CHECK-SAME: (%[[ARGINDEX:.+]]: index, %[[ARGVALUE:.+]]: memref<8xf16>)
+//       CHECK: %[[C3:.+]] = arith.constant 3 : index
+//       CHECK: %[[LB:.+]] = util.assume.int %[[ARGINDEX]]
+//       CHECK: %[[COND:.+]] = arith.cmpi slt, %[[LB]], %[[C3]] : index
+//       CHECK: scf.if %[[COND]] {
+//       CHECK:   memref.alloc()
+//       CHECK:   memref.subview %[[ARGVALUE]][%[[LB]]] [4] [1]
+//       CHECK:   memref.copy
+
+// -----
+
+func.func @dynamic_nonunittrip(%arg_index : index, %arg_value : memref<8xf16>) {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %0 = util.assume.int %arg_index<umin = 0, umax = 5> : index
+  scf.for %arg1 = %c1 to %0 step %c3 {
+       gpu.barrier
+  }
+  return
+}
+// CHECK-LABEL: func.func @dynamic_nonunittrip
+//       CHECK: scf.for
+
+// -----
+
+func.func @dynamic_unittrip_with_destination(%arg_index : index, %arg_value : tensor<8xf16>) -> tensor<4xf16> {
+  %c0 = arith.constant 0 : index
+  %c3 = arith.constant 3 : index
+  %0 = util.assume.int %arg_index<umin = 0, umax = 3> : index
+  %empty = tensor.empty() : tensor<4xf16>
+  %1 = scf.for %arg1 = %c0 to %0 step %c3 iter_args(%arg2 = %empty) -> (tensor<4xf16>) {
+       %extract = tensor.extract_slice %arg_value[%arg1][4][1] : tensor<8xf16> to tensor<4xf16>
+       %2 = arith.negf %extract : tensor<4xf16>
+       scf.yield %2 : tensor<4xf16>
+  }
+  return %1 : tensor<4xf16>
+}
+
+// CHECK-LABEL: func.func @dynamic_unittrip_with_destination
+//  CHECK-SAME: (%[[ARGINDEX:.+]]: index, %[[ARGTENSOR:.+]]: tensor<8xf16>)
+//       CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4xf16>
+//       CHECK: %[[RESULT:.+]] = scf.if
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice
+//       CHECK:   %[[NEG:.+]] = arith.negf %[[SLICE]] : tensor<4xf16>
+//       CHECK:   scf.yield %[[NEG]] : tensor<4xf16>
+//       CHECK: } else {
+//       CHECK:   scf.yield %[[EMPTY]] : tensor<4xf16>
+//       CHECK: }
+//       CHECK: return %[[RESULT]] : tensor<4xf16>
