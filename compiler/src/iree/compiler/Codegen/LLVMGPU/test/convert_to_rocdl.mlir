@@ -33,8 +33,8 @@ builtin.module {
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone})
 //         CHECK:    rocdl.workgroup.dim.x
-//         CHECK:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
-//       INDEX32:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
+//         CHECK:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//       INDEX32:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
 //         CHECK:    llvm.fadd
 
 

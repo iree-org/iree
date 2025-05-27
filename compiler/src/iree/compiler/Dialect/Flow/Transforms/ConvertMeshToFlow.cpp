@@ -10,7 +10,7 @@
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/OpVisitor.h"
 #include "iree/compiler/Utils/Permutation.h"
-#include "iree/compiler/Utils/SmallVectorDenseMapInfo.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"

@@ -289,7 +289,7 @@ public:
           extractSliceOp,
           "expect it is not a rank-reduced tensor.extract_slice op");
     }
-    if (!llvm::all_of(extractSliceOp.getMixedOffsets(), isZeroIndex)) {
+    if (!llvm::all_of(extractSliceOp.getMixedOffsets(), isZeroInteger)) {
       return rewriter.notifyMatchFailure(extractSliceOp,
                                          "expect all the offsets are zeros");
     }
