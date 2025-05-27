@@ -1118,7 +1118,7 @@ bool DeviceTopologyAttr::requiresTransfer(
   for (DeviceLinkAttr link : getLinks()) {
     if ((sourceDevice == link.getSourceDevice() &&
          targetDevice == link.getTargetDevice())) {
-      return !link.hasTransparentAccess() || !link.hasUnifiedMemory();
+      return !link.hasTransparentAccess() && !link.hasUnifiedMemory();
     }
   }
   return true;
