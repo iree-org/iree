@@ -14,12 +14,11 @@
 namespace mlir::iree_compiler {
 
 // Populates conversion patterns for stream->HAL.
-void populateStreamToHALPatterns(MLIRContext *context,
-                                 ConversionTarget &conversionTarget,
-                                 TypeConverter &typeConverter,
-                                 RewritePatternSet &patterns,
-                                 IREE::HAL::DeviceAnalysis& deviceAnalysis,
-                                 const IREE::HAL::TargetRegistry &targetRegistry);
+void populateStreamToHALPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter, RewritePatternSet &patterns,
+    IREE::HAL::DeviceAnalysis &deviceAnalysis,
+    const IREE::HAL::TargetRegistry &targetRegistry);
 
 } // namespace mlir::iree_compiler
 

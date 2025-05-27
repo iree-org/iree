@@ -22,7 +22,7 @@ Value TargetDevice::buildDeviceTargetMatch(
 LogicalResult TargetDevice::setSharedUsageBits(
     const SetVector<IREE::HAL::DeviceTargetAttr> &targets,
     IREE::HAL::BufferUsageBitfield &bufferUsage) const {
-      return failure();
+  return failure();
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL
