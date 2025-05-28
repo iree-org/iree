@@ -17,7 +17,6 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-stream-clone-to-consumers"
 
@@ -53,8 +52,11 @@ static bool canCloneOp(Operation *op) {
 // needing the fixed-point iteration. It would also let us clone across branch
 // and function boundaries: this simple local analysis only works in a single
 // basic block.
-static bool tryCloneToConsumersInRegion(Region &region,
+static bool tryCloneToConsumersInRegion(Operation *op, Region &region,
                                         AffinityAnalysis &analysis) {
+  [[maybe_unused]] std::unique_ptr<AsmState> asmState;
+  LLVM_DEBUG(asmState = std::make_unique<AsmState>(op));
+
   bool didChange = false;
   SmallVector<IREE::Stream::AffinityAttr> affinities; // cached, cleared in for
   DenseMap<Operation *, Operation *> clonedOps;       // cached, cleared in for
@@ -80,6 +82,14 @@ static bool tryCloneToConsumersInRegion(Region &region,
         auto result = cast<OpResult>(operand.get());
         auto clonedIt = clonedOps.find(definingOp);
         if (clonedIt != clonedOps.end()) {
+          LLVM_DEBUG({
+            llvm::dbgs()
+                << "[CloneToConsumers] * reusing previously cloned operand ";
+            result.printAsOperand(llvm::dbgs(), *asmState);
+            llvm::dbgs() << " source: ";
+            definingOp->print(llvm::dbgs(), *asmState);
+            llvm::dbgs() << "\n";
+          });
           operand.set(clonedIt->second->getResult(result.getResultNumber()));
           didChange = true;
           continue;
@@ -93,10 +103,28 @@ static bool tryCloneToConsumersInRegion(Region &region,
         // Clone the producer of the operand if it has multiple affinities and
         // replace our use with it.
         if (affinities.size() > 1) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "[CloneToConsumers] + cloning operand ";
+            result.printAsOperand(llvm::dbgs(), *asmState);
+            llvm::dbgs() << " source: ";
+            definingOp->print(llvm::dbgs(), *asmState);
+            llvm::dbgs() << " for unique affinity\n";
+          });
           OpBuilder builder(&op);
           auto *clonedOp = builder.clone(*definingOp);
           clonedOps.insert(std::make_pair(definingOp, clonedOp));
           operand.set(clonedOp->getResult(result.getResultNumber()));
+          if (definingOp->use_empty()) {
+            // If this was the last user of the original op we can kill it.
+            LLVM_DEBUG(
+                {
+                  llvm::dbgs()
+                      << "[CloneToConsumers] - erasing unused defining op: ";
+                  definingOp->print(llvm::dbgs(), *asmState);
+                  llvm::dbgs() << "\n";
+                });
+            definingOp->erase();
+          }
           didChange = true;
           continue;
         }
@@ -111,27 +139,6 @@ static bool tryCloneToConsumersInRegion(Region &region,
 struct CloneToConsumersPass
     : public IREE::Stream::impl::CloneToConsumersPassBase<
           CloneToConsumersPass> {
-  GreedyRewriteConfig config;
-  std::shared_ptr<const FrozenRewritePatternSet> patterns;
-
-  LogicalResult initialize(MLIRContext *context) override {
-    // Inherit the same config defaults from the upstream canonicalizer pass.
-    config.setUseTopDownTraversal().setRegionSimplificationLevel(
-        mlir::GreedySimplifyRegionLevel::Normal);
-
-    RewritePatternSet owningPatterns(context);
-    for (auto *dialect : context->getLoadedDialects()) {
-      dialect->getCanonicalizationPatterns(owningPatterns);
-    }
-    for (RegisteredOperationName op : context->getRegisteredOperations()) {
-      op.getCanonicalizationPatterns(owningPatterns, context);
-    }
-    patterns =
-        std::make_shared<FrozenRewritePatternSet>(std::move(owningPatterns));
-
-    return success();
-  }
-
   void runOnOperation() override {
     auto moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {
@@ -142,11 +149,17 @@ struct CloneToConsumersPass
     // need that. If we end up with more complex programs that have transfers
     // that break analysis we may need multiple runs.
     unsigned maxIterationCount = 32;
+    LLVM_DEBUG(llvm::dbgs()
+               << "[CloneToConsumers] beginning for maxIterationCount="
+               << maxIterationCount << "\n");
 
     // Try analyzing the program and cloning operations until all are used on
     // a single affinity.
     unsigned iterationCount = 0;
     for (; iterationCount < maxIterationCount; ++iterationCount) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "[CloneToConsumers] iteration " << iterationCount << "\n");
+
       // Perform whole-program analysis.
       // TODO(benvanik): reuse allocator across iterations.
       AffinityAnalysis analysis(moduleOp);
@@ -161,15 +174,8 @@ struct CloneToConsumersPass
       for (auto funcOp : moduleOp.getOps<CallableOpInterface>()) {
         bool funcDidChange = false;
         if (auto *region = funcOp.getCallableRegion()) {
-          funcDidChange = tryCloneToConsumersInRegion(*region, analysis);
-        }
-        if (funcDidChange) {
-          if (failed(
-                  applyPatternsGreedily(getOperation(), *patterns, config))) {
-            llvm::errs()
-                << "canonicalization failed to converge; bad IR was produced\n";
-            return signalPassFailure();
-          }
+          funcDidChange =
+              tryCloneToConsumersInRegion(funcOp, *region, analysis);
         }
         didChange |= funcDidChange;
       }
@@ -189,6 +195,10 @@ struct CloneToConsumersPass
           << " iterations; ambiguous affinity may be present";
       return;
     }
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "[CloneToConsumers] completed after " << iterationCount << "/"
+               << maxIterationCount << " iterations\n");
   }
 };
 
