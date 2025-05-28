@@ -541,6 +541,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
       static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
 
+  funcPassManager.addPass(createLLVMCPUForallToForPass());
+
   {
     GenericVectorizationPassOptions options;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;

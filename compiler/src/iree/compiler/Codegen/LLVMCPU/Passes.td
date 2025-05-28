@@ -233,4 +233,12 @@ def VerifyLinalgTransformLegalityPass :
   let summary = "Verify that only supported IR constructs are passed to the compiler.";
 }
 
+def LLVMCPUForallToForPass :
+    InterfacePass<"iree-llvmcpu-forall-to-for", "mlir::FunctionOpInterface"> {
+  let summary = "Convert non-workgroup-distribution scf.forall to scf.for loops";
+  let description = [{
+    Converts scf.forall loops without `iree_codegen.workgroup_mapping` attributes to scf.for loops.
+  }];
+}
+
 #endif // IREE_CODEGEN_LLVMCPU_PASSES
