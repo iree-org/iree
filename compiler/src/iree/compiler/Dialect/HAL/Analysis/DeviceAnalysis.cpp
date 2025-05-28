@@ -226,9 +226,9 @@ void DeviceAnalysis::gatherDeviceAffinityTargets(
     for (auto affinity : optimalAttr.getAffinities()) {
       gatherDeviceAffinityTargets(affinity, fromOp, resultSet);
     }
-  // We currently only know how to handle HAL device affinities.
-  // We could support other ones via an interface but instead we just fall back
-  // to default logic if no affinity or an unknown one is found.
+    // We currently only know how to handle HAL device affinities.
+    // We could support other ones via an interface but instead we just fall
+    // back to default logic if no affinity or an unknown one is found.
   } else if (auto deviceAffinityAttr =
                  dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(
                      affinityAttr)) {

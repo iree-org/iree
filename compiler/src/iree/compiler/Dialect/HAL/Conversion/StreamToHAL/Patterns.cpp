@@ -105,7 +105,9 @@ trySetSharedUsageBits(Operation *op,
       if (!targetDevice) {
         return failure();
       }
-      return targetDevice->setSharedUsageBits(targetAttrs, bufferUsage);
+      if (failed(targetDevice->setSharedUsageBits(targetAttrs, bufferUsage))) {
+        return failure();
+      }
     }
   }
   return success();

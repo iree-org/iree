@@ -82,14 +82,14 @@ public:
       // If the target is metal (self), we dont need to add any usage bits.
       if (targetAttr.getDeviceID().getValue() == "metal") {
         continue;
-      }
-      // For local interop, we need to add the mapping persistent usage bit.
-      if (targetAttr.getDeviceID().getValue() == "local") {
+      } else if (targetAttr.getDeviceID().getValue() == "local") {
+        // For local interop, we need to add the mapping persistent usage bit.
         bufferUsage =
             bufferUsage | IREE::HAL::BufferUsageBitfield::MappingPersistent;
+      } else {
+        // Interop with other targets is not supported yet.
+        return failure();
       }
-      // Interop with other targets is not supported yet.
-      return failure();
     }
     return success();
   }
