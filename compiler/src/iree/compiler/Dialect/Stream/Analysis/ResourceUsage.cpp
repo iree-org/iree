@@ -269,10 +269,8 @@ private:
         })
         .Case([&](IREE::Util::GlobalLoadOpInterface op) {
           removeAssumedBits(NOT_GLOBAL_READ);
-          auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
-          auto globalType = llvm::cast<IREE::Stream::ResourceType>(
-              globalInfo->op.getGlobalType());
+          auto globalType = cast<IREE::Stream::ResourceType>(
+              op.getLoadedGlobalValue().getType());
           switch (globalType.getLifetime()) {
           case IREE::Stream::Lifetime::Constant:
             removeAssumedBits(NOT_CONSTANT);
@@ -640,10 +638,8 @@ private:
         })
         .Case([&](IREE::Util::GlobalStoreOpInterface op) {
           removeAssumedBits(NOT_GLOBAL_WRITE);
-          auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
-          auto globalType = llvm::cast<IREE::Stream::ResourceType>(
-              globalInfo->op.getGlobalType());
+          auto globalType = cast<IREE::Stream::ResourceType>(
+              op.getStoredGlobalValue().getType());
           switch (globalType.getLifetime()) {
           case IREE::Stream::Lifetime::Constant:
             removeAssumedBits(NOT_CONSTANT);
