@@ -479,7 +479,10 @@ def IREEExpandStridedMetadataPass :
 }
 def IREEInjectAssumeAlignmentPass :
     InterfacePass<"iree-codegen-inject-assume-alignment", "mlir::FunctionOpInterface"> {
-  let summary = "TBD";
+  let summary = [{
+    Insert memref.assume_alignment ops right after hal.interface.binding.subspan
+    ops, if alignment is present in bindings.
+  }];
   let dependentDialects = [
       "memref::MemRefDialect"
   ];
