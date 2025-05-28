@@ -326,6 +326,24 @@ GatherOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+  return SmallVector<int64_t>(getOutputType().getShape());
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForOperands() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      AffineMap(nullptr),
+      builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
 namespace {
 struct ConvertGatherToExtract
     : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
