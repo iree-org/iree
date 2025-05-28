@@ -751,7 +751,8 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
 struct FlattenMemRefSubspanPass final
     : impl::FlattenMemRefSubspanPassBase<FlattenMemRefSubspanPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, memref::MemRefDialect>();
+    registry.insert<affine::AffineDialect, memref::MemRefDialect,
+                    IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {

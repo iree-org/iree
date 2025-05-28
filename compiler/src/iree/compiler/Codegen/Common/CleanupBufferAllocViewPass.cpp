@@ -37,7 +37,6 @@ struct CleanupBufferAllocViewPass final
     populateReshapeToInterfaceTensorPatterns(patterns);
     populateFoldTensorReshapeIntoBufferPatterns(patterns);
     populateRemoveDeadMemAllocPatterns(patterns);
-    populateCleanMemRefAssumeAlignmentPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
