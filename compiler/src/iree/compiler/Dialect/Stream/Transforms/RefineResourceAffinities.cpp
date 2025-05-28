@@ -25,8 +25,6 @@ namespace {
 // --iree-stream-refine-resource-affinities
 //===----------------------------------------------------------------------===//
 
-// Refines the affinity of an allocation operation based on usage analysis.
-// Returns the optimal affinity if refinement is needed, {} otherwise.
 static IREE::Stream::AffinityAttr
 refineAllocationAffinity(Value allocationResult,
                          AffinityAnalysis &affinityAnalysis) {
