@@ -742,6 +742,13 @@ ChangeStatus OpAffinityPVS::updateOperation(Operation *op,
       if (isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
         auto valuePVS = solver.getElementFor<ValueProducerAffinityPVS>(
             *this, Position::forValue(operand), DFX::Resolution::REQUIRED);
+        LLVM_DEBUG({
+          llvm::dbgs() << "[OpAffinityPVS] op ";
+          op->getName().print(llvm::dbgs());
+          llvm::dbgs() << " consumes ";
+          valuePVS.print(llvm::dbgs(), solver.getAsmState());
+          llvm::dbgs() << "\n";
+        });
         newState ^= valuePVS;
       }
     }
@@ -750,6 +757,13 @@ ChangeStatus OpAffinityPVS::updateOperation(Operation *op,
       if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
         auto valuePVS = solver.getElementFor<ValueConsumerAffinityPVS>(
             *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+        LLVM_DEBUG({
+          llvm::dbgs() << "[OpAffinityPVS] op ";
+          op->getName().print(llvm::dbgs());
+          llvm::dbgs() << " produces ";
+          valuePVS.print(llvm::dbgs(), solver.getAsmState());
+          llvm::dbgs() << "\n";
+        });
         newState ^= valuePVS;
       }
     }

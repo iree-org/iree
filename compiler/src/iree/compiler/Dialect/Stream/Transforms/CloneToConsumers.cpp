@@ -61,7 +61,10 @@ static bool tryCloneToConsumersInRegion(Operation *op, Region &region,
   SmallVector<IREE::Stream::AffinityAttr> affinities; // cached, cleared in for
   DenseMap<Operation *, Operation *> clonedOps;       // cached, cleared in for
   for (auto &block : region.getBlocks()) {
-    for (auto &op : block.getOperations()) {
+    // Note that we walk backwards so that we clone for later ops in the block
+    // than for earlier ones to preserve IR order. This is not required for
+    // correctness but does really help debugging.
+    for (auto &op : llvm::reverse(block.getOperations())) {
       // Since we aren't using affinities here and just cloning the entire
       // use-def chain we can't share cloned ops across other ops. It's possible
       // to use analysis to determine if the op we cloned for shares the same
@@ -104,6 +107,27 @@ static bool tryCloneToConsumersInRegion(Operation *op, Region &region,
         // replace our use with it.
         if (affinities.size() > 1) {
           LLVM_DEBUG({
+            llvm::dbgs() << "[CloneToConsumers] ! result ";
+            result.printAsOperand(llvm::dbgs(), *asmState);
+            llvm::dbgs() << " has multiple affinities: [";
+            llvm::interleaveComma(affinities, llvm::dbgs());
+            llvm::dbgs() << "]\n";
+          });
+
+          // If the op only has a single use (us) we can skip the clone. This
+          // arises in cases where we've had to clone for other users before
+          // reaching this op.
+          if (llvm::hasSingleElement(definingOp->getUsers())) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "[CloneToConsumers] ~ result op has one user "
+                              "(us), not cloning: ";
+              result.printAsOperand(llvm::dbgs(), *asmState);
+              llvm::dbgs() << "\n";
+            });
+            continue;
+          }
+
+          LLVM_DEBUG({
             llvm::dbgs() << "[CloneToConsumers] + cloning operand ";
             result.printAsOperand(llvm::dbgs(), *asmState);
             llvm::dbgs() << " source: ";
@@ -114,19 +138,24 @@ static bool tryCloneToConsumersInRegion(Operation *op, Region &region,
           auto *clonedOp = builder.clone(*definingOp);
           clonedOps.insert(std::make_pair(definingOp, clonedOp));
           operand.set(clonedOp->getResult(result.getResultNumber()));
-          if (definingOp->use_empty()) {
-            // If this was the last user of the original op we can kill it.
-            LLVM_DEBUG(
-                {
-                  llvm::dbgs()
-                      << "[CloneToConsumers] - erasing unused defining op: ";
-                  definingOp->print(llvm::dbgs(), *asmState);
-                  llvm::dbgs() << "\n";
-                });
-            definingOp->erase();
-          }
+
           didChange = true;
           continue;
+        }
+      }
+
+      // If we cloned any ops we are likely to have removed their last uses.
+      // We cleanup after the operand walk in case there are multiple uses by
+      // the same op.
+      for (auto it : clonedOps) {
+        auto *definingOp = it.first;
+        if (definingOp->use_empty()) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "[CloneToConsumers] - erasing unused defining op: ";
+            definingOp->print(llvm::dbgs(), *asmState);
+            llvm::dbgs() << "\n";
+          });
+          definingOp->erase();
         }
       }
     }
