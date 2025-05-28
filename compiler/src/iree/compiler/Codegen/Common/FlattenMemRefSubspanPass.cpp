@@ -709,15 +709,14 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
   };
 };
 
-/// Erase alignment hints.
-struct RemoveAssumeAlignOp
-    : public OpRewritePattern<memref::AssumeAlignmentOp> {
-public:
-  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
+/// Fold alignment hints.
+struct FoldAssumeAlignOp
+    : public OpConversionPattern<memref::AssumeAlignmentOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::AssumeAlignmentOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, adaptor.getMemref());
     return success();
   }
 };
@@ -757,10 +756,6 @@ struct FlattenMemRefSubspanPass final
 
     MLIRContext *context = &getContext();
 
-    // This pass currently doesn't support alignment hints so remove them first.
-    RewritePatternSet patterns(context);
-    patterns.add<RemoveAssumeAlignOp>(context);
-    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
 
     RewritePatternSet flattenPatterns(context);
 
@@ -780,6 +775,7 @@ struct FlattenMemRefSubspanPass final
           return std::nullopt;
         });
     flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
+    flattenPatterns.add<FoldAssumeAlignOp>(context);
 
     // Other ops generate MemRef values representing internal allocations (e.g.,
     // on stack for GPU, in shared memory for GPU) or data embedded in the
@@ -825,6 +821,9 @@ struct FlattenMemRefSubspanPass final
           auto byteOffset = op.getByteOffset();
           return !byteOffset || matchPattern(byteOffset, m_Zero());
         });
+    // This pass currently doesn't support alignment hints so always fold them.
+    target.addDynamicallyLegalOp<memref::AssumeAlignmentOp>(
+        [&](memref::AssumeAlignmentOp op) { return false; });
     target.addDynamicallyLegalOp<memref::GlobalOp>([](memref::GlobalOp op) {
       return isRankZeroOrOneMemRef(op.getType());
     });
