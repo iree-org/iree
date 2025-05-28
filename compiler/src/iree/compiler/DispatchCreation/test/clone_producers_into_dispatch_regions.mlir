@@ -791,3 +791,25 @@ util.func public @dont_clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor
 //       CHECK:      %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //       CHECK:        ins({{.*}}, %[[DISPATCHK]], %[[DISPATCHV]]
 //       CHECK:      flow.return %[[ATTENTION]]
+
+// -----
+
+util.func public @matmul_with_bias_consant(%arg0: tensor<2x3xf32>, %arg1: tensor<3x2xf32>) -> tensor<2x2xf32> {
+  %0 = arith.constant dense<[[1.0, 2.0], [3.0, 4.0]]> : tensor<2x2xf32>
+  %2 = flow.dispatch.region -> (tensor<2x2xf32>) {
+    %3 = linalg.matmul
+            indexing_maps = [
+                affine_map<(m, n, k) -> (m, k)>,
+                affine_map<(m, n, k) -> (k, n)>,
+                affine_map<(m, n, k) -> (m, n)>]
+            ins(%arg0, %arg1 : tensor<2x3xf32>,tensor<3x2xf32>)
+            outs(%0: tensor<2x2xf32>) -> tensor<2x2xf32>
+    flow.return %3 : tensor<2x2xf32>
+  }
+  util.return %2 : tensor<2x2xf32>
+}
+// CHECK-LABEL: util.func public @matmul_with_bias_consant
+//       CHECK: %[[BIAS:.+]] = arith.constant
+//       CHECK: %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:   flow.return %[[MATMUL]]

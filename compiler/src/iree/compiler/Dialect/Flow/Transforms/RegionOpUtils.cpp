@@ -938,6 +938,21 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
       if (insertSliceUser.getDest() == v)
         return true;
     }
+
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
+      // The following check ensures that if any constants are used as an init
+      // tensor with a linalg operation, they are not cloned into the
+      // region. The rationale is the init tensor implements Destination
+      // Style Passing and so it implies that the tensor will be written to
+      // after bufferization. Therefore, if we have a constant within the
+      // region, then verification fails as the operation writes to a constant,
+      // immutable value. However, if the constant is kept outside the region,
+      // the access is converted to a load which is treated as a mutable value.
+      auto InitTensors = linalgOp.getDpsInits();
+      return v.getDefiningOp() &&
+             matchPattern(v.getDefiningOp(), m_Constant()) &&
+             llvm::is_contained(InitTensors, v);
+    }
   }
   return false;
 }
