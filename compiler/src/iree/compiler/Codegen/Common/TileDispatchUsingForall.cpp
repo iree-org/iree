@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "tile-and-distribute-to-workgroups-using-forall-op"
@@ -135,7 +136,7 @@ static SmallVector<Attribute> getMapping(MLIRContext *context,
   SmallVector<Attribute> mapping;
   mapping.reserve(tileSizes.size());
   for (auto tileSize : llvm::reverse(tileSizes)) {
-    if (isConstantIntValue(tileSize, 0)) {
+    if (isZeroInteger(tileSize)) {
       continue;
     }
     uint64_t currSize = mapping.size();

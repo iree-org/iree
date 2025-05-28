@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -120,7 +121,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   AffineMap minMap = AffineMap::get(1, 2, {s0, s1 - d0}, builder.getContext());
   auto createBoundedTileSize = [&](OpFoldResult iv, OpFoldResult tileSize,
                                    OpFoldResult size) -> OpFoldResult {
-    if (isConstantIntValue(tileSize, 1)) {
+    if (isOneInteger(tileSize)) {
       return tileSize;
     }
     return affine::makeComposedFoldedAffineMin(
@@ -139,7 +140,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     OpFoldResult step = tileSizeVals[index];
     // No loops if tile size is zero. Set offset and size to the loop
     // offset and size.
-    if (isConstantIntValue(tileSizeVals[index], 0)) {
+    if (isZeroInteger(tileSizeVals[index])) {
       offsets[index] = lb;
       sizes[index] = ub;
       continue;
@@ -303,14 +304,14 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
       continue;
     }
     // If tile size is 0, it isnt tiled.
-    if (isConstantIntValue(tileSize, 0)) {
+    if (isZeroInteger(tileSize)) {
       continue;
     }
     // If number of tiles is statically know to be 1, the loop isnt tiled.
     OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
-    if (isConstantIntValue(numTiles, 1)) {
+    if (isOneInteger(numTiles)) {
       continue;
     }
 
