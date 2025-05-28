@@ -42,7 +42,7 @@ static constexpr int kNumBitsPerCopy = 32;
 static LogicalResult
 distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
                               ArrayRef<int64_t> workgroupSize,
-                              ArrayRef<int64_t> subgroupSize) {
+                              int64_t subgroupSize) {
   LDBG("==== distributing op: ");
   LDBG(*copy);
   Location loc = copy.getLoc();
@@ -58,32 +58,30 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   // Get the copy size:
   auto copyMemRefType = cast<MemRefType>(copy.getOperand(1).getType());
   if (!memref::isStaticShapeAndContiguousRowMajor(copyMemRefType)) {
-    return rewriter.notifyMatchFailure(
-        copy, "Cannot proceed: copy to non-static or non-contiguous, "
-              "non-row major memref.");
+    return rewriter.notifyMatchFailure(copy,
+                                       "Copy to non-static or non-contiguous, "
+                                       "non-row major memref.");
   }
-  auto rank = copyMemRefType.getRank();
+  int64_t rank = copyMemRefType.getRank();
   SmallVector<OpFoldResult> tileSize(rank - 1, rewriter.getIndexAttr(1));
 
   int64_t elementBitWidth = copyMemRefType.getElementTypeBitWidth();
   if (kNumBitsPerCopy % elementBitWidth != 0) {
-    return rewriter.notifyMatchFailure(
-        copy, "Cannot proceed: preferred copy size is not a multiple of "
-              "element bit width.");
+    return rewriter.notifyMatchFailure(copy, "Copy size is not a multiple of "
+                                             "element bit width.");
   }
   int64_t elementsPerCopy = kNumBitsPerCopy / elementBitWidth;
 
   // Divide the copy by subgroup, and load linearly.
-  assert(subgroupSize.size() == 1); // only 1-D
-  assert(workgroupSize[0] % subgroupSize[0] == 0);
+  assert(workgroupSize[0] % subgroupSize == 0);
 
-  int64_t numSubgroups = workgroupSize[0] / subgroupSize[0];
+  int64_t numSubgroups = workgroupSize[0] / subgroupSize;
   int64_t totalCopySize = copyMemRefType.getNumElements();
   int64_t totalCopySizePerSubgroup = totalCopySize / numSubgroups;
   int64_t numCopiesPerThread =
-      (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize[0];
+      (totalCopySizePerSubgroup / elementsPerCopy) / subgroupSize;
   int64_t residualElements =
-      totalCopySizePerSubgroup % (subgroupSize[0] * elementsPerCopy);
+      totalCopySizePerSubgroup % (subgroupSize * elementsPerCopy);
 
   LDBG("-- elementsPerCopy: " << elementsPerCopy);
   LDBG("-- workgroupSize: " << workgroupSize[0]);
@@ -109,7 +107,7 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
     auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     return rewriter.create<affine::AffineLinearizeIndexOp>(
         loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
-        ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize[0],
+        ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize,
                           elementsPerCopy},
         /*disjoint=*/true);
   };
@@ -135,13 +133,13 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(forOp.getBody());
     auto inductionVar = forOp.getInductionVar();
-    auto linearizedGatherIndices =
+    Value linearizedGatherIndices =
         getGlobalGatherIndex(subgroupId, laneId, inductionVar);
-    auto delinearizedGlobalIndices =
+    ValueRange delinearizedGlobalIndices =
         delinearizeIndex(linearizedGatherIndices, sourceType.getShape());
-    auto linearizedBaseIndices =
+    Value linearizedBaseIndices =
         getSubgroupStoreBaseIndex(subgroupId, inductionVar);
-    auto delinearizedLocalIndices =
+    ValueRange delinearizedLocalIndices =
         delinearizeIndex(linearizedBaseIndices, localType.getShape());
     rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
         loc, copy.getOperand(0), delinearizedGlobalIndices,
@@ -178,7 +176,7 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
 
 struct LowerToDMAPattern : public OpRewritePattern<linalg::CopyOp> {
   LowerToDMAPattern(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
-                    ArrayRef<int64_t> subgroupSize)
+                    int64_t subgroupSize)
       : OpRewritePattern<linalg::CopyOp>(context), workgroupSize(workgroupSize),
         subgroupSize(subgroupSize) {}
 
@@ -193,7 +191,7 @@ struct LowerToDMAPattern : public OpRewritePattern<linalg::CopyOp> {
 
 private:
   ArrayRef<int64_t> workgroupSize;
-  ArrayRef<int64_t> subgroupSize;
+  int64_t subgroupSize;
 };
 
 namespace {

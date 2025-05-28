@@ -39,10 +39,9 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
   // thread distributed `scf.forall` op. All other shared allocations are
   // expected to be properly indicated in advance.
   for (auto user : alloc->getUsers()) {
-    if (auto linalgCopy = dyn_cast<linalg::CopyOp>(user)) {
-      if (auto useDMAConfig =
-              getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(linalgCopy))
-        continue;
+    if (isa<linalg::CopyOp>(user) &&
+        getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(user)) {
+      continue;
     }
 
     auto forallOp = dyn_cast<scf::ForallOp>(user);

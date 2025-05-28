@@ -30,5 +30,6 @@ iree_check_single_backend_test_suite(
         "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
     ],
     driver = "hip",
+    tags = ["requires-gpu-cdna3"],
     target_backend = "rocm",
 )

@@ -22,6 +22,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmgpu-use-direct-load"
     "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul"
+  LABELS
+    "requires-gpu-cdna3"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
