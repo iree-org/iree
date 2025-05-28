@@ -42,7 +42,7 @@ LogicalResult Solver::run() {
 
 LogicalResult Solver::runTillFixpoint() {
   unsigned iterationCounter = 1;
-  unsigned maxIterations = maxFixpointIterations.value_or(32);
+  unsigned maxIterations = maxFixpointIterations.value_or(1024);
 
   SmallVector<AbstractElement *, 32> changedElements;
   SetVector<AbstractElement *> worklist, invalidElements;
