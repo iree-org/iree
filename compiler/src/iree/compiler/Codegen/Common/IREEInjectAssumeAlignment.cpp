@@ -42,15 +42,10 @@ LogicalResult InjectAssumeAlignmentForSubspanOp::matchAndRewrite(
   if (!resultType) {
     return rewriter.notifyMatchFailure(op, "result type is not a MemRefType");
   }
-  std::optional<llvm::APInt> maybeAlignment = op.getAlignment();
-  if (!maybeAlignment) {
-    return rewriter.notifyMatchFailure(op, "result type is not a MemRefType");
-  }
-  int32_t alignment = maybeAlignment->getSExtValue();
   Location loc = op.getLoc();
   rewriter.setInsertionPointAfter(op);
-  auto alignOp = rewriter.create<memref::AssumeAlignmentOp>(loc, op.getResult(),
-                                                            alignment);
+  auto alignOp = rewriter.create<memref::AssumeAlignmentOp>(
+      loc, op.getResult(), op.calculateAlignment().value());
   rewriter.replaceAllUsesExcept(op.getResult(), alignOp.getResult(), alignOp);
   return success();
 }

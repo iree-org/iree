@@ -16,6 +16,6 @@ func.func @bindings() {
 // CHECK:         %[[BIND_0:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
 // CHECK-NEXT:    %{{.+}} = memref.assume_alignment %[[BIND_0]], 64
 // CHECK:         %[[BIND_1:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
-// CHECK-NOT:     memref.assume_alignment
+// CHECK-NEXT:    %{{.+}} = memref.assume_alignment %[[BIND_1]], 4
 // CHECK:         %[[BIND_2:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
 // CHECK-NEXT:    %{{.+}} = memref.assume_alignment %[[BIND_2]], 32
