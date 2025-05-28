@@ -39,6 +39,7 @@ iree_cc_library(
     "Passes.cpp"
     "Passes.h.inc"
     "PropagateTimepoints.cpp"
+    "RefineResourceAffinities.cpp"
     "RefineUsage.cpp"
     "ReuseAllocations.cpp"
     "ScheduleAllocation.cpp"

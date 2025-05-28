@@ -397,6 +397,18 @@ def AutomaticReferenceCountingPass :
   ];
 }
 
+def RefineResourceAffinitiesPass :
+    Pass<"iree-stream-refine-resource-affinities", "mlir::ModuleOp"> {
+  let summary = "Refines resource affinities based on usage.";
+  let description = [{
+    When an buffer is used on multiple affinities, this will modify the
+    stream.affinity of the buffer to be the optimal affinity.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def PackConstantsPass :
     InterfacePass<"iree-stream-pack-constants", "mlir::CallableOpInterface"> {
   let summary = "Packs and allocates backing storage for fused constant resources.";
