@@ -35,7 +35,9 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -401,6 +403,8 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
       getDimValues(sourceType, allocOp.getDynamicSizes());
     } else if (auto allocaOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
       getDimValues(sourceType, allocaOp.getDynamicSizes());
+    } else if (auto assumeOp = dyn_cast<memref::AssumeAlignmentOp>(sourceOp)) {
+      return linearizeIndices(assumeOp.getMemref(), indices, loc, builder);
     } else {
       if (sourceType.hasStaticShape()) {
         for (int64_t dim : sourceType.getShape()) {
@@ -754,6 +758,15 @@ struct FlattenMemRefSubspanPass final
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
     MLIRContext *context = &getContext();
+
+    // Reduces the dependencies from AssumeAlignmentOp, so we do not need to
+    // implement custom patterns.
+    RewritePatternSet patterns(context);
+    populateCleanMemRefAssumeAlignmentPatterns(patterns);
+    context->getOrLoadDialect<IREE::Util::UtilDialect>()
+        ->getCanonicalizationPatterns(patterns);
+    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
+
     RewritePatternSet flattenPatterns(context);
 
     // Interface binding subspan ops represents allocations from the runtime. We
@@ -799,6 +812,8 @@ struct FlattenMemRefSubspanPass final
                                                   context);
 
     ConversionTarget target(*context);
+    // This pass currently doesn't support alignment hints so always fold them.
+    target.addIllegalOp<memref::AssumeAlignmentOp>();
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
@@ -818,9 +833,6 @@ struct FlattenMemRefSubspanPass final
           auto byteOffset = op.getByteOffset();
           return !byteOffset || matchPattern(byteOffset, m_Zero());
         });
-    // This pass currently doesn't support alignment hints so always fold them.
-    target.addDynamicallyLegalOp<memref::AssumeAlignmentOp>(
-        [&](memref::AssumeAlignmentOp op) { return false; });
     target.addDynamicallyLegalOp<memref::GlobalOp>([](memref::GlobalOp op) {
       return isRankZeroOrOneMemRef(op.getType());
     });

@@ -1470,6 +1470,31 @@ void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
       patterns.getContext());
 }
 
+//===--------------------------------------------------------------------====//
+// Pattern to reduce dependencies from memref::AssumeAlignmentOp
+//===--------------------------------------------------------------------====//
+
+namespace {
+struct RemoveDimOpDep : OpRewritePattern<memref::DimOp> {
+  using OpRewritePattern<memref::DimOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::DimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto assumeOp = op.getSource().getDefiningOp<memref::AssumeAlignmentOp>();
+    if (!assumeOp) {
+      return failure();
+    }
+    rewriter.modifyOpInPlace(
+        op, [&]() { op.getSourceMutable().assign(assumeOp.getMemref()); });
+    return success();
+  }
+};
+} // namespace
+
+void populateCleanMemRefAssumeAlignmentPatterns(RewritePatternSet &patterns) {
+  patterns.insert<RemoveDimOpDep>(patterns.getContext());
+}
+
 void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
                              ArrayRef<Operation *> allocs,
                              SmallVector<AliasGroup> &aliasGroups) {

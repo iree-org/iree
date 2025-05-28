@@ -52,7 +52,11 @@ LogicalResult InjectAssumeAlignmentForSubspanOp::matchAndRewrite(
   rewriter.setInsertionPointAfter(op);
   auto alignOp = rewriter.create<memref::AssumeAlignmentOp>(loc, op.getResult(),
                                                             alignment);
-  rewriter.replaceAllUsesExcept(op.getResult(), alignOp.getResult(), alignOp);
+  rewriter.replaceUsesWithIf(
+      op.getResult(), alignOp.getResult(), [&](OpOperand &use) {
+        Operation *user = use.getOwner();
+        return user != alignOp && !isa<memref::DimOp>(user);
+      });
   return success();
 }
 
