@@ -61,9 +61,10 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns an affinity describing the union with |other| constraints.
+        Returns an affinity describing the union with |other| constraints such
+        that the "optimal" affinity for the particular operation is selected.
         The returned affinity specifies that a particular operation may execute
-        on _either_ of the source affinities.
+        on _any_ of the source affinities.
       }],
       /*retTy=*/"IREE::Stream::AffinityAttr",
       /*methodName=*/"joinOR",
@@ -118,6 +119,12 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     // Returns true if |lhs| and |rhs| indicate that their operations can
     // execute together on the same execution queue.
     static bool canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs);
+
+    // Returns an affinity representing the optimal affinity from the given set.
+    // The resulting affinity will have a single logical execution context
+    // resolved but doing so may be deferred until runtime.
+    // Returns nullptr if no optimal join is possible.
+    static AffinityAttr joinOR(ArrayRef<AffinityAttr> affinityAttrs);
   }];
 }
 
