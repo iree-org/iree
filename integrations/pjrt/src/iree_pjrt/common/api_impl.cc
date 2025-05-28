@@ -411,8 +411,9 @@ void BufferInstance::BindApi(PJRT_Api* api) {
     return nullptr;
   };
   api->PJRT_Buffer_Memory = +[](PJRT_Buffer_Memory_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_Memory"));
+    args->memory = reinterpret_cast<PJRT_Memory*>(
+        BufferInstance::Unwrap(args->buffer)->device().memory());
+    return nullptr;
   };
   api->PJRT_Buffer_ReadyEvent =
       +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
@@ -717,6 +718,55 @@ void DeviceDescription::BindApi(PJRT_Api* api) {
 }
 
 //===----------------------------------------------------------------------===//
+// MemoryInstance
+//===----------------------------------------------------------------------===//
+
+void MemoryInstance::BindApi(PJRT_Api* api) {
+  api->PJRT_Memory_Id = +[](PJRT_Memory_Id_Args* args) -> PJRT_Error* {
+    args->id = MemoryInstance::Unwrap(args->memory)->Id();
+    return nullptr;
+  };
+  api->PJRT_Memory_Kind = +[](PJRT_Memory_Kind_Args* args) -> PJRT_Error* {
+    auto kind = MemoryInstance::Unwrap(args->memory)->Kind();
+    args->kind = kind.data();
+    args->kind_size = kind.size();
+    return nullptr;
+  };
+  api->PJRT_Memory_ToString =
+      +[](PJRT_Memory_ToString_Args* args) -> PJRT_Error* {
+    auto to_string = MemoryInstance::Unwrap(args->memory)->ToString();
+    args->to_string = to_string.data();
+    args->to_string_size = to_string.size();
+    return nullptr;
+  };
+  api->PJRT_Memory_DebugString =
+      +[](PJRT_Memory_DebugString_Args* args) -> PJRT_Error* {
+    auto debug_string = MemoryInstance::Unwrap(args->memory)->DebugString();
+    args->debug_string = debug_string.data();
+    args->debug_string_size = debug_string.size();
+    return nullptr;
+  };
+  api->PJRT_Memory_AddressableByDevices =
+      +[](PJRT_Memory_AddressableByDevices_Args* args) -> PJRT_Error* {
+    args->num_devices = 1;
+    args->devices = reinterpret_cast<PJRT_Device* const*>(
+        &MemoryInstance::Unwrap(args->memory)->device_);
+    return nullptr;
+  };
+}
+
+int MemoryInstance::Id() { return device_->device_description()->device_id(); }
+std::string_view MemoryInstance::Kind() {
+  return device_->device_description()->kind_string();
+}
+std::string_view MemoryInstance::DebugString() {
+  return device_->device_description()->debug_string();
+}
+std::string_view MemoryInstance::ToString() {
+  return device_->device_description()->user_string();
+}
+
+//===----------------------------------------------------------------------===//
 // DeviceInstance
 //===----------------------------------------------------------------------===//
 
@@ -737,13 +787,16 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Device_AddressableMemories =
       +[](PJRT_Device_AddressableMemories_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Device_AddressableMemories"));
+    const auto& memories = DeviceInstance::Unwrap(args->device)->memories_;
+    args->memories = reinterpret_cast<PJRT_Memory* const*>(memories.data());
+    args->num_memories = memories.size();
+    return nullptr;
   };
   api->PJRT_Device_DefaultMemory =
       +[](PJRT_Device_DefaultMemory_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Device_DefaultMemory"));
+    args->memory = reinterpret_cast<PJRT_Memory*>(
+        DeviceInstance::Unwrap(args->device)->memories_[0]);
+    return nullptr;
   };
   api->PJRT_Device_GetDescription =
       +[](PJRT_Device_GetDescription_Args* args) -> PJRT_Error* {
@@ -1271,6 +1324,9 @@ ClientInstance::~ClientInstance() {
   for (auto* device : devices_) {
     delete device;
   }
+  for (auto* memory : memories_) {
+    delete memory;
+  }
   if (device_infos_) {
     iree_allocator_free(host_allocator_, device_infos_);
   }
@@ -1339,8 +1395,11 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Client_AddressableMemories =
       +[](PJRT_Client_AddressableMemories_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Client_AddressableMemories"));
+    const auto& memories = ClientInstance::Unwrap(args->client)->memories();
+    args->addressable_memories =
+        reinterpret_cast<PJRT_Memory* const*>(memories.data());
+    args->num_addressable_memories = memories.size();
+    return nullptr;
   };
   api->PJRT_Client_Compile =
       +[](PJRT_Client_Compile_Args* args) -> PJRT_Error* {
@@ -1379,14 +1438,13 @@ void ClientInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Client_BufferFromHostBuffer =
       +[](PJRT_Client_BufferFromHostBuffer_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Client_BufferFromHostBuffer");
-    auto status =
-        DeviceInstance::Unwrap(args->device)
-            ->HostBufferToDevice(
-                args->data, args->type, args->dims, args->num_dims,
-                args->byte_strides, args->num_byte_strides,
-                args->host_buffer_semantics,
-                reinterpret_cast<EventInstance**>(&args->done_with_host_buffer),
-                reinterpret_cast<BufferInstance**>(&args->buffer));
+    auto device = args->device ? DeviceInstance::Unwrap(args->device)
+                               : MemoryInstance::Unwrap(args->memory)->device();
+    auto status = device->HostBufferToDevice(
+        args->data, args->type, args->dims, args->num_dims, args->byte_strides,
+        args->num_byte_strides, args->host_buffer_semantics,
+        reinterpret_cast<EventInstance**>(&args->done_with_host_buffer),
+        reinterpret_cast<BufferInstance**>(&args->buffer));
     return MakeError(status);
   };
   api->PJRT_LoadedExecutable_Fingerprint =
@@ -1444,6 +1502,15 @@ iree_status_t ClientInstance::PopulateDevices() {
   for (auto* device : devices_) {
     addressable_devices_.push_back(device);
   }
+
+  // initialize the one-to-one mapping of devices to memory instances
+  memories_.reserve(devices_.size());
+  for (auto* device : devices_) {
+    auto memory = new MemoryInstance(device);
+    memories_.push_back(memory);
+    device->set_memory(memory);
+  }
+
   return iree_ok_status();
 }
 
@@ -2199,6 +2266,7 @@ void BindMonomorphicApi(PJRT_Api* api) {
   EventInstance::BindApi(api);
   ExecutableImage::BindApi(api);
   LoadedExecutableInstance::BindApi(api);
+  MemoryInstance::BindApi(api);
 }
 
 }  // namespace iree::pjrt

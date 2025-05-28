@@ -76,7 +76,7 @@ jobs:
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           python -m pip install -v --no-deps -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
           # install
-          python -m pip install jax==0.4.36
+          python -m pip install jax==0.6.1
       - name: Run tests
         run: |
           source ${VENV_DIR}/bin/activate
