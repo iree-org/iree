@@ -924,7 +924,6 @@ DeviceAffinityAttr::joinOR(IREE::Stream::AffinityAttr other) const {
     return nullptr; // invalid
   }
   if (otherAffinityAttr.getDevice() != getDevice()) {
-    // Create a DeviceOptimalAttr containing both device affinities
     SmallVector<IREE::Stream::AffinityAttr> affinities = {*this, other};
     return IREE::HAL::DeviceOptimalAttr::get(getContext(), affinities);
   }
@@ -1049,7 +1048,6 @@ DevicePromiseAttr::joinOR(IREE::Stream::AffinityAttr other) const {
     return nullptr; // invalid
   }
   if (otherPromiseAttr.getDevice() != getDevice()) {
-    // Create a DeviceOptimalAttr containing both device affinities
     SmallVector<IREE::Stream::AffinityAttr> affinities = {*this, other};
     return IREE::HAL::DeviceOptimalAttr::get(getContext(), affinities);
   }
