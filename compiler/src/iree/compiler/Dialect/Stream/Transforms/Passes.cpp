@@ -281,6 +281,9 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Util::createPropagateSubrangesPass());
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
+  // Fixup affinities for all resources that are used across devices.
+  passManager.addPass(IREE::Stream::createRefineResourceAffinitiesPass());
+
   // Once allocations have been inserted insert the deallocations or referencing
   // counting ops. Since a bulk of usage has been moved into stream execution
   // regions at this point there is far less in the program to analyze.

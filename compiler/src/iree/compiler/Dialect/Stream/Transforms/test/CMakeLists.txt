@@ -44,6 +44,7 @@ iree_lit_test_suite(
     "pack_dispatch_operands.mlir"
     "propagate_subviews.mlir"
     "propagate_timepoints.mlir"
+    "refine_resource_affinities.mlir"
     "refine_usage.mlir"
     "reuse_allocations.mlir"
     "schedule_allocation.mlir"

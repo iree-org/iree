@@ -401,8 +401,9 @@ def RefineResourceAffinitiesPass :
     Pass<"iree-stream-refine-resource-affinities", "mlir::ModuleOp"> {
   let summary = "Refines resource affinities based on usage.";
   let description = [{
-    When an buffer is used on multiple affinities, this will modify the
-    stream.affinity of the buffer to be the optimal affinity.
+    Uses the affinityAnalysis to refine the resource affinities of allocations
+    that are used on multiple devices. This will also adapt the usage of the
+    dealloca operations.
   }];
   let dependentDialects = [
     "IREE::Stream::StreamDialect",

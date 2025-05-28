@@ -5,15 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -46,9 +40,6 @@ refineAllocationAffinity(Value allocationResult,
   if (usageAffinities.empty()) {
     return {};
   }
-  for (auto usageAffinity : usageAffinities) {
-    LLVM_DEBUG(llvm::dbgs() << "[refine-resource-affinities] Usage affinity: " << usageAffinity << "\n");
-  }
   // Join all usage affinities, will result in a DeviceOptimalAttr if the
   // affinities are across devices.
   IREE::Stream::AffinityAttr optimalAffinity = usageAffinities.front();
@@ -75,10 +66,9 @@ updateDeallocationsForAllocation(Value allocationResult,
   }
 }
 
-
 template <typename OpTy>
-static LogicalResult updateAllocationAffinity(OpTy allocOp,
-                         AffinityAnalysis &affinityAnalysis,
+static LogicalResult
+updateAllocationAffinity(OpTy allocOp, AffinityAnalysis &affinityAnalysis,
                          PatternRewriter &rewriter) {
   LLVM_DEBUG(llvm::dbgs() << "[refine-resource-affinities] Op: " << allocOp
                           << "\n");
@@ -87,29 +77,26 @@ static LogicalResult updateAllocationAffinity(OpTy allocOp,
       refineAllocationAffinity(allocOp.getResult(), affinityAnalysis);
 
   if (!optimalAffinity) {
-    LLVM_DEBUG(llvm::dbgs() << "[refine-resource-affinities] Abort: no optimal affinity\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "[refine-resource-affinities] Abort: no optimal affinity\n");
     return failure();
   }
 
-
   if (allocOp.getAffinityAttr() != optimalAffinity) {
     LLVM_DEBUG({
-      llvm::dbgs() << "[refine-resource-affinities] Updating allocation affinity: from " << allocOp.getAffinityAttr()
-                   << " to " << optimalAffinity << "\n";
+      llvm::dbgs()
+          << "[refine-resource-affinities] Updating allocation affinity: from "
+          << allocOp.getAffinityAttr() << " to " << optimalAffinity << "\n";
     });
-    rewriter.modifyOpInPlace(allocOp, [&]() {
-      allocOp.setAffinityAttr(optimalAffinity);
-    });
+    rewriter.modifyOpInPlace(
+        allocOp, [&]() { allocOp.setAffinityAttr(optimalAffinity); });
 
-    updateDeallocationsForAllocation(allocOp.getResult(), optimalAffinity,
-                                     rewriter);
     return success();
   }
 
   return failure();
 }
 
-// Pattern to refine resource allocation affinities based on usage analysis.
 struct RefineResourceAllocPattern
     : public OpRewritePattern<IREE::Stream::ResourceAllocOp> {
   RefineResourceAllocPattern(MLIRContext *context, AffinityAnalysis &analysis)
@@ -118,6 +105,7 @@ struct RefineResourceAllocPattern
 
   LogicalResult matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
+    // Alloc ops dont have deallocations.
     return updateAllocationAffinity(allocOp, affinityAnalysis, rewriter);
   }
 
@@ -125,7 +113,6 @@ private:
   AffinityAnalysis &affinityAnalysis;
 };
 
-// Pattern to refine resource alloca affinities based on usage analysis.
 struct RefineResourceAllocaPattern
     : public OpRewritePattern<IREE::Stream::ResourceAllocaOp> {
   RefineResourceAllocaPattern(MLIRContext *context, AffinityAnalysis &analysis)
@@ -134,13 +121,18 @@ struct RefineResourceAllocaPattern
 
   LogicalResult matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp,
                                 PatternRewriter &rewriter) const override {
-    return updateAllocationAffinity(allocaOp, affinityAnalysis, rewriter);
+    if (failed(
+            updateAllocationAffinity(allocaOp, affinityAnalysis, rewriter))) {
+      return failure();
+    }
+    updateDeallocationsForAllocation(allocaOp.getResult(),
+                                     allocaOp.getAffinityAttr(), rewriter);
+    return success();
   }
 
 private:
   AffinityAnalysis &affinityAnalysis;
 };
-
 
 struct RefineResourceAffinitiesPass
     : public IREE::Stream::impl::RefineResourceAffinitiesPassBase<
@@ -151,13 +143,11 @@ struct RefineResourceAffinitiesPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // Run affinity analysis on the whole module.
     AffinityAnalysis affinityAnalysis(moduleOp);
     if (failed(affinityAnalysis.run())) {
       return signalPassFailure();
     }
 
-    // Apply patterns to refine resource affinities
     RewritePatternSet patterns(&getContext());
     patterns.add<RefineResourceAllocPattern>(&getContext(), affinityAnalysis);
     patterns.add<RefineResourceAllocaPattern>(&getContext(), affinityAnalysis);
