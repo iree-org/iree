@@ -538,11 +538,14 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
 // CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
 // CHECK-DAG:     %[[LHS_GLOBAL_BIND:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
-// CHECK-DAG:     %[[LHS_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[LHS_GLOBAL_BIND]] resetOffset : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x968x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-DAG:     %[[ASSUMED_LHS_GLOBAL_BIND:.+]] = memref.assume_alignment %[[LHS_GLOBAL_BIND]], 64
+// CHECK-DAG:     %[[LHS_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_LHS_GLOBAL_BIND]] resetOffset : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x968x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-DAG:     %[[RHS_GLOBAL_BIND:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>>
-// CHECK-DAG:     %[[RHS_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[RHS_GLOBAL_BIND]] resetOffset : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x1281x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-DAG:     %[[ASSUMED_RHS_GLOBAL_BIND:.+]] = memref.assume_alignment %[[RHS_GLOBAL_BIND]], 64
+// CHECK-DAG:     %[[RHS_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_RHS_GLOBAL_BIND]] resetOffset : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x1281x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-DAG:     %[[OUT_GLOBAL_BIND:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c0) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
-// CHECK-DAG:     %[[OUT_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[OUT_GLOBAL_BIND]] resetOffset : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x968x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-DAG:     %[[ASSUMED_OUT_GLOBAL_BIND:.+]] = memref.assume_alignment %[[OUT_GLOBAL_BIND]], 64
+// CHECK-DAG:     %[[OUT_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_OUT_GLOBAL_BIND]] resetOffset : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x968x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-DAG:     %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
 // CHECK-DAG:     %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
 // CHECK-DAG:     %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]

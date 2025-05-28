@@ -477,6 +477,13 @@ def IREEExpandStridedMetadataPass :
            "Allow unresolved strided metadata op (for testing)">,
   ];
 }
+def IREEInjectAssumeAlignmentPass :
+    InterfacePass<"iree-codegen-inject-assume-alignment", "mlir::FunctionOpInterface"> {
+  let summary = "TBD";
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
+}
 
 def InstrumentMemoryAccessesPass :
     InterfacePass<"iree-codegen-instrument-memory-accesses", "mlir::FunctionOpInterface"> {

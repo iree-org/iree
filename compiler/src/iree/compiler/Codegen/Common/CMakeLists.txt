@@ -119,6 +119,7 @@ iree_cc_library(
     "HoistUnrolledVectorExtractInsertSlice.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
+    "IREEInjectAssumeAlignment.cpp"
     "IREELoopInvariantCodeMotion.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LinkTuningSpecsPass.cpp"

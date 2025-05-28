@@ -133,11 +133,8 @@ func.func @matmul_fill() {
 //  CHECK-DAG:   %[[RES_OFFSET_INDEX:.+]] = arith.index_castui %[[RES_OFFSET_I32]]
 //  CHECK-DAG:   %[[RES_OFFSET:.+]] = util.assume.int %[[RES_OFFSET_INDEX]]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(32)
-//  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[BASE_OFFSET]])
-//  CHECK-DAG:   memref.assume_alignment %[[RHS]], 8
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[RES_OFFSET]])
-//  CHECK-DAG:   memref.assume_alignment %[[RESULT]], 64
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]

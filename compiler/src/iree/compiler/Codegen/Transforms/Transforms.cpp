@@ -1416,20 +1416,10 @@ void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns) {
 
 namespace {
 
-// Erases the operation if its only users are memref.assume_alignment ops.
 static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
                                               Operation *op) {
-  SmallVector<Operation *> deadUsers;
-  for (OpOperand &use : op->getUses()) {
-    if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
-      deadUsers.push_back(user);
-      continue;
-    }
-    // For any other use, return failure;
+  if (!op->use_empty()) {
     return failure();
-  }
-  for (auto user : deadUsers) {
-    rewriter.eraseOp(user);
   }
   rewriter.eraseOp(op);
   return success();
@@ -1462,11 +1452,22 @@ struct RemoveDeadInterfaceBindings
     return eraseAlignmentOnlyDeadOp(rewriter, op);
   }
 };
+
+struct RemoveDeadAssumeAlighment : OpRewritePattern<memref::AssumeAlignmentOp> {
+  RemoveDeadAssumeAlighment(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern<memref::AssumeAlignmentOp>(context, benefit) {}
+
+  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    return eraseAlignmentOnlyDeadOp(rewriter, op);
+  }
+};
 } // namespace
 
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
-  patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
+  patterns.insert<RemoveDeadInterfaceBindings, RemoveDeadAssumeAlighment>(
+      patterns.getContext());
 }
 
 void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,

@@ -281,6 +281,7 @@ createIREEComprehensiveBufferizePass(
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
