@@ -354,8 +354,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
   return true; // did change
 }
 
-class FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
-public:
+struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
   void runOnOperation() override {
     auto *context = &getContext();
     RewritePatternSet patterns(context);

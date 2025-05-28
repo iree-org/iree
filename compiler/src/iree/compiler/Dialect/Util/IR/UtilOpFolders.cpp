@@ -683,44 +683,11 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
   }
 };
 
-// Inlines constant stores from initializers into the global initializer.
-// This is not strictly required but can help our initialization code perform
-// more efficient initialization of large numbers of primitive values.
-struct InlineConstantGlobalInitializer
-    : public OpRewritePattern<InitializerOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(InitializerOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Operation *> deadOps;
-    op.walk([&](GlobalStoreOpInterface storeOp) {
-      Attribute valueAttr;
-      if (!matchPattern(storeOp.getStoredGlobalValue(),
-                        m_Constant(&valueAttr))) {
-        return;
-      }
-      auto globalOp =
-          SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
-              storeOp->getParentOp(), storeOp.getGlobalAttr());
-      rewriter.modifyOpInPlace(
-          globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
-
-      deadOps.push_back(storeOp);
-    });
-    if (deadOps.empty())
-      return failure();
-    for (auto deadOp : deadOps)
-      rewriter.eraseOp(deadOp);
-    return success();
-  }
-};
-
 } // namespace
 
 void InitializerOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  results.insert<DropEmptyInitializerOp, InlineConstantGlobalInitializer>(
-      context);
+  results.insert<DropEmptyInitializerOp>(context);
 }
 
 void GlobalOp::getCanonicalizationPatterns(RewritePatternSet &results,
