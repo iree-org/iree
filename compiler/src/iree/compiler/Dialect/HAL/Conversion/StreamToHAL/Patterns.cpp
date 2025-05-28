@@ -102,10 +102,8 @@ trySetSharedUsageBits(Operation *op,
       StringRef deviceID = targetAttr.getDeviceID().getValue();
       std::shared_ptr<IREE::HAL::TargetDevice> targetDevice =
           targetRegistry.getTargetDevice(deviceID);
-      if (!targetDevice) {
-        return failure();
-      }
-      if (failed(targetDevice->setSharedUsageBits(targetAttrs, bufferUsage))) {
+      if (!targetDevice ||
+          failed(targetDevice->setSharedUsageBits(targetAttrs, bufferUsage))) {
         return failure();
       }
     }
