@@ -753,10 +753,7 @@ struct FlattenMemRefSubspanPass final
   void runOnOperation() override {
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
-
     MLIRContext *context = &getContext();
-
-
     RewritePatternSet flattenPatterns(context);
 
     // Interface binding subspan ops represents allocations from the runtime. We

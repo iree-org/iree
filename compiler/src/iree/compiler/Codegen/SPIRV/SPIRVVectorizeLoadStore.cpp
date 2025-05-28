@@ -1084,8 +1084,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
            ProcessSubgroupMMALoad, ProcessSubgroupMMAStore, ProcessAlloc,
            ProcessInterfaceBindingSubspan, ProcessAssumeAlignment>(
           context, *memrefUsageAnalysis);
-  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(
-      context);
+  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(context);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
