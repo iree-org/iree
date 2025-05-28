@@ -62,12 +62,15 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   // level. Currently, it selects the last compute op that has workgroup tiling
   // level.
   Operation *tilableOp = nullptr;
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp)) {
-    // There is no lowering config. Return `null`.
-    return TilingInfo{nullptr, {}, {}};
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (getLoweringConfig(op)) {
+      if (!getLoweringConfig(op).hasWorkgroupTilingLevel()) {
+        continue;
+      }
+      tilableOp = op;
+      break;
+    }
   }
-  tilableOp = rootOp.value();
   if (!tilableOp) {
     // There is no lowering config. Return `null`.
     return TilingInfo{nullptr, {}, {}};
