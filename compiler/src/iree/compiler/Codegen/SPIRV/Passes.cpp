@@ -131,6 +131,8 @@ void addSPIRVVectorLoweringPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createSPIRVFinalVectorLoweringPass());
 }
 
+/// TODO(#20912): Enable the injection of assume_alignment ops after the
+/// hoisting bug is fixed.
 static void addBufferizePasses(OpPassManager &funcPassManager,
                                BufferizationOptions::AllocationFn fn,
                                bool injectAssumeAlignmentOp = true) {
@@ -140,6 +142,8 @@ static void addBufferizePasses(OpPassManager &funcPassManager,
                                       injectAssumeAlignmentOp);
 }
 
+/// TODO(#20912): Enable the injection of assume_alignment ops after the
+/// hoisting bug is fixed.
 static void
 addSPIRVBufferizePasses(OpPassManager &funcPassManager,
                         BufferizationOptions::AllocationFn allocationFn,

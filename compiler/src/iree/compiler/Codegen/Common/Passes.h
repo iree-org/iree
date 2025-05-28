@@ -39,6 +39,8 @@ void addCommonTargetExecutablePreprocessingPasses(
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
 /// CleanupBufferAllocView).
+/// TODO(#20912): Enable the injection of assume_alignment ops after the
+/// hoisting bug is fixed.
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
                                     bool injectAssumeAlignmentOp = true);
 
