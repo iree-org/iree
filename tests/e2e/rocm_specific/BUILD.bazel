@@ -1,0 +1,35 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests of end-to-end IREE support for individual ops in the TOSA dialect.
+# Each test file should have a name matching the corresponding TOSA op and test only the
+# functionality of that op (though may make use of other ops where necessary). Tests should be
+# written using the IREE Check framework.
+# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+LDS_SRCS = [
+    "lds_matmul.mlir",
+]
+
+iree_check_single_backend_test_suite(
+    name = "check_global_load_rocm_hip",
+    srcs = LDS_SRCS,
+    compiler_flags = [
+        "--iree-llvmgpu-use-direct-load",
+        "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
+    ],
+    driver = "hip",
+    tags = ["requires-gpu-cdna3"],
+    target_backend = "rocm",
+)

@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "gpu_generalize_named_ops.mlir"
     "gpu_greedily_distribute_to_threads.mlir"
     "gpu_infer_memory_space.mlir"
+    "gpu_lower_to_global_loads.mlir"
     "gpu_lower_to_ukernels.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"

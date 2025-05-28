@@ -1403,6 +1403,33 @@ bool DerivedThreadConfigAttr::hasTilingLevel(unsigned level) const {
 }
 
 //===----------------------------------------------------------------------===//
+// UseGlobalLoadDMAAttr
+//===----------------------------------------------------------------------===//
+
+SmallVector<int64_t>
+UseGlobalLoadDMAAttr::getStaticTilingLevelSizes(unsigned level,
+                                                Operation *op) const {
+  if (level != llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return {};
+  }
+  return globalLoadDMATileSizes(op);
+}
+
+SmallVector<OpFoldResult>
+UseGlobalLoadDMAAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
+                                          Operation *op) const {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Subgroup)) {
+    return {};
+  }
+  SmallVector<int64_t> sizes = globalLoadDMATileSizes(op);
+  return getAsIndexOpFoldResult(b.getContext(), sizes);
+}
+
+bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
+  return level == llvm::to_underlying(GPU::TilingLevel::Subgroup);
+}
+
+//===----------------------------------------------------------------------===//
 // LaneIdAttr
 //===----------------------------------------------------------------------===//
 
