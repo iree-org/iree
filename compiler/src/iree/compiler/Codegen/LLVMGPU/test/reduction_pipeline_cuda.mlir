@@ -219,8 +219,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 
 // Small reduction computes the whole reduction on a single thread.
 //   CHECK-LABEL: func.func @small_reduction
-//         CHECK:   %[[READ:.+]] = vector.transfer_read {{.*}} #hal.descriptor_type<storage_buffer>>, vector<4x13xf32>
-//         CHECK:   vector.multi_reduction <add>, %[[READ]], {{.*}} : vector<4x13xf32> to vector<4xf32>
+//         CHECK:   %[[READ:.+]] = vector.transfer_read {{.*}} #hal.descriptor_type<storage_buffer>>, vector<f32>
+//         CHECK:   arith.addf {{.*}} : f32
 
 // -----
 

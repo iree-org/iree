@@ -69,9 +69,6 @@ public:
     case CodeGenPipeline::LLVMGPUBaseLowering:
       addGPUBaseLoweringPassPipeline(pipeline);
       break;
-    case CodeGenPipeline::LLVMGPUWarpReduction:
-      addGPUWarpReductionPassPipeline(pipeline);
-      break;
     case CodeGenPipeline::LLVMGPUTileAndFuse:
       addGPUTileAndFusePassPipeline(pipeline, pipelineOptions);
       break;

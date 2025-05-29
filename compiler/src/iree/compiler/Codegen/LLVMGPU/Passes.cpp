@@ -975,54 +975,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 }
 
-void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(
-      funcPassManager, /*useForall=*/clDistributeToWorkgroupsUsingForall);
-  funcPassManager.addPass(createRematerializeParallelOpsPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createGPUTileReductionPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
-
-  // Linalg -> vector
-  {
-    GenericVectorizationPassOptions options;
-    options.enableVectorMasking = true;
-    options.useConfiguredVectorSizes = false;
-    options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
-    options.enableCleanup = false;
-    options.generateContract = false;
-    funcPassManager.addPass(createGenericVectorizationPass(options));
-    funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-    funcPassManager.addPass(createCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-  }
-  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  addBufferizePasses(funcPassManager);
-
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createForOpCanonicalizationPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-
-  // vector -> simt gpu + vector
-  funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/true));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(affine::createLoopCoalescingPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-}
-
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
   tileAndBufferize(funcPassManager);
 
