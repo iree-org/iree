@@ -18,11 +18,8 @@ func.func @mmt4d_kernel_dispatch() attributes {hal.executable.target = #target} 
   %c128 = arith.constant 128 : index
   %c64 = arith.constant 64 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<1x2x8x4xi8>
-  memref.assume_alignment %0, 64 : memref<1x2x8x4xi8>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) : memref<1x2x8x4xi8>
-  memref.assume_alignment %1, 64 : memref<1x2x8x4xi8>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c128) : memref<1x1x8x8xi32>
-  memref.assume_alignment %2, 64 : memref<1x1x8x8xi32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
