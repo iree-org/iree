@@ -16,8 +16,7 @@ most powerful).
 ```shell
 pip install -r requirements.txt
 
-# a higher version of jax is highly recommended, e.g. 0.4.36
-pip install jax==0.4.36
+pip install jax==0.6.1
 ```
 
 Verify that your Jax install is functional like:

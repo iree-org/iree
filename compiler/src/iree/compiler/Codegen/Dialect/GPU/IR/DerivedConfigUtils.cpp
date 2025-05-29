@@ -181,4 +181,33 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
       .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 
+// TODO: make it a query.
+static const int64_t kDefaultGlobalLoadBitSizePerThread = 32;
+
+SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
+  auto funcOp = op->getParentOfType<FunctionOpInterface>();
+
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+  if (!workgroupSize) {
+    return {};
+  }
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) {
+    return {};
+  }
+  SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
+
+  int64_t targetSubgroupSize = getGPUTargetAttr(op).getPreferredSubgroupSize();
+  int64_t subgroupLoadSize =
+      (kDefaultGlobalLoadBitSizePerThread * targetSubgroupSize) /
+      getElementTypeOrSelf(linalgOp->getResultTypes()[0])
+          .getIntOrFloatBitWidth();
+  int64_t numThreads =
+      std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
+                      std::multiplies<int64_t>());
+  SmallVector<int64_t> tileSizes = getVectorTileSizesFromLoopRanges(
+      loopRanges, numThreads, subgroupLoadSize);
+  return tileSizes;
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU
