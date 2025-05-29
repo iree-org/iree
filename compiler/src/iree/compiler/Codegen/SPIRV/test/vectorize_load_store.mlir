@@ -71,6 +71,32 @@ func.func @resource_copy() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+// CHECK-LABEL: func.func @resource_copy_with_assume_alignment()
+//     CHECK: %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<4096x1024xvector<4xf32>>
+//     CHECK: %[[ASUMMED_A:.+]] = memref.assume_alignment %[[A]], 32
+//     CHECK: %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4096x1024xvector<4xf32>>
+//     CHECK: %[[ASUMMED_B:.+]] = memref.assume_alignment %[[B]], 32
+//     CHECK: %[[V:.+]] = memref.load %[[ASUMMED_A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
+//     CHECK: memref.store %[[V]], %[[ASUMMED_B]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
+func.func @resource_copy_with_assume_alignment() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4096x4096xf32>
+  %assume_align0 = memref.assume_alignment %0, 32 : memref<4096x4096xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4096x4096xf32>
+  %assume_align1 = memref.assume_alignment %1, 32 : memref<4096x4096xf32>
+  %v = vector.transfer_read %assume_align0[%c0, %c0], %cst : memref<4096x4096xf32>, vector<4xf32>
+  vector.transfer_write %v, %assume_align1[%c0, %c0] : vector<4xf32>, memref<4096x4096xf32>
+  return
+}
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>

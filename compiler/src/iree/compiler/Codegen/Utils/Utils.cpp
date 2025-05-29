@@ -1232,8 +1232,6 @@ Value findOrCreateSubspanBuffer(
         /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
         /*resetOffset=*/true);
   }
-  rewriter.create<memref::AssumeAlignmentOp>(
-      subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;
 }
 
