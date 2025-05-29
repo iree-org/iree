@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -51,7 +52,17 @@ static bool getUsesIfAllTransferOp(Value value,
                                    SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
-    if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp))
+    if (auto assumeAlignmentOp =
+            dyn_cast_if_present<memref::AssumeAlignmentOp>(userOp)) {
+      if (!getUsesIfAllTransferOp(assumeAlignmentOp.getResult(), uses)) {
+        uses.clear();
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed: non-transfer-like user: " << *userOp << "\n");
+        return false;
+      }
+      continue;
+    }
+    if (isa<memref::DeallocOp>(userOp))
       continue;
 
     if (!isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp,
@@ -260,7 +271,8 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
             analyzeMemRefValue(arg);
           }
         })
-        .Case<memref::AllocOp, IREE::HAL::InterfaceBindingSubspanOp>(
+        .Case<memref::AllocOp, IREE::HAL::InterfaceBindingSubspanOp,
+              memref::AssumeAlignmentOp>(
             [this](auto op) { analyzeMemRefValue(op); });
   });
 }
@@ -652,6 +664,20 @@ public:
         subspanOp, *vecMemRef, subspanOp.getLayout(), subspanOp.getBinding(),
         subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    return success();
+  }
+};
+
+class ProcessAssumeAlignment final
+    : public MemRefConversionPattern<memref::AssumeAlignmentOp> {
+public:
+  using MemRefConversionPattern::MemRefConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::AssumeAlignmentOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<memref::AssumeAlignmentOp>(
+        op, adaptor.getMemref(), op.getAlignmentAttr());
     return success();
   }
 };
@@ -1056,10 +1082,9 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   conversionPatterns
       .add<ProcessFunctionArgument, ProcessTransferRead, ProcessTransferWrite,
            ProcessSubgroupMMALoad, ProcessSubgroupMMAStore, ProcessAlloc,
-           ProcessInterfaceBindingSubspan>(context, *memrefUsageAnalysis);
-  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>,
-                         PassThroughConversion<memref::AssumeAlignmentOp>>(
-      context);
+           ProcessInterfaceBindingSubspan, ProcessAssumeAlignment>(
+          context, *memrefUsageAnalysis);
+  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(context);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
@@ -1079,7 +1104,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       });
   target.addDynamicallyLegalOp<memref::AssumeAlignmentOp>(
       [&](memref::AssumeAlignmentOp op) {
-        return !memrefUsageAnalysis->shouldVectorizeMemRef(op.getMemref());
+        return !memrefUsageAnalysis->shouldVectorizeMemRef(op.getResult());
       });
   target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp,
                                gpu::SubgroupMmaStoreMatrixOp,

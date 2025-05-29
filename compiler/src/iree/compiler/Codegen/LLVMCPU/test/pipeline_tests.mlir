@@ -317,15 +317,18 @@ func.func @dispatch() attributes {hal.executable.target = #executable_target_emb
 //       CHECK:   func @dispatch
 //       CHECK:     %[[INPUT0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[ASSUMED_INPUT0:.+]] = memref.assume_alignment %[[INPUT0]], 64
 //       CHECK:     %[[INPUT1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[ASSUMED_INPUT1:.+]] = memref.assume_alignment %[[INPUT1]], 64
 //       CHECK:     %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[ASSUMED_OUTPUT:.+]] = memref.assume_alignment %[[OUTPUT]], 64
 //   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply
 //   CHECK-DAG:     %[[SIZE:.+]] = affine.min
-//   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
-//   CHECK-DAG:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[INPUT0]][%[[OFFSET]]] [%[[SIZE]]]
-//   CHECK-DAG:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[INPUT1]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[ASSUMED_OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[ASSUMED_INPUT0]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[ASSUMED_INPUT1]][%[[OFFSET]]] [%[[SIZE]]]
 //       CHECK:     iree_codegen.ukernel.generic "simple_mul_workgroup"
 //  CHECK-SAME:         ins(%[[SUBVIEW_INPUT0]], %[[SUBVIEW_INPUT1]]
 //  CHECK-SAME:         outs(%[[SUBVIEW_OUTPUT]]

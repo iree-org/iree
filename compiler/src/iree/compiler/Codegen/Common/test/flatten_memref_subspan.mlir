@@ -633,3 +633,49 @@ func.func @reinterpret_cast_lowering_dynamic_zero_offset() -> f32 {
 // CHECK-LABEL: func @reinterpret_cast_lowering_dynamic_zero_offset()
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [%[[C0]]], sizes: [], strides: [] : memref<?xf32> to memref<f32, strided<[], offset: ?>>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @assume_alignment_in_between(%i: index, %j: index) -> f32 {
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xf32>{%0, %1}
+  %3 = memref.assume_alignment %2, 32 : memref<?x?xf32>
+  %4 = memref.load %3[%i, %j] : memref<?x?xf32>
+  return %4 : f32
+}
+// CHECK-DAG:   #[[$MUL_MAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+// CHECK-DAG:   #[[$LINEARIZE_MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>
+// CHECK-LABEL: func @assume_alignment_in_between
+// CHECK-SAME:    %[[I:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[J:[a-zA-Z0-9]+]]
+// CHECK:         %[[D0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
+// CHECK:         %[[D1:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
+// CHECK:         %[[SIZE:.+]] = affine.apply #[[$MUL_MAP]]()[%[[D0]], %[[D1]]]
+// CHECK:         %[[BUF:.+]] = hal.interface.binding.subspan {{.+}} : memref<?xf32>{%[[SIZE]]}
+// CHECK:         %[[IDX:.+]] = affine.apply #[[$LINEARIZE_MAP]]()[%[[I]], %[[D1]], %[[J]]]
+// CHECK:         memref.load %[[BUF]][%[[IDX]]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @query_assume_alignment_dim_size() -> (index, index) {
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xf32>{%0, %1}
+  %3 = memref.assume_alignment %2, 32 : memref<?x?xf32>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %4 = memref.dim %3, %c0 : memref<?x?xf32>
+  %5 = memref.dim %3, %c1 : memref<?x?xf32>
+  return %4, %5 : index, index
+}
+// CHECK-LABEL: func @query_assume_alignment_dim_size
+// CHECK:         %[[D0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
+// CHECK:         %[[D1:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
+// CHECK:         return %[[D0]], %[[D1]]

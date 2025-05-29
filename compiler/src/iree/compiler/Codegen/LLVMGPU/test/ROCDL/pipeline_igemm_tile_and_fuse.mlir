@@ -50,11 +50,14 @@ hal.executable private @main {
 
 //    CHECK-LABEL: func @conv_nhwc
 //      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//      CHECK-DAG:   %[[BUF0:.+]] = amdgpu.fat_raw_buffer_cast %[[B0]]
+//      CHECK-DAG:   %[[ASSUMED_B0:.+]] = memref.assume_alignment %[[B0]], 64
+//      CHECK-DAG:   %[[BUF0:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B0]]
 //      CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//      CHECK-DAG:   %[[BUF1:.+]] = amdgpu.fat_raw_buffer_cast %[[B1]]
+//      CHECK-DAG:   %[[ASSUMED_B1:.+]] = memref.assume_alignment %[[B1]], 64
+//      CHECK-DAG:   %[[BUF1:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B1]]
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//      CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[B2]]
+//      CHECK-DAG:   %[[ASSUMED_B2:.+]] = memref.assume_alignment %[[B2]], 64
+//      CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B2]]
 //      CHECK-DAG:   memref.alloc() : memref<1x4x16x36xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   memref.alloc() : memref<32x260xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -132,11 +135,14 @@ hal.executable private @main {
 
 //    CHECK-LABEL: func @conv_nhwc_unaligned
 //      CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//      CHECK-DAG:   %[[BUF0:.+]] = amdgpu.fat_raw_buffer_cast %[[B0]]
+//      CHECK-DAG:   %[[ASSUMED_B0:.+]] = memref.assume_alignment %[[B0]], 64
+//      CHECK-DAG:   %[[BUF0:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B0]]
 //      CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//      CHECK-DAG:   %[[BUF1:.+]] = amdgpu.fat_raw_buffer_cast %[[B1]]
+//      CHECK-DAG:   %[[ASSUMED_B1:.+]] = memref.assume_alignment %[[B1]], 64
+//      CHECK-DAG:   %[[BUF1:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B1]]
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//      CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[B2]]
+//      CHECK-DAG:   %[[ASSUMED_B2:.+]] = memref.assume_alignment %[[B2]], 64
+//      CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B2]]
 //      CHECK-DAG:   memref.alloc() : memref<2x1x32x18xf32, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   memref.alloc() : memref<16x20xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   memref.alloc() : memref<2x1x32x20xf16, #gpu.address_space<workgroup>>

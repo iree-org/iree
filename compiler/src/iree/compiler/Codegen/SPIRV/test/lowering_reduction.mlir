@@ -146,8 +146,10 @@ func.func @warp_reduction_dispatch() attributes {hal.executable.target = #execut
 //     CHECK-DAG:    %[[WGIDY:.+]] = hal.interface.workgroup.id[1] upper_bound 65535 : index
 //     CHECK-DAG:    %[[TIDX:.+]] = gpu.thread_id  x
 
-//     CHECK-DAG:    %[[SPAN0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//     CHECK-DAG:    %[[SPAN1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//     CHECK-DAG:    %[[SPAN0_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//     CHECK-DAG:    %[[SPAN0:.+]] = memref.assume_alignment %[[SPAN0_BINDING]], 64
+//     CHECK-DAG:    %[[SPAN1_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//     CHECK-DAG:    %[[SPAN1:.+]] = memref.assume_alignment %[[SPAN1_BINDING]], 64
 
 //         CHECK:    gpu.barrier
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I1]], %[[I32]] : i32

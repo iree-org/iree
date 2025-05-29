@@ -35,7 +35,9 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -401,6 +403,8 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
       getDimValues(sourceType, allocOp.getDynamicSizes());
     } else if (auto allocaOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
       getDimValues(sourceType, allocaOp.getDynamicSizes());
+    } else if (auto assumeOp = dyn_cast<memref::AssumeAlignmentOp>(sourceOp)) {
+      return linearizeIndices(assumeOp.getMemref(), indices, loc, builder);
     } else {
       if (sourceType.hasStaticShape()) {
         for (int64_t dim : sourceType.getShape()) {
@@ -709,15 +713,14 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
   };
 };
 
-/// Erase alignment hints.
-struct RemoveAssumeAlignOp
-    : public OpRewritePattern<memref::AssumeAlignmentOp> {
-public:
-  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
+/// Fold alignment hints.
+struct FoldAssumeAlignOp
+    : public OpConversionPattern<memref::AssumeAlignmentOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::AssumeAlignmentOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, adaptor.getMemref());
     return success();
   }
 };
@@ -748,18 +751,21 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
 struct FlattenMemRefSubspanPass final
     : impl::FlattenMemRefSubspanPassBase<FlattenMemRefSubspanPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, memref::MemRefDialect>();
+    registry.insert<affine::AffineDialect, memref::MemRefDialect,
+                    IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
-
     MLIRContext *context = &getContext();
 
-    // This pass currently doesn't support alignment hints so remove them first.
+    // Reduces the dependencies from AssumeAlignmentOp, so we do not need to
+    // implement custom patterns.
     RewritePatternSet patterns(context);
-    patterns.add<RemoveAssumeAlignOp>(context);
+    populateCleanMemRefAssumeAlignmentPatterns(patterns);
+    context->getOrLoadDialect<IREE::Util::UtilDialect>()
+        ->getCanonicalizationPatterns(patterns);
     (void)applyPatternsGreedily(getOperation(), std::move(patterns));
 
     RewritePatternSet flattenPatterns(context);
@@ -780,6 +786,7 @@ struct FlattenMemRefSubspanPass final
           return std::nullopt;
         });
     flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
+    flattenPatterns.add<FoldAssumeAlignOp>(context);
 
     // Other ops generate MemRef values representing internal allocations (e.g.,
     // on stack for GPU, in shared memory for GPU) or data embedded in the
@@ -806,6 +813,8 @@ struct FlattenMemRefSubspanPass final
                                                   context);
 
     ConversionTarget target(*context);
+    // This pass currently doesn't support alignment hints so always fold them.
+    target.addIllegalOp<memref::AssumeAlignmentOp>();
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
