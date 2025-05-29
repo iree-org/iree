@@ -251,8 +251,6 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
       llvm::dbgs() << "[ValueConsumerAffinityPVS] value ";
       value.printAsOperand(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << " affinity using consumer affinity from ";
-      operand.get().printAsOperand(llvm::dbgs(), solver.getAsmState());
-      llvm::dbgs() << " as ";
       opPVS.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
@@ -462,14 +460,20 @@ void ValueProducerAffinityPVS::initializeValue(Value value,
 
 ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                                                    DFX::Solver &solver) {
-  StateType newState;
-
   // If there are any ops that produce the value and pin to a specific affinity
   // then we take those directly and ignore all others.
   if (!pinnedOps.empty()) {
+    StateType newState;
     for (auto pinnedOp : pinnedOps) {
       auto &opPVS = solver.getElementFor<OpAffinityPVS>(
           *this, Position::forOperation(pinnedOp), DFX::Resolution::REQUIRED);
+      LLVM_DEBUG({
+        llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
+        value.printAsOperand(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << " affinity using pinned op ";
+        opPVS.print(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << "\n";
+      });
       newState ^= opPVS;
     }
     return DFX::clampStateAndIndicateChange(getState(), newState);
@@ -492,8 +496,7 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
       operandPVS.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
-    newState ^= operandPVS;
-    return DFX::clampStateAndIndicateChange(getState(), newState);
+    return DFX::clampStateAndIndicateChange(getState(), operandPVS.getState());
   } else if (auto loadOp =
                  dyn_cast_if_present<IREE::Util::GlobalLoadOpInterface>(
                      value.getDefiningOp())) {
@@ -510,11 +513,11 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
       globalPVS.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
-    newState ^= globalPVS.getState();
-    return DFX::clampStateAndIndicateChange(getState(), newState);
+    return DFX::clampStateAndIndicateChange(getState(), globalPVS.getState());
   }
 
   // Walk the program up into any possible producers of the value.
+  StateType newState;
   auto traversalResult = TraversalResult::COMPLETE;
   traversalResult |= solver.getExplorer().walkDefiningOps(
       value,
@@ -543,7 +546,7 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
             });
             newState ^= opPVS;
             newState.indicateOptimisticFixpoint();
-            return WalkResult::advance();
+            return WalkResult::interrupt();
           }
         }
 
@@ -683,6 +686,13 @@ GlobalAffinityPVS::updateOperation(IREE::Util::GlobalOpInterface globalOp,
         *this, Position::forValue(loadOp.getLoadedGlobalValue()),
         DFX::Resolution::OPTIONAL);
     if (valuePVS.isValidState()) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[GlobalAffinityPVS] global @"
+                     << globalOp.getGlobalName().getValue()
+                     << " affinity using consumer affinity from ";
+        valuePVS.print(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << "\n";
+      });
       newState ^= valuePVS;
     }
   }
@@ -696,6 +706,13 @@ GlobalAffinityPVS::updateOperation(IREE::Util::GlobalOpInterface globalOp,
           *this, Position::forValue(storeOp.getStoredGlobalValue()),
           DFX::Resolution::OPTIONAL);
       if (valuePVS.isValidState()) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "[GlobalAffinityPVS] global @"
+                       << globalOp.getGlobalName().getValue()
+                       << " affinity using producer affinity from ";
+          valuePVS.print(llvm::dbgs(), solver.getAsmState());
+          llvm::dbgs() << "\n";
+        });
         newState ^= valuePVS;
       }
     }
@@ -1070,6 +1087,9 @@ LogicalResult AffinityAnalysis::run() {
       }
     }
     funcOp.walk([&](Operation *op) {
+      if (isa<FunctionOpInterface>(op)) {
+        return; // ignore func/initializers/etc.
+      }
       if (auto regionOp = dyn_cast<RegionBranchOpInterface>(op)) {
         for (auto &region : regionOp->getRegions()) {
           for (auto arg : region.getArguments()) {

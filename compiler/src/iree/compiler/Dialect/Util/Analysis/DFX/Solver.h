@@ -140,7 +140,7 @@ public:
     }
 
     if (queryingElement && element.getState().isValidState()) {
-      recordDependence(element, const_cast<AbstractElement &>(*queryingElement),
+      recordDependency(element, const_cast<AbstractElement &>(*queryingElement),
                        resolution);
     }
     return element;
@@ -175,7 +175,7 @@ public:
     // Do not register a dependence on an element with an invalid state.
     if (resolution != Resolution::NONE && queryingElement &&
         element->getState().isValidState()) {
-      recordDependence(*element,
+      recordDependency(*element,
                        const_cast<AbstractElement &>(*queryingElement),
                        resolution);
     }
@@ -196,10 +196,10 @@ public:
   // beneficial to avoid false dependencies but it requires the users of
   // `getElementFor` to explicitly record true dependencies through this method.
   // The |resolution| flag indicates if the dependence is strictly necessary.
-  // That means for required dependences if |fromElement| changes to an invalid
+  // That means for required dependencies if |fromElement| changes to an invalid
   // state |toElement| can be moved to a pessimistic fixpoint because it
   // required information from |fromElement| but none are available anymore.
-  void recordDependence(const AbstractElement &fromElement,
+  void recordDependency(const AbstractElement &fromElement,
                         const AbstractElement &toElement,
                         Resolution resolution);
 
@@ -260,9 +260,9 @@ protected:
   // so. Also adjusts the state if we know further updates are not necessary.
   ChangeStatus updateElement(AbstractElement &element);
 
-  // Remembers the dependences on the top of the dependence stack such that they
-  // may trigger further updates.
-  void rememberDependences();
+  // Remembers the dependencies on the top of the dependence stack such that
+  // they may trigger further updates.
+  void rememberDependencies();
 
   // Maximum number of fixed point iterations or None for default.
   std::optional<unsigned> maxFixpointIterations;
@@ -296,15 +296,15 @@ protected:
     Resolution resolution;
   };
 
-  // The dependence stack is used to track dependences during an
+  // The dependency stack is used to track dependencies during an
   // `AbstractElement::update` call. As `AbstractElement::update` can be
-  // recursive we might have multiple vectors of dependences in here. The stack
-  // size, should be adjusted according to the expected recursion depth and the
-  // inner dependence vector size to the expected number of dependences per
+  // recursive we might have multiple vectors of dependencies in here. The stack
+  // size should be adjusted according to the expected recursion depth and the
+  // inner dependence vector size to the expected number of dependencies per
   // abstract element. Since the inner vectors are actually allocated on the
-  // stack we can be generous with their size.
+  // heap we can be generous with their size.
   using DependenceVector = SmallVector<DepInfo, 8>;
-  SmallVector<DependenceVector *, 16> dependenceStack;
+  SmallVector<DependenceVector *, 16> dependencyStack;
 };
 
 } // namespace mlir::iree_compiler::DFX
