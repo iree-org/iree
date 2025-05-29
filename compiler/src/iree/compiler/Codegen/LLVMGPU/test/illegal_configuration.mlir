@@ -152,11 +152,8 @@ func.func @illegal() attributes {translation_info = #translation} {
   %c32 = arith.constant 32 : index
   %c64 = arith.constant 64 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) offset(%c0) : memref<4x32x1024xf32>
-  memref.assume_alignment %0, 32 : memref<4x32x1024xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) offset(%c0) : memref<4x1024x64xf32>
-  memref.assume_alignment %1, 32 : memref<4x1024x64xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) offset(%c0) : memref<4x32x64xf32>
-  memref.assume_alignment %2, 32 : memref<4x32x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index

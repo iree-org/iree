@@ -12,7 +12,6 @@ module {
     %c8 = arith.constant 8 : index
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xf16>
-    memref.assume_alignment %0, 64 : memref<2xf16>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %subview = memref.subview %0[%workgroup_id_x] [1] [1] : memref<2xf16> to memref<1xf16, strided<[1], offset: ?>>
     scf.forall (%arg0) in (%c250) {

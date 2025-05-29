@@ -262,8 +262,8 @@ func.func @matmul_interchange(%0 : tensor<?x?xf32>,
 // -----
 
 func.func @no_compute(%arg0 : memref<?x?x?xf32>, %arg1 : memref<?x?x?xf32>) {
-  memref.assume_alignment %arg0, 64 : memref<?x?x?xf32>
-  memref.assume_alignment %arg1, 64 : memref<?x?x?xf32>
+  util.optimization_barrier %arg0 : memref<?x?x?xf32>
+  util.optimization_barrier %arg1 : memref<?x?x?xf32>
   return
 }
 // CHECK-LABEL: @no_compute(

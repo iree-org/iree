@@ -18,13 +18,9 @@ func.func @matmul_391x384x384_f32() {
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
   %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
-  memref.assume_alignment %0, 64 : memref<391x384xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
-  memref.assume_alignment %1, 64 : memref<384x384xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
-  memref.assume_alignment %2, 64 : memref<384xf32>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : memref<391x384xf32>
-  memref.assume_alignment %3, 64 : memref<391x384xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_y]
@@ -99,13 +95,9 @@ func.func @matmul_scalar_loads() {
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
   %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
-  memref.assume_alignment %0, 64 : memref<391x384xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
-  memref.assume_alignment %1, 64 : memref<384x384xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
-  memref.assume_alignment %2, 64 : memref<384xf32>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : memref<391x384xf32>
-  memref.assume_alignment %3, 64 : memref<391x384xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_y]
@@ -180,11 +172,8 @@ func.func @gather_strided_memref() {
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
-  memref.assume_alignment %0, 64 : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
-  memref.assume_alignment %1, 64 : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
-  memref.assume_alignment %2, 64 : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
   %subview = memref.subview %0[0, 0] [2592000, 1] [1, 1] : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>> to memref<2592000xf32, strided<[3]>, #hal.descriptor_type<storage_buffer>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 4096)>()[%workgroup_id_x]

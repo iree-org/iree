@@ -20,11 +20,8 @@ func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024() {
   %4 = memref.alloc() : memref<4x32x40xf16, 3>
   %5 = memref.alloc() : memref<4x32x40xf16, 3>
   %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<3456x2048xf16>
-  memref.assume_alignment %6, 64 : memref<3456x2048xf16>
   %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2048x1024xf16>
-  memref.assume_alignment %7, 64 : memref<2048x1024xf16>
   %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<3456x1024xf16>
-  memref.assume_alignment %8, 64 : memref<3456x1024xf16>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %9 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%1, %2, %3]
@@ -83,11 +80,8 @@ func.func @nvidia_tenscore_schedule_f16() {
   %alloc_1 = memref.alloc() : memref<3x128x32xf16, #gpu.address_space<workgroup>>
   %alloc_2 = memref.alloc() : memref<3x32x256xf16, #gpu.address_space<workgroup>>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<512x1280xf16>
-  memref.assume_alignment %3, 64 : memref<512x1280xf16>
   %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<1280x1280xf16>
-  memref.assume_alignment %4, 64 : memref<1280x1280xf16>
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<512x1280xf16>
-  memref.assume_alignment %5, 64 : memref<512x1280xf16>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %6:32 = scf.for %arg0 = %c0 to %c1280 step %c32 iter_args(%arg1 = %cst, %arg2 = %cst, %arg3 = %cst, %arg4 = %cst, %arg5 = %cst, %arg6 = %cst, %arg7 = %cst, %arg8 = %cst, %arg9 = %cst, %arg10 = %cst, %arg11 = %cst, %arg12 = %cst, %arg13 = %cst, %arg14 = %cst, %arg15 = %cst, %arg16 = %cst, %arg17 = %cst, %arg18 = %cst, %arg19 = %cst, %arg20 = %cst, %arg21 = %cst, %arg22 = %cst, %arg23 = %cst, %arg24 = %cst, %arg25 = %cst, %arg26 = %cst, %arg27 = %cst, %arg28 = %cst, %arg29 = %cst, %arg30 = %cst, %arg31 = %cst, %arg32 = %cst) -> (vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>) {
@@ -535,11 +529,8 @@ func.func @nvidia_tenscore_schedule_f32() {
   %alloc_2 = memref.alloc() : memref<3x128x32xf32, #gpu.address_space<workgroup>>
   %alloc_3 = memref.alloc() : memref<3x32x128xf32, #gpu.address_space<workgroup>>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<256x256xf32>
-  memref.assume_alignment %3, 64 : memref<256x256xf32>
   %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<256x256xf32>
-  memref.assume_alignment %4, 64 : memref<256x256xf32>
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<256x256xf32>
-  memref.assume_alignment %5, 64 : memref<256x256xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %6 = affine.apply affine_map<()[s0, s1, s2, s3] -> (s1 * 8 + s2 * 16 + s3 * 128 + s0 floordiv 8)>()[%0, %1, %2, %workgroup_id_y]

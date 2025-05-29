@@ -244,11 +244,8 @@ module {
     %cst_1 = arith.constant 0.000000e+00 : f16
     %thread_id_x = gpu.thread_id  x
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>
-    memref.assume_alignment %0, 64 : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>
-    memref.assume_alignment %1, 64 : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
-    memref.assume_alignment %2, 64 : memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %3 = affine.apply #map()[%workgroup_id_x]
     %4 = scf.for %arg0 = %c0 to %c4096 step %c512 iter_args(%arg1 = %cst) -> (vector<4x512xf16>) {

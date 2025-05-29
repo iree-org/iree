@@ -118,9 +118,7 @@ func.func @fold_dynamic_reshape_load() {
   %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
   %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>{%0, %1}
-  memref.assume_alignment %4, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>{%2, %3}
-  memref.assume_alignment %5, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   %6 = iree_codegen.load_from_buffer %4 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x?xf32>
   %collapsed = tensor.collapse_shape %6 [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
   %expanded = tensor.expand_shape %collapsed [[0, 1]] output_shape [%2, %3] : tensor<?xf32> into tensor<?x?xf32>
@@ -153,9 +151,7 @@ func.func @fold_dynamic_reshape_store() {
   %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
   %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>{%0, %1}
-  memref.assume_alignment %4, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>{%2, %3}
-  memref.assume_alignment %5, 1 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
   %6 = iree_codegen.load_from_buffer %4 : memref<?x?xf32, #hal.descriptor_type<storage_buffer>> -> tensor<?x?xf32>
   %barrier = util.optimization_barrier %6 : tensor<?x?xf32>
   %collapsed = tensor.collapse_shape %barrier [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
