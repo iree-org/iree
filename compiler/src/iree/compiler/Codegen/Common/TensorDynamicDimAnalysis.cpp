@@ -108,7 +108,7 @@ static void updateTensorDimInfo(
     return;
   }
   // Check that all strides are 1. Abort otherwise
-  if (llvm::any_of(flowLoadOp.getMixedStrides(), isOneInteger)) {
+  if (!llvm::all_of(flowLoadOp.getMixedStrides(), isOneInteger)) {
     return;
   }
 
