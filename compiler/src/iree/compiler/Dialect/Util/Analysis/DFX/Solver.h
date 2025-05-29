@@ -234,7 +234,7 @@ public:
 
   // Runs the solver until either it converges to a fixed point or exceeds the
   // maximum iteration count. Returns success() if it converges in time.
-  LogicalResult run();
+  LogicalResult run(int maxIterations = 32);
 
   // Prints the constraint dependency graph to |os|.
   void print(llvm::raw_ostream &os);
@@ -254,7 +254,7 @@ protected:
   // If the maximum iteration count is reached this method will
   // indicate pessimistic fixpoint on elements that transitively depend on
   // elements that were still scheduled for an update.
-  LogicalResult runTillFixpoint();
+  LogicalResult runTillFixpoint(int maxIterations);
 
   // Runs update on |element| and tracks the dependencies queried while doing
   // so. Also adjusts the state if we know further updates are not necessary.
@@ -263,9 +263,6 @@ protected:
   // Remembers the dependencies on the top of the dependence stack such that
   // they may trigger further updates.
   void rememberDependencies();
-
-  // Maximum number of fixed point iterations or None for default.
-  std::optional<unsigned> maxFixpointIterations;
 
   // A flag that indicates which stage of the process we are in.
   enum class Phase {
