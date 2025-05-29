@@ -460,23 +460,30 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   // This means the consumer op must have at most one additional destination
   // operand, and it must come from an empty tensor.
   auto controlPropagationFn = [](OpOperand *operand) -> bool {
-    if (!operand->get().getDefiningOp<linalg::UnPackOp>()) {
+    Operation *producer = operand->get().getDefiningOp();
+    Operation *consumer = operand->getOwner();
+    if (!isa_and_nonnull<linalg::UnPackOp>(producer)) {
       return false;
     }
     // Pads and reshapes will not produce extra pack ops.
-    if (isa<tensor::PadOp, tensor::ExpandShapeOp>(operand->getOwner())) {
+    if (isa<tensor::PadOp, tensor::ExpandShapeOp>(consumer)) {
       return true;
     }
-    // Otherwise, the consumer must be a GenericOp with all other operands
-    // coming from empty tensors.
-    auto genericConsumer = dyn_cast<linalg::GenericOp>(operand->getOwner());
-    return genericConsumer &&
-           llvm::all_of(
-               genericConsumer->getOpOperands(),
-               [&](OpOperand &consumerOperand) {
-                 return consumerOperand == *operand ||
-                        consumerOperand.get().getDefiningOp<tensor::EmptyOp>();
-               });
+    // Otherwise, the consumer must be a GenericOp with all of its `outs`
+    // operands coming from tensor.empty ops, and the `operand` must be the
+    // sole `ins` operand of the generic op. This ensures that no additional
+    // linalg.pack ops will be created on other inputs of the generic op.
+    // TODO(Max191): Remove the restriction of not creating new pack ops once
+    // codegen can handle it.
+    auto genericConsumer = dyn_cast<linalg::GenericOp>(consumer);
+    if (!genericConsumer || genericConsumer.getNumDpsInputs() != 1 ||
+        *genericConsumer.getDpsInputOperand(0) != *operand) {
+      return false;
+    }
+    return llvm::all_of(
+        genericConsumer.getDpsInits(), [&](Value consumerOperand) -> bool {
+          return consumerOperand.getDefiningOp<tensor::EmptyOp>();
+        });
   };
   linalg::populateDataLayoutPropagationPatterns(propagationPatterns,
                                                 controlPropagationFn);
