@@ -32,6 +32,9 @@ iree_pjrt_protobuf_cc_library(
     protos
   SRCS
     "xla/pjrt/compile_options.proto"
+    "xla/service/hlo.proto"
+    "xla/service/metrics.proto"
     "xla/xla_data.proto"
+    "xla/xla.proto"
   PUBLIC
 )
