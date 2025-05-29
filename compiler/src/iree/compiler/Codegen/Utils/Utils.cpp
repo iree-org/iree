@@ -1582,7 +1582,9 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   SetVector<Operation *> backwardSlice;
   for (OpOperand *operand : rootOp.getDpsInputOperands()) {
     SetVector<Operation *> tmpBackwardSlice;
-    getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    [[maybe_unused]] LogicalResult result =
+        getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    assert(result.succeeded());
     backwardSlice.set_union(tmpBackwardSlice);
   }
 

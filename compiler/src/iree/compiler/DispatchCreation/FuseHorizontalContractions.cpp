@@ -240,7 +240,8 @@ static bool isHorizontalToGroup(Operation *op,
     return !dominanceInfo.properlyDominates(op, seedOp);
   };
   llvm::SetVector<Operation *> slice;
-  getBackwardSlice(op, &slice, options);
+  [[maybe_unused]] LogicalResult result = getBackwardSlice(op, &slice, options);
+  assert(result.succeeded());
   return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
     return slice.contains(groupedOp);
   });

@@ -64,7 +64,9 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   // Filter returns true for any dialect not allowed.
   firstSliceOptions.filter = [&](Operation *op) { return !whitelistedOps(op); };
   llvm::SetVector<Operation *> firstSlice;
-  mlir::getBackwardSlice(block.getTerminator(), &firstSlice, firstSliceOptions);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(block.getTerminator(), &firstSlice, firstSliceOptions);
+  assert(ret.succeeded());
 
   // 2. Do the second slice starting from the first slice to remove any ABI
   // related operations on the argument.
@@ -75,7 +77,8 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   llvm::SetVector<Operation *> secondSlice;
   for (Operation *op : firstSlice) {
     for (Value operand : op->getOperands()) {
-      mlir::getBackwardSlice(operand, &secondSlice, secondSliceOptions);
+      ret = getBackwardSlice(operand, &secondSlice, secondSliceOptions);
+      assert(ret.succeeded());
     }
   }
   if (secondSlice.empty()) {
