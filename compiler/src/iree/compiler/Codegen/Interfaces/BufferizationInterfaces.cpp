@@ -66,7 +66,8 @@ struct DispatchTensorLoadOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     auto tensorSubspanOp =
         loadOp.getSource()
@@ -118,7 +119,8 @@ struct DispatchTensorStoreOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     auto tensorSubspanOp =
         storeOp.getTarget()
@@ -200,7 +202,8 @@ struct LoadFromBufferOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto loadOp = cast<IREE::Codegen::LoadFromBufferOp>(op);
     replaceOpWithBufferizedValues(rewriter, op, loadOp.getBuffer());
     return success();
@@ -227,7 +230,8 @@ struct StoreToBufferOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto storeOp = cast<IREE::Codegen::StoreToBufferOp>(op);
     FailureOr<Value> maybeBuffer =
         getBuffer(rewriter, storeOp.getTensor(), options);
@@ -332,7 +336,8 @@ struct LinalgExtOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     return bufferizeLinalgExtOp(
         rewriter, cast<IREE::LinalgExt::LinalgExtOp>(op), options);
   }
@@ -467,7 +472,8 @@ struct PackUnPackOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .template Case<linalg::PackOp>(
             [&](auto pack) { return bufferizePackOp(rewriter, pack, options); })

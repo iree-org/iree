@@ -45,7 +45,8 @@ LogicalResult eliminateEmptyTensors(
 /// Bufferizes the given op with One-Shot Bufferize.
 LogicalResult
 runIREEOneShotBufferize(Operation *op,
-                        const IREEOneShotBufferizationOptions &options);
+                        const IREEOneShotBufferizationOptions &options,
+                        bufferization::BufferizationState &state);
 
 /// For a given operation within a dispatch, tile and distribute the operation
 /// to workgroups as well as tile + fuse its producers. Returns the

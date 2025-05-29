@@ -235,9 +235,9 @@ template <typename OpTy>
 struct UKernelOpsBufferizationInterface
     : public bufferization::DstBufferizableOpInterfaceExternalModel<
           UKernelOpsBufferizationInterface<OpTy>, OpTy> {
-  LogicalResult
-  bufferize(Operation *op, RewriterBase &rewriter,
-            const bufferization::BufferizationOptions &options) const {
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     // TODO: Handle operations with regions if needed.
     if (op->getNumRegions() != 0) {
       op->emitOpError(
