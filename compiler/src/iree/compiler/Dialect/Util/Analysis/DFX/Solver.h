@@ -132,11 +132,16 @@ public:
 
     // Allow seeded elements to declare dependencies that are preserved for
     // use during fixed point iteration.
+    static const int maxUpdateChainLength = 16;
     if (updateAfterInit) {
-      auto oldPhase = phase;
-      phase = Phase::UPDATE;
-      updateElement(element);
-      phase = oldPhase;
+      if (updateChainLength < maxUpdateChainLength) {
+        auto oldPhase = phase;
+        phase = Phase::UPDATE;
+        ++updateChainLength;
+        updateElement(element);
+        --updateChainLength;
+        phase = oldPhase;
+      }
     }
 
     if (queryingElement && element.getState().isValidState()) {
@@ -277,6 +282,10 @@ protected:
   // The current initialization chain length. Tracked to avoid stack overflows
   // during recursive initialization.
   unsigned initializationChainLength = 0;
+  // The current update chain length. Tracked to avoid stack overflows during
+  // recursive updates. When reached the update of the element will be deferred
+  // until the next iteration.
+  unsigned updateChainLength = 0;
 
   using ElementMapKeyTy = std::pair<const char *, Position>;
   DenseMap<ElementMapKeyTy, AbstractElement *> elementMap;
