@@ -52,7 +52,7 @@ getIterationDomainAsWorkload(TilingInterface specializationRoot) {
 
   for (auto [i, range] : llvm::enumerate(iterationSpace)) {
     // Non-zero offset and non-unit stride unsupported.
-    if (!isZeroInteger(range.offset) || !isConstantIntValue(range.stride, 1)) {
+    if (!isZeroInteger(range.offset) || !isOneInteger(range.stride)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to get zero offset + unit stride.");
       return failure();
     }

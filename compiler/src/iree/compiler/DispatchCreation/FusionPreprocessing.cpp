@@ -25,6 +25,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -119,11 +120,8 @@ struct FoldSuccessiveTensorInsertSliceOps final
                    "to be fill operation with same value");
     }
 
-    auto isAllConstantOne = [](OpFoldResult ofr) {
-      return isConstantIntValue(ofr, 1);
-    };
-    if (!llvm::all_of(sliceOp.getMixedStrides(), isAllConstantOne) ||
-        !llvm::all_of(sliceOp.getMixedStrides(), isAllConstantOne)) {
+    if (!llvm::all_of(sliceOp.getMixedStrides(), isOneInteger) ||
+        !llvm::all_of(sliceOp.getMixedStrides(), isOneInteger)) {
       return rewriter.notifyMatchFailure(
           sliceOp, "unhandled non-unit strides of slices");
     }

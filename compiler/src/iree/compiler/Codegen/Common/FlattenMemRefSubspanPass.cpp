@@ -44,6 +44,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -295,7 +296,7 @@ struct FlattenBindingSubspan final
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
     Value replacement = newOp;
-    if (!isConstantIntValue(elementOffset, 0)) {
+    if (!isZeroInteger(elementOffset)) {
       OpFoldResult stride = rewriter.getIndexAttr(1);
       MemRefType returnType =
           oldType.getRank() == 0
@@ -330,7 +331,7 @@ struct FlattenReinterpretCast
           op, "unhandled op with non-zero rank memref return type");
     }
 
-    if (!isConstantIntValue(op.getConstifiedMixedOffset(), 0)) {
+    if (!isZeroInteger(op.getConstifiedMixedOffset())) {
       return rewriter.notifyMatchFailure(op, "unhandled non-zero offset");
     }
 

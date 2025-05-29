@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
 namespace mlir::iree_compiler {
@@ -67,7 +68,7 @@ static void tileToThreads(RewriterBase &rewriter,
   SmallVector<Attribute> mapping;
   int idx = 0;
   for (auto size : tileSizes) {
-    if (!isConstantIntValue(size, 0)) {
+    if (!isZeroInteger(size)) {
       unsigned mappingId =
           static_cast<unsigned>(gpu::MappingId::LinearDim0) + idx++;
       mapping.push_back(gpu::GPUThreadMappingAttr::get(

@@ -153,7 +153,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
       llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
       [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
         auto tileSize = std::get<2>(p);
-        if (isConstantIntValue(tileSize, 0)) {
+        if (isZeroInteger(tileSize)) {
           return rewriter.getIndexAttr(1);
         }
 
@@ -184,7 +184,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
   for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
     if (partitionedLoop >= tileSizes.size())
       continue;
-    if (isConstantIntValue(tileSizes[partitionedLoop], 0))
+    if (isZeroInteger(tileSizes[partitionedLoop]))
       continue;
     Value numTileAlongDim = getValueOrCreateConstantIndexOp(
         rewriter, loc, numTiles[partitionedLoop]);

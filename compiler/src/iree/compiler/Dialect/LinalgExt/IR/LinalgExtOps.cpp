@@ -896,8 +896,7 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 
 /// Return true if at least one element in `tiles` is zero.
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
-  return llvm::any_of(
-      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
+  return llvm::any_of(tiles, isZeroInteger);
 }
 
 /// Check if we have enough static information to catch undefined behavior when

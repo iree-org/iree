@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -785,7 +786,7 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   /// inner most dim.
   SmallVector<OpFoldResult> insertOffsets = insertOp.getMixedOffsets();
   for (int i = 0, e = insertOffsets.size() - 1; i < e; ++i) {
-    if (!isConstantIntValue(insertOffsets[i], 0)) {
+    if (!isZeroInteger(insertOffsets[i])) {
       return std::nullopt;
     }
   }

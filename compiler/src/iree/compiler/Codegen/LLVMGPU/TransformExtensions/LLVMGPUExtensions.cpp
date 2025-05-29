@@ -34,6 +34,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -192,15 +193,15 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
     if (threadIdOp.getDimension() != gpu::Dimension::x)
       return failure();
-    if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
+    if (pred.getPredicate() == EQ && isZeroInteger(pred.getRhs()))
       return threadIdOp;
-    if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
+    if (pred.getPredicate() == SLE && isZeroInteger(pred.getRhs()))
       return threadIdOp;
-    if (pred.getPredicate() == ULE && isConstantIntValue(pred.getRhs(), 0))
+    if (pred.getPredicate() == ULE && isZeroInteger(pred.getRhs()))
       return threadIdOp;
-    if (pred.getPredicate() == SLT && isConstantIntValue(pred.getRhs(), 1))
+    if (pred.getPredicate() == SLT && isOneInteger(pred.getRhs()))
       return threadIdOp;
-    if (pred.getPredicate() == ULT && isConstantIntValue(pred.getRhs(), 1))
+    if (pred.getPredicate() == ULT && isOneInteger(pred.getRhs()))
       return threadIdOp;
   }
   auto SGT = arith::CmpIPredicate::sgt;
@@ -210,15 +211,15 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
     if (threadIdOp.getDimension() != gpu::Dimension::x)
       return failure();
-    if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
+    if (pred.getPredicate() == EQ && isZeroInteger(pred.getLhs()))
       return threadIdOp;
-    if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))
+    if (pred.getPredicate() == SGE && isZeroInteger(pred.getLhs()))
       return threadIdOp;
-    if (pred.getPredicate() == UGE && isConstantIntValue(pred.getLhs(), 0))
+    if (pred.getPredicate() == UGE && isZeroInteger(pred.getLhs()))
       return threadIdOp;
-    if (pred.getPredicate() == SGT && isConstantIntValue(pred.getLhs(), 1))
+    if (pred.getPredicate() == SGT && isOneInteger(pred.getLhs()))
       return threadIdOp;
-    if (pred.getPredicate() == UGT && isConstantIntValue(pred.getLhs(), 1))
+    if (pred.getPredicate() == UGT && isOneInteger(pred.getLhs()))
       return threadIdOp;
   }
   return failure();

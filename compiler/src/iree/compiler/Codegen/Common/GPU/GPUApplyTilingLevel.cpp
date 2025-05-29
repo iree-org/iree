@@ -114,7 +114,7 @@ static LogicalResult applyTileAndFuseToEachRoot(
       SmallVector<Attribute> mapping;
       int idx = 0;
       for (auto size : tileSizes) {
-        if (!isConstantIntValue(size, 0)) {
+        if (!isZeroInteger(size)) {
           unsigned mappingId =
               static_cast<unsigned>(gpu::MappingId::LinearDim0) + idx++;
           if (tilingLevel == IREE::GPU::TilingLevel::Thread) {
