@@ -25,10 +25,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-LogicalResult forallWithOutsToForLoop(RewriterBase &rewriter,
-                                      scf::ForallOp forallOp) {
-
-  OpBuilder::InsertionGuard guard(rewriter);
+LogicalResult forallWithSharedOutsToForLoop(RewriterBase &rewriter,
+                                            scf::ForallOp forallOp) {
   rewriter.setInsertionPoint(forallOp);
 
   SmallVector<Value> lbs = forallOp.getLowerBound(rewriter);
@@ -39,8 +37,8 @@ LogicalResult forallWithOutsToForLoop(RewriterBase &rewriter,
   bool unsupportedOperation = false;
   auto buildBody = [&](OpBuilder &builder, Location loc, ValueRange ivs,
                        ValueRange args) -> scf::ValueVector {
-    // Inline `scf.forall` body excluding terminating `scf.forall.in_parallel`
-    // op.
+    // Inline `scf.forall` body excluding terminating
+    // `scf.forall.in_parallel` op.
     IRMapping map;
     map.map(forallOp.getInductionVars(), ivs);
     map.map(forallOp.getRegionOutArgs(), args);
@@ -48,10 +46,9 @@ LogicalResult forallWithOutsToForLoop(RewriterBase &rewriter,
       builder.clone(op, map);
     }
 
-    // Process the `scf.forall.in_parallel` terminator,
+    // Convert + inline the contents of `scf.forall.in_parallel` terminator.
     auto terminator = forallOp.getTerminator();
     SmallVector<Value> yieldedValues;
-
     for (auto &yieldOp : terminator.getYieldingOps()) {
       // Convert tensor.parallel_insert_slice to tensor.insert_slice
       if (auto parallelInsert =
@@ -85,13 +82,11 @@ LogicalResult forallWithOutsToForLoop(RewriterBase &rewriter,
 
   scf::LoopNest loopNest = scf::buildLoopNest(rewriter, forallOp->getLoc(), lbs,
                                               ubs, steps, iterArgs, buildBody);
-
   if (unsupportedOperation) {
     return failure();
   }
 
   rewriter.replaceOp(forallOp, loopNest.results);
-
   return success();
 }
 
@@ -109,7 +104,7 @@ struct LLVMCPUForallToForPass
       // are for workgroup distribution, we only want to convert inner loops
       // produced by tiling to `scf.for`.
       if (!forallOp.getMapping()) {
-        if (failed(forallWithOutsToForLoop(rewriter, forallOp))) {
+        if (failed(forallWithSharedOutsToForLoop(rewriter, forallOp))) {
           signalPassFailure();
           return WalkResult::interrupt();
         }

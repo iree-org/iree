@@ -69,8 +69,8 @@ func.func @quantized_matmul(%arg0: tensor<2x4x128x16x1xi8>, %arg1: tensor<2x4x16
 // CHECK:    linalg.fill
 // CHECK:    %[[MMT4D:.+]] = linalg.batch_mmt4d
 // CHECK:    %[[UNPACK:.+]] = linalg.unpack
-// CHECK:           scf.forall.in_parallel
-// CHECK:             tensor.parallel_insert_slice %[[UNPACK]]
+// CHECK:    scf.forall.in_parallel
+// CHECK:      tensor.parallel_insert_slice %[[UNPACK]]
 
 // -----
 
