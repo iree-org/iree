@@ -89,6 +89,15 @@ void LoadFromBufferOp::getEffects(
                        SideEffects::DefaultResource::get());
 }
 
+LogicalResult LoadFromBufferOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPointAfterValue(getBuffer());
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0] = memref::getMixedSizes(b, getLoc(), getBuffer());
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // StoreToBufferOp
 //===----------------------------------------------------------------------===//
