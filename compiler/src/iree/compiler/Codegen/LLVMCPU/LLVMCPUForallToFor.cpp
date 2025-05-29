@@ -25,7 +25,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-LogicalResult forallToForLoopIterArgs(RewriterBase &rewriter,
+LogicalResult forallWithOutsToForLoop(RewriterBase &rewriter,
                                       scf::ForallOp forallOp) {
 
   OpBuilder::InsertionGuard guard(rewriter);
@@ -109,7 +109,7 @@ struct LLVMCPUForallToForPass
       // are for workgroup distribution, we only want to convert inner loops
       // produced by tiling to `scf.for`.
       if (!forallOp.getMapping()) {
-        if (failed(forallToForLoopIterArgs(rewriter, forallOp))) {
+        if (failed(forallWithOutsToForLoop(rewriter, forallOp))) {
           signalPassFailure();
           return WalkResult::interrupt();
         }
