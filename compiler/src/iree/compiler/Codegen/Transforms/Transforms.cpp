@@ -63,7 +63,9 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
     return sliceFilter(op, nonIndexComputationOperands, baseOp);
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(baseOp, &slice, options);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(baseOp, &slice, options);
+  assert(ret.succeeded());
   IRMapping bvm;
   for (auto origOp : slice) {
     builder.clone(*origOp, bvm);
@@ -364,7 +366,9 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   llvm::SetVector<Operation *> slice;
   for (auto ofr : workgroupCount) {
     if (auto val = dyn_cast<Value>(ofr)) {
-      mlir::getBackwardSlice(val, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(val, &slice, options);
+      assert(result.succeeded());
     }
   }
   // Since there are more than one slices, sort the operations again.
@@ -1846,7 +1850,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           }
         }
         SetVector<Operation *> tmpBackwardSlice;
-        getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        [[maybe_unused]] LogicalResult result =
+            getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        assert(result.succeeded());
         slice.set_union(tmpBackwardSlice);
       }
     }
