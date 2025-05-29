@@ -61,7 +61,7 @@ void GPUAllocPrivateMemoryForDPSOpsPass::runOnOperation() {
     }
     for (int idx = 0; idx < dpsOp.getNumDpsInits(); ++idx) {
       OpOperand *value = dpsOp.getDpsInitOperand(idx);
-      if (!dpsOp->getResult(idx).use_empty()) {
+      if (!dpsOp.getTiedOpResult(value).use_empty()) {
         continue;
       }
       if (isAllocSizeTooBig(value->get().getType())) {
