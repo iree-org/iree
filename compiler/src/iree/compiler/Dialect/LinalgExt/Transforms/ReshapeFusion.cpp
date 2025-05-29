@@ -306,44 +306,65 @@ getAttentionReshapeInfo(LinalgExt::AttentionOp attentionOp) {
 }
 
 static SmallVector<ReshapeOperandInfo>
-getScatterReshapeInfo(LinalgExt::ScatterOp scatterOp) {
+getReshapeInfo(LinalgExt::ScatterOp scatterOp) {
   SmallVector<ReshapeOperandInfo> infos;
   auto rankOfContiguousSlice =
       scatterOp.getOriginalType().getRank() - scatterOp.getIndexDepth();
   auto updateRank = scatterOp.getUpdateType().getRank();
 
-  // Operand #0 Updates
-  {
-    ReshapeOperandInfo updateInfo;
-    updateInfo.originalShape = scatterOp.getUpdateType().getShape();
-    llvm::append_range(updateInfo.operandToIterationSpace,
-                       llvm::seq<int64_t>(0, updateRank));
-    infos.push_back(std::move(updateInfo));
-  }
+  ReshapeOperandInfo updateInfo;
+  updateInfo.originalShape = scatterOp.getUpdateType().getShape();
+  llvm::append_range(updateInfo.operandToIterationSpace,
+                     llvm::seq<int64_t>(0, updateRank));
+  infos.push_back(std::move(updateInfo));
 
-  // Operand#1 Indices
-  {
-    ReshapeOperandInfo indicesInfo;
-    indicesInfo.originalShape = scatterOp.getIndicesType().getShape();
-    llvm::append_range(indicesInfo.operandToIterationSpace,
-                       llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
-    if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank())
-      indicesInfo.operandToIterationSpace.push_back(
-          ReshapeOperandInfo::kNoMapping);
-    infos.push_back(std::move(indicesInfo));
-  }
+  ReshapeOperandInfo indicesInfo;
+  indicesInfo.originalShape = scatterOp.getIndicesType().getShape();
+  llvm::append_range(indicesInfo.operandToIterationSpace,
+                     llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
+  if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank())
+    indicesInfo.operandToIterationSpace.push_back(
+        ReshapeOperandInfo::kNoMapping);
+  infos.push_back(std::move(indicesInfo));
 
-  // Operand #2 Original
-  {
-    ReshapeOperandInfo originalInfo;
-    originalInfo.originalShape = scatterOp.getOriginalType().getShape();
-    originalInfo.operandToIterationSpace.append(scatterOp.getIndexDepth(),
-                                                ReshapeOperandInfo::kNoMapping);
-    llvm::append_range(
-        originalInfo.operandToIterationSpace,
-        llvm::seq(updateRank - rankOfContiguousSlice, updateRank));
-    infos.push_back(std::move(originalInfo));
-  }
+  ReshapeOperandInfo originalInfo;
+  originalInfo.originalShape = scatterOp.getOriginalType().getShape();
+  originalInfo.operandToIterationSpace.append(scatterOp.getIndexDepth(),
+                                              ReshapeOperandInfo::kNoMapping);
+  llvm::append_range(originalInfo.operandToIterationSpace,
+                     llvm::seq(updateRank - rankOfContiguousSlice, updateRank));
+  infos.push_back(std::move(originalInfo));
+  return infos;
+};
+
+static SmallVector<ReshapeOperandInfo>
+getReshapeInfo(LinalgExt::GatherOp gatherOp) {
+  SmallVector<ReshapeOperandInfo> infos;
+  auto rankOfContiguousSlice = gatherOp.getOutputSliceRank();
+  auto outputRank = gatherOp.getOutputType().getRank();
+
+  ReshapeOperandInfo sourceInfo;
+  sourceInfo.originalShape = gatherOp.getSourceType().getShape();
+  sourceInfo.operandToIterationSpace.append(gatherOp.getIndexDepth(),
+                                            ReshapeOperandInfo::kNoMapping);
+  llvm::append_range(sourceInfo.operandToIterationSpace,
+                     llvm::seq(outputRank - rankOfContiguousSlice, outputRank));
+  infos.push_back(std::move(sourceInfo));
+
+  ReshapeOperandInfo indicesInfo;
+  indicesInfo.originalShape = gatherOp.getIndicesType().getShape();
+  llvm::append_range(indicesInfo.operandToIterationSpace,
+                     llvm::seq<int64_t>(0, gatherOp.getBatchRank()));
+  if (gatherOp.getBatchRank() != gatherOp.getIndicesType().getRank())
+    indicesInfo.operandToIterationSpace.push_back(
+        ReshapeOperandInfo::kNoMapping);
+  infos.push_back(std::move(indicesInfo));
+
+  ReshapeOperandInfo outputInfo;
+  outputInfo.originalShape = gatherOp.getOutputType().getShape();
+  llvm::append_range(outputInfo.operandToIterationSpace,
+                     llvm::seq<int64_t>(0, outputRank));
+  infos.push_back(std::move(outputInfo));
   return infos;
 };
 
@@ -473,11 +494,18 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   return resultVals;
 }
 
+template <typename OpTy>
 static std::optional<Value>
-fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
-                                  OpOperand *fusableOpOperand,
-                                  PatternRewriter &rewriter) {
-  Location loc = scatterOp.getLoc();
+fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
+                           OpOperand *fusableOpOperand,
+                           PatternRewriter &rewriter) {
+  // TODO: Also support attention with this function. This means updating the
+  // indexing maps.
+  static_assert(std::is_same_v<OpTy, GatherOp> ||
+                    std::is_same_v<OpTy, ScatterOp>,
+                "only gather & scatter supported");
+
+  Location loc = op.getLoc();
   // Check if reshape is expanding or collapsing.
   auto expandingReshapeOp = dyn_cast<tensor::ExpandShapeOp>(*reshapeOp);
   auto collapsingReshapeOp = dyn_cast<tensor::CollapseShapeOp>(*reshapeOp);
@@ -486,31 +514,28 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
                                       ? expandingReshapeOp.getResultType()
                                       : collapsingReshapeOp.getSrcType();
   ExpansionInfo info;
-  if (failed(info.compute(
-          getScatterReshapeInfo(scatterOp),
-          scatterOp.getStaticLoopRanges().value(), fusableOpOperand,
-          isExpanding ? expandingReshapeOp.getReassociationIndices()
-                      : collapsingReshapeOp.getReassociationIndices(),
-          expandedType.getShape()))) {
+  if (failed(info.compute(getReshapeInfo(op), op.getStaticLoopRanges().value(),
+                          fusableOpOperand,
+                          isExpanding
+                              ? expandingReshapeOp.getReassociationIndices()
+                              : collapsingReshapeOp.getReassociationIndices(),
+                          expandedType.getShape()))) {
     return std::nullopt;
   }
 
   OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(scatterOp);
+  rewriter.setInsertionPoint(op);
 
-  OpOperand *update = scatterOp.getDpsInputOperand(0);
-  OpOperand *indices = scatterOp.getDpsInputOperand(1);
-  OpOperand *original = scatterOp.getDpsInitOperand(0);
-  auto newUpdates = info.getOrCreateExpanded(loc, update, rewriter).value();
-  auto newIndices = info.getOrCreateExpanded(loc, indices, rewriter).value();
-  auto newOriginal = info.getOrCreateExpanded(loc, original, rewriter).value();
+  IRMapping mapping;
+  for (OpOperand &operand : op->getOpOperands()) {
+    mapping.map(operand.get(),
+                info.getOrCreateExpanded(loc, &operand, rewriter).value());
+  }
 
-  auto newScatter = rewriter.create<ScatterOp>(
-      loc, newOriginal.getType(), ValueRange{newUpdates, newIndices},
-      ValueRange{newOriginal}, scatterOp.getDimensionMap(),
-      scatterOp.getUniqueIndices());
-  rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
-                              newScatter.getRegion().begin());
+  assert(op.getNumDpsInits() == 1);
+  OpOperand *original = op.getDpsInitOperand(0);
+  auto *newOp = rewriter.clone(*op, mapping);
+  newOp->getResult(0).setType(mapping.lookup(original->get()).getType());
 
   auto originalShapeMap = info.getShapeMap(original);
   SmallVector<ReassociationIndices> originalReassoc =
@@ -518,13 +543,10 @@ fuseScatterWithReshapeByExpansion(ScatterOp scatterOp, Operation *reshapeOp,
 
   // Collapse back to original shape.
   if (isIdentityReassoc(originalReassoc)) {
-    return {newScatter.getResult(0)};
+    return std::optional{newOp->getResult(0)};
   }
-  auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
-      loc, scatterOp.getOriginalType(), newScatter.getResult(0),
-      originalReassoc);
-
-  return {newCollapse};
+  return rewriter.create<tensor::CollapseShapeOp>(
+      loc, op.getResult(0).getType(), newOp->getResult(0), originalReassoc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -730,17 +752,18 @@ struct DropGatherBatchUnitDims final : public OpRewritePattern<GatherOp> {
   }
 };
 
-struct FoldScatterWithProducerReshapeByExpansion final
-    : public OpRewritePattern<ScatterOp> {
-  FoldScatterWithProducerReshapeByExpansion(
+template <typename OpTy>
+struct FoldWithProducerReshapeByExpansion final
+    : public OpRewritePattern<OpTy> {
+  FoldWithProducerReshapeByExpansion(
       MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
       PatternBenefit benefit = 1)
-      : OpRewritePattern<ScatterOp>(context, benefit),
+      : OpRewritePattern<OpTy>(context, benefit),
         controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
 
-  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+  LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
-    for (OpOperand &opOperand : scatterOp->getOpOperands()) {
+    for (OpOperand &opOperand : op->getOpOperands()) {
       tensor::CollapseShapeOp reshapeOp =
           opOperand.get().getDefiningOp<tensor::CollapseShapeOp>();
       if (!reshapeOp)
@@ -748,11 +771,11 @@ struct FoldScatterWithProducerReshapeByExpansion final
       if (!controlFoldingReshapes(&opOperand))
         continue;
 
-      std::optional<Value> replacementValue = fuseScatterWithReshapeByExpansion(
-          scatterOp, reshapeOp, &opOperand, rewriter);
+      std::optional<Value> replacementValue =
+          fuseWithReshapeByExpansion(op, reshapeOp, &opOperand, rewriter);
       if (!replacementValue)
         return failure();
-      rewriter.replaceOp(scatterOp, *replacementValue);
+      rewriter.replaceOp(op, *replacementValue);
       return success();
     }
     return failure();
@@ -761,9 +784,10 @@ struct FoldScatterWithProducerReshapeByExpansion final
   linalg::ControlFusionFn controlFoldingReshapes;
 };
 
-struct FoldScatterWithConsumerReshapeByExpansion final
+template <typename OpTy>
+struct FoldWithConsumerReshapeByExpansion final
     : public OpRewritePattern<tensor::ExpandShapeOp> {
-  FoldScatterWithConsumerReshapeByExpansion(
+  FoldWithConsumerReshapeByExpansion(
       MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
       PatternBenefit benefit = 1)
       : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
@@ -777,8 +801,8 @@ struct FoldScatterWithConsumerReshapeByExpansion final
                                          "source not produced by an operation");
     }
 
-    auto scatterOp = producerResult.getDefiningOp<LinalgExt::ScatterOp>();
-    if (!scatterOp) {
+    auto op = producerResult.getDefiningOp<OpTy>();
+    if (!op) {
       return failure();
     }
 
@@ -786,12 +810,11 @@ struct FoldScatterWithConsumerReshapeByExpansion final
       return failure();
     }
 
-    std::optional<Value> replacementValue = fuseScatterWithReshapeByExpansion(
-        scatterOp, expandOp, scatterOp.getTiedOpOperand(producerResult),
-        rewriter);
+    std::optional<Value> replacementValue = fuseWithReshapeByExpansion(
+        op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
     if (!replacementValue)
       return failure();
-    rewriter.replaceOp(scatterOp, *replacementValue);
+    rewriter.replaceOp(op, *replacementValue);
     return success();
   }
 
@@ -1012,9 +1035,13 @@ void populateFoldReshapeOpsByExpansionPatterns(
       patterns.getContext(), controlFoldingReshapes);
   patterns.add<FoldAttentionWithProducerReshapeByExpansion>(
       patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldScatterWithProducerReshapeByExpansion>(
+  patterns.add<FoldWithProducerReshapeByExpansion<ScatterOp>>(
       patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldScatterWithConsumerReshapeByExpansion>(
+  patterns.add<FoldWithConsumerReshapeByExpansion<ScatterOp>>(
+      patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldWithProducerReshapeByExpansion<GatherOp>>(
+      patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldWithConsumerReshapeByExpansion<GatherOp>>(
       patterns.getContext(), controlFoldingReshapes);
 }
 

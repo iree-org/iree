@@ -39,6 +39,7 @@ iree_cc_library(
     "ReshapeFusion.cpp"
     "RewriteFft.cpp"
     "SplitReduction.cpp"
+    "TestReshapeFusion.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
   DEPS

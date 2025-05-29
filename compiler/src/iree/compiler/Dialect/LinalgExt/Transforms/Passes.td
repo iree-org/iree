@@ -103,4 +103,9 @@ def FoldUnitExtentDimsPass :
   ];
 }
 
+def TestReshapeFusionPass :
+    Pass<"iree-linalg-ext-test-reshape-fusion", ""> {
+  let summary = "Test reshape fusion patterns";
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_PASSES
