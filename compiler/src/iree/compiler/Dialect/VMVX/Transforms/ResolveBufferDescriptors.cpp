@@ -351,7 +351,7 @@ struct FromMemRefAssumeAlignment
       return failure();
     }
 
-    auto loc = op.getLoc();
+    Location loc = op.getLoc();
     // TODO(hanchung): Refactor resolverBufferDescriptor* out, so we don't have
     // to track the SSA chain above.
     FailureOr<DescriptorInfo> resultDescriptor =
