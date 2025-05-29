@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
@@ -289,7 +290,7 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   auto applyPadding = [&](AffineMap map, OpFoldResult padding1,
                           OpFoldResult padding2, unsigned dim1, unsigned dim2,
                           Value &paddingTarget) {
-    if (!isConstantIntValue(padding1, 0) || !isConstantIntValue(padding2, 0)) {
+    if (!isZeroInteger(padding1) || !isZeroInteger(padding2)) {
       llvm::SmallDenseMap<AffineExpr, unsigned> exprToIdMap =
           createExprToIdMap(map);
       auto id1 = exprToIdMap[getAffineDimExpr(dim1, map.getContext())];

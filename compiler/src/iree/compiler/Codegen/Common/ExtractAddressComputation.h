@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
@@ -48,10 +49,7 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
     // to do.
     SmallVector<OpFoldResult> indices =
         getAsOpFoldResult(storeLoadLikeOp.getIndices());
-    if (std::all_of(indices.begin(), indices.end(),
-                    [](const OpFoldResult &opFold) {
-                      return isConstantIntValue(opFold, 0);
-                    })) {
+    if (llvm::all_of(indices, isZeroInteger)) {
       return failure();
     }
 

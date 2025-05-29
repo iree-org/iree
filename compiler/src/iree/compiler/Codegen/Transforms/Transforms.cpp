@@ -1101,9 +1101,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     // Bail out if the strides aren't unit.
-    if (!llvm::all_of(storeOp.getMixedStrides(), [](OpFoldResult s) {
-          return isConstantIntValue(s, 1);
-        })) {
+    if (!llvm::all_of(storeOp.getMixedStrides(), isOneInteger)) {
       return failure();
     }
 
