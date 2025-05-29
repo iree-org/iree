@@ -442,6 +442,59 @@ insertIdentityMapScatter(RewriterBase &rewriter,
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             PadDistributionConfigFn padDistributionConfigFn) {
+  // Sink relayout operations to the end of the funcOp.
+  RewritePatternSet propagationPatterns(ctx);
+  tensor::populateFoldTensorEmptyPatterns(propagationPatterns);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(propagationPatterns, ctx);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(propagationPatterns,
+                                                       ctx);
+  // Only sink reshape ops, so bail if the consumer operation is a reshape.
+  auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
+    Operation *consumer = operand->getOwner();
+    return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer);
+  };
+  linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
+                                                    controlSinkReshapesFn);
+  // Only sink unpack ops, so bail if the producer operation is not an unpack.
+  // Also only sink unpack ops when new pack operations will not be created.
+  // This means the consumer op must have at most one additional destination
+  // operand, and it must come from an empty tensor.
+  auto controlPropagationFn = [](OpOperand *operand) -> bool {
+    Operation *producer = operand->get().getDefiningOp();
+    Operation *consumer = operand->getOwner();
+    if (!isa_and_nonnull<linalg::UnPackOp>(producer)) {
+      return false;
+    }
+    // Pads and reshapes will not produce extra pack ops.
+    if (isa<tensor::PadOp, tensor::ExpandShapeOp>(consumer)) {
+      return true;
+    }
+    // Otherwise, the consumer must be a GenericOp with all of its `outs`
+    // operands coming from tensor.empty ops, and the `operand` must be the
+    // sole `ins` operand of the generic op. This ensures that no additional
+    // linalg.pack ops will be created on other inputs of the generic op.
+    // TODO(Max191): Remove the restriction of not creating new pack ops once
+    // codegen can handle it.
+    auto genericConsumer = dyn_cast<linalg::GenericOp>(consumer);
+    if (!genericConsumer || genericConsumer.getNumDpsInputs() != 1 ||
+        *genericConsumer.getDpsInputOperand(0) != *operand) {
+      return false;
+    }
+    return llvm::all_of(
+        genericConsumer.getDpsInits(), [&](Value consumerOperand) -> bool {
+          return consumerOperand.getDefiningOp<tensor::EmptyOp>();
+        });
+  };
+  linalg::populateDataLayoutPropagationPatterns(propagationPatterns,
+                                                controlPropagationFn);
+  // TODO(Max191): The propagation patterns could be applied at the same time as
+  // relayout ops are folded into the map_scatter, which may enable even more
+  // folding. This requires the relayout op folding to be done as pattern
+  // rewrites, and also direct foldings for pack and unpack ops.
+  if (failed(applyPatternsGreedily(funcOp, std::move(propagationPatterns)))) {
+    return failure();
+  }
+
   // Apply some preprocessing to convert complex layout transformation
   // ops like pack and unpack into simpler supported ops.
   IRRewriter rewriter(ctx);
