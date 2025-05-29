@@ -53,6 +53,7 @@
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/LoopExtension/LoopExtension.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 
@@ -95,7 +96,8 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   transform::TransformDialect,
-                  shape::ShapeDialect>();
+                  shape::ShapeDialect,
+                  ub::UBDialect>();
   // clang-format on
   cf::registerBufferizableOpInterfaceExternalModels(registry);
   func::registerInlinerExtension(registry);
