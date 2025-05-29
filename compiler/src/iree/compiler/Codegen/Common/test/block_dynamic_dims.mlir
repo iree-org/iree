@@ -353,6 +353,37 @@ func.func @fold_reshapes_with_bindings() {
 
 // -----
 
+func.func @block_dims_with_early_bufferization_ops(%input: memref<?xf32>, %size: index) {
+  %0 = util.assume.int %size<umin = 16, umax = 4080, udiv = 16> : index
+  %1 = memref.alloc(%0) : memref<?xf32>
+  %2 = iree_codegen.load_from_buffer %input : memref<?xf32> -> tensor<?xf32>
+  %3 = tensor.empty(%0) : tensor<?xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                        affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+                       ins(%2 : tensor<?xf32>) outs(%3 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?xf32>
+  iree_codegen.store_to_buffer %4, %1 : tensor<?xf32> into memref<?xf32>
+  return
+}
+// Check that the reshapes are able to be folded into load_from_buffer and
+// store_to_buffer ops.
+//
+// CHECK-LABEL: func @block_dims_with_early_bufferization_ops(
+//  CHECK-SAME:   %[[INPUT_BUFFER:[a-zA-Z0-9_]+]]
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc
+//   CHECK-DAG:   %[[ALLOC_EXPAND:.+]] = memref.expand_shape %[[ALLOC]]
+//   CHECK-DAG:   %[[INPUT_EXPAND:.+]] = memref.expand_shape %[[INPUT_BUFFER]]
+//   CHECK-DAG:   %[[INPUT_TENSOR:.+]] = iree_codegen.load_from_buffer %[[INPUT_EXPAND]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?x16xf32>)
+//       CHECK:   iree_codegen.store_to_buffer %[[GENERIC]], %[[ALLOC_EXPAND]]
+//  CHECK-SAME:       tensor<?x16xf32> into memref<?x16xf32>
+
+// -----
+
 // Check that patterns that bubble expand shapes past collapse shape kick in.
 func.func @check_bubble_up_patterns(%arg0 : tensor<4x32x?x32x?x32xf32>, %arg1 : index)
     -> tensor<4x32x?x32x?xf32> {
