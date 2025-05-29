@@ -52,9 +52,7 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
   }
   // Note: this is a bit conservative, in that it will traverse all the
   // arguments to a util.assume.int that isn't the immediate parent of val.
-  [[maybe_unused]] LogicalResult result =
-      getBackwardSlice(arg, &dependencies, opts);
-  assert(result.succeeded());
+  mlir::getBackwardSlice(arg, &dependencies, opts);
   return llvm::all_of(dependencies, [&](Operation *op) {
     if (matchPattern(op, m_Constant()))
       return true;
