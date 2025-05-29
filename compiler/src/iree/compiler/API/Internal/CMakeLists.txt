@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRSupport
+    iree::compiler::AssertInserter
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C

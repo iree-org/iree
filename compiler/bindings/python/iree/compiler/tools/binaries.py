@@ -194,6 +194,7 @@ def invoke_immediate(
         elif immediate_input is not None:
             run_args["input"] = immediate_input
 
+        print(command_line)
         process = subprocess.run(command_line, capture_output=True, **run_args)
         if process.returncode != 0:
             raise CompilerToolError(process)

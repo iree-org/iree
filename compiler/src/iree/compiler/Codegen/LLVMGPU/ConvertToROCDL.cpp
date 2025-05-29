@@ -315,6 +315,7 @@ struct ConvertToROCDLPass final
       populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
+      cf::populateAssertToLLVMConversionPattern(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
       StringRef targetArch = getGPUTargetAttr(m).getArch();
       amdgpu::Chipset chipset =

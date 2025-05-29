@@ -41,6 +41,7 @@
 #include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
+#include "iree/compiler/AssertInserter/Passes.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -963,6 +964,16 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     }
   });
 
+  parsedModule->dump();
+  {
+    auto passManager = createPassManager();
+    mlir::iree_compiler::AssertInserterPipelineOptions options;
+    options.includeVectorLoadStore = true;
+    buildAssertInserterPipeline(*passManager, options);
+    if (failed(passManager->run(parsedModule))) {
+      return false;
+    }
+  }
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
     IREEVMPipelinePhase compileFrom;

@@ -21,6 +21,7 @@
 #include "iree/compiler/Preprocessing/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 
+#include <iostream>
 namespace mlir::iree_compiler {
 
 static IREE::HAL::PipelinePhase
@@ -357,6 +358,7 @@ void buildIREEVMTransformPassPipeline(
     return; // early-exit
   }
 
+    std::cerr << "TYB YAY STD\n";
   if (compileFrom < IREEVMPipelinePhase::VM) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
     if (hooks.beforePhase)
