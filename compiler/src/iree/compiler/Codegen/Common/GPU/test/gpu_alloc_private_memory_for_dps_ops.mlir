@@ -42,3 +42,14 @@ func.func @used_result_not_copied(%arg0: !iree_tensor_ext.dispatch.tensor<readon
   } -> tensor<1x10xf32>, tensor<1x10xi64>
   return %3#0, %3#1 : tensor<1x10xf32>, tensor<1x10xi64>
 }
+
+// -----
+
+// CHECK-LABEL: func @memref_semantics(
+//  CHECK-SAME:   %[[DEST:.+]]: memref<?x?xf32>
+//       CHECK:   linalg.fill {{.*}} outs(%[[DEST]]
+func.func @memref_semantics(%dest: memref<?x?xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  linalg.fill ins(%cst : f32) outs(%dest : memref<?x?xf32>)
+  return
+}
