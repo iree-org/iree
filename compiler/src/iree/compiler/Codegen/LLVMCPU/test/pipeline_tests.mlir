@@ -148,9 +148,9 @@ func.func @check_buffer_ops_vectorization() attributes {hal.executable.target = 
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x1024xi32>
   %assume_align_0 = memref.assume_alignment %0, 64 : memref<128x1024xi32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x1536xi32>
-  %assum_align_1 = memref.assume_alignment %1, 64 : memref<128x1536xi32>
-  %subview = memref.subview %assum_align_1[0, 0] [128, 1024] [1, 1] : memref<128x1536xi32> to memref<128x1024xi32, #map>
-  linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%assum_align_0 : memref<128x1024xi32>) outs(%subview : memref<128x1024xi32, #map>) {
+  %assume_align_1 = memref.assume_alignment %1, 64 : memref<128x1536xi32>
+  %subview = memref.subview %assume_align_1[0, 0] [128, 1024] [1, 1] : memref<128x1536xi32> to memref<128x1024xi32, #map>
+  linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%assume_align_0 : memref<128x1024xi32>) outs(%subview : memref<128x1024xi32, #map>) {
   ^bb0(%in: i32, %out: i32):
     linalg.yield %in : i32
   }
