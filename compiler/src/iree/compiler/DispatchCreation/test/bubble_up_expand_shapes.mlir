@@ -139,7 +139,7 @@ util.func @bubble_up_through_reduction(%arg0: tensor<10x?xi64>) -> tensor<2x5xi6
 
 // Check that dim resolution kicks in during expand shape propagation
 util.func public @verify_dim_propagation(%arg0: index,
-    %arg1: tensor<16x32x128x?xf8E4M3FNUZ>) -> tensor<16x1x32x128x?xbf16> {
+    %arg1: tensor<16x32x128x?xf8E4M3FNUZ>) -> tensor<4x4x32x128x?xbf16> {
   %c3 = arith.constant 3 : index
   %0 = tensor.empty(%arg0) : tensor<16x32x128x?xbf16>
   %1 = linalg.generic {
@@ -153,9 +153,9 @@ util.func public @verify_dim_propagation(%arg0: index,
     } -> tensor<16x32x128x?xbf16>
   %dim = tensor.dim %1, %c3 : tensor<16x32x128x?xbf16>
   %expanded = tensor.expand_shape %1 [[0, 1], [2], [3], [4]]
-      output_shape [16, 1, 32, 128, %dim]
-      : tensor<16x32x128x?xbf16> into tensor<16x1x32x128x?xbf16>
-  util.return %expanded : tensor<16x1x32x128x?xbf16>
+      output_shape [4, 4, 32, 128, %dim]
+      : tensor<16x32x128x?xbf16> into tensor<4x4x32x128x?xbf16>
+  util.return %expanded : tensor<4x4x32x128x?xbf16>
 }
 // CHECK-LABEL: @verify_dim_propagation
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor
@@ -205,3 +205,21 @@ util.func public @test_no_infinite_loop_unit_dim_expansion(%arg0 : tensor<4xi64>
 // CHECK: tensor.expand_shape
 // CHECK: linalg.generic
 // CHECK-NOT: tensor.expand_shape
+
+// -----
+
+util.func @dont_propagate_edge_unit_reshapes(%arg0: tensor<?x1xi32>) -> tensor<?xi32> {
+  %collapsed = tensor.collapse_shape %arg0[[0, 1]] : tensor<?x1xi32> into tensor<?xi32>
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%collapsed: tensor<?xi32>) outs(%collapsed: tensor<?xi32>){
+^bb0(%in : i32, %out : i32):
+   %1 = arith.addi %in, %in : i32
+  linalg.yield %1 : i32
+  } -> tensor<?xi32>
+  util.return %0 : tensor<?xi32>
+}
+// CHECK-LABEL: util.func public @dont_propagate_edge_unit_reshapes
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:   %[[VAL:.+]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//       CHECK:   util.return %[[VAL]] : tensor<?xi32>
