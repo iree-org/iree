@@ -61,9 +61,7 @@ static bool producedByValueExtract(OpFoldResult index) {
 
   // Get the backward slice of the index.
   SetVector<Operation *> backwardSlice;
-  [[maybe_unused]] LogicalResult result =
-      getBackwardSlice(indexVal, &backwardSlice, options);
-  assert(result.succeeded());
+  getBackwardSlice(indexVal, &backwardSlice, options);
   return hasExtract;
 }
 
