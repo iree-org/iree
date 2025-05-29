@@ -22,7 +22,7 @@ Solver::~Solver() {
   }
 }
 
-LogicalResult Solver::run() {
+LogicalResult Solver::run(int maxIterations) {
   LLVM_DEBUG(llvm::dbgs() << "[Solver] identified and initialized "
                           << depGraph.syntheticRoot.deps.size()
                           << " abstract elements\n");
@@ -30,7 +30,7 @@ LogicalResult Solver::run() {
   // Now that all abstract elements are collected and initialized we start
   // the abstract analysis.
   phase = Phase::UPDATE;
-  auto result = runTillFixpoint();
+  auto result = runTillFixpoint(maxIterations);
   phase = Phase::DONE;
 
   if (failed(result)) {
@@ -40,9 +40,8 @@ LogicalResult Solver::run() {
   return result;
 }
 
-LogicalResult Solver::runTillFixpoint() {
-  unsigned iterationCounter = 1;
-  unsigned maxIterations = maxFixpointIterations.value_or(32);
+LogicalResult Solver::runTillFixpoint(int maxIterations) {
+  int iterationCounter = 1;
 
   SmallVector<AbstractElement *, 32> changedElements;
   SetVector<AbstractElement *> worklist, invalidElements;
