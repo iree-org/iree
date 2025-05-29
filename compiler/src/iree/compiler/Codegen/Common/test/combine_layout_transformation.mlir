@@ -238,3 +238,37 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
 //  CHECK:            }
 //  CHECK:          }
 //  CHECK:        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+func.func @propagate_relayout_ops(%source : tensor<?x?x128x128xf32>,
+                                  %result : memref<?xf16>,
+                                  %size0: index, %size1: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dest = tensor.empty(%size0, %size1) : tensor<?x?xf32>
+  %unpack = linalg.unpack %source
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest : tensor<?x?x128x128xf32> -> tensor<?x?xf32>
+  %collapse = tensor.collapse_shape %unpack [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
+  %flat_size = arith.muli %size0, %size1 : index
+  %init = tensor.empty(%flat_size) : tensor<?xf16>
+  %compute_op = linalg.generic
+      {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+       iterator_types = ["parallel"]}
+       ins(%collapse : tensor<?xf32>) outs(%init : tensor<?xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %trunc = arith.truncf %in : f32 to f16
+    linalg.yield %trunc : f16
+  } -> tensor<?xf16>
+  iree_codegen.store_to_buffer %compute_op, %result : tensor<?xf16> into memref<?xf16>
+  return
+}
+// CHECK-LABEL: @propagate_relayout_ops
+//  CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[INIT:.+]] = tensor.empty{{.*}} : tensor<?x?x128x128xf16>
+//       CHECK:   %[[COMPUTE_OP:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[SOURCE]] : tensor<?x?x128x128xf32>)
+//  CHECK-SAME:     outs(%[[INIT]] : tensor<?x?x128x128xf16>)
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter %[[COMPUTE_OP]]
+//       CHECK:   iree_codegen.store_to_buffer %[[MAP_SCATTER]]
