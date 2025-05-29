@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -26,6 +27,12 @@
 #define DEBUG_TYPE "iree-util-dfx"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+static llvm::cl::opt<int> clSolverMaxIterations(
+    "iree-stream-affinity-solver-max-iterations",
+    llvm::cl::desc("Maximum affinity analysis solver iteration count before it "
+                   "gives up. Roughly equivalent to operation chain depth."),
+    llvm::cl::init(128));
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -1114,7 +1121,7 @@ LogicalResult AffinityAnalysis::run() {
     });
   });
 
-  if (failed(solver.run())) {
+  if (failed(solver.run(clSolverMaxIterations))) {
     return failure(); // did not converge
   }
 
