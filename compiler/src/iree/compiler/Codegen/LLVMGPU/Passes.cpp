@@ -99,7 +99,7 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
 
     );
 
-static llvm::cl::opt<bool>
+llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(false));
@@ -426,8 +426,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
-  funcPassManager.addPass(
-      createGPUPromoteMatmulOperandsPass({clUseDirectLoad}));
+  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   // Decompose packs and unpacks that are at the function boundary.
   funcPassManager.addPass(createDecomposeBoundaryPackUnPackOpsPass());

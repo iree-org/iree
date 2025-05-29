@@ -236,11 +236,6 @@ def GPUPromoteMatmulOperandsPass :
     "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
-  let options = [
-    Option<"useDirectLoad", "use-direct-load", "bool",
-            /*default=*/"false",
-            "Use direct load/store ops instead of copies through register.">,
-  ];
 }
 
 def GPUAllocPrivateMemoryForDPSOpsPass :
