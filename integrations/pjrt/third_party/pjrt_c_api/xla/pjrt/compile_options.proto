@@ -9,7 +9,8 @@ package xla;
 // add the corresponding schema files, like below.
 //
 // Currently, these removed fields include:
-// - comp_envs, debug_options in ExecutableBuildOptionsProto
+// - comp_envs, debug_options, optimization_level,
+//   memory_fitting_level in ExecutableBuildOptionsProto
 // - target_config in CompileOptionsProto
 
 // import "xla/stream_executor/device_description.proto";
@@ -78,7 +79,7 @@ message ExecutableBuildOptionsProto {
   // time, and is typically suitable for production workloads. O3 may enable
   // costly or experimental optimizations that may greatly increase compile
   // time.
-  ExecutionOptions.EffortLevel optimization_level = 24;
+  // ExecutionOptions.EffortLevel optimization_level = 24;
 
   // The amount of effort to spend on making the program fit in memory (where
   // "fit in memory" here has a backend-dependent meaning). As a general
@@ -86,7 +87,7 @@ message ExecutableBuildOptionsProto {
   // program fit. O0 will spend minimal effort and fail as quickly as possible
   // instead. O3 might enable costly algorithms to reduce memory usage that may
   // greatly increase compile time.
-  ExecutionOptions.EffortLevel memory_fitting_level = 25;
+  // ExecutionOptions.EffortLevel memory_fitting_level = 25;
 
   // Whether HLOs should be deduplicated.
   bool deduplicate_hlo = 8;
