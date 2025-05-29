@@ -9,10 +9,11 @@ package xla;
 // add the corresponding schema files, like below.
 //
 // Currently, these removed fields include:
+// - comp_envs, debug_options in ExecutableBuildOptionsProto
 // - target_config in CompileOptionsProto
 
 // import "xla/stream_executor/device_description.proto";
-import "xla/xla.proto";
+// import "xla/xla.proto";
 import "xla/xla_data.proto";
 
 // A serialization of xla::ExecutableBuildOptions.
@@ -34,11 +35,11 @@ message ExecutableBuildOptionsProto {
 
   // Expose access to the XLA compilation environments, which will be passed to
   // the compilation process.
-  xla.CompilationEnvironmentsProto comp_envs = 13;
+  // xla.CompilationEnvironmentsProto comp_envs = 13;
 
   // Expose access to the XLA debug options which will be passed to the
   // compilation process.
-  xla.DebugOptions debug_options = 3;
+  // xla.DebugOptions debug_options = 3;
 
   // The number of replicas of this computation that are to be executed.
   // Defaults to 1.
