@@ -660,9 +660,9 @@ struct RemoveUnusedSortOpResults
     auto results = sortOp.getResults();
     unsigned numRes = sortOp.getNumResults();
 
-    // # TODO(#20831): Implement a way to remove unused results when using
-    // buffer semantics.
-    if (numRes == 0) {
+    // # TODO(#20831): Add support for removing unused operands when the op has
+    // pure buffer semantics.
+    if (sortOp.hasPureBufferSemantics()) {
       return failure();
     }
 
