@@ -540,7 +540,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
       static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
-
   funcPassManager.addPass(createLLVMCPUForallToForPass());
 
   {
