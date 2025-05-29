@@ -123,7 +123,8 @@ struct BarrierRegionOpBufferizationInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto barrierOp = cast<IREE::GPU::BarrierRegionOp>(op);
     auto terminator =
         cast<IREE::GPU::YieldOp>(barrierOp.getBody()->getTerminator());
@@ -205,7 +206,8 @@ struct ValueBarrierOpBufferizationInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto barrierOp = cast<IREE::GPU::ValueBarrierOp>(op);
     if (!barrierOp.hasTensorSemantics()) {
       return failure();
@@ -261,7 +263,8 @@ struct YieldOpBufferizationInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto yieldOp = cast<IREE::GPU::YieldOp>(op);
 
     SmallVector<Value> newResults;
@@ -348,7 +351,8 @@ struct BufferResourceCastOpBufferizationInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
     auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
 
     FailureOr<Value> buffer = getBuffer(rewriter, castOp.getInput(), options);

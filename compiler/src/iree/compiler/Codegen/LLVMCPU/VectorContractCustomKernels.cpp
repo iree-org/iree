@@ -872,7 +872,8 @@ private:
     generateAsmCodeAndConstraints(code, constraints);
     LLVM::InlineAsmOp asmOp = rewriter.create<LLVM::InlineAsmOp>(
         loc, returnType, inputs, code, constraints,
-        /*has_side_effects=*/false, /*is_align_stack=*/false, dialectAttr,
+        /*has_side_effects=*/false, /*is_align_stack=*/false,
+        LLVM::TailCallKind::None, dialectAttr,
         /*operand_attrs=*/ArrayAttr());
     // Extract result vectors from the asm op.
     SmallVector<Value> resVec;
