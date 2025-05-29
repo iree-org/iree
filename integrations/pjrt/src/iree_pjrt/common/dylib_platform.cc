@@ -75,8 +75,10 @@ iree_status_t DylibPlatform::SubclassInitialize() {
   // Fallback config to environment.
   config_vars().EnableEnvFallback("IREE_PJRT_");
 
-  // Just a vanilla logger for now.
-  logger_ = std::make_unique<Logger>();
+  auto log_level_str = config_vars().Lookup("LOG_LEVEL");
+  auto log_level =
+      log_level_str ? Logger::LevelFromString(*log_level_str) : std::nullopt;
+  logger_ = std::make_unique<Logger>(log_level.value_or(Logger::DEBUG));
 
   // Process once initialization of the compiler shared library.
   auto library_path = GetCompilerLibraryPath();
