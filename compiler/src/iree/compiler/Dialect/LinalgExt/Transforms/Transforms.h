@@ -15,7 +15,8 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 // Populate functions.
 //===----------------------------------------------------------------------===//
 
-/// Fold expand_shape ops with their producers (only `AttentionOp` supported)
+/// Fold expand_shape ops with their producers and collapse_shape ops with
+/// consumers.
 void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes);

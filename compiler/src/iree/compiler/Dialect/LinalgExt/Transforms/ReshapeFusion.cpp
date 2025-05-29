@@ -6,7 +6,7 @@
 //
 //
 // The content of this file is adapted from linalg's ElemenwiseOpFusion.cpp and
-// modified to work with LinalgExt ops, specifically `LinalgExt::AttentionOp`.
+// modified to work with LinalgExt ops.
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -282,7 +282,7 @@ CollapsingInfo::initialize(unsigned origNumLoops,
 }
 
 static SmallVector<ReshapeOperandInfo>
-getAttentionReshapeInfo(LinalgExt::AttentionOp attentionOp) {
+getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
   return llvm::map_to_vector(
       attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
         ReshapeOperandInfo operandInfo;
@@ -385,126 +385,11 @@ getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
                         builder.getContext());
 }
 
-static bool isFusableWithReshapeByDimExpansion(AttentionOp op,
-                                               OpOperand *fusableOpOperand) {
-  // Is fusable only if:
-  // - All the indexing maps for operands and results are projected
-  //   permutations.
-  // - The fused tensor is not a scalar.
-  // - All the loops for the reshaped operand are parallel loops.
-  SmallVector<utils::IteratorType> iteratorTypes = op.getLoopIteratorTypes();
-  AffineMap operandMap = op.getMatchingIndexingMap(fusableOpOperand);
-  return operandMap && op.hasPureTensorSemantics() &&
-         llvm::all_of(op.getIndexingMapsArray(),
-                      [](AffineMap map) {
-                        return map && map.isProjectedPermutation();
-                      }) &&
-         operandMap.getNumResults() > 0;
-}
-
-static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
-    AttentionOp attentionOp, Operation *reshapeOp, OpOperand *fusableOpOperand,
-    PatternRewriter &rewriter) {
-  assert(isFusableWithReshapeByDimExpansion(attentionOp, fusableOpOperand) &&
-         "preconditions for fuse operation failed");
-
-  Location loc = attentionOp.getLoc();
-  // Check if reshape is expanding or collapsing.
-  auto expandingReshapeOp = dyn_cast<tensor::ExpandShapeOp>(*reshapeOp);
-  auto collapsingReshapeOp = dyn_cast<tensor::CollapseShapeOp>(*reshapeOp);
-  bool isExpanding = (expandingReshapeOp != nullptr);
-  RankedTensorType expandedType = isExpanding
-                                      ? expandingReshapeOp.getResultType()
-                                      : collapsingReshapeOp.getSrcType();
-  ExpansionInfo expansionInfo;
-  if (failed(expansionInfo.compute(
-          getAttentionReshapeInfo(attentionOp),
-          attentionOp.getStaticLoopRanges().value(), fusableOpOperand,
-          isExpanding ? expandingReshapeOp.getReassociationIndices()
-                      : collapsingReshapeOp.getReassociationIndices(),
-          expandedType.getShape())))
-    return std::nullopt;
-  auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
-      llvm::map_range(attentionOp.getIndexingMapsArray(), [&](AffineMap m) {
-        return getIndexingMapInExpandedOp(rewriter, m, expansionInfo);
-      }));
-
-  // Set insertion point to the attention op.
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(attentionOp);
-
-  SmallVector<Value> expandedOpOperands;
-  expandedOpOperands.reserve(attentionOp.getNumDpsInputs());
-  for (OpOperand *opOperand : attentionOp.getDpsInputOperands()) {
-    if (opOperand == fusableOpOperand) {
-      expandedOpOperands.push_back(isExpanding ? expandingReshapeOp.getSrc()
-                                               : collapsingReshapeOp.getSrc());
-      continue;
-    }
-    // Reshape the operand to get the right type.
-    std::optional<Value> expanded =
-        expansionInfo.getOrCreateExpanded(loc, opOperand, rewriter);
-    if (!expanded)
-      return std::nullopt;
-    expandedOpOperands.push_back(*expanded);
-    continue;
-  }
-
-  Value output;
-  OpOperand &outOperand = attentionOp.getOutputMutable();
-
-  std::optional<Value> maybeOutput =
-      expansionInfo.getOrCreateExpanded(loc, &outOperand, rewriter);
-  if (!maybeOutput)
-    return std::nullopt;
-  output = *maybeOutput;
-
-  Value maskOperand;
-  if (expandedOpOperands.size() > 4) {
-    maskOperand = expandedOpOperands[4];
-  }
-
-  // Create a new `AttentionOp` that has the computed operands/indexing maps.
-  TypeRange resultTypes = ValueRange(output).getTypes();
-  auto fusedOp = rewriter.create<AttentionOp>(
-      attentionOp.getLoc(), resultTypes, expandedOpOperands[0],
-      expandedOpOperands[1], expandedOpOperands[2], expandedOpOperands[3],
-      output, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
-      maskOperand);
-
-  rewriter.inlineRegionBefore(attentionOp.getRegion(), fusedOp.getRegion(),
-                              fusedOp.getRegion().begin());
-
-  // Reshape the result values to their original shape if this is a collapsing
-  // reshape folded into its consumer.
-  SmallVector<Value> resultVals;
-  for (OpResult opResult : attentionOp->getOpResults()) {
-    int64_t resultNumber = opResult.getResultNumber();
-    if (resultTypes[resultNumber] != opResult.getType()) {
-      SmallVector<ReassociationIndices> reassociation =
-          expansionInfo.getReassoc(attentionOp.getTiedOpOperand(opResult));
-      resultVals.push_back(rewriter.create<tensor::CollapseShapeOp>(
-          attentionOp.getLoc(), opResult.getType(),
-          fusedOp->getResult(resultNumber), reassociation));
-    } else {
-      resultVals.push_back(fusedOp->getResult(resultNumber));
-    }
-  }
-  // Assuming a single result.
-  return resultVals;
-}
-
 template <typename OpTy>
 static std::optional<Value>
 fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
                            OpOperand *fusableOpOperand,
                            PatternRewriter &rewriter) {
-  // TODO: Also support attention with this function. This means updating the
-  // indexing maps.
-  static_assert(std::is_same_v<OpTy, GatherOp> ||
-                    std::is_same_v<OpTy, ScatterOp>,
-                "only gather & scatter supported");
-
   Location loc = op.getLoc();
   // Check if reshape is expanding or collapsing.
   auto expandingReshapeOp = dyn_cast<tensor::ExpandShapeOp>(*reshapeOp);
@@ -534,8 +419,17 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
 
   assert(op.getNumDpsInits() == 1);
   OpOperand *original = op.getDpsInitOperand(0);
-  auto *newOp = rewriter.clone(*op, mapping);
+  auto newOp = cast<OpTy>(rewriter.clone(*op, mapping));
   newOp->getResult(0).setType(mapping.lookup(original->get()).getType());
+
+  if constexpr (std::is_same_v<OpTy, AttentionOp>) {
+    auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
+        llvm::map_range(op.getIndexingMapsArray(), [&](AffineMap m) {
+          return getIndexingMapInExpandedOp(rewriter, m, info);
+        }));
+    newOp.setIndexingMapsAttr(
+        rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
+  }
 
   auto originalShapeMap = info.getShapeMap(original);
   SmallVector<ReassociationIndices> originalReassoc =
@@ -554,99 +448,6 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-// Fold attention with its consumer expand_shape op.
-struct FoldAttentionWithConsumerReshapeByExpansion
-    : public OpRewritePattern<tensor::ExpandShapeOp> {
-  FoldAttentionWithConsumerReshapeByExpansion(
-      MLIRContext *context, linalg::ControlFusionFn foldReshapes,
-      PatternBenefit benefit = 1)
-      : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
-        controlFoldingReshapes(std::move(foldReshapes)) {}
-
-  LogicalResult matchAndRewrite(tensor::ExpandShapeOp reshapeOp,
-                                PatternRewriter &rewriter) const override {
-    auto producerResult = dyn_cast<OpResult>(reshapeOp.getSrc());
-    if (!producerResult) {
-      return rewriter.notifyMatchFailure(reshapeOp,
-                                         "source not produced by an operation");
-    }
-
-    auto producer = dyn_cast<AttentionOp>(producerResult.getOwner());
-    if (!producer) {
-      return rewriter.notifyMatchFailure(reshapeOp,
-                                         "producer is not an attention op");
-    }
-
-    if (!controlFoldingReshapes(&reshapeOp.getSrcMutable())) {
-      return rewriter.notifyMatchFailure(reshapeOp,
-                                         "fusion blocked by control function");
-    }
-
-    // Note: expand_shape can always be fused with attention, it is not checked
-    // as a precondition. It is asserted in `fuseWithReshapeByExpansion`.
-    std::optional<SmallVector<Value>> replacementValues =
-        fuseAttentionWithReshapeByExpansion(
-            producer, reshapeOp,
-            producer.getDpsInitOperand(producerResult.getResultNumber()),
-            rewriter);
-    if (!replacementValues) {
-      return rewriter.notifyMatchFailure(reshapeOp,
-                                         "fusion by expansion failed");
-    }
-
-    Value reshapeReplacement =
-        (*replacementValues)[cast<OpResult>(reshapeOp.getSrc())
-                                 .getResultNumber()];
-    if (auto collapseOp =
-            reshapeReplacement.getDefiningOp<tensor::CollapseShapeOp>()) {
-      reshapeReplacement = collapseOp.getSrc();
-    }
-    rewriter.replaceOp(reshapeOp, reshapeReplacement);
-    rewriter.replaceOp(producer, *replacementValues);
-    return success();
-  }
-  linalg::ControlFusionFn controlFoldingReshapes;
-};
-
-// Fold a collapse_shape op with its consumer attention op.
-// class FoldWith
-
-struct FoldAttentionWithProducerReshapeByExpansion final
-    : public OpRewritePattern<AttentionOp> {
-  FoldAttentionWithProducerReshapeByExpansion(
-      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
-      PatternBenefit benefit = 1)
-      : OpRewritePattern<AttentionOp>(context, benefit),
-        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
-
-  LogicalResult matchAndRewrite(AttentionOp attentionOp,
-                                PatternRewriter &rewriter) const override {
-    for (OpOperand *opOperand : attentionOp.getDpsInputOperands()) {
-      tensor::CollapseShapeOp reshapeOp =
-          opOperand->get().getDefiningOp<tensor::CollapseShapeOp>();
-      if (!reshapeOp)
-        continue;
-      // Fold only if
-      // - The tensor reshape op is folding.
-      // - All constraints of fusing with reshape by expansion are met.
-      if (!isFusableWithReshapeByDimExpansion(attentionOp, opOperand) ||
-          (!controlFoldingReshapes(opOperand)))
-        continue;
-
-      std::optional<SmallVector<Value>> replacementValues =
-          fuseAttentionWithReshapeByExpansion(attentionOp, reshapeOp, opOperand,
-                                              rewriter);
-      if (!replacementValues)
-        return failure();
-      rewriter.replaceOp(attentionOp, *replacementValues);
-      return success();
-    }
-    return failure();
-  }
-
-  linalg::ControlFusionFn controlFoldingReshapes;
-};
 
 struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
   using OpRewritePattern<ScatterOp>::OpRewritePattern;
@@ -763,6 +564,10 @@ struct FoldWithProducerReshapeByExpansion final
 
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
+    if (!op.hasPureTensorSemantics()) {
+      return failure();
+    }
+
     for (OpOperand &opOperand : op->getOpOperands()) {
       tensor::CollapseShapeOp reshapeOp =
           opOperand.get().getDefiningOp<tensor::CollapseShapeOp>();
@@ -773,8 +578,9 @@ struct FoldWithProducerReshapeByExpansion final
 
       std::optional<Value> replacementValue =
           fuseWithReshapeByExpansion(op, reshapeOp, &opOperand, rewriter);
-      if (!replacementValue)
+      if (!replacementValue) {
         return failure();
+      }
       rewriter.replaceOp(op, *replacementValue);
       return success();
     }
@@ -801,8 +607,8 @@ struct FoldWithConsumerReshapeByExpansion final
                                          "source not produced by an operation");
     }
 
-    auto op = producerResult.getDefiningOp<OpTy>();
-    if (!op) {
+    auto op = expandOp.getSrc().getDefiningOp<OpTy>();
+    if (!op || !op.hasPureTensorSemantics()) {
       return failure();
     }
 
@@ -1031,17 +837,12 @@ collapseOpIterationDims(AttentionOp op,
 void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes) {
-  patterns.add<FoldAttentionWithConsumerReshapeByExpansion>(
-      patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldAttentionWithProducerReshapeByExpansion>(
-      patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldWithProducerReshapeByExpansion<ScatterOp>>(
-      patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldWithConsumerReshapeByExpansion<ScatterOp>>(
-      patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldWithProducerReshapeByExpansion<GatherOp>>(
-      patterns.getContext(), controlFoldingReshapes);
-  patterns.add<FoldWithConsumerReshapeByExpansion<GatherOp>>(
+  patterns.add<FoldWithProducerReshapeByExpansion<AttentionOp>,
+               FoldWithConsumerReshapeByExpansion<AttentionOp>,
+               FoldWithProducerReshapeByExpansion<ScatterOp>,
+               FoldWithConsumerReshapeByExpansion<ScatterOp>,
+               FoldWithProducerReshapeByExpansion<GatherOp>,
+               FoldWithConsumerReshapeByExpansion<GatherOp>>(
       patterns.getContext(), controlFoldingReshapes);
 }
 
