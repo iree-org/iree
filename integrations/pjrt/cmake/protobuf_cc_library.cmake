@@ -68,6 +68,9 @@ function(iree_pjrt_protobuf_cc_library)
     TARGET ${_NAME}
     LANGUAGE cpp
     PROTOC_OPTIONS ${_RULE_PROTOC_ARGS}
+    IMPORT_DIRS
+      ${protobuf_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}
   )
   target_include_directories(${_NAME}
     PUBLIC
