@@ -75,12 +75,14 @@ void GPUAllocPrivateMemoryForDPSOpsPass::runOnOperation() {
   auto privSpace = gpu::AddressSpaceAttr::get(
       context, gpu::GPUDialect::getPrivateAddressSpace());
   bufferization::BufferizationOptions options;
+  bufferization::BufferizationState bufferizationState;
   IRRewriter rewriter(context);
   for (auto value : worklist) {
     Location loc = value->getOwner()->getLoc();
     rewriter.setInsertionPoint(value->getOwner());
-    FailureOr<Value> copy = allocateTensorForShapedValue(
-        rewriter, loc, value->get(), options, /*copy=*/true);
+    FailureOr<Value> copy =
+        allocateTensorForShapedValue(rewriter, loc, value->get(), options,
+                                     bufferizationState, /*copy=*/true);
     if (failed(copy)) {
       funcOp.emitError("Could not allocate a tensor of the required type");
       return signalPassFailure();
