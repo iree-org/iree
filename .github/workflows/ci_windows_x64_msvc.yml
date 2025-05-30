@@ -51,7 +51,7 @@ jobs:
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       # TODO(#18813): Fix to actually use either ccache or sccache.
-      #               Not need to install both, and neither is currently used.
+      #               No need to install both, and neither is currently used.
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Configuring MSVC"
