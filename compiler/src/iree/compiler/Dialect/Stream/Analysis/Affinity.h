@@ -96,10 +96,24 @@ public:
   bool tryLookupResourceUsageAffinity(
       Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
 
+  struct PrecomputedQueries {
+    // Values mapped to ops that pin their affinity, if any.
+    // Omitted values are not pinned. Note that a single value may be pinned to
+    // multiple potential affinities.
+    DenseMap<Value, DenseSet<IREE::Stream::AffinityOpInterface>>
+        pinnedAffinities;
+
+    void compute(Explorer &explorer);
+    void inject(DFX::Solver &solver);
+    static const PrecomputedQueries &get(DFX::Solver &solver);
+    void print(llvm::raw_ostream &os, AsmState &asmState);
+  };
+
 private:
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
+  PrecomputedQueries precomputedQueries;
 };
 
 } // namespace mlir::iree_compiler::IREE::Stream

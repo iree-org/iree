@@ -49,7 +49,7 @@ util.func public @omittedSourceAffinity(%size: index) -> !stream.resource<*> {
   // CHECK: %[[SPLAT:.+]] = stream.async.splat
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // CHECK-NOT: stream.async.transfer
-  // CHECK: %[[TRANSFER:.+]] = stream.async.clone %[[SPLAT]]
+  // CHECK: %[[TRANSFER:.+]] = stream.async.clone on(#hal.device.promise<@dev_a>) %[[SPLAT]]
   %transfer = stream.async.transfer %splat : !stream.resource<*>{%size} -> to(#hal.device.promise<@dev_a>) !stream.resource<*>{%size}
   // CHECK: util.return %[[TRANSFER]]
   util.return %transfer : !stream.resource<*>

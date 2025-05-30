@@ -876,6 +876,24 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the operand tied to the given result of the op or nullptr if
+        none.
+      }],
+      /*retTy=*/"mlir::OpOperand *",
+      /*methodName=*/"getTiedResultOpOperand",
+      /*args=*/(ins "Value":$result),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        auto resultIndex = cast<mlir::OpResult>(result).getResultNumber();
+        auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
+            .getTiedResultOperandIndex(resultIndex);
+        return operandIndex.has_value() ?
+            &$_op->getOpOperand(operandIndex.value()) :
+            nullptr;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the operand index tied to the given result index, if any.
 
         Note that the index returned is into the full range of all operands of

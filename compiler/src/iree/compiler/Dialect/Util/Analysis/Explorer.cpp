@@ -46,7 +46,8 @@ static std::optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
 
 Explorer::Explorer(Operation *rootOp, TraversalAction defaultAction)
     : rootOp(rootOp),
-      asmState(rootOp, OpPrintingFlags().elideLargeElementsAttrs()),
+      asmState(rootOp,
+               OpPrintingFlags().elideLargeElementsAttrs().skipRegions()),
       callGraph(rootOp), defaultAction(defaultAction),
       analysisManager(rootOp, /*passInstrumentor=*/nullptr) {}
 
@@ -905,10 +906,11 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
     LLVM_DEBUG(llvm::dbgs() << "  == emitting op "
                             << definingOp->getName().getStringRef() << "\n");
     auto fnResult = fn(resultValue);
-    if (fnResult.wasInterrupted())
-      break;
-    if (fnResult.wasSkipped())
-      continue;
+    if (fnResult.wasInterrupted()) {
+      break; // stop walk
+    } else if (fnResult.wasSkipped()) {
+      continue; // don't recurse
+    }
 
     // If the op is tied we may need to walk up to the operand the result is
     // tied to.
@@ -1056,7 +1058,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
     }
     auto entryArg = targetOp.getCallableRegion()->getArgument(operandIdx);
     LLVM_DEBUG({
-      llvm::dbgs() << "   + queuing call to @" << targetSymbol
+      llvm::dbgs() << "   + queuing call to " << targetSymbol
                    << " entry argument ";
       entryArg.printAsOperand(llvm::dbgs(), asmState);
       llvm::dbgs() << "\n";
@@ -1144,8 +1146,12 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
       // Emit for the op itself.
       LLVM_DEBUG(llvm::dbgs() << "  == emitting op "
                               << ownerOp->getName().getStringRef() << "\n");
-      if (fn(use).wasInterrupted())
-        break;
+      WalkResult fnResult = fn(use);
+      if (fnResult.wasInterrupted()) {
+        break; // stop walk
+      } else if (fnResult.wasSkipped()) {
+        continue; // don't recurse
+      }
 
       // If the op is tied we may need to walk down to the results the operand
       // is tied to (multiple results can tie the same operand).
