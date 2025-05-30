@@ -63,6 +63,6 @@ func.func @dynamic_softmax() {
 
 
 // Finer details of this lowering are captured by the spirv pipeline test. Just
-// verify that warp reduction triggers.
-//    CHECK-LABEL: func.func @dynamic_softmax
-// CHECK-COUNT-10: gpu.shuffle  xor {{.*}} : i32
+// verify that vector distribute triggers.
+// CHECK-LABEL: func.func @dynamic_softmax
+//       CHECK:     vector.multi_reduction <add>, {{.*}} : vector<32xf16> to f16
