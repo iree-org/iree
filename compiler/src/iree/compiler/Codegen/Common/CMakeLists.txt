@@ -113,6 +113,7 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "ForallToFor.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
     "HoistStaticallyBoundAllocations.cpp"
