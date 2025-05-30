@@ -29,12 +29,13 @@ namespace {
 
 static FailureOr<SmallVector<Value>>
 getBuffers(RewriterBase &rewriter, const MutableOperandRange &operands,
-           const BufferizationOptions &options) {
+           const BufferizationOptions &options,
+           const bufferization::BufferizationState &state) {
   SmallVector<Value> result;
   for (OpOperand &opOperand : operands) {
     if (isa<TensorType>(opOperand.get().getType())) {
       FailureOr<Value> resultBuffer =
-          getBuffer(rewriter, opOperand.get(), options);
+          getBuffer(rewriter, opOperand.get(), options, state);
       if (failed(resultBuffer))
         return failure();
       result.push_back(*resultBuffer);
@@ -103,6 +104,7 @@ struct BarrierRegionOpBufferizationInterface
 
   FailureOr<BaseMemRefType>
   getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const bufferization::BufferizationState &state,
                 SmallVector<Value> &invocationStack) const {
     auto barrierOp = cast<IREE::GPU::BarrierRegionOp>(op);
 
@@ -111,11 +113,11 @@ struct BarrierRegionOpBufferizationInterface
       int64_t resultNum = opResult.getResultNumber();
       memrefType = bufferization::getBufferType(
           barrierOp.getBody()->getTerminator()->getOperand(resultNum), options,
-          invocationStack);
+          state, invocationStack);
     } else if (auto blockArg = dyn_cast<BlockArgument>(value)) {
       int64_t argNum = blockArg.getArgNumber();
-      memrefType = bufferization::getBufferType(barrierOp.getOperand(argNum),
-                                                options, invocationStack);
+      memrefType = bufferization::getBufferType(
+          barrierOp.getOperand(argNum), options, state, invocationStack);
     }
     if (failed(memrefType))
       return failure();
@@ -130,9 +132,9 @@ struct BarrierRegionOpBufferizationInterface
         cast<IREE::GPU::YieldOp>(barrierOp.getBody()->getTerminator());
 
     FailureOr<SmallVector<Value>> newOperands =
-        getBuffers(rewriter, barrierOp.getInputsMutable(), options);
+        getBuffers(rewriter, barrierOp.getInputsMutable(), options, state);
     FailureOr<SmallVector<Value>> newResults =
-        getBuffers(rewriter, terminator.getValuesMutable(), options);
+        getBuffers(rewriter, terminator.getValuesMutable(), options, state);
     if (failed(newOperands) || failed(newResults)) {
       return failure();
     }
@@ -191,6 +193,7 @@ struct ValueBarrierOpBufferizationInterface
 
   FailureOr<BaseMemRefType>
   getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const bufferization::BufferizationState &state,
                 SmallVector<Value> &invocationStack) const {
     auto barrierOp = cast<IREE::GPU::ValueBarrierOp>(op);
     assert(value.getDefiningOp() == barrierOp && "invalid value");
@@ -199,7 +202,7 @@ struct ValueBarrierOpBufferizationInterface
     }
     auto srcMemrefType = bufferization::getBufferType(
         barrierOp.getInputs()[cast<OpResult>(value).getResultNumber()], options,
-        invocationStack);
+        state, invocationStack);
     if (failed(srcMemrefType))
       return failure();
     return srcMemrefType;
@@ -218,7 +221,7 @@ struct ValueBarrierOpBufferizationInterface
     SmallVector<Value> buffers;
     buffers.reserve(barrierOp.getNumOperands());
     for (auto input : barrierOp.getInputs()) {
-      FailureOr<Value> buffer = getBuffer(rewriter, input, options);
+      FailureOr<Value> buffer = getBuffer(rewriter, input, options, state);
       if (failed(buffer)) {
         return failure();
       }
@@ -271,7 +274,8 @@ struct YieldOpBufferizationInterface
     for (const auto &it : llvm::enumerate(yieldOp.getValues())) {
       Value value = it.value();
       if (isa<TensorType>(value.getType())) {
-        FailureOr<Value> maybeBuffer = getBuffer(rewriter, value, options);
+        FailureOr<Value> maybeBuffer =
+            getBuffer(rewriter, value, options, state);
         if (failed(maybeBuffer))
           return failure();
         newResults.push_back(*maybeBuffer);
@@ -328,11 +332,12 @@ struct BufferResourceCastOpBufferizationInterface
 
   FailureOr<BaseMemRefType>
   getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const bufferization::BufferizationState &state,
                 SmallVector<Value> &invocationStack) const {
     auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
     assert(value.getDefiningOp() == castOp && "invalid value");
-    auto srcMemrefType = bufferization::getBufferType(castOp.getInput(),
-                                                      options, invocationStack);
+    auto srcMemrefType = bufferization::getBufferType(
+        castOp.getInput(), options, state, invocationStack);
     if (failed(srcMemrefType))
       return failure();
 
@@ -355,7 +360,8 @@ struct BufferResourceCastOpBufferizationInterface
                           bufferization::BufferizationState &state) const {
     auto castOp = cast<IREE::GPU::BufferResourceCastOp>(op);
 
-    FailureOr<Value> buffer = getBuffer(rewriter, castOp.getInput(), options);
+    FailureOr<Value> buffer =
+        getBuffer(rewriter, castOp.getInput(), options, state);
     if (failed(buffer)) {
       return failure();
     }
