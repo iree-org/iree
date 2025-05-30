@@ -409,18 +409,6 @@ repository.
 * Keeping tests out of tree forces them to use public project APIs and allows
   the core project to keep its infrastructure simpler.
 
-#### linalg operator tests
-
-Tests for operators in the MLIR linalg dialect like `matmul`, and `convolution`
-are being migrated from folders like
-[`tests/e2e/matmul/`](https://github.com/iree-org/iree/tree/main/tests/e2e/matmul)
-in the
-[iree-org/iree](https://github.com/iree-org/iree) repository to
-[`linalg_ops/`](https://github.com/iree-org/iree-test-suites/tree/main/linalg_ops)
-in the
-[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
-repository.
-
 #### :simple-onnx: ONNX operator tests
 
 Tests for individual ONNX operators are included at
