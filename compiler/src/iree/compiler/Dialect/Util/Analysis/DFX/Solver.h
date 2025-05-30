@@ -83,6 +83,26 @@ public:
                                            /*forceUpdate=*/true);
   }
 
+  // Creates (if needed) an element and adds it to the solver.
+  // Use during initialization for elements that may recursively initialize
+  // themselves.
+  template <typename ElementT>
+  void cacheElementFor(Position pos) {
+    cacheElementFor<ElementT>(pos, /*queryingElement=*/nullptr,
+                              Resolution::NONE);
+  }
+
+  // Creates (if needed) an element and adds it to the solver.
+  // Use during initialization for elements that may recursively initialize
+  // themselves.
+  template <typename ElementT>
+  void cacheElementFor(Position pos, const AbstractElement *queryingElement,
+                       Resolution resolution) {
+    getOrCreateElementFor<ElementT>(pos, queryingElement, resolution,
+                                    /*forceUpdate=*/false,
+                                    /*updateAfterInit=*/false);
+  }
+
   // Returns the element of |ElementT| for |pos| and optionally adds a
   // dependency from |queryingElement| to the returned element with the given
   // |resolution|.
