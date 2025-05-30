@@ -430,6 +430,21 @@ def IREECodegen_EncodingNopLayoutAttr  :
 }
 
 //===---------------------------------------------------------------------===//
+// iree_codegen.inner_tiled
+//===---------------------------------------------------------------------===//
+
+def InnerTileScope_Workgroup : I32EnumCase<"Workgroup", 0>;
+def InnerTileScope_Subgroup : I32EnumCase<"Subgroup", 1>;
+
+def InnerTileScope : I32Enum<"InnerTileScope",
+    "Descriptor for the pre-distribution scope of an inner tiled operation's tile", [
+      InnerTileScope_Workgroup,
+      InnerTileScope_Subgroup
+    ]> {
+  let cppNamespace = IREECodegen_Dialect.cppNamespace;
+}
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.rotate_rows
 //===---------------------------------------------------------------------===//
 

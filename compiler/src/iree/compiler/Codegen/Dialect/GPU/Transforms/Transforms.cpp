@@ -1008,12 +1008,13 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   // Step 1. Create the new scf.forall op with a lane id mapping.
   OpFoldResult ub;
   Attribute mappingType;
-  FailureOr<IREE::GPU::MMAScope> mmaScope = mmaOp.getKind().getMmaScope();
+  FailureOr<IREE::Codegen::InnerTileScope> mmaScope =
+      mmaOp.getKind().getInnerTileScope();
   if (failed(mmaScope)) {
     return failure();
   }
   switch (mmaScope.value()) {
-  case IREE::GPU::MMAScope::Workgroup:
+  case IREE::Codegen::InnerTileScope::Workgroup:
     if (!workgroupSize) {
       mmaOp.emitOpError("Mma op with workgroup scope needs workgroup size.");
       return failure();
@@ -1023,8 +1024,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
     ub = rewriter.getIndexAttr(
         ShapedType::getNumElements(workgroupSize.value()));
     break;
-  case IREE::GPU::MMAScope::Subgroup:
-    ub = rewriter.getIndexAttr(mmaOp.getKind().getSubgroupSize());
+  case IREE::Codegen::InnerTileScope::Subgroup:
+    ub = rewriter.getIndexAttr(*mmaOp.getKind().getSubgroupSize());
     mappingType = IREE::GPU::LaneIdAttr::get(context, 0);
   }
   auto newForallOp = rewriter.create<scf::ForallOp>(
@@ -1056,8 +1057,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   SmallVector<int64_t> lhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getLhsPermutation(), mmaOp.getLhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Lhs, id, lhsPermutation,
-          lhsOffsets, lhsSizes, lhsStrides))) {
+          rewriter, loc, 0, id, lhsPermutation, lhsOffsets, lhsSizes,
+          lhsStrides))) {
     return mmaOp->emitOpError("failed to populate lhs offsets");
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
@@ -1076,8 +1077,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   SmallVector<int64_t> rhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getRhsPermutation(), mmaOp.getRhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Rhs, id, rhsPermutation,
-          rhsOffsets, rhsSizes, rhsStrides))) {
+          rewriter, loc, 1, id, rhsPermutation, rhsOffsets, rhsSizes,
+          rhsStrides))) {
     return mmaOp->emitOpError("failed to populate rhs offsets");
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
@@ -1096,8 +1097,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   SmallVector<int64_t> accPermutation = getOrInferPermutationOfRank(
       mmaOp.getAccPermutation(), mmaOp.getAccInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Acc, id, accPermutation,
-          accOffsets, accSizes, accStrides))) {
+          rewriter, loc, 2, id, accPermutation, accOffsets, accSizes,
+          accStrides))) {
     return mmaOp->emitOpError("failed to populate acc offsets");
   }
   // Extract the rank-reduced slice of the accumulator based on the expected

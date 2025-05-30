@@ -50,6 +50,10 @@ using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 // MMA intrinsics semantics: shapes, layouts, operand element types.
 //===----------------------------------------------------------------------===//
 
+static LogicalResult verifyMmaIndexingMaps(ArrayRef<AffineMap> maps) {
+  return linalg::inferContractionDims(maps);
+}
+
 static int getBlockSize(MMAIntrinsic /*intrinsic*/) {
   // Not supporting any block size other than 1 at the moment.
   return 1;
@@ -509,18 +513,25 @@ MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
   return Base::get(context, type, /*colMajor=*/false);
 }
 
-std::tuple<Type, Type, Type> MMAAttr::getABCElementTypes() const {
-  return IREE::GPU::getABCElementTypes(getContext(), getIntrinsic());
+int64_t MMAAttr::getExpectedNumInputs() const { return 2; }
+
+LogicalResult MMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  return verifyMmaIndexingMaps(maps);
 }
 
-std::tuple<int64_t, int64_t, int64_t> MMAAttr::getMNKShape() const {
-  return getMNKShapeFromIntrinsic(getIntrinsic());
+void MMAAttr::getUndistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
+  MLIRContext *ctx = getContext();
+  OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
+  result.assign({VectorType::get({o.mSize, o.kSize}, o.aType),
+                 VectorType::get({o.kSize, o.nSize}, o.bType),
+                 VectorType::get({o.mSize, o.nSize}, o.cType)});
 }
 
 template <typename MMAIntrinsicType>
-static VectorType getVectorType(MLIRContext *context,
-                                MMAIntrinsicType intrinsic,
-                                MMAFragment fragment) {
+static VectorType getThreadVectorType(MLIRContext *context,
+                                      MMAIntrinsicType intrinsic,
+                                      MMAFragment fragment) {
   auto o = getOpaqueMMALayout(context, intrinsic);
   auto s = getSingleSubgroupLayout(intrinsic, fragment);
   Type elemType = (fragment == MMAFragment::Lhs)   ? o.aType
@@ -530,32 +541,31 @@ static VectorType getVectorType(MLIRContext *context,
       {s.element[0] * s.element[1] * s.outer[0] * s.outer[1]}, elemType);
 }
 
-std::tuple<VectorType, VectorType, VectorType>
-MMAAttr::getABCVectorTypes() const {
+void MMAAttr::getDistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
   MLIRContext *context = getContext();
   MMAIntrinsic intrinsic = getIntrinsic();
-  VectorType aVecType = getVectorType(context, intrinsic, MMAFragment::Lhs);
-  VectorType bVecType = getVectorType(context, intrinsic, MMAFragment::Rhs);
-  VectorType cVecType = getVectorType(context, intrinsic, MMAFragment::Acc);
-  return {aVecType, bVecType, cVecType};
+  result.assign({getThreadVectorType(context, intrinsic, MMAFragment::Lhs),
+                 getThreadVectorType(context, intrinsic, MMAFragment::Rhs),
+                 getThreadVectorType(context, intrinsic, MMAFragment::Acc)});
 }
 
 int64_t MMAAttr::getBlockSize() const {
   return IREE::GPU::getBlockSize(getIntrinsic());
 }
 
-int64_t MMAAttr::getSubgroupSize() const {
+std::optional<int64_t> MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-FailureOr<IREE::GPU::MMAScope> MMAAttr::getMmaScope() const {
+FailureOr<IREE::Codegen::InnerTileScope> MMAAttr::getInnerTileScope() const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
   if (intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16 ||
       intrinsic == MMAIntrinsic::NV_WMMA_F32_16x16x16_F16) {
     return failure();
   }
-  return IREE::GPU::MMAScope::Subgroup;
+  return IREE::Codegen::InnerTileScope::Subgroup;
 }
 
 // Get virtual intrinsics that is composed/based on queried op.
@@ -702,11 +712,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
 }
 
 LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, IREE::GPU::MMAFragment fragment,
-    Value laneId, ArrayRef<int64_t> permutation,
-    SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
+    SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-
+  assert(operandIndex <= 2 && "Must index valid MMA operand");
+  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
   MMASingleSubgroupLayout subgroupLayout = getSingleSubgroupLayout(
       getIntrinsic(), fragment, fragment == MMAFragment::Acc && getColMajor());
   SmallVector<OpFoldResult> canonicalOffsets;
@@ -741,22 +752,27 @@ sliceSwizzledShape(const TileSwizzle &swizzle,
   return shape;
 }
 
-std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
-  MLIRContext *ctx = getContext();
-  auto opaqueLayout = getOpaqueMMALayout(ctx, getIntrinsic());
-  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
+
+LogicalResult
+DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  return verifyMmaIndexingMaps(maps);
 }
 
-std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+void DataTiledMMAAttr::getUndistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
   MLIRContext *ctx = getContext();
-  auto opaqueLayout = getOpaqueMMALayout(ctx, getIntrinsic());
-  return {opaqueLayout.mSize * getIntrinsicsM() * getSubgroupsM(),
-          opaqueLayout.nSize * getIntrinsicsN() * getSubgroupsN(),
-          opaqueLayout.kSize * getIntrinsicsK()};
+  OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
+  int64_t m = o.mSize * getIntrinsicsM() * getSubgroupsM();
+  int64_t n = o.nSize * getIntrinsicsN() * getSubgroupsN();
+  int64_t k = o.kSize * getIntrinsicsK();
+  result.push_back(VectorType::get({m, k}, o.aType));
+  result.push_back(VectorType::get({k, n}, o.bType));
+  result.push_back(VectorType::get({m, n}, o.cType));
 }
 
-std::tuple<VectorType, VectorType, VectorType>
-DataTiledMMAAttr::getABCVectorTypes() const {
+void DataTiledMMAAttr::getDistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
   auto [A, B, C] = getABCElementTypes();
   auto getShape = [=](MMAFragment fragment) {
     return sliceSwizzledShape(
@@ -764,24 +780,27 @@ DataTiledMMAAttr::getABCVectorTypes() const {
           return d.kind != TileSwizzle::Dim::Kind::CrossThread;
         });
   };
-  return {VectorType::get(getShape(MMAFragment::Lhs), A),
-          VectorType::get(getShape(MMAFragment::Rhs), B),
-          VectorType::get(getShape(MMAFragment::Acc), C)};
+  result.assign({VectorType::get(getShape(MMAFragment::Lhs), A),
+                 VectorType::get(getShape(MMAFragment::Rhs), B),
+                 VectorType::get(getShape(MMAFragment::Acc), C)});
 }
 
-int64_t DataTiledMMAAttr::getSubgroupSize() const {
+std::optional<int64_t> DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-FailureOr<IREE::GPU::MMAScope> DataTiledMMAAttr::getMmaScope() const {
-  return IREE::GPU::MMAScope::Workgroup;
+FailureOr<IREE::Codegen::InnerTileScope>
+DataTiledMMAAttr::getInnerTileScope() const {
+  return IREE::Codegen::InnerTileScope::Workgroup;
 }
 
 LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, IREE::GPU::MMAFragment fragment,
-    Value threadId, ArrayRef<int64_t> permutation,
-    SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
+    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
+    SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
+  assert(operandIndex <= 2 && "Must index valid MMA operand");
+  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
   TileSwizzle swizzle = getSwizzle(*this, fragment);
 
   LLVM_DEBUG({
@@ -836,7 +855,7 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     // below with erasing the corresponding dim out of the delinearized indices.
     distributionThreadSizes.insert(
         distributionThreadSizes.begin() + distributionOnlyDimIdx,
-        getSubgroupSize() / intrinsicLayoutThreadBound);
+        *getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
   // Obtain the offsets from delinearization along the distributionThreadSizes.
@@ -963,7 +982,7 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
 
   MMAIntrinsic intrinsic = getIntrinsic();
   VectorType intrinCType =
-      getVectorType(builder.getContext(), intrinsic, MMAFragment::Acc);
+      getThreadVectorType(builder.getContext(), intrinsic, MMAFragment::Acc);
 
   // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
   for (int mu = 0; mu < getIntrinsicsM(); ++mu) {
@@ -1057,29 +1076,32 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
   return o;
 }
 
-std::tuple<Type, Type, Type> VirtualMMAAttr::getABCElementTypes() const {
-  MLIRContext *ctx = getContext();
-  auto opaqueLayout = getOpaqueMMALayout(ctx, getIntrinsic());
-  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+int64_t VirtualMMAAttr::getExpectedNumInputs() const { return 2; }
+
+LogicalResult
+VirtualMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  return verifyMmaIndexingMaps(maps);
 }
 
-std::tuple<VectorType, VectorType, VectorType>
-VirtualMMAAttr::getABCVectorTypes() const {
+void VirtualMMAAttr::getUndistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
+  MLIRContext *ctx = getContext();
+  OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
+  result.assign({VectorType::get({o.mSize, o.kSize}, o.aType),
+                 VectorType::get({o.kSize, o.nSize}, o.bType),
+                 VectorType::get({o.mSize, o.nSize}, o.cType)});
+}
+
+void VirtualMMAAttr::getDistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
   MLIRContext *context = getContext();
   VirtualMMAIntrinsic intrinsic = getIntrinsic();
-  VectorType aVecType = getVectorType(context, intrinsic, MMAFragment::Lhs);
-  VectorType bVecType = getVectorType(context, intrinsic, MMAFragment::Rhs);
-  VectorType cVecType = getVectorType(context, intrinsic, MMAFragment::Acc);
-  return {aVecType, bVecType, cVecType};
+  result.assign({getThreadVectorType(context, intrinsic, MMAFragment::Lhs),
+                 getThreadVectorType(context, intrinsic, MMAFragment::Rhs),
+                 getThreadVectorType(context, intrinsic, MMAFragment::Acc)});
 }
 
-std::tuple<int64_t, int64_t, int64_t> VirtualMMAAttr::getMNKShape() const {
-  MLIRContext *ctx = getContext();
-  auto opaqueLayout = getOpaqueMMALayout(ctx, getIntrinsic());
-  return {opaqueLayout.mSize, opaqueLayout.nSize, opaqueLayout.kSize};
-}
-
-int64_t VirtualMMAAttr::getSubgroupSize() const {
+std::optional<int64_t> VirtualMMAAttr::getSubgroupSize() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
@@ -1092,16 +1114,18 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   return 0;
 }
 
-FailureOr<IREE::GPU::MMAScope> VirtualMMAAttr::getMmaScope() const {
-  return IREE::GPU::MMAScope::Subgroup;
+FailureOr<IREE::Codegen::InnerTileScope>
+VirtualMMAAttr::getInnerTileScope() const {
+  return IREE::Codegen::InnerTileScope::Subgroup;
 }
 
 LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, IREE::GPU::MMAFragment fragment,
-    Value laneId, ArrayRef<int64_t> permutation,
-    SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
+    SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-
+  assert(operandIndex <= 2 && "Must index valid MMA operand");
+  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
   MMASingleSubgroupLayout subgroupLayout =
       getSingleSubgroupLayout(getIntrinsic(), fragment);
   SmallVector<OpFoldResult> canonicalOffsets;
