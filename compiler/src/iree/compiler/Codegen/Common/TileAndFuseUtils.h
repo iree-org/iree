@@ -7,13 +7,18 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 
-#include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
+
+#include <queue>
 
 namespace mlir::iree_compiler {
 
+/// Tile and fuse producers of extract slice operations from the worklist into
+/// the given loops, adding any new fusion opportunities back to the worklist,
+/// proceeding recursively until fixed point is reached.
 void fuseProducersOfSlices(RewriterBase &rewriter,
                            std::queue<Operation *> &worklist,
                            scf::SCFTileAndFuseOptions &options,
@@ -85,10 +90,10 @@ bool warForConsumerFusionSSAViolation(
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result);
 
-// Fuse all consumers of the given `tiledOp` into the surrounding scf.forall.
-// Returns a list of new `tensor.extract_slice` ops with new fusion
-// opportunities, as well as the new surrounding `scf.forall` (because consumer
-// fusion replaces the loop).
+// Fuse all consumers of the given `tiledOp` into the surrounding op that
+// implements the `LoopLikeOpInterface`.  Returns a list of new
+// `tensor.extract_slice` ops with new fusion opportunities, as well as the new
+// surrounding `scf.forall` (because consumer fusion replaces the loop).
 FailureOr<std::queue<Operation *>>
 fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
               MutableArrayRef<LoopLikeOpInterface> loops,

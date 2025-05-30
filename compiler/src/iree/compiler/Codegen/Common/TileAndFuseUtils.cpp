@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 #define DEBUG_TYPE "iree-codegen-common-tile-and-fuse-utils"
 
