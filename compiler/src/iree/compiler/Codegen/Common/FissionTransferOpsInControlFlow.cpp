@@ -54,60 +54,139 @@ SetVector<Operation *> collectBackwardSliceInControlFlow(
   return slice;
 }
 
-void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
-                                     vector::TransferReadOp readOp,
-                                     vector::TransferWriteOp writeOp,
-                                     scf::ForOp forOp) {
+void cloneSliceIntoLoop(IRRewriter &rewriter, SetVector<Operation *> &slice, scf::ForOp &newLoop, IRMapping &mapping) {  
+  rewriter.setInsertionPointToStart(newLoop.getBody());  
+  for (Operation *op : slice) {  
+    rewriter.clone(*op, mapping);  
+  }  
+}  
+  
+scf::ForOp createNewLoop(IRRewriter &rewriter, scf::ForOp forOp, Location loc) {  
+  return rewriter.create<scf::ForOp>(  
+      loc, forOp.getLowerBound(), forOp.getUpperBound(),  
+      forOp.getStep(), forOp.getRegionIterArgs());  
+}  
+  
+memref::AllocaOp createAlloca(IRRewriter &rewriter, vector::TransferWriteOp writeOp) {  
+  auto allocaType = cast<MemRefType>(writeOp.getBase().getType());  
+  auto allocaTypeNoStride =  
+      MemRefType::Builder(allocaType.getShape(), allocaType.getElementType());  
+  return rewriter.create<memref::AllocaOp>(writeOp.getLoc(), allocaTypeNoStride);  
+}  
+  
+void splitTransferOpsFromControlFlow(IRRewriter &rewriter,  
+                                     vector::TransferReadOp readOp,  
+                                     vector::TransferWriteOp writeOp,  
+                                     scf::ForOp forOp) {  
   rewriter.setInsertionPoint(forOp);
-  auto allocaType = cast<MemRefType>(writeOp.getBase().getType());
-  // Get rid of stride and offset information in the alloca type.
-  auto allocaTypeNoStride = MemRefType::Builder(allocaType.getShape(), allocaType.getElementType());
-  auto alloca = rewriter.create<memref::AllocaOp>(  
-              readOp.getLoc(), allocaTypeNoStride
-              );
-  SetVector<Operation *> readSlice =
-      collectBackwardSliceInControlFlow(readOp, forOp);
-  auto readLoop = rewriter.create<scf::ForOp>(
-      readOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
-      forOp.getStep(), forOp.getRegionIterArgs());
-  IRMapping mapping;
-  mapping.map(forOp.getInductionVar(), readLoop.getInductionVar());
-  Operation *terminator = readLoop.getBody()->getTerminator();
+  memref::AllocaOp alloca = createAlloca(rewriter, writeOp);  
+  
+  SetVector<Operation *> readSlice =  
+      collectBackwardSliceInControlFlow(readOp, forOp);  
+ 
+  // Read loop  
+  scf::ForOp readLoop = createNewLoop(rewriter, forOp, readOp.getLoc());  
+  IRMapping mapping;  
+  mapping.map(forOp.getInductionVar(), readLoop.getInductionVar());  // Map induction variables  
+  cloneSliceIntoLoop(rewriter, readSlice, readLoop, mapping);  
+  
+  Operation *lastRead = rewriter.clone(*readOp, mapping);  
+  auto newTransferWrite = writeOp.clone();    
+  newTransferWrite->setOperand(0, lastRead->getResult(0));  
+  newTransferWrite->setOperand(1, alloca);  
 
-  rewriter.setInsertionPointToStart(readLoop.getBody());
-  for (Operation *op : readSlice) {
-    rewriter.clone(*op, mapping);
-  }
-  Operation *lastRead = rewriter.clone(*readOp, mapping);
-  //rewriter.setInsertionPoint(terminator);
-  auto newTransferWrite = writeOp.clone();
-  newTransferWrite->setOperand(0, lastRead->getResult(0));
-  // Replace the base of the transfer_write with the alloca.
-  newTransferWrite->setOperand(1, alloca);
+  Operation *terminator = readLoop.getBody()->getTerminator();
   readLoop.getBody()->getOperations().insert(
       terminator->getIterator(), newTransferWrite);
-  //auto endOp = 
-  //auto writeLoop = forOp.clone();
-  rewriter.setInsertionPoint(forOp);
-  auto newReadOp = readOp.clone();
-  newReadOp->setOperand(0, alloca);
-  forOp.getBody()->getOperations().insert(
-      forOp.getBody()->begin(), newReadOp);
-  for (Operation &op : forOp.getBody()->getOperations()) {
-    for (auto &operand : op.getOpOperands()) {
-      if (operand.get() == readOp.getResult()) {
-        operand.set(newReadOp);
-      }
-    }
-  }
-  rewriter.eraseOp(readOp);
-  //DBGS() << "Read loop: " << "\n";
-  //readLoop.dump();
-  //DBGS() << "Write loop: " << "\n";
-  //forOp.dump();
+  readLoop.dump();
+  
+  // Write loop  
+  scf::ForOp writeLoop = createNewLoop(rewriter, forOp, readOp.getLoc());  
+  rewriter.setInsertionPoint(writeLoop);  
+  
+  auto newReadOp = readOp.clone();  
+  newReadOp->setOperand(0, alloca);  
+  writeLoop.getBody()->getOperations().insert(  
+      writeLoop.getBody()->begin(), newReadOp);  
 
-  //forOp.erase();
-}
+  SetVector<Operation *> writeSlice =  
+      collectBackwardSliceInControlFlow(writeOp, forOp);
+  IRMapping writeMapping;
+  writeMapping.map(forOp.getInductionVar(), writeLoop.getInductionVar());
+  cloneSliceIntoLoop(rewriter, writeSlice, writeLoop, writeMapping);
+  auto lastWrite =
+    rewriter.clone(*writeOp, writeMapping);
+  lastWrite->setOperand(0, newReadOp->getResult(0));
+  writeLoop.dump();
+  
+  //for (Operation &op : writeLoop.getBody()->getOperations()) {  
+  //  for (auto &operand : op.getOpOperands()) {  
+  //    if (operand.get() == readOp.getResult()) {  
+  //      operand.set(newReadOp);  
+  //    }  
+  //  }  
+  //}  
+  
+  // Erase original ops  
+  //rewriter.eraseOp(readOp);  
+  //rewriter.eraseOp(forOp);  
+}  
+
+
+//void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
+//                                     vector::TransferReadOp readOp,
+//                                     vector::TransferWriteOp writeOp,
+//                                     scf::ForOp forOp) {
+//  rewriter.setInsertionPoint(forOp);
+//  auto allocaType = cast<MemRefType>(writeOp.getBase().getType());
+//  // Get rid of stride and offset information in the alloca type.
+//  auto allocaTypeNoStride = MemRefType::Builder(allocaType.getShape(), allocaType.getElementType());
+//  auto alloca = rewriter.create<memref::AllocaOp>(  
+//              readOp.getLoc(), allocaTypeNoStride
+//              );
+//  SetVector<Operation *> readSlice =
+//      collectBackwardSliceInControlFlow(readOp, forOp);
+//  auto readLoop = rewriter.create<scf::ForOp>(
+//      readOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+//      forOp.getStep(), forOp.getRegionIterArgs());
+//  IRMapping mapping;
+//  mapping.map(forOp.getInductionVar(), readLoop.getInductionVar());
+//  Operation *terminator = readLoop.getBody()->getTerminator();
+//
+//  rewriter.setInsertionPointToStart(readLoop.getBody());
+//  for (Operation *op : readSlice) {
+//    rewriter.clone(*op, mapping);
+//  }
+//  Operation *lastRead = rewriter.clone(*readOp, mapping);
+//  //rewriter.setInsertionPoint(terminator);
+//  auto newTransferWrite = writeOp.clone();
+//  newTransferWrite->setOperand(0, lastRead->getResult(0));
+//  // Replace the base of the transfer_write with the alloca.
+//  newTransferWrite->setOperand(1, alloca);
+//  readLoop.getBody()->getOperations().insert(
+//      terminator->getIterator(), newTransferWrite);
+//  //auto endOp = 
+//  //auto writeLoop = forOp.clone();
+//  rewriter.setInsertionPoint(forOp);
+//  auto newReadOp = readOp.clone();
+//  newReadOp->setOperand(0, alloca);
+//  forOp.getBody()->getOperations().insert(
+//      forOp.getBody()->begin(), newReadOp);
+//  for (Operation &op : forOp.getBody()->getOperations()) {
+//    for (auto &operand : op.getOpOperands()) {
+//      if (operand.get() == readOp.getResult()) {
+//        operand.set(newReadOp);
+//      }
+//    }
+//  }
+//  rewriter.eraseOp(readOp);
+//  //DBGS() << "Read loop: " << "\n";
+//  //readLoop.dump();
+//  //DBGS() << "Write loop: " << "\n";
+//  //forOp.dump();
+//
+//  //forOp.erase();
+//}
 
 void hoistTransferReadAndDependencies(scf::ForOp forOp) {
   OpBuilder builder(forOp.getContext());
