@@ -16,7 +16,7 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 
-#define DEBUG_TYPE "iree-forall-to-for"
+#define DEBUG_TYPE "iree-codegen-forall-to-for"
 
 namespace mlir::iree_compiler {
 
@@ -25,8 +25,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-LogicalResult forallWithSharedOutsToForLoop(RewriterBase &rewriter,
-                                            scf::ForallOp forallOp) {
+LogicalResult forallToForLoop(RewriterBase &rewriter, scf::ForallOp forallOp) {
   rewriter.setInsertionPoint(forallOp);
 
   SmallVector<Value> lbs = forallOp.getLowerBound(rewriter);
@@ -97,18 +96,24 @@ struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
 
     IRRewriter rewriter(funcOp->getContext());
 
-    funcOp->walk([&](scf::ForallOp forallOp) {
+    // Find `scf.forall` ops we want to convert in innermost to outermost order.
+    SmallVector<scf::ForallOp> forallOps;
+    funcOp->walk<WalkOrder::PostOrder>([&](scf::ForallOp forallOp) {
       // Forall ops with workgroup mappings `#iree_codegen.workgroup_mapping<y>`
       // are for workgroup distribution, we only want to convert inner loops
       // produced by tiling to `scf.for`.
       if (!forallOp.getMapping()) {
-        if (failed(forallWithSharedOutsToForLoop(rewriter, forallOp))) {
-          signalPassFailure();
-          return WalkResult::interrupt();
-        }
+        forallOps.push_back(forallOp);
       }
-      return WalkResult::advance();
     });
+
+    // Convert `scf.forall` -> `scf.for`.
+    for (auto forallOp : forallOps) {
+      if (failed(iree_compiler::forallToForLoop(rewriter, forallOp))) {
+        signalPassFailure();
+        return;
+      }
+    }
   }
 };
 
