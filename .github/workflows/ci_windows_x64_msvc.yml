@@ -10,13 +10,6 @@ on:
   workflow_call:
   workflow_dispatch:
 
-concurrency:
-  # Limit to only one run at a time on our current self-hosted Windows runners.
-  # The network mount and build dir technically functions with concurrent jobs
-  # but performance degrades to the point of being unusably slow.
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
-
 jobs:
   windows_x64_msvc:
     runs-on: azure-windows-scale
