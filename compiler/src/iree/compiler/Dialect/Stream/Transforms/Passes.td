@@ -401,9 +401,11 @@ def RefineResourceAffinitiesPass :
     Pass<"iree-stream-refine-resource-affinities", "mlir::ModuleOp"> {
   let summary = "Refines resource affinities based on usage.";
   let description = [{
-    Uses the affinityAnalysis to refine the resource affinities of allocations
-    that are used on multiple devices. This will also adapt the usage of the
-    dealloca operations.
+    Uses the AffinityAnalysis to refine the resource affinities of allocations
+    that are used on multiple devices. Before this pass, allocations have fixed
+    affinities assigned to a single device. After this pass, allocations used on
+    multiple devices will have `hal.device.optimal` attribute which will include
+    all devices on which the allocation is potentially used.
   }];
   let dependentDialects = [
     "IREE::Stream::StreamDialect",
