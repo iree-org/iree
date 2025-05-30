@@ -118,10 +118,12 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   };
 
   // Build a for loop skeleton:
-  scf::ForOp forOp = rewriter.create<scf::ForOp>(
-      loc, /*lb=*/rewriter.create<arith::ConstantIndexOp>(loc, 0),
-      /*ub=*/rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread),
-      /*steps=*/rewriter.create<arith::ConstantIndexOp>(loc, 1));
+  auto lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto upperBound =
+      rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
+  auto step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  scf::ForOp forOp =
+      rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
 
   auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
     return rewriter.create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
