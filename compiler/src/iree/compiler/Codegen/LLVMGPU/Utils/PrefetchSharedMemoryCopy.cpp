@@ -212,6 +212,10 @@ private:
       return;
     }
     // By default we can mark the if op as read stage.
+    // TODO (nirvedhmeshram) : Add handling for private memory allocations. e.g
+    // write to private memory could go in write stage. But the analysis
+    // in `getValueDependencies` also needs to be aware of private memory for
+    // this so that needs to be added at the same time.
     getValueDependencies(ifOp, readDependencies);
   }
 
