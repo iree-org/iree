@@ -24,7 +24,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 
-#define DEBUG_TYPE "iree-util-dfx"
+#define DEBUG_TYPE "iree-stream-affinity-analysis"
 
 namespace mlir::iree_compiler::IREE::Stream {
 
