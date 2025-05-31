@@ -116,6 +116,8 @@ struct ResourceAllocaOpPattern
   matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = allocaOp.getLoc();
+
+    // Derive buffer propreties from the resource type.
     auto resourceType =
         cast<IREE::Stream::ResourceType>(allocaOp.getResult().getType());
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
@@ -162,8 +164,21 @@ struct ResourceDeallocaOpPattern
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = deallocaOp.getLoc();
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(deallocaOp, rewriter);
+
+    // Derive buffer propreties from the resource type. This must match the
+    // original allocation. If we're uncertain if it does we have to switch to
+    // prefer-origin mode.
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(deallocaOp.getOperand().getType());
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    bool preferOrigin = deallocaOp.getPreferOrigin();
+    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
+                                               bufferUsage))) {
+      preferOrigin = true;
+    }
+    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
+        deallocaOp, memoryTypes, bufferUsage, rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -174,7 +189,7 @@ struct ResourceDeallocaOpPattern
     // Route to the origin of the allocation (if available).
     IREE::HAL::DeallocaFlagBitfield flags =
         IREE::HAL::DeallocaFlagBitfield::None;
-    if (deallocaOp.getPreferOrigin()) {
+    if (preferOrigin) {
       flags = flags | IREE::HAL::DeallocaFlagBitfield::PreferOrigin;
     }
 

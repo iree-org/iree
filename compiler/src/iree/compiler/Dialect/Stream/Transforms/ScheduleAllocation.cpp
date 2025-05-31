@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -1448,7 +1449,8 @@ static bool isExecutedOnce(Operation *op) {
 // Performs allocation for all results and local region transients of the given
 // |executeOp| region. IR will be inserted around the op in its parent block.
 static LogicalResult
-allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
+allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
+                        AffinityAnalysis &affinityAnalysis) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Allocating execution region ]]\n");
 
   AllocationScope scope(executeOp);
@@ -1661,9 +1663,39 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
 
     // Find a pinned affinity for the value or inherit the execution region
     // affinity.
-    auto allocationAffinity = findLocalValueAffinity(yieldValue);
-    if (!allocationAffinity) {
-      allocationAffinity = executeOp.getAffinityAttr();
+    // DO NOT SUBMIT factor out
+    IREE::Stream::AffinityAttr allocationAffinity;
+    SmallVector<IREE::Stream::AffinityAttr> usageAffinities;
+    if (affinityAnalysis.tryLookupPinnedAffinities(result, usageAffinities)) {
+
+      allocationAffinity = IREE::Stream::AffinityAttr::joinOR(usageAffinities);
+      LLVM_DEBUG({
+        llvm::dbgs() << "  => affinity pinned by ops: ";
+        allocationAffinity.dump();
+      });
+    } else if (affinityAnalysis.tryLookupResourceUsageAffinity(
+                   result, usageAffinities)) {
+      allocationAffinity = IREE::Stream::AffinityAttr::joinOR(usageAffinities);
+      LLVM_DEBUG({
+        llvm::dbgs() << "  => affinity analysis provided allocation affinity: ";
+        allocationAffinity.dump();
+      });
+    } else {
+      allocationAffinity = findLocalValueAffinity(yieldValue);
+      if (allocationAffinity) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "  => affinity analysis failed, falling back to "
+                          "local value affinity: ";
+          allocationAffinity.dump();
+        });
+      } else {
+        allocationAffinity = executeOp.getAffinityAttr();
+        LLVM_DEBUG({
+          llvm::dbgs() << "  => affinity analysis failed, falling back to "
+                          "execution affinity: ";
+          allocationAffinity.dump();
+        });
+      }
     }
 
     // Queue up the allocation for packing.
@@ -1910,6 +1942,14 @@ struct ScheduleAllocationPass
           ScheduleAllocationPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
+
+    AffinityAnalysis affinityAnalysis(moduleOp);
+    if (failed(affinityAnalysis.run())) {
+      llvm::errs() << "affinity analysis failed to converge; the input IR may "
+                      "not be correct\n";
+      return signalPassFailure();
+    }
+
     for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
       if (auto asyncFuncOp = dyn_cast<IREE::Stream::AsyncFuncOp>(parentOp)) {
         convertAsyncFuncOp(asyncFuncOp);
@@ -1927,7 +1967,7 @@ struct ScheduleAllocationPass
       for (auto op : operations) {
         if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
-                         return allocateExecutionRegion(op);
+                         return allocateExecutionRegion(op, affinityAnalysis);
                        })
                        .Case([&](IREE::Stream::AsyncLoadOp op) {
                          return convertAsyncLoadOp(op);
