@@ -384,7 +384,9 @@ bool isGatherlikeOp(Operation *op) {
     }
     return currOp->getBlock() == genericOp.getBody();
   };
-  mlir::getBackwardSlice(yieldOp.getOperand(0), &sliceOps, options);
+  [[maybe_unused]] LogicalResult result =
+      getBackwardSlice(yieldOp.getOperand(0), &sliceOps, options);
+  assert(result.succeeded());
   return hasTensorExtract;
 }
 

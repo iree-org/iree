@@ -604,7 +604,9 @@ checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
   SetVector<Operation *> slice;
 
   for (Operation *op : storeOps) {
-    getBackwardSlice(op, &slice, sliceOptions);
+    [[maybe_unused]] LogicalResult result =
+        getBackwardSlice(op, &slice, sliceOptions);
+    assert(result.succeeded());
   }
 
   SetVector<linalg::LinalgOp> computeOps;
@@ -3177,7 +3179,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
       BackwardSliceOptions options;
       options.inclusive = true;
       SetVector<Operation *> slices;
-      getBackwardSlice(indices, &slices, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(indices, &slices, options);
+      assert(result.succeeded());
       genericToSkip.insert(slices.begin(), slices.end());
     }
   }

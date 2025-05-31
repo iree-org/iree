@@ -121,7 +121,9 @@ llvm::SetVector<Operation *> computeSliceToMoveIntoDispatch(
   };
   options.omitBlockArguments = true;
   llvm::SetVector<Operation *> slice;
-  getBackwardSlice(rootOp, &slice, options);
+  [[maybe_unused]] LogicalResult result =
+      getBackwardSlice(rootOp, &slice, options);
+  assert(result.succeeded());
   return slice;
 }
 

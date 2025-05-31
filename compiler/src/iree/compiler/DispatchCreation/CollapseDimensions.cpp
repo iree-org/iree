@@ -629,7 +629,9 @@ hoistTensorReshapesOutOfDispatchRegion(
     return op->getParentOfType<IREE::Flow::DispatchRegionOp>();
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(returnOp, &slice, sliceOptions);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(returnOp, &slice, sliceOptions);
+  assert(ret.succeeded());
 
   // 2. Get the leaf operations that are `tensor.collapse_shape` and
   // `tensor_expand_shape` ops.
@@ -889,7 +891,9 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     return isEligibleForCollapse(op) && parentOp == regionOp;
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(rootOp.value(), &slice, sliceOptions);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(rootOp.value(), &slice, sliceOptions);
+  assert(ret.succeeded());
 
   // Step 3. Populate each op's info with a maximally collapsable reassociation
   // indicies

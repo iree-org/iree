@@ -120,7 +120,9 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
   llvm::SetVector<Operation *> slice;
   for (auto op : operations) {
     for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(operand, &slice, options);
+      assert(result.succeeded());
     }
     auto regions = op->getRegions();
     if (regions.empty()) {
@@ -129,7 +131,9 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
     llvm::SetVector<Value> capturedVals;
     mlir::getUsedValuesDefinedAbove(regions, capturedVals);
     for (auto value : capturedVals) {
-      getBackwardSlice(value, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(value, &slice, options);
+      assert(result.succeeded());
     }
   }
 
