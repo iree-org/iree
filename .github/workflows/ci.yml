@@ -241,6 +241,12 @@ jobs:
     uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
     secrets: inherit
 
+  windows_x64_msvc:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'windows_x64_msvc')
+    uses: ./.github/workflows/ci_windows_x64_msvc.yml
+    secrets: inherit
+
   ##############################################################################
 
   # Aggregate job status and alerting on failures.
@@ -258,6 +264,7 @@ jobs:
       - linux_x64_bazel
       - linux_x64_clang
       - linux_x64_clang_asan
+      - windows_x64_msvc
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit
     with:
