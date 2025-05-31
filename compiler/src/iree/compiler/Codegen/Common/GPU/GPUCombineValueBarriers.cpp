@@ -137,8 +137,12 @@ combineValueBarrierPair(RewriterBase &rewriter,
   bOptions.filter = sliceFilterBackward;
   SetVector<Operation *> backwardSliceA;
   SetVector<Operation *> backwardSliceB;
-  getBackwardSlice(barrierA, &backwardSliceA, bOptions);
-  getBackwardSlice(barrierB, &backwardSliceB, bOptions);
+  [[maybe_unused]] LogicalResult resultA =
+      getBackwardSlice(barrierA, &backwardSliceA, bOptions);
+  assert(resultA.succeeded());
+  [[maybe_unused]] LogicalResult resultB =
+      getBackwardSlice(barrierB, &backwardSliceB, bOptions);
+  assert(resultB.succeeded());
   backwardSliceA.insert(backwardSliceB.begin(), backwardSliceB.end());
   // If the first barrier is contained in the combined backward slice of both
   // barriers, the barriers form a chain and cannot be combined.
