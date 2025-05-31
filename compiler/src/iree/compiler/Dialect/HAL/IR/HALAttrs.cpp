@@ -1087,6 +1087,161 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+// Returns the device attribute from the given HAL affinity attribute.
+static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
+  if (auto deviceAffinityAttr =
+          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
+    return deviceAffinityAttr.getDevice();
+  } else if (auto devicePromiseAttr =
+                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
+    return devicePromiseAttr.getDevice();
+  }
+  return {};
+}
+
+bool DeviceTopologyAttr::requiresTransfer(
+    IREE::Stream::AffinityAttr source,
+    IREE::Stream::AffinityAttr target) const {
+  Attribute sourceDevice = getAffinityDevice(source);
+  Attribute targetDevice = getAffinityDevice(target);
+
+  if (!sourceDevice || !targetDevice)
+    return true;
+  if (sourceDevice == targetDevice)
+    return false;
+
+  // Search for a matching link and check if it has transparent access
+  // or unified memory.
+  for (DeviceLinkAttr link : getLinks()) {
+    if ((sourceDevice == link.getSourceDevice() &&
+         targetDevice == link.getTargetDevice())) {
+      return !link.hasTransparentAccess() && !link.hasUnifiedMemory();
+    }
+  }
+  return true;
+}
+
+// Example format: (@device_a -> @device_b = {transparent_access,
+// unified_memory})
+Attribute DeviceLinkAttr::parse(AsmParser &parser, Type type) {
+  MLIRContext *context = parser.getContext();
+  FlatSymbolRefAttr sourceDevice;
+  FlatSymbolRefAttr targetDevice;
+  DictionaryAttr properties;
+  SMLoc startLoc = parser.getCurrentLocation();
+  // Parse '('
+  if (parser.parseLParen())
+    return {};
+  // Parse source device: @device_a
+  if (parser.parseAttribute(sourceDevice)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "expected source device symbol");
+    return {};
+  }
+  // Parse '->'
+  if (failed(parser.parseArrow())) {
+    parser.emitError(parser.getCurrentLocation(), "expected '->' arrow");
+    return {};
+  }
+  // Parse target device: @device_b
+  if (parser.parseAttribute(targetDevice)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "expected target device symbol");
+    return {};
+  }
+
+  if (parser.parseEqual())
+    return {};
+  // Parse properties: '{prop1, prop2}'
+  if (parser.parseLBrace())
+    return {};
+
+  SmallVector<NamedAttribute> propEntries;
+  // Check for empty properties: {}
+  if (failed(parser.parseOptionalRBrace())) {
+    // Not empty, parse comma-separated property flags.
+    do {
+      llvm::StringRef propName;
+      SMLoc propNameLoc = parser.getCurrentLocation();
+
+      // Parse property flag identifier (e.g., 'transparent_access')
+      if (parser.parseKeyword(&propName)) {
+        parser.emitError(
+            propNameLoc,
+            "expected property flag identifier (e.g., 'transparent_access')");
+        return {};
+      }
+      // Flag implies true.
+      propEntries.push_back(NamedAttribute(StringAttr::get(context, propName),
+                                           BoolAttr::get(context, true)));
+    } while (succeeded(parser.parseOptionalComma()));
+
+    if (parser.parseRBrace())
+      return {};
+  }
+  properties = DictionaryAttr::get(context, propEntries);
+  // Parse ')'
+  if (parser.parseRParen())
+    return {};
+
+  return getChecked([&]() { return parser.emitError(startLoc); }, context,
+                    sourceDevice, targetDevice, properties);
+}
+
+void DeviceLinkAttr::print(AsmPrinter &printer) const {
+  printer << "(";
+  printer.printAttribute(getSourceDevice());
+  printer << " -> ";
+  printer.printAttribute(getTargetDevice());
+  printer << " = {";
+
+  bool firstProperty = true;
+  for (const NamedAttribute &prop : getProperties()) {
+    // Only print if the property (flag) is true.
+    if (auto boolAttr = dyn_cast<BoolAttr>(prop.getValue())) {
+      if (boolAttr.getValue()) {
+        if (!firstProperty) {
+          printer << ", ";
+        }
+        printer.printKeywordOrString(prop.getName().getValue());
+        firstProperty = false;
+      }
+    }
+  }
+  printer << "})";
+}
+
+bool DeviceLinkAttr::hasUnifiedMemory() {
+  if (auto attr = getProperties().getAs<BoolAttr>("unified_memory"))
+    return attr.getValue();
+  return false;
+}
+
+bool DeviceLinkAttr::hasTransparentAccess() {
+  if (auto attr = getProperties().getAs<BoolAttr>("transparent_access"))
+    return attr.getValue();
+  return false;
+}
+
+LogicalResult
+DeviceLinkAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       SymbolRefAttr sourceDevice, SymbolRefAttr targetDevice,
+                       DictionaryAttr properties) {
+  // currently only transparent_access and unified_memory are supported.
+  for (const NamedAttribute &prop : properties) {
+    if (prop.getName().getValue() != "transparent_access" &&
+        prop.getName().getValue() != "unified_memory") {
+      return emitError() << "unsupported property: "
+                         << prop.getName().getValue();
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // #hal.device.optimal<*>
 //===----------------------------------------------------------------------===//
 
@@ -1132,18 +1287,6 @@ bool DeviceOptimalAttr::isExecutableWith(
     }
     return true;
   }
-}
-
-// Returns the device attribute from the given HAL affinity attribute.
-static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
-  if (auto deviceAffinityAttr =
-          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    return deviceAffinityAttr.getDevice();
-  } else if (auto devicePromiseAttr =
-                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
-    return devicePromiseAttr.getDevice();
-  }
-  return {};
 }
 
 using DeviceAffinitySet =

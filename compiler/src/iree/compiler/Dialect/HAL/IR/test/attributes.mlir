@@ -1,5 +1,5 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s
-// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=CHECK-INLINE
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope -verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INLINE
 
 // CHECK-LABEL: descriptor_set_layout_binding.basic
 "descriptor_set_layout_binding.basic"() {
@@ -180,3 +180,26 @@ builtin.module attributes {
     util.return %c1 : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: "device.topology"
+"device.topology"() {
+  // CHECK: topology = #hal.device.topology<links = [
+  // CHECK-SAME:   (@device_a -> @device_b = {}),
+  // CHECK-SAME:   (@device_c -> @device_d = {transparent_access}),
+  // CHECK-SAME:   (@device_g -> @device_h = {transparent_access, unified_memory})
+  // CHECK-SAME: ]>
+  topology = #hal.device.topology<links = [
+    (@device_a -> @device_b = {}),
+    (@device_c -> @device_d = {transparent_access}),
+    (@device_g -> @device_h = {transparent_access, unified_memory})
+  ]>
+} : () -> ()
+
+// -----
+
+"device.link.error"() {
+  // expected-error @+1 {{unsupported property: discrete_memory}}
+  link = #hal.device.link(@device_a -> @device_b = {discrete_memory})
+} : () -> ()
