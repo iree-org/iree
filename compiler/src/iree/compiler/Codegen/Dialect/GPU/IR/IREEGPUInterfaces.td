@@ -62,24 +62,6 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the vector layout for the A/B/C matrix of the MMA operation:
-        ```
-          C += A * B
-        ```
-      }],
-      /*retTy=*/"::mlir::FailureOr<::std::tuple<"
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface>>",
-      /*methodName=*/"getContractionLayout",
-      /*args=*/(ins "::mlir::vector::ContractionOp":$contract),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Returns the expected subgroup size of the MMA operation/intrinsic.
       }],
       /*retTy=*/"int64_t",
