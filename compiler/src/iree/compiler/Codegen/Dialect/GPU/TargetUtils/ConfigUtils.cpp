@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include <optional>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
@@ -31,6 +32,10 @@
 #define DEBUG_TYPE "iree-gpu-config-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
+namespace mlir::iree_compiler {
+extern llvm::cl::opt<bool> clUseDirectLoad;
+} // namespace mlir::iree_compiler
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -82,7 +87,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 
   // Set tile sizes.
   MLIRContext *context = multiMmaOp.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(b.getStringAttr("workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
@@ -350,7 +355,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = lhs.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
@@ -360,7 +365,10 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   if (mustBeAligned) {
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1});
+    bool directLoadArray[] = {true, true};
+    ArrayRef<bool> directLoadOperands =
+        clUseDirectLoad ? directLoadArray : ArrayRef<bool>{};
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, directLoadOperands);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
@@ -869,7 +877,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = op->getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
@@ -885,7 +893,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     attrs.emplace_back(StringAttr::get(context, "reduction"),
                        b.getI64ArrayAttr(loopTileSizes));
   }
-
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -987,14 +994,13 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = scatter.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
 
   attrs.emplace_back(StringAttr::get(context, "thread"),
                      b.getI64ArrayAttr(threadTileSizes));
-
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 

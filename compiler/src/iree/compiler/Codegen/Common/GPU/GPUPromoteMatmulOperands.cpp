@@ -198,12 +198,17 @@ struct GPUPromoteMatmulOperandsPass final
         return;
       }
 
+      SmallVector<bool> useDirectLoad =
+          getUseDirectLoad(loweringConfig)
+              .value_or(SmallVector<bool>(promotedOperands->size(), false));
+
       builder.setInsertionPoint(op);
-      for (auto operand : promotedOperands.value()) {
+      for (auto [operand, directLoadOperand] :
+           llvm::zip(promotedOperands.value(), useDirectLoad)) {
         // TODO: move switch `useDirectLoad` to the promotion attr list.
         // Here using a command line option should be only a temporary
         // solution.
-        promoteOperand(builder, op, operand, useDirectLoad);
+        promoteOperand(builder, op, operand, directLoadOperand);
       }
     });
   }
