@@ -8,7 +8,6 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_TARGETDEVICE_H_
 
 #include <optional>
-#include <string>
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -43,6 +42,11 @@ public:
   virtual Value buildDeviceTargetMatch(Location loc, Value device,
                                        IREE::HAL::DeviceTargetAttr targetAttr,
                                        OpBuilder &builder) const;
+
+  // Sets the shared usage bits for the given device set.
+  virtual LogicalResult
+  setSharedUsageBits(const SetVector<IREE::HAL::DeviceTargetAttr> &targets,
+                     IREE::HAL::BufferUsageBitfield &bufferUsage) const;
 
   // TODO(benvanik): pipeline registration for specialization of host code at
   // various stages.

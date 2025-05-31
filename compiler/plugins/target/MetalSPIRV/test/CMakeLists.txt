@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "heterogeneous_interop.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck

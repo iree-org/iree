@@ -19,4 +19,11 @@ Value TargetDevice::buildDeviceTargetMatch(
       builder);
 }
 
+LogicalResult TargetDevice::setSharedUsageBits(
+    const SetVector<IREE::HAL::DeviceTargetAttr> &targets,
+    IREE::HAL::BufferUsageBitfield &bufferUsage) const {
+  // If the TargetDevice does not implement this function, default to failure.
+  return failure();
+}
+
 } // namespace mlir::iree_compiler::IREE::HAL

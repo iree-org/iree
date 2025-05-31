@@ -7,16 +7,18 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_PATTERNS_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_PATTERNS_H_
 
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
 
 // Populates conversion patterns for stream->HAL.
-void populateStreamToHALPatterns(MLIRContext *context,
-                                 ConversionTarget &conversionTarget,
-                                 TypeConverter &typeConverter,
-                                 RewritePatternSet &patterns);
+void populateStreamToHALPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter, RewritePatternSet &patterns,
+    IREE::HAL::DeviceAnalysis &deviceAnalysis,
+    const IREE::HAL::TargetRegistry &targetRegistry);
 
 } // namespace mlir::iree_compiler
 

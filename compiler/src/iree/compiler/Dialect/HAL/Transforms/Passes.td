@@ -26,6 +26,13 @@ def ConvertToHALPass :
     so that the information required to marshal buffers and operands to the
     device is available for conversion.
   }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
+    >,
+  ];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "mlir::func::FuncDialect",
