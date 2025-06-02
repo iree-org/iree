@@ -207,7 +207,7 @@ struct MaterializeFlowDispatchTensorStoreOp final
     RankedTensorType paddedType = newTargetType.asRankedTensorType();
 
     Location loc = storeOp.getLoc();
-    SmallVector<Value> dynamicResultSizes{storeOp->getOperands()};
+    SmallVector<Value> dynamicResultSizes{adaptor.getOperands()};
     Value empty =
         rewriter.create<tensor::EmptyOp>(loc, paddedType, dynamicResultSizes);
 
