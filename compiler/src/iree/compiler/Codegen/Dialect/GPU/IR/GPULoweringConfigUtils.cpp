@@ -150,7 +150,7 @@ void appendPromotedOperandsList(MLIRContext *context,
   if (!directLoadOperands.empty()) {
     assert(directLoadOperands.size() == operands.size() &&
            "Direct load operands size must match promoted operands size");
-    attrs.emplace_back(StringAttr::get(context, "direct_load_operands"),
+    attrs.emplace_back(StringAttr::get(context, kDirectLoadOperandsName),
                        b.getBoolArrayAttr(directLoadOperands));
   }
 }
