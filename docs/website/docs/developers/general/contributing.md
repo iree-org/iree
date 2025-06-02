@@ -395,7 +395,14 @@ runs.
     ci-exactly: linux_x64_bazel
     ```
 
-For example, this PR opted in to running the `build_test_all_windows` job:
+* Opt in to the Windows compiler build and test workflow:
+
+    ``` text
+    ci-extra: windows_x64_msvc
+    ```
+
+For example, this PR opted in to running the `build_test_all_windows` job
+(which was renamed to `windows_x64_msvc`):
 
 ![ci-extra](./contributing-ci-extra.png)
 
