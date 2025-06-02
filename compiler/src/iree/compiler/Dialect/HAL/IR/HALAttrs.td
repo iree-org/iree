@@ -1078,9 +1078,9 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
     module {
       stream.topology = #hal.device.topology<
         links = [
-          (@device_gpu_0 -> @device_cpu = {transparent_access, unified_memory}),
-          (@device_gpu_1 -> @device_cpu = {transparent_access}),
-          (@device_cpu -> @device_gpu_0 = {unified_memory}),
+          (@device_gpu_0 -> @device_cpu = {transparent_access = true, unified_memory = true}),
+          (@device_gpu_1 -> @device_cpu = {transparent_access = true}),
+          (@device_cpu -> @device_gpu_0 = {unified_memory = true}),
           (@device_cpu -> @device_gpu_1 = {})
         ]
       >
@@ -1098,9 +1098,9 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
 }
 
 def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
-  let mnemonic      = "device.link";
-  let summary       = [{Connection between devices.}];
-  let description   = [{
+  let mnemonic = "device.link";
+  let summary = [{Connection between devices.}];
+  let description = [{
     Describes a directional relationship between devices in terms of memory
     and access properties.
 
@@ -1108,18 +1108,16 @@ def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
     - `unified_memory`: Whether the devices share a unified memory space
     - `transparent_access`: Whether the source device can access the target device's memory without staging
 
-    The assembly format supports only directional links:
+    The assembly format uses directional links:
     ```mlir
-    // Directional links (source can access target memory with given properties)
-    (@device_gpu -> @device_cpu = {transparent_access})  // GPU can access CPU memory transparently
-    (@device_cpu -> @device_gpu = {})  // CPU needs explicit transfers to access GPU memory
-    ```
-
-    Properties use flag-style specification where presence implies true:
-    ```mlir
-    {transparent_access}  // transparent_access is true
-    {}  // No properties (all false)
-    {unified_memory}  // Only unified_memory is true
+    // GPU can access CPU memory transparently with unified memory
+    (@device_gpu -> @device_cpu = {transparent_access = true, unified_memory = true})
+    // CPU needs explicit transfers to access GPU memory (both properties false)
+    (@device_cpu -> @device_gpu = {})
+    // GPU can access CPU memory transparently but without unified memory
+    (@device_gpu -> @device_cpu = {transparent_access = true})
+    // Its possible to add arbitrary properties to the link that are not specified here
+    (@device_gpu -> @device_cpu = {}, {optional_flag = true})
     ```
 
     Future extensions may include properties like bandwidth, latency, and target-specific
@@ -1129,20 +1127,17 @@ def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
   let parameters = (ins
     AttrParameter<"SymbolRefAttr", "source_device">:$sourceDevice,
     AttrParameter<"SymbolRefAttr", "target_device">:$targetDevice,
-    AttrParameter<"DictionaryAttr", "properties">:$properties
+    OptionalParameter<"bool", "false">:$unified_memory,
+    OptionalParameter<"bool", "false">:$transparent_access,
+    OptionalParameter<"DictionaryAttr">:$extra_properties
   );
 
-  let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    // Returns whether the devices have unified memory
-    bool hasUnifiedMemory();
-
-    // Returns whether the source can transparently access target memory
-    bool hasTransparentAccess();
+  let assemblyFormat = [{
+    `(` $sourceDevice `->` $targetDevice `=`
+   `{` struct($unified_memory, $transparent_access)`}`
+    (`,` $extra_properties^)?
+    `)`
   }];
-
-  let genVerifyDecl = 1;
 }
 
 #endif  // IREE_DIALECT_HAL_IR_HAL_ATTRS
