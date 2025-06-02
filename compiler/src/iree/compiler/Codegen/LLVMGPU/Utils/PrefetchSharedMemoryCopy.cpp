@@ -100,7 +100,8 @@ public:
     Location loc = forOp.getLoc();
     Value indVar = newForOp.getInductionVar();
     Value increment = rewriter.create<arith::ConstantIndexOp>(loc, step);
-    Value iPlusOne = rewriter.create<arith::AddIOp>(loc, indVar, increment);
+    Value iPlusOne = rewriter.create<arith::AddIOp>(
+        loc, indVar, increment, arith::IntegerOverflowFlags::nsw);
 
     for (int i = 0; i < 3; ++i) {
       for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
