@@ -1055,11 +1055,11 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
     for (auto it : params.value()) {
       param_strings.push_back(std::make_pair(py::cast<std::string>(it.first),
                                              py::cast<std::string>(it.second)));
-      passed_params.push_back(iree_string_pair_t{
-          .first = {.data = param_strings.back().first.c_str(),
-                    .size = param_strings.back().first.size()},
-          .second = {.data = param_strings.back().second.c_str(),
-                     .size = param_strings.back().second.size()}});
+      passed_params.push_back(
+          iree_string_pair_t{{param_strings.back().first.c_str(),
+                              param_strings.back().first.size()},
+                             {param_strings.back().second.c_str(),
+                              param_strings.back().second.size()}});
     }
   }
 
