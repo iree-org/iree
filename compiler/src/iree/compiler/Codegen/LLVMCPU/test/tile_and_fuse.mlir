@@ -101,53 +101,36 @@ func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @shared_out_operand() {
+#config = #iree_codegen.lowering_config<tile_sizes = [[8, 128, 0]]>
+func.func @shared_out_operand(%arg0: tensor<391x384xf32>, %arg1: tensor<384x384xf32>, %arg2: tensor<384xf32>, %arg3: tensor<391x384xf32>) -> tensor<391x384xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant 6.000000e+00 : f32
-  %c600576 = arith.constant 600576 : index
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-  %2 = arith.index_castui %0 {stream.alignment = 1024 : index, stream.values = [205824 : index, 795648 : index, 1385472 : index, 1975296 : index, 2565120 : index, 3154944 : index, 3744768 : index]} : i32 to index
-  %3 = arith.index_castui %1 {stream.alignment = 1024 : index, stream.values = [0 : index, 3072 : index, 6144 : index, 9216 : index, 12288 : index, 15360 : index, 18432 : index]} : i32 to index
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<391x384xf32>>
-  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%2) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x384xf32>>
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%3) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384xf32>>
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c600576) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<391x384xf32>>
-  %8 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<391x384xf32>> -> tensor<391x384xf32>
-  %9 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0], sizes = [384, 384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x384xf32>> -> tensor<384x384xf32>
-  %10 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0], sizes = [384], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>
-  %11 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<391x384xf32>> -> tensor<391x384xf32>
-  %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<391x384xf32>) -> tensor<391x384xf32>
-  %13 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 128, 0]]>}
-    ins(%8, %9 : tensor<391x384xf32>, tensor<384x384xf32>)
-    outs(%12 : tensor<391x384xf32>) -> tensor<391x384xf32>
-  %14 = linalg.generic {
+  %0 = linalg.fill ins(%cst : f32) outs(%arg3 : tensor<391x384xf32>) -> tensor<391x384xf32>
+  %1 = linalg.matmul {lowering_config = #config}
+    ins(%arg0, %arg1 : tensor<391x384xf32>, tensor<384x384xf32>)
+    outs(%0 : tensor<391x384xf32>) -> tensor<391x384xf32>
+  %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d1)>,
                      affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]
     }
-    ins(%10, %13 : tensor<384xf32>, tensor<391x384xf32>)
-    outs(%11 : tensor<391x384xf32>) {
+    ins(%arg2, %1 : tensor<384xf32>, tensor<391x384xf32>)
+    outs(%arg3 : tensor<391x384xf32>) {
   ^bb0(%in: f32, %in_1: f32, %out: f32):
-    %15 = arith.addf %in, %in_1 : f32
-    %16 = arith.minimumf %15, %cst_0 : f32
-    %17 = arith.maximumf %16, %cst : f32
-    linalg.yield %17 : f32
+    %3 = arith.addf %in, %in_1 : f32
+    %4 = arith.minimumf %3, %cst_0 : f32
+    %5 = arith.maximumf %4, %cst : f32
+    linalg.yield %5 : f32
   } -> tensor<391x384xf32>
-  iree_tensor_ext.dispatch.tensor.store %14, %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : tensor<391x384xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<391x384xf32>>
-  return
+  return %2 : tensor<391x384xf32>
 }
 //      CHECK: func.func @shared_out_operand(
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]
 //  CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
-//  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<391x384xf32>>
-//      CHECK:   %[[DST:.+]] = iree_tensor_ext.dispatch.tensor.load %[[DST_BINDING]]
 //      CHECK:   scf.for
 // CHECK-SAME:       iter_args(%[[ITER0:.+]] = %[[DST]])
 //      CHECK:     scf.for
@@ -217,28 +200,29 @@ func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x
 
 // -----
 
-func.func @tile_linalg_ext_scan() attributes {translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>} {
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1]]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
   %c0_i64 = arith.constant 0 : i64
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x2xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x2xi64>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x2xf32>> -> tensor<128x2xf32>
-  %3 = tensor.empty() : tensor<2xi64>
-  %4 = tensor.empty() : tensor<128x2xi64>
-  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x2xf32>) outs(%4 : tensor<128x2xi64>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1], [0, 0], [1, 0]]>} {
+  %0 = tensor.empty() : tensor<2xi64>
+  %1 = tensor.empty() : tensor<128x2xi64>
+  %2 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : tensor<128x2xf32>)
+    outs(%1 : tensor<128x2xi64>) {
   ^bb0(%in: f32, %out: i64):
-    %9 = arith.fptosi %in : f32 to i64
-    linalg.yield %9 : i64
+    %6 = arith.fptosi %in : f32 to i64
+    linalg.yield %6 : i64
   } -> tensor<128x2xi64>
-  %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [0], [1]]>} ins(%c0_i64 : i64) outs(%3 : tensor<2xi64>) -> tensor<2xi64>
-  %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1], [0, 0], [1, 0]]>} ins(%c0_i64 : i64) outs(%4 : tensor<128x2xi64>) -> tensor<128x2xi64>
-  %8:2 = iree_linalg_ext.scan {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1], [0, 1]]>} dimension(0) inclusive(true) ins(%5 : tensor<128x2xi64>) outs(%7, %6 : tensor<128x2xi64>, tensor<2xi64>) {
-  ^bb0(%arg0: i64, %arg1: i64):
-    %9 = arith.addi %arg0, %arg1 : i64
-    iree_linalg_ext.yield %9 : i64
+  %3 = linalg.fill ins(%c0_i64 : i64) outs(%0 : tensor<2xi64>) -> tensor<2xi64>
+  %4 = linalg.fill ins(%c0_i64 : i64) outs(%1 : tensor<128x2xi64>) -> tensor<128x2xi64>
+  %5:2 = iree_linalg_ext.scan {lowering_config = #config} dimension(0) inclusive(true)
+    ins(%2 : tensor<128x2xi64>)
+    outs(%4, %3 : tensor<128x2xi64>, tensor<2xi64>) {
+  ^bb0(%arg1: i64, %arg2: i64):
+    %6 = arith.addi %arg1, %arg2 : i64
+    iree_linalg_ext.yield %6 : i64
   } -> tensor<128x2xi64>, tensor<2xi64>
-  iree_tensor_ext.dispatch.tensor.store %8#0, %1, offsets = [0, 0], sizes = [128, 2], strides = [1, 1] : tensor<128x2xi64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x2xi64>>
-  return
+  return %5#0 : tensor<128x2xi64>
 }
 // CHECK-LABEL: func.func @tile_linalg_ext_scan
 // CHECK:         scf.for
