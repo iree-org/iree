@@ -62,8 +62,10 @@ struct DispatchParams {
   SmallVector<TypedAttr> uniformOperands;
 };
 
+// Nested map of entry point -> workload -> DispatchParams.
 using DispatchParamsMap =
-    llvm::DenseMap<SymbolRefAttr, std::vector<DispatchParams>>;
+    llvm::DenseMap<SymbolRefAttr,
+                   llvm::MapVector<SmallVector<unsigned>, DispatchParams>>;
 
 // Walk |moduleOp| and gather all of the dispatches to each executable.
 // Dispatch parameters are deduplicated by workload so that there's only ever
@@ -118,7 +120,6 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
         uniformOperands.push_back(uniformOperand);
       }
 
-      // Work around needing a mutable key for the set; C++ was a mistake.
       dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
         SmallVector<Binding> bindings;
         for (auto [i, resourceLength] :
@@ -135,22 +136,12 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
         }
 
         auto &dispatchParamsSet = map[entryPointAttr];
-        DispatchParams *dispatchParams = nullptr;
-        for (auto &it : dispatchParamsSet) {
-          if (it.workload == workload) {
-            dispatchParams = &it;
-            break;
-          }
-        }
-        if (!dispatchParams) {
-          dispatchParamsSet.push_back({});
-          dispatchParams = &dispatchParamsSet.back();
-        }
-        dispatchParams->locs.push_back(dispatchOp.getLoc());
-        dispatchParams->affinities.insert(affinityAttr);
-        dispatchParams->workload = workload;
-        dispatchParams->bindings = std::move(bindings);
-        dispatchParams->uniformOperands = std::move(uniformOperands);
+        DispatchParams &dispatchParams = dispatchParamsSet[workload];
+        dispatchParams.locs.push_back(dispatchOp.getLoc());
+        dispatchParams.affinities.insert(affinityAttr);
+        dispatchParams.workload = workload;
+        dispatchParams.bindings = std::move(bindings);
+        dispatchParams.uniformOperands = std::move(uniformOperands);
       });
     });
   }
@@ -431,7 +422,7 @@ buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
                            });
     auto dispatchParamsSet = dispatchParamsMap.find(symbolRefAttr);
     if (dispatchParamsSet != dispatchParamsMap.end()) {
-      for (auto &dispatchParams : dispatchParamsSet->second) {
+      for (auto &[_, dispatchParams] : dispatchParamsSet->second) {
         if (dispatchParams.affinities.empty()) {
           appendDispatchBenchmark({}, executableOp, variantOp, exportOp,
                                   dispatchParams, moduleBuilder);
