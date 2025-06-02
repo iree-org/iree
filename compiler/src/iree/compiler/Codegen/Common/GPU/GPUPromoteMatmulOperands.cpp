@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -204,7 +205,7 @@ struct GPUPromoteMatmulOperandsPass final
 
       builder.setInsertionPoint(op);
       for (auto [operand, directLoadOperand] :
-           llvm::zip(promotedOperands.value(), useDirectLoad)) {
+           llvm::zip_equal(promotedOperands.value(), useDirectLoad)) {
         // TODO: move switch `useDirectLoad` to the promotion attr list.
         // Here using a command line option should be only a temporary
         // solution.
