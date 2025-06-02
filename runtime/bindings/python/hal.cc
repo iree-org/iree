@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <iterator>
 #include <optional>
+#include <utility>
 
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
@@ -1021,6 +1022,7 @@ HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
 }
 
 HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
+                                  std::optional<py::dict> params,
                                   std::optional<py::list> allocators) {
   // Since the device ids are supposed to be opaque, we need to verify
   // them by querying available devices.
@@ -1047,11 +1049,24 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
     throw std::invalid_argument(std::move(msg));
   }
 
-  std::vector<iree_string_pair_t> params;
+  std::vector<std::pair<std::string, std::string>> param_strings;
+  std::vector<iree_string_pair_t> passed_params;
+  if (params.has_value()) {
+    for (auto it : params.value()) {
+      param_strings.push_back(std::make_pair(py::cast<std::string>(it.first),
+                                             py::cast<std::string>(it.second)));
+      passed_params.push_back(
+          iree_string_pair_t{{param_strings.back().first.c_str(),
+                              param_strings.back().first.size()},
+                             {param_strings.back().second.c_str(),
+                              param_strings.back().second.size()}});
+    }
+  }
+
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_device_by_id(
-                     raw_ptr(), device_id, params.size(),
-                     (params.empty() ? nullptr : &params.front()),
+                     raw_ptr(), device_id, passed_params.size(),
+                     (passed_params.empty() ? nullptr : &passed_params.front()),
                      iree_allocator_system(), &device),
                  "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
@@ -1450,22 +1465,24 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("create_default_device", &HalDriver::CreateDefaultDevice,
            py::keep_alive<0, 1>(), py::arg("allocators") = py::none())
       .def("create_device", &HalDriver::CreateDevice, py::keep_alive<0, 1>(),
-           py::arg("device_id"), py::arg("allocators") = py::none())
+           py::arg("device_id"), py::arg("params") = py::none(),
+           py::arg("allocators") = py::none())
       .def("create_device_by_uri", &HalDriver::CreateDeviceByURI,
            py::keep_alive<0, 1>(), py::arg("device_uri"),
            py::arg("allocators") = py::none())
       .def(
           "create_device",
           [](HalDriver& self, py::dict device_info,
+             std::optional<py::dict> params,
              std::optional<py::list> allocators) -> HalDevice {
             // Alias of create_device that takes a dict as returned from
             // query_available_devices for convenience.
             auto device_id =
                 py::cast<iree_hal_device_id_t>(device_info["device_id"]);
-            return self.CreateDevice(device_id, allocators);
+            return self.CreateDevice(device_id, params, allocators);
           },
           py::keep_alive<0, 1>(), py::arg("device_info"),
-          py::arg("allocators") = py::none())
+          py::arg("params") = py::none(), py::arg("allocators") = py::none())
       .def("query_available_devices", &HalDriver::QueryAvailableDevices)
       .def("dump_device_info",
            [](HalDriver& self, iree_hal_device_id_t device_id) {

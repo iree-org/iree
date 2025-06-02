@@ -273,11 +273,17 @@ class HalDriver:
     ) -> HalDevice: ...
     @overload
     def create_device(
-        self, device_id: int, allocators: Optional[list[HalAllocator]] = None
+        self,
+        device_id: int,
+        params: Optional[dict],
+        allocators: Optional[list[HalAllocator]] = None,
     ) -> HalDevice: ...
     @overload
     def create_device(
-        self, device_info: dict, allocators: Optional[list[HalAllocator]] = None
+        self,
+        device_info: dict,
+        params: Optional[dict],
+        allocators: Optional[list[HalAllocator]] = None,
     ) -> HalDevice: ...
     def create_device_by_uri(
         self, device_uri: str, allocators: Optional[list[HalAllocator]] = None

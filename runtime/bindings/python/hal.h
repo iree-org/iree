@@ -174,6 +174,7 @@ class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
   py::list QueryAvailableDevices();
   HalDevice CreateDefaultDevice(std::optional<py::list> allocators);
   HalDevice CreateDevice(iree_hal_device_id_t device_id,
+                         std::optional<py::dict> params,
                          std::optional<py::list> allocators);
   HalDevice CreateDeviceByURI(std::string& device_uri,
                               std::optional<py::list> allocators);
