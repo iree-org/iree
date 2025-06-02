@@ -8,6 +8,7 @@
 
 #include <cstdint>
 
+#include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
 #include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
@@ -305,6 +306,14 @@ public:
       addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
     }
 
+    auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
+    std::string specName =
+        llvm::formatv("iree_default_tuning_spec_{}.mlir", options.target);
+    if (rocmDialect->hasBuiltin(specName)) {
+      addConfig("iree_codegen.default_tuning_spec",
+                IREE::ROCM::BuiltinTuningModuleAttr::get(context, specName));
+    }
+
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("rocm"), b.getStringAttr(format),
         b.getDictionaryAttr(configItems));
@@ -317,6 +326,7 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
+    registry.insert<IREE::ROCM::ROCMDialect>();
     // Configuration may load and manipulate transform dialect libraries.
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -988,6 +998,9 @@ namespace {
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
+  void onRegisterDialects(DialectRegistry &registry) {
+    registry.insert<IREE::ROCM::ROCMDialect>();
+  }
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"amdgpu", ...
     targets.add("amdgpu", [&]() {
