@@ -86,28 +86,19 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: %[[SELIDX:.+]] = arith.select %[[CMP]], %[[CASTIDX]], %[[IDX]] : i64
 // CHECK: linalg.yield %[[MAXVAL]], %[[SELIDX]] : bf16, i64
 
-// Step 2: Compute global index = outer * tile_size + local
+// Step 2: Final reduction with global index computation.
 // CHECK: %[[C128:.+]] = arith.constant 128 : index
-// CHECK: %[[LOCALIDX:.+]] = tensor.empty(%{{.+}}) : tensor<?x1024xi64>
-// CHECK: %[[FILLGIDX:.+]] = linalg.fill ins(%{{.+}} : i64) outs(%[[LOCALIDX]] : tensor<?x1024xi64>) -> tensor<?x1024xi64>
-// CHECK: %[[GLOBALIDX:.+]] = linalg.generic
-// CHECK-SAME: indexing_maps = [#[[$MAP2]], #[[$MAP2]]]
-// CHECK-SAME: iterator_types = ["parallel", "parallel"]
-// CHECK: ^bb0(%[[INIDX:.+]]: i64, %[[GIDX_OUT:.+]]: i64)
-// CHECK: %[[OUTER:.+]] = linalg.index 1 : index
-// CHECK: %[[OFFSET:.+]] = arith.muli %[[OUTER]], %[[C128]] : index
-// CHECK: %[[OFFSET_CAST:.+]] = arith.index_cast %[[OFFSET]] : index to i64
-// CHECK: %[[GLOBALIDXVAL:.+]] = arith.addi %[[OFFSET_CAST]], %[[INIDX]] : i64
-// CHECK: linalg.yield %[[GLOBALIDXVAL]] : i64
-
-// Step 3: Final reduction over the parallel dim
 // CHECK: %[[FINAL:.+]]:2 = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[$MAP2]], #[[$MAP2]], #[[$MAP3]], #[[$MAP3]]]
 // CHECK-SAME: iterator_types = ["parallel", "reduction"]
 // CHECK: ^bb0(%[[V1:.+]]: bf16, %[[I1:.+]]: i64, %[[V2:.+]]: bf16, %[[I2:.+]]: i64)
+// CHECK: %[[OUTER:.+]] = linalg.index 1 : index
+// CHECK: %[[OFFSET:.+]] = arith.muli %[[OUTER]], %[[C128]] : index
+// CHECK: %[[OFFSET_CAST:.+]] = arith.index_cast %[[OFFSET]] : index to i64
+// CHECK: %[[GIDX:.+]] = arith.addi %[[OFFSET_CAST]], %[[I1]] : i64
 // CHECK: %[[MAX2:.+]] = arith.maximumf %[[V1]], %[[V2]] : bf16
 // CHECK: %[[CMP2:.+]] = arith.cmpf ogt, %[[V1]], %[[V2]] : bf16
-// CHECK: %[[SEL2:.+]] = arith.select %[[CMP2]], %[[I1]], %[[I2]] : i64
+// CHECK: %[[SEL2:.+]] = arith.select %[[CMP2]], %[[GIDX]], %[[I2]] : i64
 // CHECK: linalg.yield %[[MAX2]], %[[SEL2]] : bf16, i64
 
 // CHECK: util.return %[[FINAL]]#1 : tensor<?xi64>

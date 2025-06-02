@@ -658,39 +658,9 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         b.create<linalg::YieldOp>(loc, ValueRange{maxVal, selIdx});
       });
 
-  // Step 2: Compute global index: gidx = outer * ratio + local.
+  // Step 2: Final reduction that computes global indices and selects the one
+  // corresponding to the maximum value.
   Value tileSize = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
-  Value localIdxTensor = partialArgmax.getResult(1);
-  unsigned localRank =
-      cast<RankedTensorType>(localIdxTensor.getType()).getRank();
-  Value zeroIdx = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(indexElemType));
-  SmallVector<OpFoldResult> mixedSizes =
-      tensor::getMixedSizes(rewriter, loc, identityIndex);
-  Value emptyIdxTensor =
-      rewriter.create<tensor::EmptyOp>(loc, mixedSizes, indexElemType);
-  Value globalIdxInit =
-      rewriter.create<linalg::FillOp>(loc, zeroIdx, emptyIdxTensor)
-          .getResult(0);
-  auto gidxMap = rewriter.getMultiDimIdentityMap(localRank);
-  SmallVector<utils::IteratorType> allParallelIterTypes(
-      localRank, utils::IteratorType::parallel);
-  auto globalIdxOp = rewriter.create<linalg::GenericOp>(
-      loc, identityIndex.getType(), ValueRange{localIdxTensor},
-      ValueRange{globalIdxInit}, SmallVector<AffineMap>{gidxMap, gidxMap},
-      allParallelIterTypes,
-      [tileSize, insertSplitDimension](OpBuilder &b, Location loc,
-                                       ValueRange args) {
-        Value local = args[0];
-        Value outer = b.create<linalg::IndexOp>(loc, insertSplitDimension);
-        Value offset = b.create<arith::MulIOp>(loc, outer, tileSize);
-        if (offset.getType() != local.getType())
-          offset = b.create<arith::IndexCastOp>(loc, local.getType(), offset);
-        Value gidx = b.create<arith::AddIOp>(loc, offset, local);
-        b.create<linalg::YieldOp>(loc, ValueRange{gidx});
-      });
-
-  // Step 3: Final reduction to produce result (max, global idx)
   unsigned intermRank =
       cast<RankedTensorType>(identityValue.getType()).getRank();
   AffineMap valueMap = rewriter.getMultiDimIdentityMap(intermRank);
@@ -712,15 +682,24 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                                                outputMap};
   auto finalReduction = rewriter.create<linalg::GenericOp>(
       loc, genericOp.getResultTypes(),
-      ValueRange{partialArgmax.getResult(0), globalIdxOp.getResult(0)},
+      ValueRange{partialArgmax.getResult(0), partialArgmax.getResult(1)},
       genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
-      [combinerOps](OpBuilder &b, Location loc, ValueRange inputs) {
+      [combinerOps, tileSize, insertSplitDimension](OpBuilder &b, Location loc,
+                                                    ValueRange inputs) {
+        Value val = inputs[0], local = inputs[1];
+        Value outVal = inputs[2], outIdx = inputs[3];
+        Value outer = b.create<linalg::IndexOp>(loc, insertSplitDimension);
+        Value offset = b.create<arith::MulIOp>(loc, outer, tileSize);
+        if (offset.getType() != local.getType())
+          offset = b.create<arith::IndexCastOp>(loc, local.getType(), offset);
+        // gidx = outer * ratio + local.
+        Value gidx = b.create<arith::AddIOp>(loc, offset, local);
         Operation *clonedMax = b.clone(*combinerOps.maxOp);
-        clonedMax->setOperands({inputs[0], inputs[2]});
+        clonedMax->setOperands({val, outVal});
         Operation *clonedCmp = b.clone(*combinerOps.cmpOp);
-        clonedCmp->setOperands({inputs[0], inputs[2]});
+        clonedCmp->setOperands({val, outVal});
         Operation *clonedSel = b.clone(*combinerOps.selectOp);
-        clonedSel->setOperands({clonedCmp->getResult(0), inputs[1], inputs[3]});
+        clonedSel->setOperands({clonedCmp->getResult(0), gidx, outIdx});
         b.create<linalg::YieldOp>(
             loc, ValueRange{clonedMax->getResult(0), clonedSel->getResult(0)});
       });
