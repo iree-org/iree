@@ -211,12 +211,15 @@ private:
       getValueDependencies(ifOp, writeDependencies, /*noTransferReads=*/true);
       return;
     }
-    // By default we can mark the if op as read stage.
+    if (hasGlobalRead) {
+      getValueDependencies(ifOp, readDependencies);
+      return;
+    }
+    // If we dont know what kind of read/write the if is doing then we bail-out.
     // TODO (nirvedhmeshram) : Add handling for private memory allocations. e.g
     // write to private memory could go in write stage. But the analysis
     // in `getValueDependencies` also needs to be aware of private memory for
     // this so that needs to be added at the same time.
-    getValueDependencies(ifOp, readDependencies);
   }
 
   // We only support loops whose bodies can be divided into 3 stages (read,

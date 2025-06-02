@@ -247,3 +247,30 @@ func.func @noprefetch_scf_if_readwritetogether(%arg0: memref<128xf32>, %cond : i
 }
 
 // CHECK-NOT: gpu.barrier
+
+// -----
+
+// CHECK-LABEL: @noprefetch_unsupportedif
+func.func @noprefetch_unsupportedif(%arg0: memref<128xf32>, %cond: i1) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
+    scf.if %cond {
+      gpu.barrier
+    }
+    %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf32>, vector<1xf32>
+    vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %3 = arith.addf %2, %arg2 : vector<1xf32>
+    scf.yield %3 : vector<1xf32>
+  }
+  vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
+
+// CHECK: gpu.barrier
+// CHECK-NOT: gpu.barrier
