@@ -53,21 +53,20 @@ LogicalResult forallToForLoop(RewriterBase &rewriter, scf::ForallOp forallOp) {
       if (auto parallelInsert =
               dyn_cast<tensor::ParallelInsertSliceOp>(&yieldOp)) {
 
-        auto insertSlice = builder.create<tensor::InsertSliceOp>(
-            parallelInsert.getLoc(),
-            map.lookupOrDefault(parallelInsert.getSource()),
-            map.lookupOrDefault(parallelInsert.getDest()),
-            llvm::map_to_vector(
-                parallelInsert.getOffsets(),
-                [&](Value v) -> Value { return map.lookupOrDefault(v); }),
-            llvm::map_to_vector(
-                parallelInsert.getSizes(),
-                [&](Value v) -> Value { return map.lookupOrDefault(v); }),
-            llvm::map_to_vector(
-                parallelInsert.getStrides(),
-                [&](Value v) -> Value { return map.lookupOrDefault(v); }),
-            parallelInsert.getStaticOffsets(), parallelInsert.getStaticSizes(),
-            parallelInsert.getStaticStrides());
+
+auto source = map.lookupOrDefault(parallelInsert.getSource());
+auto dest = map.lookupOrDefault(parallelInsert.getDest());
+auto offsets = llvm::map_to_vector(parallelInsert.getOffsets(),
+    [&](Value v) { return map.lookupOrDefault(v); });
+auto sizes = llvm::map_to_vector(parallelInsert.getSizes(),
+    [&](Value v) { return map.lookupOrDefault(v); });
+auto strides = llvm::map_to_vector(parallelInsert.getStrides(),
+    [&](Value v) { return map.lookupOrDefault(v); });
+auto insertSlice = builder.create<tensor::InsertSliceOp>(
+     parallelInsert.getLoc(), source, dest, offsets, sizes, strides,
+    parallelInsert.getStaticOffsets(),
+    parallelInsert.getStaticSizes(),
+    parallelInsert.getStaticStrides());
         yieldedValues.push_back(insertSlice.getResult());
       } else {
         forallOp.emitError("unsupported operation in in_parallel region");
