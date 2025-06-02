@@ -1001,8 +1001,8 @@ iree_hal_hip_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
-void iree_hal_hip_async_buffer_release(void* user_data,
-                                       struct iree_hal_buffer_t* buffer) {
+static void iree_hal_hip_async_buffer_release(
+    void* user_data, struct iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = (iree_hal_hip_device_t*)user_data;
   void* ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (ptr) {
@@ -1067,7 +1067,7 @@ static const iree_hal_resource_vtable_t
         .destroy = &iree_hal_hip_dispatch_completed_destroy,
 };
 
-iree_status_t iree_hal_hip_dispatch_completed_create(
+static iree_status_t iree_hal_hip_dispatch_completed_create(
     iree_allocator_t host_allocator,
     iree_hal_hip_dispatch_completed_data_t** out) {
   *out = NULL;
@@ -1082,7 +1082,7 @@ iree_status_t iree_hal_hip_dispatch_completed_create(
   return iree_ok_status();
 }
 
-bool iree_hal_hip_dispatch_is_completed(
+static bool iree_hal_hip_dispatch_is_completed(
     iree_hal_hip_dispatch_completed_data_t* data) {
   iree_slim_mutex_lock(&data->completed_mutex);
   bool ret = data->completed;
@@ -1090,7 +1090,7 @@ bool iree_hal_hip_dispatch_is_completed(
   return ret;
 }
 
-void iree_hal_hip_set_external_stream_data_completed(
+static void iree_hal_hip_set_external_stream_data_completed(
     iree_hal_hip_dispatch_completed_data_t* data) {
   iree_slim_mutex_lock(&data->completed_mutex);
   data->completed = true;
@@ -1098,7 +1098,7 @@ void iree_hal_hip_set_external_stream_data_completed(
   iree_notification_post(&data->notification, IREE_ALL_WAITERS);
 }
 
-void iree_hal_hip_wait_for_dispatch(
+static void iree_hal_hip_wait_for_dispatch(
     iree_hal_hip_dispatch_completed_data_t* data) {
   iree_notification_await(
       &data->notification,
@@ -1121,7 +1121,7 @@ typedef struct iree_hal_hip_semaphore_callback_data_t {
   iree_hal_hip_dispatch_completed_data_t* external_stream_dispatch_data;
 } iree_hal_hip_semaphore_callback_data_t;
 
-iree_host_size_t
+static iree_host_size_t
 iree_hal_hip_semaphore_callback_data_get_additional_allocation_size(
     iree_hal_semaphore_list_t wait_semaphore_list,
     iree_hal_semaphore_list_t signal_semaphore_list) {
@@ -1135,7 +1135,7 @@ iree_hal_hip_semaphore_callback_data_get_additional_allocation_size(
   return wait_semaphore_list_size + signal_semaphore_list_size;
 }
 
-iree_status_t iree_hal_hip_semaphore_callback_data_initialize(
+static iree_status_t iree_hal_hip_semaphore_callback_data_initialize(
     iree_allocator_t host_allocator, iree_hal_hip_device_t* device,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_hip_dispatch_callback_t dispatch_fn,
@@ -1199,7 +1199,7 @@ iree_status_t iree_hal_hip_semaphore_callback_data_initialize(
   return iree_ok_status();
 }
 
-void iree_hal_hip_semaphore_callback_data_deinitialize(
+static void iree_hal_hip_semaphore_callback_data_deinitialize(
     iree_hal_hip_semaphore_callback_data_t* data) {
   iree_slim_mutex_deinitialize(&data->status_mutex);
   if (data->device->uses_external_stream) {
