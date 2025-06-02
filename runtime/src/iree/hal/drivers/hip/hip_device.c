@@ -613,11 +613,11 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
     if (!device->uses_external_stream) {
       IREE_HIP_IGNORE_ERROR(
           symbols, hipStreamDestroy(device->devices[i].hip_dispatch_stream));
-    } else {
-      IREE_HIP_IGNORE_ERROR(
-          symbols,
-          hipStreamDestroy(device->devices[i].hip_async_memory_stream));
     }
+
+    IREE_HIP_IGNORE_ERROR(
+        symbols, hipStreamDestroy(device->devices[i].hip_async_memory_stream));
+
     // NOTE: This function return hipSuccess though doesn't release the
     // primaryCtx by design on HIP/HCC path.
     IREE_HIP_IGNORE_ERROR(
