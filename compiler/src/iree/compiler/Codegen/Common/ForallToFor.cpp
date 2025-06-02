@@ -27,7 +27,6 @@ namespace {
 
 LogicalResult forallToForLoop(RewriterBase &rewriter, scf::ForallOp forallOp) {
   rewriter.setInsertionPoint(forallOp);
-
   SmallVector<Value> lbs = forallOp.getLowerBound(rewriter);
   SmallVector<Value> ubs = forallOp.getUpperBound(rewriter);
   SmallVector<Value> steps = forallOp.getStep(rewriter);
@@ -53,20 +52,24 @@ LogicalResult forallToForLoop(RewriterBase &rewriter, scf::ForallOp forallOp) {
       if (auto parallelInsert =
               dyn_cast<tensor::ParallelInsertSliceOp>(&yieldOp)) {
 
-
-auto source = map.lookupOrDefault(parallelInsert.getSource());
-auto dest = map.lookupOrDefault(parallelInsert.getDest());
-auto offsets = llvm::map_to_vector(parallelInsert.getOffsets(),
-    [&](Value v) { return map.lookupOrDefault(v); });
-auto sizes = llvm::map_to_vector(parallelInsert.getSizes(),
-    [&](Value v) { return map.lookupOrDefault(v); });
-auto strides = llvm::map_to_vector(parallelInsert.getStrides(),
-    [&](Value v) { return map.lookupOrDefault(v); });
-auto insertSlice = builder.create<tensor::InsertSliceOp>(
-     parallelInsert.getLoc(), source, dest, offsets, sizes, strides,
-    parallelInsert.getStaticOffsets(),
-    parallelInsert.getStaticSizes(),
-    parallelInsert.getStaticStrides());
+        auto source = map.lookupOrDefault(parallelInsert.getSource());
+        auto dest = map.lookupOrDefault(parallelInsert.getDest());
+        auto offsets =
+            llvm::map_to_vector(parallelInsert.getOffsets(), [&](Value v) {
+              return map.lookupOrDefault(v);
+            });
+        auto sizes =
+            llvm::map_to_vector(parallelInsert.getSizes(), [&](Value v) {
+              return map.lookupOrDefault(v);
+            });
+        auto strides =
+            llvm::map_to_vector(parallelInsert.getStrides(), [&](Value v) {
+              return map.lookupOrDefault(v);
+            });
+        auto insertSlice = builder.create<tensor::InsertSliceOp>(
+            parallelInsert.getLoc(), source, dest, offsets, sizes, strides,
+            parallelInsert.getStaticOffsets(), parallelInsert.getStaticSizes(),
+            parallelInsert.getStaticStrides());
         yieldedValues.push_back(insertSlice.getResult());
       } else {
         forallOp.emitError("unsupported operation in in_parallel region");
@@ -74,16 +77,13 @@ auto insertSlice = builder.create<tensor::InsertSliceOp>(
         return args;
       }
     }
-
     return yieldedValues;
   };
-
   scf::LoopNest loopNest = scf::buildLoopNest(rewriter, forallOp->getLoc(), lbs,
                                               ubs, steps, iterArgs, buildBody);
   if (unsupportedOperation) {
     return failure();
   }
-
   rewriter.replaceOp(forallOp, loopNest.results);
   return success();
 }
@@ -92,7 +92,6 @@ struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
   using impl::ForallToForPassBase<ForallToForPass>::ForallToForPassBase;
   void runOnOperation() override {
     auto funcOp = getOperation();
-
     IRRewriter rewriter(funcOp->getContext());
 
     // Find `scf.forall` ops we want to convert in innermost to outermost order.
