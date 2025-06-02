@@ -445,6 +445,14 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     MLIRContext *ctx = attr.getContext();
     auto gpuPadLayoutAttr = cast<GPUPadLayoutAttr>(attr);
 
+    int64_t rank = type.getRank();
+    auto noPaddingAttr =
+        IREE::Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
+    if (!gpuPadLayoutAttr.getCacheLineBytes() ||
+        !gpuPadLayoutAttr.getCacheSets()) {
+      return noPaddingAttr;
+    }
+
     auto paddingEncodingAttr =
         dyn_cast_or_null<IREE::Encoding::PadEncodingLayoutAttr>(
             type.getEncoding());
@@ -469,7 +477,6 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
       return nullptr;
     }
 
-    int64_t rank = type.getRank();
     if (rank != givenPadValues.size()) {
       return nullptr;
     }
@@ -477,13 +484,6 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     ArrayRef<int64_t> tensorShape = type.getShape();
     if (tensorShape.back() == ShapedType::kDynamic) {
       return nullptr;
-    }
-
-    auto noPaddingAttr =
-        IREE::Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
-    if (!gpuPadLayoutAttr.getCacheLineBytes() ||
-        !gpuPadLayoutAttr.getCacheSets()) {
-      return noPaddingAttr;
     }
 
     const int64_t elementBits = type.getElementTypeBitWidth();
