@@ -15,7 +15,6 @@
 #include <queue>
 
 namespace mlir::iree_compiler {
-
 /// Tile and fuse producers of extract slice operations from the worklist into
 /// the given loops, adding any new fusion opportunities back to the worklist,
 /// proceeding recursively until fixed point is reached.
@@ -99,6 +98,9 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
                         MutableArrayRef<LoopLikeOpInterface> loops,
                         bool useWARForConsumerFusionSSAViolation);
 
+// Fuse all consumers of the given `tiledOp` into the surrounding `scf.for`.
+void fuseConsumersIntoFor(RewriterBase &rewriter, Operation *tiledOp,
+                          MutableArrayRef<LoopLikeOpInterface> loops);
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_

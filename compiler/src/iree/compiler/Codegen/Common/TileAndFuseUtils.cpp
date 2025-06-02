@@ -186,4 +186,52 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
   return newFusionOpportunities;
 }
 
+void fuseConsumersIntoFor(RewriterBase &rewriter, Operation *tiledOp,
+                          MutableArrayRef<LoopLikeOpInterface> loops) {
+  //  Typically, the consumers of the tiled operation are slices of the
+  //  results of the tiled operation. These are expressed in IR using
+  //  `tensor.insert_slice` operations, whose outputs are the operands of the
+  //  untiled operation. Create a worklist of these `tensor.insert_siices`
+  //  operations. If the consumers of the source of the `tensor.insert_slices`
+  //  can be tiled such that the tiled value is generated in-place, that
+  //  effectively tiles + fuses the operations.
+  auto addCandidateSlices = [](Operation *fusedOp,
+                               std::queue<tensor::InsertSliceOp> &candidates) {
+    for (auto *userOp : fusedOp->getResults().getUsers()) {
+      if (auto sliceOp = llvm::dyn_cast<tensor::InsertSliceOp>(userOp)) {
+        candidates.push(sliceOp);
+      }
+    }
+  };
+
+  // Collect the candidate slices which can be potential consumers that can be
+  // fused.
+  std::queue<tensor::InsertSliceOp> candidates;
+  addCandidateSlices(tiledOp, candidates);
+
+  while (!candidates.empty()) {
+    // Traverse the slices in BFS fashion.
+    tensor::InsertSliceOp candidateSliceOp = candidates.front();
+    candidates.pop();
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
+                                              loops);
+    if (failed(fusedResult)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "failed to fuse consumer of slice: " << candidateSliceOp);
+      continue;
+    }
+
+    // Replace the original consumer operation with the tiled implementation.
+    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+                       fusedResult->tiledOps.front());
+
+    // The result of the fused conumers might themselved be slices of
+    // values produced by operations that implement the `TilingInterface`.
+    // Add these operations to the worklist.
+    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
+                       candidates);
+  }
+}
 } // namespace mlir::iree_compiler
