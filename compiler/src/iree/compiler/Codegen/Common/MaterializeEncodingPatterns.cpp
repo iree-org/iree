@@ -28,6 +28,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
+
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
@@ -859,6 +861,26 @@ void populateMaterializeEncodingPatterns(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
         auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
             subspanOp.getResult().getType());
+        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
+        if (!resultType)
+          return true;
+        return resultType == typeConverter.convertType(resultType);
+      });
+  target.addIllegalOp<IREE::Encoding::SetEncodingOp,
+                      IREE::Encoding::UnsetEncodingOp>();
+  target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorStoreOp>(
+      [&typeConverter](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+            storeOp.getTargetType());
+        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
+        if (!resultType)
+          return true;
+        return resultType == typeConverter.convertType(resultType);
+      });
+  target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorLoadOp>(
+      [&typeConverter](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+            loadOp.getSourceType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
           return true;

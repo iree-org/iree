@@ -348,3 +348,40 @@ func.func @load_from_padded_and_mmt_using_matmul_k() {
 //
 // CHECK:         iree_tensor_ext.dispatch.tensor.store %[[MMT]], %[[C]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
 // CHECK-SAME:                  tensor<2048x2048xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2048xf16>>
+
+// -----
+
+#encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 32]>]>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @materialize_pad_encoding_on_partial_dynamic_shape() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i64
+  %1 = arith.index_castui %0 : i64 to index
+  %2 = util.assume.int %1<umin = 0, umax = 9007199254740991> : index
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x2048xf32>>
+  %4 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf32, #encoding>>{%4}
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%4}
+  %7 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%4, 2048], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf32, #encoding>>{%4} -> tensor<?x2048xf32, #iree_encoding.pad_encoding_layout<[0, ?]>>
+  %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [4096, 2048], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x2048xf32>> -> tensor<4096x2048xf32>
+  %9 = tensor.empty(%4) : tensor<?x4096xf32>
+  %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+  %11 = iree_encoding.unset_encoding %7 : tensor<?x2048xf32, #iree_encoding.pad_encoding_layout<[0, ?]>> -> tensor<?x2048xf32>{%4}
+  %12 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%11, %8 : tensor<?x2048xf32>, tensor<4096x2048xf32>) outs(%10 : tensor<?x4096xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %13 = arith.mulf %in, %in_0 : f32
+    %14 = arith.addf %out, %13 : f32
+    linalg.yield %14 : f32
+  } -> tensor<?x4096xf32>
+  iree_tensor_ext.dispatch.tensor.store %12, %6, offsets = [0, 0], sizes = [%4, 4096], strides = [1, 1] : tensor<?x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%4}
+  return
+}
+// CHECK-LABEL: @materialize_pad_encoding_on_partial_dynamic_shape
+// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-SAME:      !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2080xf32>>
+// CHECK:         iree_tensor_ext.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [%{{.+}}, 2048], strides = [1, 1]
+// CHECK-SAME:      !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2080xf32>>{%{{.+}}} -> tensor<?x2048xf32>
