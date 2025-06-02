@@ -11,8 +11,7 @@
 
 namespace mlir::iree_compiler {
 
-LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp,
-                                  bool useDirectLoad = false);
+LogicalResult initGPULaunchConfig(mlir::FunctionOpInterface funcOp);
 
 } // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_

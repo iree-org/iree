@@ -116,6 +116,10 @@ static llvm::cl::opt<bool>
     clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(true));
+
+// Required both here and the GPU pass configuration.
+extern llvm::cl::opt<bool> clUseDirectLoad;
+
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -2966,7 +2970,7 @@ static LogicalResult setConvolutionConfig(
 
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
-                                   Operation *computeOp, bool useDirectLoad) {
+                                   Operation *computeOp) {
   IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
@@ -2980,14 +2984,14 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   }
   if (clGPUEarlyTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(
-            target, entryPointFn, computeOp, useDirectLoad))) {
+            target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG("Tile and fuse matmul config");
       return success();
     }
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp, useDirectLoad))) {
+            target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG("Tile and fuse IGEMM config");
       return success();
     }
@@ -3102,8 +3106,7 @@ static void propagateLoweringConfig(Operation *rootOperation,
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
-LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp,
-                                  bool useDirectLoad) {
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target)
     return funcOp.emitError("missing GPU target in #hal.executable.target");
@@ -3227,7 +3230,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp,
     return success();
   }
 
-  if (failed(setRootConfig(target, funcOp, rootOperation, useDirectLoad)))
+  if (failed(setRootConfig(target, funcOp, rootOperation)))
     return funcOp.emitOpError("failed to set root config");
 
   if (IREE::Codegen::TranslationInfoAttr translationInfo =
