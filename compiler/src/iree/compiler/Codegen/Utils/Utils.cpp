@@ -425,7 +425,7 @@ private:
 
 LogicalResult setDefaultCustomOpLoweringConfig(
     FunctionOpInterface funcOp, IREE::LinalgExt::CustomOp customOp,
-    std::function<LogicalResult(FunctionOpInterface)> configFn) {
+    std::function<LogicalResult(FunctionOpInterface, bool)> configFn) {
 
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
@@ -511,7 +511,7 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   }
 
   // 6. Run set configuration on the new dummy function.
-  if (failed(configFn(dummyFuncOp))) {
+  if (failed(configFn(dummyFuncOp, false))) {
     return customOp.emitOpError("failed to set configuration for custom op");
   }
 

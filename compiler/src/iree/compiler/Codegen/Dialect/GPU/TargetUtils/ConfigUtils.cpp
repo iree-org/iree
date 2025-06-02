@@ -33,10 +33,6 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
-namespace mlir::iree_compiler {
-extern llvm::cl::opt<bool> clUseDirectLoad;
-} // namespace mlir::iree_compiler
-
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
@@ -192,7 +188,8 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                                         ArrayRef<AffineMap> maps,
                                         ArrayRef<Value> operands,
-                                        IREE::GPU::TargetAttr target) {
+                                        IREE::GPU::TargetAttr target,
+                                        bool useDirectLoad) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -367,7 +364,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   if (mustBeAligned) {
     bool directLoadArray[] = {true, true};
     ArrayRef<bool> directLoadOperands =
-        clUseDirectLoad ? directLoadArray : ArrayRef<bool>{};
+        useDirectLoad ? directLoadArray : ArrayRef<bool>{};
     GPU::appendPromotedOperandsList(context, attrs, {0, 1}, directLoadOperands);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
@@ -400,7 +397,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
 LogicalResult
 setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
-                                  Operation *op) {
+                                  Operation *op, bool useDirectLoad) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -424,8 +421,8 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
-                                              igemmOperands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(
+          bounds, igemmContractionMaps, igemmOperands, target, useDirectLoad);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -455,7 +452,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
-                                      Operation *op) {
+                                      Operation *op, bool useDirectLoad) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return failure();
@@ -468,7 +465,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
+                                              useDirectLoad);
   if (failed(configAndWgSize)) {
     return failure();
   }

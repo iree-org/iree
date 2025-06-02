@@ -99,7 +99,7 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
 
     );
 
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(false));
@@ -1237,7 +1237,8 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   }
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
-  modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
+  modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
+      {/*useDirectLoad=*/clUseDirectLoad}));
 }
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(

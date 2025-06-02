@@ -108,7 +108,7 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 LogicalResult setDefaultCustomOpLoweringConfig(
     mlir::FunctionOpInterface FunctionOpInterface,
     IREE::LinalgExt::CustomOp customOp,
-    std::function<LogicalResult(mlir::FunctionOpInterface)> configFn);
+    std::function<LogicalResult(mlir::FunctionOpInterface, bool)> configFn);
 
 /// Information about a tiled and distributed loop.
 ///

@@ -94,6 +94,10 @@ def LLVMGPUPromoteMatmulToFitMMAPass :
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
+  let options = [
+    Option<"useDirectLoad", "iree-llvmgpu-use-direct-load", "bool", "false",
+           "Select direct load strategy for tiling shared memory">,
+  ];
 }
 
 def LLVMGPUTensorCoreVectorizationPass :

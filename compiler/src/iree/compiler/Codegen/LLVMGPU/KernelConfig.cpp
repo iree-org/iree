@@ -2966,7 +2966,7 @@ static LogicalResult setConvolutionConfig(
 
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
-                                   Operation *computeOp) {
+                                   Operation *computeOp, bool useDirectLoad) {
   IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
@@ -2979,15 +2979,15 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     return success();
   }
   if (clGPUEarlyTileAndFuseMatmul) {
-    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
-                                                     computeOp))) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(
+            target, entryPointFn, computeOp, useDirectLoad))) {
       LDBG("Tile and fuse matmul config");
       return success();
     }
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp))) {
+            target, entryPointFn, computeOp, useDirectLoad))) {
       LDBG("Tile and fuse IGEMM config");
       return success();
     }
@@ -3102,7 +3102,8 @@ static void propagateLoweringConfig(Operation *rootOperation,
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
-LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp,
+                                  bool useDirectLoad) {
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target)
     return funcOp.emitError("missing GPU target in #hal.executable.target");
@@ -3226,7 +3227,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     return success();
   }
 
-  if (failed(setRootConfig(target, funcOp, rootOperation)))
+  if (failed(setRootConfig(target, funcOp, rootOperation, useDirectLoad)))
     return funcOp.emitOpError("failed to set root config");
 
   if (IREE::Codegen::TranslationInfoAttr translationInfo =
