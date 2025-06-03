@@ -139,9 +139,8 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-  auto storageAttr =
-      dyn_cast_if_present<IREE::Util::StoredModuleAttrInterface>(
-          target.getConfiguration().get("iree_codegen.default_tuning_spec"));
+  auto storageAttr = dyn_cast_if_present<IREE::Util::StoredModuleAttrInterface>(
+      target.getConfiguration().get("iree_codegen.default_tuning_spec"));
   if (!storageAttr) {
     return failure();
   }
