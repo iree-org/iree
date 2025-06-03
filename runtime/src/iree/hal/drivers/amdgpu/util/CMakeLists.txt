@@ -56,6 +56,22 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    topology_test
+  SRCS
+    "topology_test.cc"
+  DEPS
+    ::libhsa
+    ::topology
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+)
+
 iree_cc_library(
   NAME
     util
