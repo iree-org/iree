@@ -27,7 +27,7 @@ iree_compiler_cc_library(
         "ROCMTargetUtils.h",
     ],
     deps = [
-        "//compiler/plugins/target/ROCM/builtins/tuning:iree_default_tuning_specs_amdgpu",
+        "//compiler/plugins/target/ROCM/Dialect/ROCM/IR:ROCMDialect",
         "//compiler/plugins/target/ROCM/builtins/ukernel:iree_uk_amdgpu_bitcode",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",

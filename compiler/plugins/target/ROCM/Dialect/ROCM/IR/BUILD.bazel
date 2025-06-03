@@ -1,0 +1,103 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files([
+    "ROCMAttrs.td",
+    "ROCMDialect.td",
+])
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "ROCMAttrs.td",
+            "ROCMDialect.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:DialectUtilsTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "ROCMDialect",
+    srcs = [
+        "ROCMAttrs.cpp",
+        "ROCMBuiltinManager.cpp",
+        "ROCMDialect.cpp",
+    ],
+    hdrs = [
+        "ROCMAttrs.h",
+        "ROCMDialect.h",
+    ],
+    textual_hdrs = [
+        "ROCMAttrs.cpp.inc",
+        "ROCMAttrs.h.inc",
+        "ROCMDialect.cpp.inc",
+        "ROCMDialect.h.inc",
+    ],
+    deps = [
+        ":ROCMAttrs",
+        ":ROCMDialectGen",
+        "//compiler/plugins/target/ROCM/builtins/tuning:iree_default_tuning_specs_amdgpu",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "ROCMDialectGen",
+    tbl_outs = [
+        (
+            ["--gen-dialect-decls"],
+            "ROCMDialect.h.inc",
+        ),
+        (
+            ["--gen-dialect-defs"],
+            "ROCMDialect.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ROCMDialect.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "ROCMAttrs",
+    tbl_outs = [
+        (
+            ["--gen-attrdef-decls"],
+            "ROCMAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "ROCMAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ROCMAttrs.td",
+    deps = [
+        ":td_files",
+    ],
+)
