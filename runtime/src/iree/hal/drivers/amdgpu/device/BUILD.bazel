@@ -1,0 +1,74 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Common sources
+#===------------------------------------------------------------------------===#
+
+BITCODE_SRCS = glob([
+    "*.c",
+    "support/*.c",
+])
+
+BITCODE_HDRS = glob([
+    "*.h",
+    "support/*.h",
+])
+
+#===------------------------------------------------------------------------===#
+# Exported Headers
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "headers",
+    hdrs = BITCODE_HDRS,
+)
+
+#===------------------------------------------------------------------------===#
+# Architecture-specific Binaries
+#===------------------------------------------------------------------------===#
+# NOTE: the naming here matches what HSA_ISA_INFO_NAME returns so that we can
+# match them at runtime without having to load and reflect each code object.
+
+# TODO(benvanik): when TheRock stabilizes its naming convention we'll want to
+# copy that and make it configurable. See:
+# https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake
+# Matching their family naming scheme would allow us to directly source from
+# their command line arguments. How best to map this to bazel I don't know, so
+# for now we include a hand-picked set that people using bazel request.
+
+iree_amdgpu_binary(
+    name = "amdgcn-amd-amdhsa--gfx1100",
+    srcs = BITCODE_SRCS,
+    arch = "gfx1100",
+    internal_hdrs = BITCODE_HDRS,
+    target = "amdgcn-amd-amdhsa",
+)
+
+#===------------------------------------------------------------------------===#
+# Embedded Binary Table
+#===------------------------------------------------------------------------===#
+
+iree_c_embed_data(
+    name = "binaries",
+    srcs = [
+        ":amdgcn-amd-amdhsa--gfx1100.so",
+    ],
+    c_file_output = "binaries.c",
+    flatten = True,
+    h_file_output = "binaries.h",
+    identifier = "iree_hal_amdgpu_device_binaries",
+)
