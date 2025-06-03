@@ -11,7 +11,7 @@
 // - IREE::Encoding::LayoutResolverAttr
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
-// - IREE::Codegen::PackedLayoutAttr
+// - IREE::Codegen::PackedLayoutMaterializerAttr
 //
 // In these backends, we transpose narrow-N into narrow-M
 // for a combination of reasons:
@@ -278,7 +278,7 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
 
   MaterializeEncodingInfo encodingInfo = {};
   if (auto packedLayoutAttr =
-          dyn_cast<IREE::Codegen::PackedLayoutAttr>(layoutAttr)) {
+          dyn_cast<IREE::Codegen::PackedLayoutMaterializerAttr>(layoutAttr)) {
     encodingInfo = packedLayoutAttr.getEncodingInfo(
         cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
   }
@@ -562,9 +562,9 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
-struct CPUEncodingPackedLayoutAttr
-    : public PackedLayoutAttrExternalModelBase<CPUEncodingPackedLayoutAttr,
-                                               CPUEncodingLayoutAttr> {
+struct CPUEncodingPackedLayoutMaterializerAttr
+    : public PackedLayoutMaterializerAttrExternalModelBase<
+          CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
@@ -698,9 +698,9 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   };
 }
 
-struct VMVXEncodingPackedLayoutAttr final
-    : PackedLayoutAttrExternalModelBase<VMVXEncodingPackedLayoutAttr,
-                                        VMVXEncodingLayoutAttr> {
+struct VMVXEncodingPackedLayoutMaterializerAttr final
+    : PackedLayoutMaterializerAttrExternalModelBase<
+          VMVXEncodingPackedLayoutMaterializerAttr, VMVXEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
@@ -804,11 +804,13 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUEncodingPackedLayoutAttr, CPUEncodingLayoutMaterializerAttr,
-            CPULayoutResolverAttr, CPUSerializableAttr>(*ctx);
+            CPUEncodingPackedLayoutMaterializerAttr,
+            CPUEncodingLayoutMaterializerAttr, CPULayoutResolverAttr,
+            CPUSerializableAttr>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXEncodingPackedLayoutAttr, VMVXEncodingLayoutMaterializerAttr,
-            VMVXLayoutResolverAttr, VMVXSerializableAttr>(*ctx);
+            VMVXEncodingPackedLayoutMaterializerAttr,
+            VMVXEncodingLayoutMaterializerAttr, VMVXLayoutResolverAttr,
+            VMVXSerializableAttr>(*ctx);
       });
 }
 

@@ -22,7 +22,7 @@ def IREECPU_CPUEncodingLayoutAttr :
   let description = [{
     This attribute can implement any layout interface methods for encoding
     serialization and or materialization, e.g., Encoding::LayoutMaterializerAttr,
-    Codegen::PackedLayoutAttr, etc. They are implemented through external model
+    Codegen::PackedLayoutMaterializerAttr, etc. They are implemented through external model
     mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.
   }];
 
@@ -41,7 +41,7 @@ def IREECPU_VMVXEncodingLayoutAttr :
   let description = [{
     This attribute can implement any layout interface methods for encoding
     serialization and or materialization, e.g., Encoding::LayoutMaterializerAttr,
-    Codegen::PackedLayoutAttr, etc. They are implemented through external model
+    Codegen::PackedLayoutMaterializerAttr, etc. They are implemented through external model
     mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.
   }];
 
