@@ -8,7 +8,7 @@
 // are supported by the CPU. In that case, the last-enumerated line overrides
 // // preceding lines. Always go from oldest to shiniest code path.
 
-IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 1, 32, 1, )
-IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 2, 32, 1, )
-IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 4, 32, 1, )
-IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 7, 32, 1, )
+IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 1, 1, )
+IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 2, 1, )
+IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 4, 1, )
+IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 7, 1, )
