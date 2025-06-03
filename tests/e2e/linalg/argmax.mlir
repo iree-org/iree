@@ -1,15 +1,12 @@
 func.func @argmax_1d() {
-  // Step 1: Fill the tensor with default value 7.0
   %seven = arith.constant 7.0 : f32
   %input_init = tensor.empty() : tensor<131072xf32>
   %input_filled = linalg.fill ins(%seven : f32) outs(%input_init : tensor<131072xf32>) -> tensor<131072xf32>
 
-  // Step 2: Insert a larger value at index 131071
   %large = arith.constant 53.0 : f32
   %index = arith.constant 131071 : index
   %input = tensor.insert %large into %input_filled[%index] : tensor<131072xf32>
 
-  // Step 3: Identity values
   %neg_inf = arith.constant 0xFF800000 : f32  // -inf
   %c0_i32 = arith.constant 0 : i32
   %init_val_buf = tensor.empty() : tensor<f32>
@@ -17,7 +14,6 @@ func.func @argmax_1d() {
   %init_val = linalg.fill ins(%neg_inf : f32) outs(%init_val_buf : tensor<f32>) -> tensor<f32>
   %init_idx = linalg.fill ins(%c0_i32 : i32) outs(%init_idx_buf : tensor<i32>) -> tensor<i32>
 
-  // Step 4: Argmax
   %result:2 = linalg.generic {
       indexing_maps = [
         affine_map<(d0) -> (d0)>,
@@ -36,7 +32,6 @@ func.func @argmax_1d() {
       linalg.yield %maxval, %sel_idx : f32, i32
   } -> (tensor<f32>, tensor<i32>)
 
-  // Step 5: Verify
   check.expect_almost_eq_const(%result#0, dense<53.0> : tensor<f32>) : tensor<f32>
   check.expect_eq_const(%result#1, dense<131071> : tensor<i32>) : tensor<i32>
 

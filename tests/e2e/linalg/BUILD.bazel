@@ -226,6 +226,7 @@ iree_check_single_backend_test_suite(
 ROCM_SRCS = enforce_glob(
     # keep sorted
     [
+        "argmax.mlir",
         "pack_i8.mlir",
         "unpack.mlir",
     ],
@@ -241,7 +242,6 @@ ROCM_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
-        "argmax.mlir",
     ],
 )
 

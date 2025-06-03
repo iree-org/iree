@@ -146,6 +146,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_rocm_hip
   SRCS
+    "argmax.mlir"
     "pack_i8.mlir"
     "unpack.mlir"
   TARGET_BACKEND
