@@ -299,19 +299,40 @@ public:
           addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
+
+      // Look for a default tuning spec.
+      auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
+      // First check for a spec based on the sku.
+      std::optional<std::string> maybeSpecName = std::nullopt;
+      if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
+        if (StringAttr sku = chip.getSku()) {
+          std::string specName =
+              llvm::formatv("iree_default_tuning_spec_{}.mlir", sku.strref());
+          if (!rocmDialect->hasBuiltin(specName)) {
+            maybeSpecName = specName;
+          }
+        }
+      }
+
+      // Then, if none was found, look for one based on the target arch.
+      if (!maybeSpecName) {
+        std::string specName =
+            llvm::formatv("iree_default_tuning_spec_{}.mlir", target.getArch());
+        if (rocmDialect->hasBuiltin(specName)) {
+          maybeSpecName = specName;
+        }
+      }
+
+      if (maybeSpecName) {
+        addConfig("iree_codegen.default_tuning_spec",
+                  IREE::ROCM::BuiltinTuningModuleAttr::get(
+                      context, maybeSpecName.value()));
+      }
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
     if (options.wavesPerEu > 0) {
       addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
-    }
-
-    auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
-    std::string specName =
-        llvm::formatv("iree_default_tuning_spec_{}.mlir", options.target);
-    if (rocmDialect->hasBuiltin(specName)) {
-      addConfig("iree_codegen.default_tuning_spec",
-                IREE::ROCM::BuiltinTuningModuleAttr::get(context, specName));
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

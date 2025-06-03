@@ -1637,7 +1637,15 @@ def Util_StoredModuleAttrInterface : AttrInterface<"StoredModuleAttrInterface"> 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the underlying module given the annotation site.
+        Returns the underlying module given the annotation site where the
+        particular instance of this attribute was found. For example,
+
+        ```
+          hal.executable.variant attributes { foo = #bar.module_ref<"hello_world"> }
+        ```
+
+        The annotation site is the `hal.executable.variant`. This allows for
+        symbol backed references.
       }],
       /*retTy=*/"::mlir::FailureOr<::mlir::ModuleOp>",
       /*methodName=*/"getModule",

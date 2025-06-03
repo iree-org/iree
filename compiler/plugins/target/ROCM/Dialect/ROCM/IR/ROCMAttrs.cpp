@@ -23,7 +23,7 @@ namespace mlir::iree_compiler::IREE::ROCM {
 //===----------------------------------------------------------------------===//
 
 FailureOr<mlir::ModuleOp>
-BuiltinTuningModuleAttr::getModule(Operation *annotationSite) const {
+BuiltinTuningModuleAttr::getModule(Operation * /*annotationSite*/) const {
   auto &rocmDialect = cast<ROCMDialect>(getDialect());
   return rocmDialect.getOrLoadBuiltinModule(getBuiltinFilename());
 }

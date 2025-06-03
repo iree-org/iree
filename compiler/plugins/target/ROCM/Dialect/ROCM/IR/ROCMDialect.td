@@ -43,7 +43,7 @@ def ROCM_Dialect : Dialect {
 
     /// Map from "filename" to module, cached on load. Accesses to this map are
     /// protected by a mutex.
-    ::llvm::StringMap<::mlir::OwningOpRef<::mlir::ModuleOp>> builtinModules;
+    ::llvm::StringMap<OwningOpRef<::mlir::ModuleOp>> builtinModules;
 
     /// Lock to control the updating of the builtin modules such that we only
     /// load the module once and can reuse it across all invocations.

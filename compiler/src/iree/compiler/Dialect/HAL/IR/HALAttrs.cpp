@@ -205,15 +205,17 @@ ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op,
   while (op) {
     // Take directly from the enclosing variant.
     if (auto variantOp = llvm::dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
-      if (annotationSite)
+      if (annotationSite) {
         *annotationSite = variantOp;
+      }
       return variantOp.getTarget();
     }
     // Use an override if specified.
     auto attr = op->getAttrOfType<IREE::HAL::ExecutableTargetAttr>(attrId);
     if (attr) {
-      if (annotationSite)
+      if (annotationSite) {
         *annotationSite = op;
+      }
       return attr;
     }
     // Continue walk.

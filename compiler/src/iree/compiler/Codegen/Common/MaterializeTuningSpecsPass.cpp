@@ -135,12 +135,12 @@ getDefaultTuningSpec(ModuleOp module,
   Operation *annotationSite = nullptr;
   auto target =
       IREE::HAL::ExecutableTargetAttr::lookup(module, &annotationSite);
-  if (!target) {
+  if (!target || !target.getConfiguration()) {
     return failure();
   }
 
   auto storageAttr =
-      llvm::dyn_cast_if_present<IREE::Util::StoredModuleAttrInterface>(
+      dyn_cast_if_present<IREE::Util::StoredModuleAttrInterface>(
           target.getConfiguration().get("iree_codegen.default_tuning_spec"));
   if (!storageAttr) {
     return failure();

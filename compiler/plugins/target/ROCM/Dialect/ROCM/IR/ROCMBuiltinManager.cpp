@@ -19,10 +19,10 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
   std::lock_guard<std::mutex> guard(builtinMutex);
   MLIRContext *ctx = getContext();
 
-  auto loadedLibrary = builtinModules.find(path);
-  if (loadedLibrary != builtinModules.end()) {
+  auto libraryIt = builtinModules.find(path);
+  if (libraryIt != builtinModules.end()) {
     // Check whether the library already failed to load.
-    if (ModuleOp module = loadedLibrary->second.get()) {
+    if (ModuleOp module = libraryIt->second.get()) {
       return module;
     }
     return failure();
