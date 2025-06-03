@@ -890,10 +890,12 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
                                   IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
                                   iree_allocator_system(), &buffer_view);
 
-  if (!iree_status_is_ok(status)) {
-    iree_hal_buffer_release(imported_buffer);
-    CheckApiStatus(status, "Failed to create buffer view");
-  }
+  // If the buffer view was successfully created, remove our ref
+  // since the buffer view incremented it.
+  // If the buffer view failed, then remove our ref so we don't
+  // leak the buffer.
+  iree_hal_buffer_release(imported_buffer);
+  CheckApiStatus(status, "Failed to create buffer view");
 
   return HalBufferView::StealFromRawPtr(buffer_view);
 }
