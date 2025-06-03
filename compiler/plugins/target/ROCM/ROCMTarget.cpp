@@ -9,11 +9,6 @@
 #include <cstdint>
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
-<<<<<<< Updated upstream
-#include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
-=======
-#include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
->>>>>>> Stashed changes
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
