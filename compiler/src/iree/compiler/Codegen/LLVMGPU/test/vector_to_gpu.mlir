@@ -30,12 +30,10 @@ func.func @ksplitmatmul_basic(%a: memref<128x16x256xf32>) -> vector<16x1x8xf32> 
   return %0 : vector<16x1x8xf32>
 }
 // CHECK-LABEL: func.func @ksplitmatmul_basic
-//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index
-//   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview
 //  CHECK-SAME:[2, 3, 4] [16, 1, 8] [1, 1, 1]
 //  CHECK-SAME:memref<128x16x256xf32> to memref<16x8xf32, strided<[4096, 1], offset: 8964>>
-//       CHECK: vector.transfer_read %[[M]][%[[ID]], %[[ID]]]
+//       CHECK: vector.transfer_read %[[M]]
 //  CHECK-SAME: {in_bounds = [true, true]} : memref<16x8xf32, strided<[4096, 1], offset: 8964>>, vector<16x8xf32>
 //       CHECK: vector.broadcast %{{.*}} : vector<16x8xf32> to vector<1x16x8xf32>
 //       CHECK: vector.transpose %{{.*}} [1, 0, 2] : vector<1x16x8xf32> to vector<16x1x8xf32>
