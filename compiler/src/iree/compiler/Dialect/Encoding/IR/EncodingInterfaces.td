@@ -207,8 +207,8 @@ def IREEEncoding_SerializableEncodingAttrInterface :
   }];
 }
 
-def IREEEncoding_LayoutAttrInterface :
-  AttrInterface<"LayoutAttrInterface"> {
+def IREEEncoding_LayoutMaterializerAttr :
+  AttrInterface<"LayoutMaterializerAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     An interface that collects a set of methods for encoding materialization.

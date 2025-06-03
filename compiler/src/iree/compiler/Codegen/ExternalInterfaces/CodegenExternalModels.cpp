@@ -15,9 +15,9 @@ namespace mlir::iree_compiler::IREE::Codegen {
 
 using IREE::TensorExt::DispatchTensorType;
 
-struct EncodingNopDeviceLayoutAttrInterface final
-    : IREE::Encoding::LayoutAttrInterface::ExternalModel<
-          EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
+struct EncodingNopDeviceLayoutMaterializerAttr final
+    : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+          EncodingNopDeviceLayoutMaterializerAttr, EncodingNopLayoutAttr> {
   Type convertType(Attribute attr, Type type) const {
     return TypeSwitch<Type, Type>(type)
         .Case<RankedTensorType>([&](auto rankedTensorType) {
@@ -82,7 +82,7 @@ void registerCodegenExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
         EncodingNopLayoutAttr::attachInterface<
             EncodingNopHostEncodingLayoutResolverAttrInterface,
-            EncodingNopDeviceLayoutAttrInterface>(*ctx);
+            EncodingNopDeviceLayoutMaterializerAttr>(*ctx);
       });
 }
 

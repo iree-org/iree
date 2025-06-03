@@ -32,7 +32,7 @@ getEncodingInfoFromType(RankedTensorType type) {
 
 IREE::Codegen::MaterializeEncodingInfo
 getEncodingInfoFromLayout(RankedTensorType type,
-                          IREE::Encoding::LayoutAttrInterface layoutAttr) {
+                          IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
   // If the layout is present in the encoding, use it directly. It means that
   // the layout is already resolved and some information could be dropped during
   // the lowering. Thus, we prioritize the resolved layout.
@@ -48,7 +48,7 @@ getEncodingInfoFromLayout(RankedTensorType type,
 
 FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     OpBuilder &rewriter, Location loc, RankedTensorType tensorType,
-    IREE::Encoding::LayoutAttrInterface layoutAttr,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo) {
   ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
   if (!ShapedType::isDynamicShape(staticTileSizes)) {
@@ -83,7 +83,7 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
 FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensorImpl(
     OpBuilder &builder, Location loc,
     IREE::TensorExt::DispatchTensorType dispatchTensorType,
-    ValueRange dynamicDims, IREE::Encoding::LayoutAttrInterface layoutAttr,
+    ValueRange dynamicDims, IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     IREE::Codegen::MaterializeEncodingInfo encodingInfo) {
   auto boundTensorType =
       llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());

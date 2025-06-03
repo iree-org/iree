@@ -9,7 +9,7 @@
 //
 // - IREE::Encoding::EncodingLayoutResolverAttrInterface
 // - IREE::Encoding::SerializableEncodingAttrInterface
-// - IREE::Encoding::LayoutAttrInterface
+// - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Encoding::PackedLayoutAttr
 //
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
@@ -359,9 +359,9 @@ struct GPUDeviceEncodingPackedLayoutAttr
   }
 };
 
-struct GPUDeviceEncodingLayoutAttrInterface
-    : public DeviceEncodingLayoutAttrInterfaceExternalModelBase<
-          GPUDeviceEncodingLayoutAttrInterface, GPUEncodingLayoutAttr> {
+struct GPUDeviceEncodingLayoutMaterializerAttr
+    : public DeviceEncodingLayoutMaterializerAttrExternalModelBase<
+          GPUDeviceEncodingLayoutMaterializerAttr, GPUEncodingLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -416,9 +416,9 @@ struct GPUHostEncodingLayoutResolverAttrInterface final
   }
 };
 
-struct GPUPadDeviceEncodingLayoutAttrInterface final
-    : IREE::Encoding::LayoutAttrInterface::ExternalModel<
-          GPUPadDeviceEncodingLayoutAttrInterface, GPUPadLayoutAttr> {
+struct GPUPadDeviceEncodingLayoutMaterializerAttr final
+    : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+          GPUPadDeviceEncodingLayoutMaterializerAttr, GPUPadLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -535,11 +535,11 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
             GPUDeviceEncodingPackedLayoutAttr,
-            GPUDeviceEncodingLayoutAttrInterface,
+            GPUDeviceEncodingLayoutMaterializerAttr,
             GPUHostEncodingLayoutResolverAttrInterface,
             GPUHostSerializableEncodingAttrInterface>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<
-            GPUPadDeviceEncodingLayoutAttrInterface,
+            GPUPadDeviceEncodingLayoutMaterializerAttr,
             GPUPadEncodingLayoutResolverAttrInterface>(*ctx);
       });
 }

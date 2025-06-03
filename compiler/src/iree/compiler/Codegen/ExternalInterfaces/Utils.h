@@ -50,16 +50,16 @@ public:
   }
 };
 
-template <typename DeviceEncodingLayoutAttrInterface,
+template <typename DeviceEncodingLayoutMaterializerAttr,
           typename EncodingLayoutAttr>
-struct DeviceEncodingLayoutAttrInterfaceExternalModelBase
-    : public IREE::Encoding::LayoutAttrInterface::ExternalModel<
-          DeviceEncodingLayoutAttrInterface, EncodingLayoutAttr> {
+struct DeviceEncodingLayoutMaterializerAttrExternalModelBase
+    : public IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+          DeviceEncodingLayoutMaterializerAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(EncodingLayoutAttr layoutAttr, RankedTensorType type) const {
     return getEncodingInfoFromLayout(
-        type, cast<IREE::Encoding::LayoutAttrInterface>(layoutAttr));
+        type, cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
   }
 
   Type convertType(Attribute attr, Type type) const {
@@ -116,7 +116,7 @@ public:
       ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
       SmallVectorImpl<OpFoldResult> &newSizes,
       SmallVectorImpl<OpFoldResult> &newStrides) const {
-    auto layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(attr);
+    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
     // Only handle cases where the slice spans the whole
     // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(jornt): Enable partial slices.
