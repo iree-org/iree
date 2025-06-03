@@ -591,6 +591,31 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_amdgpu_binary(
+        self, name, target, arch, srcs, internal_hdrs=[], copts=[], linkopts=[]
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        target_block = self._convert_string_arg_block("TARGET", target, quote=False)
+        arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
+        hdrs_block = self._convert_srcs_block(internal_hdrs, block_name="INTERNAL_HDRS")
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        linkopts_block = self._convert_string_list_block(
+            "LINKOPTS", linkopts, sort=False
+        )
+
+        self._converter.body += (
+            f"iree_amdgpu_binary(\n"
+            f"{name_block}"
+            f"{target_block}"
+            f"{arch_block}"
+            f"{hdrs_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{linkopts_block}"
+            f")\n\n"
+        )
+
     def iree_cuda_bitcode_library(
         self, name, cuda_arch, srcs, internal_hdrs=None, copts=None
     ):
