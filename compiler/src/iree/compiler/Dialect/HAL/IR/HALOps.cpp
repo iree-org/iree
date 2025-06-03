@@ -1081,10 +1081,17 @@ void BufferUsageOp::getAsmResultNames(
   setNameFn(getResult(), "buffer_usage");
 }
 
-std::optional<int32_t> BufferUsageOp::getUsageValue(
-    Value bufferUsage) {
-  if (auto bufferUsageAttr = bufferUsage.getDefiningOp<IREE::HAL::BufferUsageOp>()) {
-    return static_cast<int32_t>(bufferUsageAttr.getUsageAttr().getInt());
+BufferUsageBitfieldAttr BufferUsageOp::getUsageAttr(Value bufferUsage) {
+  auto op = bufferUsage.getDefiningOp<IREE::HAL::BufferUsageOp>();
+  if (!op) {
+    return {};
+  }
+  return op.getUsageAttr();
+}
+
+std::optional<int32_t> BufferUsageOp::getUsageValue(Value bufferUsage) {
+  if (auto bufferUsageAttr = getUsageAttr(bufferUsage)) {
+    return static_cast<int32_t>(bufferUsageAttr.getInt());
   }
   return std::nullopt;
 }
@@ -1106,10 +1113,17 @@ void MemoryTypeOp::getAsmResultNames(
   setNameFn(getResult(), "memory_type");
 }
 
-std::optional<int32_t> MemoryTypeOp::getTypeValue(
-    Value memoryType) {
-  if (auto memoryTypeAttr = memoryType.getDefiningOp<IREE::HAL::MemoryTypeOp>()) {
-    return static_cast<int32_t>(memoryTypeAttr.getTypeAttr().getInt());
+MemoryTypeBitfieldAttr MemoryTypeOp::getTypeAttr(Value memoryType) {
+  auto op = memoryType.getDefiningOp<IREE::HAL::MemoryTypeOp>();
+  if (!op) {
+    return {};
+  }
+  return op.getTypeAttr();
+}
+
+std::optional<int32_t> MemoryTypeOp::getTypeValue(Value memoryType) {
+  if (auto memoryTypeAttr = getTypeAttr(memoryType)) {
+    return static_cast<int32_t>(memoryTypeAttr.getInt());
   }
   return std::nullopt;
 }

@@ -5,9 +5,11 @@ util.func public @FoldAllocatorSelectAttr1() -> (!hal.device, i64) {
   // CHECK-NOT: hal.allocator.select.attr
   // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.device.resolve
   // CHECK-SAME: on(#hal.device.affinity<@device_a, [0]>) : !hal.device, i64
+  %memory_type = hal.memory_type<"HostLocal"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device, %queue_affinity = hal.allocator.select.attr
       from(#hal.device.optimal<[#hal.device.affinity<@device_a, [0]>]>)
-      type(HostLocal) usage(Transfer) : !hal.device, i64
+      type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   // CHECK: util.return %[[DEVICE]], %[[QUEUE_AFFINITY]]
   util.return %device, %queue_affinity : !hal.device, i64
 }
@@ -19,9 +21,11 @@ util.func public @FoldAllocatorSelectAttrSameDevice() -> (!hal.device, i64) {
   // CHECK: %[[DEVICE:.+]] = hal.device.resolve
   // CHECK-SAME: on(#hal.device.affinity<@device_a>) : !hal.device
   // CHECK: %[[UNUSED:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select.attr
+  %memory_type = hal.memory_type<"HostLocal"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device, %queue_affinity = hal.allocator.select.attr
       from(#hal.device.optimal<[#hal.device.affinity<@device_a, [0]>, #hal.device.affinity<@device_a, [1]>]>)
-      type(HostLocal) usage(Transfer) : !hal.device, i64
+      type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   // CHECK: util.return %[[DEVICE]], %[[QUEUE_AFFINITY]]
   util.return %device, %queue_affinity : !hal.device, i64
 }
@@ -32,9 +36,11 @@ util.func public @FoldAllocatorSelectAttrSameDevice() -> (!hal.device, i64) {
 util.func public @FoldAllocatorSelectAttrSameQueueAffinity() -> (!hal.device, i64) {
   // CHECK: %[[QUEUE_AFFINITY:.+]] = arith.constant 1 : i64
   // CHECK: %[[DEVICE:.+]], %[[UNUSED:.+]] = hal.allocator.select.attr
+  %memory_type = hal.memory_type<"HostLocal"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device, %queue_affinity = hal.allocator.select.attr
       from(#hal.device.optimal<[#hal.device.affinity<@device_a, [0]>, #hal.device.affinity<@device_b, [0]>]>)
-      type(HostLocal) usage(Transfer) : !hal.device, i64
+      type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   // CHECK: util.return %[[DEVICE]], %[[QUEUE_AFFINITY]]
   util.return %device, %queue_affinity : !hal.device, i64
 }
