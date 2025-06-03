@@ -274,7 +274,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
       backend, usually for better cache behavior.
     Negative values for padding is illegal.
 
-    This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
+    This attribute implements `Encoding::SerializedLayoutResolverAttr`,
     to provide a hook for tensor sizeof lowering. The implementation of this
     interface is backend-agnostic, but the emission of the pad encoding attribute
     itself can be target- or domain-specific.
@@ -303,7 +303,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 
 def IdentityEncodingAttr :
     IREEEncoding_Attr<"IdentityEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -324,7 +324,7 @@ def IdentityEncodingAttr :
 
 def UnsupportedEncodingAttr :
     IREEEncoding_Attr<"UnsupportedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -381,7 +381,7 @@ def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
 
 def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -393,7 +393,7 @@ def UnspecializedEncodingAttr :
 
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
-    very basic interface methods of EncodingLayoutResolverAttrInterface that
+    very basic interface methods of LayoutResolverAttr that
     returns the SpecializedEncodingAttr with the same seed as serialized layout
     in encoding specialization. Different seed values indicate different layouts.
 

@@ -7,7 +7,7 @@
 //
 // This file implements the following interfaces for GPU backends:
 //
-// - IREE::Encoding::EncodingLayoutResolverAttrInterface
+// - IREE::Encoding::LayoutResolverAttr
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Encoding::PackedLayoutAttr
@@ -392,9 +392,9 @@ struct GPUHostSerializableAttr final
   }
 };
 
-struct GPUHostEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          GPUHostEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
+struct GPUHostLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          GPUHostLayoutResolverAttr, GPUEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -426,9 +426,9 @@ struct GPUPadDeviceEncodingLayoutMaterializerAttr final
   }
 };
 
-struct GPUPadEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          GPUPadEncodingLayoutResolverAttrInterface, GPUPadLayoutAttr> {
+struct GPUPadLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          GPUPadLayoutResolverAttr, GPUPadLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -531,17 +531,16 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
 } // namespace
 
 void registerGPUEncodingExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
-        IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-            GPUDeviceEncodingPackedLayoutAttr,
-            GPUDeviceEncodingLayoutMaterializerAttr,
-            GPUHostEncodingLayoutResolverAttrInterface,
-            GPUHostSerializableAttr>(*ctx);
-        IREE::GPU::GPUPadLayoutAttr::attachInterface<
-            GPUPadDeviceEncodingLayoutMaterializerAttr,
-            GPUPadEncodingLayoutResolverAttrInterface>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::GPU::IREEGPUDialect *dialect) {
+    IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
+        GPUDeviceEncodingPackedLayoutAttr,
+        GPUDeviceEncodingLayoutMaterializerAttr, GPUHostLayoutResolverAttr,
+        GPUHostSerializableAttr>(*ctx);
+    IREE::GPU::GPUPadLayoutAttr::attachInterface<
+        GPUPadDeviceEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(
+        *ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

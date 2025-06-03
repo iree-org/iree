@@ -55,8 +55,7 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
     return dyn_cast<PadEncodingLayoutAttr>(*layouts.begin());
   }
   Attribute resolvedEncoding =
-      cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr)
-          .getLayout(type);
+      cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr).getLayout(type);
   LLVM_DEBUG({
     llvm::dbgs() << "Unresolved type: " << type << "\n";
     llvm::dbgs() << "layoutAttr: " << layoutAttr << "\n";
@@ -303,8 +302,7 @@ struct MaterializeEncodingIntoPaddingPass final
         targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
       layoutAttr = targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Encoding::kEncodingResolverAttrName);
-      auto resolverAttr =
-          cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
+      auto resolverAttr = cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr);
       layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
           resolverAttr.cloneWithSimplifiedConfig(targetConfig));
     } else {

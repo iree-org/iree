@@ -86,7 +86,7 @@ static bool isRecognizedEncodingType(Type type) {
 /// There are requirements to get the resolved layouts. Otherwise, the encodings
 /// are dropped.
 ///   - All attributes in the `layoutResolvers` must implement
-///     EncodingLayoutResolverAttrInterface. Otherwise, there is no way to query
+///     LayoutResolverAttr. Otherwise, there is no way to query
 ///     layouts.
 ///   - The encoding on the type must implement
 ///     SerializableAttr. Otherwise, there is no way to update
@@ -101,15 +101,13 @@ static Type getTypeWithResolvedEncodingLayouts(
   if (encodingAttr.isSerialized()) {
     return type;
   }
-  if (!llvm::all_of(
-          layoutResolvers,
-          llvm::IsaPred<IREE::Encoding::EncodingLayoutResolverAttrInterface>)) {
+  if (!llvm::all_of(layoutResolvers,
+                    llvm::IsaPred<IREE::Encoding::LayoutResolverAttr>)) {
     return rankedTensorType.dropEncoding();
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
-    auto encodingLayoutAttr =
-        cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(attr);
+    auto encodingLayoutAttr = cast<IREE::Encoding::LayoutResolverAttr>(attr);
     Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
     if (!layout) {
       return nullptr;

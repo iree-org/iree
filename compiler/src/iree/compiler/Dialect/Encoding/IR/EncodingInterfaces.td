@@ -14,8 +14,8 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 // Attribute Interfaces
 //===----------------------------------------------------------------------===//
 
-def IREEEncoding_EncodingLayoutResolverAttrInterface :
-  AttrInterface<"EncodingLayoutResolverAttrInterface"> {
+def IREEEncoding_LayoutResolverAttr :
+  AttrInterface<"LayoutResolverAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     Interface used to query layout information needed to materialize encoding

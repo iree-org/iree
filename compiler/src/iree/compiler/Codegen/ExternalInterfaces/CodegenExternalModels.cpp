@@ -63,10 +63,9 @@ struct EncodingNopDeviceLayoutMaterializerAttr final
   }
 };
 
-struct EncodingNopHostEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          EncodingNopHostEncodingLayoutResolverAttrInterface,
-          EncodingNopLayoutAttr> {
+struct EncodingNopHostLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          EncodingNopHostLayoutResolverAttr, EncodingNopLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     return attr;
@@ -81,7 +80,7 @@ void registerCodegenExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
         EncodingNopLayoutAttr::attachInterface<
-            EncodingNopHostEncodingLayoutResolverAttrInterface,
+            EncodingNopHostLayoutResolverAttr,
             EncodingNopDeviceLayoutMaterializerAttr>(*ctx);
       });
 }

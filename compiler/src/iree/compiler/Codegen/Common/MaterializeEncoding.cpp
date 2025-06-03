@@ -92,8 +92,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
             ? targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
                   IREE::Encoding::kEncodingResolverAttrName)
             : nullptr;
-    auto resolverAttr = llvm::dyn_cast_or_null<
-        IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
+    auto resolverAttr =
+        llvm::dyn_cast_or_null<IREE::Encoding::LayoutResolverAttr>(layoutAttr);
 
     IREE::Encoding::LayoutMaterializerAttr layoutAttrWithTargetInfo =
         layoutAttr && resolverAttr

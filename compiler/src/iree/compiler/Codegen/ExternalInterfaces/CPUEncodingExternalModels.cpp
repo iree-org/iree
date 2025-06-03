@@ -8,7 +8,7 @@
 // This file implements the following interfaces for CPU backends and the VMVX
 // backend:
 //
-// - IREE::Encoding::EncodingLayoutResolverAttrInterface
+// - IREE::Encoding::LayoutResolverAttr
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Codegen::PackedLayoutAttr
@@ -632,9 +632,9 @@ struct CPUDeviceEncodingLayoutMaterializerAttr final
   }
 };
 
-struct CPUHostEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          CPUHostEncodingLayoutResolverAttrInterface, CPUEncodingLayoutAttr> {
+struct CPUHostLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          CPUHostLayoutResolverAttr, CPUEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -768,9 +768,9 @@ struct VMVXDeviceEncodingLayoutMaterializerAttr final
   }
 };
 
-struct VMVXHostEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          VMVXHostEncodingLayoutResolverAttrInterface, VMVXEncodingLayoutAttr> {
+struct VMVXHostLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          VMVXHostLayoutResolverAttr, VMVXEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -801,19 +801,17 @@ struct VMVXHostSerializableAttr final
 } // namespace
 
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
-  registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::CPU::IREECPUDialect *dialect) {
-    IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-        CPUDeviceEncodingPackedLayoutAttr,
-        CPUDeviceEncodingLayoutMaterializerAttr,
-        CPUHostEncodingLayoutResolverAttrInterface, CPUHostSerializableAttr>(
-        *ctx);
-    IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-        VMVXDeviceEncodingPackedLayoutAttr,
-        VMVXDeviceEncodingLayoutMaterializerAttr,
-        VMVXHostEncodingLayoutResolverAttrInterface, VMVXHostSerializableAttr>(
-        *ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
+        IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
+            CPUDeviceEncodingPackedLayoutAttr,
+            CPUDeviceEncodingLayoutMaterializerAttr, CPUHostLayoutResolverAttr,
+            CPUHostSerializableAttr>(*ctx);
+        IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
+            VMVXDeviceEncodingPackedLayoutAttr,
+            VMVXDeviceEncodingLayoutMaterializerAttr,
+            VMVXHostLayoutResolverAttr, VMVXHostSerializableAttr>(*ctx);
+      });
 }
 
 } // namespace mlir::iree_compiler::IREE::CPU
