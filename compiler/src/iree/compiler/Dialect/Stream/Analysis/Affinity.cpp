@@ -262,9 +262,6 @@ private:
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override;
   void updateFromUse(Value value, OpOperand &operand, StateType &newState,
                      DFX::Solver &solver);
-
-  // Operations that the value is pinned to, if any.
-  SmallVector<IREE::Stream::AffinityOpInterface> pinnedOps;
 };
 const char ValueProducerAffinityPVS::ID = 0;
 
@@ -611,35 +608,10 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
 //===----------------------------------------------------------------------===//
 
 void ValueProducerAffinityPVS::initializeValue(Value value,
-                                               DFX::Solver &solver) {
-  auto &precomputedQueries = AffinityAnalysis::PrecomputedQueries::get(solver);
-  auto it = precomputedQueries.pinnedAffinities.find(value);
-  if (it != precomputedQueries.pinnedAffinities.end()) {
-    pinnedOps = llvm::to_vector(it->second);
-  }
-}
+                                               DFX::Solver &solver) {}
 
 ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                                                    DFX::Solver &solver) {
-  // If there are any ops that produce the value and pin to a specific affinity
-  // then we take those directly and ignore all others.
-  if (!pinnedOps.empty()) {
-    StateType newState;
-    for (auto pinnedOp : pinnedOps) {
-      auto &opPVS = solver.getElementFor<OpAffinityPVS>(
-          *this, Position::forOperation(pinnedOp), DFX::Resolution::REQUIRED);
-      LLVM_DEBUG({
-        llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
-        value.printAsOperand(llvm::dbgs(), solver.getAsmState());
-        llvm::dbgs() << " affinity using pinned op ";
-        opPVS.print(llvm::dbgs(), solver.getAsmState());
-        llvm::dbgs() << "\n";
-      });
-      newState ^= opPVS;
-    }
-    return DFX::clampStateAndIndicateChange(getState(), newState);
-  }
-
   // We special case some ops that act as barriers in the program. This prevents
   // us from walking past boundaries that are not profitable to do so with; for
   // example, globals are usually stored in independent contexts from where they
@@ -688,11 +660,27 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
         }
 
         // If coming from an affinity-aware op that pins the value storage to a
-        // particular affinity that overrides all other logic.
+        // particular affinity that defines the required producer, even if this
+        // op isn't producing it. We continue walking through tied ops below in
+        // case we need to _also_ find the producer affinity. This is how alias
+        // ops work: some op produces the value and then an alias op pins it -
+        // the producer need not have the same affinity as the alias op as
+        // that's just indicating where it is stored.
+        //
+        // Pinning has an important property: we know exactly where the resource
+        // *must* be (because the user told us that). What we may not be able to
+        // tell during analysis is where it _also_ is. That's fine (I think)
+        // because pinning is how users provide us information we otherwise
+        // can't get and we have to go on trust that they are telling us the
+        // proper placement. Below all state combinations we perform are guarded
+        // on whether it's pinned: if it is, we ignore invalid analysis state
+        // and only use it to augment the pinned affinity.
+        bool isPinned = false;
         if (auto affinityOp =
                 dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
                     result.getDefiningOp())) {
           if (affinityOp.pinsValueAffinity()) {
+            isPinned = true;
             auto &opPVS = solver.getElementFor<OpAffinityPVS>(
                 *this, Position::forOperation(affinityOp),
                 DFX::Resolution::REQUIRED);
@@ -706,8 +694,6 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
               llvm::dbgs() << "\n";
             });
             newState ^= opPVS;
-            newState.indicateOptimisticFixpoint();
-            return WalkResult::interrupt();
           }
         }
 
@@ -728,7 +714,9 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
               valuePVS.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
-            newState ^= valuePVS;
+            if (!isPinned || valuePVS.isValidState()) {
+              newState ^= valuePVS;
+            }
             return WalkResult::advance();
           }
         }
@@ -751,7 +739,9 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
             opPVS.print(llvm::dbgs(), solver.getAsmState());
             llvm::dbgs() << "\n";
           });
-          newState ^= opPVS;
+          if (!isPinned || opPVS.isValidState()) {
+            newState ^= opPVS;
+          }
           return WalkResult::advance();
         }
 
@@ -785,17 +775,23 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                 globalPVS.print(llvm::dbgs(), solver.getAsmState());
                 llvm::dbgs() << "\n";
               });
-              newState ^= globalPVS.getState();
+              if (!isPinned || globalPVS.isValidState()) {
+                newState ^= globalPVS.getState();
+              }
             })
             .Case<mlir::arith::SelectOp>([&](auto op) {
               auto &truePVS = solver.getElementFor<ValueProducerAffinityPVS>(
                   *this, Position::forValue(op.getTrueValue()),
                   DFX::Resolution::REQUIRED);
-              newState ^= truePVS.getState();
+              if (!isPinned || truePVS.isValidState()) {
+                newState ^= truePVS.getState();
+              }
               auto &falsePVS = solver.getElementFor<ValueProducerAffinityPVS>(
                   *this, Position::forValue(op.getFalseValue()),
                   DFX::Resolution::REQUIRED);
-              newState ^= falsePVS.getState();
+              if (!isPinned || falsePVS.isValidState()) {
+                newState ^= falsePVS.getState();
+              }
             })
             .Default([&](auto op) {
               auto valuePVS = solver.getElementFor<ValueProducerAffinityPVS>(
@@ -809,7 +805,9 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                 valuePVS.print(llvm::dbgs(), solver.getAsmState());
                 llvm::dbgs() << "\n";
               });
-              newState ^= valuePVS;
+              if (!isPinned || valuePVS.isValidState()) {
+                newState ^= valuePVS;
+              }
             });
         return WalkResult::advance();
       },
@@ -1194,6 +1192,11 @@ AffinityAnalysis::lookupResourceAffinity(Value value) {
 
 bool AffinityAnalysis::tryLookupResourceAffinity(
     Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  // If the value is pinned then we always use that.
+  if (tryLookupPinnedAffinities(value, affinities)) {
+    return true;
+  }
+
   auto valuePVS = solver.lookupElementFor<ValueProducerAffinityPVS>(
       Position::forValue(value));
   if (!valuePVS || !valuePVS->isValidState() || valuePVS->isUndefContained()) {
@@ -1214,36 +1217,49 @@ bool AffinityAnalysis::tryLookupResourceAffinity(
 
 bool AffinityAnalysis::tryLookupResourceUsageAffinity(
     Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  SetVector<IREE::Stream::AffinityAttr> affinitySet;
   auto producerPVS = solver.lookupElementFor<ValueProducerAffinityPVS>(
       Position::forValue(value));
   if (producerPVS && producerPVS->isValidState() &&
       !producerPVS->isUndefContained()) {
-    if (!producerPVS->getAssumedSet().empty()) {
-      llvm::append_range(affinities, producerPVS->getAssumedSet());
-    }
+    affinitySet.insert_range(producerPVS->getAssumedSet());
   }
   auto consumerPVS = solver.lookupElementFor<ValueConsumerAffinityPVS>(
       Position::forValue(value));
   if (consumerPVS && consumerPVS->isValidState() &&
       !consumerPVS->isUndefContained()) {
-    if (!consumerPVS->getAssumedSet().empty()) {
-      // There's probably a better way to do this but the template f*ckery
-      // required is too painful. I suspect a concat + sort + unique would do
-      // it, but not be any more efficient as we'd have to do the sort twice. We
-      // should probably change the functions to take a SetVectorImpl instead.
-      for (auto affinity : consumerPVS->getAssumedSet()) {
-        if (!producerPVS || !producerPVS->isValidState() ||
-            !producerPVS->getAssumedSet().contains(affinity)) {
-          affinities.push_back(affinity);
-        }
-      }
-    }
+    affinitySet.insert_range(consumerPVS->getAssumedSet());
   }
-  if (affinities.empty()) {
+  // Merge pinned affinities - they are indicating some assumption that we may
+  // not be able to analyze (like external modules).
+  SmallVector<IREE::Stream::AffinityAttr> pinnedAffinities;
+  tryLookupPinnedAffinities(value, pinnedAffinities);
+  affinitySet.insert_range(pinnedAffinities);
+  if (affinitySet.empty()) {
     // Analysis completed but no affinity was specified; try to find a default.
     return tryLookupDefaultAffinity(value.getParentBlock()->getParentOp(),
                                     affinities);
   }
+  llvm::append_range(affinities, affinitySet);
+  sortAffinities(affinities);
+  return true;
+}
+
+bool AffinityAnalysis::tryLookupPinnedAffinities(
+    Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  auto it = precomputedQueries.pinnedAffinities.find(value);
+  if (it == precomputedQueries.pinnedAffinities.end() || it->second.empty()) {
+    return false;
+  }
+  DenseSet<IREE::Stream::AffinityAttr> pinnedAffinities;
+  for (auto pinningOp : it->second) {
+    SmallVector<IREE::Stream::AffinityAttr> pinnerAffinities;
+    if (!tryLookupExecutionAffinity(pinningOp, pinnerAffinities)) {
+      return false;
+    }
+    pinnedAffinities.insert_range(pinnerAffinities);
+  }
+  llvm::append_range(affinities, pinnedAffinities);
   sortAffinities(affinities);
   return true;
 }

@@ -393,6 +393,21 @@ bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
   return lhs.isExecutableWith(rhs);
 }
 
+// static
+AffinityAttr AffinityAttr::joinOR(ArrayRef<AffinityAttr> affinityAttrs) {
+  if (affinityAttrs.empty()) {
+    return nullptr;
+  } else if (affinityAttrs.size() == 1) {
+    return affinityAttrs.front();
+  } else {
+    AffinityAttr resultAttr;
+    for (auto affinityAttr : affinityAttrs) {
+      resultAttr = resultAttr ? resultAttr.joinOR(affinityAttr) : affinityAttr;
+    }
+    return resultAttr;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // #stream.partitioning_config
 //===----------------------------------------------------------------------===//

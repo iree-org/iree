@@ -96,6 +96,18 @@ public:
   bool tryLookupResourceUsageAffinity(
       Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
 
+  // Populates all affinities a value has been pinned to, if any.
+  // Returns true if the value had pinned affinities.
+  bool tryLookupPinnedAffinities(
+      Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
+
+  // Precomputed IR properties that can be queried within the solver.
+  // Static information that will not change based on analysis can be placed
+  // here to amortize the costs required to calculate it.
+  //
+  // Usage within an element initialize/update:
+  //   auto &queries = AffinityAnalysis::PrecomputedQueries::get(solver);
+  //   queries.whatever;
   struct PrecomputedQueries {
     // Values mapped to ops that pin their affinity, if any.
     // Omitted values are not pinned. Note that a single value may be pinned to

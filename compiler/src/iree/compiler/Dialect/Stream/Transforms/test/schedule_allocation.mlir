@@ -57,6 +57,91 @@ util.func public @extractConstants(%timepoint: !stream.timepoint, %operand: !str
 
 // -----
 
+// Tests that constants are extracted and bucketed by their usage affinity.
+// Constants _should_ only be allocated for their users once extracted and only
+// include the execution affinity of the original region if they are used within
+// it. Today we don't track this properly and all constants extracted from an
+// execution op are assumed to be accessed by it - if we could have identified
+// them as being used exclusively on other affinities earlier we would not have
+// put them into the same region on the wrong affinity.
+
+// CHECK-LABEL: @extractConstantsMultiAffinity
+// CHECK-SAME: (%[[WAIT_TIMEPOINT:.+]]: !stream.timepoint)
+util.func public @extractConstantsMultiAffinity(%wait_timepoint: !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  %c255_i32 = arith.constant 255 : i32
+
+  // <constant>{%c8} is produced on @device_a + used on @device_b:
+  // CHECK: %[[CST8:.+]], %[[CST8_TIMEPOINT:.+]] = stream.resource.constants
+  // CHECK-SAME: on(#hal.device.optimal<[#hal.device.promise<@device_a>, #hal.device.promise<@device_b>]>)
+  // CHECK-NEXT: !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+
+  // <constant>{%c16} is produced on @device_a + used on @device_c + @device_d:
+  // CHECK: %[[CST16:.+]], %[[CST16_TIMEPOINT:.+]] = stream.resource.constants
+  // CHECK-SAME: on(#hal.device.optimal<[#hal.device.promise<@device_a>, #hal.device.promise<@device_c>, #hal.device.promise<@device_d>]>)
+  // CHECK-NEXT: !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
+
+  // <constant>{%c32} is produced on @device_a + mutated on @device_e:
+  // CHECK: %[[CST32:.+]], %[[CST32_TIMEPOINT:.+]] = stream.resource.constants
+  // CHECK-SAME: on(#hal.device.optimal<[#hal.device.promise<@device_a>, #hal.device.promise<@device_e>]>)
+  // CHECK-NEXT: !stream.resource<variable>{%c32} = dense<5> : tensor<8xi32>
+
+  // Join on wait and CST32 for execution, as the fill only needs to wait until
+  // it is loaded (and not on CST8/CST16).
+  // CHECK: %[[WAIT_FILL_TIMEPOINT:.+]] = stream.timepoint.join max(%[[WAIT_TIMEPOINT]], %[[CST32_TIMEPOINT]])
+
+  // Fill runs on CST32 only.
+  // CHECK: %[[FILL_TIMEPOINT:.+]] = stream.cmd.execute on(#hal.device.promise<@device_a>)
+  // CHECK-SAME: await(%[[WAIT_FILL_TIMEPOINT]]) => with(%[[CST32]]
+  // CHECK-NEXT: stream.cmd.fill
+
+  %results:3, %result_timepoint = stream.async.execute on(#hal.device.promise<@device_a>) await(%wait_timepoint) => with() -> (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<variable>{%c32}) {
+    %cst8 = stream.async.constant : !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+    %cst16 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
+    %cst32 = stream.async.constant : !stream.resource<variable>{%c32} = dense<5> : tensor<8xi32>
+    %fill_cst32 = stream.async.fill %c255_i32, %cst32[%c0 to %c16 for %c16] : i32 -> %cst32 as !stream.resource<variable>{%c32}
+    stream.yield %cst8, %cst16, %fill_cst32 : !stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<variable>{%c32}
+  } => !stream.timepoint
+
+  // Join the async ops (constant uploads and execution should overlap).
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[CST8_TIMEPOINT]], %[[CST16_TIMEPOINT]], %[[FILL_TIMEPOINT]])
+  // CHECK: util.optimization_barrier %[[JOIN]] : !stream.timepoint
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+
+  // As if used on another device:
+  // CHECK: stream.cmd.execute on(#hal.device.promise<@device_b>)
+  // CHECK-SAME: await(%[[JOIN]]) => with(%[[CST8]]
+  %result_b, %result_timepoint_b = stream.async.execute on(#hal.device.promise<@device_b>) await(%result_timepoint) => with(%results#0 as %capture: !stream.resource<constant>{%c8}) -> (!stream.resource<constant>{%c8}) {
+    stream.yield %capture : !stream.resource<constant>{%c8}
+  } => !stream.timepoint
+
+  // As if used on multiple devices:
+  // CHECK: stream.cmd.execute on(#hal.device.promise<@device_c>)
+  // CHECK-SAME: await(%[[JOIN]]) => with(%[[CST16]]
+  %result_c, %result_timepoint_c = stream.async.execute on(#hal.device.promise<@device_c>) await(%result_timepoint) => with(%results#1 as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  // CHECK: stream.cmd.execute on(#hal.device.promise<@device_d>)
+  // CHECK-SAME: await(%[[JOIN]]) => with(%[[CST16]]
+  %result_d, %result_timepoint_d = stream.async.execute on(#hal.device.promise<@device_d>) await(%result_timepoint) => with(%results#1 as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+
+  // As if mutated on another device:
+  // CHECK: stream.cmd.execute on(#hal.device.promise<@device_e>)
+  // CHECK-SAME: await(%[[JOIN]]) => with(%[[CST32]]
+  %result_e, %result_timepoint_e = stream.async.execute on(#hal.device.promise<@device_e>) await(%result_timepoint) => with(%results#2 as %capture: !stream.resource<variable>{%c32}) -> %results#2 as !stream.resource<variable>{%c32} {
+    stream.yield %capture : !stream.resource<variable>{%c32}
+  } => !stream.timepoint
+
+  util.return
+}
+
+// -----
+
 // Tests that execution regions in initializers are marked as `once` indicating
 // that they are one-shot. The analysis today only checks for ops within the
 // first block of an initializer and treats all others as reusable.
@@ -533,7 +618,7 @@ util.func public @applyAsyncTransferOp(%operand: !stream.resource<transient>, %s
 // CHECK-LABEL: @applyAsyncTransferMultiScopeOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
 util.func public @applyAsyncTransferMultiScopeOp(%operand: !stream.resource<transient>, %size: index) {
-  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.optimal<[#hal.device.affinity<@execution_device>, #hal.device.affinity<@result_device>]>) : !stream.resource<transient>{%[[SIZE]]}
   // CHECK: stream.cmd.execute on(#hal.device.affinity<@execution_device>) await(%[[ALLOCA_TIMEPOINT]])
   // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
   // CHECK-SAME:      %[[ALLOCA]] as %[[ALLOCA_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
@@ -542,7 +627,7 @@ util.func public @applyAsyncTransferMultiScopeOp(%operand: !stream.resource<tran
     // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
     // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device>) %[[ALLOCA_CAPTURE]][%c0 for %[[SIZE]]]
     // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
-    %0 = stream.async.transfer %capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device>) !stream.resource<transient>{%size}
+    %0 = stream.async.transfer %capture : !stream.resource<transient>{%size} -> to(#hal.device.affinity<@result_device>) !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[ALLOCA]]
@@ -555,8 +640,8 @@ util.func public @applyAsyncTransferMultiScopeOp(%operand: !stream.resource<tran
 // CHECK-LABEL: @applyAsyncConcurrentTransferMultiScopeOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
 util.func public @applyAsyncConcurrentTransferMultiScopeOp(%operand: !stream.resource<transient>, %size: index) {
-  // CHECK-DAG: %[[ALLOCA_A:.+]], %[[ALLOCA_A_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device_a>) : !stream.resource<transient>{%[[SIZE]]}
-  // CHECK-DAG: %[[ALLOCA_B:.+]], %[[ALLOCA_B_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@result_device_b>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-DAG: %[[ALLOCA_A:.+]], %[[ALLOCA_A_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.optimal<[#hal.device.affinity<@execution_device>, #hal.device.affinity<@result_device_a>]>) : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-DAG: %[[ALLOCA_B:.+]], %[[ALLOCA_B_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.optimal<[#hal.device.affinity<@execution_device>, #hal.device.affinity<@result_device_b>]>) : !stream.resource<transient>{%[[SIZE]]}
   // CHECK-DAG: %[[ALLOCA_TIMEPOINTS:.+]] = stream.timepoint.join max(%[[ALLOCA_A_TIMEPOINT]], %[[ALLOCA_B_TIMEPOINT]])
   // CHECK: stream.cmd.execute on(#hal.device.affinity<@execution_device>) await(%[[ALLOCA_TIMEPOINTS]])
   // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:[a-z0-9_]+]]: !stream.resource<transient>{%[[SIZE]]},
@@ -569,12 +654,12 @@ util.func public @applyAsyncConcurrentTransferMultiScopeOp(%operand: !stream.res
       // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
       // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device_a>) %[[ALLOCA_A_CAPTURE]][%c0 for %[[SIZE]]]
       // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
-      %transfer_a = stream.async.transfer %concurrent_capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device_a>) !stream.resource<transient>{%size}
+      %transfer_a = stream.async.transfer %concurrent_capture : !stream.resource<transient>{%size} -> to(#hal.device.affinity<@result_device_a>) !stream.resource<transient>{%size}
       // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOCA_B_CAPTURE]][%c0], %[[SIZE]]
       // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
       // CHECK: stream.cmd.flush to(#hal.device.affinity<@result_device_b>) %[[ALLOCA_B_CAPTURE]][%c0 for %[[SIZE]]]
       // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]}
-      %transfer_b = stream.async.transfer %concurrent_capture : !stream.resource<transient>{%size} from(#hal.device.affinity<@execution_device>) -> to(#hal.device.affinity<@result_device_b>) !stream.resource<transient>{%size}
+      %transfer_b = stream.async.transfer %concurrent_capture : !stream.resource<transient>{%size} -> to(#hal.device.affinity<@result_device_b>) !stream.resource<transient>{%size}
       stream.yield %transfer_a, %transfer_b : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
     }
     stream.yield %concurrent#0, %concurrent#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
@@ -773,4 +858,40 @@ util.func public @scfFor(%operand: !stream.resource<staging>, %size: index) -> f
 
   // CHECK: util.return %[[FOR]]
   util.return %sum : f32
+}
+
+// -----
+
+// Tests round-tripping a buffer through multiple devices.
+// We expect the allocations to be made optimal for both devices.
+
+// CHECK-LABEL: @multiAffinityTrip
+// CHECK-SAME: (%[[INPUT_TIMEPOINT:.+]]: !stream.timepoint
+util.func public @multiAffinityTrip(%input_timepoint: !stream.timepoint, %input_handle: i64) -> (!stream.timepoint, i64) {
+  %c0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  // CHECK: %[[INPUT:.+]] = stream.tensor.import
+  %input = stream.tensor.import on(#hal.device.promise<@device_a>) %input_handle : i64 -> tensor<4xf32> in !stream.resource<external>{%c16}
+  // CHECK: %[[RESULT_A:.+]], %[[RESULT_A_TIMEPOINT:.+]] = stream.resource.alloca
+  // CHECK-SAME: on(#hal.device.optimal<[#hal.device.promise<@device_a>, #hal.device.promise<@device_b>]>)
+  // CHECK-SAME: await(%[[INPUT_TIMEPOINT]])
+  // CHECK: %[[EXECUTE_A_READY:.+]] = stream.timepoint.join max(%[[INPUT_TIMEPOINT]], %[[RESULT_A_TIMEPOINT]])
+  // CHECK: %[[TIMEPOINT_A:.+]] = stream.cmd.execute on(#hal.device.promise<@device_a>) await(%[[EXECUTE_A_READY]]) => with(%[[INPUT]]{{.+}}, %[[RESULT_A]]
+  %result_a, %timepoint_a = stream.async.execute on(#hal.device.promise<@device_a>) await(%input_timepoint) => with(%input as %capture: !stream.resource<external>{%c16}) -> !stream.resource<transient>{%c16} {
+    %t = stream.async.dispatch @executable::@dispatch_a(%capture[%c0 to %c16 for %c16]) : (!stream.resource<external>{%c16}) -> !stream.resource<transient>{%c16}
+    stream.yield %t : !stream.resource<transient>{%c16}
+  } => !stream.timepoint
+  // CHECK: %[[RESULT_B:.+]], %[[RESULT_B_TIMEPOINT:.+]] = stream.resource.alloca
+  // CHECK-SAME: on(#hal.device.optimal<[#hal.device.promise<@device_a>, #hal.device.promise<@device_b>]>)
+  // CHECK-SAME: await(%[[TIMEPOINT_A]])
+  // CHECK: %[[EXECUTE_B_READY:.+]] = stream.timepoint.join max(%[[TIMEPOINT_A]], %[[RESULT_B_TIMEPOINT]])
+  // CHECK: %[[TIMEPOINT_B:.+]] = stream.cmd.execute on(#hal.device.promise<@device_b>) await(%[[EXECUTE_B_READY]]) => with(%[[RESULT_A]]{{.+}}, %[[RESULT_B]]
+  %result_b, %timepoint_b = stream.async.execute on(#hal.device.promise<@device_b>) await(%timepoint_a) => with(%result_a as %capture: !stream.resource<transient>{%c16}) -> !stream.resource<external>{%c16} {
+    %t = stream.async.dispatch @executable::@dispatch_b(%capture[%c0 to %c16 for %c16]) : (!stream.resource<transient>{%c16}) -> !stream.resource<external>{%c16}
+    stream.yield %t : !stream.resource<external>{%c16}
+  } => !stream.timepoint
+  // CHECK: stream.tensor.export {{.+}} %[[RESULT_B]]
+  %output_handle = stream.tensor.export on(#hal.device.promise<@device_a>) %result_b : tensor<4xf32> in !stream.resource<external>{%c16} -> i64
+  // CHECK: util.return %[[TIMEPOINT_B]]
+  util.return %timepoint_b, %output_handle : !stream.timepoint, i64
 }
