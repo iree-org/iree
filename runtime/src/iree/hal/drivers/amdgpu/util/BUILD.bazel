@@ -65,6 +65,22 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "topology_test",
+    srcs = ["topology_test.cc"],
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":libhsa",
+        ":topology",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 ##----------------------------------------------------------------------------##
 ## Internal Utilities
 ##----------------------------------------------------------------------------##
