@@ -46,9 +46,10 @@ std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
   return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
 }
 
-std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
-    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
-    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder) {
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
+                                                         Value memoryTypes,
+                                                         Value bufferUsage,
+                                                         OpBuilder &builder) {
   // Emit a select op to let the runtime decide which device/queue affinity to
   // use if required.
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
@@ -72,9 +73,9 @@ Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   return resolveOp.getResult(0);
 }
 
-std::tuple<Value, Value> lookupAllocatorAndQueueAffinityFor(
-    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
-    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder) {
+std::tuple<Value, Value>
+lookupAllocatorAndQueueAffinityFor(Operation *op, Value memoryTypes,
+                                   Value bufferUsage, OpBuilder &builder) {
   auto [device, queueAffinity] =
       lookupDeviceAndQueueAffinityFor(op, memoryTypes, bufferUsage, builder);
   Value allocator =

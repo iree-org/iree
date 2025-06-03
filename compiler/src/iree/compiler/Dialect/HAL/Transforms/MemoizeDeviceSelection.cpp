@@ -98,9 +98,12 @@ static LogicalResult memoizeAllocatorSelectOp(
           fusedLoc, queueMask, 64));
     }
     Value memoryTypesValue = initializerBuilder.create<arith::ConstantIntOp>(
-        fusedLoc, static_cast<int64_t>(firstSelectOp.getMemoryTypes()), 32);
+        fusedLoc,
+        MemoryTypeOp::getTypeValue(firstSelectOp.getMemoryTypes()).value(), 32);
     Value bufferUsageValue = initializerBuilder.create<arith::ConstantIntOp>(
-        fusedLoc, static_cast<int64_t>(firstSelectOp.getBufferUsage()), 32);
+        fusedLoc,
+        BufferUsageOp::getUsageValue(firstSelectOp.getBufferUsage()).value(),
+        32);
     auto selectOp = initializerBuilder.create<IREE::HAL::AllocatorSelectOp>(
         fusedLoc, deviceValues, queueMaskValues, memoryTypesValue,
         bufferUsageValue);
@@ -147,12 +150,13 @@ struct MemoizeDeviceSelectionPass
       // TODO(benvanik): an interface for when we have other select ops. For now
       // we only have AllocatorSelectAttrOp.
       callableOp.walk([&](IREE::HAL::AllocatorSelectAttrOp selectOp) {
-        auto fullKey = ArrayAttr::get(moduleOp.getContext(),
-                                      {
-                                          selectOp.getOptimalSetAttr(),
-                                          selectOp.getMemoryTypesAttr(),
-                                          selectOp.getBufferUsageAttr(),
-                                      });
+        auto fullKey = ArrayAttr::get(
+            moduleOp.getContext(),
+            {
+                selectOp.getOptimalSetAttr(),
+                MemoryTypeOp::getTypeAttr(selectOp.getMemoryTypes()),
+                BufferUsageOp::getUsageAttr(selectOp.getBufferUsage()),
+            });
         selectOps[fullKey].push_back(selectOp);
       });
     }

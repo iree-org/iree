@@ -2,14 +2,18 @@
 
 // CHECK-LABEL: @allocator_select_attr
 util.func public @allocator_select_attr() -> (!hal.device, i64) {
+  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"HostVisible|HostCoherent|HostLocal"> : i32
+  %memory_type = hal.memory_type<"HostLocal"> : i32
+  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select.attr
   // CHECK-SAME:   from(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-  // CHECK-SAME:   type("HostVisible|HostCoherent|HostLocal")
-  // CHECK-SAME:   usage("TransferSource|TransferTarget|Transfer")
+  // CHECK-SAME:   type(%[[MEMORY_TYPE]])
+  // CHECK-SAME:   usage(%[[BUFFER_USAGE]])
   // CHECK-SAME:   : !hal.device, i64
   %device, %queue_affinity = hal.allocator.select.attr
       from(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-      type(HostLocal) usage(Transfer) : !hal.device, i64
+      type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   util.return %device, %queue_affinity : !hal.device, i64
 }
 
@@ -48,12 +52,17 @@ util.func public @allocator_allocate(%allocator: !hal.allocator) {
   %affinity = arith.constant -1 : i64
   // CHECK-DAG: %[[SIZE:.+]] = arith.constant 123
   %size = arith.constant 123 : index
+  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"HostVisible|HostCoherent|HostLocal"> : i32
+  %memory_type = hal.memory_type<"HostLocal"> : i32
+  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   //      CHECK: %[[REF:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
-  // CHECK-SAME:   type("HostVisible|HostCoherent|HostLocal")
-  // CHECK-SAME:   usage("TransferSource|TransferTarget|Transfer")
+  // CHECK-SAME:   affinity(%[[AFFINITY]])
+  // CHECK-SAME:   type(%[[MEMORY_TYPE]])
+  // CHECK-SAME:   usage(%[[BUFFER_USAGE]])
   // CHECK-SAME:   : !hal.buffer{%[[SIZE]]}
   %ref = hal.allocator.allocate<%allocator : !hal.allocator>
-      affinity(%affinity) type(HostLocal) usage(Transfer) : !hal.buffer{%size}
+      affinity(%affinity) type(%memory_type) usage(%buffer_usage) : !hal.buffer{%size}
   util.return
 }
 
@@ -68,14 +77,18 @@ util.func public @allocator_import(%allocator: !hal.allocator, %arg1: !util.buff
   %length = arith.constant 200 : index
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   %affinity = arith.constant -1 : i64
+  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
+  %memory_type = hal.memory_type<"DeviceLocal"> : i32
+  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   //      CHECK: = hal.allocator.import<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   source(%arg1 : !util.buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   affinity(%[[AFFINITY]])
-  // CHECK-SAME:   type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME:   usage("TransferSource|TransferTarget|Transfer")
+  // CHECK-SAME:   type(%[[MEMORY_TYPE]])
+  // CHECK-SAME:   usage(%[[BUFFER_USAGE]])
   // CHECK-SAME:   : i1, !hal.buffer
   %ok, %ref = hal.allocator.import<%allocator : !hal.allocator>
       source(%arg1 : !util.buffer)[%offset, %length]
-      affinity(%affinity) type(DeviceLocal) usage(Transfer) : i1, !hal.buffer
+      affinity(%affinity) type(%memory_type) usage(%buffer_usage) : i1, !hal.buffer
   util.return
 }

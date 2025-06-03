@@ -589,8 +589,8 @@ def HAL_AllocatorSelectAttrOp : HAL_PureOp<"allocator.select.attr", [
 
   let arguments = (ins
     HAL_DeviceOptimalAttr:$optimal_set,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage
+    I32:$memory_types,
+    I32:$buffer_usage
   );
   let results = (outs
     HAL_Device:$selected_device,
@@ -693,8 +693,8 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     // TODO(benvanik): support other types (and mutable buffers).
     Util_BufferType:$source,
     HAL_DeviceSize:$offset,
@@ -1007,6 +1007,7 @@ def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
   let extraClassDeclaration = [{
     // Returns the buffer usage value.
     static std::optional<int32_t> getUsageValue(Value bufferUsage);
+    static BufferUsageBitfieldAttr getUsageAttr(Value bufferUsage);
   }];
 
   let hasVerifier = 1;
@@ -1040,6 +1041,7 @@ def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
   let extraClassDeclaration = [{
     // Returns the memory type value.
     static std::optional<int32_t> getTypeValue(Value memoryType);
+    static MemoryTypeBitfieldAttr getTypeAttr(Value memoryType);
   }];
 
   let hasVerifier = 1;
@@ -2070,8 +2072,8 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
     HAL_DeviceQueuePool:$pool,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     HAL_DeviceSize:$result_size,
     HAL_AllocaFlagBitfieldAttr:$flags
   );

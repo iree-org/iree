@@ -50,8 +50,8 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
     OptionalAttr<StrAttr>:$source_scope,
     StrArrayAttr:$source_keys,
     Variadic<I64>:$source_offsets,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     Variadic<HAL_DeviceSize>:$lengths
   );
   let results = (outs

@@ -121,10 +121,10 @@ public:
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
             castToImportType(adaptor.getQueueAffinity(), rewriter.getI64Type(),
                              rewriter),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getMemoryTypesAttr().getInt()),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getBufferUsageAttr().getInt()),
+            castToImportType(adaptor.getMemoryTypes(), rewriter.getI32Type(),
+                             rewriter),
+            castToImportType(adaptor.getBufferUsage(), rewriter.getI32Type(),
+                             rewriter),
             adaptor.getSource(),
             castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
                              rewriter),
@@ -155,10 +155,6 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                                  importSymbols);
   patterns.insert<AllocatorImportOpConversion>(typeConverter, context,
                                                importSymbols);
-  patterns.insert<VMImportOpConversion<IREE::HAL::MemoryTypeOp>>(
-      context, importSymbols, typeConverter, "hal.memory_type");
-  patterns.insert<VMImportOpConversion<IREE::HAL::BufferUsageOp>>(
-      context, importSymbols, typeConverter, "hal.buffer_usage");
 }
 
 } // namespace mlir::iree_compiler
