@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-#include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
+#include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -298,6 +298,35 @@ public:
           addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
+
+      // Look for a default tuning spec.
+      auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
+      // First check for a spec based on the sku.
+      std::optional<std::string> maybeSpecName = std::nullopt;
+      if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
+        if (StringAttr sku = chip.getSku()) {
+          std::string specName =
+              llvm::formatv("iree_default_tuning_spec_{}.mlir", sku.strref());
+          if (!rocmDialect->hasBuiltin(specName)) {
+            maybeSpecName = specName;
+          }
+        }
+      }
+
+      // Then, if none was found, look for one based on the target arch.
+      if (!maybeSpecName) {
+        std::string specName =
+            llvm::formatv("iree_default_tuning_spec_{}.mlir", target.getArch());
+        if (rocmDialect->hasBuiltin(specName)) {
+          maybeSpecName = specName;
+        }
+      }
+
+      if (maybeSpecName) {
+        addConfig("iree_codegen.default_tuning_spec",
+                  IREE::ROCM::BuiltinTuningModuleAttr::get(
+                      context, maybeSpecName.value()));
+      }
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
@@ -317,6 +346,7 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
+    registry.insert<IREE::ROCM::ROCMDialect>();
     // Configuration may load and manipulate transform dialect libraries.
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -988,6 +1018,9 @@ namespace {
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
+  void onRegisterDialects(DialectRegistry &registry) {
+    registry.insert<IREE::ROCM::ROCMDialect>();
+  }
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"amdgpu", ...
     targets.add("amdgpu", [&]() {
@@ -1021,18 +1054,6 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
   });
 }
 
-// Iterate over default tuning spec embedded-data files, and insert them into
-// the EmbeddedDataDirectory singleton.
-static void addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory() {
-  EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
-    const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
-    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
-         ++i) {
-      dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
-    }
-  });
-}
-
 } // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL
@@ -1043,8 +1064,6 @@ extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
       "hal_target_rocm");
   mlir::iree_compiler::IREE::HAL::
       addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
-  mlir::iree_compiler::IREE::HAL::
-      addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory();
   return true;
 }
 
