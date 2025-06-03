@@ -1766,6 +1766,7 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling=true"
+    "--iree-dispatch-creation-set-encoding-strategy=padding"
     "--iree-hip-encoding-layout-resolver=pad"
   LABELS
     "noasan"
@@ -1795,6 +1796,7 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling=true"
+    "--iree-dispatch-creation-set-encoding-strategy=padding"
     "--iree-hip-encoding-layout-resolver=pad"
   LABELS
     "noasan"

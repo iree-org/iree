@@ -251,8 +251,10 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
-         "calculateStorageSizeInBytes",
-         "isIdentityLayout",
+        "calculateStorageSizeInBytes",
+        "cloneWithLayouts",
+        "isIdentityLayout",
+        "isSerialized"
         ]>
     ]> {
   let mnemonic = "pad_encoding_layout";
