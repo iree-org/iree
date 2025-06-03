@@ -918,17 +918,17 @@ IREE::Stream::AffinityAttr
 DeviceAffinityAttr::joinOR(IREE::Stream::AffinityAttr other) const {
   if (!other) {
     return *this;
+  } else if (isa<DeviceOptimalAttr>(other)) {
+    return other.joinOR(*this);
+  } else if (auto otherAffinityAttr =
+                 dyn_cast_if_present<DeviceAffinityAttr>(other)) {
+    if (otherAffinityAttr.getDevice() == getDevice()) {
+      return DeviceAffinityAttr::get(getContext(), getDevice(),
+                                     getQueueMask() |
+                                         otherAffinityAttr.getQueueMask());
+    }
   }
-  auto otherAffinityAttr = dyn_cast_if_present<DeviceAffinityAttr>(other);
-  if (!otherAffinityAttr) {
-    return nullptr; // invalid
-  }
-  if (otherAffinityAttr.getDevice() != getDevice()) {
-    return nullptr; // cannot join across devices (could select optimal, though)
-  }
-  return DeviceAffinityAttr::get(getContext(), getDevice(),
-                                 getQueueMask() |
-                                     otherAffinityAttr.getQueueMask());
+  return IREE::HAL::DeviceOptimalAttr::get(getContext(), {*this, other});
 }
 
 IREE::Stream::AffinityAttr
@@ -1041,17 +1041,17 @@ IREE::Stream::AffinityAttr
 DevicePromiseAttr::joinOR(IREE::Stream::AffinityAttr other) const {
   if (!other) {
     return *this;
+  } else if (isa<DeviceOptimalAttr>(other)) {
+    return other.joinOR(*this);
+  } else if (auto otherPromiseAttr =
+                 dyn_cast_if_present<DevicePromiseAttr>(other)) {
+    if (otherPromiseAttr.getDevice() == getDevice()) {
+      return DevicePromiseAttr::get(getContext(), getDevice(),
+                                    getQueueMask() |
+                                        otherPromiseAttr.getQueueMask());
+    }
   }
-  auto otherPromiseAttr = dyn_cast_if_present<DevicePromiseAttr>(other);
-  if (!otherPromiseAttr) {
-    return nullptr; // invalid
-  }
-  if (otherPromiseAttr.getDevice() != getDevice()) {
-    return nullptr; // cannot join across devices (could select optimal, though)
-  }
-  return DevicePromiseAttr::get(getContext(), getDevice(),
-                                getQueueMask() |
-                                    otherPromiseAttr.getQueueMask());
+  return IREE::HAL::DeviceOptimalAttr::get(getContext(), {*this, other});
 }
 
 IREE::Stream::AffinityAttr
