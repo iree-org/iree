@@ -95,11 +95,8 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     return success();
   };
 
-  // TODO(hanchung): Add canonicalization pattern to fold assume_alignment
-  // sequence away.
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      memcpyFn,
-                                      /*injectAssumeAlignmentOp=*/false);
+                                      memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, funcOp))) {
     return signalPassFailure();
   }

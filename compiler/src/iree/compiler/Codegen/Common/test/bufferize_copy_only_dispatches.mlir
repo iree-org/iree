@@ -41,8 +41,10 @@ func.func @tensor_insert_slice() {
 //  CHECK-DAG:   %[[SOURCE_OFFSET_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(6)
 //  CHECK-DAG:   %[[SOURCE_STRIDE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(7)
 //  CHECK-DAG:   %[[SOURCE_STRIDE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(8)
-//  CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  CHECK-DAG:   %[[SOURCE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  CHECK-DAG:   %[[SOURCE:.+]] = memref.assume_alignment %[[SOURCE_BINDING]], 4
+//  CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  CHECK-DAG:   %[[DEST:.+]] = memref.assume_alignment %[[DEST_BINDING]], 4
 //  CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][%[[SOURCE_OFFSET_Y]], %[[SOURCE_OFFSET_X]]] [1, %[[SLICE_SIZE]]] [%[[SOURCE_STRIDE_Y]], %[[SOURCE_STRIDE_X]]]
 //  CHECK-DAG:   %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][%[[DEST_OFFSET_Y]], %[[DEST_OFFSET_X]]] [%[[SLICE_SIZE]], 1] [%[[DEST_STRIDE_Y]], %[[DEST_STRIDE_X]]]
 //      CHECK:   linalg.generic
@@ -65,10 +67,10 @@ func.func @UpSampling1D() {
 }
 
 // CHECK-LABEL: func.func @UpSampling1D()
-//   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//NO-CHECK-DAG:   %[[DEST:.+]] = memref.assume_alignment %[[SUBSPAN_DEST]], 64
-//   CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//NO-CHECK-DAG:   %[[SOURCE:.+]] = memref.assume_alignment %[[SUBSPAN_SOURCE]], 64
+//   CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[DEST:.+]] = memref.assume_alignment %[[DEST_BINDING]], 64
+//   CHECK-DAG:   %[[SOURCE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[SOURCE:.+]] = memref.assume_alignment %[[SOURCE_BINDING]], 64
 //   CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][0, 0, 0] [2, 1, 3]
 //   CHECK-DAG:   %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][0, 0, 0] [2, 1, 3]
 //       CHECK:   linalg.generic
@@ -91,8 +93,8 @@ func.func @concatenate_cst() {
 // CHECK-LABEL: func.func @concatenate_cst()
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
 //   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_buffer %[[CST]] : tensor<2x3xi32> to memref<2x3xi32
-//   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan
-//NO-CHECK-DAG:   %[[DEST:.+]] = memref.assume_alignment %[[DEST_BINDING]], 64
+//   CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan
+//   CHECK-DAG:   %[[DEST:.+]] = memref.assume_alignment %[[DEST_BINDING]], 64
 //   CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[DEST]][0, 2] [2, 3]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       ins(%[[ZERO]] :
