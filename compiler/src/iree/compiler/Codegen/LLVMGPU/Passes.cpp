@@ -99,11 +99,6 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
 
     );
 
-static llvm::cl::opt<bool>
-    clUseDirectLoad("iree-llvmgpu-use-direct-load",
-                    llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -370,11 +365,9 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
 
-  if (clUseDirectLoad) {
-    // Convert linalg.copy to direct loads. This has to be before any
-    // canonicalization.
-    funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
-  }
+  // Convert linalg.copy to direct loads. This has to be before any
+  // canonicalization.
+  funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
 
   addIREEPostBufferizationPasses(funcPassManager);
 
@@ -426,8 +419,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPadOperandsPass());
-  funcPassManager.addPass(
-      createGPUPromoteMatmulOperandsPass({clUseDirectLoad}));
+  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   // Decompose packs and unpacks that are at the function boundary.
   funcPassManager.addPass(createDecomposeBoundaryPackUnPackOpsPass());
@@ -550,8 +542,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  if (pipelineOptions.enableReduceSharedMemoryBankConflicts &&
-      !clUseDirectLoad) {
+  if (pipelineOptions.enableReduceSharedMemoryBankConflicts) {
     GPUReduceBankConflictsPassOptions options = {};
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));

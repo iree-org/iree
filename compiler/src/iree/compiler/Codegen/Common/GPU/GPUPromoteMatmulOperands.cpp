@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -198,12 +199,17 @@ struct GPUPromoteMatmulOperandsPass final
         return;
       }
 
+      SmallVector<bool> useDirectLoad =
+          getUseDirectLoad(loweringConfig)
+              .value_or(SmallVector<bool>(promotedOperands->size(), false));
+
       builder.setInsertionPoint(op);
-      for (auto operand : promotedOperands.value()) {
+      for (auto [operand, directLoadOperand] :
+           llvm::zip_equal(promotedOperands.value(), useDirectLoad)) {
         // TODO: move switch `useDirectLoad` to the promotion attr list.
         // Here using a command line option should be only a temporary
         // solution.
-        promoteOperand(builder, op, operand, useDirectLoad);
+        promoteOperand(builder, op, operand, directLoadOperand);
       }
     });
   }
