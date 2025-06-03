@@ -18,6 +18,10 @@ iree_cc_library(
   SRCS
     "driver.c"
     "driver.h"
+    "executable.c"
+    "executable.h"
+    "executable_cache.c"
+    "executable_cache.h"
     "logical_device.c"
     "logical_device.h"
     "physical_device.c"
