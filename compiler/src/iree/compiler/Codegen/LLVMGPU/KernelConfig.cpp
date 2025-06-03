@@ -117,11 +117,11 @@ static llvm::cl::opt<bool>
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(true));
 
-// Required both here and the GPU pass configuration.
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(false));
+
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
