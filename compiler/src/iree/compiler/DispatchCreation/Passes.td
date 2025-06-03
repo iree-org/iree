@@ -185,13 +185,6 @@ def TransposeGenericOpsPass :
   ];
 }
 
-def BubbleUpExtractSlicesPass : Pass<"iree-dispatch-creation-bubble-up-extract-slices"> {
-  let summary = "Bubble up `extract_slice` ops through Linalg-like ops";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-  ];
-}
-
 //===---------------------------------------------------------------------===//
 // Dispatch region creation passes.
 //===---------------------------------------------------------------------===//
