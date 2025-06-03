@@ -7,13 +7,19 @@
 #include <memory>
 #include <utility>
 
+#include "../../compiler/plugins/target/EXSLERATEV2/exsleratev2/Transforms/MetaData.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
@@ -146,6 +152,272 @@ struct VerifyDevicesPass
         return WalkResult::advance();
       });
     }
+
+    bool anyconvolution = false;
+    //  EXSLERATEV2::globalParamas.reset();
+    //Value bnMean, bnVar;
+   // DenseResourceElementsAttr bnGamma, bnBeta;
+    
+    // for(auto &op : moduleOp.getOps()){
+    //   op.walk([&](linalg::GenericOp genericOp){
+        
+    //     // Find BN variance: Look for AddF and check direct BlockArgument inputs
+    //     if(!bnVar){
+    //       genericOp.getRegion().walk([&](arith::AddFOp addOp){
+    //         auto inputOperands = genericOp.getInputs();
+    //         for(auto input : inputOperands){
+    //           if(auto funcArg = dyn_cast<BlockArgument>(input)){
+    //             if(auto tensorType = dyn_cast<RankedTensorType>(funcArg.getType())){
+    //               if(tensorType.getRank() == 1 && mlir::isa<FloatType>(tensorType.getElementType())){
+    //                 bnVar = funcArg;
+    //                 llvm::outs() << "found bn var " << tensorType.getNumElements() << " elements\n";
+    //                 return WalkResult::interrupt();
+    //               }
+    //             }
+    //           }
+    //         }
+    //         return WalkResult::advance();
+    //       });
+    //     }
+        
+    //     // Find BN mean: Look for SubF and check expand_shape inputs (same as gamma/beta pattern)
+    //     if(!bnMean){
+    //       genericOp.getRegion().walk([&](arith::SubFOp subOp){
+    //         auto inputOperands = genericOp.getInputs();
+    //         for(auto input : inputOperands){
+    //           if(auto definingOp = input.getDefiningOp()){
+    //             if(auto expandOp = dyn_cast<tensor::ExpandShapeOp>(definingOp)){
+    //               auto expandInput = expandOp.getSrc();
+    //               if(auto funcArg = dyn_cast<BlockArgument>(expandInput)){
+    //                 if(auto tensorType = dyn_cast<RankedTensorType>(funcArg.getType())){
+    //                   if(tensorType.getRank() == 1 && mlir::isa<FloatType>(tensorType.getElementType())){
+    //                     bnMean = funcArg;
+    //                     llvm::errs() << "found bn mean " << tensorType.getNumElements() << " elements\n";
+    //                     return WalkResult::interrupt();
+    //                   }
+    //                 }
+    //               }
+    //             }
+    //           }
+    //         }
+    //         return WalkResult::advance();
+    //       });
+    //     }
+    
+    //     // Find BN gamma: Look for MulF and check expand_shape inputs (your existing working code)
+    //     if(!bnGamma){
+    //       genericOp.getRegion().walk([&](arith::MulFOp mulOp){
+    //         auto inputOperands = genericOp.getInputs();
+    //         for(auto input : inputOperands){
+    //           if(auto definingOp = input.getDefiningOp()){
+    //             if(auto expandOp = dyn_cast<tensor::ExpandShapeOp>(definingOp)){
+    //               auto expandInput = expandOp.getSrc();
+    //               if(auto constOp = dyn_cast<arith::ConstantOp>(expandInput.getDefiningOp())){
+    //                 if(auto denseAttr = dyn_cast<DenseResourceElementsAttr>(constOp.getValue())){
+    //                   bnGamma = denseAttr;
+    //                   llvm::errs() << "found bn gamma " << denseAttr.getType().getNumElements() << " elements\n";
+    //                   return WalkResult::interrupt();
+    //                 }
+    //               }
+    //             }
+    //           }
+    //         }
+    //         return WalkResult::advance();
+    //       });
+    //     }
+    
+    //     // Find BN beta: Look for AddF and check expand_shape inputs (your existing working code)
+    //     if(!bnBeta){
+    //       genericOp.getRegion().walk([&](arith::AddFOp addOp){
+    //         auto inputOperands = genericOp.getInputs();
+    //         for(auto input : inputOperands){
+    //           if(auto definingOp = input.getDefiningOp()){
+    //             if(auto expandOp = dyn_cast<tensor::ExpandShapeOp>(definingOp)){
+    //               auto expandInput = expandOp.getSrc();
+    //               if(auto constOp = dyn_cast<arith::ConstantOp>(expandInput.getDefiningOp())){
+    //                 if(auto denseAttr = dyn_cast<DenseResourceElementsAttr>(constOp.getValue())){
+    //                   if(denseAttr != bnGamma){
+    //                     bnBeta = denseAttr;
+    //                     llvm::errs() << "found bn beta " << denseAttr.getType().getNumElements() << " elements\n";
+    //                     return WalkResult::interrupt();
+    //                   }
+    //                 }
+    //               }
+    //             }
+    //           }
+    //         }
+    //         return WalkResult::advance();
+    //       });
+    //     }
+    
+    //     return WalkResult::advance();
+    //   });
+    // }
+
+    for (auto &op : moduleOp.getOps()) {
+      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
+        continue; // ignore executables
+      }
+
+      op.walk([&](Operation *childop) {
+        if (isa<linalg::Conv1DNcwFcwOp, linalg::Conv2DNchwFchwOp,
+                linalg::Conv2DNhwcFhwcOp, linalg::Conv3DNcdhwFcdhwOp>(
+                childop)) {
+          anyconvolution = true;
+          EXSLERATEV2::LayerParams layerParam;
+          bool hasweight = false, hasbias = false;
+
+          if (childop->getNumOperands() >= 2) {
+
+            auto weightOperand = childop->getOperand(1);
+
+            if (auto definingOp = weightOperand.getDefiningOp()) {
+
+              if (auto constOp = dyn_cast<arith::ConstantOp>(definingOp)) {
+
+                if (auto denseattr = dyn_cast<DenseResourceElementsAttr>(
+                        constOp.getValue())) {
+
+                  layerParam.convWeight = denseattr;
+                  hasweight = true;
+
+                  llvm::errs()
+                      << "Extracted convolution weight - Size: "
+                      << denseattr.getType().getNumElements() << " elements\n";
+                }
+              }
+            }
+          }
+
+          auto outsOperand = childop->getOperand(childop->getNumOperands() - 1);
+          if (auto broadcastOp =
+                  dyn_cast<linalg::BroadcastOp>(outsOperand.getDefiningOp())) {
+            auto baisOperand = broadcastOp.getInput();
+
+            if (auto definingOp = baisOperand.getDefiningOp()) {
+              if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
+                if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
+                        constop.getValue())) {
+                  layerParam.convBias = denseAttr;
+                  hasbias = true;
+                  llvm::errs()
+                      << "Extracted convolution bais - Size: "
+                      << denseAttr.getType().getNumElements() << "elements \n";
+                }
+              }
+            }
+          }
+
+          // if (bnGamma) {
+          //   layerParam.bnGamma = bnGamma;
+          //   llvm::outs() << "Assigned BN gamma to layer\n";
+          // }
+          // if (bnBeta) {
+          //   layerParam.bnBeta = bnBeta;
+          //   llvm::outs() << "Assigned BN beta to layer\n";
+          // }
+          // if (bnMean) {
+          //   layerParam.bnMean = bnMean;
+          //   llvm::outs() << "Assigned BN mean to layer\n";
+          // }
+          // if (bnVar) {
+          //   layerParam.bnVar = bnVar;
+          //   llvm::outs() << "Assigned BN var to layer\n";
+          // }
+
+          if (hasweight) {
+            EXSLERATEV2::globalParamas.layers.push_back(layerParam);
+            if (!hasbias) {
+              llvm::errs() << "Note: Convolution has no bias\n";
+            }
+          }
+          return WalkResult::advance(); 
+        }
+
+        return WalkResult::advance();
+      });
+    }
+
+    // if (anyconvolution) {
+    //   llvm::outs() << "Module contains "
+    //                << EXSLERATEV2::globalParamas.layers.size()
+    //                << " convolution operations with extracted weights\n";
+
+    //   if (EXSLERATEV2::globalParamas.layers.empty()) {
+    //     llvm::outs()
+    //         << "Warning: Found convolutions but no weights extracted\n";
+    //   } else {
+    //     llvm::outs() << "Total layers with weights: "
+    //                  << EXSLERATEV2::globalParamas.layers.size() << "\n";
+    //     for (size_t i = 0; i < EXSLERATEV2::globalParamas.layers.size(); ++i) {
+    //       if (EXSLERATEV2::globalParamas.layers[i].convWeight) {
+    //         llvm::outs() << "Layer " << i << " weight elements: "
+    //                      << EXSLERATEV2::globalParamas.layers[i]
+    //                             .convWeight.getType()
+    //                             .getNumElements()
+    //                      << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has empty weight\n";
+    //       }
+
+    //       if (EXSLERATEV2::globalParamas.layers[i].convBias) {
+    //         llvm::outs() << "Layer " << i << " bias elements: "
+    //                      << EXSLERATEV2::globalParamas.layers[i]
+    //                             .convBias.getType()
+    //                             .getNumElements()
+    //                      << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no bias\n";
+    //       }
+
+    //       if (EXSLERATEV2::globalParamas.layers[i].bnGamma) {
+    //         llvm::outs() << "Layer " << i << " BN gamma elements: "
+    //                      << EXSLERATEV2::globalParamas.layers[i]
+    //                             .bnGamma.getType()
+    //                             .getNumElements()
+    //                      << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN gamma\n";
+    //       }
+
+    //       if (EXSLERATEV2::globalParamas.layers[i].bnBeta) {
+    //         llvm::outs() << "Layer " << i << " BN beta elements: "
+    //                      << EXSLERATEV2::globalParamas.layers[i]
+    //                             .bnBeta.getType()
+    //                             .getNumElements()
+    //                      << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN beta\n";
+    //       }
+
+    //       if (EXSLERATEV2::globalParamas.layers[i].bnMean) {
+    //         auto meanType = dyn_cast<RankedTensorType>(
+    //             EXSLERATEV2::globalParamas.layers[i].bnMean.getType());
+    //         if (meanType) {
+    //           llvm::outs() << "Layer " << i
+    //                        << " BN mean elements: " << meanType.getNumElements()
+    //                        << "\n";
+    //         }
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN mean\n";
+    //       }
+
+    //       if (EXSLERATEV2::globalParamas.layers[i].bnVar) {
+    //         auto varType = dyn_cast<RankedTensorType>(
+    //             EXSLERATEV2::globalParamas.layers[i].bnVar.getType());
+    //         if (varType) {
+    //           llvm::outs() << "Layer " << i
+    //                        << " BN var elements: " << varType.getNumElements()
+    //                        << "\n";
+    //         }
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN var\n";
+    //       }
+    //     }
+    //   }
+    // } else {
+    //  // llvm::outs() << "No convolution operations found in module\n";
+    // }
     // TODO(multi-device): the logic above is insufficient; we only need devices
     // if the program will end up requiring them but we don't know that here.
     // We have to wait until we've lowered to the point where we do require a
