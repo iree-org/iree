@@ -17,6 +17,9 @@ set(_BITCODE_HDRS
   "kernels.h"
   "support/common.h"
   "support/kernel_args.h"
+  "support/mutex.h"
+  "support/queue.h"
+  "support/signal.h"
 )
 
 #===------------------------------------------------------------------------===#
