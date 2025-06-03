@@ -312,19 +312,20 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         // Fuse in all other cases.
         return true;
       };
+
+  // Expand/Collapse shape bubbling patterns.
   linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                     bubbleUpExpansionControlFn);
-  bubbleExpandShapePatterns.insert<BubbleUpExtract>(context);
-  bubbleExpandShapePatterns.insert<SwapExtractSliceOfFill>(context);
-
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
       bubbleExpandShapePatterns, bubbleUpExpansionControlFn);
+
+  // Extract slice bubbling patterns.
+  bubbleExpandShapePatterns.insert<BubbleUpExtract>(context);
+  bubbleExpandShapePatterns.insert<SwapExtractSliceOfFill>(context);
 
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
-  tensor::populateReassociativeReshapeFoldingPatterns(
-      bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
