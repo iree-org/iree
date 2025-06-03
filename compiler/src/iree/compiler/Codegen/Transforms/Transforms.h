@@ -110,9 +110,6 @@ void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
 /// Populate patterns that remove dead allocations
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
 
-/// Populate patterns that makes op less dependent on AssumeAlignmentOp.
-void populateCleanMemRefAssumeAlignmentPatterns(RewritePatternSet &patterns);
-
 // Group of Alloc operations that have overlapping liveranges.
 using AliasGroup = SmallVector<Operation *>;
 

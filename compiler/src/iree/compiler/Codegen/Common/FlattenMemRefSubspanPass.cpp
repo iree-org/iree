@@ -760,15 +760,6 @@ struct FlattenMemRefSubspanPass final
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
     MLIRContext *context = &getContext();
-
-    // Reduces the dependencies from AssumeAlignmentOp, so we do not need to
-    // implement custom patterns.
-    RewritePatternSet patterns(context);
-    populateCleanMemRefAssumeAlignmentPatterns(patterns);
-    context->getOrLoadDialect<IREE::Util::UtilDialect>()
-        ->getCanonicalizationPatterns(patterns);
-    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
-
     RewritePatternSet flattenPatterns(context);
 
     // Interface binding subspan ops represents allocations from the runtime. We
