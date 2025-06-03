@@ -1055,18 +1055,6 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
   });
 }
 
-// Iterate over default tuning spec embedded-data files, and insert them into
-// the EmbeddedDataDirectory singleton.
-static void addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory() {
-  EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
-    const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
-    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
-         ++i) {
-      dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
-    }
-  });
-}
-
 } // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL
@@ -1077,8 +1065,6 @@ extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
       "hal_target_rocm");
   mlir::iree_compiler::IREE::HAL::
       addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
-  mlir::iree_compiler::IREE::HAL::
-      addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory();
   return true;
 }
 
