@@ -17,15 +17,12 @@
 namespace mlir::iree_compiler::IREE::Encoding {
 
 // static
-bool SerializableEncodingAttrInterface::areCompatible(Attribute lhs,
-                                                      Attribute rhs) {
+bool SerializableAttr::areCompatible(Attribute lhs, Attribute rhs) {
   if (lhs == rhs) {
     return true;
   }
-  auto lhsEncoding =
-      llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>(lhs);
-  auto rhsEncoding =
-      llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>(rhs);
+  auto lhsEncoding = llvm::dyn_cast_or_null<SerializableAttr>(lhs);
+  auto rhsEncoding = llvm::dyn_cast_or_null<SerializableAttr>(rhs);
   if (!lhsEncoding || !rhsEncoding) {
     return false;
   }

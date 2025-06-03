@@ -14,9 +14,8 @@
 namespace mlir::iree_compiler::IREE::Encoding {
 
 /// Returns the encoding attribute from the type if there is an encoding that
-/// implements SerializableEncodingAttrInterface. Otherwise, returns null.
-SerializableEncodingAttrInterface
-getSerializableEncodingAttrInterface(RankedTensorType type);
+/// implements SerializableAttr. Otherwise, returns null.
+SerializableAttr getSerializableAttr(RankedTensorType type);
 
 /// Returns the encoding attribute from the type if there is an encoding.
 /// Otherwise, returns null.

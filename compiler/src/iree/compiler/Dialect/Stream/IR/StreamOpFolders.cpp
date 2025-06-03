@@ -1471,8 +1471,8 @@ OpFoldResult TensorEncodeOp::fold(FoldAdaptor adaptor) {
     if (!type.getEncoding()) {
       return true;
     }
-    IREE::Encoding::SerializableEncodingAttrInterface attr =
-        IREE::Encoding::getSerializableEncodingAttrInterface(type);
+    IREE::Encoding::SerializableAttr attr =
+        IREE::Encoding::getSerializableAttr(type);
     if (!attr) {
       return false;
     }

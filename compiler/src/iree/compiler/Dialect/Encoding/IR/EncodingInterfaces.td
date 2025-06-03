@@ -14,8 +14,8 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 // Attribute Interfaces
 //===----------------------------------------------------------------------===//
 
-def IREEEncoding_EncodingLayoutResolverAttrInterface :
-  AttrInterface<"EncodingLayoutResolverAttrInterface"> {
+def IREEEncoding_LayoutResolverAttr :
+  AttrInterface<"LayoutResolverAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     Interface used to query layout information needed to materialize encoding
@@ -55,7 +55,7 @@ def IREEEncoding_EncodingLayoutResolverAttrInterface :
       /*desc=*/[{
         Returns the an attribute implementing the  which is either common format
         or wrapped by an attribute that implements the
-        `SerializableEncodingAttrInterface` interface.
+        `SerializableAttr` interface.
         If it is in common format (e.g., a regular tensor type), we can easily
         calculate the storage size. Otherwise, we will need a hook from
         external, and the hook can come from an attribute that implements the
@@ -76,8 +76,8 @@ def IREEEncoding_EncodingLayoutResolverAttrInterface :
   ];
 }
 
-def IREEEncoding_SerializableEncodingAttrInterface :
-  AttrInterface<"SerializableEncodingAttrInterface"> {
+def IREEEncoding_SerializableAttr :
+  AttrInterface<"SerializableAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     Interface for encoding attributes that can be attached on a tensor type. An
@@ -161,12 +161,12 @@ def IREEEncoding_SerializableEncodingAttrInterface :
       /*retTy=*/"bool",
       /*methodName=*/"isCompatibleWith",
       /*args=*/(ins
-        "IREE::Encoding::SerializableEncodingAttrInterface":$other
+        "IREE::Encoding::SerializableAttr":$other
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         auto attr =
-          llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>($_attr);
+          llvm::dyn_cast_or_null<SerializableAttr>($_attr);
         if (!attr) {
           return false;
         }
@@ -201,14 +201,14 @@ def IREEEncoding_SerializableEncodingAttrInterface :
 
   let extraClassDeclaration = [{
     /// Returns true if they are the same attribute. Otherwise, returns true if
-    /// both attributes implement SerializableEncodingAttrInterface interface
+    /// both attributes implement SerializableAttr interface
     /// and they are compatible with each other.
     static bool areCompatible(Attribute lhs, Attribute rhs);
   }];
 }
 
-def IREEEncoding_LayoutAttrInterface :
-  AttrInterface<"LayoutAttrInterface"> {
+def IREEEncoding_LayoutMaterializerAttr :
+  AttrInterface<"LayoutMaterializerAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     An interface that collects a set of methods for encoding materialization.
