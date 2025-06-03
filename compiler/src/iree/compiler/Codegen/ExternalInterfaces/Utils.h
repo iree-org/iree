@@ -27,16 +27,16 @@ static const char kEncodingInfoAttrName[] = "encoding_info";
 // reduce the duplicated implementations before. To inherit it, it requires the
 // derived class to implement the `getConfiguration` method and the
 // `getEncodingInfoImpl` method.
-template <typename DeviceEncodingPackedLayoutAttrInterface,
+template <typename EncodingPackedLayoutMaterializerAttr,
           typename EncodingLayoutAttr>
-struct DevicePackedLayoutAttrExternalModelBase
-    : public IREE::Codegen::PackedLayoutAttrInterface::ExternalModel<
-          DeviceEncodingPackedLayoutAttrInterface, EncodingLayoutAttr> {
+struct PackedLayoutMaterializerAttrExternalModelBase
+    : public IREE::Codegen::PackedLayoutMaterializerAttr::ExternalModel<
+          EncodingPackedLayoutMaterializerAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
-    const DeviceEncodingPackedLayoutAttrInterface *impl =
-        static_cast<const DeviceEncodingPackedLayoutAttrInterface *>(this);
+    const EncodingPackedLayoutMaterializerAttr *impl =
+        static_cast<const EncodingPackedLayoutMaterializerAttr *>(this);
     // If the layout is already resolved, use it directly.
     if (auto config = impl->getConfiguration(attr)) {
       if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
@@ -51,16 +51,15 @@ public:
   }
 };
 
-template <typename DeviceEncodingLayoutAttrInterface,
-          typename EncodingLayoutAttr>
-struct DeviceEncodingLayoutAttrInterfaceExternalModelBase
-    : public IREE::Encoding::LayoutAttrInterface::ExternalModel<
-          DeviceEncodingLayoutAttrInterface, EncodingLayoutAttr> {
+template <typename EncodingLayoutMaterializerAttr, typename EncodingLayoutAttr>
+struct EncodingLayoutMaterializerAttrExternalModelBase
+    : public IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+          EncodingLayoutMaterializerAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(EncodingLayoutAttr layoutAttr, RankedTensorType type) const {
     return getEncodingInfoFromLayout(
-        type, cast<IREE::Encoding::LayoutAttrInterface>(layoutAttr));
+        type, cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
   }
 
   Type convertType(Attribute attr, Type type) const {
@@ -117,7 +116,7 @@ public:
       ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
       SmallVectorImpl<OpFoldResult> &newSizes,
       SmallVectorImpl<OpFoldResult> &newStrides) const {
-    auto layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(attr);
+    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
     // Only handle cases where the slice spans the whole
     // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(jornt): Enable partial slices.
@@ -142,7 +141,7 @@ public:
 
 /// Calculates the storage size in bytes for the given `type` with a packed
 /// layout encoding `attr`. Requirement: `attr` must implement
-/// IREE::Codegen::PackedLayoutAttrInterface.
+/// IREE::Codegen::PackedLayoutMaterializerAttr.
 Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             OpBuilder &builder,
                                             RankedTensorType type,
@@ -156,7 +155,8 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
 /// `addEncodingAttr` is mainly for VMVX ukernel path because the ukernel ops
 /// lowering requires all the information. There are no direct mappings from
 /// layouts to ukernels.
-/// Requirement: `attr` must implement IREE::Codegen::PackedLayoutAttrInterface.
+/// Requirement: `attr` must implement
+/// IREE::Codegen::PackedLayoutMaterializerAttr.
 DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
                                    bool addEncodingAttr = false);
 

@@ -26,7 +26,7 @@ using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Encoding::PadEncodingLayoutAttr;
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
-    IREE::Encoding::LayoutAttrInterface layoutAttr)
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr)
     : layoutAttr(layoutAttr) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });

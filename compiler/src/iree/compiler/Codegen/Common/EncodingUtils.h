@@ -23,9 +23,9 @@ namespace mlir::iree_compiler {
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
   MaterializeEncodingTypeConverter(
-      IREE::Encoding::LayoutAttrInterface layoutAttr);
+      IREE::Encoding::LayoutMaterializerAttr layoutAttr);
 
-  const IREE::Encoding::LayoutAttrInterface &getLayoutAttr() const {
+  const IREE::Encoding::LayoutMaterializerAttr &getLayoutAttr() const {
     return layoutAttr;
   }
 
@@ -60,7 +60,7 @@ public:
       SmallVectorImpl<OpFoldResult> &newStrides) const;
 
 private:
-  const IREE::Encoding::LayoutAttrInterface layoutAttr;
+  const IREE::Encoding::LayoutMaterializerAttr layoutAttr;
 };
 
 /// Conversion target to use for for materializing the encoding.

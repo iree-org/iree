@@ -52,8 +52,7 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
     return success();
   }
 
-  auto serializableEncoding =
-      IREE::Encoding::getSerializableEncodingAttrInterface(encodingType);
+  auto serializableEncoding = IREE::Encoding::getSerializableAttr(encodingType);
   if (serializableEncoding && !serializableEncoding.isSerialized()) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
       d << "unsupported (unserialized) tensor encoding: " << encodingType;

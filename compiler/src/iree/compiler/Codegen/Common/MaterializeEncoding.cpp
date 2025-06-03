@@ -64,11 +64,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     }
 
     auto getTestTargetOrNopLayout =
-        [&]() -> IREE::Encoding::LayoutAttrInterface {
+        [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
         LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
              "(testCLGPUTarget)");
-        return cast<IREE::Encoding::LayoutAttrInterface>(
+        return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingLayoutAttr::get(
                 ctx,
                 DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
@@ -76,7 +76,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       }
       LDBG("Select EncodingNopLayoutAttr attribute as the layout "
            "attribute (Encoding resolver unknown or unsupported).");
-      return cast<IREE::Encoding::LayoutAttrInterface>(
+      return cast<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
 
@@ -87,20 +87,21 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // If the layoutAttr was not found, or if it does not implement the layout
     // resolver interface, fall back to the resolver for getCLGPUTarget. If
     // there is also no test target set, fall back to the nop layout.
-    IREE::Encoding::LayoutAttrInterface layoutAttr =
-        targetConfig ? targetConfig.getAs<IREE::Encoding::LayoutAttrInterface>(
-                           IREE::Encoding::kEncodingResolverAttrName)
-                     : nullptr;
-    auto resolverAttr = llvm::dyn_cast_or_null<
-        IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr =
+        targetConfig
+            ? targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
+                  IREE::Encoding::kEncodingResolverAttrName)
+            : nullptr;
+    auto resolverAttr =
+        llvm::dyn_cast_or_null<IREE::Encoding::LayoutResolverAttr>(layoutAttr);
 
-    IREE::Encoding::LayoutAttrInterface layoutAttrWithTargetInfo =
+    IREE::Encoding::LayoutMaterializerAttr layoutAttrWithTargetInfo =
         layoutAttr && resolverAttr
-            ? cast<IREE::Encoding::LayoutAttrInterface>(
+            ? cast<IREE::Encoding::LayoutMaterializerAttr>(
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
             : getTestTargetOrNopLayout();
 
-    LDBG("Selected LayoutAttrInterface with target configuration: "
+    LDBG("Selected Encoding::LayoutMaterializerAttr with target configuration: "
          << layoutAttrWithTargetInfo);
 
     MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);

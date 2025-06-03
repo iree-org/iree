@@ -22,12 +22,12 @@ namespace mlir::iree_compiler {
 /// otherwise.
 IREE::Codegen::MaterializeEncodingInfo
 getEncodingInfoFromLayout(RankedTensorType type,
-                          IREE::Encoding::LayoutAttrInterface layoutAttr);
+                          IREE::Encoding::LayoutMaterializerAttr layoutAttr);
 
 /// Returns the inner tile sizes to be used for the given tensor type.
 FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     OpBuilder &rewriter, Location loc, RankedTensorType tensorType,
-    IREE::Encoding::LayoutAttrInterface layoutAttr,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo);
 
 /// Returns the materialized packed and swizzled shape for a
@@ -37,7 +37,7 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
 FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensorImpl(
     OpBuilder &builder, Location loc,
     IREE::TensorExt::DispatchTensorType dispatchTensorType,
-    ValueRange dynamicDims, IREE::Encoding::LayoutAttrInterface layoutAttr,
+    ValueRange dynamicDims, IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     IREE::Codegen::MaterializeEncodingInfo encodingInfo);
 
 /// Applies an returns a tile-swizzling permutation to a packed shape.

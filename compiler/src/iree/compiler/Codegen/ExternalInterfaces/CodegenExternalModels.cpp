@@ -15,9 +15,9 @@ namespace mlir::iree_compiler::IREE::Codegen {
 
 using IREE::TensorExt::DispatchTensorType;
 
-struct EncodingNopDeviceLayoutAttrInterface final
-    : IREE::Encoding::LayoutAttrInterface::ExternalModel<
-          EncodingNopDeviceLayoutAttrInterface, EncodingNopLayoutAttr> {
+struct EncodingNopLayoutMaterializerAttr final
+    : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+          EncodingNopLayoutMaterializerAttr, EncodingNopLayoutAttr> {
   Type convertType(Attribute attr, Type type) const {
     return TypeSwitch<Type, Type>(type)
         .Case<RankedTensorType>([&](auto rankedTensorType) {
@@ -63,10 +63,9 @@ struct EncodingNopDeviceLayoutAttrInterface final
   }
 };
 
-struct EncodingNopHostEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          EncodingNopHostEncodingLayoutResolverAttrInterface,
-          EncodingNopLayoutAttr> {
+struct EncodingNopLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          EncodingNopLayoutResolverAttr, EncodingNopLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     return attr;
@@ -78,12 +77,12 @@ struct EncodingNopHostEncodingLayoutResolverAttrInterface final
 };
 
 void registerCodegenExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
-        EncodingNopLayoutAttr::attachInterface<
-            EncodingNopHostEncodingLayoutResolverAttrInterface,
-            EncodingNopDeviceLayoutAttrInterface>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    EncodingNopLayoutAttr::attachInterface<EncodingNopLayoutResolverAttr,
+                                           EncodingNopLayoutMaterializerAttr>(
+        *ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen

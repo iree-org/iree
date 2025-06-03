@@ -14,10 +14,8 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
-SerializableEncodingAttrInterface
-getSerializableEncodingAttrInterface(RankedTensorType type) {
-  return dyn_cast_or_null<SerializableEncodingAttrInterface>(
-      type.getEncoding());
+SerializableAttr getSerializableAttr(RankedTensorType type) {
+  return dyn_cast_or_null<SerializableAttr>(type.getEncoding());
 }
 
 EncodingAttr getEncodingAttr(RankedTensorType type) {
