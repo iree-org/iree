@@ -111,26 +111,6 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Populates the reassociation indices and result shape to materialize the
-        thread layout shape from the subgroup block shape.
-      }],
-      /*retTy=*/"::mlir::LogicalResult",
-      /*methodName=*/"materializeOperandConcreteShape",
-      /*args=*/(ins
-        "::mlir::OpBuilder&":$builder,
-        "::mlir::iree_compiler::IREE::GPU::MMAFragment":$fragment,
-        "::mlir::Value":$operand,
-        "std::optional<::llvm::ArrayRef<int64_t>>":$permutation,
-        "::llvm::SmallVector<::mlir::SmallVector<int64_t, 2>>&":$reassociations,
-        "::mlir::RankedTensorType&":$result_type
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Returns the scope of the MMA operation. See IREEGPUEnums.td for
         available options.
       }],
