@@ -28,7 +28,7 @@ iree_td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//compiler/plugins/target/ROCM/Dialect/ROCM/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
