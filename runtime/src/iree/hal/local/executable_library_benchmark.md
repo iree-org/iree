@@ -73,7 +73,7 @@ ensure that what's being tested is relatively immune to the potential effects
 
 1. Hand-author a `hal.executable.source` op or extract a `hal.executable`
 
-See [iree/hal/local/testdata/elementwise_mul.mlir](iree/hal/local/testdata/elementwise_mul.mlir)
+See [iree/hal/local/testdata/elementwise_mul.mlir](/runtime/src/iree/hal/local/testdata/elementwise_mul.mlir)
 for an example of the former that allows for the same source to be retargeted
 to many different formats/architectures.
 
@@ -91,7 +91,7 @@ iree-compile \
 ```
 
 Note that the architecture and other related LLVM flags must be specified by the
-user. Some examples can be seen in [iree/hal/local/testdata/generate.sh](iree/hal/local/testdata/generate.sh).
+user. Some examples can be seen in [iree/hal/local/testdata/generate.sh](/runtime/src/iree/hal/local/testdata/generate.sh).
 
 3. Setup flags
 

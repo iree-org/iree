@@ -289,6 +289,9 @@ set(IREE_HAL_EXECUTABLE_PLUGIN_EXTRA_DEPS "" CACHE STRING "")
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 
+# AMDGPU support is disabled by default.
+set(IREE_HAL_DRIVER_AMDGPU_DEFAULT OFF)
+
 # CUDA support is disabled by default. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
@@ -309,7 +312,7 @@ endif()
 # binary sizes of minified builds.
 set(IREE_HAL_DRIVER_NULL_DEFAULT OFF)
 string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
-if (IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG"))
+if(IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG"))
   set(IREE_HAL_DRIVER_NULL_DEFAULT ON)
 endif()
 
@@ -320,6 +323,7 @@ if(APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 endif()
 
+option(IREE_HAL_DRIVER_AMDGPU "Enables the `amdgpu` runtime HAL driver" ${IREE_HAL_DRIVER_AMDGPU_DEFAULT})
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
 option(IREE_HAL_DRIVER_HIP "Enables the 'hip' runtime HAL driver" ${IREE_HAL_DRIVER_HIP_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
@@ -370,6 +374,9 @@ if(IREE_BUILD_COMPILER)
 endif()
 
 message(STATUS "IREE HAL drivers:")
+if(IREE_HAL_DRIVER_AMDGPU)
+  message(STATUS "  - amdgpu")
+endif()
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
 endif()
@@ -593,6 +600,7 @@ include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_c_embed_data)
+include(iree_amdgpu_binary)
 include(iree_bitcode_library)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -988,6 +996,10 @@ if(IREE_ALLOCATOR_SYSTEM STREQUAL "mimalloc")
       "-DIREE_ALLOCATOR_MIMALLOC_STATIC_SRC=\"${mimalloc_SOURCE_DIR}/src/static.c\""
     )
   endif()
+endif()
+
+if(IREE_HAL_DRIVER_AMDGPU)
+  add_subdirectory(build_tools/third_party/hsa-runtime-headers EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_HAL_DRIVER_CUDA)
