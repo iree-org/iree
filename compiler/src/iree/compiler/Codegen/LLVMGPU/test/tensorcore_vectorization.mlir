@@ -38,6 +38,8 @@ func.func @dot() {
   return
 }
 
+// Disabled while unmaintained and flaky.
+
 //    CHECK-LABEL: func.func @dot
 // C-HECK-COUNT-4:   vector.transfer_write {{.*}} : vector<16x16xf32>, memref<32x32xf32
 //         C-HECK:   scf.for
