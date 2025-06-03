@@ -111,8 +111,13 @@ struct ResourceAllocOpPattern
     auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
         allocOp, memoryTypes, bufferUsage, rewriter);
 
+    auto memoryTypeOp = rewriter.create<IREE::HAL::MemoryTypeOp>(
+        allocOp.getLoc(), memoryTypes);
+    auto bufferUsageOp = rewriter.create<IREE::HAL::BufferUsageOp>(
+        allocOp.getLoc(), bufferUsage);
+
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateOp>(
-        allocOp, bufferType, allocator, queueAffinity, memoryTypes, bufferUsage,
+        allocOp, bufferType, allocator, queueAffinity, memoryTypeOp, bufferUsageOp,
         adaptor.getStorageSize());
     return success();
   }
