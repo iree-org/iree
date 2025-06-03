@@ -443,8 +443,7 @@ PadEncodingLayoutAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 }
 
 bool PadEncodingLayoutAttr::isSerialized() const {
-  return llvm::all_of(getPadding().asArrayRef(),
-                      [](int64_t val) { return val != ShapedType::kDynamic; });
+  return !ShapedType::isDynamicShape(getPadding().asArrayRef());
 }
 
 bool PadEncodingLayoutAttr::isIdentityLayout() const {

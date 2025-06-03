@@ -480,7 +480,7 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     if (rank != givenPadValues.size()) {
       return nullptr;
     }
-    // TODO: Support dynamic shape of the inner tensor size
+    // TODO: Support dynamic shape of the inner tensor size.
     ArrayRef<int64_t> tensorShape = type.getShape();
     if (tensorShape.back() == ShapedType::kDynamic) {
       return nullptr;
