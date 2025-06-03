@@ -140,8 +140,13 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
   using OpRewritePattern<DimOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(DimOp op,
                                 PatternRewriter &rewriter) const override {
+    Value source = op.getSource();
+    while (auto assumeAlignmentOp =
+               source.getDefiningOp<memref::AssumeAlignmentOp>()) {
+      source = assumeAlignmentOp.getViewSource();
+    }
     auto shapeAwareOp =
-        dyn_cast_or_null<ShapeAwareOpInterface>(op.getSource().getDefiningOp());
+        dyn_cast_or_null<ShapeAwareOpInterface>(source.getDefiningOp());
     if (!shapeAwareOp)
       return failure();
 
@@ -156,7 +161,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     }
 
     // If it's a static dim then just fold to that.
-    auto type = llvm::cast<ShapedType>(op.getSource().getType());
+    auto type = llvm::cast<ShapedType>(source.getType());
     int64_t staticDim = type.getDimSize(index.getZExtValue());
     if (!ShapedType::isDynamic(staticDim)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
@@ -166,8 +171,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     // Otherwise try to get the dynamic dimension cheaply without the need to
     // insert new IR.
     unsigned dynamicIdx = type.getDynamicDimIndex(index.getZExtValue());
-    auto dynamicDims =
-        shapeAwareOp.getResultDynamicDimsFromValue(op.getSource());
+    auto dynamicDims = shapeAwareOp.getResultDynamicDimsFromValue(source);
     rewriter.replaceOp(op, dynamicDims[dynamicIdx]);
 
     return success();
