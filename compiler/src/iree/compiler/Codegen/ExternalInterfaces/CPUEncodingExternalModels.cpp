@@ -11,7 +11,7 @@
 // - IREE::Encoding::EncodingLayoutResolverAttrInterface
 // - IREE::Encoding::SerializableEncodingAttrInterface
 // - IREE::Encoding::LayoutAttrInterface
-// - IREE::Encoding::PackedLayoutAttrInterface
+// - IREE::Codegen::PackedLayoutAttr
 //
 // In these backends, we transpose narrow-N into narrow-M
 // for a combination of reasons:
@@ -279,7 +279,7 @@ lowerContractionOpWithEncoding(OpBuilder &builder, linalg::LinalgOp linalgOp,
 
   MaterializeEncodingInfo encodingInfo = {};
   if (auto packedLayoutAttr =
-          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)) {
+          dyn_cast<IREE::Codegen::PackedLayoutAttr>(layoutAttr)) {
     encodingInfo = packedLayoutAttr.getEncodingInfo(
         cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
   }
@@ -563,9 +563,9 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
-struct CPUDeviceEncodingPackedLayoutAttrInterface
+struct CPUDeviceEncodingPackedLayoutAttr
     : public DevicePackedLayoutAttrExternalModelBase<
-          CPUDeviceEncodingPackedLayoutAttrInterface, CPUEncodingLayoutAttr> {
+          CPUDeviceEncodingPackedLayoutAttr, CPUEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
@@ -699,9 +699,9 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   };
 }
 
-struct VMVXDeviceEncodingPackedLayoutAttrInterface final
+struct VMVXDeviceEncodingPackedLayoutAttr final
     : DevicePackedLayoutAttrExternalModelBase<
-          VMVXDeviceEncodingPackedLayoutAttrInterface, VMVXEncodingLayoutAttr> {
+          VMVXDeviceEncodingPackedLayoutAttr, VMVXEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
@@ -802,19 +802,18 @@ struct VMVXHostSerializableEncodingAttrInterface final
 } // namespace
 
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
-        IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUDeviceEncodingPackedLayoutAttrInterface,
-            CPUDeviceEncodingLayoutAttrInterface,
-            CPUHostEncodingLayoutResolverAttrInterface,
-            CPUHostSerializableEncodingAttrInterface>(*ctx);
-        IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXDeviceEncodingPackedLayoutAttrInterface,
-            VMVXDeviceEncodingLayoutAttrInterface,
-            VMVXHostEncodingLayoutResolverAttrInterface,
-            VMVXHostSerializableEncodingAttrInterface>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::CPU::IREECPUDialect *dialect) {
+    IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
+        CPUDeviceEncodingPackedLayoutAttr, CPUDeviceEncodingLayoutAttrInterface,
+        CPUHostEncodingLayoutResolverAttrInterface,
+        CPUHostSerializableEncodingAttrInterface>(*ctx);
+    IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
+        VMVXDeviceEncodingPackedLayoutAttr,
+        VMVXDeviceEncodingLayoutAttrInterface,
+        VMVXHostEncodingLayoutResolverAttrInterface,
+        VMVXHostSerializableEncodingAttrInterface>(*ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::CPU

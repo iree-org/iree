@@ -24,8 +24,7 @@ getEncodingInfoFromType(RankedTensorType type) {
   }
   ArrayRef<Attribute> layouts = layoutAttr.getLayouts().getValue();
   assert(layouts.size() == 1 && "only single layout is supported");
-  if (auto layout =
-          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layouts[0])) {
+  if (auto layout = dyn_cast<IREE::Codegen::PackedLayoutAttr>(layouts[0])) {
     return layout.getEncodingInfo(type);
   }
   return std::nullopt;
@@ -41,7 +40,7 @@ getEncodingInfoFromLayout(RankedTensorType type,
     return maybeEncodingInfo.value();
   }
   if (auto packedLayoutAttr =
-          dyn_cast<IREE::Codegen::PackedLayoutAttrInterface>(layoutAttr)) {
+          dyn_cast<IREE::Codegen::PackedLayoutAttr>(layoutAttr)) {
     return packedLayoutAttr.getEncodingInfo(type);
   }
   return IREE::Codegen::MaterializeEncodingInfo{};

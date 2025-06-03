@@ -320,10 +320,10 @@ def IREEGPU_GPUEncodingLayoutAttr :
   let description = [{
     This attribute can implement any layout interface methods for encoding
     serialization and or materialization, e.g., Encoding::LayoutAttrInterface,
-    Codegen::PackedLayoutAttrInterface, etc. They should be implemented
-    through external model mechanism because we do not want to relocate
-    domain-specific logic to the dialect implementation, and we can have better
-    code structure. See the implementation in
+    Codegen::PackedLayoutAttr, etc. They should be implemented through external
+    model mechanism because we do not want to relocate domain-specific logic to
+    the dialect implementation, and we can have better code structure. See the
+    implementation in
     compiler/Codegen/ExternalInterfaces/*.
   }];
 

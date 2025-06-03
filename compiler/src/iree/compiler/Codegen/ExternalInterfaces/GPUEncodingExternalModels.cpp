@@ -10,7 +10,7 @@
 // - IREE::Encoding::EncodingLayoutResolverAttrInterface
 // - IREE::Encoding::SerializableEncodingAttrInterface
 // - IREE::Encoding::LayoutAttrInterface
-// - IREE::Encoding::PackedLayoutAttrInterface
+// - IREE::Encoding::PackedLayoutAttr
 //
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
@@ -307,9 +307,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
   return mmaOp;
 }
 
-struct GPUDeviceEncodingPackedLayoutAttrInterface
+struct GPUDeviceEncodingPackedLayoutAttr
     : public DevicePackedLayoutAttrExternalModelBase<
-          GPUDeviceEncodingPackedLayoutAttrInterface, GPUEncodingLayoutAttr> {
+          GPUDeviceEncodingPackedLayoutAttr, GPUEncodingLayoutAttr> {
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
   }
@@ -534,7 +534,7 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-            GPUDeviceEncodingPackedLayoutAttrInterface,
+            GPUDeviceEncodingPackedLayoutAttr,
             GPUDeviceEncodingLayoutAttrInterface,
             GPUHostEncodingLayoutResolverAttrInterface,
             GPUHostSerializableEncodingAttrInterface>(*ctx);

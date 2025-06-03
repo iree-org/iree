@@ -27,16 +27,15 @@ static const char kEncodingInfoAttrName[] = "encoding_info";
 // reduce the duplicated implementations before. To inherit it, it requires the
 // derived class to implement the `getConfiguration` method and the
 // `getEncodingInfoImpl` method.
-template <typename DeviceEncodingPackedLayoutAttrInterface,
-          typename EncodingLayoutAttr>
+template <typename DeviceEncodingPackedLayoutAttr, typename EncodingLayoutAttr>
 struct DevicePackedLayoutAttrExternalModelBase
-    : public IREE::Codegen::PackedLayoutAttrInterface::ExternalModel<
-          DeviceEncodingPackedLayoutAttrInterface, EncodingLayoutAttr> {
+    : public IREE::Codegen::PackedLayoutAttr::ExternalModel<
+          DeviceEncodingPackedLayoutAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
-    const DeviceEncodingPackedLayoutAttrInterface *impl =
-        static_cast<const DeviceEncodingPackedLayoutAttrInterface *>(this);
+    const DeviceEncodingPackedLayoutAttr *impl =
+        static_cast<const DeviceEncodingPackedLayoutAttr *>(this);
     // If the layout is already resolved, use it directly.
     if (auto config = impl->getConfiguration(attr)) {
       if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
@@ -142,7 +141,7 @@ public:
 
 /// Calculates the storage size in bytes for the given `type` with a packed
 /// layout encoding `attr`. Requirement: `attr` must implement
-/// IREE::Codegen::PackedLayoutAttrInterface.
+/// IREE::Codegen::PackedLayoutAttr.
 Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             OpBuilder &builder,
                                             RankedTensorType type,
@@ -156,7 +155,7 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
 /// `addEncodingAttr` is mainly for VMVX ukernel path because the ukernel ops
 /// lowering requires all the information. There are no direct mappings from
 /// layouts to ukernels.
-/// Requirement: `attr` must implement IREE::Codegen::PackedLayoutAttrInterface.
+/// Requirement: `attr` must implement IREE::Codegen::PackedLayoutAttr.
 DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
                                    bool addEncodingAttr = false);
 
