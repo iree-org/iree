@@ -58,10 +58,9 @@ LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
   if (layouts.empty()) {
     return emitError() << "expected non-empty layouts";
   }
-  if (!llvm::all_of(layouts,
-                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
+  if (!llvm::all_of(layouts, llvm::IsaPred<SerializableAttr>)) {
     return emitError() << "expected all the layout attributes to implement "
-                          "SerializableEncodingAttrInterface";
+                          "SerializableAttr";
   }
   return success();
 }
@@ -69,7 +68,7 @@ LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
 bool LayoutAttr::isSerialized() const { return true; }
 
 bool LayoutAttr::isIdentityLayout() const {
-  auto layouts = getLayouts().getAsRange<SerializableEncodingAttrInterface>();
+  auto layouts = getLayouts().getAsRange<SerializableAttr>();
   return llvm::all_of(layouts,
                       [](auto attr) { return attr.isIdentityLayout(); });
 }
@@ -79,8 +78,7 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
                                               ValueRange dynamicDims) const {
   ArrayAttr layoutsAttr = getLayouts();
   Value res;
-  for (auto attr :
-       layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
+  for (auto attr : layoutsAttr.getAsRange<SerializableAttr>()) {
     Value requestedSize =
         attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
     if (!res) {

@@ -47,7 +47,7 @@ def EncodingOpTypeAttr:
 
 def LayoutAttr :
     IREEEncoding_Attr<"Layout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "isIdentityLayout",
         "calculateStorageSizeInBytes",
@@ -62,7 +62,7 @@ def LayoutAttr :
     array because a device could have multiple target layouts.
 
     It has a verifier that will ensure that all the attributes in layouts
-    implement SerializableEncodingAttrInterface.
+    implement SerializableAttr.
   }];
 
   let parameters = (ins
@@ -99,7 +99,7 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>,
@@ -189,7 +189,7 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>,
@@ -250,7 +250,7 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "cloneWithLayouts",
         "isIdentityLayout",
@@ -346,7 +346,7 @@ def UnsupportedEncodingAttr :
 
 def TestingEncodingAttr :
     IREEEncoding_Attr<"TestingEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>
@@ -406,7 +406,7 @@ def UnspecializedEncodingAttr :
 
 def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
-      IREEEncoding_SerializableEncodingAttrInterface
+      IREEEncoding_SerializableAttr
     ]> {
   let mnemonic = "specialized_encoding";
   let assemblyFormat = "`<` $seed (`,` $type^)? `>`";

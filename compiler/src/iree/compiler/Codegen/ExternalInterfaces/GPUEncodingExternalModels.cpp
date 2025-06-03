@@ -8,7 +8,7 @@
 // This file implements the following interfaces for GPU backends:
 //
 // - IREE::Encoding::EncodingLayoutResolverAttrInterface
-// - IREE::Encoding::SerializableEncodingAttrInterface
+// - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Encoding::PackedLayoutAttr
 //
@@ -380,9 +380,9 @@ struct GPUDeviceEncodingLayoutMaterializerAttr
   }
 };
 
-struct GPUHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
-          GPUHostSerializableEncodingAttrInterface, GPUEncodingLayoutAttr> {
+struct GPUHostSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<GPUHostSerializableAttr,
+                                                      GPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -537,7 +537,7 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
             GPUDeviceEncodingPackedLayoutAttr,
             GPUDeviceEncodingLayoutMaterializerAttr,
             GPUHostEncodingLayoutResolverAttrInterface,
-            GPUHostSerializableEncodingAttrInterface>(*ctx);
+            GPUHostSerializableAttr>(*ctx);
         IREE::GPU::GPUPadLayoutAttr::attachInterface<
             GPUPadDeviceEncodingLayoutMaterializerAttr,
             GPUPadEncodingLayoutResolverAttrInterface>(*ctx);

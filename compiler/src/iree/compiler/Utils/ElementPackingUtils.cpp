@@ -91,7 +91,7 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder) {
   if (auto serializableEncodingAttr =
-          IREE::Encoding::getSerializableEncodingAttrInterface(shapedType)) {
+          IREE::Encoding::getSerializableAttr(shapedType)) {
     return serializableEncodingAttr.calculateStorageSizeInBytes(
         loc, builder, shapedType, dynamicDims);
   }

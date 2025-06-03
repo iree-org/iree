@@ -9,7 +9,7 @@
 // backend:
 //
 // - IREE::Encoding::EncodingLayoutResolverAttrInterface
-// - IREE::Encoding::SerializableEncodingAttrInterface
+// - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Codegen::PackedLayoutAttr
 //
@@ -652,9 +652,9 @@ struct CPUHostEncodingLayoutResolverAttrInterface final
   }
 };
 
-struct CPUHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
-          CPUHostSerializableEncodingAttrInterface, CPUEncodingLayoutAttr> {
+struct CPUHostSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<CPUHostSerializableAttr,
+                                                      CPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -787,9 +787,9 @@ struct VMVXHostEncodingLayoutResolverAttrInterface final
   }
 };
 
-struct VMVXHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
-          VMVXHostSerializableEncodingAttrInterface, VMVXEncodingLayoutAttr> {
+struct VMVXHostSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<VMVXHostSerializableAttr,
+                                                      VMVXEncodingLayoutAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
@@ -801,19 +801,19 @@ struct VMVXHostSerializableEncodingAttrInterface final
 } // namespace
 
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
-        IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUDeviceEncodingPackedLayoutAttr,
-            CPUDeviceEncodingLayoutMaterializerAttr,
-            CPUHostEncodingLayoutResolverAttrInterface,
-            CPUHostSerializableEncodingAttrInterface>(*ctx);
-        IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXDeviceEncodingPackedLayoutAttr,
-            VMVXDeviceEncodingLayoutMaterializerAttr,
-            VMVXHostEncodingLayoutResolverAttrInterface,
-            VMVXHostSerializableEncodingAttrInterface>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::CPU::IREECPUDialect *dialect) {
+    IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
+        CPUDeviceEncodingPackedLayoutAttr,
+        CPUDeviceEncodingLayoutMaterializerAttr,
+        CPUHostEncodingLayoutResolverAttrInterface, CPUHostSerializableAttr>(
+        *ctx);
+    IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
+        VMVXDeviceEncodingPackedLayoutAttr,
+        VMVXDeviceEncodingLayoutMaterializerAttr,
+        VMVXHostEncodingLayoutResolverAttrInterface, VMVXHostSerializableAttr>(
+        *ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::CPU
