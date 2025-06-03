@@ -119,23 +119,19 @@ func.func @argmax_f32i64_without_selected_ukernel(%arg0 : tensor<1x?xf32>) -> te
 
 // -----
 
-func.func @argmax_invalid_index_without_selected_ukernel() -> tensor<i64> {
-  %c0_f32 = arith.constant 0.0 : f32
+func.func @argmax_invalid_index_without_selected_ukernel(
+    %input: tensor<131072xf32>,
+    %init_val_arg: tensor<f32>,
+    %init_idx_arg: tensor<i64>
+) -> tensor<i64> {
   %c0_i64 = arith.constant 0 : i64
   %cst_min = arith.constant 0xFF800000 : f32  // -inf
-
-  %input_empty = tensor.empty() : tensor<131072xf32>
-  %input = linalg.fill ins(%c0_f32 : f32)
-            outs(%input_empty : tensor<131072xf32>) -> tensor<131072xf32>
-
-  %init_val_empty = tensor.empty() : tensor<f32>
   %init_val = linalg.fill ins(%cst_min : f32)
-              outs(%init_val_empty : tensor<f32>) -> tensor<f32>
-
-  %init_idx_empty = tensor.empty() : tensor<i64>
+              outs(%init_val_arg : tensor<f32>) -> tensor<f32>
   %init_idx = linalg.fill ins(%c0_i64 : i64)
-              outs(%init_idx_empty : tensor<i64>) -> tensor<i64>
+              outs(%init_idx_arg : tensor<i64>) -> tensor<i64>
 
+  // Argmax-style reduction with a matcher-breaking intermediate op (`addi`).
   %result:2 = linalg.generic {
       indexing_maps = [
         affine_map<(d0) -> (d0)>,
@@ -148,7 +144,7 @@ func.func @argmax_invalid_index_without_selected_ukernel() -> tensor<i64> {
     ^bb0(%in: f32, %val: f32, %idx: i64):
       %i = linalg.index 0 : index
       %cast = arith.index_cast %i : index to i64
-      // intermediate op breaks isArgmaxOp matcher.
+      // Breaks isArgmaxOp matching
       %plus = arith.addi %cast, %c0_i64 : i64
       %maxval = arith.maximumf %in, %val : f32
       %cmp = arith.cmpf ogt, %in, %val : f32

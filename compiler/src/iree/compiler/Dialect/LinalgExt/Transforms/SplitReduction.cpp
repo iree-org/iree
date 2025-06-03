@@ -641,20 +641,24 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     }
   }
 
-  // Step 1: Create partial linalg.generic op for strict argmax.
+  // Step 1: Create a pure argmax to partially reduce the split dimension. The
+  // result will contain local indices within each reduction group, which need
+  // to be adjusted to the global index later.
   auto partialArgmax = rewriter.create<linalg::GenericOp>(
       loc, TypeRange{identityValue.getType(), identityIndex.getType()},
       newInputs, ValueRange{identityValue, identityIndex}, newMaps,
       newIteratorTypes,
       [reductionDim](OpBuilder &b, Location loc, ValueRange args) {
         Value in = args[0], outVal = args[1], outIdx = args[2];
-        Value redIdx = b.create<linalg::IndexOp>(loc, reductionDim + 1);
-        if (outIdx.getType() != redIdx.getType())
-          redIdx = b.create<arith::IndexCastOp>(loc, outIdx.getType(), redIdx);
+        Value reductionIdx = b.create<linalg::IndexOp>(loc, reductionDim + 1);
+        if (outIdx.getType() != reductionIdx.getType())
+          reductionIdx =
+              b.create<arith::IndexCastOp>(loc, outIdx.getType(), reductionIdx);
         Value maxVal = b.create<arith::MaximumFOp>(loc, in, outVal);
         Value cmp =
             b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT, in, outVal);
-        Value selIdx = b.create<arith::SelectOp>(loc, cmp, redIdx, outIdx);
+        Value selIdx =
+            b.create<arith::SelectOp>(loc, cmp, reductionIdx, outIdx);
         b.create<linalg::YieldOp>(loc, ValueRange{maxVal, selIdx});
       });
 
