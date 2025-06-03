@@ -307,9 +307,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
   return mmaOp;
 }
 
-struct GPUDeviceEncodingPackedLayoutAttr
-    : public DevicePackedLayoutAttrExternalModelBase<
-          GPUDeviceEncodingPackedLayoutAttr, GPUEncodingLayoutAttr> {
+struct GPUEncodingPackedLayoutAttr
+    : public PackedLayoutAttrExternalModelBase<GPUEncodingPackedLayoutAttr,
+                                               GPUEncodingLayoutAttr> {
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
   }
@@ -359,9 +359,9 @@ struct GPUDeviceEncodingPackedLayoutAttr
   }
 };
 
-struct GPUDeviceEncodingLayoutMaterializerAttr
-    : public DeviceEncodingLayoutMaterializerAttrExternalModelBase<
-          GPUDeviceEncodingLayoutMaterializerAttr, GPUEncodingLayoutAttr> {
+struct GPUEncodingLayoutMaterializerAttr
+    : public EncodingLayoutMaterializerAttrExternalModelBase<
+          GPUEncodingLayoutMaterializerAttr, GPUEncodingLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -380,8 +380,8 @@ struct GPUDeviceEncodingLayoutMaterializerAttr
   }
 };
 
-struct GPUHostSerializableAttr final
-    : IREE::Encoding::SerializableAttr::ExternalModel<GPUHostSerializableAttr,
+struct GPUSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<GPUSerializableAttr,
                                                       GPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
@@ -392,9 +392,9 @@ struct GPUHostSerializableAttr final
   }
 };
 
-struct GPUHostLayoutResolverAttr final
-    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          GPUHostLayoutResolverAttr, GPUEncodingLayoutAttr> {
+struct GPULayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<GPULayoutResolverAttr,
+                                                        GPUEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -416,9 +416,9 @@ struct GPUHostLayoutResolverAttr final
   }
 };
 
-struct GPUPadDeviceEncodingLayoutMaterializerAttr final
+struct GPUPadEncodingLayoutMaterializerAttr final
     : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
-          GPUPadDeviceEncodingLayoutMaterializerAttr, GPUPadLayoutAttr> {
+          GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -534,12 +534,10 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::GPU::IREEGPUDialect *dialect) {
     IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-        GPUDeviceEncodingPackedLayoutAttr,
-        GPUDeviceEncodingLayoutMaterializerAttr, GPUHostLayoutResolverAttr,
-        GPUHostSerializableAttr>(*ctx);
+        GPUEncodingPackedLayoutAttr, GPUEncodingLayoutMaterializerAttr,
+        GPULayoutResolverAttr, GPUSerializableAttr>(*ctx);
     IREE::GPU::GPUPadLayoutAttr::attachInterface<
-        GPUPadDeviceEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(
-        *ctx);
+        GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(*ctx);
   });
 }
 

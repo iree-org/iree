@@ -27,15 +27,15 @@ static const char kEncodingInfoAttrName[] = "encoding_info";
 // reduce the duplicated implementations before. To inherit it, it requires the
 // derived class to implement the `getConfiguration` method and the
 // `getEncodingInfoImpl` method.
-template <typename DeviceEncodingPackedLayoutAttr, typename EncodingLayoutAttr>
-struct DevicePackedLayoutAttrExternalModelBase
+template <typename EncodingPackedLayoutAttr, typename EncodingLayoutAttr>
+struct PackedLayoutAttrExternalModelBase
     : public IREE::Codegen::PackedLayoutAttr::ExternalModel<
-          DeviceEncodingPackedLayoutAttr, EncodingLayoutAttr> {
+          EncodingPackedLayoutAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
-    const DeviceEncodingPackedLayoutAttr *impl =
-        static_cast<const DeviceEncodingPackedLayoutAttr *>(this);
+    const EncodingPackedLayoutAttr *impl =
+        static_cast<const EncodingPackedLayoutAttr *>(this);
     // If the layout is already resolved, use it directly.
     if (auto config = impl->getConfiguration(attr)) {
       if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
@@ -50,11 +50,10 @@ public:
   }
 };
 
-template <typename DeviceEncodingLayoutMaterializerAttr,
-          typename EncodingLayoutAttr>
-struct DeviceEncodingLayoutMaterializerAttrExternalModelBase
+template <typename EncodingLayoutMaterializerAttr, typename EncodingLayoutAttr>
+struct EncodingLayoutMaterializerAttrExternalModelBase
     : public IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
-          DeviceEncodingLayoutMaterializerAttr, EncodingLayoutAttr> {
+          EncodingLayoutMaterializerAttr, EncodingLayoutAttr> {
 public:
   IREE::Codegen::MaterializeEncodingInfo
   getEncodingInfo(EncodingLayoutAttr layoutAttr, RankedTensorType type) const {

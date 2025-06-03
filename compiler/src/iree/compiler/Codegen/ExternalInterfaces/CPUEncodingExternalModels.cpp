@@ -562,9 +562,9 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
-struct CPUDeviceEncodingPackedLayoutAttr
-    : public DevicePackedLayoutAttrExternalModelBase<
-          CPUDeviceEncodingPackedLayoutAttr, CPUEncodingLayoutAttr> {
+struct CPUEncodingPackedLayoutAttr
+    : public PackedLayoutAttrExternalModelBase<CPUEncodingPackedLayoutAttr,
+                                               CPUEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
@@ -612,9 +612,9 @@ struct CPUDeviceEncodingPackedLayoutAttr
   }
 };
 
-struct CPUDeviceEncodingLayoutMaterializerAttr final
-    : public DeviceEncodingLayoutMaterializerAttrExternalModelBase<
-          CPUDeviceEncodingLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
+struct CPUEncodingLayoutMaterializerAttr final
+    : public EncodingLayoutMaterializerAttrExternalModelBase<
+          CPUEncodingLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
@@ -632,9 +632,9 @@ struct CPUDeviceEncodingLayoutMaterializerAttr final
   }
 };
 
-struct CPUHostLayoutResolverAttr final
-    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          CPUHostLayoutResolverAttr, CPUEncodingLayoutAttr> {
+struct CPULayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<CPULayoutResolverAttr,
+                                                        CPUEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -652,8 +652,8 @@ struct CPUHostLayoutResolverAttr final
   }
 };
 
-struct CPUHostSerializableAttr final
-    : IREE::Encoding::SerializableAttr::ExternalModel<CPUHostSerializableAttr,
+struct CPUSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
                                                       CPUEncodingLayoutAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
@@ -698,9 +698,9 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
   };
 }
 
-struct VMVXDeviceEncodingPackedLayoutAttr final
-    : DevicePackedLayoutAttrExternalModelBase<
-          VMVXDeviceEncodingPackedLayoutAttr, VMVXEncodingLayoutAttr> {
+struct VMVXEncodingPackedLayoutAttr final
+    : PackedLayoutAttrExternalModelBase<VMVXEncodingPackedLayoutAttr,
+                                        VMVXEncodingLayoutAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
     return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
@@ -748,9 +748,9 @@ struct VMVXDeviceEncodingPackedLayoutAttr final
   }
 };
 
-struct VMVXDeviceEncodingLayoutMaterializerAttr final
-    : DeviceEncodingLayoutMaterializerAttrExternalModelBase<
-          VMVXDeviceEncodingLayoutMaterializerAttr, VMVXEncodingLayoutAttr> {
+struct VMVXEncodingLayoutMaterializerAttr final
+    : EncodingLayoutMaterializerAttrExternalModelBase<
+          VMVXEncodingLayoutMaterializerAttr, VMVXEncodingLayoutAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
@@ -768,9 +768,9 @@ struct VMVXDeviceEncodingLayoutMaterializerAttr final
   }
 };
 
-struct VMVXHostLayoutResolverAttr final
+struct VMVXLayoutResolverAttr final
     : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          VMVXHostLayoutResolverAttr, VMVXEncodingLayoutAttr> {
+          VMVXLayoutResolverAttr, VMVXEncodingLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -787,8 +787,8 @@ struct VMVXHostLayoutResolverAttr final
   }
 };
 
-struct VMVXHostSerializableAttr final
-    : IREE::Encoding::SerializableAttr::ExternalModel<VMVXHostSerializableAttr,
+struct VMVXSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<VMVXSerializableAttr,
                                                       VMVXEncodingLayoutAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -804,13 +804,11 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
         IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
-            CPUDeviceEncodingPackedLayoutAttr,
-            CPUDeviceEncodingLayoutMaterializerAttr, CPUHostLayoutResolverAttr,
-            CPUHostSerializableAttr>(*ctx);
+            CPUEncodingPackedLayoutAttr, CPUEncodingLayoutMaterializerAttr,
+            CPULayoutResolverAttr, CPUSerializableAttr>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
-            VMVXDeviceEncodingPackedLayoutAttr,
-            VMVXDeviceEncodingLayoutMaterializerAttr,
-            VMVXHostLayoutResolverAttr, VMVXHostSerializableAttr>(*ctx);
+            VMVXEncodingPackedLayoutAttr, VMVXEncodingLayoutMaterializerAttr,
+            VMVXLayoutResolverAttr, VMVXSerializableAttr>(*ctx);
       });
 }
 

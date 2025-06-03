@@ -15,9 +15,9 @@ namespace mlir::iree_compiler::IREE::Codegen {
 
 using IREE::TensorExt::DispatchTensorType;
 
-struct EncodingNopDeviceLayoutMaterializerAttr final
+struct EncodingNopLayoutMaterializerAttr final
     : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
-          EncodingNopDeviceLayoutMaterializerAttr, EncodingNopLayoutAttr> {
+          EncodingNopLayoutMaterializerAttr, EncodingNopLayoutAttr> {
   Type convertType(Attribute attr, Type type) const {
     return TypeSwitch<Type, Type>(type)
         .Case<RankedTensorType>([&](auto rankedTensorType) {
@@ -63,9 +63,9 @@ struct EncodingNopDeviceLayoutMaterializerAttr final
   }
 };
 
-struct EncodingNopHostLayoutResolverAttr final
+struct EncodingNopLayoutResolverAttr final
     : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          EncodingNopHostLayoutResolverAttr, EncodingNopLayoutAttr> {
+          EncodingNopLayoutResolverAttr, EncodingNopLayoutAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     return attr;
@@ -77,12 +77,12 @@ struct EncodingNopHostLayoutResolverAttr final
 };
 
 void registerCodegenExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
-        EncodingNopLayoutAttr::attachInterface<
-            EncodingNopHostLayoutResolverAttr,
-            EncodingNopDeviceLayoutMaterializerAttr>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    EncodingNopLayoutAttr::attachInterface<EncodingNopLayoutResolverAttr,
+                                           EncodingNopLayoutMaterializerAttr>(
+        *ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen
