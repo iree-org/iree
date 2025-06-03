@@ -24,7 +24,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
-  // Apply AMD GPU targetting patterns
+  // Apply AMD GPU targeting patterns.
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();

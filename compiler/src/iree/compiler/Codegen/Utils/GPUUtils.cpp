@@ -444,10 +444,10 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   // gpu.shuffle ops.
   if (!expandSubgroupReduce && numLaneToReduce <= warpSize &&
       warpSize % numLaneToReduce == 0) {
-    auto gpuReduceKind = combiningKindToAllReduce(kind);
+    gpu::AllReduceOperation gpuReduceKind = combiningKindToAllReduce(kind);
 
-    // SPIRV doesn't support clustered reduction, so if possible, avoid adding
-    // problematic attribute until it is supported.
+    // SPIRV currently doesn't have a lowering for clustered reduction,
+    // so if possible avoid adding problematic attribute until it is supported.
     if (numLaneToReduce == warpSize) {
       return builder.create<gpu::SubgroupReduceOp>(loc, input, gpuReduceKind,
                                                    /*uniform=*/false);
@@ -649,8 +649,8 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
                                                 identity, loadVal);
     }
-    laneVal =
-        warpReduction(loc, builder, loadVal, kind, warpSize, numWarp, true);
+    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
+                            /*expandSubgroupReduce=*/true);
   }
 
   return laneVal;

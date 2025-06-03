@@ -1163,7 +1163,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   // Run checks on shared memory usage.
   funcPassManager
-      .addPass([&]() {
+      .addPass([&] {
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
@@ -1263,7 +1263,7 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     options.forROCDL = useROCM;
     FunctionLikeNest(modulePassManager)
         .addPass(
-            [&]() { return createLLVMGPULowerExecutableTargetPass(options); })
+            [&] { return createLLVMGPULowerExecutableTargetPass(options); })
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   {

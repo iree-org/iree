@@ -70,7 +70,7 @@ public:
       addGPUBaseLoweringPassPipeline(pipeline);
       break;
     case CodeGenPipeline::LLVMGPUWarpReduction:
-      addGPUWarpReductionPassPipeline(pipeline, true);
+      addGPUWarpReductionPassPipeline(pipeline, /*forROCDL=*/true);
       break;
     case CodeGenPipeline::LLVMGPUTileAndFuse:
       addGPUTileAndFusePassPipeline(pipeline, pipelineOptions);
