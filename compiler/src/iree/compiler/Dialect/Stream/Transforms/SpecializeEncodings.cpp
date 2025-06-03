@@ -86,11 +86,9 @@ static bool isRecognizedEncodingType(Type type) {
 /// There are requirements to get the resolved layouts. Otherwise, the encodings
 /// are dropped.
 ///   - All attributes in the `layoutResolvers` must implement
-///     LayoutResolverAttr. Otherwise, there is no way to query
-///     layouts.
-///   - The encoding on the type must implement
-///     SerializableAttr. Otherwise, there is no way to update
-///     encodings.
+///     LayoutResolverAttr. Otherwise, there is no way to query layouts.
+///   - The encoding on the type must implement SerializableAttr. Otherwise,
+///     there is no way to update encodings.
 static Type getTypeWithResolvedEncodingLayouts(
     Type type, const SetVector<Attribute> &layoutResolvers) {
   if (!isRecognizedEncodingType(type)) {
