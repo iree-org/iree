@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -22,12 +22,10 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
     Location loc = op.getLoc();
     Value input = op.getOperand();
     Type resultType = op.getType();
-    if(resultType.isF16()) {
-        input = rewriter.create<arith::FPToSIOp>(loc, rewriter.getF32Type(), input);
-    }
-    // Erf only supports float inputs. -- TODO
+
+    // Erf only supports f32.
     else if(!resultType.isF32()) {
-      return rewriter.notifyMatchFailure(op, "Input type must be f16 or f32");
+      return rewriter.notifyMatchFailure(op, "Result only supports f32");
     }
     // Create constants
     auto f32Type = rewriter.getF32Type();
@@ -115,9 +113,6 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
     
     // Restore the sign: BUILTIN_COPYSIGN_F32(ret, x)
     Value finalResult = rewriter.create<math::CopySignOp>(loc, ifOp.getResult(0), input);
-    if(resultType.isF16()) {
-        finalResult = rewriter.create<arith::TruncFOp>(loc, resultType, finalResult);
-    }
     // Replace the original op with our implementation
     rewriter.replaceOp(op, finalResult);
     
