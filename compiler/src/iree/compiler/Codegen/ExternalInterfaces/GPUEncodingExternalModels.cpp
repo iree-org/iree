@@ -10,7 +10,7 @@
 // - IREE::Encoding::LayoutResolverAttr
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
-// - IREE::Encoding::PackedLayoutAttr
+// - IREE::Codegen::PackedLayoutAttr
 //
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
