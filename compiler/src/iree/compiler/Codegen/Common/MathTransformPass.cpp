@@ -109,8 +109,7 @@ static bool predicateF32Cast(StringRef name,
 }
 
 static bool predicateApprox(StringRef name,
-                            IREE::HAL::ExecutableTargetAttr target,
-                            bool hasFastExp) {
+                            IREE::HAL::ExecutableTargetAttr target) {
   if (isROCMBackend(target)) {
     // On ROCm, we do not need most rewrites as we can generally bottom out on
     // either device library functions, or handling of intrinsics in AMDGPU.
@@ -122,6 +121,10 @@ static bool predicateApprox(StringRef name,
     // something that we can really prevent. Avoiding this rewrite helps a bit.
     return false;
   }
+  
+  // Compute hasFastExp from target attribute
+  bool hasFastExp = isROCMBackend(target);
+  
   // Continue with the existing list for standard approximations
   StringRef acos = math::AcosOp::getOperationName();
   StringRef asin = math::AsinOp::getOperationName();
@@ -154,13 +157,15 @@ static bool predicateApprox(StringRef name,
 
 // Add a new predicate function for device-lib implementations
 static bool predicateDeviceLibImpl(StringRef name,
-                             IREE::HAL::ExecutableTargetAttr target,
-                             bool hasFastExp) {
-  // If fast exp is not available, don't use device-lib implementations
+                             IREE::HAL::ExecutableTargetAttr target) {
+  // Compute hasFastExp from target attribute
+  bool hasFastExp = isROCMBackend(target);
+  
+  // If fast exp is not available, don't use device-lib implementations.
   if (!hasFastExp)
     return false;
     
-  // Only apply to erf for now
+  // Only apply to erf for now.
   StringRef erf = math::ErfOp::getOperationName();
   return llvm::is_contained({erf}, name);
 }
@@ -204,15 +209,15 @@ public:
 
     populateMathPolynomialApproximationPatterns(
         patterns,
-        [this, target](StringRef name) { 
-          return predicateApprox(name, target, hasFastExp); 
+        [target](StringRef name) { 
+          return predicateApprox(name, target); 
         });
         
     // Add device-lib implementation patterns
     populateDeviceLibMathPatterns(
         patterns,
-        [this, target](StringRef name) { 
-          return predicateDeviceLibImpl(name, target, hasFastExp); 
+        [target](StringRef name) { 
+          return predicateDeviceLibImpl(name, target); 
         });
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {

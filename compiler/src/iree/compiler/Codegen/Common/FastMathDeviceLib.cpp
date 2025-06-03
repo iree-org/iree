@@ -24,11 +24,12 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
     Type resultType = op.getType();
 
     // Erf only supports f32.
-    else if(!resultType.isF32()) {
+    if (!resultType.isF32()) {
       return rewriter.notifyMatchFailure(op, "Result only supports f32");
     }
+    
     // Create constants
-    auto f32Type = rewriter.getF32Type();
+    Type f32Type = rewriter.getF32Type();
     auto oneF = rewriter.create<arith::ConstantOp>(
         loc, f32Type, rewriter.getF32FloatAttr(1.0f));
         

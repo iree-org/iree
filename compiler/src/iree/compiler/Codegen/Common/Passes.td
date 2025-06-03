@@ -560,11 +560,6 @@ def PadDynamicAllocPass :
 def MathTransformPass :
     Pass<"iree-codegen-math-transform", ""> {
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
-  let options = [
-    Option<"hasFastExp", "has-fast-exp", "bool",
-            /*default=*/"false",
-           "Enable device-lib implementations for operations that rely on fast exp">
-  ];
   let dependentDialects = [
     "::mlir::scf::SCFDialect",
     "::mlir::arith::ArithDialect"
