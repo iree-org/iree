@@ -333,7 +333,7 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
   IREEConvertVectorStore(MLIRContext *context, bool disableAtomicRMW,
-                     PatternBenefit benefit)
+                         PatternBenefit benefit)
       : OpConversionPattern<vector::StoreOp>(context, benefit),
         disableAtomicRMW(disableAtomicRMW) {}
 
