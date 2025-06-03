@@ -117,7 +117,7 @@ FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
 }
 
 constexpr StringLiteral kPromoteOperandsName = "promote_operands";
-
+constexpr StringLiteral kDirectLoadOperandsName = "direct_load_operands";
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config) {
   auto array = config.getAttributes().getAs<ArrayAttr>(kPromoteOperandsName);
@@ -127,12 +127,32 @@ getPromotedOperandList(LoweringConfigAttr config) {
   return getIntegerVector(array);
 }
 
+std::optional<SmallVector<bool>> getUseDirectLoad(LoweringConfigAttr config) {
+  auto array = config.getAttributes().getAs<ArrayAttr>(kDirectLoadOperandsName);
+  if (!array) {
+    return std::nullopt;
+  }
+  if (!llvm::all_of(array.getValue(), llvm::IsaPred<BoolAttr>)) {
+    return std::nullopt;
+  }
+  return llvm::map_to_vector(array.getValue(), [](Attribute s) -> bool {
+    return cast<BoolAttr>(s).getValue();
+  });
+}
+
 void appendPromotedOperandsList(MLIRContext *context,
                                 SmallVectorImpl<NamedAttribute> &attrs,
-                                ArrayRef<int64_t> operands) {
+                                ArrayRef<int64_t> operands,
+                                ArrayRef<bool> directLoadOperands) {
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, kPromoteOperandsName),
                      b.getI64ArrayAttr(operands));
+  if (!directLoadOperands.empty()) {
+    assert(directLoadOperands.size() == operands.size() &&
+           "Direct load operands size must match promoted operands size");
+    attrs.emplace_back(StringAttr::get(context, kDirectLoadOperandsName),
+                       b.getBoolArrayAttr(directLoadOperands));
+  }
 }
 IREE::GPU::LoweringConfigAttr
 setPromotedOperandsList(MLIRContext *context,

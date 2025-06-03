@@ -27,14 +27,15 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 LogicalResult
 setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
-                                  Operation *op);
+                                  Operation *op, bool useDirectLoad = false);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
-                                      Operation *op);
+                                      Operation *op,
+                                      bool useDirectLoad = false);
 
 /// Helper for setting up a default tile and fuse config for targeting
 /// simple thread distribution. Currently restricted to linalg ops.

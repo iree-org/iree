@@ -116,6 +116,12 @@ static llvm::cl::opt<bool>
     clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
+    clUseDirectLoad("iree-llvmgpu-use-direct-load",
+                    llvm::cl::desc("Use global load DMA for direct load ops."),
+                    llvm::cl::Hidden, llvm::cl::init(false));
+
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -2979,15 +2985,15 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     return success();
   }
   if (clGPUEarlyTileAndFuseMatmul) {
-    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
-                                                     computeOp))) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(
+            target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG("Tile and fuse matmul config");
       return success();
     }
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp))) {
+            target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG("Tile and fuse IGEMM config");
       return success();
     }

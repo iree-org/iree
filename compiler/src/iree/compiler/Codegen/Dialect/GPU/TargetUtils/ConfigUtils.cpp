@@ -82,7 +82,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 
   // Set tile sizes.
   MLIRContext *context = multiMmaOp.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(b.getStringAttr("workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
@@ -187,7 +187,8 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                                         ArrayRef<AffineMap> maps,
                                         ArrayRef<Value> operands,
-                                        IREE::GPU::TargetAttr target) {
+                                        IREE::GPU::TargetAttr target,
+                                        bool useDirectLoad) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -350,7 +351,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = lhs.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
@@ -360,7 +361,10 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   if (mustBeAligned) {
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1});
+    bool directLoadArray[] = {true, true};
+    ArrayRef<bool> directLoadOperands =
+        useDirectLoad ? directLoadArray : ArrayRef<bool>{};
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, directLoadOperands);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
@@ -392,7 +396,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
 LogicalResult
 setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
-                                  Operation *op) {
+                                  Operation *op, bool useDirectLoad) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -416,8 +420,8 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
-                                              igemmOperands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(
+          bounds, igemmContractionMaps, igemmOperands, target, useDirectLoad);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -427,7 +431,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
-      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
@@ -447,7 +451,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
-                                      Operation *op) {
+                                      Operation *op, bool useDirectLoad) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return failure();
@@ -460,7 +464,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
+                                              useDirectLoad);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -470,7 +475,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
-      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
@@ -869,7 +874,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = op->getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
@@ -885,7 +890,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     attrs.emplace_back(StringAttr::get(context, "reduction"),
                        b.getI64ArrayAttr(loopTileSizes));
   }
-
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -987,14 +991,13 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = scatter.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
 
   attrs.emplace_back(StringAttr::get(context, "thread"),
                      b.getI64ArrayAttr(threadTileSizes));
-
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
