@@ -972,16 +972,13 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 
 } // OpGroupBufferOps
 
-def OpGroupBufferBitfieldOps : OpDocGroup {
-  let summary = "Buffer bitfield ops";
-  let description = "Ops for `!hal.buffer_usage` / `iree_hal_buffer_usage_t` and `!hal.memory_type` / `iree_hal_memory_type_t`.";
+def OpGroupBufferPropertiesOps : OpDocGroup {
+  let summary = "Buffer properties ops";
+  let description = "Ops for `iree_hal_buffer_usage_t` and `iree_hal_memory_type_t`.";
 }
 
-let opDocGroup = OpGroupBufferBitfieldOps in {
+let opDocGroup = OpGroupBufferPropertiesOps in {
 
-//===----------------------------------------------------------------------===//
-// !hal.buffer_usage / iree_hal_buffer_usage_t
-//===----------------------------------------------------------------------===//
 
 def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -1007,15 +1004,12 @@ def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
   let extraClassDeclaration = [{
     // Returns the buffer usage value.
     static std::optional<int32_t> getUsageValue(Value bufferUsage);
+    // Returns the buffer usage bitfield attribute.
     static BufferUsageBitfieldAttr getUsageAttr(Value bufferUsage);
   }];
 
   let hasVerifier = 1;
 }
-
-//===----------------------------------------------------------------------===//
-// !hal.memory_type / iree_hal_memory_type_t
-//===----------------------------------------------------------------------===//
 
 def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -1041,13 +1035,14 @@ def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
   let extraClassDeclaration = [{
     // Returns the memory type value.
     static std::optional<int32_t> getTypeValue(Value memoryType);
+    // Returns the memory type bitfield attribute.
     static MemoryTypeBitfieldAttr getTypeAttr(Value memoryType);
   }];
 
   let hasVerifier = 1;
 }
 
-} // OpGroupBufferBitfieldOps
+} // OpGroupBufferPropertiesOps
 
 //===----------------------------------------------------------------------===//
 // !hal.buffer_view / iree_hal_buffer_view_t
