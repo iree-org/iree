@@ -335,7 +335,7 @@ def Stream_AffinityTopologyAttr : AttrInterface<"AffinityTopologyAttrInterface">
 
   let summary = [{Defines device-device link topology for transfer elision.}];
   let description = [{
-      Implementations can use this to query the connection topology between devices.
+    Implementations can use this to query the connection topology between devices.
   }];
 
   let methods = [
