@@ -4,10 +4,11 @@ util.global private @device : !hal.device
 
 // CHECK-LABEL: @resourceAlloc
 util.func public @resourceAlloc(%arg0: index) -> !stream.resource<transient> {
-  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}Dispatch{{.+}}"> : i32
+  // CHECK: %[[MEMORY_TYPES:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
+  // CHECK-SAME: for(#hal.device.affinity<@device>)
+  // CHECK-SAME: lifetime(transient) : i32, i32
   // CHECK: %[[RET0:.+]] = hal.allocator.allocate
-  // CHECK-SAME: type(%[[MEMORY_TYPE]])
+  // CHECK-SAME: type(%[[MEMORY_TYPES]])
   // CHECK-SAME: usage(%[[BUFFER_USAGE]])
   // CHECK-SAME: : !hal.buffer{%arg0}
   %0 = stream.resource.alloc uninitialized on(#hal.device.affinity<@device>) : !stream.resource<transient>{%arg0}
@@ -22,8 +23,9 @@ util.global private @device : !hal.device
 // CHECK-LABEL: @resourceAlloca
 // CHECK-SAME: (%[[SIZE:.+]]: index)
 util.func public @resourceAlloca(%size: index) -> (!stream.resource<transient>, !stream.timepoint) {
-  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}DispatchStorage"> : i32
+  // CHECK: %[[MEMORY_TYPES:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
+  // CHECK-SAME: for(#hal.device.affinity<@device>)
+  // CHECK-SAME: lifetime(transient) : i32, i32
   // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
@@ -31,7 +33,7 @@ util.func public @resourceAlloca(%size: index) -> (!stream.resource<transient>, 
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%c0
-  // CHECK-SAME: type(%[[MEMORY_TYPE]])
+  // CHECK-SAME: type(%[[MEMORY_TYPES]])
   // CHECK-SAME: usage(%[[BUFFER_USAGE]])
   // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
@@ -47,15 +49,16 @@ util.global private @device : !hal.device
 // CHECK-LABEL: @resourceAllocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[WAIT_FENCE:.+]]: !hal.fence)
 util.func public @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<transient>, !stream.timepoint) {
-  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}DispatchStorage"> : i32
+  // CHECK: %[[MEMORY_TYPES:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
+  // CHECK-SAME: for(#hal.device.affinity<@device>)
+  // CHECK-SAME: lifetime(transient) : i32, i32
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%c0
-  // CHECK-SAME: type(%[[MEMORY_TYPE]])
+  // CHECK-SAME: type(%[[MEMORY_TYPES]])
   // CHECK-SAME: usage(%[[BUFFER_USAGE]])
   // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
@@ -72,8 +75,7 @@ util.global private @device_b : !hal.device
 // CHECK-LABEL: @resourceAllocaOptimal
 // CHECK-SAME: (%[[SIZE:.+]]: index)
 util.func public @resourceAllocaOptimal(%size: index) -> (!stream.resource<transient>, !stream.timepoint) {
-  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}DispatchStorage"> : i32
+  // CHECK: %[[MEMORY_TYPES:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
   // CHECK: %[[DEVICE_A:.+]] = util.global.load immutable @device_a : !hal.device
   // CHECK: %[[AFFINITY_A:.+]] = arith.constant -1 : i64
   // CHECK: %[[DEVICE_B:.+]] = util.global.load immutable @device_b : !hal.device

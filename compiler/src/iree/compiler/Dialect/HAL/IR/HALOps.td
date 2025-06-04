@@ -703,25 +703,22 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
   }];
 
   let arguments = (ins
-    HAL_Device:$allocation_device,
     OptionalAttr<Stream_AffinityAttr>:$affinity,
     Stream_LifetimeAttr:$resource_lifetime
   );
   let results = (outs
-    I32:$memory_types,
-    I32:$buffer_usage
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
   );
 
   let assemblyFormat = [{
-    `for` `(` $allocation_device `:` type($allocation_device) `)`
-    `affinity` `(` $affinity `)`
+    `for` `(` $affinity `)`
     `lifetime` `(` $resource_lifetime `)`
     `:` type($memory_types) `,` type($buffer_usage)
     attr-dict-with-keyword
   }];
 
-  // let hasCanonicalizer = 1;
-  // let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 } // OpGroupAllocatorOps

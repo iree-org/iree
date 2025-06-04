@@ -61,8 +61,7 @@ IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region);
 // The bits set here are those that must be set for the buffer to be used as the
 // buffer within the program with its defined resource lifetime.
 LogicalResult
-deriveRequiredResourceBufferBits(Location loc,
-                                 IREE::Stream::ResourceType resourceType,
+deriveRequiredResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
                                  IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                  IREE::HAL::BufferUsageBitfield &bufferUsage);
 
@@ -72,8 +71,7 @@ deriveRequiredResourceBufferBits(Location loc,
 // are useful for providing buffers back to users via the ABI that may need to
 // be used for more than just what the internal program requires.
 LogicalResult
-deriveAllowedResourceBufferBits(Location loc,
-                                IREE::Stream::ResourceType resourceType,
+deriveAllowedResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                 IREE::HAL::BufferUsageBitfield &bufferUsage);
 

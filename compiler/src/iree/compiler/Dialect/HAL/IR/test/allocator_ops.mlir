@@ -78,15 +78,14 @@ util.func public @allocator_import(%allocator: !hal.allocator, %arg1: !util.buff
 
 // CHECK-LABEL: @allocator_resolve_memory_properties
 //  CHECK-SAME: %[[DEVICE:.+]]: !hal.device
-util.func public @allocator_resolve_memory_properties(%device: !hal.device) -> (i32, i32) {
+util.func public @allocator_resolve_memory_properties() -> (i32, i32) {
   // CHECK: %[[MEMORY_TYPES:.+]] = hal.allocator.resolve_memory_properties
   // CHECK-SAME:   for(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   affinity(#hal.device.affinity<@device_a>)
   // CHECK-SAME:   lifetime(constant)
   // CHECK-SAME:   : i32, i32
   %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
-      for(%device : !hal.device)
-      affinity(#hal.device.affinity<@device_a>)
+      for(#hal.device.affinity<@device_a>)
       lifetime(constant) : i32, i32
   util.return %memory_types, %buffer_usage : i32, i32
 }

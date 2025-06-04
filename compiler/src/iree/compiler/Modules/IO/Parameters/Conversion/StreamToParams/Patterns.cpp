@@ -33,21 +33,15 @@ struct ParameterLoadOpPattern
     // Derive the allocation requirements.
     auto resourceType =
         cast<IREE::Stream::ResourceType>(loadOp.getResults().front().getType());
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
-                                               bufferUsage))) {
-      return failure();
-    }
 
-    // Lookup the appropriate device/queue for allocation based on the buffer
-    // propreties.
-    Value memoryTypeOp =
-        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
-    Value bufferUsageOp =
-        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
-    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
-        loadOp, memoryTypeOp, bufferUsageOp, rewriter);
+    auto resolveOp =
+        rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
+            loc, rewriter.getI32Type(), rewriter.getI32Type(),
+            loadOp.getAffinity().value_or(nullptr), resourceType.getLifetime());
+
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(loadOp, resolveOp.getMemoryTypes(),
+                                        resolveOp.getBufferUsage(), rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -61,8 +55,8 @@ struct ParameterLoadOpPattern
     auto newOp = rewriter.create<IREE::IO::Parameters::LoadOp>(
         loc, newResultTypes, device, queueAffinity, waitFence, signalFence,
         adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
-        adaptor.getSourceOffsets(), memoryTypeOp, bufferUsageOp,
-        adaptor.getResultSizes());
+        adaptor.getSourceOffsets(), resolveOp.getMemoryTypes(),
+        resolveOp.getBufferUsage(), adaptor.getResultSizes());
 
     SmallVector<Value> resultReplacements;
     llvm::append_range(resultReplacements, newOp.getResults());
