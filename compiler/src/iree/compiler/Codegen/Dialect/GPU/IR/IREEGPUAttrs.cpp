@@ -620,20 +620,24 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
 FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
-                                            Type resultType, Value lhs,
-                                            Value rhs, Value acc) const {
-  auto [aType, bType, cType] = getABCVectorTypes();
-  if (aType != lhs.getType() || bType != rhs.getType() ||
-      cType != acc.getType()) {
+                                            Type resultType,
+                                            ValueRange operands) const {
+  if (operands.size() != 3) {
     return failure();
   }
+  SmallVector<VectorType> threadTypes;
+  getDistributedTileTypes(threadTypes);
+  if (!llvm::equal(threadTypes, operands.getTypes()))
+    return failure();
+
   // Fail if the result type does not match with the expected return type of
   // the intrinsic. We expect the caller to handle type conversions externally.
-  if (cType != resultType) {
+  if (operands.back().getType() != resultType) {
     return failure();
   }
-  if (Value value = createMmaOp(builder, loc, getIntrinsic(), resultType, lhs,
-                                rhs, acc, getColMajor())) {
+  if (Value value =
+          createMmaOp(builder, loc, getIntrinsic(), resultType, operands[0],
+                      operands[1], operands[2], getColMajor())) {
     return value;
   }
   return failure();
@@ -944,20 +948,23 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
   return distributedValues;
 }
 
-FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
-                                                     Location loc,
-                                                     Type resultType, Value lhs,
-                                                     Value rhs,
-                                                     Value acc) const {
+FailureOr<Value>
+DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
+                                    Type resultType,
+                                    ValueRange operands) const {
   // Validation. Similar to MMAAttr::buildMmaOperation.
-  auto [aType, bType, cType] = getABCVectorTypes();
-  if (aType != lhs.getType() || bType != rhs.getType() ||
-      cType != acc.getType()) {
+  if (operands.size() != 3) {
     return failure();
   }
+  SmallVector<VectorType> regTypes;
+  getDistributedTileTypes(regTypes);
+  if (!llvm::equal(operands.getTypes(), regTypes)) {
+    return failure();
+  }
+
   // Fail if the result type does not match with the expected return type of
   // the intrinsic. We expect the caller to handle type conversions externally.
-  if (cType != resultType) {
+  if (operands.back().getType() != resultType) {
     return failure();
   }
 
@@ -966,20 +973,20 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   LDBG("DataTiledMMAAttr::buildMmaOperation");
   LDBG("    lhsSwizzle: " << lhsSwizzle);
   SmallVector<Value> intrinsicsLhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, lhs, lhsSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, operands[0], lhsSwizzle);
 
   TileSwizzle rhsSwizzle = getSwizzle(*this, MMAFragment::Rhs);
   LDBG("DataTiledMMAAttr::buildMmaOperation");
   LDBG("    rhsSwizzle: " << rhsSwizzle);
   SmallVector<Value> intrinsicsRhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, rhs, rhsSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, operands[1], rhsSwizzle);
 
   TileSwizzle accSwizzle = getSwizzle(*this, MMAFragment::Acc);
   LDBG("DataTiledMMAAttr::buildMmaOperation");
   LDBG("    accSwizzle: " << accSwizzle);
 
   SmallVector<Value> intrinsicsAcc =
-      distributeMmaFragmentToIntrinsics(builder, loc, acc, accSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, operands[2], accSwizzle);
 
   MMAIntrinsic intrinsic = getIntrinsic();
   VectorType intrinCType =
@@ -1012,9 +1019,12 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   int dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);
   SmallVector<int64_t> indices(dstRank, 0);
+  Value acc = operands.back();
   for (Value intrAcc : intrinsicsAcc) {
     auto expandedAcc = builder.create<vector::ShapeCastOp>(
-        loc, VectorType::get(accInternalShape, cType.getElementType()),
+        loc,
+        VectorType::get(accInternalShape,
+                        cast<VectorType>(resultType).getElementType()),
         intrAcc);
     acc = builder.create<vector::InsertStridedSliceOp>(loc, expandedAcc, acc,
                                                        indices, strides);
@@ -1160,18 +1170,22 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
 // type.
 FailureOr<Value> VirtualMMAAttr::buildMmaOperation(OpBuilder &builder,
                                                    Location loc,
-                                                   Type resultType, Value lhs,
-                                                   Value rhs, Value acc) const {
-  auto [aType, bType, cType] = getABCVectorTypes();
-  if (aType != lhs.getType() || bType != rhs.getType() ||
-      cType != acc.getType()) {
+                                                   Type resultType,
+                                                   ValueRange operands) const {
+  if (operands.size() != 3) {
     return failure();
   }
+  SmallVector<VectorType> threadTypes;
+  getDistributedTileTypes(threadTypes);
+  if (!llvm::equal(threadTypes, operands.getTypes()))
+    return failure();
+
   // Fail if the result type does not match with the expected return type of
   // the intrinsic. We expect the caller to handle type conversions externally.
-  if (cType != resultType) {
+  if (operands.back().getType() != resultType) {
     return failure();
   }
+
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
@@ -1190,14 +1204,15 @@ FailureOr<Value> VirtualMMAAttr::buildMmaOperation(OpBuilder &builder,
       return failure();
     }
     int64_t vectorWidth = aType.getShape()[0] / unrollKFactor;
+    Value acc = operands.back();
     for (int i = 0; i < unrollKFactor; i++) {
       int64_t offset = vectorWidth * i;
       Value sliced_lhs = builder.create<vector::ExtractStridedSliceOp>(
-          loc, lhs, ArrayRef<int64_t>{offset}, ArrayRef<int64_t>{vectorWidth},
-          ArrayRef<int64_t>{1});
+          loc, operands[0], ArrayRef<int64_t>{offset},
+          ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       Value sliced_rhs = builder.create<vector::ExtractStridedSliceOp>(
-          loc, rhs, ArrayRef<int64_t>{offset}, ArrayRef<int64_t>{vectorWidth},
-          ArrayRef<int64_t>{1});
+          loc, operands[1], ArrayRef<int64_t>{offset},
+          ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       acc = builder
                 .create<amdgpu::MFMAOp>(loc, resultType, m, n, nativeKSize,
                                         getBlockSize(), sliced_lhs, sliced_rhs,

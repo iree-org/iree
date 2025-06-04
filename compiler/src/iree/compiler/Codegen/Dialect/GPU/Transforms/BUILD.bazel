@@ -60,7 +60,7 @@ iree_compiler_cc_library(
     srcs = [
         "CombineBarrierRegions.cpp",
         "ConcretizeMmaShapes.cpp",
-        "DistributeMmaToLanes.cpp",
+        "DistributeInnerTiledToLanes.cpp",
         "LowerIREEGPUOps.cpp",
         "Passes.cpp",
         "Transforms.cpp",

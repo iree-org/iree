@@ -146,6 +146,14 @@ def IREECodegen_InnerTileDescAttrInterface :
   }];
 }
 
+def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
+  CPred<"isa<IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
+]>, "buffer-like constant attribute values"> {
+  let storageType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
+  let returnType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
+  let convertFromStorage = "$_self";
+}
+
 def IREECodegen_LoweringConfigAttrInterface :
   AttrInterface<"LoweringConfigAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

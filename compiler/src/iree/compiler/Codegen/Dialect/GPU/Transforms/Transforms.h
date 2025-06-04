@@ -13,6 +13,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -144,14 +145,15 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
                                    scf::ForallOp forallOp,
                                    tensor::ExtractSliceOp extractSliceOp);
 
-// Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
-FailureOr<IREE::GPU::MultiMmaOp>
+// Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
+// op with a multi-MMA-like intrinsic descriptor.
+FailureOr<IREE::Codegen::InnerTiledOp>
 convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                              IREE::GPU::MmaInterfaceAttr mmaKind);
 
-// Helper to distribute a multi_mma op to lanes.
-FailureOr<Operation *> distributeMultiMmaOp(
-    RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
+// Helper to distribute an inner_tiled op to lanes.
+FailureOr<Operation *> distributeInnerTiledOp(
+    RewriterBase &rewriter, IREE::Codegen::InnerTiledOp mmaOp,
     std::optional<SmallVector<int64_t>> workgroupSize = std::nullopt);
 
 // Helper to map all scf.forall ops on lanes.

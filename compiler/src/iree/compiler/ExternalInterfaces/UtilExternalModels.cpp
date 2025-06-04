@@ -6,8 +6,7 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -302,13 +301,14 @@ struct LinalgOpTiedOpInterfaceHelper {
 };
 
 // TODO(Max191): Remove this interface once GPU data tiling stops using early
-// materialization. This only exists for handling multi_mma ops before dispatch
-// workgroups are created, which only happens with early materialization.
-struct MultiMmaOpTiedOpInterface
+// materialization. This only exists for handling inner_tiled ops before
+// dispatch workgroups are created, which only happens with early
+// materialization.
+struct InnerTiledOpTiedOpInterface
     : public IREE::Util::TiedOpInterface::ExternalModel<
-          MultiMmaOpTiedOpInterface, IREE::GPU::MultiMmaOp> {
+          InnerTiledOpTiedOpInterface, IREE::Codegen::InnerTiledOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto linalgOp = cast<IREE::GPU::MultiMmaOp>(op);
+    auto linalgOp = cast<IREE::Codegen::InnerTiledOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(linalgOp.getAcc());
   }
 
@@ -460,8 +460,9 @@ void registerUtilExternalModels(DialectRegistry &registry) {
       });
 
   registry.addExtension(+[](MLIRContext *context,
-                            IREE::GPU::IREEGPUDialect *dialect) {
-    IREE::GPU::MultiMmaOp::attachInterface<MultiMmaOpTiedOpInterface>(*context);
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    IREE::Codegen::InnerTiledOp::attachInterface<InnerTiledOpTiedOpInterface>(
+        *context);
   });
 
   registry.addExtension(

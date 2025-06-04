@@ -293,7 +293,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Value cCast =
         builder.create<vector::ShapeCastOp>(c.getLoc(), cVectorType, c);
     FailureOr<Value> mmaOp = mmaKind.buildMmaOperation(
-        builder, loc, cVectorType, aCast, bCast, cCast);
+        builder, loc, cVectorType, {aCast, bCast, cCast});
     assert(succeeded(mmaOp) && "Failed to construct mma op");
     return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), *mmaOp);
   }

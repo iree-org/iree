@@ -43,9 +43,7 @@ def IREEGPU_MmaInterfaceAttr
         "::mlir::OpBuilder&":$builder,
         "::mlir::Location":$loc,
         "::mlir::Type":$result_type,
-        "::mlir::Value":$lhs,
-        "::mlir::Value":$rhs,
-        "::mlir::Value":$acc
+        "::mlir::ValueRange":$operands
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

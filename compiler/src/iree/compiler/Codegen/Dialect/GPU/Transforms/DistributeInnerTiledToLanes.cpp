@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
@@ -25,12 +26,13 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-#define GEN_PASS_DEF_DISTRIBUTEMMATOLANESPASS
+#define GEN_PASS_DEF_DISTRIBUTEINNERTILEDTOLANESPASS
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h.inc"
 
 namespace {
-struct DistributeMmaToLanesPass final
-    : impl::DistributeMmaToLanesPassBase<DistributeMmaToLanesPass> {
+struct DistributeInnerTiledToLanesPass final
+    : impl::DistributeInnerTiledToLanesPassBase<
+          DistributeInnerTiledToLanesPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -76,31 +78,32 @@ LogicalResult fuseProducersGreedily(RewriterBase &rewriter,
   return success();
 }
 
-void DistributeMmaToLanesPass::runOnOperation() {
+void DistributeInnerTiledToLanesPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  // Distribute multi_mma ops to lanes and greedily fuse producers.
-  SmallVector<IREE::GPU::MultiMmaOp> mmaOps;
-  funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) {
-    if (!mmaOp.hasTensorSemantics()) {
+  // Distribute inner_tiled ops to lanes where possible and greedily fuse
+  // producers.
+  SmallVector<IREE::Codegen::InnerTiledOp> tiledOps;
+  funcOp.walk([&](IREE::Codegen::InnerTiledOp tiledOp) {
+    if (!tiledOp.hasTensorSemantics()) {
       return;
     }
-    mmaOps.push_back(mmaOp);
+    tiledOps.push_back(tiledOp);
   });
-  if (mmaOps.empty()) {
+  if (tiledOps.empty()) {
     return;
   }
 
   std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
 
   IRRewriter rewriter(funcOp);
-  for (auto mmaOp : mmaOps) {
-    rewriter.setInsertionPoint(mmaOp);
+  for (auto tiledOp : tiledOps) {
+    rewriter.setInsertionPoint(tiledOp);
     FailureOr<scf::ForallOp> maybeLaneForall =
-        distributeMultiMmaOp(rewriter, mmaOp, workgroupSize);
+        distributeInnerTiledOp(rewriter, tiledOp, workgroupSize);
     if (failed(maybeLaneForall)) {
-      funcOp.emitError() << "failed to distribute multi_mma ops to lanes";
+      funcOp.emitError() << "failed to distribute inner_tiled ops to lanes";
       return signalPassFailure();
     }
 

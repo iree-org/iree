@@ -6,7 +6,7 @@
  affine_map<() -> ()>
 ]
 func.func @lower_multi_mma_mfma_16x16x16(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vector<4xf32>) -> vector<4xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -40,7 +40,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_multi_mma_mfma_32x32x8(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vector<16xf32>) -> vector<16xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
@@ -74,7 +74,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_col_major_multi_mma_mfma_32x32x8(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vector<16xf32>) -> vector<16xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16, col_major = true>
@@ -108,7 +108,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_multi_mma_wmmar3_16x16x16(%lhs: vector<16xf16>, %rhs: vector<16xf16>, %acc: vector<8xf32>) -> vector<8xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
@@ -141,7 +141,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_multi_mma_wmmar4_16x16x16(%lhs: vector<8xf16>, %rhs: vector<8xf16>, %acc: vector<8xf32>) -> vector<8xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
@@ -174,7 +174,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_multi_mma_mfma_shape_cast_16x16x16(%lhs: vector<1x4xf16>, %rhs: vector<4x1xf16>, %acc: vector<4x1xf32>) -> vector<4x1xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>

@@ -17,17 +17,6 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
-/// TODO: Iterator type arrays are duplicated across dialects upstream and here.
-/// These should be unified somewhere as a common iterator type array attr.
-def IREEGPU_IteratorTypeEnum
-    : EnumAttr<IREEGPU_Dialect, IteratorType, "iterator_type"> {
-    let assemblyFormat = "`<` $value `>`";
-}
-
-def IREEGPU_IteratorTypeArrayAttr
-    : TypedArrayAttrBase<IREEGPU_IteratorTypeEnum,
-                         "Iterator type should be an enum.">;
-
 //===----------------------------------------------------------------------===//
 // GPU Specific Lowering Config Attributes
 //===----------------------------------------------------------------------===//
