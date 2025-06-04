@@ -1073,7 +1073,7 @@ void BufferLengthOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.buffer.usage
+// hal.buffer_usage
 //===----------------------------------------------------------------------===//
 
 void BufferUsageOp::getAsmResultNames(

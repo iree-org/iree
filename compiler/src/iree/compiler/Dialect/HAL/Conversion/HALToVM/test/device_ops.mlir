@@ -104,17 +104,17 @@ util.func public @device_queue_alloca(
     // CHECK-SAME: %[[SIZE_I32:.+]]: i32)
     %size: index) -> !hal.buffer {
   %c100_i64 = arith.constant 100 : i64
-  // CHECK: %{{.+}} = vm.const.i64.zero
+  // CHECK: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: %{{.+}} = vm.const.i64 100
-  // CHECK: %{{.+}} = vm.const.i32 48
+  // CHECK: %[[MEMORY_TYPE:.+]] = vm.const.i32 48
   %memory_type = hal.memory_type<"DeviceLocal"> : i32
-  // CHECK: %{{.+}} = vm.const.i32 3
+  // CHECK: %[[BUFFER_USAGE:.+]] = vm.const.i32 3
   %buffer_usage = hal.buffer_usage<"Transfer"> : i32
-  // CHECK: %{{.+}} = vm.ext.i32.i64.s %[[SIZE_I32]]
+  // CHECK: %[[SIZE_I64:.+]] = vm.ext.i32.i64.s %[[SIZE_I32]]
   // CHECK: = vm.call @hal.device.queue.alloca(
   // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
   // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
-  // CHECK-SAME: %c100, %{{.+}}, %{{.+}}, %{{.+}}, %{{.+}})
+  // CHECK-SAME: %c100, %[[MEMORY_TYPE]], %[[BUFFER_USAGE]], %[[SIZE_I64]], %[[FLAGS]])
   %buffer = hal.device.queue.alloca<%device : !hal.device>
       affinity(%affinity)
       wait(%wait_fence) signal(%signal_fence)
