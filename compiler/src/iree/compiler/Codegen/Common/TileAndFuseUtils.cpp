@@ -106,9 +106,9 @@ void collectTiledAndFusedOps(Operation *rootOp,
 }
 
 FailureOr<std::queue<Operation *>>
-fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
-              MutableArrayRef<LoopLikeOpInterface> loops,
-              bool useWARForConsumerFusionSSAViolation) {
+fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
+                        MutableArrayRef<LoopLikeOpInterface> loops,
+                        bool useWARForConsumerFusionSSAViolation) {
   auto addCandidateSlices =
       [](Operation *fusedOp,
          std::queue<tensor::ParallelInsertSliceOp> &candidates) {
@@ -164,7 +164,7 @@ fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
     rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
                        fusedResult->tiledOps.front());
 
-    // The result of the fused consumers might themselved be slices of
+    // The result of the fused consumers might themselves be slices of
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
     addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),

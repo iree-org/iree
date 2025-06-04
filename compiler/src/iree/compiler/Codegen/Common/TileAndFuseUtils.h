@@ -90,14 +90,14 @@ bool warForConsumerFusionSSAViolation(
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result);
 
-// Fuse all consumers of the given `tiledOp` into the surrounding op that
-// implements the `LoopLikeOpInterface`.  Returns a list of new
-// `tensor.extract_slice` ops with new fusion opportunities, as well as the new
-// surrounding `scf.forall` (because consumer fusion replaces the loop).
+// Fuse all consumers of the given `tiledOp` into the surrounding `scf.forall`.
+// Returns a list of new `tensor.extract_slice` ops with new fusion
+// opportunities, as well as the new surrounding `scf.forall` (because consumer
+// fusion replaces the loop).
 FailureOr<std::queue<Operation *>>
-fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
-              MutableArrayRef<LoopLikeOpInterface> loops,
-              bool useWARForConsumerFusionSSAViolation);
+fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
+                        MutableArrayRef<LoopLikeOpInterface> loops,
+                        bool useWARForConsumerFusionSSAViolation);
 
 } // namespace mlir::iree_compiler
 
