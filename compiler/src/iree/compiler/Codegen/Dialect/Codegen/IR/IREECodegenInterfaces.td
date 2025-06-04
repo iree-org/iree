@@ -10,7 +10,7 @@
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
 def IREECodegen_InnerTileDescAttrInterface :
-  AttrInterface<"InnerTileDescAtterInterface"> {
+  AttrInterface<"InnerTileDescAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   let description = [{
     Attribute interface used to descripe an inner tiled operation, such as

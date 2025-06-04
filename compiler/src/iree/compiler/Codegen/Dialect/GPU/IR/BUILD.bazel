@@ -162,7 +162,7 @@ iree_gentbl_cc_library(
     td_file = "IREEGPUAttrs.td",
     deps = [
         ":td_files",
-        "//compiler/src/iree/compiler/Codegen/IR:LoweringConfigInterfaceGen",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:LoweringConfigInterfaceGen",
         "@llvm-project//mlir:SCFDeviceMappingInterfacesIncGen",
     ],
 )
