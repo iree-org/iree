@@ -2761,6 +2761,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#devicelinkattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      DeviceLinkAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#deviceoptimalattr" class="md-nav__link">
     <span class="md-ellipsis">
       DeviceOptimalAttr
@@ -2800,6 +2809,15 @@
   <a href="#devicetargetattr" class="md-nav__link">
     <span class="md-ellipsis">
       DeviceTargetAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#devicetopologyattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      DeviceTopologyAttr
     </span>
   </a>
   
@@ -7617,6 +7635,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#devicelinkattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      DeviceLinkAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#deviceoptimalattr" class="md-nav__link">
     <span class="md-ellipsis">
       DeviceOptimalAttr
@@ -7656,6 +7683,15 @@
   <a href="#devicetargetattr" class="md-nav__link">
     <span class="md-ellipsis">
       DeviceTargetAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#devicetopologyattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      DeviceTopologyAttr
     </span>
   </a>
   
@@ -8685,11 +8721,13 @@ input.</p>
 <li><a href="#deviceaffinityattr">DeviceAffinityAttr</a></li>
 <li><a href="#devicealiasattr">DeviceAliasAttr</a></li>
 <li><a href="#devicefallbackattr">DeviceFallbackAttr</a></li>
+<li><a href="#devicelinkattr">DeviceLinkAttr</a></li>
 <li><a href="#deviceoptimalattr">DeviceOptimalAttr</a></li>
 <li><a href="#deviceordinalattr">DeviceOrdinalAttr</a></li>
 <li><a href="#devicepromiseattr">DevicePromiseAttr</a></li>
 <li><a href="#deviceselectattr">DeviceSelectAttr</a></li>
 <li><a href="#devicetargetattr">DeviceTargetAttr</a></li>
+<li><a href="#devicetopologyattr">DeviceTopologyAttr</a></li>
 <li><a href="#executableobjectattr">ExecutableObjectAttr</a></li>
 <li><a href="#executableobjectsattr">ExecutableObjectsAttr</a></li>
 <li><a href="#executabletargetattr">ExecutableTargetAttr</a></li>
@@ -13583,6 +13621,71 @@ null.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="devicelinkattr">DeviceLinkAttr<a class="headerlink" href="#devicelinkattr" title="Permanent link">link</a></h3>
+<p><em>Connection between devices.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#hal.device.link&lt;
+  SymbolRefAttr,   # sourceDevice
+  SymbolRefAttr,   # targetDevice
+  bool,   # unified_memory
+  bool,   # transparent_access
+  DictionaryAttr   # extra_properties
+&gt;
+</code></pre></div>
+<p>Describes a directional relationship between devices in terms of memory
+and access properties.</p>
+<p>Currently the following properties are supported:
+- <code>unified_memory</code>: Whether the devices share a unified memory space
+- <code>transparent_access</code>: Whether the source device can access the target device's memory without staging</p>
+<p>The assembly format uses directional links:
+<div class="highlight"><pre><span></span><code>// GPU can access CPU memory transparently with unified memory
+(@device_gpu -&gt; @device_cpu = {transparent_access = true, unified_memory = true})
+// CPU needs explicit transfers to access GPU memory (both properties false)
+(@device_cpu -&gt; @device_gpu = {})
+// GPU can access CPU memory transparently but without unified memory
+(@device_gpu -&gt; @device_cpu = {transparent_access = true})
+// Its possible to add arbitrary properties to the link that are not specified here
+(@device_gpu -&gt; @device_cpu = {}, {optional_flag = true})
+</code></pre></div></p>
+<p>Future extensions may include properties like bandwidth, latency, and target-specific
+information for specialized connections (e.g., GPUs sharing an SoC, InfiniBand, PCIe).</p>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">sourceDevice</td>
+<td style="text-align: center;"><code>SymbolRefAttr</code></td>
+<td>source_device</td>
+</tr>
+<tr>
+<td style="text-align: center;">targetDevice</td>
+<td style="text-align: center;"><code>SymbolRefAttr</code></td>
+<td>target_device</td>
+</tr>
+<tr>
+<td style="text-align: center;">unified_memory</td>
+<td style="text-align: center;"><code>bool</code></td>
+<td>false</td>
+</tr>
+<tr>
+<td style="text-align: center;">transparent_access</td>
+<td style="text-align: center;"><code>bool</code></td>
+<td>false</td>
+</tr>
+<tr>
+<td style="text-align: center;">extra_properties</td>
+<td style="text-align: center;"><code>DictionaryAttr</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="deviceoptimalattr">DeviceOptimalAttr<a class="headerlink" href="#deviceoptimalattr" title="Permanent link">link</a></h3>
 <p><em>Selects an optimal device for the assigned operation.</em></p>
 <p>Syntax:</p>
@@ -13601,7 +13704,7 @@ if required information is available or be deferred to runtime.</p>
   #hal.device.affinity&lt;@device_b, [4, 5]&gt;
 ]&gt;
 </code></pre></div></p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13629,7 +13732,7 @@ if required information is available or be deferred to runtime.</p>
 <p>Represents the device registered with the runtime in the order it was
 registered with ordinal 0 being the first registered. Returns null during
 initialization if the device ordinal is out of range.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13669,7 +13772,7 @@ Verification is performed as part of the ResolveDevicePromisesPass.</p>
 // Queues 4 and 5 on whatever @device_b will be after declaration.
 #hal.device.promise&lt;@device_b, [4, 5]&gt;
 </code></pre></div></p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13722,7 +13825,7 @@ device can be selected.</p>
   #hal.device.fallback&lt;@fallback&gt; : !hal.device
 ]&gt; : !hal.device
 </code></pre></div></p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13763,7 +13866,7 @@ select between multiple homogeneous devices.</p>
   #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_64&quot;&gt;,
 ]&gt; : !hal.device
 </code></pre></div></p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13787,6 +13890,46 @@ select between multiple homogeneous devices.</p>
 <td style="text-align: center;">executable_targets</td>
 <td style="text-align: center;"><code>::llvm::ArrayRef&lt;ExecutableTargetAttr&gt;</code></td>
 <td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="devicetopologyattr">DeviceTopologyAttr<a class="headerlink" href="#devicetopologyattr" title="Permanent link">link</a></h3>
+<p><em>Device connection topology specification.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#hal.device.topology&lt;
+  ::llvm::ArrayRef&lt;DeviceLinkAttr&gt;   # links
+&gt;
+</code></pre></div>
+<p>Specifies the topology of connections between devices, including
+information about memory sharing and access characteristics between devices.</p>
+<p>This attribute is attached to the top-level module as <code>stream.topology</code>
+to inform Stream dialect passes about device connectivity.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>module {
+  stream.topology = #hal.device.topology&lt;
+    links = [
+      (@device_gpu_0 -&gt; @device_cpu = {transparent_access = true, unified_memory = true}),
+      (@device_gpu_1 -&gt; @device_cpu = {transparent_access = true}),
+      (@device_cpu -&gt; @device_gpu_0 = {unified_memory = true}),
+      (@device_cpu -&gt; @device_gpu_1 = {})
+    ]
+  &gt;
+}
+</code></pre></div></p>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">links</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;DeviceLinkAttr&gt;</code></td>
+<td>links</td>
 </tr>
 </tbody>
 </table>
@@ -13814,7 +13957,7 @@ variant without needing to reach into the IREE compiler code.</p>
   data = dense&lt;[...]&gt; : vector&lt;2048xi8&gt;
 }&gt;
 </code></pre></div></p>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13857,7 +14000,7 @@ ones ("only x86_64 targets with vector_size = 64 get these objects").</p>
   ]
 }&gt;
 </code></pre></div></p>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13901,7 +14044,7 @@ backend-specific defaults.</p>
 several different runtime devices. Likewise the same runtime device may use
 one of many different executable targets. Assume an N:M mapping between the
 two in all cases.</p>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13937,7 +14080,7 @@ two in all cases.</p>
 &gt;
 </code></pre></div>
 <p>Specifies a single binding within a pipeline layout.</p>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13971,7 +14114,7 @@ two in all cases.</p>
 <p>Specifies the layout information used for interacting with executable
 functions. This allows host code to correctly map parameters to the
 lower-level target-specific argument passing behavior.</p>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
