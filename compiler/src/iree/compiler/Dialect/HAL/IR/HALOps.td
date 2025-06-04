@@ -589,8 +589,8 @@ def HAL_AllocatorSelectAttrOp : HAL_PureOp<"allocator.select.attr", [
 
   let arguments = (ins
     HAL_DeviceOptimalAttr:$optimal_set,
-    I32:$memory_types,
-    I32:$buffer_usage
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
   );
   let results = (outs
     HAL_Device:$selected_device,
