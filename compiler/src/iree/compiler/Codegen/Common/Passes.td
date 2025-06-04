@@ -376,7 +376,7 @@ def FoldTensorExtractOpPass :
 }
 
 def ForallToForPass :
-  InterfacePass<"iree-forall-to-for", "mlir::FunctionOpInterface"> {
+  InterfacePass<"iree-codegen-forall-to-for", "mlir::FunctionOpInterface"> {
   let summary = "Convert scf.forall to nested scf.for loops";
   let description = [{
     Converts scf.forall operations (without workgroup mapping) to nested

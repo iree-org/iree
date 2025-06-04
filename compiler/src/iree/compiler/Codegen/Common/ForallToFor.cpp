@@ -16,6 +16,8 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 
+#include <cassert>
+
 #define DEBUG_TYPE "iree-codegen-forall-to-for"
 
 namespace mlir::iree_compiler {
@@ -23,16 +25,24 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_FORALLTOFORPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-namespace {
-
-LogicalResult forallToForLoop(RewriterBase &rewriter, scf::ForallOp forallOp) {
+static LogicalResult forallToForLoop(RewriterBase &rewriter,
+                                     scf::ForallOp forallOp) {
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(forallOp);
+
+  // Check pre-condition, the buildBody function below needs to know how to
+  // convert all the ops inside `scf.forall.in_parallel`.
+  auto terminator = forallOp.getTerminator();
+  if (!all_of(terminator.getYieldingOps(),
+              llvm::IsaPred<tensor::ParallelInsertSliceOp>)) {
+    return failure();
+  }
+
+  // Build `scf.for` loop nest.
   SmallVector<Value> lbs = forallOp.getLowerBound(rewriter);
   SmallVector<Value> ubs = forallOp.getUpperBound(rewriter);
   SmallVector<Value> steps = forallOp.getStep(rewriter);
   SmallVector<Value> iterArgs = forallOp.getOutputs();
-
-  bool unsupportedOperation = false;
   auto buildBody = [&](OpBuilder &builder, Location loc, ValueRange ivs,
                        ValueRange args) -> scf::ValueVector {
     // Inline `scf.forall` body excluding terminating
@@ -45,69 +55,58 @@ LogicalResult forallToForLoop(RewriterBase &rewriter, scf::ForallOp forallOp) {
     }
 
     // Convert + inline the contents of `scf.forall.in_parallel` terminator.
-    auto terminator = forallOp.getTerminator();
     SmallVector<Value> yieldedValues;
     for (auto &yieldOp : terminator.getYieldingOps()) {
+      assert(isa<tensor::ParallelInsertSliceOp>(yieldOp) &&
+             "unsupported operation in in_parallel region");
       // Convert tensor.parallel_insert_slice to tensor.insert_slice
-      if (auto parallelInsert =
-              dyn_cast<tensor::ParallelInsertSliceOp>(&yieldOp)) {
-
-        auto source = map.lookupOrDefault(parallelInsert.getSource());
-        auto dest = map.lookupOrDefault(parallelInsert.getDest());
-        auto offsets =
-            llvm::map_to_vector(parallelInsert.getOffsets(), [&](Value v) {
-              return map.lookupOrDefault(v);
-            });
-        auto sizes =
-            llvm::map_to_vector(parallelInsert.getSizes(), [&](Value v) {
-              return map.lookupOrDefault(v);
-            });
-        auto strides =
-            llvm::map_to_vector(parallelInsert.getStrides(), [&](Value v) {
-              return map.lookupOrDefault(v);
-            });
-        auto insertSlice = builder.create<tensor::InsertSliceOp>(
-            parallelInsert.getLoc(), source, dest, offsets, sizes, strides,
-            parallelInsert.getStaticOffsets(), parallelInsert.getStaticSizes(),
-            parallelInsert.getStaticStrides());
-        yieldedValues.push_back(insertSlice.getResult());
-      } else {
-        forallOp.emitError("unsupported operation in in_parallel region");
-        unsupportedOperation = true;
-        return args;
-      }
+      auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(&yieldOp);
+      auto source = map.lookupOrDefault(parallelInsert.getSource());
+      auto dest = map.lookupOrDefault(parallelInsert.getDest());
+      auto offsets =
+          llvm::map_to_vector(parallelInsert.getOffsets(),
+                              [&](Value v) { return map.lookupOrDefault(v); });
+      auto sizes = llvm::map_to_vector(parallelInsert.getSizes(), [&](Value v) {
+        return map.lookupOrDefault(v);
+      });
+      auto strides =
+          llvm::map_to_vector(parallelInsert.getStrides(),
+                              [&](Value v) { return map.lookupOrDefault(v); });
+      auto insertSlice = builder.create<tensor::InsertSliceOp>(
+          parallelInsert.getLoc(), source, dest, offsets, sizes, strides,
+          parallelInsert.getStaticOffsets(), parallelInsert.getStaticSizes(),
+          parallelInsert.getStaticStrides());
+      yieldedValues.push_back(insertSlice.getResult());
     }
     return yieldedValues;
   };
   scf::LoopNest loopNest = scf::buildLoopNest(rewriter, forallOp->getLoc(), lbs,
                                               ubs, steps, iterArgs, buildBody);
-  if (unsupportedOperation) {
-    return failure();
-  }
   rewriter.replaceOp(forallOp, loopNest.results);
   return success();
 }
 
+namespace {
 struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
   using impl::ForallToForPassBase<ForallToForPass>::ForallToForPassBase;
   void runOnOperation() override {
     auto funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
-    // Find `scf.forall` ops we want to convert in innermost to outermost order.
+    // Find `scf.forall` ops we want to convert.
     SmallVector<scf::ForallOp> forallOps;
-    funcOp->walk<WalkOrder::PostOrder>([&](scf::ForallOp forallOp) {
-      // Forall ops with workgroup any mapping
-      // are for distribution, we only want to convert inner loops
-      // produced by tiling to `scf.for`.
+    funcOp->walk([&](scf::ForallOp forallOp) {
+      // Forall ops with workgroup mappings are for distribution, we only want
+      // to convert inner loops produced by tiling to `scf.for`.
       if (!forallOp.getMapping()) {
         forallOps.push_back(forallOp);
       }
     });
 
-    // Convert `scf.forall` -> `scf.for`.
     for (auto forallOp : forallOps) {
       if (failed(iree_compiler::forallToForLoop(rewriter, forallOp))) {
+        // This is currently the only reason `forallToForLoop` will fail.
+        forallOp.emitError("unsupported operation in in_parallel region");
         signalPassFailure();
         return;
       }
