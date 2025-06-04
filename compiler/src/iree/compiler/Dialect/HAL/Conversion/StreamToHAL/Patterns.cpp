@@ -196,8 +196,15 @@ struct ResourceDeallocaOpPattern
                                                bufferUsage))) {
       preferOrigin = true;
     }
-    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
-        deallocaOp, memoryTypes, bufferUsage, rewriter);
+
+    auto memoryTypeOp =
+        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+    auto bufferUsageOp =
+        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(deallocaOp, memoryTypeOp.getResult(),
+                                        bufferUsageOp.getResult(), rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
