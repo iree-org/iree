@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
@@ -135,25 +136,26 @@ FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   SmallVector<LoopLikeOpInterface> tilingLoops = tiledResults->loops;
 
   if (!onlyFuseProducerInputOperands) {
+    FailureOr<std::queue<Operation *>> newFusionOpportunities;
     if (tileUsingForall) {
-      FailureOr<std::queue<Operation *>> newFusionOpportunities =
-          fuseConsumersIntoForall(rewriter, *tiledOp, tilingLoops,
-                                  useWARForConsumerFusionSSAViolation);
-
-      if (failed(newFusionOpportunities)) {
-        tiledOp.value()->emitOpError("failed to fuse consumers");
-        return failure();
-      }
-
-      // Because we restrict to at most a single tilable consumer for yielding
-      // a replacement, no new fusion opportunities will yield a replacement,
-      // meaning there is no need to run consumer fusion again afterwards.
-      // TODO: run producer and consumer fusion in one worklist.
-      fuseProducersOfSlices(rewriter, *newFusionOpportunities,
-                            tileAndFuseOptions, tilingLoops);
+      newFusionOpportunities = fuseConsumersInto<scf::ForallOp>(
+          rewriter, *tiledOp, tilingLoops, useWARForConsumerFusionSSAViolation);
     } else {
-      fuseConsumersIntoFor(rewriter, *tiledOp, tilingLoops);
+      newFusionOpportunities =
+          fuseConsumersInto<scf::ForOp>(rewriter, *tiledOp, tilingLoops, false);
     }
+
+    if (failed(newFusionOpportunities)) {
+      tiledOp.value()->emitOpError("failed to fuse consumers");
+      return failure();
+    }
+
+    // Because we restrict to at most a single tilable consumer for yielding
+    // a replacement, no new fusion opportunities will yield a replacement,
+    // meaning there is no need to run consumer fusion again afterwards.
+    // TODO: run producer and consumer fusion in one worklist.
+    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
+                          tilingLoops);
   }
 
   return tiledResults->tiledAndFusedOps.front();
