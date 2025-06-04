@@ -13,7 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 
 // clang-format off
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/LoweringConfigEnums.h.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h.inc"
 // clang-format on
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENENUMS_H_
