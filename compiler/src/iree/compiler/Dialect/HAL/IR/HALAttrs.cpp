@@ -1094,6 +1094,44 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+// Returns the device attribute from the given HAL affinity attribute.
+static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
+  if (auto deviceAffinityAttr =
+          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
+    return deviceAffinityAttr.getDevice();
+  } else if (auto devicePromiseAttr =
+                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
+    return devicePromiseAttr.getDevice();
+  }
+  return {};
+}
+
+bool DeviceTopologyAttr::requiresTransfer(
+    IREE::Stream::AffinityAttr source,
+    IREE::Stream::AffinityAttr target) const {
+  Attribute sourceDevice = getAffinityDevice(source);
+  Attribute targetDevice = getAffinityDevice(target);
+
+  if (!sourceDevice || !targetDevice)
+    return true;
+  if (sourceDevice == targetDevice)
+    return false;
+
+  // Search for a matching link and check if it has transparent access
+  // or unified memory.
+  for (DeviceLinkAttr link : getLinks()) {
+    if ((sourceDevice == link.getSourceDevice() &&
+         targetDevice == link.getTargetDevice())) {
+      return !link.getTransparentAccess() && !link.getUnifiedMemory();
+    }
+  }
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 // #hal.device.optimal<*>
 //===----------------------------------------------------------------------===//
 
@@ -1139,18 +1177,6 @@ bool DeviceOptimalAttr::isExecutableWith(
     }
     return true;
   }
-}
-
-// Returns the device attribute from the given HAL affinity attribute.
-static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
-  if (auto deviceAffinityAttr =
-          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    return deviceAffinityAttr.getDevice();
-  } else if (auto devicePromiseAttr =
-                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
-    return devicePromiseAttr.getDevice();
-  }
-  return {};
 }
 
 using DeviceAffinitySet =
