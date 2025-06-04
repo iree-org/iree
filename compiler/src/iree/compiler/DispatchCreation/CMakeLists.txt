@@ -18,7 +18,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "BubbleUpExpandShapes.cpp"
-    "BubbleUpExtractSlices.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
     "ConvertDispatchRegionsToWorkgroups.cpp"
