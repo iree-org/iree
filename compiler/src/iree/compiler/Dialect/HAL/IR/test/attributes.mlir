@@ -180,3 +180,21 @@ builtin.module attributes {
     util.return %c1 : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: "device.topology"
+"device.topology"() {
+  // CHECK: topology = #hal.device.topology<links = [
+  // CHECK-SAME:   (@device_a -> @device_b = {}),
+  // CHECK-SAME:   (@device_c -> @device_d = {transparent_access = true}),
+  // CHECK-SAME:   (@device_g -> @device_h = {unified_memory = true, transparent_access = true})
+  // CHECK-SAME:   (@device_i -> @device_j = {}, {optional_flag = true})
+  // CHECK-SAME: ]>
+  topology = #hal.device.topology<links = [
+    (@device_a -> @device_b = {}),
+    (@device_c -> @device_d = {transparent_access = true}),
+    (@device_g -> @device_h = {transparent_access = true, unified_memory = true}),
+    (@device_i -> @device_j = {}, {optional_flag = true})
+  ]>
+} : () -> ()
