@@ -10,6 +10,7 @@
 include "ROCMDialect.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinTypeInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // rocm.builtin.*
@@ -32,7 +33,7 @@ def ROCM_BuiltinTuningModuleAttr :
   }];
 
   let parameters = (ins
-    "std::string":$builtin_filename
+    StringRefParameter<>:$builtin_filename
   );
   let assemblyFormat = "`<` $builtin_filename `>`";
 }
