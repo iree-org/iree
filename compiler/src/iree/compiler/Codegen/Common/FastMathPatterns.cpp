@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/FastMathDeviceLib.h"
+#include "iree/compiler/Codegen/Common/FastMathPatterns.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -14,7 +14,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 // Pattern to lower math.erf to its device lib implementation (from erfF.cl)
-struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
+struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
   using OpRewritePattern<math::ErfOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(math::ErfOp op,
@@ -122,14 +122,14 @@ struct ErfDeviceLibPattern : public OpRewritePattern<math::ErfOp> {
 };
 } // anonymous namespace
 
-void populateDeviceLibMathPatterns(
+void populateFastMathPatterns(
     RewritePatternSet &patterns,
     const std::function<bool(StringRef)> &predicate) {
   MLIRContext *ctx = patterns.getContext();
   
   // Add the device-lib erf pattern if enabled
   if (predicate(math::ErfOp::getOperationName())) {
-    patterns.add<ErfDeviceLibPattern>(ctx);
+    patterns.add<FastErfPattern>(ctx);
   }
   
   // TODO: Add more device-lib implementations for other math functions as needed.
