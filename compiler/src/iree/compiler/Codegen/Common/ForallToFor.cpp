@@ -97,8 +97,8 @@ struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
     // Find `scf.forall` ops we want to convert in innermost to outermost order.
     SmallVector<scf::ForallOp> forallOps;
     funcOp->walk<WalkOrder::PostOrder>([&](scf::ForallOp forallOp) {
-      // Forall ops with workgroup mappings `#iree_codegen.workgroup_mapping<y>`
-      // are for workgroup distribution, we only want to convert inner loops
+      // Forall ops with workgroup any mapping
+      // are for distribution, we only want to convert inner loops
       // produced by tiling to `scf.for`.
       if (!forallOp.getMapping()) {
         forallOps.push_back(forallOp);
