@@ -57,8 +57,6 @@ static LogicalResult forallToForLoop(RewriterBase &rewriter,
     // Convert + inline the contents of `scf.forall.in_parallel` terminator.
     SmallVector<Value> yieldedValues;
     for (auto &yieldOp : terminator.getYieldingOps()) {
-      assert(isa<tensor::ParallelInsertSliceOp>(yieldOp) &&
-             "unsupported operation in in_parallel region");
       // Convert tensor.parallel_insert_slice to tensor.insert_slice
       auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(&yieldOp);
       auto source = map.lookupOrDefault(parallelInsert.getSource());
@@ -107,8 +105,7 @@ struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
       if (failed(iree_compiler::forallToForLoop(rewriter, forallOp))) {
         // This is currently the only reason `forallToForLoop` will fail.
         forallOp.emitError("unsupported operation in in_parallel region");
-        signalPassFailure();
-        return;
+        return signalPassFailure();
       }
     }
   }
