@@ -3106,6 +3106,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-forall-to-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-forall-to-for
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fuse-tensor-pad-with-consumer" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fuse-tensor-pad-with-consumer
@@ -5927,6 +5936,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-forall-to-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-forall-to-for
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fuse-tensor-pad-with-consumer" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fuse-tensor-pad-with-consumer
@@ -6777,6 +6795,10 @@ to backends that require linearized access.</p>
 tensor_loads introduced for use only in tensor_extract. These can be
 folded to use a load of the created memref object that holds the constant
 values.</p>
+<h3 id="-iree-codegen-forall-to-for"><code>-iree-codegen-forall-to-for</code><a class="headerlink" href="#-iree-codegen-forall-to-for" title="Permanent link">link</a></h3>
+<p><em>Convert scf.forall to nested scf.for loops</em></p>
+<p>Converts scf.forall operations (without workgroup mapping) to nested
+scf.for loops.</p>
 <h3 id="-iree-codegen-fuse-tensor-pad-with-consumer"><code>-iree-codegen-fuse-tensor-pad-with-consumer</code><a class="headerlink" href="#-iree-codegen-fuse-tensor-pad-with-consumer" title="Permanent link">link</a></h3>
 <p><em>Fuse tensor.pad op into its consumer op's tiled loop nest</em></p>
 <h3 id="-iree-codegen-generic-vectorization"><code>-iree-codegen-generic-vectorization</code><a class="headerlink" href="#-iree-codegen-generic-vectorization" title="Permanent link">link</a></h3>
