@@ -151,7 +151,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
                                        /*usePadToModelSharedMemcpy=*/true);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
-    addGPUWarpReductionPassPipeline(pipeline);
+    addGPUWarpReductionPassPipeline(pipeline, forROCDL);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse:
     addGPUTileAndFusePassPipeline(pipeline, pipelineOptions);
