@@ -1023,6 +1023,18 @@ Value AllocatorImportOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorImportOp::getResultSize(unsigned idx) { return getLength(); }
 
 //===----------------------------------------------------------------------===//
+// hal.allocator.resolve_memory_properties
+//===----------------------------------------------------------------------===//
+
+
+void AllocatorResolveMemoryPropertiesOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(0), "memory_types");
+  setNameFn(getResult(1), "buffer_usage");
+}
+
+
+//===----------------------------------------------------------------------===//
 // hal.buffer.allocation.discard
 //===----------------------------------------------------------------------===//
 

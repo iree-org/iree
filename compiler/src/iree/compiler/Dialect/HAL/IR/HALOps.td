@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
+include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
@@ -676,6 +677,51 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
     `:` type($did_import) `,` type($result)
     attr-dict-with-keyword
   }];
+}
+
+def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memory_properties", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Resolves memory properties from resource lifetime and affinity.}];
+  let description = [{
+    Resolves the required memory types and buffer usage for a resource with
+    the given lifetime and affinity. This operation encapsulates the logic
+    for deriving buffer properties based on stream resource semantics, allowing
+    for cleaner separation between stream-to-HAL conversion patterns and the
+    actual property resolution logic.
+
+    This operation can be resolved later in compilation by either constant
+    folding when the affinity is statically known or by runtime device
+    selection when the affinity is dynamic.
+
+    Example:
+    ```mlir
+    %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
+        for(#hal.device.affinity<@device_a>)
+        lifetime(variable) : i32, i32
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$allocation_device,
+    OptionalAttr<Stream_AffinityAttr>:$affinity,
+    Stream_LifetimeAttr:$resource_lifetime
+  );
+  let results = (outs
+    I32:$memory_types,
+    I32:$buffer_usage
+  );
+
+  let assemblyFormat = [{
+    `for` `(` $allocation_device `:` type($allocation_device) `)`
+    `affinity` `(` $affinity `)`
+    `lifetime` `(` $resource_lifetime `)`
+    `:` type($memory_types) `,` type($buffer_usage)
+    attr-dict-with-keyword
+  }];
+
+  // let hasCanonicalizer = 1;
+  // let hasFolder = 1;
 }
 
 } // OpGroupAllocatorOps
