@@ -345,6 +345,8 @@
           
             
               
+                
+              
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -1361,24 +1363,67 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#tuning-specs" class="md-nav__link">
+  <a href="#shark-tuner" class="md-nav__link">
     <span class="md-ellipsis">
-      Tuning specs
+      SHARK Tuner
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SHARK Tuner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#flags" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-dispatch" class="md-nav__link">
     <span class="md-ellipsis">
-      Flags
+      What is a dispatch?
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
+  <a href="#knobs-in-dispatches" class="md-nav__link">
+    <span class="md-ellipsis">
+      Knobs in Dispatches
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-knobs-and-tuning-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting knobs and tuning specs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting knobs and tuning specs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage-in-iree" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage in IREE
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#anatomy-of-a-tuning-spec" class="md-nav__link">
     <span class="md-ellipsis">
       Anatomy of a tuning spec
@@ -1403,6 +1448,11 @@
       Explanation
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4586,6 +4636,8 @@
             
             
               
+                
+              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -4605,24 +4657,67 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#tuning-specs" class="md-nav__link">
+  <a href="#shark-tuner" class="md-nav__link">
     <span class="md-ellipsis">
-      Tuning specs
+      SHARK Tuner
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SHARK Tuner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#flags" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-dispatch" class="md-nav__link">
     <span class="md-ellipsis">
-      Flags
+      What is a dispatch?
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
+  <a href="#knobs-in-dispatches" class="md-nav__link">
+    <span class="md-ellipsis">
+      Knobs in Dispatches
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-knobs-and-tuning-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting knobs and tuning specs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting knobs and tuning specs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage-in-iree" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage in IREE
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#anatomy-of-a-tuning-spec" class="md-nav__link">
     <span class="md-ellipsis">
       Anatomy of a tuning spec
@@ -4654,6 +4749,11 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
     </ul>
   
@@ -4668,6 +4768,19 @@
               <article class="md-content__inner md-typeset">
                 
                   
+  
+  
+
+<nav class="md-tags" hidden>
+  
+    
+    
+    
+      <a href="../../community/tags/#performance" class="md-tag">performance</a>
+    
+  
+</nav>
+
 
   
     <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/reference/tuning.md" title="Edit this page" class="md-content__button md-icon">
@@ -4678,28 +4791,214 @@
   
 
 
-<h1 id="tuning">Tuning<a class="headerlink" href="#tuning" title="Permanent link">link</a></h1>
-<p>This page documents support for IREE dispatch tuning. The compiler supports
-both default and user-provided tuning specs (specifications) that override
-compiler heuristics that guide dispatch code generation. In our experience,
-tuning specs can provide meaningful speedup of model execution. For example, we
-achieved a ~10% improvement on the Stable Diffusion XL (SDXL) model with the
-MI300X GPU.</p>
-<h2 id="tuning-specs">Tuning specs<a class="headerlink" href="#tuning-specs" title="Permanent link">link</a></h2>
-<p>The default specs are shipped with the IREE compiler and are target-specific.
-We aim to provide default tuning specs that cover the most in-demand hardware
-and dispatches from most popular ML models, although we do not guarantee
-completeness.</p>
-<p>User-provided tuning specs are a mechanism that allows for users to get the
-best performance on custom models and hardware targets without having to modify
-the compiler source code or needlessly special-case compiler heuristics.</p>
-<p>Currently, the dispatch tuner that generates tuning specs is still experimental
-and hosted
-<a href="https://github.com/nod-ai/shark-ai/tree/main/tuner">in an external repo</a>. This
-document describes how to work with tuning specs generated by the SHARK Tuner
-or produced manually, but it does not go into detail on how to generate these
-specs.</p>
-<h2 id="flags">Flags<a class="headerlink" href="#flags" title="Permanent link">link</a></h2>
+<h1 id="tuning"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 0 6.016 4.035.75.75 0 0 1 1.388-.57 8 8 0 1 1-4.37-4.37.75.75 0 1 1-.569 1.389A6.5 6.5 0 0 0 8 1.5m6.28.22a.75.75 0 0 1 0 1.06l-4.063 4.064a2.5 2.5 0 1 1-1.06-1.06L13.22 1.72a.75.75 0 0 1 1.06 0M7 8a1 1 0 1 0 2 0 1 1 0 0 0-2 0"/></svg></span> Tuning<a class="headerlink" href="#tuning" title="Permanent link">link</a></h1>
+<p>Tuning is an important step in the process of extracting performance from your
+hardware. During the compilation of a workload, IREE makes decisions on how to
+set certain parameters that define how a workload is run on targeted hardware.
+For example, when targeting a GPU, there could be multiple options for thread
+count or tile size for a given input graph. By default, these parameters are
+chosen in a way that performs well for any generic workload. However, it is
+often possible to select values for these parameters that squeeze out extra
+performance for a specific workload.</p>
+<p>This process of iterating over the space of possible parameter values (knobs)
+to enable improvements in some chosen performance metrics is called Tuning.</p>
+<pre class="mermaid"><code>---
+title: Generic Tuning workflow
+---
+graph LR;
+    accTitle: Generic Tuning workflow
+    accDescr {
+     A generic tuning workflow consists of compiling a model, benchmarking the
+     performance with current choice of parameters, than changing the
+     parameters before begining the next iteration of this loop.
+    }
+    A[Compile]--&gt;B;
+    B[Benchmark]--&gt;C;
+    C[Set knobs]--&gt;A;</code></pre>
+<h2 id="shark-tuner"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.75 7.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75m5.25.75a.75.75 0 0 0-1.5 0v1.5a.75.75 0 0 0 1.5 0z"/><path d="M6.25 0h2A.75.75 0 0 1 9 .75V3.5h3.25a2.25 2.25 0 0 1 2.25 2.25V8h.75a.75.75 0 0 1 0 1.5h-.75v2.75a2.25 2.25 0 0 1-2.25 2.25h-8.5a2.25 2.25 0 0 1-2.25-2.25V9.5H.75a.75.75 0 0 1 0-1.5h.75V5.75A2.25 2.25 0 0 1 3.75 3.5H7.5v-2H6.25a.75.75 0 0 1 0-1.5M3 5.75v6.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-6.5a.75.75 0 0 0-.75-.75h-8.5a.75.75 0 0 0-.75.75"/></svg></span> SHARK Tuner<a class="headerlink" href="#shark-tuner" title="Permanent link">link</a></h2>
+<h3 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.74 3.74 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574M8.755 4.75l-.004 7.322a3.75 3.75 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h3>
+<p>While tuning can be done manually, the
+<a href="https://github.com/nod-ai/shark-ai/tree/main/sharktuner">SHARK Tuner</a> tool
+can automatically search through possible knob values for individual
+dispatches to improve overall program performance. Dispatches are blocks of
+code that are created as part of IREE's compilation flow by splitting the
+input program into blocks that can be executed concurrently and atomically.
+For further information on dispatches see the sections below.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>For more information about SHARK Tuner, see its source in the
+<a href="https://github.com/nod-ai/shark-ai/tree/main/sharktuner">shark-ai GitHub repository</a>
+and the <a href="https://github.com/nod-ai/shark-ai/tree/main/sharktuner/model_tuner">Model Tuner example</a>.</p>
+</div>
+<p>In our experience, using the SHARK Tuner can provide <strong>meaningful speedup</strong> of
+model execution.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>SHARK Tuner achieved a <a href="https://rocm.blogs.amd.com/artificial-intelligence/mi325x-accelerates-mlperf-inference/README.html#tuning">~10% improvement</a>
+on the SDXL (Stable Diffusion XL) model with the MI300X GPU.</p>
+</div>
+<h3 id="what-is-a-dispatch"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.76 2.76 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6 6 0 0 0-.26.16 1 1 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661q.154-.1.313-.195l.007-.004c.1-.061.182-.11.258-.161a1 1 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.61.61 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1 1 0 0 0-.34.398M9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></svg></span> What is a dispatch?<a class="headerlink" href="#what-is-a-dispatch" title="Permanent link">link</a></h3>
+<p>To obtain a deeper understanding of what it means to tune dispatches, let's
+first build some intuition for what is a dispatch.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>Reminder: A dispatch is a block of code that can be executed concurrently
+and atomically, created by splitting the original input graph.</p>
+</div>
+<p>Let's walk through an example.</p>
+<div class="highlight"><pre><span></span><code>#map = affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;
+#map1 = affine_map&lt;(d0, d1) -&gt; (d0)&gt;
+func.func @matmul_reduce_32_1024_2048(%lhs: tensor&lt;32x1024xf16&gt;, %rhs: tensor&lt;1024x2048xf16&gt;) -&gt; tensor&lt;32xf32&gt; {
+  %c0_f16 = arith.constant 0.0: f16
+  %c1 = arith.constant dense&lt;1.000000e+00&gt; : tensor&lt;32xf16&gt;
+
+  // perform a matmul
+  %mm_acc = tensor.empty() : tensor&lt;32x2048xf32&gt;
+  %mm_fill = linalg.fill ins(%c0_f16 : f16) outs(%mm_acc :tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+  %mm = linalg.matmul ins(%lhs, %rhs: tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;) outs(%mm_fill: tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+
+  // sum over last dimension
+  %c0_f32 = arith.constant 0.0: f32
+  %red_acc = tensor.empty() : tensor&lt;32xf32&gt;
+  %red_fill = linalg.fill ins(%c0_f32 : f32) outs(%red_acc : tensor&lt;32xf32&gt;) -&gt; tensor&lt;32xf32&gt;
+  %red = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [&quot;parallel&quot;, &quot;reduction&quot;]} ins(%mm : tensor&lt;32x2048xf32&gt;) outs(%red_fill : tensor&lt;32xf32&gt;)  {
+  ^bb0(%in: f32, %out: f32):
+    %7 = arith.addf %in, %out : f32
+    linalg.yield %7 : f32
+  } -&gt; tensor&lt;32xf32&gt;
+  return %red: tensor&lt;32xf32&gt;
+}
+</code></pre></div>
+<p>The above IR performs a MatMul and then a sum over the last dimension.</p>
+<pre class="mermaid"><code>flowchart TD
+    accTitle: Illustration of example IR
+    accDescr {
+     An example of IR representing a simple model consisting of a matmul with
+     shape `32x1024x2048` followed by a reduction sum over the last dimension.
+    }
+    A[/Input 1/]--&gt;|tensor&lt;32x1024xf32&gt;|C;
+    B[/Input 2/]--&gt;|tensor&lt;1024x2048xf32&gt;|C;
+    C(MatMul)--&gt;|tensor&lt;32x2048xf32&gt;|E;
+    E(Sum Reduction)--&gt;|tensor&lt;32xf32&gt;|F[/Output/];</code></pre>
+<p>While compiling this graph with IREE, the flag
+<code>--iree-hal-dump-executable-files-to=&lt;some directory&gt;</code> can be used to observe
+the created dispatches.</p>
+<div class="highlight"><pre><span></span><code>// RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
+            --mlir-print-ir-after=iree-codegen-materialize-user-configs \
+            --iree-hal-dump-executable-files-to=&lt;some directory&gt;
+hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {
+  hal.executable.variant public @rocm_hsaco_fb target(&lt;...&gt;) {
+    module {
+      func.func @matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f32() {
+        %cst = arith.constant 0.000000e+00 : f32
+        ...
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32, 1024], strides = [1, 1] : !flow.dispatch.tensor&lt;readonly:tensor&lt;32x1024xf16&gt;&gt; -&gt; tensor&lt;32x1024xf16&gt;
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 2048], strides = [1, 1] : !flow.dispatch.tensor&lt;readonly:tensor&lt;1024x2048xf16&gt;&gt; -&gt; tensor&lt;1024x2048xf16&gt;
+        %5 = tensor.empty() : tensor&lt;32x2048xf32&gt;
+        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+        %7 = linalg.matmul {lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 128], subgroup_m_count = 1 : i64, subgroup_n_count = 4 : i64, workgroup = [16, 128, 0]}&gt;} ins(%3, %4 : tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;) outs(%6 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [32, 2048], strides = [1, 1] : tensor&lt;32x2048xf32&gt; -&gt; !flow.dispatch.tensor&lt;writeonly:tensor&lt;32x2048xf32&gt;&gt;
+        return
+      }
+    }
+  }
+}
+hal.executable public @matmul_reduce_32_1024_2048_dispatch_1 {
+  hal.executable.variant public @rocm_hsaco_fb target(&lt;...&gt;) {
+    module {
+      func.func @matmul_reduce_32_1024_2048_dispatch_1_generic_32x2048_f32() {
+        %cst = arith.constant 0.000000e+00 : f32
+        ...
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32, 2048], strides = [1, 1] : !flow.dispatch.tensor&lt;readonly:tensor&lt;32x2048xf32&gt;&gt; -&gt; tensor&lt;32x2048xf32&gt;
+        %3 = tensor.empty() : tensor&lt;32xf32&gt;
+        %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor&lt;32xf32&gt;) -&gt; tensor&lt;32xf32&gt;
+        %5 = linalg.generic {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;, affine_map&lt;(d0, d1) -&gt; (d0)&gt;], iterator_types = [&quot;parallel&quot;, &quot;reduction&quot;]} ins(%2 : tensor&lt;32x2048xf32&gt;) outs(%4 : tensor&lt;32xf32&gt;) {
+        ^bb0(%in: f32, %out: f32):
+          %6 = arith.addf %in, %out : f32
+          linalg.yield %6 : f32
+        } -&gt; tensor&lt;32xf32&gt;
+        flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [32], strides = [1] : tensor&lt;32xf32&gt; -&gt; !flow.dispatch.tensor&lt;writeonly:tensor&lt;32xf32&gt;&gt;
+        return
+      }
+    }
+  }
+}
+</code></pre></div>
+<p>Illustrated graphically, the following dispatches were created.</p>
+<pre class="mermaid"><code>flowchart TD
+    accTitle: Example of dispatch creation
+    accDescr {
+      In the earlier example, the matmul and the sum reduction are split into
+      individual dispatches, with the output of the matmul dispatch being tied
+      to the input of the sum reduction dispatch.
+    }
+    A[/Input 1/]--&gt;|tensor&lt;32x1024xf32&gt;|C;
+    B[/Input 2/]--&gt;|tensor&lt;1024x2048xf32&gt;|C;
+    subgraph Dispatch 0
+    C(MatMul);
+    end
+    C--&gt;|tensor&lt;32x2048xf32&gt;|D
+    subgraph Dispatch 1
+    D(Sum Reduction);
+    end
+    D--&gt;|tensor&lt;32xf32&gt;|F[/Output/];</code></pre>
+<p>In the above example, each <code>hal.executable</code> represents a dispatch.
+To briefly explain how these dispatches came to be, when creating dispatches we
+first identify "root" operations. These are often operations that perform some
+kind of reduction. In our example, there are two such root ops, the MatMul and
+the sum reduction. Then for each root op, we find surrounding operations that
+could be merged into the same dispatch (not applicable in our example). Then
+each of these groups of ops with a single root are split off into individual
+functions, creating dispatches. There are many nuances such as how operations
+are chosen for a particular dispatch that are beyond the scope of this document
+but hopefully this provides a useful starting point to understand how a graph
+is broken down into dispatches.</p>
+<h3 id="knobs-in-dispatches"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8 8 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224q.347.171.668.386c.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63q.406.578.704 1.218c.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294q.024.386 0 .772c-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a8 8 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a6 6 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8 8 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a6 6 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8 8 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6 6 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a8 8 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071q.321-.215.668-.386c.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03Q7.646 0 8 0m-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189q-.26.13-.5.29c-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045q-.33.47-.573.99c-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a5 5 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19q.243.52.573.989c.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27q.242.16.501.29c.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189q.26-.13.5-.29c.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045q.33-.47.573-.99c.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a5 5 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.5 6.5 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.4 4.4 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0M11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0M9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8"/></svg></span> Knobs in Dispatches<a class="headerlink" href="#knobs-in-dispatches" title="Permanent link">link</a></h3>
+<p>Depending on the hardware being targeted, a dispatch will expose different
+knobs. Focusing on GPUs, some common knobs are subgroup tile sizes or workgroup
+thread count. For a given input graph, the knobs associated with a particular
+dispatch can be seen by adding the following flags when compiling.</p>
+<ul>
+<li><code>--iree-hal-dump-executable-benchmarks-to=&lt;directory&gt;</code></li>
+<li><code>--iree-config-add-tuner-attributes</code></li>
+</ul>
+<p>These will dump standalone hal.executable benchmarks for each dispatch. Within
+these benchmark files we can find an attribute associated to the root op of the
+dispatch which shows some tunable attributes.</p>
+<p>Shown below is the aforementioned attribute for the MatMul dispatch from our
+earlier example.</p>
+<div class="highlight"><pre><span></span><code>linalg.matmul {lowering_config = #iree_gpu.lowering_config&lt;{
+    mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
+    promote_operands = [0, 1],
+    reduction = [0, 0, 128],
+    subgroup_m_count = 1 : i64,
+    subgroup_n_count = 4 : i64,
+    workgroup = [16, 128, 0]}&gt;,
+    root_op
+} ins(%3, %4 : tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;)
+  outs(%6 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+</code></pre></div>
+<p>Specifically, observe the <code>lowering_config</code> attribute which lists some tunable
+parameters such as the choice of MMA Layout or the subgroup counts along
+various dimensions. These parameters affect model execution on hardware in
+various ways such as by influencing memory locality, bank conflicts, etc.</p>
+<h3 id="setting-knobs-and-tuning-specs"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.433 2.304A4.49 4.49 0 0 0 3.5 6c0 1.598.832 3.002 2.09 3.802.518.328.929.923.902 1.64v.008l-.164 3.337a.75.75 0 1 1-1.498-.073l.163-3.33c.002-.085-.05-.216-.207-.316A6 6 0 0 1 2 6a6 6 0 0 1 2.567-4.92 1.48 1.48 0 0 1 1.673-.04c.462.296.76.827.76 1.423v2.82c0 .082.041.16.11.206l.75.51a.25.25 0 0 0 .28 0l.75-.51A.25.25 0 0 0 9 5.282V2.463c0-.596.298-1.127.76-1.423a1.48 1.48 0 0 1 1.673.04A6 6 0 0 1 14 6a6 6 0 0 1-2.786 5.068c-.157.1-.209.23-.207.315l.163 3.33a.752.752 0 0 1-1.094.714.75.75 0 0 1-.404-.64l-.164-3.345c-.027-.717.384-1.312.902-1.64A4.5 4.5 0 0 0 12.5 6a4.49 4.49 0 0 0-1.933-3.696c-.024.017-.067.067-.067.16v2.818a1.75 1.75 0 0 1-.767 1.448l-.75.51a1.75 1.75 0 0 1-1.966 0l-.75-.51A1.75 1.75 0 0 1 5.5 5.282V2.463c0-.092-.043-.142-.067-.159"/></svg></span> Setting knobs and tuning specs<a class="headerlink" href="#setting-knobs-and-tuning-specs" title="Permanent link">link</a></h3>
+<p>Changing / setting the values of knobs can be done in many ways. One way is to
+use the flags below to dump the IR after these knobs have been set, manually
+edit the values, and then resume compilation.</p>
+<ul>
+<li><code>--compile-to=executable-configurations</code></li>
+<li><code>--compile-from=executable-configurations</code></li>
+</ul>
+<p>But a more elegant solution is to use the
+<a href="https://mlir.llvm.org/docs/Dialects/Transform/">transform dialect</a> in mlir.
+This dialect provides ops that can be added to the IR that allow the
+transformation of the IR during compilation. For more information, see this
+<a href="https://mlir.llvm.org/docs/Dialects/Transform/#overview">overview</a> of the
+Transform dialect. For the purposes of tuning, we use the Transform dialect to
+create mlir files, which we call "specs", that describe how dispatches and
+their relevant knobs should be changed.</p>
+<h4 id="usage-in-iree">Usage in IREE<a class="headerlink" href="#usage-in-iree" title="Permanent link">link</a></h4>
 <p>The use of tuning specs in <code>iree-compile</code> is controlled with the following
 flags:</p>
 <ul>
@@ -4712,70 +5011,31 @@ flags:</p>
 <p>Note that both default and user-provided specs can be enabled at the same time.
 The compiler will link them together and invoke the user-provided spec before
 attempting the default one.</p>
-<h2 id="anatomy-of-a-tuning-spec">Anatomy of a tuning spec<a class="headerlink" href="#anatomy-of-a-tuning-spec" title="Permanent link">link</a></h2>
-<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h3>
-<div class="highlight"><pre><span></span><code>module @my_spec attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
-transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
-                                          %config: !transform.any_param {transform.readonly}) {
-  transform.annotate %op &quot;compilation_info&quot; = %config : !transform.any_op, !transform.any_param
-  transform.yield
-}
-
-transform.named_sequence
-@match_mmt_f16_f16_f32(%root: !transform.any_op {transform.readonly}) -&gt; !transform.any_op {
-  transform.match.operation_name %root [&quot;linalg.generic&quot;] : !transform.any_op
-  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
-    ^bb0(%lhs: tensor&lt;?x?xf16&gt;, %rhs: tensor&lt;?x?xf16&gt;, %out: tensor&lt;?x?xf32&gt;):
-    %7 = linalg.generic {indexing_maps = [affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;,
-                                          affine_map&lt;(d0, d1, d2) -&gt; (d1, d2)&gt;,
-                                          affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;],
-                          iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]}
-        ins(%lhs, %rhs : tensor&lt;?x?xf16&gt;, tensor&lt;?x?xf16&gt;) outs(%out : tensor&lt;?x?xf32&gt;) {
-      ^bb0(%in: f16, %in_0: f16, %acc: f32):
-        %8 = arith.extf %in : f16 to f32
-        %9 = arith.extf %in_0 : f16 to f32
-        %10 = arith.mulf %8, %9 : f32
-        %11 = arith.addf %acc, %10 : f32
-        linalg.yield %11 : f32
-      } -&gt; tensor&lt;?x?xf32&gt;
-  } : (!transform.any_op) -&gt; (!transform.any_value, !transform.any_value)
-  transform.yield %root : !transform.any_op
-}
-
-transform.named_sequence
-@match_mmt_2048x1280x5120_f16_f16_f32(%matmul: !transform.any_op {transform.readonly})
-  -&gt; (!transform.any_op, !transform.any_param) {
-  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul)
-    : (!transform.any_op) -&gt; !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -&gt; !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -&gt; !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor&lt;2048x5120xf16&gt; : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor&lt;1280x5120xf16&gt; : !transform.any_value
-  %config = transform.param.constant #iree_codegen.compilation_info&lt;
-    lowering_config = #iree_gpu.lowering_config&lt;{promote_operands = [0, 1],
-                                                 mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
-                                                 subgroup_m_count = 2, subgroup_n_count = 2,
-                                                 reduction = [0, 0, 64],
-                                                 workgroup = [64, 128, 0]}&gt;,
-    translation_info = #iree_codegen.translation_info&lt;pipeline = LLVMGPUVectorDistribute
-      workgroup_size = [256, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;}&gt;
-  &gt; -&gt; !transform.any_param
-  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
-}
-
-transform.named_sequence
-@__kernel_config(%variant_op: !transform.any_op {transform.consumed}) -&gt; !transform.any_op
-  attributes { iree_codegen.tuning_spec_entrypoint } {
-  %res = transform.foreach_match in %variant_op
-    @match_mmt_2048x1280x5120_f16_f16_f32 -&gt; @apply_op_config
-    : (!transform.any_op) -&gt; !transform.any_op
-  transform.yield %res : !transform.any_op
-}
+<h3 id="anatomy-of-a-tuning-spec"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7"/></svg></span> Anatomy of a tuning spec<a class="headerlink" href="#anatomy-of-a-tuning-spec" title="Permanent link">link</a></h3>
+<h4 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h4>
+<p>This is an example of a tuning spec that may be applied to the MatMul dispatch
+in our earlier example.</p>
+<div class="highlight"><pre><span></span><code>module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence} {
+  transform.named_sequence @apply_op_config(%arg0: !transform.any_op {transform.readonly}, %arg1: !transform.any_param {transform.readonly}) {
+    transform.annotate %arg0 &quot;compilation_info&quot; = %arg1 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+  transform.named_sequence @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32(%arg0: !transform.any_op {transform.readonly}) -&gt; (!transform.any_op, !transform.any_param) {
+    %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
+    ^bb0(%arg1: tensor&lt;32x1024xf16&gt;, %arg2: tensor&lt;1024x2048xf16&gt;, %arg3: tensor&lt;32x2048xf32&gt;):
+      %1 = linalg.matmul ins(%arg1, %arg2 : tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;) outs(%arg3 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
+    } : (!transform.any_op) -&gt; (!transform.any_value, !transform.any_value)
+    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 128], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [32, 128, 0]}&gt;, translation_info = &lt;pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {&quot;amdgpu-waves-per-eu&quot; = &quot;2&quot;}}&gt;&gt; -&gt; !transform.any_param
+    transform.yield %arg0, %0 : !transform.any_op, !transform.any_param
+  }
+  transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -&gt; !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {
+    %updated_root = transform.foreach_match in %arg0
+        @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32 -&gt; @apply_op_config : (!transform.any_op) -&gt; !transform.any_op
+    transform.yield %updated_root : !transform.any_op
+  }
 }
 </code></pre></div>
-<h3 id="explanation">Explanation<a class="headerlink" href="#explanation" title="Permanent link">link</a></h3>
+<h4 id="explanation">Explanation<a class="headerlink" href="#explanation" title="Permanent link">link</a></h4>
 <p>Tuning specs are
 <a href="https://mlir.llvm.org/docs/Dialects/Transform/">transform dialect</a> libraries
 that conform to the following format:</p>
@@ -4787,13 +5047,13 @@ that conform to the following format:</p>
 <li>All entry points in the final tuning specs must either read
   (<code>transform.readonly</code>) or consume (<code>transform.consumed</code>) the argument.</li>
 <li>The <code>iree_codegen.tuning_spec_with_default_entrypoint</code> attribute ensures that
-  the tuning spec includes a named sequence op with name <code>__kernel_config</code>, which
-  must contain exactly one <code>foreach_match</code> op. That <code>foreach_match</code> op must have
-  exactly one argument and one result of type any_op.</li>
+  the tuning spec includes a named sequence op with name <code>__kernel_config</code>,
+  which must contain exactly one <code>foreach_match</code> op. That <code>foreach_match</code> op
+  must have exactly one argument and one result of type any_op.</li>
 </ul>
-<p>The tuning spec above attempts to match <code>linalg.generic</code> ops that correspond to the
-matmul operation with the RHS operand transposed (a.k.a. mmt) of shape
-<code>2048x1280x5120</code> and <code>f16</code> operand element types and <code>f32</code> result element type.</p>
+<p>The tuning spec above attempts to match <code>linalg.matmul</code> ops that correspond to
+the shape <code>32x1024x2048</code> and <code>f16</code> operand element types and <code>f32</code> result
+element type.</p>
 <p>If the match succeeds, the tuning spec applies the <code>compilation_info</code> attribute
 that will drive the code generation. This attribute is considered a compiler
 implementation detail; in general, each codegen pipeline has its own
@@ -4812,6 +5072,8 @@ interpret it.</p>
 
 
 
+
+  
 
 
 
