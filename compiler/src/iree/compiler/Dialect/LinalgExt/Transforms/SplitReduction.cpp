@@ -641,15 +641,20 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     }
   }
 
-  // Step 1: Create a pure argmax to partially reduce the split dimension. The
-  // result will contain local indices within each reduction group, which need
-  // to be adjusted to the global index later.
+  // Step 1: Create a a structurally strict argmax that performs a partial
+  // reduction over the split (tile) dimension. The argmax matches the pattern
+  // expected by isArgmaxOp (maximumf, cmpf, select with index from
+  // linalg.index). The result yields the local maximum values and their
+  // corresponding local indices within each tile. These local indices will be
+  // adjusted to global indices in step 2.
   auto partialArgmax = rewriter.create<linalg::GenericOp>(
       loc, TypeRange{identityValue.getType(), identityIndex.getType()},
       newInputs, ValueRange{identityValue, identityIndex}, newMaps,
       newIteratorTypes,
       [reductionDim](OpBuilder &b, Location loc, ValueRange args) {
-        Value in = args[0], outVal = args[1], outIdx = args[2];
+        Value in = args[0];
+        Value outVal = args[1];
+        Value outIdx = args[2];
         Value reductionIdx = b.create<linalg::IndexOp>(loc, reductionDim + 1);
         if (outIdx.getType() != reductionIdx.getType())
           reductionIdx =
@@ -690,8 +695,10 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
       [combinerOps, tileSize, insertSplitDimension](OpBuilder &b, Location loc,
                                                     ValueRange inputs) {
-        Value val = inputs[0], local = inputs[1];
-        Value outVal = inputs[2], outIdx = inputs[3];
+        Value val = inputs[0];
+        Value local = inputs[1];
+        Value outVal = inputs[2];
+        Value outIdx = inputs[3];
         Value outer = b.create<linalg::IndexOp>(loc, insertSplitDimension);
         Value offset = b.create<arith::MulIOp>(loc, outer, tileSize);
         if (offset.getType() != local.getType())

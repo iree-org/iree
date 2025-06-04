@@ -144,7 +144,7 @@ func.func @argmax_invalid_index_without_selected_ukernel(
     ^bb0(%in: f32, %val: f32, %idx: i64):
       %i = linalg.index 0 : index
       %cast = arith.index_cast %i : index to i64
-      // Breaks isArgmaxOp matching
+      // Breaks isArgmaxOp matching.
       %plus = arith.addi %cast, %c0_i64 : i64
       %maxval = arith.maximumf %in, %val : f32
       %cmp = arith.cmpf ogt, %in, %val : f32

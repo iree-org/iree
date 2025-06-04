@@ -891,7 +891,7 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
     if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
       return false;
     }
-    auto selectOp = dyn_cast<arith::SelectOp>(producerOutput.getDefiningOp());
+    auto selectOp = cast<arith::SelectOp>(producerOutput.getDefiningOp());
     Value trueVal = selectOp.getTrueValue();
     if (auto castOp = trueVal.getDefiningOp<arith::IndexCastOp>())
       trueVal = castOp.getIn();
