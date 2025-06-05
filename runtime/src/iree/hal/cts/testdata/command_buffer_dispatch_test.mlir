@@ -1,5 +1,3 @@
-// RUN: cd /root/iree/build/model/runtime/src/iree/hal/drivers/hip/cts && /root/iree/build/model/tools/iree-compile --output-format=vm-bytecode --mlir-print-op-on-diagnostic=false --compile-mode=hal-executable --iree-hip-target=gfx942 --iree-hal-target-backends=rocm /root/iree/runtime/src/iree/hal/cts/testdata/command_buffer_dispatch_test.mlir -o rocm_command_buffer_dispatch_test.bin --iree-hal-executable-object-search-path=\"/root/iree/build/model\" --debug
-
 // Bootstrapped from this source IR:
 //
 // func.func @abs(%input : tensor<2xf32>) -> (tensor<2xf32>) {

@@ -355,7 +355,7 @@ def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-tr
 }
 
 
-def FlattenMemRefSubspanPass : InterfacePass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
+def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
       "Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets";
   let description = [{
