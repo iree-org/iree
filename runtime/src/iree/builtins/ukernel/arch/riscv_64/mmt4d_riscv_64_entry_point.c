@@ -1,4 +1,4 @@
-// Copyright 2025 10xEngineers
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -24,6 +24,13 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
 
   #define IREE_UK_MMT4D_TILE_riscv_64(lhs, rhs, out, m0, k0) \
   IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, )
+
+  #ifdef IREE_UK_BUILD_RISCV_64_V
+  #define IREE_UK_MMT4D_TILE_riscv_64_v(lhs, rhs, out, m0, k0) \
+    IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _v)
+  #else
+  #define IREE_UK_MMT4D_TILE_riscv_64_v(lhs, rhs, out, m0, k0)
+  #endif
 
   #define IREE_UK_MMT4D_TILE(arch, lhs, rhs, out, m0, k0, suffix) \
   IREE_UK_MMT4D_TILE_riscv_64##suffix(lhs, rhs, out, m0, k0)

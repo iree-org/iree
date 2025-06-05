@@ -8,7 +8,7 @@
 #include "iree/builtins/ukernel/arch/riscv_64/mmt4d_riscv_64_internal.h"
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
-iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64(
+iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64_v(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -45,7 +45,7 @@ iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64(
     for (int k = 0; k < params->K; ++k) {
       vfloat32m4_t rhs = __riscv_vle32_v_f32m4(rhs_ptr, vl);
       rhs_ptr += N0;
-      float lhs[M0];
+      float lhs[2];
       IREE_UK_UNROLL for (int i = 0; i < M0; ++i) { lhs[i] = *lhs_ptr++; }
       acc0 = __riscv_vfmacc_vf_f32m4(acc0, lhs[0], rhs, vl);
       acc1 = __riscv_vfmacc_vf_f32m4(acc1, lhs[1], rhs, vl);
@@ -67,7 +67,7 @@ iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64(
     for (int k = 0; k < params->K; ++k) {
       vfloat32m4_t rhs = __riscv_vle32_v_f32m4(rhs_ptr, vl);
       rhs_ptr += N0;
-      float lhs[M0];
+      float lhs[4];
       IREE_UK_UNROLL for (int i = 0; i < M0; ++i) { lhs[i] = *lhs_ptr++; }
       acc0 = __riscv_vfmacc_vf_f32m4(acc0, lhs[0], rhs, vl);
       acc1 = __riscv_vfmacc_vf_f32m4(acc1, lhs[1], rhs, vl);
@@ -99,7 +99,7 @@ iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64(
     for (int k = 0; k < params->K; ++k) {
       vfloat32m4_t rhs = __riscv_vle32_v_f32m4(rhs_ptr, vl);
       rhs_ptr += N0;
-      float lhs[M0];
+      float lhs[7];
       IREE_UK_UNROLL for (int i = 0; i < M0; ++i) { lhs[i] = *lhs_ptr++; }
       acc0 = __riscv_vfmacc_vf_f32m4(acc0, lhs[0], rhs, vl);
       acc1 = __riscv_vfmacc_vf_f32m4(acc1, lhs[1], rhs, vl);
@@ -120,14 +120,14 @@ iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64(
 }
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64,
-    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_riscv_64, 1)
+    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64_v,
+    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_riscv_64_v, 1)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64,
-    iree_uk_mmt4d_tile_f32f32f32_2xXXx1_riscv_64, 2)
+    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64_v,
+    iree_uk_mmt4d_tile_f32f32f32_2xXXx1_riscv_64_v, 2)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64,
-    iree_uk_mmt4d_tile_f32f32f32_4xXXx1_riscv_64, 4)
+    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64_v,
+    iree_uk_mmt4d_tile_f32f32f32_4xXXx1_riscv_64_v, 4)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64,
-    iree_uk_mmt4d_tile_f32f32f32_7xXXx1_riscv_64, 7)
+    iree_uk_mmt4d_tile_f32f32f32_1xXXx1_to_7xXXx1_riscv_64_v,
+    iree_uk_mmt4d_tile_f32f32f32_7xXXx1_riscv_64_v, 7)

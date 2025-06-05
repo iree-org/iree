@@ -30,7 +30,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arch_riscv_64_base
+    ukernel_bitcode_arch_riscv_64_v
   ARCH
     riscv_64
   INTERNAL_HDRS
@@ -40,7 +40,7 @@ iree_bitcode_library(
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
   SRCS
-    "mmt4d_riscv_64_base.c"
+    "mmt4d_riscv_64_v.c"
   COPTS
     "-march=rv64gcv"
 )
@@ -49,7 +49,7 @@ iree_link_bitcode(
   NAME
     ukernel_bitcode_arch_riscv_64
   SRCS
-    "ukernel_bitcode_arch_riscv_64_base.bc"
+    "ukernel_bitcode_arch_riscv_64_v.bc"
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
 
 )
@@ -59,3 +59,61 @@ iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arch_riscv_64.
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_RISCV_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if (NOT (IREE_ARCH STREQUAL "riscv_64"))
+  return()
+endif()
+
+iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_V
+  CLANG_OR_GCC
+    "-march=rv64gv"
+)
+
+check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
+
+# Placeholder for now
+configure_file("config_riscv_64.h.in" "config_riscv_64.h")
+
+iree_cc_library(
+  NAME
+    common_riscv_64
+  HDRS
+    "common_riscv_64.h"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+    iree::schemas::cpu_data
+)
+set(IREE_UK_RISCV_64_DEPS "")
+
+if(IREE_UK_BUILD_RISCV_64_V)
+iree_cc_library(
+  NAME
+    riscv_64_v
+  SRCS
+    "mmt4d_riscv_64_v.c"
+  COPTS
+    "${IREE_UK_COPTS_RISCV_64_V}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_v")
+endif()  # IREE_UK_BUILD_RISCV_64_V
+
+iree_cc_library(
+  NAME
+    riscv_64
+  SRCS
+    "mmt4d_riscv_64_entry_point.c"
+    "pack_riscv_64_entry_point.c"
+    "unpack_riscv_64_entry_point.c"
+    "query_tile_sizes_riscv_64_entry_point.c"
+  DEPS
+    ::common_riscv_64
+    iree::base::core_headers
+    iree::schemas::cpu_data
+    iree::builtins::ukernel::internal_headers
+    ${IREE_UK_RISCV_64_DEPS}
+  PUBLIC
+)
+
+set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::riscv_64" PARENT_SCOPE)
