@@ -33,15 +33,13 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_LLVMCPUTILEROOTANDFUSEPRODUCERCONSUMERPASS
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
-namespace {
-
 /// Implementation of tile root and fuse producers and consumers greedily. Tile
 /// the root operation and fuse the producers of the root operation then
 /// consumers (finds any missing fusion opportunities, then apply producer
 /// fusion). If `onlyFuseProducerInputOperands` is set, only fuse producer input
 /// operands. If `tileUsingForall` is set, creates `scf.forall`, rather than
 /// `scf.for` loops during tiling.
-FailureOr<Operation *> tileRootAndFuseProducerConsumer(
+static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
     IRRewriter &rewriter, TilingInterface rootOp, int64_t tilingLevel,
     bool onlyFuseProducerInputOperands, bool tileUsingForall) {
   auto *context = rewriter.getContext();
@@ -161,6 +159,7 @@ FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   return tiledResults->tiledAndFusedOps.front();
 }
 
+namespace {
 /// This pass starts with the first TilingInterface operation that has
 /// lowering_config attribute, tiles the op and fuses its  consumers and
 /// producers recursively. If the `onlyFuseProducerInputOperands` is set, it
@@ -210,7 +209,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   }
 
   if (failed(tileRootAndFuseProducerConsumer(
-          rewriter, dyn_cast<TilingInterface>(rootOp.value()), tilingLevel,
+          rewriter, cast<TilingInterface>(rootOp.value()), tilingLevel,
           onlyFuseProducerInputOperands, tileUsingForall))) {
     funcOp.emitError() << "tiling of level " << tilingLevel.getValue()
                        << " failed\n";
