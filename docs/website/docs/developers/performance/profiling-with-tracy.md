@@ -402,6 +402,20 @@ sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
 
 ---
 
+### :octicons-clock-fill-16: GPU timeline drift
+
+On some platforms, the GPU timeline and CPU timeline may drift relative to each
+other. In some cases this is a result of network time synchronization. To ensure
+accurate timing, disable network time synchronization. On Ubuntu and some other
+linux platforms, that can be done with the following command, which will disable
+time sync until the next boot:
+
+```shell
+sudo systmectl stop systemd-timesyncd
+# When done, resume the sync:
+sudo systemctl start systemd-timesyncd
+```
+
 ## :octicons-log-16: Appendix
 
 ### Building Tracy from source
