@@ -12,7 +12,7 @@ iree_uk_query_matmul_tile_sizes_riscv_64_f32f32f32(
     const iree_uk_query_tile_sizes_2d_params_t* params) {
   #if defined (IREE_UK_BUILD_RISCV_64_V)
     if (iree_uk_cpu_riscv_64_v(params->cpu_data)) {
-      return (iree_uk_matmul_tile_sizes_t){.M = 7, .K = 1, .N = 32};
+      return (iree_uk_matmul_tile_sizes_t){.M = 7, .K = 1, .N = 16};
     }
   #endif
   return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 1, .N = 8};
