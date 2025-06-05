@@ -20,6 +20,7 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateTargetDevices.cpp",
         "AssignLegacyTargetDevices.cpp",
         "AssignTargetDevices.cpp",
         "CaptureExecutableSources.cpp",
