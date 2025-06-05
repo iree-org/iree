@@ -1,24 +1,5 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
-// CHECK-LABEL: @allocator_select_attr
-util.func public @allocator_select_attr() -> (!hal.device, i64) {
-  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"HostVisible|HostCoherent|HostLocal"> : i32
-  %memory_type = hal.memory_type<"HostLocal"> : i32
-  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer"> : i32
-  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
-  // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select.attr
-  // CHECK-SAME:   from(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-  // CHECK-SAME:   type(%[[MEMORY_TYPE]])
-  // CHECK-SAME:   usage(%[[BUFFER_USAGE]])
-  // CHECK-SAME:   : !hal.device, i64
-  %device, %queue_affinity = hal.allocator.select.attr
-      from(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-      type(%memory_type) usage(%buffer_usage) : !hal.device, i64
-  util.return %device, %queue_affinity : !hal.device, i64
-}
-
-// -----
-
 // CHECK-LABEL: @allocator_select
 // CHECK-SAME: (%[[DEVICE_A:.+]]: !hal.device, %[[AFFINITY_A:.+]]: i64, %[[DEVICE_B:.+]]: !hal.device, %[[AFFINITY_B:.+]]: i64)
 util.func public @allocator_select(%device_a: !hal.device, %affinity_a: i64, %device_b: !hal.device, %affinity_b: i64) -> (!hal.device, i64) {
