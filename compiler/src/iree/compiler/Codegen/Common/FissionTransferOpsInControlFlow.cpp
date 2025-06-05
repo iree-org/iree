@@ -39,7 +39,10 @@ collectBackwardSliceInControlFlow(Operation *op, Operation *parentOp) {
   options.inclusive = false;
   options.filter = [&](Operation *op) { return parentOp == op->getParentOp(); };
   SetVector<Operation *> slice;
-  getBackwardSlice(op, &slice, options);
+  LogicalResult result = getBackwardSlice(op, &slice, options);
+  if (failed(result)) {
+    return {};
+  }
   return slice;
 }
 
