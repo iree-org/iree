@@ -36,8 +36,6 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipEventRecord, hipEvent_t, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipEventSynchronize, hipEvent_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipFree, void *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipFreeAsync, void *, hipStream_t)
-IREE_HAL_HIP_REQUIRED_PFN_DECL(hipFuncGetAttribute, int *, hipFuncAttribute,
-                               const void *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipFuncSetAttribute, const void *,
                                hipFuncAttribute, int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGetDeviceCount, int *)

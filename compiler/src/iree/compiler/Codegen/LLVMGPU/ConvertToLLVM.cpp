@@ -32,7 +32,7 @@ namespace mlir::iree_compiler {
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   SymbolTableCollection symbolTableCollection;
-  // Collect all the addressOfOps to static shared memory globals.
+  // Collect all the adressOfOps to static shared memory globals.
   SmallVector<LLVM::AddressOfOp> addressOfOps;
   moduleOp.walk([&](LLVM::AddressOfOp addressOfOp) {
     // Check that the global associated with this addressOfOp has shared memory
@@ -91,18 +91,6 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
     for (auto exportOp : variantOp.getExportOps()) {
       exportOp->setAttr(exportOp.getWorkgroupLocalMemoryAttrName(),
                         builder.getIndexAttr(numberOfBytes));
-    }
-  }
-}
-
-void setSharedMemoryAlignment(ModuleOp moduleOp, uint64_t newAlignment) {
-  for (auto global : moduleOp.getOps<LLVM::GlobalOp>()) {
-    if (global.getAddrSpace() == 3) {
-      uint64_t baseAlignment = 0;
-      if (std::optional<uint64_t> alignment = global.getAlignment()) {
-        baseAlignment = alignment.value();
-      }
-      global.setAlignment(std::max<uint64_t>(baseAlignment, newAlignment));
     }
   }
 }
