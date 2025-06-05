@@ -44,9 +44,9 @@ iree_bitcode_library(
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arch_riscv_64_base",
+    name = "ukernel_bitcode_arch_riscv_64_v",
     srcs = [
-        "mmt4d_riscv_64_base.c",
+        "mmt4d_riscv_64_v.c",
         ],
     arch = "riscv_64",
     copts = ["-march=rv64gcv"],
@@ -58,7 +58,7 @@ iree_link_bitcode(
     name = "ukernel_bitcode_arch_riscv_64",
     bitcode_files = [
         "ukernel_bitcode_arch_riscv_64_entry_points.bc",
-        "ukernel_bitcode_arch_riscv_64_base.bc",
+        "ukernel_bitcode_arch_riscv_64_v.bc",
     ],
 )
 
