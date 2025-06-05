@@ -74,14 +74,29 @@ util.global private @device_b : !hal.device
 util.func public @resourceAllocaOptimal(%size: index) -> (!stream.resource<transient>, !stream.timepoint) {
   // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
   // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}DispatchStorage"> : i32
-  // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select.attr
-  // CHECK-SAME: from(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-  // CHECK-SAME: type(%[[MEMORY_TYPE]])
-  // CHECK-SAME: usage(%[[BUFFER_USAGE]])
+  // CHECK: %[[DEVICE_A:.+]] = util.global.load immutable @device_a : !hal.device
+  // CHECK: %[[AFFINITY_A:.+]] = arith.constant -1 : i64
+  // CHECK: %[[DEVICE_B:.+]] = util.global.load immutable @device_b : !hal.device
+  // CHECK: %[[AFFINITY_B:.+]] = arith.constant -1 : i64
+  // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select from([
+  // CHECK: (%[[DEVICE_A]], %[[AFFINITY_A]] : !hal.device, i64),
+  // CHECK: (%[[DEVICE_B]], %[[AFFINITY_B]] : !hal.device, i64)
+  // CHECK: ]) type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]]) : !hal.device, i64
+  // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
+  // CHECK: %[[POOL:.+]] = arith.constant 0 : i64
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
   // CHECK-SAME: <%[[DEVICE]] : !hal.device>
   // CHECK-SAME: affinity(%[[QUEUE_AFFINITY]])
+  // CHECK-SAME: wait(%[[WAIT_FENCE]])
+  // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+  // CHECK-SAME: pool(%[[POOL]])
+  // CHECK-SAME: type(%[[MEMORY_TYPE]])
+  // CHECK-SAME: usage(%[[BUFFER_USAGE]])
+  // CHECK-SAME: flags("None")
+  // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
   %0:2 = stream.resource.alloca uninitialized on(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>) : !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]
   util.return %0#0, %0#1 : !stream.resource<transient>, !stream.timepoint
 }
 

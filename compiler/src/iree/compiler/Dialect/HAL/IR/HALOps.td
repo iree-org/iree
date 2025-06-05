@@ -570,45 +570,6 @@ def OpGroupAllocatorOps : OpDocGroup {
 
 let opDocGroup = OpGroupAllocatorOps in {
 
-// TODO(benvanik): fix the name to something less wonky or make the op support
-// exclusively an attribute _or_ a set of variadic operands.
-def HAL_AllocatorSelectAttrOp : HAL_PureOp<"allocator.select.attr", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{Selects a device/queue from the given set for allocations.}];
-  let description = [{
-    Chooses one device and queue affinity pair from the given optimal set that
-    can service the requested memory type and usage for all devices in the set.
-    Returns a null device if no pair is able to satisfy the conditions.
-
-    This variant of the op selects from an optimal device affinity set without
-    capturing any SSA values to more easily allow it to be hoisted/memoized.
-    After devices have been materialized and hoisting performed it will be
-    turned into the lower-level `hal.allocator.select` op.
-  }];
-
-  let arguments = (ins
-    HAL_DeviceOptimalAttr:$optimal_set,
-    HAL_MemoryType:$memory_types,
-    HAL_BufferUsage:$buffer_usage
-  );
-  let results = (outs
-    HAL_Device:$selected_device,
-    HAL_DeviceQueueAffinity:$selected_queue_affinity
-  );
-
-  // TODO(benvanik): change type/usage to ref params.
-  let assemblyFormat = [{
-    `from` `(` qualified($optimal_set) `)`
-    `type` `(` $memory_types `)`
-    `usage` `(` $buffer_usage `)`
-    `:`
-    type($selected_device) `,` type($selected_queue_affinity)
-    attr-dict-with-keyword
-  }];
-
-  let hasCanonicalizer = 1;
-}
 
 def HAL_AllocatorSelectOp : HAL_PureOp<"allocator.select", [
   SameVariadicOperandSize,
@@ -624,8 +585,8 @@ def HAL_AllocatorSelectOp : HAL_PureOp<"allocator.select", [
   let arguments = (ins
     Variadic<HAL_Device>:$devices,
     Variadic<HAL_DeviceQueueAffinity>:$queue_affinities,
-    I32:$memory_types,
-    I32:$buffer_usage
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
   );
   let results = (outs
     HAL_Device:$selected_device,
@@ -970,16 +931,6 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
   }];
 }
 
-} // OpGroupBufferOps
-
-def OpGroupBufferPropertiesOps : OpDocGroup {
-  let summary = "Buffer properties ops";
-  let description = "Ops for `iree_hal_buffer_usage_t` and `iree_hal_memory_type_t`.";
-}
-
-let opDocGroup = OpGroupBufferPropertiesOps in {
-
-
 def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
@@ -1004,8 +955,6 @@ def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
   let extraClassDeclaration = [{
     // Returns the buffer usage value.
     static std::optional<int32_t> getUsageValue(Value bufferUsage);
-    // Returns the buffer usage bitfield attribute.
-    static BufferUsageBitfieldAttr getUsageAttr(Value bufferUsage);
   }];
 
   let hasVerifier = 1;
@@ -1035,14 +984,12 @@ def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
   let extraClassDeclaration = [{
     // Returns the memory type value.
     static std::optional<int32_t> getTypeValue(Value memoryType);
-    // Returns the memory type bitfield attribute.
-    static MemoryTypeBitfieldAttr getTypeAttr(Value memoryType);
   }];
 
   let hasVerifier = 1;
 }
 
-} // OpGroupBufferPropertiesOps
+} // OpGroupBufferOps
 
 //===----------------------------------------------------------------------===//
 // !hal.buffer_view / iree_hal_buffer_view_t
