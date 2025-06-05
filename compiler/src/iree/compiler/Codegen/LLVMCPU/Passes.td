@@ -163,7 +163,7 @@ def LLVMCPUTileRootAndFuseProducerConsumerPass
               "This is helpful to tile&fuse in case of reduction dimensions.">,
        Option<"tileUsingForall", "tile-using-forall", "bool",
               /*default=*/"false",
-              "Tile using `scf.forall` instead of `scf.for`.">];
+              "Tile parallel dimensions using `scf.forall` instead of `scf.for`. Reduction dimension defaults to `scf.for`.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :
