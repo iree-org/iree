@@ -430,13 +430,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     return failure();
   }
 
-  // TODO: Support dilation.
-  if (!hasAllOneValues(convDims.dilations)) {
-    LDBG("[unimplemented] expected no dilations (expected dilations to all be "
-         "one).");
-    return failure();
-  }
-
   // TODO: Support pooling operations. For pooling ops, the input/output channel
   // size will be categorized as the additional batch dimension.
   if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
