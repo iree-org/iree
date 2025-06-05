@@ -29,8 +29,6 @@ void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp);
 
-void setSharedMemoryAlignment(ModuleOp moduleOp, uint64_t newAlignment);
-
 using MemorySpaceMapping =
     std::function<unsigned(gpu::AddressSpace gpuAddressSpace)>;
 void populateGpuMemorySpaceAttributeConversions(
