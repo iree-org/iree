@@ -909,6 +909,62 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// ArgmaxOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgmaxOp::verify() {
+  Operation *op = getOperation();
+
+  // Check number of inputs and outputs.
+  if (getNumDpsInputs() != 1) {
+    return op->emitOpError("expected exactly one input operand (values)");
+  }
+
+  if (getNumDpsInits() != 2) {
+    return op->emitOpError("expected two output operands (value and index)");
+  }
+
+  uint64_t dim = getDimension();
+  if (dim >= getInputRank()) {
+    return op->emitOpError("reduction dimension exceeds input rank");
+  }
+
+  ShapedType inputType = getInputType();
+  ShapedType outputValueType = cast<ShapedType>(outputValue().getType());
+  ShapedType outputIndexType = cast<ShapedType>(outputIndex().getType());
+
+  // Element type compatibility.
+  if (inputType.getElementType() != outputValueType.getElementType()) {
+    return op->emitOpError("input and output value element types must match");
+  }
+
+  // Output indicies and values must have the same shape.
+  if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
+    return op->emitOpError("output indices/values shape must match");
+  }
+
+  // Expected output shape = input shape with `dim` removed.
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < getInputRank(); ++i) {
+    if (static_cast<uint64_t>(i) != dim)
+      expectedShape.push_back(inputType.getDimSize(i));
+  }
+  if (!llvm::equal(expectedShape, outputValueType.getShape())) {
+    return op->emitOpError(
+        "output shape must match input shape with reduction dimension removed");
+  }
+
+  return success();
+}
+
+LogicalResult
+ArgmaxOp::reifyResultShapes(OpBuilder &b,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
@@ -2332,6 +2388,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
+DEFINE_OP_GET_EFFECTS(ArgmaxOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)

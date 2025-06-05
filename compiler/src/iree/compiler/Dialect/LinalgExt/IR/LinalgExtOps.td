@@ -668,6 +668,60 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
+def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+]> {
+  let summary = "Argmax reduction op.";
+  let description = [{
+    An argmax op that reduces along a given dimension, returning the max value and its index.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyShaped>:$inputs,
+    Variadic<AnyShaped>:$outputs,
+    I64Attr:$dimension
+  );
+
+  let results = (outs
+    Variadic<AnyRankedTensor>:$results
+  );
+
+let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`:` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value getInputValue() {
+      return getDpsInputOperand(0)->get();
+    }
+
+    Value outputValue() {
+      return getDpsInitOperand(0)->get();
+    }
+
+    Value outputIndex() {
+      return getDpsInitOperand(1)->get();
+    }
+
+    ShapedType getInputType() {
+      return llvm::cast<ShapedType>(getInputValue().getType());
+    }
+
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+
+    // For DPS interface.
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Attention
 //===----------------------------------------------------------------------===//
