@@ -148,6 +148,7 @@ def IREEGPU_MMAIntrinsicAttr
 
 def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getSubgroupSize",
     "buildMmaOperation",
   ]>,
   DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
@@ -155,9 +156,8 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
-    "getSubgroupSize",
     "populateOperandOffsetsSizesStrides",
-    "getInnerTileScope",
+    "getDistributionMappingKind",
   ]>
 ]> {
   let mnemonic = "mma_layout";
@@ -205,6 +205,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
 def IREEGPU_DataTiledMMAAttr :
     AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getSubgroupSize",
     "buildMmaOperation",
   ]>,
   DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
@@ -212,9 +213,8 @@ def IREEGPU_DataTiledMMAAttr :
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
-    "getSubgroupSize",
     "populateOperandOffsetsSizesStrides",
-    "getInnerTileScope",
+    "getDistributionMappingKind",
   ]>
 ]> {
   let mnemonic = "data_tiled_mma_layout";
@@ -250,6 +250,7 @@ def IREEGPU_VirtualMMAIntrinsicAttr
 def IREEGPU_VirtualMMAAttr :
     AttrDef<IREEGPU_Dialect, "VirtualMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getSubgroupSize",
     "buildMmaOperation",
   ]>,
   DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
@@ -257,9 +258,8 @@ def IREEGPU_VirtualMMAAttr :
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
-    "getSubgroupSize",
     "populateOperandOffsetsSizesStrides",
-    "getInnerTileScope",
+    "getDistributionMappingKind",
   ]>
 ]> {
   let mnemonic = "virtual_mma_layout";

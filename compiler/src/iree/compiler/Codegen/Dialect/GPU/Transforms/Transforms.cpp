@@ -1007,27 +1007,23 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
 
   // Step 1. Create the new scf.forall op with a lane id mapping.
   OpFoldResult ub;
-  Attribute mappingType;
-  FailureOr<IREE::Codegen::InnerTileScope> mmaScope =
-      mmaOp.getKind().getInnerTileScope();
-  if (failed(mmaScope)) {
+  Attribute mappingType = mmaOp.getKind().getDistributionMappingKind();
+  if (!mappingType)
     return failure();
-  }
-  switch (mmaScope.value()) {
-  case IREE::Codegen::InnerTileScope::Workgroup:
+  if (isa<gpu::GPUThreadMappingAttr>(mappingType)) {
     if (!workgroupSize) {
       mmaOp.emitOpError("Mma op with workgroup scope needs workgroup size.");
       return failure();
     }
-    mappingType =
-        gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
     ub = rewriter.getIndexAttr(
         ShapedType::getNumElements(workgroupSize.value()));
-    break;
-  case IREE::Codegen::InnerTileScope::Subgroup:
-    ub = rewriter.getIndexAttr(*mmaOp.getKind().getSubgroupSize());
-    mappingType = IREE::GPU::LaneIdAttr::get(context, 0);
+  } else if (isa<LaneIdAttr>(mappingType)) {
+    ub = rewriter.getIndexAttr(mmaOp.getKind().getSubgroupSize());
+  } else {
+    mmaOp.emitOpError("expected workgroup or subgroup distribution type");
+    return failure();
   }
+
   auto newForallOp = rewriter.create<scf::ForallOp>(
       loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
       ArrayRef<OpFoldResult>{one}, mmaOp.getAcc(),

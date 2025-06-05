@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -554,18 +555,18 @@ int64_t MMAAttr::getBlockSize() const {
   return IREE::GPU::getBlockSize(getIntrinsic());
 }
 
-std::optional<int64_t> MMAAttr::getSubgroupSize() const {
+int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-FailureOr<IREE::Codegen::InnerTileScope> MMAAttr::getInnerTileScope() const {
+Attribute MMAAttr::getDistributionMappingKind() const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
   if (intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16 ||
       intrinsic == MMAIntrinsic::NV_WMMA_F32_16x16x16_F16) {
-    return failure();
+    return Attribute();
   }
-  return IREE::Codegen::InnerTileScope::Subgroup;
+  return IREE::GPU::LaneIdAttr::get(getContext(), 0);
 }
 
 // Get virtual intrinsics that is composed/based on queried op.
@@ -641,9 +642,9 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
 static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, Value laneId,
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
-    SmallVector<OpFoldResult> &canonicalOffsets,
-    SmallVector<OpFoldResult> &canonicalSizes,
-    SmallVector<OpFoldResult> &canonicalStrides) {
+    SmallVectorImpl<OpFoldResult> &canonicalOffsets,
+    SmallVectorImpl<OpFoldResult> &canonicalSizes,
+    SmallVectorImpl<OpFoldResult> &canonicalStrides) {
   SmallVector<int64_t> rankReducedShape;
 
   for (auto [outer, thread, element] :
@@ -706,16 +707,16 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     canonicalSizes.push_back(builder.getIndexAttr(element));
     canonicalOffsets.push_back(vtids[idx++]);
   }
-  applyPermutationToVector(canonicalOffsets, permutation);
-  applyPermutationToVector(canonicalSizes, permutation);
+  canonicalOffsets.assign(applyPermutation(canonicalOffsets, permutation));
+  canonicalSizes.assign(applyPermutation(canonicalSizes, permutation));
   return success();
 }
 
 LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
-    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes,
-    SmallVector<OpFoldResult> &strides) const {
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
   assert(operandIndex <= 2 && "Must index valid MMA operand");
   auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
   MMASingleSubgroupLayout subgroupLayout = getSingleSubgroupLayout(
@@ -785,20 +786,20 @@ void DataTiledMMAAttr::getDistributedTileTypes(
                  VectorType::get(getShape(MMAFragment::Acc), C)});
 }
 
-std::optional<int64_t> DataTiledMMAAttr::getSubgroupSize() const {
+int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-FailureOr<IREE::Codegen::InnerTileScope>
-DataTiledMMAAttr::getInnerTileScope() const {
-  return IREE::Codegen::InnerTileScope::Workgroup;
+Attribute DataTiledMMAAttr::getDistributionMappingKind() const {
+  return gpu::GPUThreadMappingAttr::get(getContext(),
+                                        gpu::MappingId::LinearDim0);
 }
 
 LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
-    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes,
-    SmallVector<OpFoldResult> &strides) const {
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
   assert(operandIndex <= 2 && "Must index valid MMA operand");
   auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
   TileSwizzle swizzle = getSwizzle(*this, fragment);
@@ -855,7 +856,7 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     // below with erasing the corresponding dim out of the delinearized indices.
     distributionThreadSizes.insert(
         distributionThreadSizes.begin() + distributionOnlyDimIdx,
-        *getSubgroupSize() / intrinsicLayoutThreadBound);
+        getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
   // Obtain the offsets from delinearization along the distributionThreadSizes.
@@ -1101,7 +1102,7 @@ void VirtualMMAAttr::getDistributedTileTypes(
                  getThreadVectorType(context, intrinsic, MMAFragment::Acc)});
 }
 
-std::optional<int64_t> VirtualMMAAttr::getSubgroupSize() const {
+int64_t VirtualMMAAttr::getSubgroupSize() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
@@ -1114,16 +1115,15 @@ std::optional<int64_t> VirtualMMAAttr::getSubgroupSize() const {
   return 0;
 }
 
-FailureOr<IREE::Codegen::InnerTileScope>
-VirtualMMAAttr::getInnerTileScope() const {
-  return IREE::Codegen::InnerTileScope::Subgroup;
+Attribute VirtualMMAAttr::getDistributionMappingKind() const {
+  return IREE::GPU::LaneIdAttr::get(getContext(), 0);
 }
 
 LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
     OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
-    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes,
-    SmallVector<OpFoldResult> &strides) const {
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
   assert(operandIndex <= 2 && "Must index valid MMA operand");
   auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
   MMASingleSubgroupLayout subgroupLayout =

@@ -49,7 +49,7 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each input operand (includingthe accumulator, which is the final
+        For each operand (including the accumulator, which is the final
         operand), return the vector type of the inner tile before the operation
         is distributed (if applicable). This should be the logical type of
         the operands, ignoring any permutations that may be present on the
@@ -64,8 +64,8 @@ def IREECodegen_InnerTileDescAttrInterface :
         where `tA`, `tB`, and `tC` are the element types of matrices A, B, and C,
         respectively.
 
-        The types are placed into `result`, which has its existing contents
-        cloberred.
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
       }],
       /*retType=*/"void",
       /*methodName=*/"getUndistributedTileTypes",
@@ -73,27 +73,17 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each input operand (including the accumulator, which is the final
+        For each operand (including the accumulator, which is the final
         operand), return the vector type of the inner tile after the operation
         is distributed to threads. Vectors of this type will be stored into or
         loaded from registers by inndividual threads.
 
-        The types are placed into `result`, which has its existing contents
-        cloberred.
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
       }],
       /*retType=*/"void",
       /*methodName=*/"getDistributedTileTypes",
       /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        If this operation is to be distributed to subgroups or is required to
-        execute in a subgroup-wide way, return the size of those subgroups.
-        Otherwise, return std::nullopt.
-      }],
-      /*retType=*/"std::optional<int64_t>",
-      /*methodName=*/"getSubgroupSize",
-      /*args=*/(ins)
     >,
     InterfaceMethod<
       /*desc=*/[{
@@ -110,9 +100,9 @@ def IREECodegen_InnerTileDescAttrInterface :
         "uint32_t":$operandIndex,
         "::mlir::Value":$lane_id,
         "::llvm::ArrayRef<int64_t>":$permutation,
-        "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
-        "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
-        "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$strides
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
@@ -121,16 +111,18 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the scape at which this inner tiled operation's pre-distribution
-        inner tiles are located if one is known and explicit distribution to threads
-        via `populateOperandOffsetSisezStrides` is supported.
+        If this intrinsic can be mapped from its undistributed to its distributed
+        form using an `scf.forall`, return the attribute describing the mapping
+        kind that is to be used.
+
+        If such a mapping is not supported, return Attribute() (the null attribute).
       }],
-      /*retTy=*/"::mlir::FailureOr<::mlir::iree_compiler::IREE::Codegen::InnerTileScope>",
-      /*methodName=*/"getInnerTileScope",
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getDistributionMappingKind",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return failure();
+        return ::mlir::Attribute();
       }]
     >
   ];

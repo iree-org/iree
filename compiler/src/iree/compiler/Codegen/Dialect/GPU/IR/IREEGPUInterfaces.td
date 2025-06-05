@@ -27,6 +27,14 @@ def IREEGPU_MmaInterfaceAttr
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
+        Return the subgroup size needed to execute this kind of multi-MMA.
+      }],
+      /*retType=*/"int64_t",
+      /*methodName=*/"getSubgroupSize",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Constructs a concrete instance of the associated mma operation.
       }],
       /*retTy=*/"::mlir::FailureOr<::mlir::Value>",

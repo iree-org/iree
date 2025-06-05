@@ -10,7 +10,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENENUMS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENENUMS_H_
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
 // clang-format off
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h.inc"
