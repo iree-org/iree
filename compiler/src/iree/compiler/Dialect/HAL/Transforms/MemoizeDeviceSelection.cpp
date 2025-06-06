@@ -113,8 +113,7 @@ struct MemoizeDeviceSelectionPass
     // Gather all select ops in the program and bucket by unique key.
     // For each bucket the first op will be the first that appears in the
     // module for that given bucket.
-    llvm::DenseMap<Attribute, SmallVector<IREE::HAL::AllocatorSelectOp>>
-        selectOps;
+    DenseMap<Attribute, SmallVector<IREE::HAL::AllocatorSelectOp>> selectOps;
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       // TODO(benvanik): an interface for when we have other select ops. For now
       // we only have AllocatorSelectOp.
@@ -122,7 +121,7 @@ struct MemoizeDeviceSelectionPass
         // Build unique key from device symbols, queue affinities, memory type,
         // and buffer usage. If we fail to determine any of these values,
         // we skip the op as we cannot be sure the key is unique.
-        llvm::SmallVector<Attribute, 6> keyComponents;
+        SmallVector<Attribute, 6> keyComponents;
 
         // Add device symbols
         for (Value device : selectOp.getDevices()) {
@@ -171,7 +170,7 @@ struct MemoizeDeviceSelectionPass
     }
 
     // Insert globals/an initializer/swap ops with lookups.
-    for (auto &[key, allOps] : selectOps) {
+    for (auto [key, allOps] : selectOps) {
       if (failed(memoizeAllocatorSelectOp(allOps, symbolTable))) {
         return signalPassFailure();
       }
