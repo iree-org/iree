@@ -999,13 +999,13 @@ Attribute DevicePromiseAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(p.getContext(), deviceName, queueMask);
+  return get(p.getContext(), FlatSymbolRefAttr::get(deviceName), queueMask);
 }
 
 void DevicePromiseAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << "<@";
-  os << getDevice().getValue();
+  os << "<";
+  os << getDevice();
   int64_t queueMask = getQueueMask();
   if (queueMask != -1) {
     os << ", [";
