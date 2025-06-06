@@ -229,6 +229,7 @@ def EmplaceAllocationsPass :
     tensor concatenation.
   }];
   let dependentDialects = [
+    "mlir::arith::ArithDialect",
     "IREE::Stream::StreamDialect",
   ];
 }
