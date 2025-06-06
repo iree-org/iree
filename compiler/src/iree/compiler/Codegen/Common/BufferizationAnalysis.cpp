@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -516,6 +517,12 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
             [&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
               return analyseInterfaceStoreTensorOp(storeOp, plan);
             })
+        // iree_codegen.load_from_buffer and iree_codegen.store_to_buffer have
+        // only one tensor operand, so no equivalence analysis is needed.
+        .Case<IREE::Codegen::LoadFromBufferOp>(
+            [&](IREE::Codegen::LoadFromBufferOp) { return success(); })
+        .Case<IREE::Codegen::StoreToBufferOp>(
+            [&](IREE::Codegen::StoreToBufferOp) { return success(); })
         .Case<IREE::HAL::InterfaceBindingSubspanOp>(
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
               return analyseInterfaceBindingSubspanOp(subspanOp, plan);

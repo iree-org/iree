@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -38,6 +39,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -68,21 +70,6 @@ public:
   void runOnOperation() override;
 };
 } // namespace
-
-/// Returns the subview into the buffer that is supposed to be populated with
-/// the `value` of the `iree_tensor_ext.dispatch.tensor.store` operation. This
-/// can be used to compute the results in place.
-static Value getTensorLoadOpForTensorStoreOp(
-    OpBuilder &b, IREE::TensorExt::DispatchTensorStoreOp storeOp) {
-  // Clone the offset, size and stride values. They will be CSE-ed later.
-  SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
-  Value tensorLoadOp = b.create<IREE::TensorExt::DispatchTensorLoadOp>(
-      storeOp.getLoc(),
-      llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
-      storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
-      clonedVals.sizes, clonedVals.strides);
-  return tensorLoadOp;
-}
 
 /// Gets the reverse of a `tensor.expand_shape`/`tensor.collapse_shape` op to
 /// get a memref type that can be used for in-place computation of the result
@@ -129,20 +116,21 @@ static Value getTiedResultForOperand(OpOperand &operand,
 
 /// To perform updates directly into the result buffer, the uses need to be
 /// walked to get to a value already mapped to a buffer or a
-/// `iree_tensor_ext.dispatch.tensor.store` operation. For each use, gets the
-/// tied result and follow its uses. The traversed uses and thir tied results
-/// are returned in `traversedUses`.
-static IREE::TensorExt::DispatchTensorStoreOp
-walkUseToGetDispatchTensorStoreOp(Value value, const BufferizationPlan &plan,
-                                  SmallVectorImpl<OpOperand *> &traversedUses,
-                                  llvm::DenseSet<Value> &processed) {
+/// `iree_tensor_ext.dispatch.tensor.store` or `iree_codegen.store_to_buffer`
+/// operation. For each use, gets the tied result and follow its uses. The
+/// traversed uses and thir tied results are returned in `traversedUses`.
+static Operation *
+walkUseToGetDispatchStoreOp(Value value, const BufferizationPlan &plan,
+                            SmallVectorImpl<OpOperand *> &traversedUses,
+                            llvm::DenseSet<Value> &processed) {
   Operation *user = nullptr;
   while (value.hasOneUse()) {
     processed.insert(value);
     OpOperand &use = *value.use_begin();
     user = use.getOwner();
-    if (auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(user)) {
-      return storeOp;
+    if (isa<IREE::TensorExt::DispatchTensorStoreOp,
+            IREE::Codegen::StoreToBufferOp>(user)) {
+      return user;
     }
     value = getTiedResultForOperand(use, plan);
     if (!value)
@@ -151,8 +139,9 @@ walkUseToGetDispatchTensorStoreOp(Value value, const BufferizationPlan &plan,
   }
   // If the value has a use which is a store, then use that directly.
   for (Operation *user : value.getUsers()) {
-    if (auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(user)) {
-      return storeOp;
+    if (isa<IREE::TensorExt::DispatchTensorStoreOp,
+            IREE::Codegen::StoreToBufferOp>(user)) {
+      return user;
     }
   }
   return nullptr;
@@ -186,29 +175,31 @@ static LogicalResult
 modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
                              const BufferizationPlan &plan,
                              llvm::DenseSet<Value> &processed) {
-  // Traverse the use-def chains to get the
+  // Traverse the use-def chains to get the `iree_codegen.store_to_buffer` or
   // `iree_tensor_ext.dispatch.tensor.store` operation keeping track of all the
   // traversed operations. Note that the equivalence set construction should
   // ensure that all operations traversed here have a single use.
   Operation *resultValueOp = resultValue.getOwner();
   SmallVector<OpOperand *> traversedUses;
-  IREE::TensorExt::DispatchTensorStoreOp storeOp =
-      walkUseToGetDispatchTensorStoreOp(resultValue, plan, traversedUses,
-                                        processed);
+  Operation *storeOp =
+      walkUseToGetDispatchStoreOp(resultValue, plan, traversedUses, processed);
   if (!storeOp) {
     return resultValueOp->emitOpError(
         "failed walk of uses to get to iree_tensor_ext.dispatch.tensor.store "
-        "op");
+        "or iree_codegen.store_to_memref op");
   }
 
+  auto subsetInsertionOp = cast<SubsetInsertionOpInterface>(storeOp);
   OpBuilder::InsertionGuard g(b);
-  b.setInsertionPointToStart(storeOp->getBlock());
-  if (auto sourceDefiningOp = storeOp.getTarget().getDefiningOp()) {
-    if (sourceDefiningOp->getBlock() == storeOp->getBlock()) {
-      b.setInsertionPointAfter(sourceDefiningOp);
-    }
-  }
-  Value resultBuffer = getTensorLoadOpForTensorStoreOp(b, storeOp);
+  (void)setInsertionPointAfterLastNeededValue(b, subsetInsertionOp);
+  // Value storeSource = subsetInsertionOp.getSourceOperand().get();
+  // if (auto sourceDefiningOp = storeSource.getDefiningOp()) {
+  //   if (sourceDefiningOp->getBlock() == storeOp->getBlock()) {
+  //     b.setInsertionPointAfter(sourceDefiningOp);
+  //   }
+  // }
+  Value resultBuffer =
+      subsetInsertionOp.buildSubsetExtraction(b, storeOp->getLoc());
 
   // Now replay the instructions that are essentially doing type-conversion, in
   // reverse, to get the type needed for the operation computing the value.
