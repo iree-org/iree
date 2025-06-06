@@ -948,9 +948,9 @@ LogicalResult ArgmaxOp::verify() {
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
     return op->emitOpError("output indices/values shape must match. ")
            << "Output value shape: "
-           << llvm::interleaved_array(outputValueType.getShape(), ", ")
+           << llvm::interleaved_array(outputValueType.getShape())
            << ", output index shape: "
-           << llvm::interleaved_array(outputIndexType.getShape(), ", ");
+           << llvm::interleaved_array(outputIndexType.getShape());
   }
 
   SmallVector<int64_t> expectedShape;
@@ -961,9 +961,9 @@ LogicalResult ArgmaxOp::verify() {
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
     return op->emitOpError("output shape must match input shape with reduction "
                            "dimension removed. ")
-           << "Expected: " << llvm::interleaved_array(expectedShape, ", ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
            << ", but got: "
-           << llvm::interleaved_array(outputValueType.getShape(), ", ");
+           << llvm::interleaved_array(outputValueType.getShape());
   }
 
   return success();
