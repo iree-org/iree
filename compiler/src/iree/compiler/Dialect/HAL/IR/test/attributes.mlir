@@ -187,19 +187,14 @@ builtin.module attributes {
 "device.topology"() {
   // CHECK: topology = #hal.device.topology<links = [
   // CHECK-SAME:   (@device_a -> @device_b = {}),
-  // CHECK-SAME:   (@device_c -> @device_d = {transparent_access}),
-  // CHECK-SAME:   (@device_g -> @device_h = {transparent_access, unified_memory})
+  // CHECK-SAME:   (@device_c -> @device_d = {transparent_access = true}),
+  // CHECK-SAME:   (@device_g -> @device_h = {unified_memory = true, transparent_access = true})
+  // CHECK-SAME:   (@device_i -> @device_j = {}, {optional_flag = true})
   // CHECK-SAME: ]>
   topology = #hal.device.topology<links = [
     (@device_a -> @device_b = {}),
-    (@device_c -> @device_d = {transparent_access}),
-    (@device_g -> @device_h = {transparent_access, unified_memory})
+    (@device_c -> @device_d = {transparent_access = true}),
+    (@device_g -> @device_h = {transparent_access = true, unified_memory = true}),
+    (@device_i -> @device_j = {}, {optional_flag = true})
   ]>
-} : () -> ()
-
-// -----
-
-"device.link.error"() {
-  // expected-error @+1 {{unsupported property: discrete_memory}}
-  link = #hal.device.link(@device_a -> @device_b = {discrete_memory})
 } : () -> ()

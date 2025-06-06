@@ -211,6 +211,9 @@ LogicalResult linkExecutablesInto(
                                 mlir::ModuleOp linkedInnerModule,
                                 DenseMap<StringRef, Operation *> &symbolMap)>
         mergeInnerModuleFn) {
+  if (!linkedTargetOp.getInnerModule()) {
+    return success();
+  }
   MLIRContext *context = linkedTargetOp.getContext();
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
@@ -232,6 +235,9 @@ LogicalResult linkExecutablesInto(
     auto variantOps = llvm::to_vector(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
+      if (!variantOp.getInnerModule()) {
+        continue;
+      }
       // Only process compatible targets.
       // TODO(benvanik): allow for grouping when multi-versioning is supported?
       // We could, for example, link all aarch64 variants together and then
@@ -311,7 +317,6 @@ LogicalResult linkExecutablesInto(
         symbolReplacements.exportRefs[oldExportRefAttr] = newExportRefAttr;
       }
 
-      // Merge the existing module into the new linked module op.
       if (failed(mergeInnerModuleFn(variantOp.getInnerModule(),
                                     linkedTargetOp.getInnerModule(),
                                     targetSymbolMap))) {
