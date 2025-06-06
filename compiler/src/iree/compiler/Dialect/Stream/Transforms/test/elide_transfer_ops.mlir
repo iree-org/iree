@@ -2,8 +2,8 @@
 
 module @test attributes {
   stream.topology = #hal.device.topology<links = [
-    (@dev_a -> @dev_b = {unified_memory}),
-    (@dev_b -> @dev_a = {unified_memory}),
+    (@dev_a -> @dev_b = {transparent_access = true}),
+    (@dev_b -> @dev_a = {}),
     (@dev_a -> @dev_c = {})
   ]>
 } {
@@ -64,7 +64,7 @@ util.func public @preserve_lifetime_changing_transfer(%resource: !stream.resourc
   util.return %transfer : !stream.resource<external>
 }
 
-// Transfer with that is infered to be on the same device should be elided.
+// Transfer with that is inferred to be on the same device should be elided.
 // CHECK-LABEL: @elide_same_device_transfer
 // CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>)
 util.func public @elide_same_device_transfer(%resource: !stream.resource<*>) -> !stream.resource<*> {
