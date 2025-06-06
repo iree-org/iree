@@ -143,6 +143,9 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
   // Convert the op to be fully emplaced (all results are tied allocas).
   // We may immediately replace some of these with transfer targets and that's
   // a waste of IR but we won't know exactly which ones we'll replace until we
+  // are processing the results (as some values may be used by multiple operands
+  // _and_ tied to multiple results, and that may only happen after we start
+  // emplacing things).
   OpBuilder builder(dispatchOp);
   Value zeroOffset = indexSet.get(0);
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
