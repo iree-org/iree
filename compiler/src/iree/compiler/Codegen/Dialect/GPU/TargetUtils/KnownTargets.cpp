@@ -407,8 +407,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // AMD RDNA4 architecture:
   // https://www.amd.com/en/newsroom/press-releases/2025-2-28-amd-unveils-next-generation-amd-rdna-4-architectu.html.
+  static const ChipDetails r9070Chip = {64 / 2, "r9070"};
   static const ChipDetails rx9070xtChip = {64 / 2, "rx9070xt"};
   static const ChipDetails rx9070Chip = {56 / 2, "rx9070"};
+  static const ChipDetails rx9060xtChip = {32 / 2, "rx9060xt"};
 
   // AMD RDNA3.
   static const ChipDetails rx7900xtxChip = {96 / 2, "rx7900xtx"};
@@ -439,6 +441,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("rx9070xt", TargetDetails{rdna4Wgp, &rx9070xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9070.c4250
       .Case("rx9070", TargetDetails{rdna4Wgp, &rx9070Chip})
+      // https://www.techpowerup.com/gpu-specs/radeon-ai-pro-r9700.c4290
+      .Case("r9070", TargetDetails{rdna4Wgp, &r9070Chip})
+      // https://www.techpowerup.com/gpu-specs/radeon-rx-9060-xt-16-gb.c4293
+      .Case("rx9060xt", TargetDetails{rdna4Wgp, &rx9060xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
       .Case("rx7900xtx", TargetDetails{rdna3Wgp, &rx7900xtxChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xt.c3912
@@ -478,7 +484,8 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
-      .Cases("rx9070xt", "rx9070", "gfx1201")
+      .Cases("rx9070xt", "rx9070", "r9070", "gfx1201")
+      .Case("rx9060xt", "gfx1200")
       .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
       .Default("");
