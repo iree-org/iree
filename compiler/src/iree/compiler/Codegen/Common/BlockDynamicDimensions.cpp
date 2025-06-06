@@ -122,6 +122,13 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   if (!tensorType) {
     return std::nullopt;
   }
+  // TODO(#21028): Expanding x2 out causes correctness issues. This is a hack
+  // to prevent the miscompilation but shouldn't have too much of a perf
+  // impact since the divisibility is small.
+  if (llvm::all_of(divisibilityInfo,
+                   [](const auto &pair) { return pair.second.sdiv() < 4; })) {
+    return std::nullopt;
+  }
 
   // Check if we know that the operands have a divisibility information.
   SmallVector<OpFoldResult> outputShape;

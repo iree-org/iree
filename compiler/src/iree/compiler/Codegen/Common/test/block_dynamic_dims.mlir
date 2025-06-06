@@ -399,3 +399,23 @@ func.func @check_bubble_up_patterns(%arg0 : tensor<4x32x?x32x?x32xf32>, %arg1 : 
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<4x32x?x32x?x32xf32>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //       CHECK:   return %[[COLLAPSED]]
+
+// -----
+
+func.func @no_expand_small_div(%input: tensor<?xf32>, %size : index) -> tensor<?xf32> {
+  %0 = util.assume.int %size<udiv = 2> : index
+  %empty = tensor.empty(%0) : tensor<?xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                        affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+                       ins(%input : tensor<?xf32>) outs(%empty : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %2 = arith.addf %in, %in : f32
+    linalg.yield %2 : f32
+  } -> tensor<?xf32>
+  return %4 : tensor<?xf32>
+}
+// CHECK-LABEL: func @no_expand_small_div
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0]] : tensor<?xf32>
