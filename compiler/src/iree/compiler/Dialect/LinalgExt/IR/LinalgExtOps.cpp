@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -946,15 +947,10 @@ LogicalResult ArgmaxOp::verify() {
 
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
     return op->emitOpError("output indices/values shape must match. ")
-           << "Output value shape: ["
-           << llvm::join(map_range(outputValueType.getShape(),
-                                   [](int64_t d) { return std::to_string(d); }),
-                         ", ")
-           << "]" << ", output index shape: ["
-           << llvm::join(map_range(outputIndexType.getShape(),
-                                   [](int64_t d) { return std::to_string(d); }),
-                         ", ")
-           << "]";
+           << "Output value shape: "
+           << llvm::interleaved_array(outputValueType.getShape(), ", ")
+           << ", output index shape: "
+           << llvm::interleaved_array(outputIndexType.getShape(), ", ");
   }
 
   SmallVector<int64_t> expectedShape;
@@ -965,15 +961,9 @@ LogicalResult ArgmaxOp::verify() {
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
     return op->emitOpError("output shape must match input shape with reduction "
                            "dimension removed. ")
-           << "Expected: ["
-           << llvm::join(map_range(expectedShape,
-                                   [](int64_t d) { return std::to_string(d); }),
-                         ", ")
-           << "]" << ", but got: ["
-           << llvm::join(map_range(outputValueType.getShape(),
-                                   [](int64_t d) { return std::to_string(d); }),
-                         ", ")
-           << "]";
+           << "Expected: " << llvm::interleaved_array(expectedShape, ", ")
+           << ", but got: "
+           << llvm::interleaved_array(outputValueType.getShape(), ", ");
   }
 
   return success();
