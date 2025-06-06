@@ -16,8 +16,8 @@ package(
 iree_runtime_cc_library(
     name = "amdgpu",
     srcs = [
-        # "allocator.c",
-        # "allocator.h",
+        "allocator.c",
+        "allocator.h",
         "buffer.c",
         "buffer.h",
         "buffer_pool.c",
@@ -79,7 +79,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "headers",
     hdrs = [
-        # "allocator.h",
+        "allocator.h",
         "buffer.h",
         "buffer_pool.h",
         "channel.h",
