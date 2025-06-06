@@ -573,7 +573,7 @@ func.func @argmax_invalid_too_many_inputs(
     %input_extra: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
     %out_idx: tensor<2xi32>) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{expected exactly one input operand (values)}}
+  // expected-error@+1 {{expected exactly one input operand (values), but got 2}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val, %input_extra : tensor<2x10xf32>, tensor<2x10xf32>)
@@ -587,7 +587,7 @@ func.func @argmax_invalid_too_many_inputs(
 func.func @argmax_invalid_missing_output(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{expected two output operands (value and index)}}
+  // expected-error@+1 {{expected two output operands (value and index), but got 1}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
@@ -602,7 +602,7 @@ func.func @argmax_invalid_dim(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
     %out_idx: tensor<2xi32>) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{reduction dimension exceeds input rank}}
+  // expected-error@+1 {{reduction dimension exceeds or equals input rank. got dimension: 2, but input rank is: 2}}
   %0:2 = iree_linalg_ext.argmax
     dimension(2)
     ins(%input_val : tensor<2x10xf32>)
@@ -617,7 +617,7 @@ func.func @argmax_invalid_type_mismatch(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf16>,
     %out_idx: tensor<2xi32>) -> (tensor<2xf16>, tensor<2xi32>) {
-  // expected-error@+1 {{input and output value element types must match}}
+  // expected-error@+1 {{input and output value element types must match. Input type: 'f32', output value type: 'f16'}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
@@ -632,7 +632,7 @@ func.func @argmax_invalid_output_shape_mismatch(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
     %out_idx: tensor<10xi32>) -> (tensor<2xf32>, tensor<10xi32>) {
-  // expected-error@+1 {{output indices/values shape must match}}
+  // expected-error@+1 {{output indices/values shape must match. Output value shape: [2], output index shape: [10]}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
@@ -647,7 +647,7 @@ func.func @argmax_invalid_output_shape_wrong_reduction(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<1xf32>,
     %out_idx: tensor<1xi32>) -> (tensor<1xf32>, tensor<1xi32>) {
-  // expected-error@+1 {{output shape must match input shape with reduction dimension removed}}
+  // expected-error@+1 {{output shape must match input shape with reduction dimension removed. Expected: [2], but got: [1]}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
@@ -662,7 +662,7 @@ func.func @argmax_invalid_output_same_as_input(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2x10xf32>,
     %out_idx: tensor<2x10xi32>) -> (tensor<2x10xf32>, tensor<2x10xi32>) {
-  // expected-error@+1 {{output shape must match input shape with reduction dimension removed}}
+  // expected-error@+1 {{output shape must match input shape with reduction dimension removed. Expected: [2], but got: [2, 10]}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)

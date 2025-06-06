@@ -708,7 +708,15 @@ let assemblyFormat = [{
     }
 
     ShapedType getInputType() {
-      return llvm::cast<ShapedType>(getInputValue().getType());
+      return cast<ShapedType>(getInputValue().getType());
+    }
+
+    ShapedType getOutputValueType() {
+      return cast<ShapedType>(outputValue().getType());
+    }
+
+    ShapedType getOutputIndexType() {
+      return cast<ShapedType>(outputIndex().getType());
     }
 
     int64_t getInputRank() {

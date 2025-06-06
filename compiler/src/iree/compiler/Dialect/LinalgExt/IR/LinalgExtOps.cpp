@@ -915,43 +915,65 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 LogicalResult ArgmaxOp::verify() {
   Operation *op = getOperation();
 
-  // Check number of inputs and outputs.
   if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected exactly one input operand (values)");
+    return op->emitOpError(
+               "expected exactly one input operand (values), but got ")
+           << getNumDpsInputs();
   }
 
   if (getNumDpsInits() != 2) {
-    return op->emitOpError("expected two output operands (value and index)");
+    return op->emitOpError(
+               "expected two output operands (value and index), but got ")
+           << getNumDpsInits();
   }
 
   uint64_t dim = getDimension();
-  if (dim >= getInputRank()) {
-    return op->emitOpError("reduction dimension exceeds input rank");
+  int64_t rank = getInputRank();
+  if (dim >= rank) {
+    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
+           << "got dimension: " << dim << ", but input rank is: " << rank;
   }
 
   ShapedType inputType = getInputType();
-  ShapedType outputValueType = cast<ShapedType>(outputValue().getType());
-  ShapedType outputIndexType = cast<ShapedType>(outputIndex().getType());
+  auto outputValueType = getOutputValueType();
+  auto outputIndexType = getOutputIndexType();
 
-  // Element type compatibility.
   if (inputType.getElementType() != outputValueType.getElementType()) {
-    return op->emitOpError("input and output value element types must match");
+    return op->emitOpError("input and output value element types must match. ")
+           << "Input type: " << inputType.getElementType()
+           << ", output value type: " << outputValueType.getElementType();
   }
 
-  // Output indicies and values must have the same shape.
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
-    return op->emitOpError("output indices/values shape must match");
+    return op->emitOpError("output indices/values shape must match. ")
+           << "Output value shape: ["
+           << llvm::join(map_range(outputValueType.getShape(),
+                                   [](int64_t d) { return std::to_string(d); }),
+                         ", ")
+           << "]" << ", output index shape: ["
+           << llvm::join(map_range(outputIndexType.getShape(),
+                                   [](int64_t d) { return std::to_string(d); }),
+                         ", ")
+           << "]";
   }
 
-  // Expected output shape = input shape with `dim` removed.
   SmallVector<int64_t> expectedShape;
   for (int64_t i = 0; i < getInputRank(); ++i) {
-    if (static_cast<uint64_t>(i) != dim)
+    if (i != dim)
       expectedShape.push_back(inputType.getDimSize(i));
   }
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
-    return op->emitOpError(
-        "output shape must match input shape with reduction dimension removed");
+    return op->emitOpError("output shape must match input shape with reduction "
+                           "dimension removed. ")
+           << "Expected: ["
+           << llvm::join(map_range(expectedShape,
+                                   [](int64_t d) { return std::to_string(d); }),
+                         ", ")
+           << "]" << ", but got: ["
+           << llvm::join(map_range(outputValueType.getShape(),
+                                   [](int64_t d) { return std::to_string(d); }),
+                         ", ")
+           << "]";
   }
 
   return success();
