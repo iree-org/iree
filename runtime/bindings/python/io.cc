@@ -228,10 +228,24 @@ void SetupIoBindings(py::module_ &m) {
           [](py::handle self) {
             return py::steal<py::object>(PyMemoryView_FromObject(self.ptr()));
           })
+      .def_prop_ro("is_fd",
+                   [](FileHandle &self) {
+                     auto primitive =
+                         iree_io_file_handle_primitive(self.raw_ptr());
+                     return primitive.type == IREE_IO_FILE_HANDLE_TYPE_FD;
+                   })
+      .def_prop_ro("fd",
+                   [](FileHandle &self) {
+                     auto primitive =
+                         iree_io_file_handle_primitive(self.raw_ptr());
+                     return primitive.value.fd;
+                   })
       .def("__repr__", [](py::handle self_object) {
         if (py::cast<py::bool_>(self_object.attr("is_host_allocation"))) {
           return py::str("FileHandle<host_allocation({})>")
               .format(self_object.attr("host_allocation"));
+        } else if (py::cast<py::bool_>(self_object.attr("is_fd"))) {
+          return py::str("FileHandle<fd({})>").format(self_object.attr("fd"));
         } else {
           return py::str("<FileHandle unknown>");
         }

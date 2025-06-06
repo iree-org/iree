@@ -125,7 +125,7 @@ class ParameterApiTest(unittest.TestCase):
             )
             self.assertRegex(
                 repr(entries["array"]),
-                r"<ParameterIndexEntry 'array' FileHandle<host_allocation\(.*\)>:384:24",
+                r"<ParameterIndexEntry 'array' FileHandle<fd\(.*\)>",
             )
 
             # Verify some non-happy paths.
@@ -143,6 +143,7 @@ class ParameterApiTest(unittest.TestCase):
             self.assertEqual(len(array_view), 24)
             array_back = np.asarray(array_view).view(np.int64).reshape(orig_array.shape)
             np.testing.assert_array_equal(array_back, orig_array)
+            f.close()
 
         with tempfile.TemporaryDirectory() as td:
             file_path = Path(td) / "archive.irpa"
