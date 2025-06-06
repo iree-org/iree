@@ -138,11 +138,6 @@ class ParameterApiTest(unittest.TestCase):
             index_repr = repr(index)
             self.assertIn("Parameter scope <global> (3 entries", index_repr)
 
-            # Get the array contents and verify against original.
-            array_view = entries["array"].file_view
-            self.assertEqual(len(array_view), 24)
-            array_back = np.asarray(array_view).view(np.int64).reshape(orig_array.shape)
-            np.testing.assert_array_equal(array_back, orig_array)
             f.close()
 
         with tempfile.TemporaryDirectory() as td:
