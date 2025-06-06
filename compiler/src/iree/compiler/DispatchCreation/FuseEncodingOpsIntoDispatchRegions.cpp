@@ -47,15 +47,8 @@ static bool isFusableWithSetEncoding(Operation *op) {
     if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
       continue;
     }
-    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
-            op)) {
-      continue;
-    }
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) {
-      return false;
-    }
-    if (linalgOp.getNumReductionLoops() != 0) {
+    if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp,
+             linalg::LinalgOp>(op)) {
       return false;
     }
   }
