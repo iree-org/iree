@@ -25,6 +25,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_FISSIONTRANSFEROPSINCONTROLFLOWPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
+/// Replaces all occurrences of `oldVal` in the operands of `op` with `newVal`.
 static void replaceOperand(Operation *op, Value oldVal, Value newVal) {
   for (auto &operand : op->getOpOperands()) {
     if (operand.get() == oldVal) {
@@ -33,6 +34,9 @@ static void replaceOperand(Operation *op, Value oldVal, Value newVal) {
   }
 }
 
+/// Collects a backward slice of operations within the same control flow scope
+/// (i.e., with the same parent) from the specified operation. This is useful
+/// for identifying dependencies within a block.
 static SetVector<Operation *>
 collectBackwardSliceInControlFlow(Operation *op, Operation *parentOp) {
   BackwardSliceOptions options;
@@ -46,14 +50,17 @@ collectBackwardSliceInControlFlow(Operation *op, Operation *parentOp) {
   return slice;
 }
 
+/// Clones a slice of operations, remapping their operands.
 static void cloneSliceIntoLoop(IRRewriter &rewriter,
                                SetVector<Operation *> &slice,
-                               scf::ForOp &newLoop, IRMapping &mapping) {
+                               IRMapping &mapping) {
   for (Operation *op : slice) {
     rewriter.clone(*op, mapping);
   }
 }
 
+/// Creates a new loop with the same iteration parameters (bounds, step) as the
+/// given loop.
 static scf::ForOp createNewLoop(IRRewriter &rewriter, scf::ForOp forOp,
                                 Location loc) {
   return rewriter.create<scf::ForOp>(loc, forOp.getLowerBound(),
@@ -61,10 +68,12 @@ static scf::ForOp createNewLoop(IRRewriter &rewriter, scf::ForOp forOp,
                                      forOp.getRegionIterArgs());
 }
 
+/// Creates an alloca operation for the intermediate results of the transfer.
+/// %alloca_size = (%upper_bound - %lower_bound) / %step
+/// Note the division is a ceildiv to ensure enough space is allocated.
 static memref::AllocaOp createAlloca(IRRewriter &rewriter,
                                      vector::TransferReadOp readOp,
                                      scf::ForOp forOp) {
-  // %alloca_size = (%upper_bound - %lower_bound) / %step
   auto loc = forOp.getLoc();
   auto allocaSize = rewriter.create<arith::CeilDivUIOp>(
       loc,
@@ -84,6 +93,18 @@ static memref::AllocaOp createAlloca(IRRewriter &rewriter,
                                            ValueRange{allocaSize});
 }
 
+/// Creates an index for accessing the memref in the loop. This index is
+/// normalized into step of one in order to access the correct element from the
+/// alloca. %index = (%loop_index - %loop_lower_bound) / %loop_step
+static Value createMemrefAccessIndex(IRRewriter &rewriter, scf::ForOp forOp) {
+  auto subIOp = rewriter.create<arith::SubIOp>(
+      forOp.getLoc(), forOp.getInductionVar(), forOp.getLowerBound());
+  auto divUIOp =
+      rewriter.create<arith::DivUIOp>(forOp.getLoc(), subIOp, forOp.getStep());
+  return divUIOp.getResult();
+}
+
+/// Sets up the read loop for the transfer read operation.
 static void setupReadLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
                           scf::ForOp forOp, memref::AllocaOp alloca) {
   scf::ForOp readLoop = createNewLoop(rewriter, forOp, readOp.getLoc());
@@ -93,18 +114,10 @@ static void setupReadLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
   readMapping.map(forOp.getInductionVar(), readLoop.getInductionVar());
   SetVector<Operation *> readSlice =
       collectBackwardSliceInControlFlow(readOp, forOp);
-  cloneSliceIntoLoop(rewriter, readSlice, readLoop, readMapping);
-
+  cloneSliceIntoLoop(rewriter, readSlice, readMapping);
   Operation *lastRead = rewriter.clone(*readOp, readMapping);
 
-  // %read_index = (%loop_index - %loop_lower_bound) / %loop_step
-  auto readLoopIndex = rewriter.create<arith::DivUIOp>(
-      readOp.getLoc(),
-      rewriter.create<arith::SubIOp>(readOp.getLoc(),
-                                     readLoop.getInductionVar(),
-                                     readLoop.getLowerBound()),
-      readLoop.getStep());
-
+  auto readLoopIndex = createMemrefAccessIndex(rewriter, readLoop);
   SmallVector<Value> readLoopIndices = {readLoopIndex};
   auto readOpIndicesSize = readOp.getIndices().size();
   auto constantZero =
@@ -120,20 +133,14 @@ static void setupReadLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
   rewriter.setInsertionPointAfter(readLoop.getOperation());
 }
 
+/// Sets up the write loop for the transfer write operation.
 static void setupWriteLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
                            vector::TransferWriteOp writeOp, scf::ForOp forOp,
                            memref::AllocaOp alloca) {
   scf::ForOp writeLoop = createNewLoop(rewriter, forOp, writeOp.getLoc());
   rewriter.setInsertionPointToStart(writeLoop.getBody());
 
-  // %write_index = (%loop_index - %loop_lower_bound) / %loop_step
-  auto writeLoopIndex = rewriter.create<arith::DivUIOp>(
-      writeOp.getLoc(),
-      rewriter.create<arith::SubIOp>(writeOp.getLoc(),
-                                     writeLoop.getInductionVar(),
-                                     writeLoop.getLowerBound()),
-      writeLoop.getStep());
-
+  auto writeLoopIndex = createMemrefAccessIndex(rewriter, writeLoop);
   SmallVector<Value> writeLoopIndices = {writeLoopIndex};
   auto zeroIndicesSize = writeOp.getIndices().size();
   auto constantZero =
@@ -149,7 +156,7 @@ static void setupWriteLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
   writeMapping.map(forOp.getInductionVar(), writeLoop.getInductionVar());
   SetVector<Operation *> writeSlice =
       collectBackwardSliceInControlFlow(writeOp, forOp);
-  cloneSliceIntoLoop(rewriter, writeSlice, writeLoop, writeMapping);
+  cloneSliceIntoLoop(rewriter, writeSlice, writeMapping);
 
   rewriter.clone(*writeOp, writeMapping);
   for (auto &op : writeLoop.getBody()->getOperations()) {
@@ -194,6 +201,7 @@ static void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
   rewriter.eraseOp(forOp);
 }
 
+/// Checks if the transfer read and write operations are legal for fissioning.
 static bool isLegal(vector::TransferReadOp readOp,
                     vector::TransferWriteOp writeOp, scf::ForOp forOp) {
   if (readOp->getParentOp() != forOp || writeOp->getParentOp() != forOp) {
@@ -218,6 +226,8 @@ struct FissionTarget {
 };
 } // namespace
 
+/// Populates a FissionTarget from a scf::ForOp by checking if it contains a
+/// transfer read and write operation that can be legally fissioned.
 static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
   // Fission Loop always has a transfer_write as the last operation.
   auto lastOp = forOp.getBody()->getTerminator()->getPrevNode();
