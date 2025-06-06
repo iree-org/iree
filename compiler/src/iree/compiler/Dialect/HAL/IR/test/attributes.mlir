@@ -1,5 +1,5 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope -verify-diagnostics %s | FileCheck %s
-// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-INLINE
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=CHECK-INLINE
 
 // CHECK-LABEL: descriptor_set_layout_binding.basic
 "descriptor_set_layout_binding.basic"() {
