@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_target_devices.mlir"
     "assign_legacy_target_devices.mlir"
     "assign_target_devices.mlir"
     "capture_executable_sources.mlir"
