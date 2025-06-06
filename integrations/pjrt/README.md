@@ -16,8 +16,7 @@ most powerful).
 ```shell
 pip install -r requirements.txt
 
-# a higher version of jax is highly recommended, e.g. 0.4.36
-pip install jax==0.4.36
+pip install jax==0.6.1
 ```
 
 Verify that your Jax install is functional like:
@@ -28,7 +27,9 @@ python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print
 
 ## Install the plugin of your choice (in this example 'cpu')
 
+```shell
 pip install -v --no-deps -e python_packages/iree_cpu_plugin
+```
 
 ## Verify basic functionality
 
@@ -48,6 +49,9 @@ For example:
 export IREE_PJRT_IREE_COMPILER_OPTIONS=--iree-scheduling-dump-statistics-format=csv
 JAX_PLATFORMS=iree_cpu python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
 ```
+
+Besides, to control logging levels in the IREE PJRT plugin,
+you can set `IREE_PJRT_LOG_LEVEL` to `debug` or `error` (default: `debug`).
 
 ## Incrementally developing
 

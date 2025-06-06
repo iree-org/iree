@@ -1,33 +1,22 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-verify-linalg-transform-legality))" %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-verify-linalg-transform-legality))" %s --verify-diagnostics
 
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
+func.func @generic_with_marker(%arg0: tensor<123x4x114xf32>, %arg1: tensor<4x114x789xf32>) -> tensor<4x123x789xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<123x4x114xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x114x789xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x123x789xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [123, 4, 114], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<123x4x114xf32>> -> tensor<123x4x114xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 114, 789], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x114x789xf32>> -> tensor<4x114x789xf32>
-  %5 = tensor.empty() : tensor<4x123x789xf32>
-  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<4x123x789xf32>) -> tensor<4x123x789xf32>
+  %0 = tensor.empty() : tensor<4x123x789xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x123x789xf32>) -> tensor<4x123x789xf32>
   // expected-error @+1 {{expected no Linalg transform markers}}
-  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>,
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>,
                                         affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
                                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
                        iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
-    ins(%3, %4 : tensor<123x4x114xf32>, tensor<4x114x789xf32>)
-    outs(%6 : tensor<4x123x789xf32>)
-    attrs =  {__internal_linalg_transform__ = "DEADBEEF", linalg.memoized_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]} {
-  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-    %8 = arith.mulf %arg0, %arg1 : f32
-    %9 = arith.addf %arg2, %8 : f32
-    linalg.yield %9 : f32
+    ins(%arg0, %arg1 : tensor<123x4x114xf32>, tensor<4x114x789xf32>)
+    outs(%1 : tensor<4x123x789xf32>)
+    attrs = {__internal_linalg_transform__ = "DEADBEEF"} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
   } -> tensor<4x123x789xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [4, 123, 789], strides = [1, 1, 1] : tensor<4x123x789xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x123x789xf32>>
-  return
+  return %2 : tensor<4x123x789xf32>
 }

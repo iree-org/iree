@@ -18,16 +18,28 @@ namespace iree::pjrt {
 
 //===----------------------------------------------------------------------===//
 // Logger
-// The plugin API currently does not have any logging facilities, but since
-// these are easier added later, we have a placeholder Logger that we thread
-// through. It can be extended later.
+// It currently contains two log levels: debug and error.
+// The sink can only be stderr for now, and log messages are prefixed with
+// [IREE-PJRT][YYYY-MM-DD HH:MM:SS][LEVEL].
 //===----------------------------------------------------------------------===//
 
 class Logger {
  public:
-  Logger() = default;
+  // NOTE: The log levels must be ordered by severity,
+  // with the most verbose level first.
+  enum Level { DEBUG, ERROR };
+
+  static std::optional<Level> LevelFromString(std::string_view level);
+  static std::string_view LevelToString(Level level);
+
+  Logger(Level level) : level_(level){};
   void debug(std::string_view message);
   void error(std::string_view message);
+
+ private:
+  void log(Level level, std::string_view message);
+
+  Level level_;
 };
 
 //===----------------------------------------------------------------------===//

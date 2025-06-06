@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes, canonicalize, cse, canonicalize))" --iree-dispatch-creation-propagate-collapse-across-expands=true %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-linalg-ext-test-reshape-fusion, canonicalize, cse, canonicalize))" %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
@@ -677,3 +677,61 @@ util.func public @scatter_collapse_noop(%arg0: tensor<10xf16>, %arg1: tensor<10x
 //  CHECK-SAME:       outs(%[[ARG2]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SCATTER]]
 //       CHECK:   util.return %[[EXPANDED]]
+
+// -----
+
+util.func public @gather_expand(%arg0: tensor<100x128xf16>, %arg1: tensor<10xi32>, %arg2: tensor<10x128xf16>) -> tensor<2x5x4x32xf16> {
+  %c0 = arith.constant 0 : index
+  %0 = iree_linalg_ext.gather dimension_map = [0] ins(%arg0, %arg1 : tensor<100x128xf16>, tensor<10xi32>) outs(%arg2 : tensor<10x128xf16>) -> tensor<10x128xf16>
+  %expanded = tensor.expand_shape %0[[0, 1], [2, 3]] output_shape[2, 5, 4, 32] : tensor<10x128xf16> into tensor<2x5x4x32xf16>
+  util.return %expanded : tensor<2x5x4x32xf16>
+}
+// CHECK-LABEL: util.func public @gather_expand
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//   CHECK-DAG:   %[[EXPANDED0:.+]] = tensor.expand_shape %[[ARG0]] {{.+}} tensor<100x128xf16> into tensor<100x4x32xf16>
+//   CHECK-DAG:   %[[EXPANDED1:.+]] = tensor.expand_shape %[[ARG2]] {{.+}} tensor<10x128xf16> into tensor<2x5x4x32xf16>
+//   CHECK-DAG:   %[[EXPANDED2:.+]] = tensor.expand_shape %[[ARG1]] {{.+}} tensor<10xi32> into tensor<2x5xi32>
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather
+//  CHECK-SAME:       ins(%[[EXPANDED0]], %[[EXPANDED2]]
+//  CHECK-SAME:       outs(%[[EXPANDED1]]
+//       CHECK:   util.return %[[GATHER]]
+
+// -----
+
+util.func public @gather_expand_partial(%arg0: tensor<100x128xf16>, %arg1: tensor<10xi32>, %arg2: tensor<10x128xf16>) -> tensor<10x4x32xf16> {
+  %c0 = arith.constant 0 : index
+  %0 = iree_linalg_ext.gather dimension_map = [0] ins(%arg0, %arg1 : tensor<100x128xf16>, tensor<10xi32>) outs(%arg2 : tensor<10x128xf16>) -> tensor<10x128xf16>
+  %expanded = tensor.expand_shape %0[[0], [1, 2]] output_shape[10, 4, 32] : tensor<10x128xf16> into tensor<10x4x32xf16>
+  util.return %expanded : tensor<10x4x32xf16>
+}
+// CHECK-LABEL: util.func public @gather_expand
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//   CHECK-DAG:   %[[EXPANDED0:.+]] = tensor.expand_shape %[[ARG0]] {{.+}} tensor<100x128xf16> into tensor<100x4x32xf16>
+//   CHECK-DAG:   %[[EXPANDED1:.+]] = tensor.expand_shape %[[ARG2]] {{.+}} tensor<10x128xf16> into tensor<10x4x32xf16>
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather
+//  CHECK-SAME:       ins(%[[EXPANDED0]], %[[ARG1]]
+//  CHECK-SAME:       outs(%[[EXPANDED1]]
+//       CHECK:   util.return %[[GATHER]]
+
+// -----
+
+util.func public @gather_collapse_source(%arg0: tensor<10x10x4x32xf16>, %arg1: tensor<10xi32>, %arg2: tensor<10x128xf16>) -> tensor<10x128xf16> {
+  %c0 = arith.constant 0 : index
+  %collapse = tensor.collapse_shape %arg0[[0, 1], [2, 3]] : tensor<10x10x4x32xf16> into tensor<100x128xf16>
+  %0 = iree_linalg_ext.gather dimension_map = [0] ins(%collapse, %arg1 : tensor<100x128xf16>, tensor<10xi32>) outs(%arg2 : tensor<10x128xf16>) -> tensor<10x128xf16>
+  util.return %0 : tensor<10x128xf16>
+}
+// CHECK-LABEL: util.func public @gather_collapse_source
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//   CHECK-DAG:   %[[EXPANDED0:.+]] = tensor.collapse_shape %[[ARG0]] {{.+}} tensor<10x10x4x32xf16> into tensor<100x4x32xf16>
+//   CHECK-DAG:   %[[EXPANDED1:.+]] = tensor.expand_shape %[[ARG2]] {{.+}} tensor<10x128xf16> into tensor<10x4x32xf16>
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather
+//  CHECK-SAME:       ins(%[[EXPANDED0]], %[[ARG1]]
+//  CHECK-SAME:       outs(%[[EXPANDED1]]
+//       CHECK:   tensor.collapse_shape %[[GATHER]] {{.*}} tensor<10x4x32xf16> into tensor<10x128xf16>

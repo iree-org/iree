@@ -51,8 +51,8 @@ def BufferizeDispatchTensorLoadStorePass :
       "Bufferize the iree_tensor_ext.dispatch.tensor.load/store ops at dispatch boundaries";
   let description = [{
     Pass to bufferize the edges of dispatch regions, converting
-    iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_memref, and
-    iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_memref.
+    iree_tensor_ext.dispatch.tensor.load ops to iree_codegen.load_from_buffer, and
+    iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_buffer.
   }];
   let dependentDialects = [
     "IREE::Codegen::IREECodegenDialect",
@@ -128,12 +128,12 @@ def CombineLayoutTransformationPass :
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
-    Starting from iree_codegen.store_to_memref ops, iteratively combine producer
+    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
     layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
     etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
     ops, the writing of pad values is distributed to workgroups, and then the
     padding values are written directly to the output buffer of the
-    store_to_memref op.
+    store_to_buffer op.
   }];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
@@ -477,6 +477,13 @@ def IREEExpandStridedMetadataPass :
            "Allow unresolved strided metadata op (for testing)">,
   ];
 }
+def IREEInjectAssumeAlignmentPass :
+    InterfacePass<"iree-codegen-inject-assume-alignment", "mlir::FunctionOpInterface"> {
+  let summary = "Insert memref.assume_alignment ops right after hal.interface.binding.subspan ops, if alignment is present in bindings.";
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
+}
 
 def InstrumentMemoryAccessesPass :
     InterfacePass<"iree-codegen-instrument-memory-accesses", "mlir::FunctionOpInterface"> {
@@ -656,6 +663,11 @@ def ResolveSwizzleHintsPass :
     "affine::AffineDialect",
     "arith::ArithDialect",
   ];
+}
+
+def SpecializeExportsPass :
+    Pass<"iree-codegen-specialize-exports", "IREE::HAL::ExecutableVariantOp">{
+   let summary = "Specializes exported functions based on annotated ranges";
 }
 
 def StripCompilationInfoPass :

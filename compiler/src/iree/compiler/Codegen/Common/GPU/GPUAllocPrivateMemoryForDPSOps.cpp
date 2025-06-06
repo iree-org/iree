@@ -56,9 +56,12 @@ void GPUAllocPrivateMemoryForDPSOpsPass::runOnOperation() {
   // dimensions).
   SmallVector<OpOperand *> worklist;
   funcOp.walk([&](DestinationStyleOpInterface dpsOp) {
+    if (!dpsOp.hasPureTensorSemantics()) {
+      return;
+    }
     for (int idx = 0; idx < dpsOp.getNumDpsInits(); ++idx) {
       OpOperand *value = dpsOp.getDpsInitOperand(idx);
-      if (!dpsOp->getResult(idx).use_empty()) {
+      if (!dpsOp.getTiedOpResult(value).use_empty()) {
         continue;
       }
       if (isAllocSizeTooBig(value->get().getType())) {
@@ -72,12 +75,14 @@ void GPUAllocPrivateMemoryForDPSOpsPass::runOnOperation() {
   auto privSpace = gpu::AddressSpaceAttr::get(
       context, gpu::GPUDialect::getPrivateAddressSpace());
   bufferization::BufferizationOptions options;
+  bufferization::BufferizationState bufferizationState;
   IRRewriter rewriter(context);
   for (auto value : worklist) {
     Location loc = value->getOwner()->getLoc();
     rewriter.setInsertionPoint(value->getOwner());
-    FailureOr<Value> copy = allocateTensorForShapedValue(
-        rewriter, loc, value->get(), options, /*copy=*/true);
+    FailureOr<Value> copy =
+        allocateTensorForShapedValue(rewriter, loc, value->get(), options,
+                                     bufferizationState, /*copy=*/true);
     if (failed(copy)) {
       funcOp.emitError("Could not allocate a tensor of the required type");
       return signalPassFailure();

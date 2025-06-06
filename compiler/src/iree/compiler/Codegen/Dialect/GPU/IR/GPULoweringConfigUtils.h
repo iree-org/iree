@@ -52,10 +52,16 @@ void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
 /// Helper to retrieve/set a list of operand indices to promote.
 std::optional<SmallVector<int64_t>>
 getPromotedOperandList(LoweringConfigAttr config);
+/// Helper to retrieve/set a list of booleans indicating whether the
+/// corresponding operand should use direct load.
+std::optional<SmallVector<bool>> getUseDirectLoad(LoweringConfigAttr config);
 /// Append to `attrs` an `ArrayAttr` for `promotedOperands`.
+/// The `directLoadOperands` is an optional list of booleans
+/// indicating whether the corresponding operand should use direct load.
 void appendPromotedOperandsList(MLIRContext *context,
                                 SmallVectorImpl<NamedAttribute> &attrs,
-                                ArrayRef<int64_t> operands);
+                                ArrayRef<int64_t> operands,
+                                ArrayRef<bool> directLoadOperands = {});
 /// Create a new `LoweringConfigAttr` from `currAttr` with the promoted operands
 /// list modified/set to `operands`.
 IREE::GPU::LoweringConfigAttr

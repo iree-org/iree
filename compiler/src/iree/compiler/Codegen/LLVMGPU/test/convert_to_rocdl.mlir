@@ -33,8 +33,8 @@ builtin.module {
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone})
 //         CHECK:    rocdl.workgroup.dim.x
-//         CHECK:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
-//       INDEX32:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
+//         CHECK:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//       INDEX32:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
 //         CHECK:    llvm.fadd
 
 
@@ -138,13 +138,9 @@ module {
     %c0 = arith.constant 0 : index
     %thread_id_x = gpu.thread_id  x upper_bound 64
     %0 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<131072x192xf16, #gpu.address_space<global>>
-    memref.assume_alignment %0, 64 : memref<131072x192xf16, #gpu.address_space<global>>
     %1 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<131072x192xf16, #gpu.address_space<global>>
-    memref.assume_alignment %1, 64 : memref<131072x192xf16, #gpu.address_space<global>>
     %2 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<402653184xi8, #gpu.address_space<global>>
-    memref.assume_alignment %2, 64 : memref<402653184xi8, #gpu.address_space<global>>
     %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(4) alignment(64) offset(%c0) flags(Indirect) : memref<131072x192x32xf16, #gpu.address_space<global>>
-    memref.assume_alignment %3, 64 : memref<131072x192x32xf16, #gpu.address_space<global>>
     %4 = arith.divui %thread_id_x, %c4 : index
     %5 = arith.remui %thread_id_x, %c4 : index
     %6 = arith.muli %5, %c8 : index

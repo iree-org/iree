@@ -192,6 +192,33 @@ class DeviceDescription {
 };
 
 //===----------------------------------------------------------------------===//
+// MemoryInstance
+//===----------------------------------------------------------------------===//
+
+// TODO: currently we assume that each device has
+// exactly one attached memory space (one-to-one mapping)
+class MemoryInstance {
+ public:
+  MemoryInstance(DeviceInstance* device) : device_(device) {}
+
+  static void BindApi(PJRT_Api* api);
+
+  static MemoryInstance* Unwrap(PJRT_Memory* memory) {
+    return reinterpret_cast<MemoryInstance*>(memory);
+  }
+
+  int Id();
+  std::string_view Kind();
+  std::string_view DebugString();
+  std::string_view ToString();
+
+  DeviceInstance* device() { return device_; }
+
+ private:
+  DeviceInstance* device_;
+};
+
+//===----------------------------------------------------------------------===//
 // DeviceInstance
 //===----------------------------------------------------------------------===//
 
@@ -214,6 +241,9 @@ class DeviceInstance {
   ClientInstance& client() { return client_; }
   bool is_addressable() { return true; }
   int local_hardware_id() { return -1; }
+
+  void set_memory(MemoryInstance* memory) { memories_.push_back(memory); }
+  MemoryInstance* memory() { return memories_[0]; }
 
   iree_status_t HostBufferToDeviceZeroDim(
       PJRT_Buffer_Type type, const int64_t* dims, size_t num_dims,
@@ -276,6 +306,8 @@ class DeviceInstance {
   // The timepoint of the last transfer.
   uint64_t last_transfer_timepoint_ = 0;
   DeviceDescription info_;
+  // Memory space attached to this device.
+  std::vector<MemoryInstance*> memories_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -443,6 +475,7 @@ class ClientInstance {
   const std::vector<DeviceInstance*>& addressable_devices() {
     return addressable_devices_;
   }
+  const std::vector<MemoryInstance*>& memories() { return memories_; }
   const std::string& cached_platform_name() { return cached_platform_name_; }
   const std::string& cached_platform_version() {
     return cached_platform_version_;
@@ -498,6 +531,7 @@ class ClientInstance {
   iree_host_size_t device_info_count_ = 0;
   std::vector<DeviceInstance*> devices_;
   std::vector<DeviceInstance*> addressable_devices_;
+  std::vector<MemoryInstance*> memories_;
 
   // VM.
   iree::vm::ref<iree_vm_instance_t> vm_instance_;

@@ -30,14 +30,13 @@ jobs:
         include:
           - runner: ubuntu-24.04
             pjrt_platform: cpu
-        # TODO: cuda runner is not available yet, refer to #18814
-        #   - runner: some-cuda-available-runner
-        #     pjrt_platform: cuda
-        # TODO: enable these AMD runners
-        #   - runner: nodai-amdgpu-w7900-x86-64
-        #     pjrt_platform: rocm
-        #   - runner: nodai-amdgpu-w7900-x86-64
-        #     pjrt_platform: vulkan
+          - runner: ubuntu-24.04
+            pjrt_platform: cuda
+          # TODO: enable these AMD runners
+          # - runner: nodai-amdgpu-w7900-x86-64
+          #   pjrt_platform: rocm
+          # - runner: nodai-amdgpu-w7900-x86-64
+          #   pjrt_platform: vulkan
     name: Build and test
     runs-on: ${{ matrix.runner }}
     env:
@@ -76,8 +75,11 @@ jobs:
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           python -m pip install -v --no-deps -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
           # install
-          python -m pip install jax==0.4.36
+          python -m pip install jax==0.6.1
+      # TODO: We can only run on CPU for now, as the CUDA runner
+      # is not available yet, refer to #18814.
       - name: Run tests
+        if: ${{ matrix.pjrt_platform == 'cpu' }}
         run: |
           source ${VENV_DIR}/bin/activate
           build_tools/testing/run_jax_tests.sh ${{ matrix.pjrt_platform }}

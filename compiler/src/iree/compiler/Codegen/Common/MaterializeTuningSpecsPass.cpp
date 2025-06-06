@@ -9,9 +9,11 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -130,52 +132,27 @@ getDefaultTuningSpec(ModuleOp module,
     return failure();
   }
 
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(module);
-  if (!gpuTarget) {
+  Operation *annotationSite = nullptr;
+  auto target =
+      IREE::HAL::ExecutableTargetAttr::lookup(module, &annotationSite);
+  if (!target || !target.getConfiguration()) {
     return failure();
   }
 
-  std::optional<StringRef> sku;
-  if (IREE::GPU::TargetChipAttr chip = gpuTarget.getChip()) {
-    if (StringAttr chipSku = chip.getSku()) {
-      sku = chipSku.getValue();
-    }
-  }
-
-  std::string defaultTuningSpecName;
-  std::optional<StringRef> defaultTuningSpecSource;
-  if (sku) {
-    // GPUs with the same ISA may have different hardware characteristics such
-    // as the number of workgroup processors and power limits, Look up
-    // SKU-specific tuning spec for optimal performance.
-    defaultTuningSpecSource = fetchDefaultTuningSpec(*sku);
-  }
-
-  if (!defaultTuningSpecSource) {
-    // If SKU-specific spec is not found, fall back to the default
-    // architecture-based tuning spec to ensure broader compatibility.
-    StringRef arch = gpuTarget.getArch();
-    defaultTuningSpecSource = fetchDefaultTuningSpec(arch);
-  }
-
-  if (!defaultTuningSpecSource) {
-    // Not all architectures are expected to provide default tuning specs, so
-    // this shouldn't be considered a hard error (but that's up to the caller).
+  auto storageAttr = dyn_cast_if_present<IREE::Util::StoredModuleAttrInterface>(
+      target.getConfiguration().get("iree_codegen.default_tuning_spec"));
+  if (!storageAttr) {
     return failure();
   }
 
-  // Load the library through the codegen dialect so that we cache the parsed
-  // module.
   FailureOr<ModuleOp> defaultTransformLibrary =
-      dialect.getOrParseTransformLibraryModule(defaultTuningSpecName,
-                                               *defaultTuningSpecSource);
+      storageAttr.getModule(annotationSite);
 
 #ifndef NDEBUG
   if (succeeded(defaultTransformLibrary) &&
       failed(mlir::verify(*defaultTransformLibrary)))
     return (*defaultTransformLibrary).emitError()
-           << "Default tuning spec " << defaultTuningSpecName
-           << " failed to verify";
+           << "Default tuning spec from " << storageAttr << " failed to verify";
 #endif
 
   return defaultTransformLibrary;

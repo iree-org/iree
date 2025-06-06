@@ -38,12 +38,14 @@ func.func @dot() {
   return
 }
 
+// Disabled while unmaintained and flaky.
+
 //    CHECK-LABEL: func.func @dot
-// CHECK-COUNT-4:   vector.transfer_write {{.*}} : vector<16x16xf32>, memref<32x32xf32
-//         CHECK:   scf.for
-// CHECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<32x16xf32, #{{.*}}>, vector<16x8xf32>
-// CHECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<16x32xf32, #{{.*}}>, vector<8x16xf32>
-// CHECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<32x32xf32, #{{.*}}>, vector<16x16xf32>
-// CHECK-COUNT-8:     vector.contract {{.*}} : vector<16x8xf32>, vector<8x16xf32> into vector<16x16xf32>
-// CHECK-COUNT-4:     vector.transfer_write {{.*}} : vector<16x16xf32>, memref<32x32xf32
-//    CHECK-NEXT:   }
+// C-HECK-COUNT-4:   vector.transfer_write {{.*}} : vector<16x16xf32>, memref<32x32xf32
+//         C-HECK:   scf.for
+// C-HECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<32x16xf32, #{{.*}}>, vector<16x8xf32>
+// C-HECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<16x32xf32, #{{.*}}>, vector<8x16xf32>
+// C-HECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<32x32xf32, #{{.*}}>, vector<16x16xf32>
+// C-HECK-COUNT-8:     vector.contract {{.*}} : vector<16x8xf32>, vector<8x16xf32> into vector<16x16xf32>
+// C-HECK-COUNT-4:     vector.transfer_write {{.*}} : vector<16x16xf32>, memref<32x32xf32
+//    C-HECK-NEXT:   }

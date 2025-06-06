@@ -36,10 +36,10 @@ hal.executable @transpose_dispatch_0 {
 //   CHECK-DAG:  %[[TX:.*]] = gpu.thread_id  x
 //   CHECK-DAG:  %[[TY:.*]] = gpu.thread_id  y
 //   CHECK-DAG:  %[[ALLOC:.*]] = memref.alloc() : memref<32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:  %[[D0:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  memref.assume_alignment %[[D0]], 64 : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  %[[D1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  memref.assume_alignment %[[D1]], 64 : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D0_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D0:.+]] = memref.assume_alignment %[[D0_BINDING]], 64 : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D1_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D1:.+]] = memref.assume_alignment %[[D1_BINDING]], 64 : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  gpu.barrier
 //       CHECK:  %[[D2:.*]] = affine.apply #{{.*}}()[%{{.+}}, %[[TY]]]
 //       CHECK:  %[[D3:.*]] = affine.apply #{{.*}}()[%{{.+}}, %[[TX]]]
@@ -94,12 +94,12 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 //       CHECK:  %[[TX:.*]] = gpu.thread_id  x
 //       CHECK:  %[[TY:.*]] = gpu.thread_id  y
 //       CHECK:  %[[ALLOC:.*]] = memref.alloc() : memref<32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:  %[[D0:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  memref.assume_alignment %[[D0]], 64 : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  %[[D1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  memref.assume_alignment %[[D1]], 64 : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  %[[D2:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  memref.assume_alignment %[[D2]], 64 : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D0_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D0:.+]] = memref.assume_alignment %[[D0_BINDING]], 64 : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D1_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D1:.+]] = memref.assume_alignment %[[D1_BINDING]], 64 : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D2_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D2:.+]] = memref.assume_alignment %[[D2_BINDING]], 64 : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  gpu.barrier
 //       CHECK:  %[[D3:.*]] = affine.apply #{{.*}}()[%[[TX]]]
 //       CHECK:  %[[D4:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
@@ -198,12 +198,12 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 //       CHECK:   %[[TX:.*]] = gpu.thread_id  x
 //       CHECK:   %[[TY:.*]] = gpu.thread_id  y
 //       CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<1x32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[D0:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   memref.assume_alignment %[[D0]], 64 : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   memref.assume_alignment %[[D1]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D2:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   memref.assume_alignment %[[D2]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D0_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D0:.+]] = memref.assume_alignment %[[D0_BINDING]], 64 : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D1_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D1:.+]] = memref.assume_alignment %[[D1_BINDING]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D2_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D2:.+]] = memref.assume_alignment %[[D2_BINDING]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[D3:.*]] = affine.apply #{{.*}}()[%[[TX]]]
 //       CHECK:   %[[D4:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
@@ -263,12 +263,12 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 //       CHECK:   %[[TY:.*]] = gpu.thread_id  y
 //       CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<1x32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:   %[[ALLOC1:.*]] = memref.alloc() : memref<1x32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[D0:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   memref.assume_alignment %[[D0]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   memref.assume_alignment %[[D1]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D2:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   memref.assume_alignment %[[D2]], 64 : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D0_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D0:.+]] = memref.assume_alignment %[[D0_BINDING]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D1_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D1:.+]] = memref.assume_alignment %[[D1_BINDING]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D2_BINDING:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D2:.+]] = memref.assume_alignment %[[D2_BINDING]], 64 : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[D3:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
 //       CHECK:   %[[D4:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TX]]]

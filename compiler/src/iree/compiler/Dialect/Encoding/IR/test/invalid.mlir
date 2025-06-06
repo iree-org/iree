@@ -180,7 +180,7 @@ func.func @illegal_layout_encoding_without_any_layout(%arg0: tensor<?x?xf32, #en
 
 // -----
 
-// expected-error @+1 {{expected all the layout attributes to implement SerializableEncodingAttrInterface}}
+// expected-error @+1 {{expected all the layout attributes to implement SerializableAttr}}
 #encoding = #iree_encoding.layout<[#iree_encoding.unknown_encoding]>
 func.func @illegal_layout_encoding_with_invalid_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>

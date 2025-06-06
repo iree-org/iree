@@ -31,8 +31,10 @@ hal.executable @scalar_dispatch {
 
 //       CHECK: func.func @scalar_dispatch()
 //  CHECK-SAME:     translation_info = #iree_codegen.translation_info<pipeline = SPIRVBaseLowering workgroup_size = [1, 1, 1]>
-//       CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//       CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//       CHECK:   %[[SPAN0_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//       CHECK:   %[[SPAN0:.+]] = memref.assume_alignment %[[SPAN0_BINDING]], 64
+//       CHECK:   %[[SPAN1_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//       CHECK:   %[[SPAN1:.+]] = memref.assume_alignment %[[SPAN1_BINDING]], 64
 //       CHECK:   memref.load %[[SPAN0]][] : memref<i64, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   arith.muli {{.+}} : i64
 //       CHECK:   arith.addi {{.+}} : i64

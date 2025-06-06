@@ -168,6 +168,7 @@ void populateIREEGPUVectorUnrollPatterns(
 // Version of unrolling with a preset configuration.
 void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerGlobalLoadDMAPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

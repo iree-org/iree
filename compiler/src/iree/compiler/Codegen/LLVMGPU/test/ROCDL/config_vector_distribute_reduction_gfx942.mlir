@@ -240,6 +240,11 @@ func.func @test_multiple_stores(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 //       CHECK: func.func @test_multiple_stores
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
+//  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               reduction = [0, 4096],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 16], [0, 1]],
+//  CHECK-SAME:               thread = [0, 4], thread_basis = {{\[}}[1, 64], [0, 1]],
+//  CHECK-SAME:               workgroup = [1, 0]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               partial_reduction = [0, 4096],

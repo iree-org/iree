@@ -129,8 +129,8 @@ def IREECodegen_LoweringConfigAttrInterface :
   ];
 }
 
-def IREECodegen_PackedLayoutAttrInterface :
-  AttrInterface<"PackedLayoutAttrInterface"> {
+def IREECodegen_PackedLayoutMaterializerAttr :
+  AttrInterface<"PackedLayoutMaterializerAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   let description = [{
     An interface that collects a set of methods for packed encoding materialization.

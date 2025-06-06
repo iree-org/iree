@@ -47,7 +47,7 @@ def EncodingOpTypeAttr:
 
 def LayoutAttr :
     IREEEncoding_Attr<"Layout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "isIdentityLayout",
         "calculateStorageSizeInBytes",
@@ -62,7 +62,7 @@ def LayoutAttr :
     array because a device could have multiple target layouts.
 
     It has a verifier that will ensure that all the attributes in layouts
-    implement SerializableEncodingAttrInterface.
+    implement SerializableAttr.
   }];
 
   let parameters = (ins
@@ -99,7 +99,7 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>,
@@ -189,7 +189,7 @@ def EncodingAttr :
 //===---------------------------------------------------------------------===//
 
 def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>,
@@ -250,9 +250,11 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
 //===---------------------------------------------------------------------===//
 
 def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
-         "calculateStorageSizeInBytes",
-         "isIdentityLayout",
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "calculateStorageSizeInBytes",
+        "cloneWithLayouts",
+        "isIdentityLayout",
+        "isSerialized"
         ]>
     ]> {
   let mnemonic = "pad_encoding_layout";
@@ -272,7 +274,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
       backend, usually for better cache behavior.
     Negative values for padding is illegal.
 
-    This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
+    This attribute implements `Encoding::SerializedLayoutResolverAttr`,
     to provide a hook for tensor sizeof lowering. The implementation of this
     interface is backend-agnostic, but the emission of the pad encoding attribute
     itself can be target- or domain-specific.
@@ -301,7 +303,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 
 def IdentityEncodingAttr :
     IREEEncoding_Attr<"IdentityEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -322,7 +324,7 @@ def IdentityEncodingAttr :
 
 def UnsupportedEncodingAttr :
     IREEEncoding_Attr<"UnsupportedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -344,7 +346,7 @@ def UnsupportedEncodingAttr :
 
 def TestingEncodingAttr :
     IREEEncoding_Attr<"TestingEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>
@@ -379,7 +381,7 @@ def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
 
 def UnspecializedEncodingAttr :
     IREEEncoding_Attr<"UnspecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
@@ -391,7 +393,7 @@ def UnspecializedEncodingAttr :
 
   let description = [{
     This attribute indicates this is an unspecialized encoding. It implements
-    very basic interface methods of EncodingLayoutResolverAttrInterface that
+    very basic interface methods of LayoutResolverAttr that
     returns the SpecializedEncodingAttr with the same seed as serialized layout
     in encoding specialization. Different seed values indicate different layouts.
 
@@ -404,7 +406,7 @@ def UnspecializedEncodingAttr :
 
 def SpecializedEncodingAttr :
     IREEEncoding_Attr<"SpecializedEncoding", [
-      IREEEncoding_SerializableEncodingAttrInterface
+      IREEEncoding_SerializableAttr
     ]> {
   let mnemonic = "specialized_encoding";
   let assemblyFormat = "`<` $seed (`,` $type^)? `>`";

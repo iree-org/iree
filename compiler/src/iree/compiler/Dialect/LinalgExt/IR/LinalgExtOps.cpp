@@ -326,6 +326,24 @@ GatherOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+  return SmallVector<int64_t>(getOutputType().getShape());
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForOperands() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      AffineMap(nullptr),
+      builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
 namespace {
 struct ConvertGatherToExtract
     : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
@@ -642,9 +660,9 @@ struct RemoveUnusedSortOpResults
     auto results = sortOp.getResults();
     unsigned numRes = sortOp.getNumResults();
 
-    // # TODO(#20831): Implement a way to remove unused results when using
-    // buffer semantics.
-    if (numRes == 0) {
+    // # TODO(#20831): Add support for removing unused operands when the op has
+    // pure buffer semantics.
+    if (sortOp.hasPureBufferSemantics()) {
       return failure();
     }
 
@@ -896,8 +914,7 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 
 /// Return true if at least one element in `tiles` is zero.
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
-  return llvm::any_of(
-      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
+  return llvm::any_of(tiles, isZeroInteger);
 }
 
 /// Check if we have enough static information to catch undefined behavior when

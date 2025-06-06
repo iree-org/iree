@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
+#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Utils/IntegerSet.h"
 #include "llvm/Support/Debug.h"
@@ -335,6 +336,47 @@ getBaseBufferReplacementForDescriptor(GetBufferDescriptorOp descriptorOp,
       .getResult(0);
 }
 
+struct FromMemRefAssumeAlignment
+    : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
+                                PatternRewriter &rewriter) const override {
+    auto assumeOp = op.getSource().getDefiningOp<memref::AssumeAlignmentOp>();
+    if (!assumeOp) {
+      return failure();
+    }
+    auto binding = assumeOp.getMemref()
+                       .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!binding) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    // TODO(hanchung): Refactor resolverBufferDescriptor* out, so we don't have
+    // to track the SSA chain above.
+    FailureOr<DescriptorInfo> resultDescriptor =
+        resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
+    if (failed(resultDescriptor)) {
+      return rewriter.notifyMatchFailure(
+          op, "failed to resolve descriptor with source being binding op");
+    }
+
+    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
+
+    // Base buffer.
+    rewriter.replaceAllUsesWith(
+        op.getBaseBuffer(),
+        rewriter
+            .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
+                loc, op.getBaseBuffer().getType(), binding.getLayout(),
+                binding.getBindingAttr())
+            .getResult());
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
 struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
@@ -420,7 +462,8 @@ public:
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<FromAllocation, FromGlobal, FromHalInterfaceBindingSubspan,
-                    FromMemRefSubView>(&getContext());
+                    FromMemRefSubView, FromMemRefAssumeAlignment>(
+        &getContext());
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();

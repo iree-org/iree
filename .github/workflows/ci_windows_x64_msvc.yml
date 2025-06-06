@@ -7,21 +7,11 @@
 name: CI - Windows x64 MSVC
 
 on:
-  schedule:
-    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
-    - cron: "15 9 * * 1-5"
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit)
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
   windows_x64_msvc:
-    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: azure-windows-scale
     env:
       BASE_BUILD_DIR_POWERSHELL: B:\tmpbuild
@@ -34,6 +24,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
+      # TODO(#18813): Remove this. Environment setup needs to happen on runners, not in workflows.
       - name: "Create build dir"
         run: |
           $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\"
@@ -52,6 +43,8 @@ jobs:
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      # TODO(#18813): Fix to actually use either ccache or sccache.
+      #               No need to install both, and neither is currently used.
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Configuring MSVC"
@@ -73,10 +66,4 @@ jobs:
         if: always()
         run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}
 
-      - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@5ddd3b114a98457dd80a39b2f00b6a998cd69008 # v1.15.3
-        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The ${{ github.workflow }} workflow failed"
-          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+      # Alerting on failure is the responsibility of the calling job.

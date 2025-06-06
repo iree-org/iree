@@ -364,6 +364,11 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   };
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
+
+  // Convert linalg.copy to direct loads. This has to be before any
+  // canonicalization.
+  funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
+
   addIREEPostBufferizationPasses(funcPassManager);
 
   funcPassManager.addPass(createROCDLBufferInstructionsOptimizationPass());
@@ -544,6 +549,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
   if (pipelineOptions.prefetchSharedMemory) {
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
+    funcPassManager.addPass(createRemoveSingleIterationLoopPass());
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
   }
 
@@ -1229,6 +1235,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   buildLLVMGPUCodegenConfigurationPassPipelineImpl(
       variantPassManager.nest<ModuleOp>());
 }
@@ -1307,6 +1314,7 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
 
 void buildROCDLCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildROCDLCodegenConfigurationPassPipelineImpl(modulePassManager);
 }

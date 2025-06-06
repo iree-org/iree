@@ -51,12 +51,6 @@
 #define SYNC_ASSERT(x) assert(x)
 #endif  // NDEBUG
 
-// Tag functions in .c files with this to indicate that thread safety analysis
-// warnings should not show. This is useful on our implementation functions as
-// clang cannot reason about lock-free magic.
-#define IREE_DISABLE_THREAD_SAFETY_ANALYSIS \
-  IREE_THREAD_ANNOTATION_ATTRIBUTE(no_thread_safety_analysis)
-
 //==============================================================================
 // Cross-platform processor yield (where supported)
 //==============================================================================
@@ -263,21 +257,19 @@ void iree_mutex_deinitialize(iree_mutex_t* mutex) {
   memset(mutex, 0, sizeof(*mutex));
 }
 
-void iree_mutex_lock(iree_mutex_t* mutex) IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_mutex_lock(iree_mutex_t* mutex) {
   iree_tracing_mutex_before_lock(mutex->lock_id);
   iree_mutex_impl_lock(mutex);
   iree_tracing_mutex_after_lock(mutex->lock_id);
 }
 
-bool iree_mutex_try_lock(iree_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_mutex_try_lock(iree_mutex_t* mutex) {
   bool was_acquired = iree_mutex_impl_try_lock(mutex);
   iree_tracing_mutex_after_try_lock(mutex->lock_id, was_acquired);
   return was_acquired;
 }
 
-void iree_mutex_unlock(iree_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_mutex_unlock(iree_mutex_t* mutex) {
   iree_mutex_impl_unlock(mutex);
   iree_tracing_mutex_after_unlock(mutex->lock_id);
 }
@@ -294,19 +286,13 @@ void iree_mutex_deinitialize(iree_mutex_t* mutex) {
   memset(mutex, 0, sizeof(*mutex));
 }
 
-void iree_mutex_lock(iree_mutex_t* mutex) IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
-  iree_mutex_impl_lock(mutex);
-}
+void iree_mutex_lock(iree_mutex_t* mutex) { iree_mutex_impl_lock(mutex); }
 
-bool iree_mutex_try_lock(iree_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_mutex_try_lock(iree_mutex_t* mutex) {
   return iree_mutex_impl_try_lock(mutex);
 }
 
-void iree_mutex_unlock(iree_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
-  iree_mutex_impl_unlock(mutex);
-}
+void iree_mutex_unlock(iree_mutex_t* mutex) { iree_mutex_impl_unlock(mutex); }
 
 #endif  // IREE_TRACING_FEATURE_SLOW_LOCKS
 
@@ -332,18 +318,15 @@ void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
   iree_mutex_deinitialize(&mutex->impl);
 }
 
-void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex) {
   iree_mutex_lock(&mutex->impl);
 }
 
-bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex) {
   return iree_mutex_try_lock(&mutex->impl);
 }
 
-void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex) {
   iree_mutex_unlock(&mutex->impl);
 }
 
@@ -355,16 +338,13 @@ void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex) {}
 
 void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {}
 
-void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {}
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex) {}
 
-bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex) {
   return iree_mutex_try_lock((iree_mutex_t*)&mutex->reserved);
 }
 
-void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {}
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex) {}
 
 #elif defined(IREE_PLATFORM_APPLE)
 
@@ -376,18 +356,15 @@ void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
   os_unfair_lock_assert_not_owner(&mutex->value);
 }
 
-void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex) {
   os_unfair_lock_lock(&mutex->value);
 }
 
-bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex) {
   return os_unfair_lock_trylock(&mutex->value);
 }
 
-void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex) {
   os_unfair_lock_unlock(&mutex->value);
 }
 
@@ -404,18 +381,15 @@ void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
   iree_mutex_impl_deinitialize(mutex);
 }
 
-void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex) {
   iree_mutex_impl_lock(mutex);
 }
 
-bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex) {
   return iree_mutex_impl_try_lock(mutex);
 }
 
-void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex) {
   iree_mutex_impl_unlock(mutex);
 }
 
@@ -452,9 +426,9 @@ void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
 
 // Helper to perform a compare_exchange operation on mutex->value, internally
 // used by iree_slim_mutex_try_lock and iree_slim_mutex_lock.
-static bool iree_slim_mutex_try_lock_compare_exchange(
-    iree_slim_mutex_t* mutex, int32_t* expected,
-    int32_t desired) IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+static bool iree_slim_mutex_try_lock_compare_exchange(iree_slim_mutex_t* mutex,
+                                                      int32_t* expected,
+                                                      int32_t desired) {
   // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics",
   // particularly regarding why the comparison-success case has 'acquire' order
   // and not the perhaps more intuitive 'acq_rel'.
@@ -471,8 +445,7 @@ static bool iree_slim_mutex_try_lock_compare_exchange(
                                            iree_memory_order_relaxed);
 }
 
-void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex) {
   // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics".
   // Try first to acquire the lock from an unlocked state.
   int32_t value = 0;
@@ -525,8 +498,7 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
   }
 }
 
-bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex) {
   // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics".
   // Attempt to acquire the lock from an unlocked state.
   int32_t value = 0;
@@ -534,8 +506,7 @@ bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
                                                    iree_slim_mutex_value(1));
 }
 
-void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex) {
   // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics".
   // Transition 1->0 (unlocking with no waiters) or 2->1 (with waiters).
   if (iree_atomic_fetch_sub(&mutex->value, iree_slim_mutex_value(1),
@@ -565,18 +536,15 @@ void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
   iree_mutex_deinitialize(&mutex->impl);
 }
 
-void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex) {
   iree_mutex_lock(&mutex->impl);
 }
 
-bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex) {
   return iree_mutex_try_lock(&mutex->impl);
 }
 
-void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
-    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex) {
   iree_mutex_unlock(&mutex->impl);
 }
 

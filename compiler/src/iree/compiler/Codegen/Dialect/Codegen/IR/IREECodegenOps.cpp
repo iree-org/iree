@@ -67,10 +67,10 @@ void ExtractStridedMetadataOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// LoadFromMemrefOp
+// LoadFromBufferOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult LoadFromMemrefOp::verify() {
+LogicalResult LoadFromBufferOp::verify() {
   RankedTensorType tensorType = getTensor().getType();
   MemRefType memrefType = getBuffer().getType();
   if (failed(verifyCompatibleShape(tensorType.getShape(),
@@ -82,18 +82,27 @@ LogicalResult LoadFromMemrefOp::verify() {
   return success();
 }
 
-void LoadFromMemrefOp::getEffects(
+void LoadFromBufferOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
   effects.emplace_back(MemoryEffects::Read::get(), &getBufferMutable(),
                        SideEffects::DefaultResource::get());
 }
 
+LogicalResult LoadFromBufferOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPointAfterValue(getBuffer());
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0] = memref::getMixedSizes(b, getLoc(), getBuffer());
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
-// StoreToMemrefOp
+// StoreToBufferOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult StoreToMemrefOp::verify() {
+LogicalResult StoreToBufferOp::verify() {
   RankedTensorType tensorType = getTensor().getType();
   MemRefType memrefType = getBuffer().getType();
   if (failed(verifyCompatibleShape(tensorType.getShape(),
@@ -105,7 +114,7 @@ LogicalResult StoreToMemrefOp::verify() {
   return success();
 }
 
-void StoreToMemrefOp::getEffects(
+void StoreToBufferOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
   effects.emplace_back(MemoryEffects::Write::get(), &getBufferMutable(),

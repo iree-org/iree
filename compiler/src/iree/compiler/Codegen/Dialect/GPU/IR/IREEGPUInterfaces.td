@@ -62,24 +62,6 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the vector layout for the A/B/C matrix of the MMA operation:
-        ```
-          C += A * B
-        ```
-      }],
-      /*retTy=*/"::mlir::FailureOr<::std::tuple<"
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface>>",
-      /*methodName=*/"getContractionLayout",
-      /*args=*/(ins "::mlir::vector::ContractionOp":$contract),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Returns the expected subgroup size of the MMA operation/intrinsic.
       }],
       /*retTy=*/"int64_t",
@@ -121,26 +103,6 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
         "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
         "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
         "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Populates the reassociation indices and result shape to materialize the
-        thread layout shape from the subgroup block shape.
-      }],
-      /*retTy=*/"::mlir::LogicalResult",
-      /*methodName=*/"materializeOperandConcreteShape",
-      /*args=*/(ins
-        "::mlir::OpBuilder&":$builder,
-        "::mlir::iree_compiler::IREE::GPU::MMAFragment":$fragment,
-        "::mlir::Value":$operand,
-        "std::optional<::llvm::ArrayRef<int64_t>>":$permutation,
-        "::llvm::SmallVector<::mlir::SmallVector<int64_t, 2>>&":$reassociations,
-        "::mlir::RankedTensorType&":$result_type
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

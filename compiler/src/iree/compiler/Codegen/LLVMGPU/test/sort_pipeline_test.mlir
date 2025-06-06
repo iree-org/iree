@@ -22,7 +22,6 @@ module {
 
 //   CHECK-LABEL:  func.func @sort1D
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      memref.assume_alignment
 
 // -----
 
@@ -46,7 +45,6 @@ module {
 
 //   CHECK-LABEL:  func.func @sort2D_static_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      memref.assume_alignment
 //         CHECK:      scf.forall
 //         CHECK:        memref.subview
 //         CHECK:        scf.for
@@ -78,7 +76,6 @@ module {
 
 //   CHECK-LABEL:  func.func @sort3D_dynamic_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      memref.assume_alignment
 //         CHECK:      scf.forall
 //         CHECK:       scf.for
 //         CHECK:         memref.subview

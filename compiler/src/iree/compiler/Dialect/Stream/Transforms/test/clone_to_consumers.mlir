@@ -94,16 +94,16 @@ util.func private @splatLikeDispatchOp() -> (tensor<1xi32>, tensor<1xi32>) {
 util.func private @reshapedDispatchOp() -> (tensor<1x4xi32>, tensor<1x4xi32>) {
   %splat_value = arith.constant 123 : i32
   //      CHECK: %[[DISPATCH_A:.+]] = flow.dispatch
-  // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[DISPATCH_A]]
-  // CHECK-NEXT: %[[RESHAPE_A:.+]] = flow.tensor.reshape %[[TRANSFER_A]]
+  // CHECK-NEXT: %[[RESHAPE_A:.+]] = flow.tensor.reshape %[[DISPATCH_A]]
+  // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[RESHAPE_A]]
   %splat = flow.dispatch @some::@splat_like(%splat_value) : (i32) -> tensor<4x1xi32>
   %reshape = flow.tensor.reshape %splat : tensor<4x1xi32> -> tensor<1x4xi32>
   %transfer_a = flow.tensor.transfer %reshape : tensor<1x4xi32> to #hal.device.promise<@dev_a>
   // CHECK-NEXT: %[[DISPATCH_B:.+]] = flow.dispatch
-  // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[DISPATCH_B]]
-  // CHECK-NEXT: %[[RESHAPE_B:.+]] = flow.tensor.reshape %[[TRANSFER_B]]
+  // CHECK-NEXT: %[[RESHAPE_B:.+]] = flow.tensor.reshape %[[DISPATCH_B]]
+  // CHECK-NEXT: %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[RESHAPE_B]]
   %transfer_b = flow.tensor.transfer %reshape : tensor<1x4xi32> to #hal.device.promise<@dev_b>
-  // CHECK-NEXT: util.return %[[RESHAPE_A]], %[[RESHAPE_B]]
+  // CHECK-NEXT: util.return %[[TRANSFER_A]], %[[TRANSFER_B]]
   util.return %transfer_a, %transfer_b : tensor<1x4xi32>, tensor<1x4xi32>
 }
 
