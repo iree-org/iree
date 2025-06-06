@@ -56,11 +56,8 @@ struct MemoryTypeOpConversion
   LogicalResult
   matchAndRewrite(IREE::HAL::MemoryTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto value = IREE::HAL::MemoryTypeOp::getTypeValue(op.getResult());
-    if (!value.has_value())
-      return rewriter.notifyMatchFailure(op.getLoc(),
-                                         "unsupported memory type");
-    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, value.value(), 32);
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(
+        op, op.getTypeAttr().getInt(), 32);
     return success();
   }
 };
@@ -71,11 +68,8 @@ struct BufferUsageOpConversion
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferUsageOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto value = IREE::HAL::BufferUsageOp::getUsageValue(op.getResult());
-    if (!value.has_value())
-      return rewriter.notifyMatchFailure(op.getLoc(),
-                                         "unsupported buffer usage");
-    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, value.value(), 32);
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(
+        op, op.getUsageAttr().getInt(), 32);
     return success();
   }
 };

@@ -932,6 +932,7 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 }
 
 def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
+  ConstantLike,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{An iree_hal_buffer_usage_t for the given usage bits.}];
@@ -952,15 +953,11 @@ def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
     `:` type($result)
   }];
 
-  let extraClassDeclaration = [{
-    // Returns the buffer usage value.
-    static std::optional<int32_t> getUsageValue(Value bufferUsage);
-  }];
-
-  let hasVerifier = 1;
+  let hasFolder = 1;
 }
 
 def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
+  ConstantLike,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{An iree_hal_memory_type_t for the given memory type bits.}];
@@ -981,12 +978,7 @@ def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
     `:` type($result)
   }];
 
-  let extraClassDeclaration = [{
-    // Returns the memory type value.
-    static std::optional<int32_t> getTypeValue(Value memoryType);
-  }];
-
-  let hasVerifier = 1;
+  let hasFolder = 1;
 }
 
 } // OpGroupBufferOps
