@@ -120,9 +120,9 @@ struct MemoizeDeviceSelectionPass
       // we only have AllocatorSelectOp.
       callableOp.walk([&](IREE::HAL::AllocatorSelectOp selectOp) {
         // Build unique key from device symbols, queue affinities, memory type,
-        // and buffer usage IF we fail to determine any of these values,
+        // and buffer usage. If we fail to determine any of these values,
         // we skip the op as we cannot be sure the key is unique.
-        llvm::SmallVector<Attribute> keyComponents;
+        llvm::SmallVector<Attribute, 6> keyComponents;
 
         // Add device symbols
         for (Value device : selectOp.getDevices()) {
@@ -137,30 +137,27 @@ struct MemoizeDeviceSelectionPass
         // Add queue affinities
         for (Value queueAffinity : selectOp.getQueueAffinities()) {
           IntegerAttr queueAffinityAttr;
-          if (matchPattern(queueAffinity, m_Constant(&queueAffinityAttr))) {
-            keyComponents.push_back(queueAffinityAttr);
-          } else {
+          if (!matchPattern(queueAffinity, m_Constant(&queueAffinityAttr))) {
             return;
           }
+          keyComponents.push_back(queueAffinityAttr);
         }
 
         // Add memory type
         IntegerAttr memoryTypeAttr;
-        if (matchPattern(selectOp.getMemoryTypes(),
-                         m_Constant(&memoryTypeAttr))) {
-          keyComponents.push_back(memoryTypeAttr);
-        } else {
+        if (!matchPattern(selectOp.getMemoryTypes(),
+                          m_Constant(&memoryTypeAttr))) {
           return;
         }
+        keyComponents.push_back(memoryTypeAttr);
 
         // Add buffer usage
         IntegerAttr bufferUsageAttr;
-        if (matchPattern(selectOp.getBufferUsage(),
-                         m_Constant(&bufferUsageAttr))) {
-          keyComponents.push_back(bufferUsageAttr);
-        } else {
+        if (!matchPattern(selectOp.getBufferUsage(),
+                          m_Constant(&bufferUsageAttr))) {
           return;
         }
+        keyComponents.push_back(bufferUsageAttr);
 
         auto key = ArrayAttr::get(moduleOp.getContext(), keyComponents);
 
