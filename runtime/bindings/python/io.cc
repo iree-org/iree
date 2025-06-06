@@ -76,6 +76,18 @@ FileHandle FileHandleWrapMemory(py::object host_buffer, bool readable,
   return FileHandle::StealFromRawPtr(created_handle);
 }
 
+FileHandle FileHandleWrapFd(int fd, bool readable, bool writable) {
+  iree_io_file_mode_t mode = 0;
+  if (readable) mode |= IREE_IO_FILE_MODE_READ;
+  if (writable) mode |= IREE_IO_FILE_MODE_WRITE;
+  iree_io_file_handle_t *created_handle;
+  CheckApiStatus(iree_io_file_handle_open_fd(mode, fd, iree_allocator_system(),
+                                             &created_handle),
+                 "Could not wrap host fd into a file handle");
+
+  return FileHandle::StealFromRawPtr(created_handle);
+}
+
 void ParameterIndexAddFromFileHandle(ParameterIndex &self, std::string &key,
                                      FileHandle &file_handle, uint64_t length,
                                      uint64_t offset,
@@ -203,6 +215,8 @@ void SetupIoBindings(py::module_ &m) {
           },
           py::arg("host_buffer"), py::arg("readable") = true,
           py::arg("writable") = false)
+      .def_static("wrap_fd", &FileHandleWrapFd, py::arg("fd"),
+                  py::arg("readable") = true, py::arg("writable") = false)
       .def_prop_ro(
           "is_host_allocation",
           [](FileHandle &self) {
