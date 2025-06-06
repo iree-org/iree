@@ -31,12 +31,12 @@ util.func public @fn1() -> (!hal.device, i64) {
   %memory_type = hal.memory_type<"HostLocal"> : i32
   %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device_a = util.global.load @device_a : !hal.device
-  %c-1_i64 = arith.constant -1 : i64
+  %affinity_a = arith.constant -1 : i64
   %device_b = util.global.load @device_b : !hal.device
-  %c-1_i64_0 = arith.constant -1 : i64
+  %affinity_b = arith.constant -1 : i64
   %device, %queue_affinity = hal.allocator.select from([
-    (%device_a, %c-1_i64 : !hal.device, i64),
-    (%device_b, %c-1_i64_0 : !hal.device, i64)
+    (%device_a, %affinity_a : !hal.device, i64),
+    (%device_b, %affinity_b : !hal.device, i64)
   ]) type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   // CHECK: util.return %[[FN1_DEVICE]], %[[FN1_AFFINITY]]
   util.return %device, %queue_affinity : !hal.device, i64
@@ -50,12 +50,12 @@ util.func public @fn2() -> (!hal.device, i64) {
   %memory_type = hal.memory_type<"HostLocal"> : i32
   %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device_a = util.global.load @device_a : !hal.device
-  %c-1_i64 = arith.constant -1 : i64
+  %affinity_a = arith.constant -1 : i64
   %device_b = util.global.load @device_b : !hal.device
-  %c-1_i64_0 = arith.constant -1 : i64
+  %affinity_b = arith.constant -1 : i64
   %device, %queue_affinity = hal.allocator.select from([
-    (%device_a, %c-1_i64 : !hal.device, i64),
-    (%device_b, %c-1_i64_0 : !hal.device, i64)
+    (%device_a, %affinity_a : !hal.device, i64),
+    (%device_b, %affinity_b : !hal.device, i64)
   ]) type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   // CHECK: util.return %[[FN2_DEVICE]], %[[FN2_AFFINITY]]
   util.return %device, %queue_affinity : !hal.device, i64
@@ -73,27 +73,28 @@ util.func public @fn3() -> (!hal.device, i64) {
   %memory_type = hal.memory_type<"HostLocal"> : i32
   %buffer_usage = hal.buffer_usage<"DispatchStorage"> : i32
   %device_a = util.global.load @device_a : !hal.device
-  %c-1_i64 = arith.constant -1 : i64
+  %affinity_a = arith.constant -1 : i64
   %device_c = util.global.load @device_c : !hal.device
-  %c-1_i64_0 = arith.constant -1 : i64
+  %affinity_c = arith.constant -1 : i64
   %device, %queue_affinity = hal.allocator.select from([
-    (%device_a, %c-1_i64 : !hal.device, i64),
-    (%device_c, %c-1_i64_0 : !hal.device, i64)
+    (%device_a, %affinity_a : !hal.device, i64),
+    (%device_c, %affinity_c : !hal.device, i64)
   ]) type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   // CHECK: util.return %[[FN3_DEVICE]], %[[FN3_AFFINITY]]
   util.return %device, %queue_affinity : !hal.device, i64
 }
-// should not get hoisted since not all operands are constants
+
 // CHECK: @fn4
 util.func public @fn4(%memory_type: i32, %buffer_usage: i32) -> (!hal.device, i64) {
-  // CHECK: hal.allocator.select
   %device_a = util.global.load @device_a : !hal.device
-  %c-1_i64 = arith.constant -1 : i64
+  %affinity_a = arith.constant -1 : i64
   %device_b = util.global.load @device_b : !hal.device
-  %c-1_i64_0 = arith.constant -1 : i64
+  %affinity_b = arith.constant -1 : i64
+  // should not get hoisted since they type/usage are not constants
+  // CHECK: hal.allocator.select
   %device, %queue_affinity = hal.allocator.select from([
-    (%device_a, %c-1_i64 : !hal.device, i64),
-    (%device_b, %c-1_i64_0 : !hal.device, i64)
+    (%device_a, %affinity_a : !hal.device, i64),
+    (%device_b, %affinity_b : !hal.device, i64)
   ]) type(%memory_type) usage(%buffer_usage) : !hal.device, i64
   util.return %device, %queue_affinity : !hal.device, i64
 }

@@ -1071,22 +1071,6 @@ void BufferUsageOp::getAsmResultNames(
   setNameFn(getResult(), "buffer_usage");
 }
 
-std::optional<int32_t> BufferUsageOp::getUsageValue(Value bufferUsage) {
-  if (auto bufferUsageAttr =
-          bufferUsage.getDefiningOp<IREE::HAL::BufferUsageOp>()) {
-    return static_cast<int32_t>(bufferUsageAttr.getUsageAttr().getInt());
-  }
-  return std::nullopt;
-}
-
-LogicalResult BufferUsageOp::verify() {
-  auto usage = getUsageValue(getResult());
-  if (!usage.has_value()) {
-    return emitOpError("unsupported buffer usage");
-  }
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // hal.memory_type
 //===----------------------------------------------------------------------===//
@@ -1094,22 +1078,6 @@ LogicalResult BufferUsageOp::verify() {
 void MemoryTypeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "memory_type");
-}
-
-std::optional<int32_t> MemoryTypeOp::getTypeValue(Value memoryType) {
-  if (auto memoryTypeAttr =
-          memoryType.getDefiningOp<IREE::HAL::MemoryTypeOp>()) {
-    return static_cast<int32_t>(memoryTypeAttr.getTypeAttr().getInt());
-  }
-  return std::nullopt;
-}
-
-LogicalResult MemoryTypeOp::verify() {
-  auto type = getTypeValue(getResult());
-  if (!type.has_value()) {
-    return emitOpError("unsupported memory type");
-  }
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

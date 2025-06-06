@@ -202,9 +202,9 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
                      IREE::HAL::BufferUsageBitfield::DispatchStorage;
-  auto memoryTypeOp =
+  Value memoryTypeOp =
       initBuilder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
-  auto bufferUsageOp =
+  Value bufferUsageOp =
       initBuilder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
   auto allocateOp = initBuilder.create<IREE::HAL::AllocatorAllocateOp>(
       loc, globalOp.getType(), allocator, queueAffinity, memoryTypeOp,

@@ -42,12 +42,12 @@ struct ParameterLoadOpPattern
 
     // Lookup the appropriate device/queue for allocation based on the buffer
     // propreties.
-    auto memoryTypeOp =
+    Value memoryTypeOp =
         rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
-    auto bufferUsageOp =
+    Value bufferUsageOp =
         rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
     auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
-        loadOp, memoryTypeOp.getResult(), bufferUsageOp.getResult(), rewriter);
+        loadOp, memoryTypeOp, bufferUsageOp, rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -61,8 +61,8 @@ struct ParameterLoadOpPattern
     auto newOp = rewriter.create<IREE::IO::Parameters::LoadOp>(
         loc, newResultTypes, device, queueAffinity, waitFence, signalFence,
         adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
-        adaptor.getSourceOffsets(), memoryTypeOp.getResult(),
-        bufferUsageOp.getResult(), adaptor.getResultSizes());
+        adaptor.getSourceOffsets(), memoryTypeOp, bufferUsageOp,
+        adaptor.getResultSizes());
 
     SmallVector<Value> resultReplacements;
     llvm::append_range(resultReplacements, newOp.getResults());

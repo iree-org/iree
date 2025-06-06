@@ -1188,4 +1188,22 @@ void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<DeduplicateFenceAwaitFences>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// hal.buffer_usage
+//===----------------------------------------------------------------------===//
+
+OpFoldResult BufferUsageOp::fold(FoldAdaptor operands) {
+  return IntegerAttr::get(IntegerType::get(getContext(), 32),
+                          getUsageAttr().getInt());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.memory_type
+//===----------------------------------------------------------------------===//
+
+OpFoldResult MemoryTypeOp::fold(FoldAdaptor operands) {
+  return IntegerAttr::get(IntegerType::get(getContext(), 32),
+                          getTypeAttr().getInt());
+}
+
 } // namespace mlir::iree_compiler::IREE::HAL

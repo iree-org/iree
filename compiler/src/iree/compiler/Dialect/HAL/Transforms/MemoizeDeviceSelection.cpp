@@ -113,21 +113,22 @@ struct MemoizeDeviceSelectionPass
     // Gather all select ops in the program and bucket by unique key.
     // For each bucket the first op will be the first that appears in the
     // module for that given bucket.
-    llvm::StringMap<SmallVector<IREE::HAL::AllocatorSelectOp>> selectOps;
+    llvm::DenseMap<Attribute, SmallVector<IREE::HAL::AllocatorSelectOp>>
+        selectOps;
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       // TODO(benvanik): an interface for when we have other select ops. For now
       // we only have AllocatorSelectOp.
       callableOp.walk([&](IREE::HAL::AllocatorSelectOp selectOp) {
         // Build unique key from device symbols, queue affinities, memory type,
-        // and buffer usage IF we fail to determine any of these values as
-        // constants, we skip the op
-        std::string key;
+        // and buffer usage IF we fail to determine any of these values,
+        // we skip the op as we cannot be sure the key is unique.
+        llvm::SmallVector<Attribute> keyComponents;
 
         // Add device symbols
         for (Value device : selectOp.getDevices()) {
           if (auto globalLoadOp =
                   device.getDefiningOp<IREE::Util::GlobalLoadOp>()) {
-            key += globalLoadOp.getGlobal().str() + "_";
+            keyComponents.push_back(globalLoadOp.getGlobalAttr());
           } else {
             return;
           }
@@ -135,31 +136,33 @@ struct MemoizeDeviceSelectionPass
 
         // Add queue affinities
         for (Value queueAffinity : selectOp.getQueueAffinities()) {
-          if (auto constOp =
-                  queueAffinity.getDefiningOp<arith::ConstantIntOp>()) {
-            key += std::to_string(constOp.value()) + "_";
+          IntegerAttr queueAffinityAttr;
+          if (matchPattern(queueAffinity, m_Constant(&queueAffinityAttr))) {
+            keyComponents.push_back(queueAffinityAttr);
           } else {
             return;
           }
         }
 
         // Add memory type
-        if (std::optional<int32_t> memoryType =
-                IREE::HAL::MemoryTypeOp::getTypeValue(
-                    selectOp.getMemoryTypes())) {
-          key += std::to_string(*memoryType) + "_";
+        IntegerAttr memoryTypeAttr;
+        if (matchPattern(selectOp.getMemoryTypes(),
+                         m_Constant(&memoryTypeAttr))) {
+          keyComponents.push_back(memoryTypeAttr);
         } else {
           return;
         }
 
         // Add buffer usage
-        if (std::optional<int32_t> bufferUsage =
-                IREE::HAL::BufferUsageOp::getUsageValue(
-                    selectOp.getBufferUsage())) {
-          key += std::to_string(*bufferUsage);
+        IntegerAttr bufferUsageAttr;
+        if (matchPattern(selectOp.getBufferUsage(),
+                         m_Constant(&bufferUsageAttr))) {
+          keyComponents.push_back(bufferUsageAttr);
         } else {
           return;
         }
+
+        auto key = ArrayAttr::get(moduleOp.getContext(), keyComponents);
 
         selectOps[key].push_back(selectOp);
       });
@@ -171,8 +174,8 @@ struct MemoizeDeviceSelectionPass
     }
 
     // Insert globals/an initializer/swap ops with lookups.
-    for (const auto &allOps : selectOps) {
-      if (failed(memoizeAllocatorSelectOp(allOps.getValue(), symbolTable))) {
+    for (auto &[key, allOps] : selectOps) {
+      if (failed(memoizeAllocatorSelectOp(allOps, symbolTable))) {
         return signalPassFailure();
       }
     }
