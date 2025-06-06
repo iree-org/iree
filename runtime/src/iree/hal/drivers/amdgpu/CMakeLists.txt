@@ -16,6 +16,10 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
+    "buffer.c"
+    "buffer.h"
+    "buffer_pool.c"
+    "buffer_pool.h"
     "channel.c"
     "channel.h"
     "driver.c"
@@ -50,6 +54,53 @@ iree_cc_library(
     iree::schemas::amdgpu_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    headers
+  HDRS
+    "buffer.h"
+    "buffer_pool.h"
+    "channel.h"
+    "driver.h"
+    "event.h"
+    "executable.h"
+    "executable_cache.h"
+    "logical_device.h"
+    "physical_device.h"
+    "system.h"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::base::internal::arena
+    iree::hal
+    iree::hal::drivers::amdgpu::device::binaries
+    iree::hal::drivers::amdgpu::device::headers
+    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::topology
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_pool_test
+  SRCS
+    "buffer_pool_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::hal::drivers::amdgpu::device::headers
+    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::topology
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
