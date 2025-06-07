@@ -641,39 +641,35 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     }
   }
 
-  // Create partial linalg.generic op with global index computation.
-  Value tileSize = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
-  auto partialOp = rewriter.create<linalg::GenericOp>(
+  // Step 1: Create a a structurally strict argmax that performs a partial
+  // reduction over the split (tile) dimension. The argmax matches the pattern
+  // expected by isArgmaxOp (maximumf, cmpf, select with index from
+  // linalg.index). The result yields the local maximum values and their
+  // corresponding local indices within each tile. These local indices will be
+  // adjusted to global indices in step 2.
+  auto partialArgmax = rewriter.create<linalg::GenericOp>(
       loc, TypeRange{identityValue.getType(), identityIndex.getType()},
       newInputs, ValueRange{identityValue, identityIndex}, newMaps,
-      newIteratorTypes);
+      newIteratorTypes,
+      [reductionDim](OpBuilder &b, Location loc, ValueRange args) {
+        Value in = args[0];
+        Value outVal = args[1];
+        Value outIdx = args[2];
+        Value reductionIdx = b.create<linalg::IndexOp>(loc, reductionDim + 1);
+        if (outIdx.getType() != reductionIdx.getType())
+          reductionIdx =
+              b.create<arith::IndexCastOp>(loc, outIdx.getType(), reductionIdx);
+        Value maxVal = b.create<arith::MaximumFOp>(loc, in, outVal);
+        Value cmp =
+            b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT, in, outVal);
+        Value selIdx =
+            b.create<arith::SelectOp>(loc, cmp, reductionIdx, outIdx);
+        b.create<linalg::YieldOp>(loc, ValueRange{maxVal, selIdx});
+      });
 
-  rewriter.inlineRegionBefore(genericOp.getRegion(), partialOp.getRegion(),
-                              partialOp.getRegion().begin());
-
-  Block &body = partialOp.getRegion().front();
-  rewriter.setInsertionPointToStart(&body);
-
-  unsigned innerIdxDim = reductionDim + 1;
-  unsigned outerIdxDim = insertSplitDimension;
-
-  // Compute global index (gidx) for reduction when the original reduction
-  // dimension is split into [outerIdx, innerIdx] using `ratio`. This is used to
-  // correctly compute the global index for comparisons and index selection.
-  Value outerIdx = rewriter.create<linalg::IndexOp>(loc, outerIdxDim);
-  Value innerIdx = rewriter.create<linalg::IndexOp>(loc, innerIdxDim);
-  Value offset = rewriter.create<arith::MulIOp>(loc, outerIdx, tileSize);
-  Value gidx = rewriter.create<arith::AddIOp>(loc, offset, innerIdx);
-
-  auto selectOp = dyn_cast<arith::SelectOp>(combinerOps.selectOp);
-  Value oldIdx = selectOp.getTrueValue();
-  Value newIdx = gidx;
-  if (oldIdx.getType() != gidx.getType()) {
-    newIdx = rewriter.create<arith::IndexCastOp>(loc, oldIdx.getType(), gidx);
-  }
-  selectOp.setOperand(1, newIdx);
-  rewriter.setInsertionPointAfter(partialOp);
-
+  // Step 2: Final reduction that computes global indices and selects the one
+  // corresponding to the maximum value.
+  Value tileSize = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
   unsigned intermRank =
       cast<RankedTensorType>(identityValue.getType()).getRank();
   AffineMap valueMap = rewriter.getMultiDimIdentityMap(intermRank);
@@ -693,19 +689,28 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       AffineMap::get(intermRank, 0, resultExprs, rewriter.getContext());
   SmallVector<AffineMap> finalReductionMaps = {valueMap, indexMap, outputMap,
                                                outputMap};
-
-  // Create block for final reduction region.
   auto finalReduction = rewriter.create<linalg::GenericOp>(
       loc, genericOp.getResultTypes(),
-      ValueRange{partialOp.getResult(0), partialOp.getResult(1)},
+      ValueRange{partialArgmax.getResult(0), partialArgmax.getResult(1)},
       genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
-      [combinerOps](OpBuilder &b, Location loc, ValueRange inputs) {
+      [combinerOps, tileSize, insertSplitDimension](OpBuilder &b, Location loc,
+                                                    ValueRange inputs) {
+        Value val = inputs[0];
+        Value local = inputs[1];
+        Value outVal = inputs[2];
+        Value outIdx = inputs[3];
+        Value outer = b.create<linalg::IndexOp>(loc, insertSplitDimension);
+        Value offset = b.create<arith::MulIOp>(loc, outer, tileSize);
+        if (offset.getType() != local.getType())
+          offset = b.create<arith::IndexCastOp>(loc, local.getType(), offset);
+        // gidx = outer * ratio + local.
+        Value gidx = b.create<arith::AddIOp>(loc, offset, local);
         Operation *clonedMax = b.clone(*combinerOps.maxOp);
-        clonedMax->setOperands({inputs[0], inputs[2]});
+        clonedMax->setOperands({val, outVal});
         Operation *clonedCmp = b.clone(*combinerOps.cmpOp);
-        clonedCmp->setOperands({inputs[0], inputs[2]});
+        clonedCmp->setOperands({val, outVal});
         Operation *clonedSel = b.clone(*combinerOps.selectOp);
-        clonedSel->setOperands({clonedCmp->getResult(0), inputs[1], inputs[3]});
+        clonedSel->setOperands({clonedCmp->getResult(0), gidx, outIdx});
         b.create<linalg::YieldOp>(
             loc, ValueRange{clonedMax->getResult(0), clonedSel->getResult(0)});
       });
@@ -714,7 +719,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   // Init or alloc and fillOp are not applicable for argmax op; set to nullptr.
   return linalg::SplitReductionResult{
       /*initOrAlloc=*/nullptr, /*fillOp=*/nullptr,
-      cast<linalg::LinalgOp>(partialOp.getOperation()), finalReduction};
+      cast<linalg::LinalgOp>(partialArgmax.getOperation()), finalReduction};
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

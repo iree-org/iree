@@ -146,6 +146,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_rocm_hip
   SRCS
+    "argmax.mlir"
     "pack_i8.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -167,6 +168,19 @@ iree_check_single_backend_test_suite(
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
     "noriscv"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_argmax_llvm-cpu_local-task
+  SRCS
+    "argmax.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
