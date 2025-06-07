@@ -133,6 +133,7 @@ struct OutlineDispatchExternsPass
     : public IREE::Flow::impl::OutlineDispatchExternsPassBase<
           OutlineDispatchExternsPass> {
   void runOnOperation() override {
+    int64_t uniqueId = 0;
     for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Outline all of the dispatch externs ops in this function.
       SmallVector<Operation *> deadOps;
@@ -140,10 +141,11 @@ struct OutlineDispatchExternsPass
         return TypeSwitch<Operation *, WalkResult>(op)
             .Case<IREE::HAL::DispatchExternOp>([&](auto dispatchExternOp) {
               if (failed(outlineDispatchExternOp(
-                      ("extern_dispatch_" + llvm::Twine(deadOps.size())).str(),
+                      ("extern_dispatch_" + llvm::Twine(uniqueId)).str(),
                       dispatchExternOp))) {
                 return WalkResult::interrupt();
               }
+              uniqueId++;
               deadOps.push_back(op);
               return WalkResult::advance();
             })
