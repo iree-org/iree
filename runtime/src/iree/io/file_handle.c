@@ -261,6 +261,24 @@ static iree_status_t iree_io_file_handle_platform_open(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_io_file_handle_platform_open_fd(
+    int fd, iree_allocator_t host_allocator,
+    iree_io_file_handle_primitive_t* out_handle_primitive) {
+  IREE_ASSERT_ARGUMENT(out_handle_primitive);
+  memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
+
+  int new_fd = _dup(fd);
+
+  if (new_fd == -1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid file_descriptor");
+  }
+
+  out_handle_primitive->type = IREE_IO_FILE_HANDLE_TYPE_FD;
+  out_handle_primitive->value.fd = new_fd;
+  return iree_ok_status();
+}
+
 static void iree_io_file_handle_platform_close(
     void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
   // NOTE: we opened the file using Win32 APIs but it's safe to _close since we
@@ -345,6 +363,24 @@ static iree_status_t iree_io_file_handle_platform_open(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_io_file_handle_platform_open_fd(
+    int fd, iree_allocator_t host_allocator,
+    iree_io_file_handle_primitive_t* out_handle_primitive) {
+  IREE_ASSERT_ARGUMENT(out_handle_primitive);
+  memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
+
+  int new_fd = dup(fd);
+
+  if (new_fd == -1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid file_descriptor");
+  }
+
+  out_handle_primitive->type = IREE_IO_FILE_HANDLE_TYPE_FD;
+  out_handle_primitive->value.fd = new_fd;
+  return iree_ok_status();
+}
+
 static void iree_io_file_handle_platform_close(
     void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
   IREE_ASSERT_EQ(handle_primitive.type, IREE_IO_FILE_HANDLE_TYPE_FD);
@@ -418,6 +454,47 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
+    iree_io_file_mode_t mode, int fd, iree_allocator_t host_allocator,
+    iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, fd);
+
+  iree_io_file_access_t allowed_access = 0;
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ)) {
+    allowed_access |= IREE_IO_FILE_ACCESS_READ;
+  }
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_WRITE)) {
+    allowed_access |= IREE_IO_FILE_ACCESS_WRITE;
+  }
+  iree_io_file_handle_primitive_t handle_primitive = {0};
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_io_file_handle_platform_open_fd(fd, host_allocator,
+                                               &handle_primitive));
+
+  iree_io_file_handle_release_callback_t release_callback = {
+      .fn = iree_io_file_handle_platform_close,
+      .user_data = NULL,
+  };
+
+  iree_io_file_handle_t* handle = NULL;
+  iree_status_t status =
+      iree_io_file_handle_wrap(allowed_access, handle_primitive,
+                               release_callback, host_allocator, &handle);
+
+  if (iree_status_is_ok(status)) {
+    *out_handle = handle;
+  } else {
+    release_callback.fn(release_callback.user_data, handle_primitive);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 #else
 
 IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
@@ -433,6 +510,16 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
 IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
     iree_io_file_mode_t mode, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file support has been compiled out of this binary; "
+                          "set IREE_FILE_IO_ENABLE=1 to include it");
+}
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
+    iree_io_file_mode_t mode, int fd, iree_allocator_t host_allocator,
+    iree_io_file_handle_t** out_handle) {
   IREE_ASSERT_ARGUMENT(out_handle);
   *out_handle = NULL;
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
