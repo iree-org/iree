@@ -35,7 +35,6 @@ inline llvm::cl::opt<bool>
 } // namespace mlir::iree_compiler
 
 // clang-format off
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/LoweringConfigEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h.inc"
 // clang-format on

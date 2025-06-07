@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowInterfaces
+    MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRParser

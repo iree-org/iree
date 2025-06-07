@@ -330,37 +330,38 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
       return {range.begin(), range.end()};
     }
 
+    ArrayRef<int64_t> getOperandInnerShape(uint32_t index) {
+      auto opType = ::llvm::cast<::mlir::ShapedType>(getOperandTypes()[index]);
+      int64_t innerDimRank = opType.getRank() - getIndexingMapsArray()[index].getNumResults();
+      return opType.getShape().take_back(innerDimRank);
+    }
+
     ArrayRef<int64_t> getLhsInnerShape() {
-      ShapedType lhsType = getLhsType();
-      int64_t lhsInnerDimRank =
-        lhsType.getRank() - getIndexingMapsArray()[0].getNumResults();
-      return lhsType.getShape().take_back(lhsInnerDimRank);
+      return getOperandInnerShape(0);
     }
 
     ArrayRef<int64_t> getRhsInnerShape() {
-      ShapedType rhsType = getRhsType();
-      int64_t rhsInnerDimRank =
-        rhsType.getRank() - getIndexingMapsArray()[1].getNumResults();
-      return rhsType.getShape().take_back(rhsInnerDimRank);
+      return getOperandInnerShape(1);
     }
 
     ArrayRef<int64_t> getAccInnerShape() {
-      ShapedType accType = getAccType();
-      int64_t accInnerDimRank =
-        accType.getRank() - getIndexingMapsArray()[2].getNumResults();
-      return accType.getShape().take_back(accInnerDimRank);
+      return getOperandInnerShape(2);
+    }
+
+    int64_t getOperandOuterRank(int64_t index) {
+      return getIndexingMapsArray()[index].getNumResults();
     }
 
     int64_t getLhsOuterRank() {
-      return getIndexingMapsArray()[0].getNumResults();
+      return getOperandOuterRank(0);
     }
 
     int64_t getRhsOuterRank() {
-      return getIndexingMapsArray()[1].getNumResults();
+      return getOperandOuterRank(1);
     }
 
     int64_t getAccOuterRank() {
-      return getIndexingMapsArray()[2].getNumResults();
+      return getOperandOuterRank(2);
     }
 
     // Method to implement for specifying output range for

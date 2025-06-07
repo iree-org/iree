@@ -148,13 +148,16 @@ def IREEGPU_MMAIntrinsicAttr
 
 def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
-    "getABCElementTypes",
-    "getABCVectorTypes",
-    "getMNKShape",
     "getSubgroupSize",
-    "getMmaScope",
     "buildMmaOperation",
+  ]>,
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "verifyIndexingMaps",
+    "getUndistributedTileTypes",
+    "getDistributedTileTypes",
     "populateOperandOffsetsSizesStrides",
+    "getDistributionMappingKind",
   ]>
 ]> {
   let mnemonic = "mma_layout";
@@ -202,13 +205,16 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
 def IREEGPU_DataTiledMMAAttr :
     AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
-    "getABCElementTypes",
-    "getABCVectorTypes",
-    "getMNKShape",
     "getSubgroupSize",
-    "getMmaScope",
-    "populateOperandOffsetsSizesStrides",
     "buildMmaOperation",
+  ]>,
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "verifyIndexingMaps",
+    "getUndistributedTileTypes",
+    "getDistributedTileTypes",
+    "populateOperandOffsetsSizesStrides",
+    "getDistributionMappingKind",
   ]>
 ]> {
   let mnemonic = "data_tiled_mma_layout";
@@ -244,13 +250,16 @@ def IREEGPU_VirtualMMAIntrinsicAttr
 def IREEGPU_VirtualMMAAttr :
     AttrDef<IREEGPU_Dialect, "VirtualMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
-    "getABCElementTypes",
-    "getABCVectorTypes",
-    "getMNKShape",
     "getSubgroupSize",
-    "getMmaScope",
-    "populateOperandOffsetsSizesStrides",
     "buildMmaOperation",
+  ]>,
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "verifyIndexingMaps",
+    "getUndistributedTileTypes",
+    "getDistributedTileTypes",
+    "populateOperandOffsetsSizesStrides",
+    "getDistributionMappingKind",
   ]>
 ]> {
   let mnemonic = "virtual_mma_layout";
