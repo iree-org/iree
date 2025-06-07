@@ -1007,7 +1007,7 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   }];
 
   let parameters = (ins
-    AttrParameter<"StringAttr", "">:$device,
+    AttrParameter<"SymbolRefAttr", "">:$device,
     AttrParameter<"int64_t", "">:$queue_mask
   );
 
