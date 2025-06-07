@@ -125,70 +125,6 @@ namespace {
 
 /// Tries to fold either the device or queue affinity of a select when all
 /// potential values of either match.
-struct FoldAllocatorSelectAttr
-    : public OpRewritePattern<AllocatorSelectAttrOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(AllocatorSelectAttrOp op,
-                                PatternRewriter &rewriter) const override {
-    // Calculate the unique set of devices and unique set of queue affinities.
-    DenseSet<SymbolRefAttr> deviceAttrs;
-    DenseSet<int64_t> queueAffinities;
-    for (auto affinityAttr : op.getOptimalSet().getAffinities()) {
-      auto deviceAffinityAttr =
-          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
-      if (!deviceAffinityAttr) {
-        return rewriter.notifyMatchFailure(op, "non-device affinity present");
-      }
-      deviceAttrs.insert(deviceAffinityAttr.getDevice());
-      queueAffinities.insert(deviceAffinityAttr.getQueueMask());
-    }
-    if (deviceAttrs.size() == 1 && queueAffinities.size() == 1) {
-      // Only a single selected combination.
-      SymbolRefAttr commonDeviceAttr = *deviceAttrs.begin();
-      int64_t commonQueueAffinityMask = *queueAffinities.begin();
-      rewriter.replaceOpWithNewOp<IREE::HAL::DeviceResolveOp>(
-          op, op.getResultTypes(),
-          rewriter.getAttr<IREE::HAL::DeviceAffinityAttr>(
-              commonDeviceAttr, commonQueueAffinityMask));
-      return success();
-    } else if (deviceAttrs.size() == 1 && !op.getSelectedDevice().use_empty()) {
-      // Device is common but queue masks are not.
-      // This is unlikely to arise naturally.
-      SymbolRefAttr commonDeviceAttr = *deviceAttrs.begin();
-      auto resolveOp = rewriter.create<IREE::HAL::DeviceResolveOp>(
-          op.getLoc(), rewriter.getType<IREE::HAL::DeviceType>(),
-          rewriter.getAttr<IREE::HAL::DeviceAffinityAttr>(commonDeviceAttr,
-                                                          -1));
-      rewriter.replaceAllUsesWith(op.getSelectedDevice(),
-                                  resolveOp.getResult(0));
-      return success();
-    } else if (queueAffinities.size() == 1 &&
-               !op.getSelectedQueueAffinity().use_empty()) {
-      // Queue affinities are common (likely "any") but devices are not.
-      // We can fold the queue affinity mask to a constant now to allow it to
-      // propagate.
-      int64_t commonQueueAffinityMask = *queueAffinities.begin();
-      auto queueAffinityValue = rewriter.create<arith::ConstantIntOp>(
-          op.getLoc(), commonQueueAffinityMask, 64);
-      rewriter.replaceAllUsesWith(op.getSelectedQueueAffinity(),
-                                  queueAffinityValue);
-      return success();
-    }
-    return failure();
-  }
-};
-
-} // namespace
-
-void AllocatorSelectAttrOp::getCanonicalizationPatterns(
-    RewritePatternSet &results, MLIRContext *context) {
-  results.insert<FoldAllocatorSelectAttr>(context);
-}
-
-namespace {
-
-/// Tries to fold either the device or queue affinity of a select when all
-/// potential values of either match.
 struct FoldAllocatorSelect : public OpRewritePattern<AllocatorSelectOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AllocatorSelectOp op,
@@ -1250,6 +1186,24 @@ void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   results.insert<ElideEmptyFenceAwait>(context);
   results.insert<DeduplicateFenceAwaitFences>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer_usage
+//===----------------------------------------------------------------------===//
+
+OpFoldResult BufferUsageOp::fold(FoldAdaptor operands) {
+  return IntegerAttr::get(IntegerType::get(getContext(), 32),
+                          getUsageAttr().getInt());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.memory_type
+//===----------------------------------------------------------------------===//
+
+OpFoldResult MemoryTypeOp::fold(FoldAdaptor operands) {
+  return IntegerAttr::get(IntegerType::get(getContext(), 32),
+                          getTypeAttr().getInt());
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL
