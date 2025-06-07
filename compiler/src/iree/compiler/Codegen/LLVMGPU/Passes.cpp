@@ -548,6 +548,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
   if (pipelineOptions.prefetchSharedMemory) {
+    funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());

@@ -1172,14 +1172,13 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<1x16x66xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
-//       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c145 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
+//       CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 // CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
 //       CHECK:       scf.yield
-//       CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x4x1xf32> to vector<4xf32>
-//       CHECK:     vector.transfer_write %[[LOOP_T]]
+//       CHECK:     vector.transfer_write {{.*}} #gpu.address_space<workgroup>>
 //       CHECK:     scf.for {{.*}} {
 //       CHECK:       memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //       CHECK:    }
