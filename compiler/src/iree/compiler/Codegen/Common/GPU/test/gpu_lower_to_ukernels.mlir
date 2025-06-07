@@ -119,6 +119,48 @@ func.func @argmax_f32i64_without_selected_ukernel(%arg0 : tensor<1x?xf32>) -> te
 
 // -----
 
+func.func @argmax_invalid_index_without_selected_ukernel(
+    %input: tensor<131072xf32>,
+    %init_val_arg: tensor<f32>,
+    %init_idx_arg: tensor<i64>
+) -> tensor<i64> {
+  %c0_i64 = arith.constant 0 : i64
+  %cst_min = arith.constant 0xFF800000 : f32  // -inf
+  %init_val = linalg.fill ins(%cst_min : f32)
+              outs(%init_val_arg : tensor<f32>) -> tensor<f32>
+  %init_idx = linalg.fill ins(%c0_i64 : i64)
+              outs(%init_idx_arg : tensor<i64>) -> tensor<i64>
+
+  // Argmax-style reduction with a matcher-breaking intermediate op (`addi`).
+  %result:2 = linalg.generic {
+      indexing_maps = [
+        affine_map<(d0) -> (d0)>,
+        affine_map<(d0) -> ()>,
+        affine_map<(d0) -> ()>
+      ],
+      iterator_types = ["reduction"]
+    } ins(%input : tensor<131072xf32>)
+      outs(%init_val, %init_idx : tensor<f32>, tensor<i64>) {
+    ^bb0(%in: f32, %val: f32, %idx: i64):
+      %i = linalg.index 0 : index
+      %cast = arith.index_cast %i : index to i64
+      // Breaks isArgmaxOp matching.
+      %plus = arith.addi %cast, %c0_i64 : i64
+      %maxval = arith.maximumf %in, %val : f32
+      %cmp = arith.cmpf ogt, %in, %val : f32
+      %sel = arith.select %cmp, %plus, %idx : i64
+      linalg.yield %maxval, %sel : f32, i64
+  } -> (tensor<f32>, tensor<i64>)
+
+  return %result#1 : tensor<i64>
+}
+
+// CHECK-LABEL: func @argmax_invalid_index_without_selected_ukernel(
+//      CHECK-NOT: iree_codegen.ukernel.generic
+//      CHECK: linalg.generic
+
+// -----
+
 func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x1x1x2x8xi8>, %b : tensor<1x2x1x2x1x1x2x8xi8>, %c : tensor<1x1x1x8x2x1x1x4xi32>) -> tensor<1x1x1x8x2x1x1x4xi32> {
   %d = iree_gpu.multi_mma %a, %b, %c {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
