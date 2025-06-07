@@ -10,7 +10,6 @@
 #include <optional>
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "llvm/ADT/DenseSet.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -23,6 +22,14 @@ public:
   explicit DeviceSet(ArrayRef<IREE::HAL::DeviceTargetAttr> targetAttrs);
   explicit DeviceSet(const DenseSet<IREE::HAL::DeviceTargetAttr> &targetAttrs);
   ~DeviceSet();
+
+  // Returns true if the set is empty (analysis failed or was incomplete).
+  bool empty() const { return targetAttrs.empty(); }
+
+  // Returns the unordered list of device targets.
+  ArrayRef<IREE::HAL::DeviceTargetAttr> getValues() const {
+    return targetAttrs.getArrayRef();
+  }
 
   // Returns zero or more executable targets that may be used by any device.
   std::optional<SmallVector<IREE::HAL::ExecutableTargetAttr>>
@@ -50,7 +57,7 @@ public:
   std::optional<StaticRange<APInt>> getConfigAttrRange(StringRef name) const;
 
 private:
-  DenseSet<IREE::HAL::DeviceTargetAttr> targetAttrs;
+  SetVector<IREE::HAL::DeviceTargetAttr> targetAttrs;
 };
 
 } // namespace mlir::iree_compiler::IREE::HAL

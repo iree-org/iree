@@ -160,10 +160,6 @@ private:
       return;
     }
 
-    if (noTransferReads && isa<vector::TransferReadOp>(op)) {
-      return;
-    }
-
     if (!forOp->isProperAncestor(op)) {
       return;
     }
@@ -209,7 +205,7 @@ private:
       return;
     }
     if (hasSharedWrite) {
-      getValueDependencies(ifOp, writeDependencies, /*noTransferReads=*/true);
+      getValueDependencies(ifOp, writeDependencies);
       return;
     }
     if (hasGlobalRead) {
@@ -237,8 +233,7 @@ private:
       if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
         getValueDependencies(read, readDependencies);
       } else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
-        getValueDependencies(write, writeDependencies,
-                             /*noTransferReads=*/true);
+        getValueDependencies(write, writeDependencies);
       } else if (auto compute = dyn_cast<scf::YieldOp>(op)) {
         getValueDependencies(compute, computeDependencies);
       } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
@@ -259,7 +254,9 @@ private:
         readStage.push_back(&op);
         hasStage = true;
       }
-      if (writeDependencies.contains(&op)) {
+      // We do not need to de-duplicate read stage ops in write stage as the
+      // iteration count of both stages is always same.
+      if (writeDependencies.contains(&op) && !hasStage) {
         writeStage.push_back(&op);
         hasStage = true;
       }

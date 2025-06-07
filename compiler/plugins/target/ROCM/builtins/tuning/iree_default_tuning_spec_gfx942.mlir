@@ -728,6 +728,7 @@ util.func private @pingpong_medium_expanded(%lhs_base: !mexp_in_ty, %rhs_base: !
   %c3 = arith.constant 3 : index
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
   %c32 = arith.constant 32 : index
   %c64 = arith.constant 64 : index
   %c256 = arith.constant 256 : index
@@ -777,13 +778,17 @@ util.func private @pingpong_medium_expanded(%lhs_base: !mexp_in_ty, %rhs_base: !
 
     // Inner 64 loads 8 threads x 8 elements.
     %gko = arith.muli %wt#2, %c8 : index
-    // Each subgroup loads 32 contiguous rows out of 256.
+    // RHS indexing. Each subgroup loads 32 contiguous rows out of 256.
     %bpo = arith.muli %wt#0, %c32 : index
     // Base index is remaining outer 8 lanes + subgroup base.
     %glb0 = arith.addi %wt#1, %bpo : index
     %glb1 = arith.addi %glb0, %c8 : index
     %glb2 = arith.addi %glb1, %c8 : index
     %glb3 = arith.addi %glb2, %c8 : index
+    // LHS indexing.
+    %bpo_lhs = arith.muli %wt#0, %c16 : index
+    %glb0_lhs = arith.addi %wt#1, %bpo_lhs : index
+    %glb1_lhs = arith.addi %glb0_lhs, %c8 : index
 
     %2 = arith.constant dense<0.0> : vector<4x4x1x4xf32>
 
@@ -823,9 +828,9 @@ util.func private @pingpong_medium_expanded(%lhs_base: !mexp_in_ty, %rhs_base: !
 
       // Global loads of lhs.
       %lhs_block = tensor.extract_slice %lhs [0, 0, %i] [1, 128, 64] [1, 1, 1] : !mexp_in_ty to !mexp_block_in
-      %lhs_thread_0 = tensor.extract_slice %lhs_block [0, %glb0, %gko] [1, 1, 8] [1, 1, 1] : !mexp_block_in to tensor<1x1x8xf16>
+      %lhs_thread_0 = tensor.extract_slice %lhs_block [0, %glb0_lhs, %gko] [1, 1, 8] [1, 1, 1] : !mexp_block_in to tensor<1x1x8xf16>
       %lhs_vec_local_0 = vector.transfer_read %lhs_thread_0 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x8xf16>, vector<1x8xf16>
-      %lhs_thread_1 = tensor.extract_slice %lhs_block [0, %glb1, %gko] [1, 1, 8] [1, 1, 1] : !mexp_block_in to tensor<1x1x8xf16>
+      %lhs_thread_1 = tensor.extract_slice %lhs_block [0, %glb1_lhs, %gko] [1, 1, 8] [1, 1, 1] : !mexp_block_in to tensor<1x1x8xf16>
       %lhs_vec_local_1 = vector.transfer_read %lhs_thread_1 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x8xf16>, vector<1x8xf16>
 
       gpu.barrier
@@ -847,8 +852,8 @@ util.func private @pingpong_medium_expanded(%lhs_base: !mexp_in_ty, %rhs_base: !
       vector.transfer_write %rhs_vec_local_2, %rhs_shared [%glb2, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
       vector.transfer_write %rhs_vec_local_3, %rhs_shared [%glb3, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
 
-      vector.transfer_write %lhs_vec_local_0, %lhs_shared [%glb0, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
-      vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
+      vector.transfer_write %lhs_vec_local_0, %lhs_shared [%glb0_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
+      vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
 
       gpu.barrier
       rocdl.sched.barrier 0

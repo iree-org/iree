@@ -639,6 +639,16 @@ def ElideRedundantCommandsPass :
 // Benchmarking and debugging utilities
 //===----------------------------------------------------------------------===//
 
+def AnnotateTargetDevicesPass :
+    Pass<"iree-hal-annotate-target-devices", "mlir::ModuleOp"> {
+  let summary = "Annotates device values with their analyzed potential target devices.";
+  let description = [{
+    Uses data flow analysis to identify potential targets for `!hal.device`
+    values. This can be used to diagnose device analysis issues and otherwise
+    does not impact compilation.
+  }];
+}
+
 def CaptureExecutableSourcesPass :
     Pass<"iree-hal-capture-executable-sources", "mlir::ModuleOp"> {
   let summary = "Captures individual hal.executable.variant source listings and embeds them in the IR.";

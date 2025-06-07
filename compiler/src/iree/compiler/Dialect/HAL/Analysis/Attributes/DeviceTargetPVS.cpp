@@ -229,6 +229,13 @@ void DeviceTargetValuePVS::updateFromDefiningOp(Value value, OpResult result,
         newState ^= truePVS.getState();
         newState ^= falsePVS.getState();
       })
+      .Case([&](IREE::HAL::AllocatorSelectOp op) {
+        for (auto device : op.getDevices()) {
+          auto &operandPVS = solver.getElementFor<DeviceTargetValuePVS>(
+              *this, Position::forValue(device), DFX::Resolution::REQUIRED);
+          newState ^= operandPVS.getState();
+        }
+      })
       .Case([&](IREE::Util::OptimizationBarrierOp op) {
         auto &sourcePVS = solver.getElementFor<DeviceTargetValuePVS>(
             *this, Position::forValue(op.getOperand(0)),
