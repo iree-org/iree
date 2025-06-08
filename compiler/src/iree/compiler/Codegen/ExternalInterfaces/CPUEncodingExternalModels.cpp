@@ -343,7 +343,7 @@ enumerateMatmulTileRiscv32(DictionaryAttr config) {
 // RISC-V has vector register length extensions: zvl128b, zvl256b etc.
 // If these extension are specified in target cpu feature,
 // they can be used to determine VLEN. This function assumes that
-// 'v' feature is present 
+// 'v' feature is present
 size_t getRISCVVVlenFromCPUFeatures(DictionaryAttr config) {
   // If +zvl* feature is not explicitly specified,
   // fallback to +zvl128b, as spec specifies minimum VLEN
@@ -389,6 +389,9 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
   Type out = elementTypes[2];
   if (lhs.isF32() && rhs.isF32() && out.isF32()) {
     // VLEN-aware Tile size selection
+    // One concern that needs to be addressed here is that
+    // for larger VLENs tile sizes would be very large
+    // leading to a very high padding overhead
     int N0 = vlen / 8;
     return {
         TileMxNxK{7, N0, 1}, // Aim to use vfmacc, 100% register utilization.

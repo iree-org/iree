@@ -15,6 +15,7 @@ iree_uk_query_matmul_tile_sizes_riscv_64_f32f32f32(
       return (iree_uk_matmul_tile_sizes_t){.M = 7, .K = 1, .N = 16};
     }
   #endif
+  // generic fallback
   return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 1, .N = 8};
 }
 
