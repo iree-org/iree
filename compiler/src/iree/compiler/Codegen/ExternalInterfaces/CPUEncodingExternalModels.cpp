@@ -342,8 +342,9 @@ enumerateMatmulTileRiscv32(DictionaryAttr config) {
 }
 // RISC-V has vector register length extensions: zvl128b, zvl256b etc.
 // If these extension are specified in target cpu feature,
-// they can be used to determine VLEN.
-size_t getRVVVlenFromCPUFeatures(DictionaryAttr config) {
+// they can be used to determine VLEN. This function assumes that
+// 'v' feature is present 
+size_t getRISCVVVlenFromCPUFeatures(DictionaryAttr config) {
   // If +zvl* feature is not explicitly specified,
   // fallback to +zvl128b, as spec specifies minimum VLEN
   // of 128b for the V extension: https://rb.gy/p8rbzv
@@ -381,7 +382,7 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
   if (!hasFeature(config, "+v")) {
     return {};
   }
-  size_t vlen = getRVVVlenFromCPUFeatures(config);
+  size_t vlen = getRISCVVVlenFromCPUFeatures(config);
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
