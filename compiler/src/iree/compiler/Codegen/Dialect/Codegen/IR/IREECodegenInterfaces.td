@@ -17,10 +17,7 @@ def IREECodegen_InnerTileDescAttrInterface :
     a (sequence of) matrix multiplications that are performed using
     intrinsics which have their own inherent tiling.
 
-    Note: this interface is intended to generate MmaInterfaceAttr on a
-    case-by-case basis. The methods here are not currently complete, as we're
-    mid-refactoring. Feel free to add anything that'll be needed during the scaling
-    MMA project.
+    Note: this interface is a generalization of MmaInterfaceAttr.
   }];
 
   let methods = [
