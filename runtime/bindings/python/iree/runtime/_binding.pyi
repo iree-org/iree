@@ -96,6 +96,10 @@ class FileHandle:
     def wrap_memory(
         host_buffer: Any, readable: bool = True, writable: bool = False
     ) -> FileHandle: ...
+    @staticmethod
+    def wrap_fd(
+        fd: int, readable: bool = True, writable: bool = False
+    ) -> FileHandle: ...
     def host_allocation(self) -> memoryview:
         """Access the raw view of the allocated host memory.
 

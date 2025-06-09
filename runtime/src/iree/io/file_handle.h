@@ -206,6 +206,12 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
     iree_io_file_mode_t mode, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle);
 
+// Duplicates an existing platform fd that was already opened as |mode|
+// Returns IREE_STATUS_INVALID_ARGUMENT if the fd was not valid.
+IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
+    iree_io_file_mode_t mode, int fd, iree_allocator_t host_allocator,
+    iree_io_file_handle_t** out_handle);
+
 //===----------------------------------------------------------------------===//
 // iree_io_file_mapping_t
 //===----------------------------------------------------------------------===//
