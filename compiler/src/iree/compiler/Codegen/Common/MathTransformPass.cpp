@@ -12,7 +12,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "iree/compiler/Codegen/Common/FastMathDeviceLib.h"
+#include "iree/compiler/Codegen/Common/FastMathPatterns.h"
 
 namespace mlir::iree_compiler {
 
@@ -214,7 +214,7 @@ public:
         });
         
     // Add device-lib implementation patterns
-    populateDeviceLibMathPatterns(
+    populateFastMathPatterns(
         patterns,
         [target](StringRef name) { 
           return predicateDeviceLibImpl(name, target); 
