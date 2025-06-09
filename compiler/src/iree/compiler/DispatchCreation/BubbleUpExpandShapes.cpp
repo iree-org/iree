@@ -250,10 +250,15 @@ isExpandingUnitDims(ArrayRef<ReassociationIndices> reassociationIndices,
 
 // Optimistic check to make sure reshapes are moved if they could block fusion.
 static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
-  return isa_and_nonnull<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(
-             producer) &&
-         isa_and_nonnull<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(
-             consumer);
+  auto isFusableOp = [](Operation *op) {
+    if (!op) {
+      return false;
+    }
+    return isa_and_nonnull<linalg::LinalgDialect,
+                           IREE::LinalgExt::IREELinalgExtDialect,
+                           tensor::TensorDialect>(op->getDialect());
+  };
+  return isFusableOp(producer) && isFusableOp(consumer);
 }
 
 } // namespace
