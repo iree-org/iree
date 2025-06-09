@@ -128,6 +128,7 @@ func.func @no_approx_on_rocm(%arg0: f16) -> f16 attributes {
   // On ROCm, we want to use the native device library functions.
   // It's OK for f16 to still get casted to f32, as
   // the device library functions for f16 are casting to f32 anyway.
+  // math.erf will be expanded to the above lit-test. (func.func @erf_fastmath)
   // CHECK:         math.acos
   // CHECK:         math.atan
   // CHECK:         math.sin
@@ -139,7 +140,6 @@ func.func @no_approx_on_rocm(%arg0: f16) -> f16 attributes {
   // CHECK:         math.exp2
   // CHECK:         math.expm1
   // CHECK:         math.cbrt
-  // CHECK:         math.erf
   %0 = math.acos %arg0 : f16
   %1 = math.atan %0 : f16
   %2 = math.sin %1 : f16
