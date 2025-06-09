@@ -349,6 +349,14 @@ def ExtractAddressComputationPass : Pass<"iree-codegen-extract-address-computati
   ];
 }
 
+def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-transfer-ops-in-control-flow", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Fission transfer read and write ops in control flow to allow prefetching.";
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
+}
+
 def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
       "Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets";
