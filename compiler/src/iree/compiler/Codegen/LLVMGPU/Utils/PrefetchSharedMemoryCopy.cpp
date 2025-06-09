@@ -182,6 +182,7 @@ private:
       return;
     bool hasGlobalRead = false;
     bool hasSharedWrite = false;
+    bool hasPrivateWrite = false;
     // Else region not yet supported.
     if (!ifOp.getElseRegion().empty()) {
       return;
@@ -197,6 +198,8 @@ private:
         auto dstType = dyn_cast<MemRefType>(writeOp.getBase().getType());
         if (hasSharedMemoryAddressSpace(dstType)) {
           hasSharedWrite = true;
+        } else if (!hasGlobalMemoryAddressSpace(dstType)) {
+          hasPrivateWrite = true;
         }
       }
     });
@@ -204,19 +207,18 @@ private:
     if (hasGlobalRead && hasSharedWrite) {
       return;
     }
-    if (hasSharedWrite) {
-      getValueDependencies(ifOp, writeDependencies);
-      return;
-    }
+    // Note that the order matters here, if we have a global read and a private
+    // write the global read getting assigned to read stage takes precedence.
+    // But private write by itself will be assigned write stage. This is becuase
+    // private writes are transient values which are typically produced by the
+    // read stage and consumed  by the write stage and moving this to write
+    // stage makes sure the read stage doesnt get blocked.
     if (hasGlobalRead) {
       getValueDependencies(ifOp, readDependencies);
-      return;
+    } else if (hasSharedWrite || hasPrivateWrite) {
+      getValueDependencies(ifOp, writeDependencies);
     }
-    // If we dont know what kind of read/write the if is doing then we bail-out.
-    // TODO (nirvedhmeshram) : Add handling for private memory allocations. e.g
-    // write to private memory could go in write stage. But the analysis
-    // in `getValueDependencies` also needs to be aware of private memory for
-    // this so that needs to be added at the same time.
+    // Bail-out for unahndled if ops.
   }
 
   // We only support loops whose bodies can be divided into 3 stages (read,
@@ -231,6 +233,13 @@ private:
 
     for (Operation &op : forOp.getBody()->getOperations()) {
       if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+        auto srcType = dyn_cast<MemRefType>(read.getBase().getType());
+        // only global memory reads should be selected as root ops of read
+        // stage. Reads from shared memory are picked by compute stage and reads
+        // from private memory can belong to any stage.
+        if (!hasGlobalMemoryAddressSpace(srcType)) {
+          continue;
+        }
         getValueDependencies(read, readDependencies);
       } else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
         getValueDependencies(write, writeDependencies);
@@ -254,7 +263,7 @@ private:
         readStage.push_back(&op);
         hasStage = true;
       }
-      // We do not need to de-duplicate read stage ops in write stage as the
+      // We do not need to duplicate read stage ops in write stage as the
       // iteration count of both stages is always same.
       if (writeDependencies.contains(&op) && !hasStage) {
         writeStage.push_back(&op);
