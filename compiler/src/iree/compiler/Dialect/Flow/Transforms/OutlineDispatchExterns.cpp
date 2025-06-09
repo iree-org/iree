@@ -59,7 +59,8 @@ convertDispatchExternToDispatchOp(IREE::HAL::DispatchExternOp dispatchExternOp,
 // with a dispatch to that outlined executable.
 static LogicalResult
 outlineDispatchExternOp(std::string name,
-                        IREE::HAL::DispatchExternOp dispatchExternOp) {
+                        IREE::HAL::DispatchExternOp dispatchExternOp,
+                        SymbolTable &moduleSymbolTable) {
   // Create the executable that will contain the outlined region.
   // NOTE: this will get uniquified if we have multiple in the same block.
   auto parentFuncOp =
@@ -70,6 +71,7 @@ outlineDispatchExternOp(std::string name,
       dispatchExternOp.getLoc(), name);
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
+  moduleSymbolTable.insert(executableOp);
 
   // Add one variant per object target.
   SymbolTable executableSymbolTable(executableOp);
@@ -133,15 +135,16 @@ struct OutlineDispatchExternsPass
     : public IREE::Flow::impl::OutlineDispatchExternsPassBase<
           OutlineDispatchExternsPass> {
   void runOnOperation() override {
+    SymbolTable moduleSymbolTable(getOperation());
     for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Outline all of the dispatch externs ops in this function.
       SmallVector<Operation *> deadOps;
       auto outlineOps = [&](Operation *op) {
         return TypeSwitch<Operation *, WalkResult>(op)
             .Case<IREE::HAL::DispatchExternOp>([&](auto dispatchExternOp) {
-              if (failed(outlineDispatchExternOp(
-                      ("extern_dispatch_" + llvm::Twine(deadOps.size())).str(),
-                      dispatchExternOp))) {
+              if (failed(outlineDispatchExternOp("extern_dispatch",
+                                                 dispatchExternOp,
+                                                 moduleSymbolTable))) {
                 return WalkResult::interrupt();
               }
               deadOps.push_back(op);

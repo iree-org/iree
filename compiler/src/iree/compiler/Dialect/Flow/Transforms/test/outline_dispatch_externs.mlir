@@ -1,5 +1,12 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-externs --mlir-print-local-scope %s | FileCheck %s
 
+// Demonstrates the full functionality of an extern dispatch op.
+// Note that some fields are optional.
+
+// Existing conflicting name to ensure we unique the new executables.
+// CHECK:  hal.executable private @extern_dispatch
+hal.executable private @extern_dispatch {}
+
 //      CHECK: hal.executable private @extern_dispatch_0
 // CHECK-NEXT:   hal.executable.variant public @a target(<"llvm-cpu", "a">)
 // CHECK-SAME:       objects([#hal.executable.object<{path = "a.o"}>])
@@ -17,9 +24,6 @@
 //      CHECK:     hal.executable.export public @main ordinal(200)
 // CHECK-SAME:         layout(#hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer>]>)
 // CHECK-SAME:         count(%arg0: !hal.device, %arg1: index, %arg2: index)
-
-// Demonstrates the full functionality of an extern dispatch op.
-// Note that some fields are optional.
 
 // CHECK-LABEL: util.func public @dispatchExtern
 util.func public @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32) -> tensor<8xi32> {
