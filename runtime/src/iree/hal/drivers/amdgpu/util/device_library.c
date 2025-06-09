@@ -55,9 +55,10 @@ static iree_status_t iree_hal_amdgpu_agent_available_isas_append_to_builder(
     IREE_RETURN_IF_ERROR(
         iree_hsa_isa_get_info_alt(IREE_LIBHSA(libhsa), isas->values[i],
                                   HSA_ISA_INFO_NAME_LENGTH, &isa_name_length));
+    IREE_ASSERT_GT(isa_name_length, 0);  // always +1 in HSA
     char* isa_name = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_string_builder_append_inline(builder, isa_name_length, &isa_name));
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_inline(
+        builder, isa_name_length - 1, &isa_name));
     IREE_RETURN_IF_ERROR(iree_hsa_isa_get_info_alt(
         IREE_LIBHSA(libhsa), isas->values[i], HSA_ISA_INFO_NAME, isa_name));
   }
@@ -100,12 +101,13 @@ static iree_status_t iree_hal_amdgpu_device_library_select_file(
         z0,
         iree_hsa_isa_get_info_alt(IREE_LIBHSA(libhsa), isa,
                                   HSA_ISA_INFO_NAME_LENGTH, &isa_name_length));
+    IREE_ASSERT_GT(isa_name_length, 0);  // always +1 in HSA
     char* isa_name_buffer = iree_alloca(isa_name_length);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hsa_isa_get_info_alt(IREE_LIBHSA(libhsa), isa,
                                       HSA_ISA_INFO_NAME, isa_name_buffer));
     iree_string_view_t isa_name =
-        iree_make_string_view(isa_name_buffer, isa_name_length - 1);
+        iree_make_string_view(isa_name_buffer, isa_name_length - /*NUL*/ 1);
     for (iree_host_size_t j = 0; j < iree_hal_amdgpu_device_binaries_size();
          ++j) {
       const iree_file_toc_t* file_toc =
