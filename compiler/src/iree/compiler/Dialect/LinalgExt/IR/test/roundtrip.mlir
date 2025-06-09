@@ -833,6 +833,79 @@ func.func @map_scatter_memref_static(
 
 // -----
 
+func.func @argmax_static(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>, %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>)
+    : tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// CHECK-LABEL: func.func @argmax_static(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x6xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xindex>
+//      CHECK:   %[[VAL:.+]]:2 = iree_linalg_ext.argmax
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : tensor<2x6xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<2xf32>, tensor<2xindex>)
+// CHECK-SAME:     : tensor<2xf32>, tensor<2xindex>
+//      CHECK:   return %[[VAL]]#0, %[[VAL]]#1 : tensor<2xf32>, tensor<2xindex>
+
+// -----
+
+func.func @argmax_dynamic(
+    %input : tensor<?x?xf32>,
+    %outv : tensor<?xf32>, %outi : tensor<?xindex>
+) -> (tensor<?xf32>, tensor<?xindex>) {
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<?x?xf32>)
+    outs(%outv, %outi : tensor<?xf32>, tensor<?xindex>)
+    : tensor<?xf32>, tensor<?xindex>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xindex>
+}
+
+// CHECK-LABEL: func.func @argmax_dynamic(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<?xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<?xindex>
+//      CHECK:   %[[VAL:.+]]:2 = iree_linalg_ext.argmax
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : tensor<?x?xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<?xf32>, tensor<?xindex>)
+// CHECK-SAME:     : tensor<?xf32>, tensor<?xindex>
+//      CHECK:   return %[[VAL]]#0, %[[VAL]]#1 : tensor<?xf32>, tensor<?xindex>
+
+// -----
+
+func.func @argmax_static_memref(
+    %input : memref<2x6xf32>,
+    %outv : memref<2xf32>, %outi : memref<2xindex>
+) {
+  iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : memref<2x6xf32>)
+    outs(%outv, %outi : memref<2xf32>, memref<2xindex>)
+  return
+}
+
+
+// CHECK-LABEL: func.func @argmax_static_memref(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: memref<2x6xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: memref<2xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: memref<2xindex>
+// CHECK:   iree_linalg_ext.argmax
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : memref<2x6xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : memref<2xf32>, memref<2xindex>)
+
+// -----
+
 func.func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
     -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 1 : index
