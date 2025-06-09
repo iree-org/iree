@@ -1226,6 +1226,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     // This materializes into 'nop' in the absence of pad encoding layout
     // attributes.
+    funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass);
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
