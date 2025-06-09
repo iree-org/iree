@@ -13,6 +13,7 @@
 #include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -595,8 +596,11 @@ static FailureOr<SetVector<linalg::LinalgOp>>
 checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
   SmallVector<Operation *> storeOps;
 
-  entryPoint.walk([&](IREE::TensorExt::DispatchTensorStoreOp op) {
-    storeOps.push_back(op.getOperation());
+  entryPoint.walk([&](Operation *op) {
+    if (isa<IREE::TensorExt::DispatchTensorStoreOp,
+            IREE::Codegen::StoreToBufferOp>(op)) {
+      storeOps.push_back(op);
+    }
   });
 
   if (storeOps.empty()) {
