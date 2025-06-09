@@ -937,7 +937,16 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
       return rewriter.notifyMatchFailure(storeOp, "found a non-1 stride");
     }
 
-    const SmallVector<ReassociationIndices> reassocInfo =
+    const llvm::SmallBitVector droppedDims = storeOp.getDroppedDims();
+    int64_t firstStoreDim = 0;
+    while (firstStoreDim < droppedDims.size() &&
+           droppedDims.test(firstStoreDim)) {
+      ++firstStoreDim;
+    }
+    const int64_t lastStoreDim =
+        firstStoreDim + reshapeOp.getResultType().getRank();
+
+    SmallVector<ReassociationIndices> reassocInfo =
         reshapeOp.getReassociationIndices();
 
     // To support partial stores, keep track of collapsed and non-collapsed
@@ -946,7 +955,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     SmallVector<int64_t> collapsedDstDims;
     for (auto [index, reassocIndices] : llvm::enumerate(reassocInfo)) {
       if (reassocIndices.size() > 1) {
-        collapsedDstDims.push_back(index);
+        collapsedDstDims.push_back(index + firstStoreDim);
       }
     }
 
@@ -997,6 +1006,19 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
           }
         });
 
+    SmallVector<OpFoldResult> dispatchTensorMixedShape = mlir::getMixedValues(
+        storeOp.getTargetType().getShape(), storeOp.getTargetDims(), rewriter);
+    if (firstStoreDim != 0) {
+      SmallVector<OpFoldResult> tmp(
+          ArrayRef<OpFoldResult>(dispatchTensorMixedShape)
+              .take_front(firstStoreDim));
+      llvm::append_range(tmp, *expandedShape);
+      *expandedShape = std::move(tmp);
+    }
+    llvm::append_range(*expandedShape,
+                       ArrayRef<OpFoldResult>(dispatchTensorMixedShape)
+                           .drop_front(lastStoreDim));
+
     SmallVector<int64_t> expandedStaticShape;
     SmallVector<Value> expandedDynamicShape;
     dispatchIndexOpFoldResults(*expandedShape, expandedDynamicShape,
@@ -1005,21 +1027,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     auto tensorAccess =
         cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
             .getAccess();
-    auto newSubspanShape =
-        llvm::to_vector_of<int64_t>(reshapeSrcType.getShape());
-    transformOverReassociation<int64_t>(
-        newSubspanShape, reassocInfo,
-        [&storeOp](size_t collapsedIdx, ReassociationIndicesRef,
-                   MutableArrayRef<int64_t> expandedValues) {
-          if (expandedValues.size() == 1) {
-            // Restore the original non-collapsed subspan dim, which may be
-            // smaller than the reshape result in case of partial stores.
-            expandedValues[0] =
-                storeOp.getTargetType().getDimSize(collapsedIdx);
-            return;
-          }
-        });
-
+    auto newSubspanShape = llvm::to_vector_of<int64_t>(expandedStaticShape);
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrcType.cloneWith(
                           newSubspanShape, reshapeSrcType.getElementType()));
@@ -1030,6 +1038,27 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
 
     rewriter.setInsertionPoint(storeOp);
 
+    int64_t reshapeDstRank = reshapeOp.getType().getRank();
+    int64_t reshapeSrcRank = reshapeOp.getSrcType().getRank();
+    int64_t targetRank = storeOp.getTargetType().getRank();
+
+    // Create a new reassociation that represents the change in shape of the
+    // entire target tensor (not just the inserted section).
+    SmallVector<ReassociationIndices> newReassocInfo;
+    for (int64_t i = 0; i < firstStoreDim; ++i) {
+      newReassocInfo.push_back(ReassociationIndices{i});
+    }
+    for (ReassociationIndices reassoc : reassocInfo) {
+      for (int64_t &elem : reassoc) {
+        elem += firstStoreDim;
+      }
+      newReassocInfo.push_back(std::move(reassoc));
+    }
+    for (int64_t i = lastStoreDim; i < targetRank; ++i) {
+      newReassocInfo.push_back(
+          ReassociationIndices{i + reshapeSrcRank - reshapeDstRank});
+    }
+
     const size_t expandedSize = newSubspanShape.size();
     SmallVector<OpFoldResult> newOffsets(expandedSize,
                                          rewriter.getIndexAttr(0));
@@ -1037,7 +1066,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     const SmallVector<OpFoldResult> newStrides(expandedSize,
                                                rewriter.getIndexAttr(1));
     transformOverReassociation<OpFoldResult>(
-        newOffsets, reassocInfo,
+        newOffsets, newReassocInfo,
         [&origOffsets](size_t collapseIdx, ReassociationIndicesRef reassoc,
                        MutableArrayRef<OpFoldResult> expandedValues) {
           // Restore the original offsets of non-collapsed dimensions.
@@ -1047,7 +1076,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
         });
 
     transformOverReassociation<OpFoldResult>(
-        newSizes, reassocInfo,
+        newSizes, newReassocInfo,
         [&expandedShape,
          &origSizes](size_t collapseIdx, ReassociationIndicesRef reassoc,
                      MutableArrayRef<OpFoldResult> expandedValues) {
@@ -1068,7 +1097,6 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         storeOp, reshapeSrc, newSubspanOp, expandedDynamicShape, newOffsets,
         newSizes, newStrides);
-
     return success();
   }
 };
