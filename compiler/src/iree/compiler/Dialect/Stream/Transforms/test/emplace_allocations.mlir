@@ -16,9 +16,9 @@ util.func public @emplaceDispatch(
   // CHECK-DAG: %[[UNIFORM1:.+]] = arith.constant 456
   %uniform1 = arith.constant 456 : i32
   // CHECK: %[[UPDATE_END:.+]] = arith.addi %[[UPDATE_OFFSET]], %[[UPDATE_SIZE]]
-  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@dispatch(%[[UNIFORM0]], %[[INPUT]][%c0 to %[[INPUT_SIZE]] for %[[INPUT_SIZE]]], %[[UNIFORM1]], %[[TARGET]][%[[UPDATE_OFFSET]] to %[[UPDATE_END]] for %[[UPDATE_SIZE]]]) :
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@dispatch[%c0](%[[UNIFORM0]], %[[INPUT]][%c0 to %[[INPUT_SIZE]] for %[[INPUT_SIZE]]], %[[UNIFORM1]], %[[TARGET]][%[[UPDATE_OFFSET]] to %[[UPDATE_END]] for %[[UPDATE_SIZE]]]) :
   // CHECK-SAME: (i32, !stream.resource<*>{%[[INPUT_SIZE]]}, i32, !stream.resource<*>{%[[TARGET_SIZE]]}) -> %[[TARGET]]{%[[TARGET_SIZE]]}
-  %update = stream.async.dispatch @ex::@dispatch(%uniform0, %input[%c0 to %input_size for %input_size], %uniform1) : (i32, !stream.resource<*>{%input_size}, i32) -> !stream.resource<*>{%update_size}
+  %update = stream.async.dispatch @ex::@dispatch[%c0](%uniform0, %input[%c0 to %input_size for %input_size], %uniform1) : (i32, !stream.resource<*>{%input_size}, i32) -> !stream.resource<*>{%update_size}
   // NOTE: this gets hoisted above the dispatch.
   %update_end = arith.addi %update_offset, %update_size : index
   // CHECK-NOT: stream.async.update
