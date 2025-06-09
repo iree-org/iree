@@ -3079,6 +3079,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fission-transfer-ops-in-control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-fission-transfer-ops-in-control-flow
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-flatten-memref-subspan" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-flatten-memref-subspan
@@ -5909,6 +5918,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fission-transfer-ops-in-control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-fission-transfer-ops-in-control-flow
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-flatten-memref-subspan" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-flatten-memref-subspan
@@ -6782,6 +6800,8 @@ accesses such that these memory accesses use only a base pointer.</p>
 <div class="highlight"><pre><span></span><code>%new_base = memref.subview %base[%off0,...][1,...][1,...]
 memref.load %new_base[%c0,...]
 </code></pre></div></p>
+<h3 id="-iree-codegen-fission-transfer-ops-in-control-flow"><code>-iree-codegen-fission-transfer-ops-in-control-flow</code><a class="headerlink" href="#-iree-codegen-fission-transfer-ops-in-control-flow" title="Permanent link">link</a></h3>
+<p><em>Fission transfer read and write ops in control flow to allow prefetching.</em></p>
 <h3 id="-iree-codegen-flatten-memref-subspan"><code>-iree-codegen-flatten-memref-subspan</code><a class="headerlink" href="#-iree-codegen-flatten-memref-subspan" title="Permanent link">link</a></h3>
 <p><em>Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets</em></p>
 <p>Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
