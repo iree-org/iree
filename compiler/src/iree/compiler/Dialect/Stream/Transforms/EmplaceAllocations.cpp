@@ -218,6 +218,8 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
     // only for resources. operandIndex is in the mixed domain and we have to
     // calculate the corresponding resource domain index.
     auto operandIndex = dispatchOp.getTiedResultOperandIndex(resultIndex);
+    operandIndex =
+        *operandIndex - dispatchOp.getTiedOperandsIndexAndLength().first;
     assert(operandIndex.has_value() && "should have been tied above");
     unsigned resourceIndex = 0;
     for (unsigned i = 0; i < *operandIndex; ++i) {
