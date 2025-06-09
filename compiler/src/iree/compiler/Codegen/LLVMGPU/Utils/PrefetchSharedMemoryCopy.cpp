@@ -182,7 +182,7 @@ private:
       return;
     bool hasGlobalRead = false;
     bool hasSharedWrite = false;
-    bool hasPrivateWrite = false;
+    bool hasPrivateOrSharedWrite = false;
     // Else region not yet supported.
     if (!ifOp.getElseRegion().empty()) {
       return;
@@ -198,8 +198,9 @@ private:
         auto dstType = dyn_cast<MemRefType>(writeOp.getBase().getType());
         if (hasSharedMemoryAddressSpace(dstType)) {
           hasSharedWrite = true;
-        } else if (!hasGlobalMemoryAddressSpace(dstType)) {
-          hasPrivateWrite = true;
+        }
+        if (!hasGlobalMemoryAddressSpace(dstType)) {
+          hasPrivateOrSharedWrite = true;
         }
       }
     });
@@ -215,7 +216,7 @@ private:
     // stage makes sure the read stage doesnt get blocked.
     if (hasGlobalRead) {
       getValueDependencies(ifOp, readDependencies);
-    } else if (hasSharedWrite || hasPrivateWrite) {
+    } else if (hasPrivateOrSharedWrite) {
       getValueDependencies(ifOp, writeDependencies);
     }
     // Bail-out for unahndled if ops.
