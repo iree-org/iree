@@ -131,21 +131,28 @@ void addSPIRVVectorLoweringPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createSPIRVFinalVectorLoweringPass());
 }
 
+/// TODO(#20912): Enable the injection of assume_alignment ops after the
+/// hoisting bug is fixed.
 static void addBufferizePasses(OpPassManager &funcPassManager,
-                               BufferizationOptions::AllocationFn fn) {
+                               BufferizationOptions::AllocationFn fn,
+                               bool injectAssumeAlignmentOp = true) {
   BufferizationOptions::AllocationFn allocationFn = fn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
+  addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn,
+                                      injectAssumeAlignmentOp);
 }
 
+/// TODO(#20912): Enable the injection of assume_alignment ops after the
+/// hoisting bug is fixed.
 static void
 addSPIRVBufferizePasses(OpPassManager &funcPassManager,
-                        BufferizationOptions::AllocationFn allocationFn) {
+                        BufferizationOptions::AllocationFn allocationFn,
+                        bool injectAssumeAlignmentOp = true) {
   // Resolve dim ops first so that we don't have compute Linalg ops lingering on
   // becuase of dim op usage. This avoids bufferizing those compute ops just for
   // their shape dimensions.
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  addBufferizePasses(funcPassManager, allocationFn);
+  addBufferizePasses(funcPassManager, allocationFn, injectAssumeAlignmentOp);
   // Distribute immediately after bufferization to avoid losing attribute
   // annotations in subsequent transformations. This is a bit fragile right now
   // but we expect upstream for loops to eventually recognize distribution as a
@@ -388,7 +395,8 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
       funcPassManager, /*useFuseTensorPadWithConsumerPass=*/false,
       /*useWARForCooperativeMatrixCodegen=*/true);
 
-  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
+  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn,
+                     /*injectAssumeAlignmentOp=*/false);
 
   // Tile to GPU workgroups and promote.
   funcPassManager.addPass(
@@ -403,6 +411,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
 
   // Tile and distribute to GPU subgroups.
   funcPassManager.addPass(createSPIRVTileToCooperativeOpsPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -500,7 +509,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Bufferize.
-  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
+  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn,
+                     /*injectAssumeAlignmentOp=*/false);
 
   // Distribute scf.forall to GPU threads.
   funcPassManager.addPass(createGPUDistributePass());
@@ -605,8 +615,9 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
 
   // Handle vector reduction operations specifically.
-  funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/false));
+  VectorReductionToGPUPassOptions options;
+  options.expandSubgroupReduction = false;
+  funcPassManager.addPass(createVectorReductionToGPUPass(options));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
   addSPIRVVectorLoweringPasses(funcPassManager);
@@ -632,6 +643,7 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
 
 void buildSPIRVCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
 }

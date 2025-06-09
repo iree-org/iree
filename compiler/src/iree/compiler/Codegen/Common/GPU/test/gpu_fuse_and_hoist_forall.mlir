@@ -627,3 +627,35 @@ func.func @no_fuse_extract_slice_rank_reduced(%arg0: tensor<4x8xf32>, %size1: in
 //       CHECK:   } {mapping = [#gpu.thread<x>]}
 //       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[FORALL_RESULT]]
 //       CHECK:   return %[[EXTRACT]]
+
+// -----
+
+// Tests `collapse_shape` fusion into `scf.forall` with the `parallel_insert_slice` depending on both
+// a block argument and an affine expression on the same block argument. This lead to dominance issues
+// before being fixed.
+
+#map = affine_map<(d0) -> (d0 * 2)>
+func.func @fuse_collapse_shape(%arg0: tensor<?x?x8xf32>, %arg1 : index, %arg2 : index) -> tensor<?xf32> {
+  %0 = tensor.empty(%arg1, %arg2) : tensor<?x?x8xf32>
+  %1 = scf.forall (%arg3, %arg4) in (%arg1, %arg2) shared_outs(%arg5 = %0) -> (tensor<?x?x8xf32>) {
+    %2 = affine.apply #map(%arg4)
+    %extracted_slice = tensor.extract_slice %arg0[%arg3, %2, 0] [1, 1, 8] [1, 1, 1] : tensor<?x?x8xf32> to tensor<1x1x8xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg5[%arg3, %2, 0] [1, 1, 8] [1, 1, 1] : tensor<?x?x8xf32> to tensor<1x1x8xf32>
+    %3 = linalg.copy ins(%extracted_slice : tensor<1x1x8xf32>) outs(%extracted_slice_0 : tensor<1x1x8xf32>) -> tensor<1x1x8xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %3 into %arg5[%arg3, %2, 0] [1, 1, 8] [1, 1, 1] : tensor<1x1x8xf32> into tensor<?x?x8xf32>
+    }
+  } {mapping = [#gpu.thread<x>, #gpu.thread<y>]}
+  %collapsed = tensor.collapse_shape %1 [[0, 1, 2]] : tensor<?x?x8xf32> into tensor<?xf32>
+  return %collapsed : tensor<?xf32>
+}
+
+// CHECK-LABEL: func @fuse_collapse_shape
+//       CHECK:   %[[FORALL_RESULT:.+]] = scf.forall {{.*}} -> (tensor<?xf32>) {
+//       CHECK:     %[[COPY:.+]] = linalg.copy
+//       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[COPY]]
+//       CHECK:     scf.forall.in_parallel {
+//   CHECK-DAG:       tensor.parallel_insert_slice %[[COLLAPSE]] into {{.*}} [8] [1] : tensor<8xf32> into tensor<?xf32>
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<x>, #gpu.thread<y>]}
+//       CHECK:   return %[[FORALL_RESULT]]

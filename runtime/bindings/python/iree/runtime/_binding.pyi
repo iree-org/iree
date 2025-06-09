@@ -96,6 +96,10 @@ class FileHandle:
     def wrap_memory(
         host_buffer: Any, readable: bool = True, writable: bool = False
     ) -> FileHandle: ...
+    @staticmethod
+    def wrap_fd(
+        fd: int, readable: bool = True, writable: bool = False
+    ) -> FileHandle: ...
     def host_allocation(self) -> memoryview:
         """Access the raw view of the allocated host memory.
 
@@ -273,11 +277,17 @@ class HalDriver:
     ) -> HalDevice: ...
     @overload
     def create_device(
-        self, device_id: int, allocators: Optional[list[HalAllocator]] = None
+        self,
+        device_id: int,
+        params: Optional[dict],
+        allocators: Optional[list[HalAllocator]] = None,
     ) -> HalDevice: ...
     @overload
     def create_device(
-        self, device_info: dict, allocators: Optional[list[HalAllocator]] = None
+        self,
+        device_info: dict,
+        params: Optional[dict],
+        allocators: Optional[list[HalAllocator]] = None,
     ) -> HalDevice: ...
     def create_device_by_uri(
         self, device_uri: str, allocators: Optional[list[HalAllocator]] = None

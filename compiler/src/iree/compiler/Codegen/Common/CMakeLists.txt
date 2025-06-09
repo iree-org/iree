@@ -69,11 +69,13 @@ iree_cc_library(
     Common
   HDRS
     "BufferizationAnalysis.h"
+    "CombineLayoutTransformation.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "PassUtils.h"
     "Passes.h"
     "TensorDynamicDimAnalysis.h"
+    "TileAndFuseUtils.h"
     "TileInferenceUtils.h"
     "TileSizeSelection.h"
     "Transforms.h"
@@ -106,18 +108,21 @@ iree_cc_library(
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
+    "FissionTransferOpsInControlFlow.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FlattenMemRefs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "ForallToFor.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "HoistUnrolledVectorExtractInsertSlice.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
+    "IREEInjectAssumeAlignment.cpp"
     "IREELoopInvariantCodeMotion.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LinkTuningSpecsPass.cpp"
@@ -144,6 +149,7 @@ iree_cc_library(
     "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
     "ResolveSwizzleHints.cpp"
+    "SpecializeExports.cpp"
     "SplitFullPartialTransferPass.cpp"
     "StripCompilationInfoPass.cpp"
     "TensorDynamicDimAnalysis.cpp"
@@ -151,6 +157,7 @@ iree_cc_library(
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
+    "TileAndFuseUtils.cpp"
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
     "TileInferenceUtils.cpp"
@@ -239,6 +246,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::TensorExt::Transforms

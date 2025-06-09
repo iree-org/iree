@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-common-transforms"
 
@@ -64,7 +65,7 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
 
   auto isZeroOffsetAndFullSize = [](OpFoldResult offset, OpFoldResult sliceSize,
                                     OpFoldResult size) {
-    if (!isConstantIntValue(offset, 0))
+    if (!isZeroInteger(offset))
       return false;
     FailureOr<bool> maybeEqual =
         ValueBoundsConstraintSet::areEqual(sliceSize, size);
@@ -79,7 +80,7 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
     // Find the first expanded dim after the first dim with non-unit extracted
     // size.
     for (; i < e; ++i) {
-      if (!isConstantIntValue(sizes[indices[i]], 1)) {
+      if (!isOneInteger(sizes[indices[i]])) {
         // +1 to skip the first non-unit size dim.
         i++;
         break;
@@ -110,7 +111,7 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
     // Offset = cumulative product of leading unit extracted dims.
     for (; i < e; ++i) {
       int64_t expandedDim = indices[i];
-      if (!isConstantIntValue(sizes[expandedDim], 1))
+      if (!isOneInteger(sizes[expandedDim]))
         break;
 
       basis.push_back(outputShape[expandedDim]);

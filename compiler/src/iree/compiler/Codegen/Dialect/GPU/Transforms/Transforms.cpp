@@ -17,6 +17,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -362,6 +363,7 @@ static tensor::ParallelInsertSliceOp
 collapseParallelInsertOp(RewriterBase &rewriter,
                          tensor::ParallelInsertSliceOp parallelInsertOp,
                          SmallVector<ReassociationIndices> reassociations) {
+  OpBuilder::InsertionGuard g(rewriter);
   // Compute the collapsed offsets, sizes, and strides.
   auto subsetOp =
       cast<SubsetInsertionOpInterface>(parallelInsertOp.getOperation());
@@ -1005,26 +1007,23 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
 
   // Step 1. Create the new scf.forall op with a lane id mapping.
   OpFoldResult ub;
-  Attribute mappingType;
-  FailureOr<IREE::GPU::MMAScope> mmaScope = mmaOp.getKind().getMmaScope();
-  if (failed(mmaScope)) {
+  Attribute mappingType = mmaOp.getKind().getDistributionMappingKind();
+  if (!mappingType)
     return failure();
-  }
-  switch (mmaScope.value()) {
-  case IREE::GPU::MMAScope::Workgroup:
+  if (isa<gpu::GPUThreadMappingAttr>(mappingType)) {
     if (!workgroupSize) {
       mmaOp.emitOpError("Mma op with workgroup scope needs workgroup size.");
       return failure();
     }
-    mappingType =
-        gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
     ub = rewriter.getIndexAttr(
         ShapedType::getNumElements(workgroupSize.value()));
-    break;
-  case IREE::GPU::MMAScope::Subgroup:
+  } else if (isa<LaneIdAttr>(mappingType)) {
     ub = rewriter.getIndexAttr(mmaOp.getKind().getSubgroupSize());
-    mappingType = IREE::GPU::LaneIdAttr::get(context, 0);
+  } else {
+    mmaOp.emitOpError("expected workgroup or subgroup distribution type");
+    return failure();
   }
+
   auto newForallOp = rewriter.create<scf::ForallOp>(
       loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
       ArrayRef<OpFoldResult>{one}, mmaOp.getAcc(),
@@ -1054,8 +1053,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   SmallVector<int64_t> lhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getLhsPermutation(), mmaOp.getLhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Lhs, id, lhsPermutation,
-          lhsOffsets, lhsSizes, lhsStrides))) {
+          rewriter, loc, 0, id, lhsPermutation, lhsOffsets, lhsSizes,
+          lhsStrides))) {
     return mmaOp->emitOpError("failed to populate lhs offsets");
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
@@ -1074,8 +1073,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   SmallVector<int64_t> rhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getRhsPermutation(), mmaOp.getRhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Rhs, id, rhsPermutation,
-          rhsOffsets, rhsSizes, rhsStrides))) {
+          rewriter, loc, 1, id, rhsPermutation, rhsOffsets, rhsSizes,
+          rhsStrides))) {
     return mmaOp->emitOpError("failed to populate rhs offsets");
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
@@ -1094,8 +1093,8 @@ distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
   SmallVector<int64_t> accPermutation = getOrInferPermutationOfRank(
       mmaOp.getAccPermutation(), mmaOp.getAccInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Acc, id, accPermutation,
-          accOffsets, accSizes, accStrides))) {
+          rewriter, loc, 2, id, accPermutation, accOffsets, accSizes,
+          accStrides))) {
     return mmaOp->emitOpError("failed to populate acc offsets");
   }
   // Extract the rank-reduced slice of the accumulator based on the expected
@@ -1596,10 +1595,27 @@ struct LowerValueBarrierPattern
     return success();
   }
 };
+
+struct LowerGlobalLoadDMAPattern
+    : public OpRewritePattern<IREE::GPU::GlobalLoadDMAOp> {
+  using OpRewritePattern<IREE::GPU::GlobalLoadDMAOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
+                                PatternRewriter &rewriter) const override {
+    Type transferType = rewriter.getI32Type();
+    rewriter.replaceOpWithNewOp<amdgpu::GatherToLDSOp>(
+        dmaOp, dmaOp.getSource(), dmaOp.getSourceIndices(), dmaOp.getTarget(),
+        dmaOp.getTargetIndices(), transferType);
+    return success();
+  }
+};
 } // namespace
 
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerValueBarrierPattern>(patterns.getContext());
+}
+
+void populateIREEGPULowerGlobalLoadDMAPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerGlobalLoadDMAPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

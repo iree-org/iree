@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -112,9 +113,7 @@ bool DispatchTensorType::doesSliceSpanWholeTensor(
     ValueRange dispatchTypeDims, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides) const {
   // All offsets must be zero.
-  if (!llvm::all_of(offsets, [](OpFoldResult ofr) {
-        return isConstantIntValue(ofr, 0);
-      })) {
+  if (!llvm::all_of(offsets, isZeroInteger)) {
     return false;
   }
 
@@ -131,9 +130,7 @@ bool DispatchTensorType::doesSliceSpanWholeTensor(
   }
 
   // All the strides must be 1.
-  if (!llvm::all_of(strides, [](OpFoldResult ofr) {
-        return isConstantIntValue(ofr, 1);
-      })) {
+  if (!llvm::all_of(strides, isOneInteger)) {
     return false;
   }
   return true;

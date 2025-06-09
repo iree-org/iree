@@ -295,7 +295,6 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0: ind
 // CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
 // CHECK:         util.return %[[RES]]
 
-
 // -----
 
 // Check that we are able to collapse in presence of unit dims in the make single dispatch pipeline
@@ -323,3 +322,37 @@ util.func public @make_single_dispatch(%arg0: tensor<16x8x32x2048xbf16>, %arg1: 
 //       CHECK: linalg.generic
 //  CHECK-SAME: ins(%{{.*}}, %{{.*}} : tensor<4096x2048xbf16>, tensor<4096x4096xbf16>)
 //  CHECK-SAME: outs(%{{.*}} :  tensor<4096x2048xf32>)
+
+// -----
+
+util.func public @gather_matmul(%source : tensor<20x20x100xi32>, %indices : tensor<100x2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+  %empty = tensor.empty() : tensor<100x100xi32>
+  %result = iree_linalg_ext.gather dimension_map = [1, 0]
+                          ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
+                          outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
+  %mm = linalg.matmul_transpose_b ins(%result, %arg2 : tensor<100x100xi32>, tensor<100x100xi32>) outs(%arg3 : tensor<100x100xi32>) -> tensor<100x100xi32>
+  util.return %mm : tensor<100x100xi32>
+}
+// CHECK-LABEL: util.func public @gather_matmul
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul_transpose_b
+//  CHECK-SAME:       ins(%[[GATHER]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func public @single_gather(%source : tensor<20x20x100xi32>, %indices : tensor<100x2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+  %empty = tensor.empty() : tensor<100x100xi32>
+  %result = iree_linalg_ext.gather dimension_map = [1, 0]
+                          ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
+                          outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
+  util.return %result : tensor<100x100xi32>
+}
+// Make sure single gather gets wrapped in dispatch.
+// CHECK-LABEL: util.func public @single_gather
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GATHER]]
+//       CHECK:   util.return %[[DISPATCH]]

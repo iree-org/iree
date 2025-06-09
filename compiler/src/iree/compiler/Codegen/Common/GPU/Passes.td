@@ -30,6 +30,26 @@ def GPUCheckResourceUsagePass :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCombineLayoutTransformationPass :
+    InterfacePass<"iree-codegen-gpu-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations into a single map_scatter operation.";
+  let description = [{
+    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
+    layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
+    etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
+    ops, the writing of pad values is distributed to workgroups and threads, and
+    then the padding values are written directly to the output buffer of the
+    store_to_buffer op.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "gpu::GPUDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def GPUCombineValueBarriersPass :
     Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
   let summary = "Combines `iree_gpu.value_barrier` ops";
@@ -47,6 +67,15 @@ def GPUDistributeCopyUsingForallPass :
   let summary = "Pass to distribute copies to threads.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
+  ];
+}
+
+def GPULowerToGlobalLoadsPass :
+    InterfacePass<"iree-codegen-gpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Emit direct global loads instructions.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 
@@ -345,10 +374,14 @@ def ReorderWorkgroupsPass :
 def VectorReductionToGPUPass :
     InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
   let summary = "Convert vector reduction to GPU ops.";
-  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
+  ];
+  let options = [
+    Option<"expandSubgroupReduction", "expand-subgroup-reduction", "bool",
+           /*default=*/"true",
+           "Lower subgroup reductions to gpu ops immediately where possible.">,
   ];
 }
 

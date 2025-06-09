@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -155,6 +156,8 @@ public:
         break;
       }
     });
+
+    bufferization::BufferizationState bufferizationState;
     for (Operation *op : opsToPromote) {
       OpBuilder builder(op);
       auto linalgOp = cast<linalg::LinalgOp>(op);
@@ -164,7 +167,8 @@ public:
         // Promote all the input operands
         for (auto operand : linalgOp.getDpsInputOperands()) {
           FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-              builder, op->getLoc(), operand->get(), options);
+              builder, op->getLoc(), operand->get(), options,
+              bufferizationState);
           if (failed(ret)) {
             return signalPassFailure();
           }
@@ -178,7 +182,8 @@ public:
 
         for (auto operand : opInfo.getTransposeOperands()) {
           FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-              builder, op->getLoc(), operand->get(), options);
+              builder, op->getLoc(), operand->get(), options,
+              bufferizationState);
           if (failed(ret)) {
             return signalPassFailure();
           }

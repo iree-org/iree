@@ -62,6 +62,15 @@ struct ContextResolveOpPattern
       return success();
     }
 
+    // TODO(multi-device): policy for selecting the appropriate affinity.
+    // Today we only support optimal affinities for certain ops as there needs
+    // to be some runtime policy hooks to choose otherwise. For any op that
+    // ends up here we select the first device in the optimal set.
+    if (auto deviceOptimalAttr =
+            dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+      affinityAttr = deviceOptimalAttr.getAffinities().front();
+    }
+
     // We currently only handle HAL device affinities.
     // We could make this an interface to select the device and allow users to
     // provide their own affinities to convert to HAL. In the future users may
@@ -87,19 +96,20 @@ struct ResourceAllocOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto [allocator, queueAffinity] =
-        lookupAllocatorAndQueueAffinityFor(allocOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
-
     auto resourceType =
         cast<IREE::Stream::ResourceType>(allocOp.getResult().getType());
-
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
     if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
                                                memoryTypes, bufferUsage))) {
       return failure();
     }
+
+    // Lookup the appropriate allocator/queue for allocation based on the buffer
+    // propreties.
+    auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
+        allocOp, memoryTypes, bufferUsage, rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateOp>(
         allocOp, bufferType, allocator, queueAffinity, memoryTypes, bufferUsage,
@@ -115,10 +125,8 @@ struct ResourceAllocaOpPattern
   matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = allocaOp.getLoc();
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(allocaOp, rewriter);
-    auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
+    // Derive buffer propreties from the resource type.
     auto resourceType =
         cast<IREE::Stream::ResourceType>(allocaOp.getResult().getType());
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
@@ -127,6 +135,12 @@ struct ResourceAllocaOpPattern
                                                bufferUsage))) {
       return failure();
     }
+    auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
+
+    // Lookup the appropriate device/queue for allocation based on the buffer
+    // propreties.
+    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
+        allocaOp, memoryTypes, bufferUsage, rewriter);
 
     // Behavior flags.
     IREE::HAL::AllocaFlagBitfield flags = IREE::HAL::AllocaFlagBitfield::None;
@@ -159,8 +173,21 @@ struct ResourceDeallocaOpPattern
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = deallocaOp.getLoc();
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(deallocaOp, rewriter);
+
+    // Derive buffer propreties from the resource type. This must match the
+    // original allocation. If we're uncertain if it does we have to switch to
+    // prefer-origin mode.
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(deallocaOp.getOperand().getType());
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    bool preferOrigin = deallocaOp.getPreferOrigin();
+    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
+                                               bufferUsage))) {
+      preferOrigin = true;
+    }
+    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
+        deallocaOp, memoryTypes, bufferUsage, rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -171,7 +198,7 @@ struct ResourceDeallocaOpPattern
     // Route to the origin of the allocation (if available).
     IREE::HAL::DeallocaFlagBitfield flags =
         IREE::HAL::DeallocaFlagBitfield::None;
-    if (deallocaOp.getPreferOrigin()) {
+    if (preferOrigin) {
       flags = flags | IREE::HAL::DeallocaFlagBitfield::PreferOrigin;
     }
 
@@ -239,12 +266,9 @@ struct ResourceTryMapOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto [allocator, queueAffinity] =
-        lookupAllocatorAndQueueAffinityFor(tryMapOp, rewriter);
     auto resourceType =
         llvm::cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
-
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
     switch (resourceType.getLifetime()) {
@@ -279,6 +303,11 @@ struct ResourceTryMapOpPattern
           bufferUsage | IREE::HAL::BufferUsageBitfield::TransferSource;
       break;
     }
+
+    // Lookup the appropriate allocator/queue for allocation based on the buffer
+    // propreties.
+    auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
+        tryMapOp, memoryTypes, bufferUsage, rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorImportOp>(
         tryMapOp, rewriter.getI1Type(), bufferType, allocator, queueAffinity,

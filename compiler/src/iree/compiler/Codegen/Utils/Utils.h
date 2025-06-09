@@ -214,12 +214,22 @@ Value findOrCreateSubspanBuffer(RewriterBase &rewriter,
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//
 
+/// Given a list of `Value`s, set the insertion point to the last (least
+/// dominant) of these values.
+Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
+                                           ArrayRef<Value> values);
+
 /// Given a SubsetInsertionOpInterface, find all values that are needed to
 /// build an equivalent subset extraction, and set the insertion point to the
 /// last of these values.
 Operation *
 setInsertionPointAfterLastNeededValue(OpBuilder &builder,
                                       SubsetInsertionOpInterface subsetOp);
+
+/// Moves the op to right after its last (most dominant) operand. If the operand
+/// is a block argument, then the op is moved to the start of the block.
+void moveOpAfterLastOperand(RewriterBase &rewriter, DominanceInfo &domInfo,
+                            Operation *op);
 
 /// Check if the two tensor types (with their respective dynamic dimension
 /// values) have the same shape.

@@ -174,11 +174,12 @@ def IREECodegen_NullPointerOp :
 }
 
 //===----------------------------------------------------------------------===//
-// LoadFrom/StoreToMemref Ops
+// LoadFrom/StoreToBuffer Ops
 //===----------------------------------------------------------------------===//
 
-def IREECodegen_LoadFromMemrefOp : Op<IREECodegen_Dialect, "load_from_memref",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def IREECodegen_LoadFromBufferOp : Op<IREECodegen_Dialect, "load_from_buffer",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
   let summary = [{Loads a tensor from a memref.}];
   let description = [{
     Loads a tensor from a memref with a compatible shape and the same element
@@ -186,20 +187,20 @@ def IREECodegen_LoadFromMemrefOp : Op<IREECodegen_Dialect, "load_from_memref",
   }];
 
   let arguments = (ins
-    AnyStridedMemRef:$source
+    AnyStridedMemRef:$buffer
   );
   let results = (outs
-    AnyRankedTensor:$result
+    AnyRankedTensor:$tensor
   );
 
   let assemblyFormat = [{
-    $source attr-dict `:` type($source) `->` type($result)
+    $buffer attr-dict `:` type($buffer) `->` type($tensor)
   }];
 
   let hasVerifier = 1;
 }
 
-def IREECodegen_StoreToMemrefOp : Op<IREECodegen_Dialect, "store_to_memref",
+def IREECodegen_StoreToBufferOp : Op<IREECodegen_Dialect, "store_to_buffer",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let summary = [{Stores a tensor into a memref.}];
   let description = [{
@@ -208,14 +209,14 @@ def IREECodegen_StoreToMemrefOp : Op<IREECodegen_Dialect, "store_to_memref",
   }];
 
   let arguments = (ins
-    AnyRankedTensor:$value,
-    AnyStridedMemRef:$target
+    AnyRankedTensor:$tensor,
+    AnyStridedMemRef:$buffer
   );
   let results = (outs);
 
   let assemblyFormat = [{
-    $value `,` $target
-    attr-dict `:` type($value) `into` type($target)
+    $tensor `,` $buffer
+    attr-dict `:` type($tensor) `into` type($buffer)
   }];
 
   let hasVerifier = 1;

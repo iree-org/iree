@@ -58,6 +58,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect

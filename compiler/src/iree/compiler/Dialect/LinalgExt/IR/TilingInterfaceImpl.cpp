@@ -2514,7 +2514,7 @@ OnlineAttentionOp::generateInitialTensorForPartialReduction(
 
   SmallVector<OpFoldResult> tiledShape;
   for (auto [tileSize, dimSize] : llvm::zip_equal(sizes, shape)) {
-    if (isZeroIndex(tileSize)) {
+    if (isZeroInteger(tileSize)) {
       tiledShape.push_back(dimSize);
     } else {
       tiledShape.push_back(tileSize);
@@ -2914,7 +2914,7 @@ computeCustomOpAllSliceParameters(OpBuilder &builder, Location loc,
                                   SmallVector<OpFoldResult> tileSizes) {
   assert(ivs.size() == static_cast<size_t>(llvm::count_if(
                            llvm::make_range(tileSizes.begin(), tileSizes.end()),
-                           [](OpFoldResult v) { return !isZeroIndex(v); })) &&
+                           [](OpFoldResult v) { return !isZeroInteger(v); })) &&
          "expected as many ivs as non-zero sizes");
   unsigned numDims = customOp.getNumLoops();
   unsigned numSymbols = customOp.getNumNonLoopDimensions();

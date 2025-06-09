@@ -1,0 +1,75 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# TODO(benvanik): implement omitted files.
+iree_runtime_cc_library(
+    name = "amdgpu",
+    srcs = [
+        # "allocator.c",
+        # "allocator.h",
+        # "buffer.c",
+        # "buffer.h",
+        # "buffer_pool.c",
+        # "buffer_pool.h",
+        # "channel.c",
+        # "channel.h",
+        # "command_buffer.c",
+        # "command_buffer.h",
+        "driver.c",
+        "driver.h",
+        # "event.c",
+        # "event.h",
+        "executable.c",
+        "executable.h",
+        "executable_cache.c",
+        "executable_cache.h",
+        # "host_worker.c",
+        # "host_worker.h",
+        "logical_device.c",
+        "logical_device.h",
+        "physical_device.c",
+        "physical_device.h",
+        # "queue.c",
+        # "queue.h",
+        # "semaphore.c",
+        # "semaphore.h",
+        # "semaphore_pool.c",
+        # "semaphore_pool.h",
+        # "system.c",
+        # "system.h",
+        # "trace_buffer.c",
+        # "trace_buffer.h",
+    ],
+    hdrs = [
+        "api.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
+        "//runtime/src/iree/hal/drivers/amdgpu/util",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+        "//runtime/src/iree/hal/utils:executable_debug_info",
+        "//runtime/src/iree/hal/utils:file_transfer",
+        "//runtime/src/iree/hal/utils:files",
+        "//runtime/src/iree/hal/utils:resource_set",
+        "//runtime/src/iree/schemas:amdgpu_executable_def_c_fbs",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
+    ],
+)

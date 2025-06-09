@@ -11,6 +11,7 @@
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-dynamic-dim-analysis"
@@ -107,8 +108,7 @@ static void updateTensorDimInfo(
     return;
   }
   // Check that all strides are 1. Abort otherwise
-  if (llvm::any_of(flowLoadOp.getMixedStrides(),
-                   [](OpFoldResult s) { return !isConstantIntValue(s, 1); })) {
+  if (!llvm::all_of(flowLoadOp.getMixedStrides(), isOneInteger)) {
     return;
   }
 

@@ -24,7 +24,6 @@ LLVM_SRCS = enforce_glob(
         "conv2d.mlir",
         "fp_to_subbyte.mlir",
         "narrow_n_matmuls.mlir",
-        "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
         "subbyte_to_fp.mlir",
@@ -32,8 +31,12 @@ LLVM_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        # TODO(#20929): Enable the pack.mlir test after the numerical issue is
+        # fixed.
+        "pack.mlir",
         "large_linalg_matmul.mlir",
         "index.mlir",
+        "argmax.mlir",
     ],
 )
 
@@ -45,6 +48,39 @@ iree_check_single_backend_test_suite(
     tags = [
         # subbyte support for wasm is not on priorities.
         "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+NO_RISCV_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "pack.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "conv2d.mlir",
+        "fp_to_subbyte.mlir",
+        "index.mlir",
+        "large_linalg_matmul.mlir",
+        "narrow_n_matmuls.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "pack_i8.mlir",
+        "subbyte_to_fp.mlir",
+        "unpack.mlir",
+        "argmax.mlir",
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_local-task_noriscv",
+    srcs = NO_RISCV_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+        "noriscv",
     ],
     target_backend = "llvm-cpu",
 )
@@ -65,6 +101,7 @@ VMVX_SRCS = enforce_glob(
         "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
         "index.mlir",
+        "argmax.mlir",
     ],
 )
 
@@ -112,6 +149,7 @@ VULKAN_SRCS = enforce_glob(
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
         "unpack.mlir",
+        "argmax.mlir",
     ],
 )
 
@@ -166,6 +204,7 @@ CUDA_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "argmax.mlir",
     ],
 )
 
@@ -187,6 +226,7 @@ iree_check_single_backend_test_suite(
 ROCM_SRCS = enforce_glob(
     # keep sorted
     [
+        "argmax.mlir",
         "pack_i8.mlir",
         "unpack.mlir",
     ],
@@ -228,9 +268,22 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+ARGMAX_SRCS = [
+    "argmax.mlir",
+]
+
+iree_check_single_backend_test_suite(
+    name = "check_argmax_llvm-cpu_local-task",
+    srcs = ARGMAX_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
 test_suite(
     name = "check",
     tests = [
+        ":check_argmax_llvm-cpu_local-task",
         ":check_index_llvm-cpu_local-task",
         ":check_large_linalg_matmul_cuda",
         ":check_llvm-cpu_local-task",

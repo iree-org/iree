@@ -968,7 +968,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
       return addressSpaceAttr;
     };
   }
-  if (failed(runIREEOneShotBufferize(target, options))) {
+  bufferization::BufferizationState bufferizationState;
+  if (failed(runIREEOneShotBufferize(target, options, bufferizationState))) {
     return mlir::emitDefiniteFailure(target, "bufferization failed");
   }
 
@@ -1256,6 +1257,7 @@ DiagnosedSilenceableFailure transform_dialect::FuseConsumerOp::apply(
 void transform_dialect::FuseConsumerOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTargetMutable(), effects);
+  transform::consumesHandle(getLoopsMutable(), effects);
   transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }

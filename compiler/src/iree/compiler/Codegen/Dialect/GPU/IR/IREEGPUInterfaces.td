@@ -7,11 +7,13 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES
 
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.td"
 include "mlir/IR/EnumAttr.td"
 
-def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
+def IREEGPU_MmaInterfaceAttr
+    : AttrInterface<"MmaInterfaceAttr", [IREECodegen_InnerTileDescAttrInterface]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let description = [{
@@ -25,64 +27,9 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the shape of the MMA operation:
-        ```
-          C += A * B
-        ```
-        Where, up to some transpositions, `A` has shape `<M, K>`, `B` has shape
-        `<K, N>`, and `C` has shape `<M, N>`.
+        Return the subgroup size needed to execute this kind of multi-MMA.
       }],
-      /*retTy=*/"::std::tuple<int64_t, int64_t, int64_t>",
-      /*methodName=*/"getMNKShape",
-      /*args=*/(ins)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the element types of the operands to the MMA operation:
-        ```
-          C += A * B
-        ```
-      }],
-      /*retTy=*/"::std::tuple<::mlir::Type, ::mlir::Type, ::mlir::Type>",
-      /*methodName=*/"getABCElementTypes",
-      /*args=*/(ins)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the vector types of the operands to the MMA operation:
-        ```
-          C += A * B
-        ```
-        Each thread participating in the MMA operation is responsible for
-        storing such shaped vectors in the registers.
-      }],
-      /*retTy=*/"::std::tuple<::mlir::VectorType, ::mlir::VectorType, ::mlir::VectorType>",
-      /*methodName=*/"getABCVectorTypes",
-      /*args=*/(ins)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the vector layout for the A/B/C matrix of the MMA operation:
-        ```
-          C += A * B
-        ```
-      }],
-      /*retTy=*/"::mlir::FailureOr<::std::tuple<"
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
-                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface>>",
-      /*methodName=*/"getContractionLayout",
-      /*args=*/(ins "::mlir::vector::ContractionOp":$contract),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the expected subgroup size of the MMA operation/intrinsic.
-      }],
-      /*retTy=*/"int64_t",
+      /*retType=*/"int64_t",
       /*methodName=*/"getSubgroupSize",
       /*args=*/(ins)
     >,
@@ -105,62 +52,49 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
         return failure();
       }]
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Constructs the offsets/sizes/strides for extracting the per-thread
-        slice of the given operand fragment.
-      }],
-      /*retTy=*/"::mlir::LogicalResult",
-      /*methodName=*/"populateOperandOffsetsSizesStrides",
-      /*args=*/(ins
-        "::mlir::OpBuilder&":$builder,
-        "::mlir::Location":$loc,
-        "::mlir::iree_compiler::IREE::GPU::MMAFragment":$fragment,
-        "::mlir::Value":$lane_id,
-        "::llvm::ArrayRef<int64_t>":$permutation,
-        "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
-        "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
-        "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Populates the reassociation indices and result shape to materialize the
-        thread layout shape from the subgroup block shape.
-      }],
-      /*retTy=*/"::mlir::LogicalResult",
-      /*methodName=*/"materializeOperandConcreteShape",
-      /*args=*/(ins
-        "::mlir::OpBuilder&":$builder,
-        "::mlir::iree_compiler::IREE::GPU::MMAFragment":$fragment,
-        "::mlir::Value":$operand,
-        "std::optional<::llvm::ArrayRef<int64_t>>":$permutation,
-        "::llvm::SmallVector<::mlir::SmallVector<int64_t, 2>>&":$reassociations,
-        "::mlir::RankedTensorType&":$result_type
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the scope of the MMA operation. See IREEGPUEnums.td for
-        available options.
-      }],
-      /*retTy=*/"::mlir::FailureOr<::mlir::iree_compiler::IREE::GPU::MMAScope>",
-      /*methodName=*/"getMmaScope",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return failure();
-      }]
-    >,
   ];
+  // Methods included to preserve interfaces from beforet he InnerTileDescAttrInterface
+  // refactoring.
+  let extraSharedClassDeclaration = [{
+    /// Returns the shape of the MMA operation:
+    /// ```
+    ///   C += A * B
+    /// ```
+    /// Where, up to some transpositions, `A` has shape `<M, K>`, `B` has shape
+    /// `<K, N>`, and `C` has shape `<M, N>`.
+    ::std::tuple<int64_t, int64_t, int64_t>
+    getMNKShape() const {
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
+      $_attr.getUndistributedTileTypes(preThreadTypes);
+      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[2].getShape();
+      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
+      return {accShape[0], accShape[1], lhsShape[1]};
+    }
+
+    /// Returns the element types of the operands to the MMA operation:
+    /// ```
+    ///   C += A * B
+    /// ```
+    ::std::tuple<::mlir::Type, ::mlir::Type, ::mlir::Type>
+    getABCElementTypes() const {
+      ::llvm::SmallVector<::mlir::Type> elementTypes;
+      $_attr.getElementTypes(elementTypes);
+      return {elementTypes[0], elementTypes[1], elementTypes[2]};
+    }
+
+    /// Returns the vector types of the operands to the MMA operation:
+    /// ```
+    /// C += A * B
+    /// ```
+    /// Each thread participating in the MMA operation is responsible for
+    /// storing such shaped vectors in the registers.
+    ::std::tuple<::mlir::VectorType, ::mlir::VectorType, ::mlir::VectorType>
+    getABCVectorTypes() const {
+      ::llvm::SmallVector<::mlir::VectorType> threadTypes;
+      $_attr.getDistributedTileTypes(threadTypes);
+      return {threadTypes[0], threadTypes[1], threadTypes[2]};
+    }
+  }];
 }
 
 def IREEGPU_AnyMmaAttr : Attr<Or<[

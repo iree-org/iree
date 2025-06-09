@@ -16,7 +16,7 @@
 // so that it becomes a loop variable. This is highly desirable as the opposite
 // leads to very poor performance.
 
-// CHECK-LABEL: @pipeline()
+// CHECK-LABEL: @pipeline(
 // CHECK:       scf.for {{.*}} iter_args(%[[OUT_TENSOR:.*]] = {{.*}}) -> (tensor<1024x1024xf32>) {
 // CHECK-NEXT:    scf.for {{.*}} iter_args(%[[OUT_TENSOR_1:.*]] = %[[OUT_TENSOR]]) -> (tensor<1024x1024xf32>) {
 // CHECK-NEXT:      %[[OUT_SLICE:.*]] = tensor.extract_slice %[[OUT_TENSOR_1]]{{.*}} : tensor<1024x1024xf32> to tensor<8x?xf32>
@@ -33,24 +33,12 @@
 // CHECK-NEXT:  %[[OUT_WRITE:.*]] = vector.transfer_write %[[INNER_LOOP]], %[[OUT_SLICE_1]]{{.*}} {{.*}} : vector<8x[16]xf32>, tensor<8x?xf32>
 // CHECK-NEXT:  %[[INSERT_SLICE:.*]] = tensor.insert_slice %[[OUT_WRITE]] into %[[OUT_SLICE]]{{.*}} : tensor<8x?xf32> into tensor<8x?xf32>
 // CHECK-NEXT:  tensor.insert_slice %[[INSERT_SLICE]] into %[[OUT_TENSOR_1]]{{.*}} : tensor<8x?xf32> into tensor<1024x1024xf32>
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @pipeline() {
+func.func @pipeline(%3: tensor<1024x1024xf32>, %4: tensor<1024x1024xf32>, %5: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
   %c1 = arith.constant 1 : index
   %c1024 = arith.constant 1024 : index
   %c16 = arith.constant 16 : index
   %c8 = arith.constant 8 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024x1024xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>> -> tensor<1024x1024xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>> -> tensor<1024x1024xf32>
-  %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024x1024xf32>> -> tensor<1024x1024xf32>
   %6 = vector.vscale
   %7 = arith.muli %6, %c16 : index
   %8 = scf.for %arg0 = %c0 to %c1024 step %c8 iter_args(%arg1 = %5) -> (tensor<1024x1024xf32>) {
@@ -74,6 +62,5 @@ func.func @pipeline() {
     }
     scf.yield %10 : tensor<1024x1024xf32>
   }
-  iree_tensor_ext.dispatch.tensor.store %8, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : tensor<1024x1024xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024x1024xf32>>
-  return
+  return %8 : tensor<1024x1024xf32>
 }

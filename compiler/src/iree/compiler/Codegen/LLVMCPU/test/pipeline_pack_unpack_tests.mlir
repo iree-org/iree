@@ -79,8 +79,9 @@ module {
 
 // CHECK-LABEL:     func.func @aligned_unpack_generic
 // CHECK:             %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
-// CHECK-COUNT-15:        vector.load %[[SRC]]
-// CHECK:                 %[[LAST_LOAD:.+]] = vector.load %[[SRC]]
+// CHECK:             %[[ASSUMED_SRC:.+]] = memref.assume_alignment %[[SRC]], 64
+// CHECK-COUNT-15:        vector.load %[[ASSUMED_SRC]]
+// CHECK:                 %[[LAST_LOAD:.+]] = vector.load %[[ASSUMED_SRC]]
 // CHECK:                 %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
 // CHECK:                 %[[T0:.+]] = arith.addf %[[IN_0]], %{{.+}} : vector<16x16xf32>
 // CHECK:                 %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>

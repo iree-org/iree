@@ -89,6 +89,10 @@ struct FlowBarrierTargetAffinityAttrExternalModel
 
   bool requiresAffinity(Operation *op) const { return true; }
 
+  bool pinsValueAffinity(Operation *op) const {
+    return op->hasAttrOfType<IREE::Stream::AffinityAttr>("target");
+  }
+
   IREE::Stream::AffinityAttr getAffinityAttr(Operation *op) const {
     return op->getAttrOfType<IREE::Stream::AffinityAttr>("target");
   }

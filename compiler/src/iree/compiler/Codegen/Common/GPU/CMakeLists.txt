@@ -54,6 +54,7 @@ iree_cc_library(
     "GPUApplyTilingLevel.cpp"
     "GPUBubbleResourceCasts.cpp"
     "GPUCheckResourceUsage.cpp"
+    "GPUCombineLayoutTransformation.cpp"
     "GPUCombineValueBarriers.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
@@ -66,6 +67,7 @@ iree_cc_library(
     "GPUGeneralizeNamedOps.cpp"
     "GPUGreedilyDistributeToThreads.cpp"
     "GPUInferMemorySpace.cpp"
+    "GPULowerToGlobalLoads.cpp"
     "GPULowerToUKernels.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
@@ -92,6 +94,7 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils
@@ -115,6 +118,7 @@ iree_cc_library(
     MLIRLoopLikeInterface
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRNVGPUDialect
     MLIRPass
     MLIRRewrite
@@ -144,6 +148,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils

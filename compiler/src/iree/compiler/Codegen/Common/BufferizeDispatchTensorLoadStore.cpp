@@ -56,7 +56,7 @@ bufferizeDispatchTensorLoad(RewriterBase &rewriter,
       rewriter, loadOp.getLoc(), subspanOp, loadOp.getType(),
       loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
       loadOp.getMixedStrides());
-  rewriter.replaceOpWithNewOp<IREE::Codegen::LoadFromMemrefOp>(
+  rewriter.replaceOpWithNewOp<IREE::Codegen::LoadFromBufferOp>(
       loadOp, loadOp.getType(), sourceBuffer);
 }
 
@@ -68,10 +68,10 @@ bufferizeDispatchTensorStore(RewriterBase &rewriter,
   if (!subspanOp) {
     return;
   }
-  // For the store_to_memref op, generate any subviews as early as possible in
-  // the IR. This opens more opportunities for using the store_to_memref op's
+  // For the store_to_buffer op, generate any subviews as early as possible in
+  // the IR. This opens more opportunities for using the store_to_buffer op's
   // SubsetInsertionOpInterface, since equivalent subset extractions can only be
-  // created after the store_to_memref op's output (the subspan or subview) in
+  // created after the store_to_buffer op's output (the subspan or subview) in
   // the IR.
   OpBuilder::InsertionGuard g(rewriter);
   (void)setInsertionPointAfterLastNeededValue(
@@ -81,9 +81,9 @@ bufferizeDispatchTensorStore(RewriterBase &rewriter,
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides());
 
-  Value value = storeOp.getValue();
+  Value tensor = storeOp.getValue();
   rewriter.setInsertionPoint(storeOp);
-  rewriter.replaceOpWithNewOp<IREE::Codegen::StoreToMemrefOp>(storeOp, value,
+  rewriter.replaceOpWithNewOp<IREE::Codegen::StoreToBufferOp>(storeOp, tensor,
                                                               outputBuffer);
 }
 

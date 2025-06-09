@@ -6,10 +6,11 @@
 
 #include "compiler/plugins/target/ROCM/builtins/ukernel/common.h"
 
-[[clang::always_inline]] void
-iree_uk_amdgpu_argmax_f16i32(const _Float16 *inputBuffer, int64_t input_offset,
-                             int32_t *outputBuffer, int64_t output_offset,
-                             int64_t reductionSize) {
+[[clang::always_inline]] void iree_uk_amdgpu_argmax_f16i32(
+    const _Float16 *inputBuffer, int64_t input_offset,
+    _Float16 *outputBufferVal, int64_t output_val_offset,
+    int32_t *outputBufferIdx, int64_t output_idx_offset, int64_t reductionSize,
+    bool writeValue) {
   const int warpSize = __builtin_amdgcn_wavefrontsize();
   _Float16 NEG_F16_MAX = (_Float16)(-65504.0f);
   int32_t laneID = __builtin_amdgcn_workitem_id_x();
@@ -36,7 +37,10 @@ iree_uk_amdgpu_argmax_f16i32(const _Float16 *inputBuffer, int64_t input_offset,
   // if there is only one max value holder, write and exit.
   if (__builtin_popcountll(laneHasMaxValmask) == 1) {
     if (wgMax == laneMax) {
-      outputBuffer[output_offset] = laneResult;
+      if (writeValue) {
+        outputBufferVal[output_val_offset] = wgMax;
+      }
+      outputBufferIdx[output_idx_offset] = laneResult;
     }
   } else {
     // if there are multiple max value holder, find smallest index (argmax
@@ -44,7 +48,10 @@ iree_uk_amdgpu_argmax_f16i32(const _Float16 *inputBuffer, int64_t input_offset,
     int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
     laneResult = __ockl_wfred_min_i32(indexVal);
     if (laneID == 0) {
-      outputBuffer[output_offset] = laneResult;
+      if (writeValue) {
+        outputBufferVal[output_val_offset] = wgMax;
+      }
+      outputBufferIdx[output_idx_offset] = laneResult;
     }
   }
   // TODO(bjacob): this fence should be on the caller side. Move to TileAndFuse?

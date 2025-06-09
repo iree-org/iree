@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -325,6 +327,111 @@ GatherOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+  return SmallVector<int64_t>(getOutputType().getShape());
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForOperands() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      AffineMap(nullptr),
+      builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
+namespace {
+struct ConvertGatherToExtract
+    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
+                                PatternRewriter &rewriter) const override {
+    // TODO: support memref case.
+    if (!gatherOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    auto loc = gatherOp.getLoc();
+    ArrayRef<int64_t> indicesShape = gatherOp.getIndicesType().getShape();
+    ArrayRef<int64_t> batchShape =
+        indicesShape.take_front(gatherOp.getBatchRank());
+    if (!llvm::all_of(batchShape, [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+
+    // Get all `indexDepth` indices as scalars.
+    SmallVector<Value> indices(indicesShape.size(),
+                               rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    SmallVector<OpFoldResult> offsets(gatherOp.getIndexDepth());
+    for (int64_t i = 0; i < gatherOp.getIndexDepth(); ++i) {
+      indices.back() = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value elem = rewriter.create<tensor::ExtractOp>(
+          loc, gatherOp.getIndices(), indices);
+      offsets[i] =
+          rewriter
+              .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
+              .getResult();
+    }
+
+    applyPermutationToVector(offsets, gatherOp.getDimensionMap());
+    int64_t sourceRank = gatherOp.getSourceType().getRank();
+    offsets.resize(sourceRank, rewriter.getIndexAttr(0));
+
+    // Create the new `tensor.extract_slice`.
+    SmallVector<OpFoldResult> strides(sourceRank, rewriter.getIndexAttr(1));
+    SmallVector<int64_t> resultShape(gatherOp.getIndexDepth(), 1);
+    SmallVector<OpFoldResult> sizes(gatherOp.getIndexDepth(),
+                                    rewriter.getIndexAttr(1));
+    for (int64_t i = gatherOp.getIndexDepth(); i < sourceRank; ++i) {
+      sizes.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, gatherOp.getSource(), i));
+      resultShape.push_back(gatherOp.getSourceType().getDimSize(i));
+    }
+    auto resultType =
+        cast<RankedTensorType>(gatherOp.getSourceType()).clone(resultShape);
+    auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
+        loc, resultType, gatherOp.getSource(), offsets, sizes, strides);
+
+    // `sliceOp` may differ from the expected result type by leading unit
+    // dimensions. Reshape so that the types match.
+    int64_t sliceRank = sliceOp.getResultType().getRank();
+    int64_t gatherRank = gatherOp.getOutputType().getRank();
+    if (sliceRank < gatherRank) {
+      SmallVector<ReassociationIndices> reassoc(1);
+      llvm::append_range(reassoc[0], llvm::seq(gatherOp.getBatchRank()));
+      for (int64_t i = 0; i < sourceRank - 1; ++i) {
+        reassoc.emplace_back(1, i + gatherOp.getBatchRank());
+      }
+
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
+          gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
+    } else if (sliceRank > gatherRank) {
+      SmallVector<ReassociationIndices> reassoc(1);
+      llvm::append_range(reassoc[0], llvm::seq(sliceRank - gatherRank + 1));
+      for (int64_t i = sliceRank - gatherRank + 1; i < sliceRank; ++i) {
+        reassoc.emplace_back(1, i);
+      }
+
+      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
+          gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
+    } else {
+      rewriter.replaceOp(gatherOp, sliceOp);
+    }
+    return success();
+  }
+};
+} // namespace
+
+void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *ctx) {
+  results.add<ConvertGatherToExtract>(ctx);
+}
+
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//
@@ -554,9 +661,9 @@ struct RemoveUnusedSortOpResults
     auto results = sortOp.getResults();
     unsigned numRes = sortOp.getNumResults();
 
-    // # TODO(#20831): Implement a way to remove unused results when using
-    // buffer semantics.
-    if (numRes == 0) {
+    // # TODO(#20831): Add support for removing unused operands when the op has
+    // pure buffer semantics.
+    if (sortOp.hasPureBufferSemantics()) {
       return failure();
     }
 
@@ -803,13 +910,79 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// ArgmaxOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgmaxOp::verify() {
+  Operation *op = getOperation();
+
+  if (getNumDpsInputs() != 1) {
+    return op->emitOpError(
+               "expected exactly one input operand (values), but got ")
+           << getNumDpsInputs();
+  }
+
+  if (getNumDpsInits() != 2) {
+    return op->emitOpError(
+               "expected two output operands (value and index), but got ")
+           << getNumDpsInits();
+  }
+
+  uint64_t dim = getDimension();
+  int64_t rank = getInputRank();
+  if (dim >= rank) {
+    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
+           << "got dimension: " << dim << ", but input rank is: " << rank;
+  }
+
+  ShapedType inputType = getInputType();
+  auto outputValueType = getOutputValueType();
+  auto outputIndexType = getOutputIndexType();
+
+  if (inputType.getElementType() != outputValueType.getElementType()) {
+    return op->emitOpError("input and output value element types must match. ")
+           << "Input type: " << inputType.getElementType()
+           << ", output value type: " << outputValueType.getElementType();
+  }
+
+  if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
+    return op->emitOpError("output indices/values shape must match. ")
+           << "Output value shape: "
+           << llvm::interleaved_array(outputValueType.getShape())
+           << ", output index shape: "
+           << llvm::interleaved_array(outputIndexType.getShape());
+  }
+
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < getInputRank(); ++i) {
+    if (i != dim)
+      expectedShape.push_back(inputType.getDimSize(i));
+  }
+  if (!llvm::equal(expectedShape, outputValueType.getShape())) {
+    return op->emitOpError("output shape must match input shape with reduction "
+                           "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: "
+           << llvm::interleaved_array(outputValueType.getShape());
+  }
+
+  return success();
+}
+
+LogicalResult
+ArgmaxOp::reifyResultShapes(OpBuilder &b,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
 /// Return true if at least one element in `tiles` is zero.
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
-  return llvm::any_of(
-      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
+  return llvm::any_of(tiles, isZeroInteger);
 }
 
 /// Check if we have enough static information to catch undefined behavior when
@@ -2227,6 +2400,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
+DEFINE_OP_GET_EFFECTS(ArgmaxOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)

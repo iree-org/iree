@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AnnotateTargetDevices.cpp"
     "AssignLegacyTargetDevices.cpp"
     "AssignTargetDevices.cpp"
     "CaptureExecutableSources.cpp"
@@ -33,6 +34,7 @@ iree_cc_library(
     "MaterializeResourceCaches.cpp"
     "MaterializeTargetDevices.cpp"
     "MemoizeDeviceQueries.cpp"
+    "MemoizeDeviceSelection.cpp"
     "OutlineMemoizeRegions.cpp"
     "Passes.cpp"
     "Passes.h.inc"

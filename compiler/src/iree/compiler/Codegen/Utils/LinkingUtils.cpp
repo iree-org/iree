@@ -211,6 +211,9 @@ LogicalResult linkExecutablesInto(
                                 mlir::ModuleOp linkedInnerModule,
                                 DenseMap<StringRef, Operation *> &symbolMap)>
         mergeInnerModuleFn) {
+  if (!linkedTargetOp.getInnerModule()) {
+    return success();
+  }
   MLIRContext *context = linkedTargetOp.getContext();
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
@@ -225,12 +228,27 @@ LogicalResult linkExecutablesInto(
 
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
+    // All variants must be linkable in order to process the executable.
+    auto variantOps = llvm::to_vector(
+        sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
+    if (llvm::any_of(variantOps, [](auto variantOp) {
+          return !variantOp.getInnerModule();
+        })) {
+      continue; // 1+ variants without bodies
+    }
+
     // Remap root executable refs.
+    //
+    // NOTE: this is currently risky as we assume that all targets need to link
+    // consistently but there's nothing ensuring that here. If some targets
+    // decide to link some subset of variants and others don't we'll still have
+    // replaced the executable name here. We may have to ensure root executable
+    // names are never used at the time this runs, or perform the linking as a
+    // global pipeline that uses each TargetBackend to link instead of running
+    // it per-backend/pass.
     symbolReplacements.executableRefs[SymbolRefAttr::get(sourceExecutableOp)] =
         SymbolRefAttr::get(linkedExecutableOp);
 
-    auto variantOps = llvm::to_vector(
-        sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process compatible targets.
       // TODO(benvanik): allow for grouping when multi-versioning is supported?
@@ -311,7 +329,6 @@ LogicalResult linkExecutablesInto(
         symbolReplacements.exportRefs[oldExportRefAttr] = newExportRefAttr;
       }
 
-      // Merge the existing module into the new linked module op.
       if (failed(mergeInnerModuleFn(variantOp.getInnerModule(),
                                     linkedTargetOp.getInnerModule(),
                                     targetSymbolMap))) {

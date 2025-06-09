@@ -168,7 +168,7 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
-  if (isa<IREE::LinalgExt::AttentionOp>(op)) {
+  if (isa<IREE::LinalgExt::AttentionOp, linalg::FillOp>(op)) {
     return true;
   }
 
@@ -629,7 +629,9 @@ hoistTensorReshapesOutOfDispatchRegion(
     return op->getParentOfType<IREE::Flow::DispatchRegionOp>();
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(returnOp, &slice, sliceOptions);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(returnOp, &slice, sliceOptions);
+  assert(ret.succeeded());
 
   // 2. Get the leaf operations that are `tensor.collapse_shape` and
   // `tensor_expand_shape` ops.
@@ -889,7 +891,9 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     return isEligibleForCollapse(op) && parentOp == regionOp;
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(rootOp.value(), &slice, sliceOptions);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(rootOp.value(), &slice, sliceOptions);
+  assert(ret.succeeded());
 
   // Step 3. Populate each op's info with a maximally collapsable reassociation
   // indicies
@@ -964,7 +968,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     using ResultsType = FailureOr<SmallVector<Value>>;
     auto maybeReplacements =
         llvm::TypeSwitch<Operation *, ResultsType>(opToCollapse)
-            .Case<linalg::GenericOp>(
+            .Case<linalg::LinalgOp>(
                 [&, &info = info](auto genericOp) -> ResultsType {
                   FailureOr<linalg::CollapseResult> maybeReplacements =
                       mlir::linalg::collapseOpIterationDims(

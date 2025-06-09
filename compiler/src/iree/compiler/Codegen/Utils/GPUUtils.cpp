@@ -426,7 +426,8 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 /// Emit warp reduction code sequence for a given scalar input value.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
-                           uint32_t numLaneToReduce) {
+                           uint32_t numLaneToReduce,
+                           bool expandSubgroupReduce) {
   assert(llvm::isPowerOf2_32(numLaneToReduce));
   assert((llvm::isa<IntegerType, FloatType>(input.getType())) &&
          "Input must be a scalar");
@@ -438,9 +439,26 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   const bool needsPacking = kShuffleBitWidth != origBitWidth;
   IntegerType equivIntType = builder.getIntegerType(origBitWidth);
 
-  // Always perform the shuffles over the supported scalar type. For inputs of
-  // smaller bitwidth, perform packing and unpacking via the supported integer
-  // type.
+  // Defer expansion of subgroup reduction until later in pass pipeline to
+  // enable conditional lowering to DPP ops, for potential perf gains over
+  // gpu.shuffle ops.
+  if (!expandSubgroupReduce && numLaneToReduce <= warpSize &&
+      warpSize % numLaneToReduce == 0) {
+    gpu::AllReduceOperation gpuReduceKind = combiningKindToAllReduce(kind);
+
+    // SPIRV currently doesn't have a lowering for clustered reduction,
+    // so if possible avoid adding problematic attribute until it is supported.
+    if (numLaneToReduce == warpSize) {
+      return builder.create<gpu::SubgroupReduceOp>(loc, input, gpuReduceKind,
+                                                   /*uniform=*/false);
+    }
+    return builder.create<gpu::SubgroupReduceOp>(
+        loc, input, gpuReduceKind, /*uniform=*/false, numLaneToReduce);
+  }
+
+  // Otherwise, perform the shuffles over the supported scalar type. For inputs
+  // of smaller bitwidth, perform packing and unpacking via the supported
+  // integer type.
   auto unpack = [loc, &builder, needsPacking, equivIntType,
                  origInputType](Value packedVal) -> Value {
     if (!needsPacking)
@@ -577,20 +595,17 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
 
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize,
+                          expandSubgroupReduce);
+  // Simple case -- emit `gpu.subgroup_reduce` directly.
   if (!expandSubgroupReduce && size == warpSize) {
-    auto gpuReduceKind = combiningKindToAllReduce(kind);
-    // Simple case -- emit `gpu.subgroup_reduce` directly.
-    Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-    return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, gpuReduceKind,
-                                                 /*uniform=*/false);
+    return laneVal;
   }
 
   // More-involved case -- generate `gpu.shuffle` ops over i32 values (using the
   // butterfly shuffle algorithm).
-  //
-  // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
     uint32_t numWarp = size / warpSize;
@@ -634,7 +649,8 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
                                                 identity, loadVal);
     }
-    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
+    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
+                            /*expandSubgroupReduce=*/true);
   }
 
   return laneVal;

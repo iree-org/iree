@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
@@ -18,13 +19,14 @@
 #include "mlir/IR/MLIRContext.h"
 
 namespace mlir::iree_compiler::IREE {
-using Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingInfo;
 
 Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             OpBuilder &builder,
                                             RankedTensorType type,
                                             ValueRange dynamicDims) {
-  auto deviceLayoutAttr = cast<IREE::Codegen::PackedLayoutAttrInterface>(attr);
+  auto deviceLayoutAttr =
+      cast<IREE::Codegen::PackedLayoutMaterializerAttr>(attr);
   MaterializeEncodingInfo encodingInfo = deviceLayoutAttr.getEncodingInfo(type);
   SmallVector<int64_t> paddedShape(type.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
@@ -95,7 +97,8 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
 DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
                                    bool addEncodingAttr) {
   MLIRContext *ctx = attr.getContext();
-  auto deviceLayoutAttr = cast<IREE::Codegen::PackedLayoutAttrInterface>(attr);
+  auto deviceLayoutAttr =
+      cast<IREE::Codegen::PackedLayoutMaterializerAttr>(attr);
   const MaterializeEncodingInfo info = deviceLayoutAttr.getEncodingInfo(type);
   Attribute encodingInfoAttr =
       IREE::Codegen::serializeEncodingInfo(attr.getContext(), info);

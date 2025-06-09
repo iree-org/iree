@@ -170,8 +170,9 @@ bool ExecutableTargetAttr::isGenericOf(
   // This is the most common case for users manually specifying targets.
   auto genericConfigAttr = getConfiguration();
   auto specificConfigAttr = specificAttr.getConfiguration();
-  if (!genericConfigAttr || !specificConfigAttr)
+  if (!genericConfigAttr || !specificConfigAttr) {
     return true;
+  }
 
   // Ensure all fields in specificConfigAttr either don't exist or match.
   for (auto expectedAttr : specificConfigAttr.getValue()) {
@@ -197,18 +198,26 @@ bool ExecutableTargetAttr::isGenericOf(
 }
 
 // static
-ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op) {
+ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op,
+                                                  Operation **annotationSite) {
   auto *context = op->getContext();
   auto attrId = StringAttr::get(context, "hal.executable.target");
   while (op) {
     // Take directly from the enclosing variant.
     if (auto variantOp = llvm::dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+      if (annotationSite) {
+        *annotationSite = variantOp;
+      }
       return variantOp.getTarget();
     }
     // Use an override if specified.
     auto attr = op->getAttrOfType<IREE::HAL::ExecutableTargetAttr>(attrId);
-    if (attr)
+    if (attr) {
+      if (annotationSite) {
+        *annotationSite = op;
+      }
       return attr;
+    }
     // Continue walk.
     op = op->getParentOp();
   }
@@ -254,8 +263,9 @@ void ExecutableObjectAttr::print(AsmPrinter &p) const {
 void ExecutableObjectAttr::filterObjects(
     ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
     SmallVectorImpl<IREE::HAL::ExecutableObjectAttr> &filteredAttrs) {
-  if (!objectAttrs)
+  if (!objectAttrs) {
     return;
+  }
   for (auto objectAttr :
        objectAttrs.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
     auto path = objectAttr.getPath();
@@ -274,14 +284,16 @@ findFileInPaths(StringRef filePath, ArrayRef<std::string> searchPaths) {
   // First try to see if it's an absolute path - we don't want to perform any
   // additional processing on top of that.
   if (llvm::sys::path::is_absolute(filePath)) {
-    if (llvm::sys::fs::exists(filePath))
+    if (llvm::sys::fs::exists(filePath)) {
       return filePath.str();
+    }
     return failure();
   }
 
   // Try a relative lookup from the current working directory.
-  if (llvm::sys::fs::exists(filePath))
+  if (llvm::sys::fs::exists(filePath)) {
     return filePath.str();
+  }
 
   // Search each path in turn for a file that exists.
   // It doesn't mean we can open it but we'll get a better error out of the
@@ -289,8 +301,9 @@ findFileInPaths(StringRef filePath, ArrayRef<std::string> searchPaths) {
   for (auto searchPath : searchPaths) {
     SmallVector<char> tryPath{searchPath.begin(), searchPath.end()};
     llvm::sys::path::append(tryPath, filePath);
-    if (llvm::sys::fs::exists(Twine(tryPath)))
+    if (llvm::sys::fs::exists(Twine(tryPath))) {
       return Twine(tryPath).str();
+    }
   }
 
   // Not found in either the user-specified absolute path, cwd, or the search
@@ -306,8 +319,9 @@ static llvm::cl::list<std::string> clExecutableObjectSearchPath(
 
 FailureOr<std::string> ExecutableObjectAttr::getAbsolutePath() {
   auto pathAttr = getPath();
-  if (!pathAttr)
+  if (!pathAttr) {
     return failure(); // not a file reference
+  }
   return findFileInPaths(pathAttr.getValue(), clExecutableObjectSearchPath);
 }
 
@@ -333,8 +347,9 @@ std::optional<std::string> ExecutableObjectAttr::loadData() {
       return std::nullopt;
     }
     auto file = llvm::MemoryBuffer::getFile(*filePath);
-    if (!file)
+    if (!file) {
       return std::nullopt;
+    }
     return std::string((*file)->getBuffer());
   }
   return std::nullopt;
@@ -372,8 +387,9 @@ Attribute ExecutableObjectsAttr::parse(AsmParser &p, Type type) {
   // `<{` target = [objects, ...], ... `}>`
   SmallVector<Attribute> targetAttrs;
   SmallVector<Attribute> objectsAttrs;
-  if (failed(p.parseLess()))
+  if (failed(p.parseLess())) {
     return {};
+  }
   if (succeeded(p.parseLBrace()) && !succeeded(p.parseOptionalRBrace())) {
     do {
       Attribute targetAttr;
@@ -385,11 +401,13 @@ Attribute ExecutableObjectsAttr::parse(AsmParser &p, Type type) {
       targetAttrs.push_back(targetAttr);
       objectsAttrs.push_back(objectsAttr);
     } while (succeeded(p.parseOptionalComma()));
-    if (failed(p.parseRBrace()))
+    if (failed(p.parseRBrace())) {
       return {};
+    }
   }
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
   return get(p.getContext(), ArrayAttr::get(p.getContext(), targetAttrs),
              ArrayAttr::get(p.getContext(), objectsAttrs));
 }
@@ -418,8 +436,9 @@ std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
       allObjectAttrs.append(objectsArrayAttr.begin(), objectsArrayAttr.end());
     }
   }
-  if (allObjectAttrs.empty())
+  if (allObjectAttrs.empty()) {
     return std::nullopt;
+  }
   return ArrayAttr::get(specificTargetAttr.getContext(), allObjectAttrs);
 }
 
@@ -599,10 +618,11 @@ Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
     // Ask the target backend to build the match expression. It may opt to
     // let the default handling take care of things.
     Value match = buildDeviceTargetMatch(loc, device, *this, builder);
-    if (match)
-      return match;
-    return IREE::HAL::DeviceTargetAttr::buildDeviceIDAndExecutableFormatsMatch(
-        loc, device, getDeviceID(), getExecutableTargets(), builder);
+    return match ? match
+                 : IREE::HAL::DeviceTargetAttr::
+                       buildDeviceIDAndExecutableFormatsMatch(
+                           loc, device, getDeviceID(), getExecutableTargets(),
+                           builder);
   };
 
   // Enumerate all devices and match the first one found (if any).
@@ -702,8 +722,9 @@ Value DeviceTargetAttr::buildExecutableFormatMatch(
     Location loc, Value device,
     ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
     OpBuilder &builder) {
-  if (executableTargetAttrs.empty())
+  if (executableTargetAttrs.empty()) {
     return builder.create<arith::ConstantIntOp>(loc, 1, 1);
+  }
   Value anyFormatMatch;
   for (auto executableTargetAttr : executableTargetAttrs) {
     Value formatMatch = IREE::HAL::DeviceQueryOp::createI1(
@@ -770,8 +791,9 @@ DeviceSelectAttr DeviceSelectAttr::get(MLIRContext *context,
 LogicalResult
 DeviceSelectAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
                          Type type, ArrayAttr devicesAttr) {
-  if (devicesAttr.empty())
+  if (devicesAttr.empty()) {
     return emitError() << "must have at least one device to select";
+  }
   for (auto deviceAttr : devicesAttr) {
     if (!mlir::isa<IREE::HAL::DeviceAliasAttr>(deviceAttr) &&
         !mlir::isa<IREE::HAL::DeviceInitializationAttrInterface>(deviceAttr)) {
@@ -834,8 +856,9 @@ Attribute DeviceAffinityAttr::parse(AsmParser &p, Type type) {
   // `<@device`
   StringAttr deviceName;
   int64_t queueMask = -1;
-  if (failed(p.parseLess()) || failed(p.parseSymbolName(deviceName)))
+  if (failed(p.parseLess()) || failed(p.parseSymbolName(deviceName))) {
     return {};
+  }
   if (succeeded(p.parseOptionalComma())) {
     // `[`queue_bit[, ...] `]`
     queueMask = 0;
@@ -850,8 +873,9 @@ Attribute DeviceAffinityAttr::parse(AsmParser &p, Type type) {
     }
   }
   // `>`
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
   return get(p.getContext(), FlatSymbolRefAttr::get(deviceName), queueMask);
 }
 
@@ -864,8 +888,9 @@ void DeviceAffinityAttr::print(AsmPrinter &p) const {
     os << ", [";
     for (int i = 0, j = 0; i < sizeof(queueMask) * 8; ++i) {
       if (queueMask & (1ll << i)) {
-        if (j++ > 0)
+        if (j++ > 0) {
           os << ", ";
+        }
         os << i;
       }
     }
@@ -876,44 +901,57 @@ void DeviceAffinityAttr::print(AsmPrinter &p) const {
 
 bool DeviceAffinityAttr::isExecutableWith(
     IREE::Stream::AffinityAttr other) const {
-  if (!other)
+  if (!other) {
     return true;
+  }
   // Only compatible with the same exact devices today. We could support a
   // peering model to allow operations to move across devices in a peered set
   // but that may be best done at higher levels and avoided once we get to the
   // "are these the same device" stage.
   auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
-  if (!otherAffinityAttr || getDevice() != otherAffinityAttr.getDevice())
+  if (!otherAffinityAttr || getDevice() != otherAffinityAttr.getDevice()) {
     return false;
+  }
   // If this affinity is a subset of the target affinity then it can execute
   // with it.
-  if ((getQueueMask() & otherAffinityAttr.getQueueMask()) == getQueueMask())
+  if ((getQueueMask() & otherAffinityAttr.getQueueMask()) == getQueueMask()) {
     return true;
+  }
   // Otherwise not compatible.
   return false;
 }
 
 IREE::Stream::AffinityAttr
 DeviceAffinityAttr::joinOR(IREE::Stream::AffinityAttr other) const {
-  if (!other)
+  if (!other) {
     return *this;
-  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
-    return nullptr;
+  } else if (isa<DeviceOptimalAttr>(other)) {
+    return other.joinOR(*this);
+  } else if (auto otherAffinityAttr =
+                 dyn_cast_if_present<DeviceAffinityAttr>(other)) {
+    if (otherAffinityAttr.getDevice() == getDevice()) {
+      return DeviceAffinityAttr::get(getContext(), getDevice(),
+                                     getQueueMask() |
+                                         otherAffinityAttr.getQueueMask());
+    }
   }
-  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
-  return DeviceAffinityAttr::get(getContext(), getDevice(),
-                                 getQueueMask() |
-                                     otherAffinityAttr.getQueueMask());
+  return IREE::HAL::DeviceOptimalAttr::get(getContext(), {*this, other});
 }
 
 IREE::Stream::AffinityAttr
 DeviceAffinityAttr::joinAND(IREE::Stream::AffinityAttr other) const {
-  if (!other)
+  if (!other) {
     return *this;
-  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+  } else if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
-  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
+  auto otherAffinityAttr = dyn_cast_if_present<DeviceAffinityAttr>(other);
+  if (!otherAffinityAttr) {
+    return nullptr; // invalid
+  }
+  if (otherAffinityAttr.getDevice() != getDevice()) {
+    return nullptr; // cannot join across devices (could select optimal, though)
+  }
   return DeviceAffinityAttr::get(getContext(), getDevice(),
                                  getQueueMask() &
                                      otherAffinityAttr.getQueueMask());
@@ -941,8 +979,9 @@ Attribute DevicePromiseAttr::parse(AsmParser &p, Type type) {
   // `<@device`
   StringAttr deviceName;
   int64_t queueMask = -1;
-  if (failed(p.parseLess()) || failed(p.parseSymbolName(deviceName)))
+  if (failed(p.parseLess()) || failed(p.parseSymbolName(deviceName))) {
     return {};
+  }
   if (succeeded(p.parseOptionalComma())) {
     // `[`queue_bit[, ...] `]`
     queueMask = 0;
@@ -957,8 +996,9 @@ Attribute DevicePromiseAttr::parse(AsmParser &p, Type type) {
     }
   }
   // `>`
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
   return get(p.getContext(), deviceName, queueMask);
 }
 
@@ -971,8 +1011,9 @@ void DevicePromiseAttr::print(AsmPrinter &p) const {
     os << ", [";
     for (int i = 0, j = 0; i < sizeof(queueMask) * 8; ++i) {
       if (queueMask & (1ll << i)) {
-        if (j++ > 0)
+        if (j++ > 0) {
           os << ", ";
+        }
         os << i;
       }
     }
@@ -983,44 +1024,57 @@ void DevicePromiseAttr::print(AsmPrinter &p) const {
 
 bool DevicePromiseAttr::isExecutableWith(
     IREE::Stream::AffinityAttr other) const {
-  if (!other)
+  if (!other) {
     return true;
+  }
   // Only compatible with the same exact devices today. We could support a
   // peering model to allow operations to move across devices in a peered set
   // but that may be best done at higher levels and avoided once we get to the
   // "are these the same device" stage.
   auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
-  if (!otherPromiseAttr || getDevice() != otherPromiseAttr.getDevice())
+  if (!otherPromiseAttr || getDevice() != otherPromiseAttr.getDevice()) {
     return false;
+  }
   // If this affinity is a subset of the target affinity then it can execute
   // with it.
-  if ((getQueueMask() & otherPromiseAttr.getQueueMask()) == getQueueMask())
+  if ((getQueueMask() & otherPromiseAttr.getQueueMask()) == getQueueMask()) {
     return true;
+  }
   // Otherwise not compatible.
   return false;
 }
 
 IREE::Stream::AffinityAttr
 DevicePromiseAttr::joinOR(IREE::Stream::AffinityAttr other) const {
-  if (!other)
+  if (!other) {
     return *this;
-  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
-    return nullptr;
+  } else if (isa<DeviceOptimalAttr>(other)) {
+    return other.joinOR(*this);
+  } else if (auto otherPromiseAttr =
+                 dyn_cast_if_present<DevicePromiseAttr>(other)) {
+    if (otherPromiseAttr.getDevice() == getDevice()) {
+      return DevicePromiseAttr::get(getContext(), getDevice(),
+                                    getQueueMask() |
+                                        otherPromiseAttr.getQueueMask());
+    }
   }
-  auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
-  return DevicePromiseAttr::get(getContext(), getDevice(),
-                                getQueueMask() |
-                                    otherPromiseAttr.getQueueMask());
+  return IREE::HAL::DeviceOptimalAttr::get(getContext(), {*this, other});
 }
 
 IREE::Stream::AffinityAttr
 DevicePromiseAttr::joinAND(IREE::Stream::AffinityAttr other) const {
-  if (!other)
+  if (!other) {
     return *this;
-  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+  } else if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
-  auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
+  auto otherPromiseAttr = dyn_cast_if_present<DevicePromiseAttr>(other);
+  if (!otherPromiseAttr) {
+    return nullptr; // invalid
+  }
+  if (otherPromiseAttr.getDevice() != getDevice()) {
+    return nullptr; // cannot join across devices (could select optimal, though)
+  }
   return DevicePromiseAttr::get(getContext(), getDevice(),
                                 getQueueMask() &
                                     otherPromiseAttr.getQueueMask());
@@ -1037,6 +1091,186 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
   // anyway.
   auto targetAffinityAttr = IREE::Stream::AffinityAttr::lookup(inlineSite);
   return *this == targetAffinityAttr;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+// Returns the device attribute from the given HAL affinity attribute.
+static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
+  if (auto deviceAffinityAttr =
+          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
+    return deviceAffinityAttr.getDevice();
+  } else if (auto devicePromiseAttr =
+                 dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
+    return devicePromiseAttr.getDevice();
+  }
+  return {};
+}
+
+bool DeviceTopologyAttr::requiresTransfer(
+    IREE::Stream::AffinityAttr source,
+    IREE::Stream::AffinityAttr target) const {
+  Attribute sourceDevice = getAffinityDevice(source);
+  Attribute targetDevice = getAffinityDevice(target);
+
+  if (!sourceDevice || !targetDevice)
+    return true;
+  if (sourceDevice == targetDevice)
+    return false;
+
+  // Search for a matching link and check if it has transparent access
+  // or unified memory.
+  for (DeviceLinkAttr link : getLinks()) {
+    if ((sourceDevice == link.getSourceDevice() &&
+         targetDevice == link.getTargetDevice())) {
+      return !link.getTransparentAccess() && !link.getUnifiedMemory();
+    }
+  }
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.optimal<*>
+//===----------------------------------------------------------------------===//
+
+// static
+LogicalResult
+DeviceOptimalAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
+                          ArrayRef<IREE::Stream::AffinityAttr> affinityAttrs) {
+  if (affinityAttrs.empty()) {
+    return emitError() << "must have at least one device affinity";
+  }
+  for (auto affinityAttr : affinityAttrs) {
+    if (!mlir::isa<IREE::HAL::DeviceAffinityAttr>(affinityAttr) &&
+        !mlir::isa<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
+      return emitError() << "can only select between HAL affinity attrs";
+    }
+  }
+  return success();
+}
+
+bool DeviceOptimalAttr::isExecutableWith(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) {
+    return true;
+  }
+
+  // Since any affinity in the set may be selected at runtime all must be
+  // compatible with the target. If the other attr is itself an optimal set then
+  // all must be compatable with all.
+  if (auto otherOptimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(other)) {
+    for (auto affinityAttr : getAffinities()) {
+      for (auto otherAffinityAttr : otherOptimalAttr.getAffinities()) {
+        if (!affinityAttr.isExecutableWith(otherAffinityAttr)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  } else {
+    for (auto affinityAttr : getAffinities()) {
+      if (!affinityAttr.isExecutableWith(other)) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
+using DeviceAffinitySet =
+    llvm::MapVector<Attribute, IREE::Stream::AffinityAttr>;
+
+static IREE::Stream::AffinityAttr joinDeviceOptimalAttr(
+    IREE::HAL::DeviceOptimalAttr optimalAttr,
+    IREE::Stream::AffinityAttr otherAttr,
+    std::function<bool(DeviceAffinitySet &affinitySet,
+                       IREE::Stream::AffinityAttr affinityAttr)>
+        tryMerge) {
+  if (!otherAttr) {
+    return optimalAttr;
+  }
+  DeviceAffinitySet affinitySet;
+  for (auto affinityAttr : optimalAttr.getAffinities()) {
+    auto deviceAffinity = getAffinityDevice(affinityAttr);
+    if (!deviceAffinity) {
+      return nullptr;
+    }
+    affinitySet.insert({deviceAffinity, affinityAttr});
+  }
+  if (auto otherOptimalAttr =
+          dyn_cast<IREE::HAL::DeviceOptimalAttr>(otherAttr)) {
+    for (auto otherAffinityAttr : otherOptimalAttr.getAffinities()) {
+      if (!tryMerge(affinitySet, otherAffinityAttr)) {
+        return nullptr;
+      }
+    }
+  } else {
+    if (!tryMerge(affinitySet, otherAttr)) {
+      return nullptr;
+    }
+  }
+  auto affinityAttrs = llvm::map_to_vector(affinitySet.getArrayRef(),
+                                           [](auto it) { return it.second; });
+  return IREE::HAL::DeviceOptimalAttr::get(optimalAttr.getContext(),
+                                           affinityAttrs);
+}
+
+IREE::Stream::AffinityAttr
+DeviceOptimalAttr::joinOR(IREE::Stream::AffinityAttr other) const {
+  return joinDeviceOptimalAttr(
+      *this, other,
+      [&](DeviceAffinitySet &affinitySet,
+          IREE::Stream::AffinityAttr affinityAttr) {
+        auto otherDeviceAttr = getAffinityDevice(affinityAttr);
+        if (!otherDeviceAttr) {
+          return false;
+        }
+        auto it = affinitySet.find(otherDeviceAttr);
+        if (it == affinitySet.end()) {
+          // New device entry.
+          affinitySet.insert({otherDeviceAttr, affinityAttr});
+        }
+        // OR in with existing entry.
+        auto joinedAttr = it->second.joinOR(other);
+        assert(joinedAttr &&
+               "did not expect to fail with the current attr design");
+        affinitySet.insert_or_assign(otherDeviceAttr, joinedAttr);
+        return true;
+      });
+}
+
+IREE::Stream::AffinityAttr
+DeviceOptimalAttr::joinAND(IREE::Stream::AffinityAttr other) const {
+  return joinDeviceOptimalAttr(
+      *this, other,
+      [&](DeviceAffinitySet &affinitySet,
+          IREE::Stream::AffinityAttr affinityAttr) {
+        auto otherDeviceAttr = getAffinityDevice(affinityAttr);
+        if (!otherDeviceAttr) {
+          return false;
+        }
+        auto it = affinitySet.find(otherDeviceAttr);
+        if (it == affinitySet.end()) {
+          // No device matching in the set, exclude.
+          return true;
+        }
+        // AND in with existing entry.
+        auto joinedAttr = it->second.joinAND(other);
+        assert(joinedAttr &&
+               "did not expect to fail with the current attr design");
+        affinitySet.insert_or_assign(otherDeviceAttr, joinedAttr);
+        return true;
+      });
+}
+
+bool DeviceOptimalAttr::isLegalToInline(Operation *inlineSite,
+                                        Operation *inlinable) const {
+  // Look up the affinity of the inlining target site and only allow inlining if
+  // the target affinity is compatible with all of the selected affinities.
+  auto targetAffinityAttr = IREE::Stream::AffinityAttr::lookup(inlineSite);
+  return isExecutableWith(targetAffinityAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1062,8 +1296,9 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.has_value())
+  if (parseResult.has_value()) {
     return genAttr;
+  }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};

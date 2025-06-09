@@ -146,11 +146,11 @@ func.func @batch_matmul_dynamic() attributes {hal.executable.target = #executabl
 func.func @check_buffer_ops_vectorization() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x1024xi32>
-  memref.assume_alignment %0, 64 : memref<128x1024xi32>
+  %assume_align_0 = memref.assume_alignment %0, 64 : memref<128x1024xi32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x1536xi32>
-  memref.assume_alignment %1, 64 : memref<128x1536xi32>
-  %subview = memref.subview %1[0, 0] [128, 1024] [1, 1] : memref<128x1536xi32> to memref<128x1024xi32, #map>
-  linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%0 : memref<128x1024xi32>) outs(%subview : memref<128x1024xi32, #map>) {
+  %assume_align_1 = memref.assume_alignment %1, 64 : memref<128x1536xi32>
+  %subview = memref.subview %assume_align_1[0, 0] [128, 1024] [1, 1] : memref<128x1536xi32> to memref<128x1024xi32, #map>
+  linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%assume_align_0 : memref<128x1024xi32>) outs(%subview : memref<128x1024xi32, #map>) {
   ^bb0(%in: i32, %out: i32):
     linalg.yield %in : i32
   }
@@ -317,15 +317,18 @@ func.func @dispatch() attributes {hal.executable.target = #executable_target_emb
 //       CHECK:   func @dispatch
 //       CHECK:     %[[INPUT0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[ASSUMED_INPUT0:.+]] = memref.assume_alignment %[[INPUT0]], 64
 //       CHECK:     %[[INPUT1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[ASSUMED_INPUT1:.+]] = memref.assume_alignment %[[INPUT1]], 64
 //       CHECK:     %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[ASSUMED_OUTPUT:.+]] = memref.assume_alignment %[[OUTPUT]], 64
 //   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply
 //   CHECK-DAG:     %[[SIZE:.+]] = affine.min
-//   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
-//   CHECK-DAG:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[INPUT0]][%[[OFFSET]]] [%[[SIZE]]]
-//   CHECK-DAG:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[INPUT1]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[ASSUMED_OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[ASSUMED_INPUT0]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[ASSUMED_INPUT1]][%[[OFFSET]]] [%[[SIZE]]]
 //       CHECK:     iree_codegen.ukernel.generic "simple_mul_workgroup"
 //  CHECK-SAME:         ins(%[[SUBVIEW_INPUT0]], %[[SUBVIEW_INPUT1]]
 //  CHECK-SAME:         outs(%[[SUBVIEW_OUTPUT]]

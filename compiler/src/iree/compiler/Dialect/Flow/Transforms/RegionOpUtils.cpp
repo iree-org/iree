@@ -45,12 +45,6 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
 
-// TODO(#18457, #18447): Remove once backends support gather fusion.
-static llvm::cl::opt<bool>
-    clEnableGatherFusion("iree-flow-enable-gather-fusion",
-                         llvm::cl::desc("Fuse gather-like ops with consumer."),
-                         llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
@@ -193,7 +187,9 @@ static bool checkShapeIsDataDependant(Operation *op) {
     };
     llvm::SetVector<Operation *> slice;
     for (Value initOperand : linalgOp.getDpsInits()) {
-      mlir::getBackwardSlice(initOperand, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(initOperand, &slice, options);
+      assert(result.succeeded());
     }
     return llvm::any_of(slice, llvm::IsaPred<tensor::ExtractOp>);
   }
@@ -861,9 +857,7 @@ bool isClonableIntoDispatchOp(Operation *op,
   if (LinalgExt::isBitExtendOp(op)) {
     return true;
   }
-  if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
-    return true;
-  }
+
   // If the operation is used for masking an AttentionOp, then we always
   // clone it. The Attention mask is usually big, and is always generated
   // from a small tensor, so it's always good to clone it.
@@ -874,6 +868,10 @@ bool isClonableIntoDispatchOp(Operation *op,
   // If the operation is used for the indices computation of a scatter op, it
   // should be cloned into the dispatch.
   if (options.aggressive && isScatterIndicesGenerator(op)) {
+    return true;
+  }
+
+  if (isa<IREE::LinalgExt::GatherOp>(op)) {
     return true;
   }
 
@@ -939,17 +937,6 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
       if (insertSliceUser.getDest() == v)
         return true;
-    }
-
-    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
-      // Only clone if used by Query, Mask, or scale.
-      if (!LinalgExt::isBitExtendOp(v.getDefiningOp()) &&
-          !llvm::is_contained<Value>(
-              {attentionOp.getQuery(), attentionOp.getMask(),
-               attentionOp.getScale(), attentionOp.getOutput()},
-              v)) {
-        return true;
-      }
     }
   }
   return false;

@@ -323,13 +323,6 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     // by the iterator types of this operation.
     void getIterationBounds(SmallVectorImpl<int64_t> &iterationBounds);
 
-    // Returns a list of index maps, where there is a list entry for each
-    // op indexing map attribute (i.e. one for each input and output, with
-    // the output listed last). Each index map, maps from this operations
-    // iteration space, to vector dimensions of the maps input/output.
-    void getIterationIndexMap(
-      std::vector<DenseMap<int64_t, int64_t>> &iterationIndexMap);
-
     SmallVector<utils::IteratorType> getIteratorTypesArray() {
       auto range =
           getIteratorTypes()
@@ -337,37 +330,38 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
       return {range.begin(), range.end()};
     }
 
+    ArrayRef<int64_t> getOperandInnerShape(uint32_t index) {
+      auto opType = ::llvm::cast<::mlir::ShapedType>(getOperandTypes()[index]);
+      int64_t innerDimRank = opType.getRank() - getIndexingMapsArray()[index].getNumResults();
+      return opType.getShape().take_back(innerDimRank);
+    }
+
     ArrayRef<int64_t> getLhsInnerShape() {
-      ShapedType lhsType = getLhsType();
-      int64_t lhsInnerDimRank =
-        lhsType.getRank() - getIndexingMapsArray()[0].getNumResults();
-      return lhsType.getShape().take_back(lhsInnerDimRank);
+      return getOperandInnerShape(0);
     }
 
     ArrayRef<int64_t> getRhsInnerShape() {
-      ShapedType rhsType = getRhsType();
-      int64_t rhsInnerDimRank =
-        rhsType.getRank() - getIndexingMapsArray()[1].getNumResults();
-      return rhsType.getShape().take_back(rhsInnerDimRank);
+      return getOperandInnerShape(1);
     }
 
     ArrayRef<int64_t> getAccInnerShape() {
-      ShapedType accType = getAccType();
-      int64_t accInnerDimRank =
-        accType.getRank() - getIndexingMapsArray()[2].getNumResults();
-      return accType.getShape().take_back(accInnerDimRank);
+      return getOperandInnerShape(2);
+    }
+
+    int64_t getOperandOuterRank(int64_t index) {
+      return getIndexingMapsArray()[index].getNumResults();
     }
 
     int64_t getLhsOuterRank() {
-      return getIndexingMapsArray()[0].getNumResults();
+      return getOperandOuterRank(0);
     }
 
     int64_t getRhsOuterRank() {
-      return getIndexingMapsArray()[1].getNumResults();
+      return getOperandOuterRank(1);
     }
 
     int64_t getAccOuterRank() {
-      return getIndexingMapsArray()[2].getNumResults();
+      return getOperandOuterRank(2);
     }
 
     // Method to implement for specifying output range for
@@ -494,6 +488,37 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
   }];
 
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// GlobalLoadDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
+    SameVariadicOperandSize]> {
+  let summary = "Does a global load DMA operation";
+  let description = [{
+    This operation represents a subgroup-level global load DMA operation.
+    It is used to represent a direct gathering operation from global memory to workgroup.
+    To be specific, the thread gathers data from the global memoryspace at the designated
+    indices, and stores it to the thread's lane-offset of the workgroup memref at the
+    designated indices.
+
+    Specifically, if the thread's subgroup lane id is `lane_id`, the thread will load the data
+    from `$source[sourceIndices]` and store it to `$target[targetIndices] + lane_id`.
+    Collectively, all threads in the subgroup orchestrate the load DMA operation.
+
+    Note: each gather has a load width is 32bit.
+  }];
+
+  let arguments = (ins AnyMemRef:$source, Variadic<Index>:$sourceIndices,
+                       AnyMemRef:$target, Variadic<Index>:$targetIndices);
+  let results   = (outs);
+
+  let assemblyFormat = [{
+    $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
+      `:` type($source) `->` type($target)
+  }];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS

@@ -109,6 +109,9 @@ typedef struct iree_hal_hip_device_params_t {
 
   // Enable async caching on the device.
   bool async_caching;
+
+  // External stream to use for the device.
+  uint64_t external_stream;
 } iree_hal_hip_device_params_t;
 
 // Initializes |out_params| to default values.

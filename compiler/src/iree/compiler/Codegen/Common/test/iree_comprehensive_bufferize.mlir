@@ -133,11 +133,8 @@ func.func @matmul_fill() {
 //  CHECK-DAG:   %[[RES_OFFSET_INDEX:.+]] = arith.index_castui %[[RES_OFFSET_I32]]
 //  CHECK-DAG:   %[[RES_OFFSET:.+]] = util.assume.int %[[RES_OFFSET_INDEX]]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(32)
-//  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[BASE_OFFSET]])
-//  CHECK-DAG:   memref.assume_alignment %[[RHS]], 8
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[RES_OFFSET]])
-//  CHECK-DAG:   memref.assume_alignment %[[RESULT]], 64
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]
@@ -279,7 +276,6 @@ func.func @early_bufferized_copy_cst_ops() {
   %cst = arith.constant dense<0> : tensor<2x3xi32>
   %0 = bufferization.to_buffer %cst : tensor<2x3xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2x5xi32>
-  memref.assume_alignment %1, 64 : memref<2x5xi32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2x5xi32>>
   %3 = memref.subview %1[%c0, %c2] [2, 3] [%c1, %c1] : memref<2x5xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
   linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) outs(%3 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) {
@@ -2955,16 +2951,16 @@ func.func @check_no_alloc() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @load_from_memref_store_to_memref() {
+func.func @load_from_buffer_store_to_buffer() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 {read_only} : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
-  iree_codegen.store_to_memref %2, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  %2 = iree_codegen.load_from_buffer %0 {read_only} : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
+  iree_codegen.store_to_buffer %2, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 
-// CHECK-LABEL: func.func @load_from_memref_store_to_memref()
+// CHECK-LABEL: func.func @load_from_buffer_store_to_buffer()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //       CHECK:   linalg.generic
@@ -2977,12 +2973,12 @@ func.func @load_from_memref_store_to_memref() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @load_from_memref_store_to_memref_in_place() {
+func.func @load_from_buffer_store_to_buffer_in_place() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %0 : memref<128x384xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128x384xf32>
-  %3 = iree_codegen.load_from_memref %1 : memref<128x384xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128x384xf32>
+  %2 = iree_codegen.load_from_buffer %0 : memref<128x384xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128x384xf32>
+  %3 = iree_codegen.load_from_buffer %1 : memref<128x384xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128x384xf32>
   %forall = scf.forall (%arg0) in (128) shared_outs(%arg1 = %3) -> (tensor<128x384xf32>) {
     %input = tensor.extract_slice %2[%arg0, 0] [1, 384] [1, 1] : tensor<128x384xf32> to tensor<384xf32>
     %init = tensor.extract_slice %arg1[%arg0, 0] [1, 384] [1, 1] : tensor<128x384xf32> to tensor<384xf32>
@@ -2991,11 +2987,11 @@ func.func @load_from_memref_store_to_memref_in_place() {
       tensor.parallel_insert_slice %copy into %arg1[%arg0, 0] [1, 384] [1, 1] : tensor<384xf32> into tensor<128x384xf32>
     }
   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
-  iree_codegen.store_to_memref %forall, %1 : tensor<128x384xf32> into memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %forall, %1 : tensor<128x384xf32> into memref<128x384xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 
-// CHECK-LABEL: func.func @load_from_memref_store_to_memref_in_place()
+// CHECK-LABEL: func.func @load_from_buffer_store_to_buffer_in_place()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //       CHECK:   scf.forall (%[[ARG0:.+]]) in (128)
@@ -3009,18 +3005,18 @@ func.func @load_from_memref_store_to_memref_in_place() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @load_from_memref_read_only_copy() {
+func.func @load_from_buffer_read_only_copy() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<2x64xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128xf32, #hal.descriptor_type<storage_buffer>>
   %collapse = memref.collapse_shape %0 [[0, 1]] : memref<2x64xf32, #hal.descriptor_type<storage_buffer>> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
-  %2 = iree_codegen.load_from_memref %collapse : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
+  %2 = iree_codegen.load_from_buffer %collapse : memref<128xf32, #hal.descriptor_type<storage_buffer>> -> tensor<128xf32>
   %copy = linalg.copy ins(%2 : tensor<128xf32>) outs(%2 : tensor<128xf32>) -> tensor<128xf32>
-  iree_codegen.store_to_memref %copy, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %copy, %1 : tensor<128xf32> into memref<128xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 
-// CHECK-LABEL: func.func @load_from_memref_read_only_copy()
+// CHECK-LABEL: func.func @load_from_buffer_read_only_copy()
 //   CHECK-DAG:   %[[READ_ONLY_BUFFER:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //   CHECK-DAG:   %[[COLLAPSED:.+]] = memref.collapse_shape %[[READ_ONLY_BUFFER]]
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)

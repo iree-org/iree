@@ -20,6 +20,7 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateTargetDevices.cpp",
         "AssignLegacyTargetDevices.cpp",
         "AssignTargetDevices.cpp",
         "CaptureExecutableSources.cpp",
@@ -37,6 +38,7 @@ iree_compiler_cc_library(
         "MaterializeResourceCaches.cpp",
         "MaterializeTargetDevices.cpp",
         "MemoizeDeviceQueries.cpp",
+        "MemoizeDeviceSelection.cpp",
         "OutlineMemoizeRegions.cpp",
         "Passes.cpp",
         "Passes.h.inc",

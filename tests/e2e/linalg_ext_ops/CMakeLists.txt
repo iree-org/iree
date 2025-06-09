@@ -16,6 +16,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "attention.mlir"
     "gather.mlir"
+    "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
@@ -53,6 +54,7 @@ iree_check_single_backend_test_suite(
     check_vmvx_local-task
   SRCS
     "gather.mlir"
+    "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"

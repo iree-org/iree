@@ -37,7 +37,7 @@ struct MaterializeEncodingIntoNopPass final
     FunctionOpInterface operation = getOperation();
 
     RewritePatternSet materializeEncodingPattern(context);
-    auto layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(
+    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
         IREE::Codegen::EncodingNopLayoutAttr::get(context));
     MaterializeEncodingTypeConverter typeConverter(layoutAttr);
     MaterializeEncodingConversionTarget target(*context);

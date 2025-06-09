@@ -122,10 +122,10 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     "iree/tests/e2e/matmul/e2e_matmul_vmvx_dt_uk_i8_small_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_vmvx_dt_uk_f32_small_vmvx_local-task"
     # TODO: Regressed when `pack` ukernel gained a uint64_t parameter in #13264.
-    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack.mlir"
-    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack_dynamic_inner_tiles.mlir"
+    "iree/tests/e2e/linalg/check_vmvx_ukernel_local-task_pack.mlir"
+    "iree/tests/e2e/linalg/check_vmvx_ukernel_local-task_pack_dynamic_inner_tiles.mlir"
     # TODO: Fix equality mismatch
-    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
+    "iree/tests/e2e/linalg/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
     # Flaky on CI opening the .safetensors testdata for unknown reasons, skip.

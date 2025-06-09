@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -23,9 +24,15 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 
-#define DEBUG_TYPE "iree-util-dfx"
+#define DEBUG_TYPE "iree-stream-affinity-analysis"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+static llvm::cl::opt<int> clSolverMaxIterations(
+    "iree-stream-affinity-solver-max-iterations",
+    llvm::cl::desc("Maximum affinity analysis solver iteration count before it "
+                   "gives up. Roughly equivalent to operation chain depth."),
+    llvm::cl::init(128));
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -52,6 +59,169 @@ static const std::string getAffinitySetAsStr(
   }
   sstream.flush();
   return str;
+}
+
+//===----------------------------------------------------------------------===//
+// Precomputed IR properties
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): template this as a helper and move into common... though
+// hopefully it's rarely needed.
+class SidebandElement
+    : public DFX::StateWrapper<DFX::BooleanState, DFX::OperationElement> {
+public:
+  using BaseType = DFX::StateWrapper<DFX::BooleanState, DFX::OperationElement>;
+  SidebandElement(const Position &pos,
+                  AffinityAnalysis::PrecomputedQueries *precomputedQueries)
+      : BaseType(pos), precomputedQueries(precomputedQueries) {}
+
+  static SidebandElement &
+  createForPosition(const Position &pos, DFX::Solver &solver,
+                    AffinityAnalysis::PrecomputedQueries *precomputedQueries) {
+    return *(new (solver.getAllocator())
+                 SidebandElement(pos, precomputedQueries));
+  }
+
+  // Identity definitions.
+  const std::string getName() const override { return "SidebandElement"; }
+  const void *getID() const override { return &ID; }
+  static bool classof(const DFX::AbstractElement *element) {
+    return (element->getID() == &ID);
+  }
+  static const char ID;
+
+  const std::string getAsStr(AsmState &asmState) const override {
+    return "sideband";
+  }
+
+  const AffinityAnalysis::PrecomputedQueries &get() const {
+    return *precomputedQueries;
+  }
+
+private:
+  void initializeOperation(Operation *op, DFX::Solver &solver) override {
+    getState().setKnown(true);
+    indicateOptimisticFixpoint();
+  }
+  ChangeStatus updateOperation(Operation *op, DFX::Solver &solver) override {
+    return ChangeStatus::UNCHANGED;
+  }
+
+  AffinityAnalysis::PrecomputedQueries *precomputedQueries;
+};
+const char SidebandElement::ID = 0;
+
+// Populates value affinities for all operands and results of the affinity op
+// that pins affinity transitively (through tied ops).
+static void populatePinnedAffinities(
+    IREE::Stream::AffinityOpInterface affinityOp, Explorer &explorer,
+    AffinityAnalysis::PrecomputedQueries &precomputedQueries) {
+  assert(affinityOp.pinsValueAffinity() && "must pin affinity");
+  auto &pinnedAffinities = precomputedQueries.pinnedAffinities;
+  auto markPinned = [&](Value value) {
+    auto it = pinnedAffinities.find(value);
+    if (it == pinnedAffinities.end()) {
+      // First time this value has been pinned.
+      pinnedAffinities[value].insert(affinityOp);
+      return true; // continue searching
+    } else if (it->second.contains(affinityOp)) {
+      // Already pinned to this affinity.
+      return false; // stop searching
+    } else {
+      // Adding a new affinity.
+      it->second.insert(affinityOp);
+      return true; // continue searching
+    }
+  };
+  for (Value result : affinityOp->getResults()) {
+    if (!isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
+      continue;
+    }
+    explorer.walkTransitiveUses(result, [&](OpOperand &operand) {
+      if (!isa<IREE::Stream::AffinityTypeInterface>(operand.get().getType())) {
+        // Type changed; stop tracking affinity.
+        return WalkResult::skip();
+      } else if (auto affinityOp =
+                     dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
+                         operand.getOwner())) {
+        // If the user _also_ pins affinity we need to stop. The overall
+        // population will eventually reach it and start pinning from there.
+        if (affinityOp.pinsValueAffinity()) {
+          return WalkResult::skip();
+        }
+      }
+      return markPinned(operand.get()) ? WalkResult::advance()
+                                       : WalkResult::skip();
+    });
+  }
+  for (Value operand : affinityOp->getOperands()) {
+    if (!isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
+      continue;
+    }
+    explorer.walkDefiningOps(operand, [&](OpResult result) -> WalkResult {
+      if (result.getOwner() == affinityOp) {
+        return WalkResult::advance(); // starting point
+      }
+      if (!isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
+        // Type changed; stop tracking affinity.
+        return WalkResult::skip();
+      } else if (auto affinityOp =
+                     dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
+                         result.getOwner())) {
+        // If the defining op _also_ pins affinity we need to stop. The overall
+        // population will eventually reach it and start pinning from there.
+        if (affinityOp.pinsValueAffinity()) {
+          return WalkResult::skip();
+        }
+      }
+      return markPinned(result) ? WalkResult::advance() : WalkResult::skip();
+    });
+  }
+}
+
+void AffinityAnalysis::PrecomputedQueries::compute(Explorer &explorer) {
+  explorer.forEachFunctionLikeOp([&](FunctionOpInterface funcOp) {
+    funcOp.walk([&](Operation *op) {
+      if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+        if (affinityOp.pinsValueAffinity()) {
+          populatePinnedAffinities(affinityOp, explorer, *this);
+        }
+      }
+    });
+  });
+}
+
+void AffinityAnalysis::PrecomputedQueries::inject(DFX::Solver &solver) {
+  solver.registerElement(SidebandElement::createForPosition(
+      Position::forOperation(solver.getExplorer().getRootOp()), solver, this));
+}
+
+// static
+const AffinityAnalysis::PrecomputedQueries &
+AffinityAnalysis::PrecomputedQueries::get(DFX::Solver &solver) {
+  auto *sidebandElement = solver.lookupElementFor<SidebandElement>(
+      Position::forOperation(solver.getExplorer().getRootOp()));
+  assert(sidebandElement && "sideband element must have been registered before "
+                            "attempting to query it");
+  return sidebandElement->get();
+}
+
+void AffinityAnalysis::PrecomputedQueries::print(llvm::raw_ostream &os,
+                                                 AsmState &asmState) {
+  os << "[PrecomputedQueries] pinned affinities:\n";
+  for (auto it : pinnedAffinities) {
+    os << "  ";
+    it.first.printAsOperand(os, asmState);
+    os << ":\n";
+    llvm::interleave(
+        it.second, os,
+        [&](auto affinityOp) {
+          os << "    ";
+          affinityOp->print(llvm::dbgs(), asmState);
+        },
+        ",\n");
+    os << "\n";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -92,9 +262,6 @@ private:
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override;
   void updateFromUse(Value value, OpOperand &operand, StateType &newState,
                      DFX::Solver &solver);
-
-  // Operations that the value is pinned to.
-  SetVector<Operation *> pinnedOps;
 };
 const char ValueProducerAffinityPVS::ID = 0;
 
@@ -251,8 +418,6 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
       llvm::dbgs() << "[ValueConsumerAffinityPVS] value ";
       value.printAsOperand(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << " affinity using consumer affinity from ";
-      operand.get().printAsOperand(llvm::dbgs(), solver.getAsmState());
-      llvm::dbgs() << " as ";
       opPVS.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
@@ -286,6 +451,18 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
   // Handle consumers that are not affinity aware - this should have any control
   // flow ops so that we can track values that flow through the program.
   return TypeSwitch<Operation *, TraversalResult>(operand.getOwner())
+      .Case([&](IREE::Stream::AsyncTransferOp op) {
+        if (auto targetAffinityAttr = op.getResultAffinityAttr()) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "[ValueConsumerAffinityPVS] value ";
+            value.printAsOperand(llvm::dbgs(), solver.getAsmState());
+            llvm::dbgs() << " affinity unioning with transfer target "
+                         << "affinity as " << targetAffinityAttr << "\n";
+          });
+          newState.unionAssumed(targetAffinityAttr);
+        }
+        return TraversalResult::COMPLETE;
+      })
       .Case([&](mlir::arith::SelectOp op) {
         auto &resultPVS = solver.getElementFor<ValueConsumerAffinityPVS>(
             *this, Position::forValue(op.getResult()),
@@ -385,6 +562,15 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
           return TraversalResult::INCOMPLETE;
         }
       })
+      .Case([&](IREE::Stream::YieldOp op) {
+        auto parentOp = op->getParentOp();
+        auto &resultPVS = solver.getElementFor<ValueConsumerAffinityPVS>(
+            *this,
+            Position::forValue(parentOp->getResult(operand.getOperandNumber())),
+            DFX::Resolution::REQUIRED);
+        newState ^= resultPVS.getState();
+        return TraversalResult::COMPLETE;
+      })
       .Case([&](IREE::Util::ReturnOp op) {
         return solver.getExplorer().walkIncomingCalls(
             op->getParentOfType<mlir::CallableOpInterface>(),
@@ -422,50 +608,10 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
 //===----------------------------------------------------------------------===//
 
 void ValueProducerAffinityPVS::initializeValue(Value value,
-                                               DFX::Solver &solver) {
-  solver.getExplorer().walkDefiningOps(value, [&](OpResult result) {
-    if (!isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
-      return WalkResult::skip();
-    }
-    if (auto affinityOp =
-            dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
-                result.getOwner())) {
-      if (affinityOp.pinsValueAffinity()) {
-        pinnedOps.insert(result.getOwner());
-      }
-    }
-    return WalkResult::advance();
-  });
-  solver.getExplorer().walkTransitiveUses(value, [&](OpOperand &operand) {
-    if (!isa<IREE::Stream::AffinityTypeInterface>(operand.get().getType())) {
-      return WalkResult::skip();
-    }
-    if (auto affinityOp =
-            dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
-                operand.getOwner())) {
-      if (affinityOp.pinsValueAffinity()) {
-        pinnedOps.insert(operand.getOwner());
-      }
-    }
-    return WalkResult::advance();
-  });
-}
+                                               DFX::Solver &solver) {}
 
 ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                                                    DFX::Solver &solver) {
-  StateType newState;
-
-  // If there are any ops that produce the value and pin to a specific affinity
-  // then we take those directly and ignore all others.
-  if (!pinnedOps.empty()) {
-    for (auto pinnedOp : pinnedOps) {
-      auto &opPVS = solver.getElementFor<OpAffinityPVS>(
-          *this, Position::forOperation(pinnedOp), DFX::Resolution::REQUIRED);
-      newState ^= opPVS;
-    }
-    return DFX::clampStateAndIndicateChange(getState(), newState);
-  }
-
   // We special case some ops that act as barriers in the program. This prevents
   // us from walking past boundaries that are not profitable to do so with; for
   // example, globals are usually stored in independent contexts from where they
@@ -483,8 +629,7 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
       operandPVS.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
-    newState ^= operandPVS;
-    return DFX::clampStateAndIndicateChange(getState(), newState);
+    return DFX::clampStateAndIndicateChange(getState(), operandPVS.getState());
   } else if (auto loadOp =
                  dyn_cast_if_present<IREE::Util::GlobalLoadOpInterface>(
                      value.getDefiningOp())) {
@@ -501,11 +646,11 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
       globalPVS.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
-    newState ^= globalPVS.getState();
-    return DFX::clampStateAndIndicateChange(getState(), newState);
+    return DFX::clampStateAndIndicateChange(getState(), globalPVS.getState());
   }
 
   // Walk the program up into any possible producers of the value.
+  StateType newState;
   auto traversalResult = TraversalResult::COMPLETE;
   traversalResult |= solver.getExplorer().walkDefiningOps(
       value,
@@ -515,26 +660,40 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
         }
 
         // If coming from an affinity-aware op that pins the value storage to a
-        // particular affinity that overrides all other logic.
+        // particular affinity that defines the required producer, even if this
+        // op isn't producing it. We continue walking through tied ops below in
+        // case we need to _also_ find the producer affinity. This is how alias
+        // ops work: some op produces the value and then an alias op pins it -
+        // the producer need not have the same affinity as the alias op as
+        // that's just indicating where it is stored.
+        //
+        // Pinning has an important property: we know exactly where the resource
+        // *must* be (because the user told us that). What we may not be able to
+        // tell during analysis is where it _also_ is. That's fine (I think)
+        // because pinning is how users provide us information we otherwise
+        // can't get and we have to go on trust that they are telling us the
+        // proper placement. Below all state combinations we perform are guarded
+        // on whether it's pinned: if it is, we ignore invalid analysis state
+        // and only use it to augment the pinned affinity.
+        bool isPinned = false;
         if (auto affinityOp =
                 dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
                     result.getDefiningOp())) {
           if (affinityOp.pinsValueAffinity()) {
+            isPinned = true;
             auto &opPVS = solver.getElementFor<OpAffinityPVS>(
                 *this, Position::forOperation(affinityOp),
                 DFX::Resolution::REQUIRED);
             LLVM_DEBUG({
               llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
               value.printAsOperand(llvm::dbgs(), solver.getAsmState());
-              llvm::dbgs() << " affinity using assuming pinned affinity from ";
+              llvm::dbgs() << " affinity using pinned affinity from ";
               result.printAsOperand(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << " as ";
               opPVS.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
             newState ^= opPVS;
-            newState.indicateOptimisticFixpoint();
-            return WalkResult::advance();
           }
         }
 
@@ -555,7 +714,9 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
               valuePVS.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
-            newState ^= valuePVS;
+            if (!isPinned || valuePVS.isValidState()) {
+              newState ^= valuePVS;
+            }
             return WalkResult::advance();
           }
         }
@@ -578,12 +739,26 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
             opPVS.print(llvm::dbgs(), solver.getAsmState());
             llvm::dbgs() << "\n";
           });
-          newState ^= opPVS;
+          if (!isPinned || opPVS.isValidState()) {
+            newState ^= opPVS;
+          }
           return WalkResult::advance();
         }
 
         // Special handling for specific ops.
         TypeSwitch<Operation *>(result.getOwner())
+            .Case([&](IREE::Stream::AsyncTransferOp op) {
+              if (auto sourceAffinityAttr = op.getSourceAffinityAttr()) {
+                LLVM_DEBUG({
+                  llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
+                  value.printAsOperand(llvm::dbgs(), solver.getAsmState());
+                  llvm::dbgs()
+                      << " affinity unioning with transfer source affinity as "
+                      << sourceAffinityAttr << "\n";
+                });
+                newState.unionAssumed(sourceAffinityAttr);
+              }
+            })
             .Case<IREE::Util::GlobalLoadOpInterface>([&](auto loadOp) {
               auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
                   loadOp.getGlobalName(), loadOp);
@@ -600,22 +775,39 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                 globalPVS.print(llvm::dbgs(), solver.getAsmState());
                 llvm::dbgs() << "\n";
               });
-              newState ^= globalPVS.getState();
+              if (!isPinned || globalPVS.isValidState()) {
+                newState ^= globalPVS.getState();
+              }
             })
             .Case<mlir::arith::SelectOp>([&](auto op) {
               auto &truePVS = solver.getElementFor<ValueProducerAffinityPVS>(
                   *this, Position::forValue(op.getTrueValue()),
                   DFX::Resolution::REQUIRED);
-              newState ^= truePVS.getState();
+              if (!isPinned || truePVS.isValidState()) {
+                newState ^= truePVS.getState();
+              }
               auto &falsePVS = solver.getElementFor<ValueProducerAffinityPVS>(
                   *this, Position::forValue(op.getFalseValue()),
                   DFX::Resolution::REQUIRED);
-              newState ^= falsePVS.getState();
+              if (!isPinned || falsePVS.isValidState()) {
+                newState ^= falsePVS.getState();
+              }
             })
             .Default([&](auto op) {
               auto valuePVS = solver.getElementFor<ValueProducerAffinityPVS>(
                   *this, Position::forValue(result), DFX::Resolution::OPTIONAL);
-              newState ^= valuePVS;
+              LLVM_DEBUG({
+                llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
+                value.printAsOperand(llvm::dbgs(), solver.getAsmState());
+                llvm::dbgs() << " affinity using generic producer affinity of ";
+                result.printAsOperand(llvm::dbgs(), solver.getAsmState());
+                llvm::dbgs() << " as ";
+                valuePVS.print(llvm::dbgs(), solver.getAsmState());
+                llvm::dbgs() << "\n";
+              });
+              if (!isPinned || valuePVS.isValidState()) {
+                newState ^= valuePVS;
+              }
             });
         return WalkResult::advance();
       },
@@ -674,6 +866,13 @@ GlobalAffinityPVS::updateOperation(IREE::Util::GlobalOpInterface globalOp,
         *this, Position::forValue(loadOp.getLoadedGlobalValue()),
         DFX::Resolution::OPTIONAL);
     if (valuePVS.isValidState()) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[GlobalAffinityPVS] global @"
+                     << globalOp.getGlobalName().getValue()
+                     << " affinity using consumer affinity from ";
+        valuePVS.print(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << "\n";
+      });
       newState ^= valuePVS;
     }
   }
@@ -687,6 +886,13 @@ GlobalAffinityPVS::updateOperation(IREE::Util::GlobalOpInterface globalOp,
           *this, Position::forValue(storeOp.getStoredGlobalValue()),
           DFX::Resolution::OPTIONAL);
       if (valuePVS.isValidState()) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "[GlobalAffinityPVS] global @"
+                       << globalOp.getGlobalName().getValue()
+                       << " affinity using producer affinity from ";
+          valuePVS.print(llvm::dbgs(), solver.getAsmState());
+          llvm::dbgs() << "\n";
+        });
         newState ^= valuePVS;
       }
     }
@@ -733,6 +939,13 @@ ChangeStatus OpAffinityPVS::updateOperation(Operation *op,
       if (isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
         auto valuePVS = solver.getElementFor<ValueProducerAffinityPVS>(
             *this, Position::forValue(operand), DFX::Resolution::REQUIRED);
+        LLVM_DEBUG({
+          llvm::dbgs() << "[OpAffinityPVS] op ";
+          op->getName().print(llvm::dbgs());
+          llvm::dbgs() << " consumes ";
+          valuePVS.print(llvm::dbgs(), solver.getAsmState());
+          llvm::dbgs() << "\n";
+        });
         newState ^= valuePVS;
       }
     }
@@ -741,6 +954,13 @@ ChangeStatus OpAffinityPVS::updateOperation(Operation *op,
       if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
         auto valuePVS = solver.getElementFor<ValueConsumerAffinityPVS>(
             *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+        LLVM_DEBUG({
+          llvm::dbgs() << "[OpAffinityPVS] op ";
+          op->getName().print(llvm::dbgs());
+          llvm::dbgs() << " produces ";
+          valuePVS.print(llvm::dbgs(), solver.getAsmState());
+          llvm::dbgs() << "\n";
+        });
         newState ^= valuePVS;
       }
     }
@@ -844,12 +1064,14 @@ bool AffinityAnalysis::tryLookupGlobalAffinity(
     Operation *op, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
   auto globalPVS =
       solver.lookupElementFor<GlobalAffinityPVS>(Position::forOperation(op));
-  if (!globalPVS || !globalPVS->isValidState() ||
-      globalPVS->isUndefContained()) {
+  if (!globalPVS) {
+    // Global was never analyzed (probably not an executable op); try to find a
+    // default.
+    return tryLookupDefaultAffinity(op, affinities);
+  } else if (!globalPVS->isValidState() || globalPVS->isUndefContained()) {
     // Analysis failed.
     return false;
-  }
-  if (globalPVS->getAssumedSet().empty()) {
+  } else if (globalPVS->getAssumedSet().empty()) {
     // Analysis completed but no affinity was specified; try to find a default.
     return tryLookupDefaultAffinity(op, affinities);
   }
@@ -876,11 +1098,14 @@ bool AffinityAnalysis::tryLookupExecutionAffinity(
     Operation *op, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
   auto opPVS =
       solver.lookupElementFor<OpAffinityPVS>(Position::forOperation(op));
-  if (!opPVS || !opPVS->isValidState() || opPVS->isUndefContained()) {
+  if (!opPVS) {
+    // Op was never analyzed (probably not an executable op); try to find a
+    // default.
+    return tryLookupDefaultAffinity(op, affinities);
+  } else if (!opPVS->isValidState() || opPVS->isUndefContained()) {
     // Analysis failed.
     return false;
-  }
-  if (opPVS->getAssumedSet().empty()) {
+  } else if (opPVS->getAssumedSet().empty()) {
     // Analysis completed but no affinity was specified; try to find a default.
     return tryLookupDefaultAffinity(op, affinities);
   }
@@ -967,6 +1192,11 @@ AffinityAnalysis::lookupResourceAffinity(Value value) {
 
 bool AffinityAnalysis::tryLookupResourceAffinity(
     Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  // If the value is pinned then we always use that.
+  if (tryLookupPinnedAffinities(value, affinities)) {
+    return true;
+  }
+
   auto valuePVS = solver.lookupElementFor<ValueProducerAffinityPVS>(
       Position::forValue(value));
   if (!valuePVS || !valuePVS->isValidState() || valuePVS->isUndefContained()) {
@@ -985,7 +1215,66 @@ bool AffinityAnalysis::tryLookupResourceAffinity(
   return true;
 }
 
+bool AffinityAnalysis::tryLookupResourceUsageAffinity(
+    Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  SetVector<IREE::Stream::AffinityAttr> affinitySet;
+  auto producerPVS = solver.lookupElementFor<ValueProducerAffinityPVS>(
+      Position::forValue(value));
+  if (producerPVS && producerPVS->isValidState() &&
+      !producerPVS->isUndefContained()) {
+    affinitySet.insert_range(producerPVS->getAssumedSet());
+  }
+  auto consumerPVS = solver.lookupElementFor<ValueConsumerAffinityPVS>(
+      Position::forValue(value));
+  if (consumerPVS && consumerPVS->isValidState() &&
+      !consumerPVS->isUndefContained()) {
+    affinitySet.insert_range(consumerPVS->getAssumedSet());
+  }
+  // Merge pinned affinities - they are indicating some assumption that we may
+  // not be able to analyze (like external modules).
+  SmallVector<IREE::Stream::AffinityAttr> pinnedAffinities;
+  tryLookupPinnedAffinities(value, pinnedAffinities);
+  affinitySet.insert_range(pinnedAffinities);
+  if (affinitySet.empty()) {
+    // Analysis completed but no affinity was specified; try to find a default.
+    return tryLookupDefaultAffinity(value.getParentBlock()->getParentOp(),
+                                    affinities);
+  }
+  llvm::append_range(affinities, affinitySet);
+  sortAffinities(affinities);
+  return true;
+}
+
+bool AffinityAnalysis::tryLookupPinnedAffinities(
+    Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities) {
+  auto it = precomputedQueries.pinnedAffinities.find(value);
+  if (it == precomputedQueries.pinnedAffinities.end() || it->second.empty()) {
+    return false;
+  }
+  DenseSet<IREE::Stream::AffinityAttr> pinnedAffinities;
+  for (auto pinningOp : it->second) {
+    SmallVector<IREE::Stream::AffinityAttr> pinnerAffinities;
+    if (!tryLookupExecutionAffinity(pinningOp, pinnerAffinities)) {
+      return false;
+    }
+    pinnedAffinities.insert_range(pinnerAffinities);
+  }
+  llvm::append_range(affinities, pinnedAffinities);
+  sortAffinities(affinities);
+  return true;
+}
+
 LogicalResult AffinityAnalysis::run() {
+  // An unfortunate full-module walk.
+  // We should try to do everything that we can before touching the solver in
+  // this walk and cache it on precomputedQueries.
+  precomputedQueries.compute(explorer);
+  LLVM_DEBUG(precomputedQueries.print(llvm::dbgs(), solver.getAsmState()));
+
+  // Inject sideband data into the solver. This allows our elements to lookup
+  // the data by querying on the root op.
+  precomputedQueries.inject(solver);
+
   // Initialize globals so that we can assign them affinity.
   explorer.forEachGlobal([&](const auto *globalInfo) {
     if (isa<IREE::Stream::AffinityTypeInterface>(
@@ -1012,6 +1301,9 @@ LogicalResult AffinityAnalysis::run() {
       }
     }
     funcOp.walk([&](Operation *op) {
+      if (isa<FunctionOpInterface>(op)) {
+        return; // ignore func/initializers/etc.
+      }
       if (auto regionOp = dyn_cast<RegionBranchOpInterface>(op)) {
         for (auto &region : regionOp->getRegions()) {
           for (auto arg : region.getArguments()) {
@@ -1023,18 +1315,23 @@ LogicalResult AffinityAnalysis::run() {
         }
       }
       if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-        solver.getOrCreateElementFor<OpAffinityPVS>(Position::forOperation(op));
+        if (affinityOp.requiresAffinity()) {
+          solver.getOrCreateElementFor<OpAffinityPVS>(
+              Position::forOperation(op));
+        }
       }
       for (auto result : op->getResults()) {
         if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
           solver.getOrCreateElementFor<ValueProducerAffinityPVS>(
+              Position::forValue(result));
+          solver.getOrCreateElementFor<ValueConsumerAffinityPVS>(
               Position::forValue(result));
         }
       }
     });
   });
 
-  if (failed(solver.run())) {
+  if (failed(solver.run(clSolverMaxIterations))) {
     return failure(); // did not converge
   }
 

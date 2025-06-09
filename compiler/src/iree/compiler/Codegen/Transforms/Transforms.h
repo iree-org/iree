@@ -103,6 +103,10 @@ void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns);
 /// hal.interface.binding.subspan.
 void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
 
+/// Populate patterns that fold tensor.expand/collapse_shape into the memref
+/// of iree_codegen.load_from_buffer or iree_codegen.store_to_buffer ops.
+void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
+
 /// Populate patterns that remove dead allocations
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
 

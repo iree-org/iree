@@ -1954,7 +1954,7 @@ LogicalResult TensorCloneOp::verify() {
   // information.
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
-  if (!IREE::Encoding::SerializableEncodingAttrInterface::areCompatible(
+  if (!IREE::Encoding::SerializableAttr::areCompatible(
           sourceEncoding.getEncoding(), resultEncoding.getEncoding())) {
     return op.emitOpError() << "clones changing tensor encoding from "
                             << sourceEncoding.getEncoding() << " to "

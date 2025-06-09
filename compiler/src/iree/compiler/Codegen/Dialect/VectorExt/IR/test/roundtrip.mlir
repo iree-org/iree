@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 func.func @specify_inline_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   %cst_0 = arith.constant 0.0 : f16

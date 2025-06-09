@@ -577,7 +577,10 @@ def HAL_ExecutableTargetAttr :
     // This will recursively walk parent operations until one with the
     // `hal.executable.target` attribute is found or a `hal.executable.variant`
     // specifies a value. Returns nullptr if no target specification can be found.
-    static IREE::HAL::ExecutableTargetAttr lookup(Operation *op);
+    //
+    // If present, sets |annotationSite| to the operation where the target
+    // configuration was found.
+    static IREE::HAL::ExecutableTargetAttr lookup(Operation *op, Operation **annotationSite = nullptr);
   }];
 
   let hasCustomAssemblyFormat = 1;
@@ -1009,6 +1012,135 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   );
 
   let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.optimal<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceOptimalAttr : AttrDef<HAL_Dialect, "DeviceOptimal", [
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
+  Util_HoistableAttrInterface,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
+]> {
+  let mnemonic = "device.optimal";
+  let summary = [{Selects an optimal device for the assigned operation.}];
+  let description = [{
+    Specifies that an annotated operation or scope may execute on one device
+    in the provided affinity set based on whichever is "optimal" for the
+    operation. Resolution of the specific device may happen during compilation
+    if required information is available or be deferred to runtime.
+
+    Example:
+    ```mlir
+    // Run on either @device_a (any queue) or @device_b (queues 4 and 5).
+    #hal.device.optimal<[
+      #hal.device.affinity<@device_a>,
+      #hal.device.affinity<@device_b, [4, 5]>
+    ]>
+    ```
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"IREE::Stream::AffinityAttr", "">:$affinities
+  );
+
+  let assemblyFormat = [{
+    `<` `[` $affinities `]` `>`
+  }];
+
+  let genVerifyDecl = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
+  DeclareAttrInterfaceMethods<Stream_AffinityTopologyAttr, [
+    "requiresTransfer",
+  ]>
+]> {
+  let mnemonic = "device.topology";
+  let summary = [{Device connection topology specification.}];
+  let description = [{
+    Specifies the topology of connections between devices, including
+    information about memory sharing and access characteristics between devices.
+
+    This attribute is attached to the top-level module as `stream.topology`
+    to inform Stream dialect passes about device connectivity.
+
+    Example:
+    ```mlir
+    module {
+      stream.topology = #hal.device.topology<
+        links = [
+          (@device_gpu_0 -> @device_cpu = {transparent_access = true, unified_memory = true}),
+          (@device_gpu_1 -> @device_cpu = {transparent_access = true}),
+          (@device_cpu -> @device_gpu_0 = {unified_memory = true}),
+          (@device_cpu -> @device_gpu_1 = {})
+        ]
+      >
+    }
+    ```
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"DeviceLinkAttr", "links">:$links
+  );
+
+  let assemblyFormat = [{
+    `<` `links` `=` `[` $links `]` `>`
+  }];
+}
+
+def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
+  let mnemonic = "device.link";
+  let summary = [{Connection between devices.}];
+  let description = [{
+    Describes a directional relationship between devices in terms of memory
+    and access properties.
+
+    Currently the following properties are supported:
+    - `unified_memory`: Whether the devices share a unified memory space
+    - `transparent_access`: Whether the source device can access the target device's memory without staging
+
+    The assembly format uses directional links:
+    ```mlir
+    // GPU can access CPU memory transparently with unified memory
+    (@device_gpu -> @device_cpu = {transparent_access = true, unified_memory = true})
+    // CPU needs explicit transfers to access GPU memory (both properties false)
+    (@device_cpu -> @device_gpu = {})
+    // GPU can access CPU memory transparently but without unified memory
+    (@device_gpu -> @device_cpu = {transparent_access = true})
+    // Its possible to add arbitrary properties to the link that are not specified here
+    (@device_gpu -> @device_cpu = {}, {optional_flag = true})
+    ```
+
+    Future extensions may include properties like bandwidth, latency, and target-specific
+    information for specialized connections (e.g., GPUs sharing an SoC, InfiniBand, PCIe).
+  }];
+
+  let parameters = (ins
+    AttrParameter<"SymbolRefAttr", "source_device">:$sourceDevice,
+    AttrParameter<"SymbolRefAttr", "target_device">:$targetDevice,
+    OptionalParameter<"bool", "false">:$unified_memory,
+    OptionalParameter<"bool", "false">:$transparent_access,
+    OptionalParameter<"DictionaryAttr">:$extra_properties
+  );
+
+  let assemblyFormat = [{
+    `(` $sourceDevice `->` $targetDevice `=`
+   `{` struct($unified_memory, $transparent_access)`}`
+    (`,` $extra_properties^)?
+    `)`
+  }];
 }
 
 #endif  // IREE_DIALECT_HAL_IR_HAL_ATTRS

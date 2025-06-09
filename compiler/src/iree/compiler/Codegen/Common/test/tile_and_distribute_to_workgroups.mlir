@@ -1713,9 +1713,7 @@ hal.executable private @no_compute {
         %8 = iree_tensor_ext.dispatch.workload.ordinal %3, 3 : index
         %9 = iree_tensor_ext.dispatch.workload.ordinal %4, 4 : index
         %10 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<?x?x?xf32>{%5, %6, %7}
-        memref.assume_alignment %10, 64 : memref<?x?x?xf32>
         %11 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<1x?x?xf32>{%8, %9}
-        memref.assume_alignment %11, 64 : memref<1x?x?xf32>
         return
       }
     }

@@ -1232,8 +1232,6 @@ Value findOrCreateSubspanBuffer(
         /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
         /*resetOffset=*/true);
   }
-  rewriter.create<memref::AssumeAlignmentOp>(
-      subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;
 }
 
@@ -1241,11 +1239,9 @@ Value findOrCreateSubspanBuffer(
 // Misc. utility functions
 //===---------------------------------------------------------------------===//
 
-Operation *
-setInsertionPointAfterLastNeededValue(OpBuilder &builder,
-                                      SubsetInsertionOpInterface subsetOp) {
+Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
+                                           ArrayRef<Value> values) {
   DominanceInfo domInfo;
-  SmallVector<Value> values = subsetOp.getValuesNeededToBuildSubsetExtraction();
   Operation *lastOp = nullptr;
   bool setInsertionPointBefore = false;
   for (auto val : values) {
@@ -1254,7 +1250,16 @@ setInsertionPointAfterLastNeededValue(OpBuilder &builder,
       definingOp =
           &cast<BlockArgument>(val).getOwner()->getOperations().front();
     }
-    if (!definingOp || (lastOp && domInfo.dominates(definingOp, lastOp)))
+    if (!definingOp)
+      continue;
+    if (lastOp && definingOp == lastOp) {
+      // Combine 'setInsertionPointBefore' by ANDing because we only want to set
+      // the insertion point before the last op if all values this operation is
+      // derived from are block arguments.
+      setInsertionPointBefore &= isa<BlockArgument>(val);
+      continue;
+    }
+    if (lastOp && domInfo.dominates(definingOp, lastOp))
       continue;
     lastOp = definingOp;
 
@@ -1269,6 +1274,35 @@ setInsertionPointAfterLastNeededValue(OpBuilder &builder,
     builder.setInsertionPointAfter(lastOp);
   }
   return lastOp;
+}
+
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp) {
+  return setInsertionPointAfterLastValue(
+      builder, subsetOp.getValuesNeededToBuildSubsetExtraction());
+}
+
+void moveOpAfterLastOperand(RewriterBase &rewriter, DominanceInfo &domInfo,
+                            Operation *op) {
+  auto getDefiningOrContainingOp = [](Value v) -> Operation * {
+    return isa<BlockArgument>(v)
+               ? cast<BlockArgument>(v).getOwner()->getParentOp()
+               : v.getDefiningOp();
+  };
+  Value lastOperand = op->getOperand(0);
+  for (Value operand : op->getOperands()) {
+    Operation *operandDefiningOp = getDefiningOrContainingOp(operand);
+    Operation *lastValueDefiningOp = getDefiningOrContainingOp(lastOperand);
+    if (domInfo.dominates(lastValueDefiningOp, operandDefiningOp)) {
+      lastOperand = operand;
+    }
+  }
+  if (auto blockArg = dyn_cast<BlockArgument>(lastOperand)) {
+    rewriter.moveOpBefore(op, &blockArg.getOwner()->front());
+    return;
+  }
+  rewriter.moveOpAfter(op, lastOperand.getDefiningOp());
 }
 
 bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
@@ -1570,7 +1604,9 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   SetVector<Operation *> backwardSlice;
   for (OpOperand *operand : rootOp.getDpsInputOperands()) {
     SetVector<Operation *> tmpBackwardSlice;
-    getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    [[maybe_unused]] LogicalResult result =
+        getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    assert(result.succeeded());
     backwardSlice.set_union(tmpBackwardSlice);
   }
 

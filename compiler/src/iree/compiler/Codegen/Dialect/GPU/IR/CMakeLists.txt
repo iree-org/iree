@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowInterfaces
+    MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRParser
@@ -68,6 +69,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Utils
     iree::compiler::bindings::c::headers

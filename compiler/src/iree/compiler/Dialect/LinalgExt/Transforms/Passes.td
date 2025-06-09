@@ -94,4 +94,18 @@ def ConvertAttentionToOnlineAttentionPass :
   let summary = "Converts attention op to online_attention op";
 }
 
+def FoldUnitExtentDimsPass :
+      Pass<"iree-linalg-ext-fold-unit-extent-dims", "">  {
+  let summary = "Folds unit dims for iree_linalg_ext ops";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
+}
+
+def TestReshapeFusionPass :
+    Pass<"iree-linalg-ext-test-reshape-fusion", ""> {
+  let summary = "Test reshape fusion patterns";
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

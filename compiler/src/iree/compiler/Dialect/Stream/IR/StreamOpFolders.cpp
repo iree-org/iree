@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <optional>
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -507,10 +507,159 @@ void ResourceAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.resource.alloca
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Elides transient allocations that have no uses of their resource.
+// This sometimes arises when operations that were using the resource are
+// DCEd by other patterns or passes. The ElideAllocaDeallocaOp pattern will be
+// used after deallocations have been inserted but prior to that point this
+// pattern allows for more eager removal of unused allocations.
+struct ElideUnusedAllocaOp : public OpRewritePattern<ResourceAllocaOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceAllocaOp allocaOp,
+                                PatternRewriter &rewriter) const override {
+    if (!allocaOp.getResult().use_empty()) {
+      return failure(); // >= 1 user
+    }
+    Value newTimepoint = allocaOp.getAwaitTimepoint();
+    if (!newTimepoint) {
+      newTimepoint = rewriter.create<IREE::Stream::TimepointImmediateOp>(
+          allocaOp.getLoc());
+    }
+    rewriter.replaceAllUsesWith(allocaOp.getResultTimepoint(), newTimepoint);
+    rewriter.eraseOp(allocaOp);
+    return success();
+  }
+};
+
+// Elides transient allocations that are only used by deallocations.
+// This sometimes arises when operations that were using the resource are
+// DCEd by other patterns or passes.
+//
+// Example:
+//   %resource, %alloca_t = stream.resource.alloca
+//   %dealloca_t = stream.resource.dealloca await(%alloca_t) %resource
+struct ElideAllocaDeallocaOp : public OpRewritePattern<ResourceAllocaOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceAllocaOp allocaOp,
+                                PatternRewriter &rewriter) const override {
+    if (!allocaOp.getResult().hasOneUse()) {
+      return failure(); // more than one user
+    }
+    auto user = *allocaOp.getResult().getUsers().begin();
+    auto deallocaOp = dyn_cast<IREE::Stream::ResourceDeallocaOp>(user);
+    if (!deallocaOp) {
+      return failure(); // not used by a dealloca
+    }
+
+    // Replace waiters on the alloca and dealloca.
+    // Note that the dealloca may be using the timepoint of the alloca so we
+    // replace that first.
+    Value newAllocaTimepoint = allocaOp.getAwaitTimepoint();
+    if (!newAllocaTimepoint) {
+      newAllocaTimepoint = rewriter.create<IREE::Stream::TimepointImmediateOp>(
+          allocaOp.getLoc());
+    }
+    rewriter.replaceAllUsesWith(allocaOp.getResultTimepoint(),
+                                newAllocaTimepoint);
+    Value newDeallocaTimepoint = deallocaOp.getAwaitTimepoint();
+    if (!newDeallocaTimepoint) {
+      newDeallocaTimepoint =
+          rewriter.create<IREE::Stream::TimepointImmediateOp>(
+              deallocaOp.getLoc());
+    }
+    rewriter.replaceAllUsesWith(deallocaOp.getResultTimepoint(),
+                                newDeallocaTimepoint);
+
+    // Erase the deallocation first (its the only user of the allocated
+    // resource).
+    rewriter.eraseOp(deallocaOp);
+    rewriter.eraseOp(allocaOp);
+
+    return success();
+  }
+};
+
+// Finds sequences of chained allocas/deallocas and rewrites them to batch as
+// many as possible on a single timepoint. This is done as a canonicalization as
+// it is always intended that allocations and deallocations do not wait and we
+// can repeatedly optimize when run as part of a larger canonicalization pass
+// that cleans up timepoints with other patterns as we modify them here.
+//
+// Example:
+//   %d0 = dealloca await(%t)
+//   %d1 = dealloca await(%d0)
+//   %d2 = dealloca await(%d1)
+//   %d3 = dealloca await(%d2)
+//   ... await(%d3)
+// ->
+//   %d0 = dealloca await(%t)
+//   %d1 = dealloca await(%t)
+//   %d2 = dealloca await(%t)
+//   %d3 = dealloca await(%t)
+//   %j = join %d0, %d1, %d2, %d3
+//   ... await(%j)
+template <typename OpT>
+struct BatchAllocaOps : public OpRewritePattern<OpT> {
+  using OpRewritePattern<OpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpT op,
+                                PatternRewriter &rewriter) const override {
+    // Gather alloca ops chained on timepoints starting from this op.
+    SmallVector<OpT> allocaOps;
+    OpT nextOp = op;
+    while (nextOp) {
+      Value resultTimepoint = nextOp.getResultTimepoint();
+      allocaOps.push_back(nextOp);
+      if (!resultTimepoint.hasOneUse()) {
+        break;
+      }
+      nextOp = dyn_cast<OpT>(*resultTimepoint.user_begin());
+    }
+    if (allocaOps.size() <= 1) {
+      return failure(); // no-op if only one op
+    }
+
+    // Gather the result timepoints of all alloca ops so we can join on them.
+    // We'll issue all of them concurrently and only join after all
+    // deallocations complete.
+    SmallVector<Location> allocaLocs;
+    SmallVector<Value> allocaTimepoints;
+    for (auto allocaOp : allocaOps) {
+      allocaLocs.push_back(allocaOp.getLoc());
+      allocaTimepoints.push_back(allocaOp.getResultTimepoint());
+    }
+    rewriter.setInsertionPointAfter(allocaOps.back());
+    auto joinOp = rewriter.create<IREE::Stream::TimepointJoinOp>(
+        rewriter.getFusedLoc(allocaLocs),
+        rewriter.getType<IREE::Stream::TimepointType>(), allocaTimepoints);
+
+    // Make all alloca ops wait on the earliest timepoint so they can proceed
+    // together. Note that the origin op may be waiting on an immediate
+    // timepoint and be nullptr.
+    Value awaitTimepoint = op.getAwaitTimepoint();
+    for (auto allocaOp : allocaOps) {
+      rewriter.modifyOpInPlace(allocaOp, [&]() {
+        allocaOp.getAwaitTimepointMutable().assign(awaitTimepoint);
+      });
+    }
+
+    // Replace the tail timepoint in the alloca chain with the join result so
+    // subsequent waiters are waiting on the batch.
+    rewriter.replaceAllUsesExcept(allocaOps.back().getResultTimepoint(),
+                                  joinOp.getResultTimepoint(), joinOp);
+
+    return success();
+  }
+};
+
+} // namespace
+
 void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   // TODO(benvanik): sink to first user.
-  // TODO(benvanik): elide if only user is dealloc.
+  results.insert<ElideUnusedAllocaOp>(context);
+  results.insert<ElideAllocaDeallocaOp>(context);
+  results.insert<BatchAllocaOps<ResourceAllocaOp>>(context);
   results.insert<ElideImmediateTimepointWait<ResourceAllocaOp>>(context);
 }
 
@@ -521,6 +670,7 @@ void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
   // TODO(benvanik): move up to producer of timepoint.
+  results.insert<BatchAllocaOps<ResourceDeallocaOp>>(context);
   results.insert<ElideImmediateTimepointWait<ResourceDeallocaOp>>(context);
 }
 
@@ -1321,8 +1471,8 @@ OpFoldResult TensorEncodeOp::fold(FoldAdaptor adaptor) {
     if (!type.getEncoding()) {
       return true;
     }
-    IREE::Encoding::SerializableEncodingAttrInterface attr =
-        IREE::Encoding::getSerializableEncodingAttrInterface(type);
+    IREE::Encoding::SerializableAttr attr =
+        IREE::Encoding::getSerializableAttr(type);
     if (!attr) {
       return false;
     }
@@ -2827,10 +2977,10 @@ namespace {
 
 // Elides a region-carrying op when the region is empty.
 // Requires no results that need replacement.
-template <typename Op>
-struct ElideEmptyCmdRegionOp : public OpRewritePattern<Op> {
-  using OpRewritePattern<Op>::OpRewritePattern;
-  LogicalResult matchAndRewrite(Op op,
+template <typename OpT>
+struct ElideEmptyCmdRegionOp : public OpRewritePattern<OpT> {
+  using OpRewritePattern<OpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpT op,
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
     auto yieldOp = getYieldIfOnlyOp(entryBlock);

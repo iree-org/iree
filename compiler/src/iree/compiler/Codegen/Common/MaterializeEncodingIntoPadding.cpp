@@ -55,8 +55,7 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
     return dyn_cast<PadEncodingLayoutAttr>(*layouts.begin());
   }
   Attribute resolvedEncoding =
-      cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr)
-          .getLayout(type);
+      cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr).getLayout(type);
   LLVM_DEBUG({
     llvm::dbgs() << "Unresolved type: " << type << "\n";
     llvm::dbgs() << "layoutAttr: " << layoutAttr << "\n";
@@ -88,7 +87,7 @@ static RankedTensorType getPaddedType(Attribute layoutAttr,
 struct MaterializePadEncodingTypeConverter final
     : MaterializeEncodingTypeConverter {
   MaterializePadEncodingTypeConverter(
-      IREE::Encoding::LayoutAttrInterface layoutAttr)
+      IREE::Encoding::LayoutMaterializerAttr layoutAttr)
       : MaterializeEncodingTypeConverter(layoutAttr) {
     addConversion([](RankedTensorType type) -> std::optional<RankedTensorType> {
       // The type converter is designed for `pad_encoding_layout` encoding
@@ -207,7 +206,7 @@ struct MaterializeFlowDispatchTensorStoreOp final
     RankedTensorType paddedType = newTargetType.asRankedTensorType();
 
     Location loc = storeOp.getLoc();
-    SmallVector<Value> dynamicResultSizes{storeOp->getOperands()};
+    SmallVector<Value> dynamicResultSizes{adaptor.getOperands()};
     Value empty =
         rewriter.create<tensor::EmptyOp>(loc, paddedType, dynamicResultSizes);
 
@@ -298,17 +297,16 @@ struct MaterializeEncodingIntoPaddingPass final
     // access the target info during materialization.
     //
     // Otherwise, fall back to the nop layout.
-    IREE::Encoding::LayoutAttrInterface layoutAttr;
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr;
     if (targetConfig &&
         targetConfig.contains(IREE::Encoding::kEncodingResolverAttrName)) {
-      layoutAttr = targetConfig.getAs<IREE::Encoding::LayoutAttrInterface>(
+      layoutAttr = targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Encoding::kEncodingResolverAttrName);
-      auto resolverAttr =
-          cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
-      layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(
+      auto resolverAttr = cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr);
+      layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
           resolverAttr.cloneWithSimplifiedConfig(targetConfig));
     } else {
-      layoutAttr = cast<IREE::Encoding::LayoutAttrInterface>(
+      layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Codegen::EncodingNopLayoutAttr::get(context));
     }
 

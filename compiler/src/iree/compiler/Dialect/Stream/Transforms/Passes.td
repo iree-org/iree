@@ -229,6 +229,7 @@ def EmplaceAllocationsPass :
     tensor concatenation.
   }];
   let dependentDialects = [
+    "mlir::arith::ArithDialect",
     "IREE::Stream::StreamDialect",
   ];
 }
@@ -381,6 +382,22 @@ def ScheduleAllocationPass :
   ];
 }
 
+def AutomaticReferenceCountingPass :
+    Pass<"iree-stream-automatic-reference-counting", "mlir::ModuleOp"> {
+  let summary = "Inserts automatic reference counting ops for resources.";
+  let description = [{
+    Identifies asynchronous allocations and based on their lifetime inserts
+    either local deallocations or reference counting ops
+    (`stream.resource.retain` and `stream.resource.release`). If analysis fails
+    for a particular resource they will be marked as having indeterminate
+    lifetime in order to prevent external users from deallocating the resources
+    while they may still be used.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def PackConstantsPass :
     InterfacePass<"iree-stream-pack-constants", "mlir::CallableOpInterface"> {
   let summary = "Packs and allocates backing storage for fused constant resources.";
@@ -415,6 +432,25 @@ def LayoutSlicesPass :
     "mlir::arith::ArithDialect",
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",
+  ];
+}
+
+def ReuseAllocationsPass :
+    InterfacePass<"iree-stream-reuse-allocations", "mlir::CallableOpInterface"> {
+  let summary = "Reuses transient allocations when doing so will not increase lifetime.";
+  let description = [{
+    Tries to reduce allocation overhead by reusing allocations from a
+    deallocation-to-allocation sequence on a compatible affinity.
+
+    This relies on timeline ordering and the guarantees (or lack thereof) of
+    timeline operations: deallocations _may_ happen as late as immediately prior
+    to their timepoint being signaled and allocations _may_ happen as early as
+    immediately after their await timepoint has been reached. With this
+    allowance the compiler is allowed to treat any allocation on the same
+    affinity as an atomic reallocation of the resource for reuse.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
   ];
 }
 
@@ -507,8 +543,7 @@ def SpecializeEncodingsPass :
     - The binding types have to implement IREE::Encoding::EncodingTypeInterface,
       so it can updates the types without accessing any other dialects.
     - All the encodings attached on the types have to implement
-      SerializableEncodingAttrInterface. Because the pass updates the encodings
-      using interfaces.
+      SerializableAttr. Because the pass updates the encodings using interfaces.
   }];
   let dependentDialects = [
     "IREE::Encoding::IREEEncodingDialect"

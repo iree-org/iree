@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
@@ -90,7 +91,7 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder) {
   if (auto serializableEncodingAttr =
-          IREE::Encoding::getSerializableEncodingAttrInterface(shapedType)) {
+          IREE::Encoding::getSerializableAttr(shapedType)) {
     return serializableEncodingAttr.calculateStorageSizeInBytes(
         loc, builder, shapedType, dynamicDims);
   }

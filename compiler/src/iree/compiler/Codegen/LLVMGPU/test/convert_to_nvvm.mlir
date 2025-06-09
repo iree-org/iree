@@ -36,7 +36,7 @@ hal.executable @abs_ex_dispatch_0 {
 //  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
 //  CHECK-SAME:  %[[ARG2:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
 //  CHECK: %[[FADD:.+]] = llvm.fadd %{{.*}}, %{{.*}}  : f32
-//  CHECK: %[[ADDR:.+]] = llvm.getelementptr %[[ARG2]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//  CHECK: %[[ADDR:.+]] = llvm.getelementptr inbounds|nuw %[[ARG2]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //  CHECK: llvm.store %[[FADD]], %[[ADDR]] : f32, !llvm.ptr
 // -----
 
@@ -110,14 +110,14 @@ hal.executable @abs_dynamic {
 //   CHECK-DAG: llvm.intr.assume %[[ARG6_CMP]]
 //   CHECK-DAG: %[[D2:.+]] = llvm.zext %[[ARG7]] : i32 to i64
 //   CHECK: %[[GEP1:.+]] = llvm.getelementptr %[[ARG1]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
-//   CHECK: %[[GEP:.+]] = llvm.getelementptr %[[GEP1]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//   CHECK: %[[GEP:.+]] = llvm.getelementptr inbounds|nuw %[[GEP1]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //   CHECK: %[[LOAD:.+]] = llvm.load %[[GEP]] : !llvm.ptr -> f32
-//   CHECK: %[[GEP2:.+]] = llvm.getelementptr %[[ARG0]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, i32
+//   CHECK: %[[GEP2:.+]] = llvm.getelementptr inbounds|nuw %[[ARG0]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, i32
 //   CHECK: llvm.load %[[GEP2]] : !llvm.ptr -> i32
 //   CHECK: %[[FADD:.+]] = llvm.fadd %[[LOAD]], %{{.*}}  : f32
 //   CHECK: %[[ADD:.+]] = llvm.add
 //   CHECK: %[[ADD2:.+]] = llvm.add
-//   CHECK: %[[ADDR:.+]] = llvm.getelementptr %[[ARG2]][%[[ADD2]]] : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//   CHECK: %[[ADDR:.+]] = llvm.getelementptr inbounds|nuw %[[ARG2]][%[[ADD2]]] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //   CHECK: llvm.store %[[FADD]], %[[ADDR]] : f32, !llvm.ptr
 
 

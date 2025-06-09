@@ -63,7 +63,9 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
     return sliceFilter(op, nonIndexComputationOperands, baseOp);
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(baseOp, &slice, options);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(baseOp, &slice, options);
+  assert(ret.succeeded());
   IRMapping bvm;
   for (auto origOp : slice) {
     builder.clone(*origOp, bvm);
@@ -364,7 +366,9 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   llvm::SetVector<Operation *> slice;
   for (auto ofr : workgroupCount) {
     if (auto val = dyn_cast<Value>(ofr)) {
-      mlir::getBackwardSlice(val, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(val, &slice, options);
+      assert(result.succeeded());
     }
   }
   // Since there are more than one slices, sort the operations again.
@@ -933,7 +937,16 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
       return rewriter.notifyMatchFailure(storeOp, "found a non-1 stride");
     }
 
-    const SmallVector<ReassociationIndices> reassocInfo =
+    const llvm::SmallBitVector droppedDims = storeOp.getDroppedDims();
+    int64_t firstStoreDim = 0;
+    while (firstStoreDim < droppedDims.size() &&
+           droppedDims.test(firstStoreDim)) {
+      ++firstStoreDim;
+    }
+    const int64_t lastStoreDim =
+        firstStoreDim + reshapeOp.getResultType().getRank();
+
+    SmallVector<ReassociationIndices> reassocInfo =
         reshapeOp.getReassociationIndices();
 
     // To support partial stores, keep track of collapsed and non-collapsed
@@ -942,7 +955,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     SmallVector<int64_t> collapsedDstDims;
     for (auto [index, reassocIndices] : llvm::enumerate(reassocInfo)) {
       if (reassocIndices.size() > 1) {
-        collapsedDstDims.push_back(index);
+        collapsedDstDims.push_back(index + firstStoreDim);
       }
     }
 
@@ -956,7 +969,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
 
     for (int64_t collapsedDim : collapsedDstDims) {
       if (origSizes[collapsedDim] != mixedTensorShape[collapsedDim] ||
-          !isZeroIndex(origOffsets[collapsedDim])) {
+          !isZeroInteger(origOffsets[collapsedDim])) {
         return rewriter.notifyMatchFailure(
             storeOp,
             llvm::formatv(
@@ -993,6 +1006,19 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
           }
         });
 
+    SmallVector<OpFoldResult> dispatchTensorMixedShape = mlir::getMixedValues(
+        storeOp.getTargetType().getShape(), storeOp.getTargetDims(), rewriter);
+    if (firstStoreDim != 0) {
+      SmallVector<OpFoldResult> tmp(
+          ArrayRef<OpFoldResult>(dispatchTensorMixedShape)
+              .take_front(firstStoreDim));
+      llvm::append_range(tmp, *expandedShape);
+      *expandedShape = std::move(tmp);
+    }
+    llvm::append_range(*expandedShape,
+                       ArrayRef<OpFoldResult>(dispatchTensorMixedShape)
+                           .drop_front(lastStoreDim));
+
     SmallVector<int64_t> expandedStaticShape;
     SmallVector<Value> expandedDynamicShape;
     dispatchIndexOpFoldResults(*expandedShape, expandedDynamicShape,
@@ -1001,21 +1027,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     auto tensorAccess =
         cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
             .getAccess();
-    auto newSubspanShape =
-        llvm::to_vector_of<int64_t>(reshapeSrcType.getShape());
-    transformOverReassociation<int64_t>(
-        newSubspanShape, reassocInfo,
-        [&storeOp](size_t collapsedIdx, ReassociationIndicesRef,
-                   MutableArrayRef<int64_t> expandedValues) {
-          if (expandedValues.size() == 1) {
-            // Restore the original non-collapsed subspan dim, which may be
-            // smaller than the reshape result in case of partial stores.
-            expandedValues[0] =
-                storeOp.getTargetType().getDimSize(collapsedIdx);
-            return;
-          }
-        });
-
+    auto newSubspanShape = llvm::to_vector_of<int64_t>(expandedStaticShape);
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrcType.cloneWith(
                           newSubspanShape, reshapeSrcType.getElementType()));
@@ -1026,6 +1038,27 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
 
     rewriter.setInsertionPoint(storeOp);
 
+    int64_t reshapeDstRank = reshapeOp.getType().getRank();
+    int64_t reshapeSrcRank = reshapeOp.getSrcType().getRank();
+    int64_t targetRank = storeOp.getTargetType().getRank();
+
+    // Create a new reassociation that represents the change in shape of the
+    // entire target tensor (not just the inserted section).
+    SmallVector<ReassociationIndices> newReassocInfo;
+    for (int64_t i = 0; i < firstStoreDim; ++i) {
+      newReassocInfo.push_back(ReassociationIndices{i});
+    }
+    for (ReassociationIndices reassoc : reassocInfo) {
+      for (int64_t &elem : reassoc) {
+        elem += firstStoreDim;
+      }
+      newReassocInfo.push_back(std::move(reassoc));
+    }
+    for (int64_t i = lastStoreDim; i < targetRank; ++i) {
+      newReassocInfo.push_back(
+          ReassociationIndices{i + reshapeSrcRank - reshapeDstRank});
+    }
+
     const size_t expandedSize = newSubspanShape.size();
     SmallVector<OpFoldResult> newOffsets(expandedSize,
                                          rewriter.getIndexAttr(0));
@@ -1033,7 +1066,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     const SmallVector<OpFoldResult> newStrides(expandedSize,
                                                rewriter.getIndexAttr(1));
     transformOverReassociation<OpFoldResult>(
-        newOffsets, reassocInfo,
+        newOffsets, newReassocInfo,
         [&origOffsets](size_t collapseIdx, ReassociationIndicesRef reassoc,
                        MutableArrayRef<OpFoldResult> expandedValues) {
           // Restore the original offsets of non-collapsed dimensions.
@@ -1043,7 +1076,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
         });
 
     transformOverReassociation<OpFoldResult>(
-        newSizes, reassocInfo,
+        newSizes, newReassocInfo,
         [&expandedShape,
          &origSizes](size_t collapseIdx, ReassociationIndicesRef reassoc,
                      MutableArrayRef<OpFoldResult> expandedValues) {
@@ -1064,7 +1097,6 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         storeOp, reshapeSrc, newSubspanOp, expandedDynamicShape, newOffsets,
         newSizes, newStrides);
-
     return success();
   }
 };
@@ -1101,9 +1133,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     // Bail out if the strides aren't unit.
-    if (!llvm::all_of(storeOp.getMixedStrides(), [](OpFoldResult s) {
-          return isConstantIntValue(s, 1);
-        })) {
+    if (!llvm::all_of(storeOp.getMixedStrides(), isOneInteger)) {
       return failure();
     }
 
@@ -1221,25 +1251,207 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
 }
 
 //===--------------------------------------------------------------------====//
+// Patterns to fold ops into iree_codegen.store_to/load_from_buffer
+//===--------------------------------------------------------------------====//
+
+namespace {
+
+/// Given an iree_codegen.load_from_buffer op or iree_codegen.store_to_buffer
+/// op, and a list of reassociation indices, replace the memref operand of the
+/// load_from_buffer or store_to_buffer op with a collapsed memref according to
+/// the reassociations. The `tensorToMemrefOp` will be modified in place without
+/// updating users or producers. The caller of this function is responsible for
+/// updating producers and consumers to maintain valid IR.
+template <typename OpTy>
+static LogicalResult
+collapseMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
+                      ArrayRef<ReassociationIndices> reassociations) {
+  Value memref = tensorToMemrefOp.getBuffer();
+  auto memrefType = cast<MemRefType>(memref.getType());
+  if (!memref::CollapseShapeOp::isGuaranteedCollapsible(memrefType,
+                                                        reassociations)) {
+    return failure();
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfterValue(memref);
+  Location loc = tensorToMemrefOp.getLoc();
+  Value collapsedMemref =
+      rewriter.create<memref::CollapseShapeOp>(loc, memref, reassociations);
+  rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
+    tensorToMemrefOp.getBufferMutable().assign(collapsedMemref);
+  });
+  return success();
+}
+
+/// Given an iree_codegen.load_from_buffer op or iree_codegen.store_to_buffer
+/// op, a list of reassociation indices, and an output shape, replace the memref
+/// operand of the load_from_buffer or store_to_buffer op with an expanded
+/// memref according to the reassociations. The `tensorToMemrefOp` will be
+/// modified in place without updating users or producers. The caller of this
+/// function is responsible for updating producers and consumers to maintain
+/// valid IR.
+template <typename OpTy>
+static LogicalResult
+expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
+                    ArrayRef<ReassociationIndices> reassociations,
+                    SmallVector<OpFoldResult> &mixedOutputShape) {
+  Value memref = tensorToMemrefOp.getBuffer();
+  auto memrefType = cast<MemRefType>(memref.getType());
+  SmallVector<int64_t> expandedShape;
+  SmallVector<Value> dynamicValues;
+  std::tie(expandedShape, dynamicValues) =
+      decomposeMixedValues(mixedOutputShape);
+  FailureOr<MemRefType> expandedMemrefType =
+      memref::ExpandShapeOp::computeExpandedType(memrefType, expandedShape,
+                                                 reassociations);
+  if (failed(expandedMemrefType)) {
+    return failure();
+  }
+  Location loc = tensorToMemrefOp.getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  dynamicValues.push_back(memref);
+  setInsertionPointAfterLastValue(rewriter, dynamicValues);
+  Value expandedMemref = rewriter.create<memref::ExpandShapeOp>(
+      loc, *expandedMemrefType, memref, reassociations, mixedOutputShape);
+  rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
+    tensorToMemrefOp.getBufferMutable().assign(expandedMemref);
+  });
+  return success();
+}
+
+/// Fold a tensor.expand_shape into a consumer iree_codegen.store_to_buffer op
+/// by collapsing the memref operand of the store_to_buffer, and replacing the
+/// tensor operand with the source of the expand_shape.
+struct FoldExpandShapeIntoStoreToBuffer
+    : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto expandOp = storeOp.getTensor().getDefiningOp<tensor::ExpandShapeOp>();
+    if (!expandOp) {
+      return failure();
+    }
+    if (failed(collapseMemrefOperand(rewriter, storeOp,
+                                     expandOp.getReassociationIndices()))) {
+      return rewriter.notifyMatchFailure(storeOp, "memref is not collapsible");
+    }
+    rewriter.modifyOpInPlace(storeOp, [&]() {
+      storeOp.getTensorMutable().assign(expandOp.getSrc());
+    });
+    return success();
+  }
+};
+
+/// Fold a tensor.collapse_shape into a consumer iree_codegen.store_to_buffer op
+/// by expanding the memref operand of the store_to_buffer, and replacing the
+/// tensor operand with the source of the collapse_shape.
+struct FoldCollapseShapeIntoStoreToBuffer
+    : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto collapseOp =
+        storeOp.getTensor().getDefiningOp<tensor::CollapseShapeOp>();
+    if (!collapseOp) {
+      return failure();
+    }
+    Value collapseSrc = collapseOp.getSrc();
+    SmallVector<OpFoldResult> mixedOutputShape =
+        tensor::getMixedSizes(rewriter, collapseSrc.getLoc(), collapseSrc);
+    if (failed(expandMemrefOperand(rewriter, storeOp,
+                                   collapseOp.getReassociationIndices(),
+                                   mixedOutputShape))) {
+      return rewriter.notifyMatchFailure(storeOp, "memref is not expandable");
+    }
+    rewriter.modifyOpInPlace(
+        storeOp, [&]() { storeOp.getTensorMutable().assign(collapseSrc); });
+    return success();
+  }
+};
+
+/// Fold a tensor.collapse_shape into a producer iree_codegen.load_from_buffer
+/// op by collapsing the memref operand of the load_from_buffer, and replacing
+/// the collapse_shape with the collapsed load_from_buffer op.
+struct FoldCollapseShapeIntoLoadFromBuffer
+    : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
+  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    if (!loadOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(loadOp, "load op has multiple uses");
+    }
+    auto collapseOp =
+        dyn_cast<tensor::CollapseShapeOp>(*loadOp->getUsers().begin());
+    if (!collapseOp) {
+      return failure();
+    }
+    if (failed(collapseMemrefOperand(rewriter, loadOp,
+                                     collapseOp.getReassociationIndices()))) {
+      return rewriter.notifyMatchFailure(loadOp, "memref is not collapsible");
+    }
+    rewriter.modifyOpInPlace(loadOp, [&]() {
+      loadOp->getOpResult(0).setType(collapseOp.getResultType());
+    });
+    rewriter.replaceOp(collapseOp, loadOp);
+    return success();
+  }
+};
+
+/// Fold a tensor.expand_shape into a producer iree_codegen.load_from_buffer op
+/// by expanding the memref operand of the load_from_buffer, and replacing the
+/// expand_shape with the expanded load_from_buffer op.
+struct FoldExpandShapeIntoLoadFromBuffer
+    : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
+  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    if (!loadOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(loadOp, "load op has multiple uses");
+    }
+    auto expandOp =
+        dyn_cast<tensor::ExpandShapeOp>(*loadOp->getUsers().begin());
+    if (!expandOp) {
+      return failure();
+    }
+    SmallVector<OpFoldResult> mixedOutputShape = expandOp.getMixedOutputShape();
+    if (failed(expandMemrefOperand(rewriter, loadOp,
+                                   expandOp.getReassociationIndices(),
+                                   mixedOutputShape))) {
+      return rewriter.notifyMatchFailure(loadOp, "memref is not expandable");
+    }
+    rewriter.modifyOpInPlace(loadOp, [&]() {
+      loadOp->getOpResult(0).setType(expandOp.getResultType());
+    });
+    DominanceInfo domInfo;
+    moveOpAfterLastOperand(rewriter, domInfo, loadOp);
+    rewriter.replaceOp(expandOp, loadOp);
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns) {
+  patterns.insert<
+      FoldCollapseShapeIntoLoadFromBuffer, FoldExpandShapeIntoLoadFromBuffer,
+      FoldCollapseShapeIntoStoreToBuffer, FoldExpandShapeIntoStoreToBuffer>(
+      patterns.getContext());
+}
+
+//===--------------------------------------------------------------------====//
 // Pattern to remove dead allocations
 //===--------------------------------------------------------------------====//
 
 namespace {
 
-// Erases the operation if its only users are memref.assume_alignment ops.
 static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
                                               Operation *op) {
-  SmallVector<Operation *> deadUsers;
-  for (OpOperand &use : op->getUses()) {
-    if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
-      deadUsers.push_back(user);
-      continue;
-    }
-    // For any other use, return failure;
+  if (!op->use_empty()) {
     return failure();
-  }
-  for (auto user : deadUsers) {
-    rewriter.eraseOp(user);
   }
   rewriter.eraseOp(op);
   return success();
@@ -1272,12 +1484,27 @@ struct RemoveDeadInterfaceBindings
     return eraseAlignmentOnlyDeadOp(rewriter, op);
   }
 };
+
+struct RemoveDeadAssumeAlighment : OpRewritePattern<memref::AssumeAlignmentOp> {
+  RemoveDeadAssumeAlighment(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern<memref::AssumeAlignmentOp>(context, benefit) {}
+
+  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    return eraseAlignmentOnlyDeadOp(rewriter, op);
+  }
+};
 } // namespace
 
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
-  patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
+  patterns.insert<RemoveDeadInterfaceBindings, RemoveDeadAssumeAlighment>(
+      patterns.getContext());
 }
+
+//===--------------------------------------------------------------------====//
+// Pattern to reduce dependencies from memref::AssumeAlignmentOp
+//===--------------------------------------------------------------------====//
 
 void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
                              ArrayRef<Operation *> allocs,
@@ -1632,7 +1859,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           }
         }
         SetVector<Operation *> tmpBackwardSlice;
-        getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        [[maybe_unused]] LogicalResult result =
+            getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        assert(result.succeeded());
         slice.set_union(tmpBackwardSlice);
       }
     }

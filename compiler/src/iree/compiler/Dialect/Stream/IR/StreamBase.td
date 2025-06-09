@@ -528,8 +528,9 @@ def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
     them does not extend outside of the invocation they are provided to.
 
     Stream values are not usable directly outside of a stream execution or
-    transfer operation. If the contents of the value are needed they must first
-    be transferred via `stream.transfer` - which may incur a copy.
+    transfer operation. If the contents of the value are needed for host access
+    or access from a device without memory compatibility they must first
+    be transferred via a transfer operation (e.g. `stream.async.transfer`).
   }];
 
   let parameters = (ins

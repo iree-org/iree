@@ -124,11 +124,11 @@ class HALAffinityAnalysisDialectInterface
 public:
   using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
 
-  // Returns a function that gathers the corresponding
-  // EncodingLayoutResolverAttrInterface attributes for each
-  // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
-  // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
-  // `encoding` is not present, IdentityEncodingAttr is returned.
+  // Returns a function that gathers the corresponding LayoutResolverAttr
+  // attributes for each (IREE::Stream::Affinity, Operation) query. The
+  // attribute is extracted from the `encoding` field in the
+  // HAL::ExecutableTargetAttr configuration. If the `encoding` is not present,
+  // IdentityEncodingAttr is returned.
   IREE::Stream::ResolveLayoutAttrFn
   makeLayoutAttrResolver(ModuleOp moduleOp) const {
     return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
@@ -163,7 +163,7 @@ public:
           }
           auto encodingLayoutAttr =
               targetAttr.getConfiguration()
-                  .getAs<IREE::Encoding::EncodingLayoutResolverAttrInterface>(
+                  .getAs<IREE::Encoding::LayoutResolverAttr>(
                       IREE::Encoding::kEncodingResolverAttrName);
           if (!encodingLayoutAttr) {
             layoutAttrs[key].insert(getDefaultAttr());

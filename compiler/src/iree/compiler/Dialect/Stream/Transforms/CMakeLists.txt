@@ -19,6 +19,7 @@ iree_cc_library(
     "AnnotateAffinities.cpp"
     "AnnotateDispatchArguments.cpp"
     "AnnotateDispatchAssumptions.cpp"
+    "AutomaticReferenceCounting.cpp"
     "CloneToConsumers.cpp"
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
@@ -39,6 +40,7 @@ iree_cc_library(
     "Passes.h.inc"
     "PropagateTimepoints.cpp"
     "RefineUsage.cpp"
+    "ReuseAllocations.cpp"
     "ScheduleAllocation.cpp"
     "ScheduleConcurrency.cpp"
     "ScheduleExecution.cpp"
@@ -70,6 +72,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR

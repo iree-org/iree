@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-bubble-up-extract-slices --iree-flow-canonicalize --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-bubble-up-expand-shapes --iree-flow-canonicalize --mlir-print-local-scope %s | FileCheck %s
 
 util.func public @bubble_up_extract_rank_reduce(%arg0 : tensor<1024x7x7x2xi8>) -> tensor<1024x7x7xf32>{
   %0 = tensor.empty() : tensor<1024x7x7x2xf32>
@@ -163,4 +163,59 @@ func.func @bubble_extract_broadcast(%arg0: tensor<1x1x131072xi64>, %arg2: index)
 //  CHECK-SAME:     tensor<1x1x131072xi64> to tensor<?xi64>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[EXTRACT]] : tensor<?xi64>)
+//       CHECK:   return %[[GENERIC]]
+
+// -----
+
+func.func @bubble_up_extract_of_expand(%arg0: tensor<131072xi64>, %arg1: tensor<131072xi64>, %arg2: index) -> tensor<?x?xi1> {
+  %0 = tensor.empty() : tensor<131072x131072xi1>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<131072xi64>, tensor<131072xi64>) outs(%0 : tensor<131072x131072xi1>) {
+  ^bb0(%in: i64, %in_0: i64, %out: i1):
+    %2 = arith.cmpi sge, %in, %in_0 : i64
+    linalg.yield %2 : i1
+  } -> tensor<131072x131072xi1>
+  %expanded = tensor.expand_shape %1 [[0, 1, 2], [3]] output_shape[1, 1, 131072, 131072] : tensor<131072x131072xi1> into tensor<1x1x131072x131072xi1>
+  %extracted_slice = tensor.extract_slice %expanded[0, 0, 0, 0] [1, 1, %arg2, %arg2] [1, 1, 1, 1] : tensor<1x1x131072x131072xi1> to tensor<?x?xi1>
+  return %extracted_slice : tensor<?x?xi1>
+}
+// CHECK-LABEL: func @bubble_up_extract_of_expand
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<131072xi64>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<131072xi64>
+//  CHECK-SAME:     %[[ARG2:.+]]: index
+//   CHECK-DAG:   %[[EXPAND1:.+]] = tensor.expand_shape %[[ARG1]]
+//   CHECK-DAG:   %[[SLICE0:.+]] = tensor.extract_slice %[[ARG0]]
+//   CHECK-DAG:   %[[SLICE1:.+]] = tensor.extract_slice %[[EXPAND1]]
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[ARG2]], %[[ARG2]])
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[SLICE0]], %[[SLICE1]] :
+//  CHECK-SAME:       outs(%[[EMPTY]] :
+//       CHECK:   return %[[GENERIC]]
+
+// -----
+
+func.func @bubble_up_expand_of_extract_of_expand(%arg0: tensor<131072xi64>, %arg1: tensor<131072xi64>, %arg2: index, %arg3: index) -> tensor<?x?x?xi1> {
+  %0 = tensor.empty() : tensor<131072x131072xi1>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<131072xi64>, tensor<131072xi64>) outs(%0 : tensor<131072x131072xi1>) {
+  ^bb0(%in: i64, %in_0: i64, %out: i1):
+    %2 = arith.cmpi sge, %in, %in_0 : i64
+    linalg.yield %2 : i1
+  } -> tensor<131072x131072xi1>
+  %expanded = tensor.expand_shape %1 [[0, 1, 2], [3]] output_shape[1, 1, 131072, 131072] : tensor<131072x131072xi1> into tensor<1x1x131072x131072xi1>
+  %extracted_slice = tensor.extract_slice %expanded[0, 0, 0, 0] [1, 1, %arg2, %arg2] [1, 1, 1, 1] : tensor<1x1x131072x131072xi1> to tensor<?x?xi1>
+  %expanded_0 = tensor.expand_shape %extracted_slice [[0, 1], [2]] output_shape[%arg3, %arg3, %arg2] : tensor<?x?xi1> into tensor<?x?x?xi1>
+  return %expanded_0 : tensor<?x?x?xi1>
+}
+// CHECK-LABEL: func @bubble_up_expand_of_extract_of_expand
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<131072xi64>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<131072xi64>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
+//   CHECK-DAG:   %[[SLICE0:.+]] = tensor.extract_slice %[[ARG0]]
+//   CHECK-DAG:   %[[EXPAND1:.+]] = tensor.expand_shape %[[ARG1]]
+//   CHECK-DAG:   %[[SLICE1:.+]] = tensor.extract_slice %[[EXPAND1]]
+//   CHECK-DAG:   %[[EXPAND2:.+]] = tensor.expand_shape %[[SLICE1]]
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[ARG3]], %[[ARG3]], %[[ARG2]])
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[SLICE0]], %[[EXPAND2]] :
+//  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   return %[[GENERIC]]

@@ -28,7 +28,6 @@ iree_cc_library(
     "PassUtils.h"
     "PatternUtils.h"
     "Permutation.h"
-    "SmallVectorDenseMapInfo.h"
     "StringUtils.h"
     "ToolUtils.h"
     "TracingUtils.h"
@@ -62,6 +61,7 @@ iree_cc_library(
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )
