@@ -32,6 +32,8 @@ def BubbleUpExpandShapesPass :
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
+    "mlir::linalg::LinalgDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 

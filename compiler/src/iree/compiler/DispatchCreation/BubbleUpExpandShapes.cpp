@@ -234,6 +234,33 @@ struct BubbleExpandThroughExtract final
   }
 };
 
+static bool
+isExpandingUnitDims(ArrayRef<ReassociationIndices> reassociationIndices,
+                    ArrayRef<int64_t> expandedShape) {
+  for (ReassociationIndicesRef reassoc : reassociationIndices) {
+    if (reassoc.size() > 1 &&
+        llvm::any_of(reassoc, [&expandedShape](int64_t dim) {
+          return expandedShape[dim] == 1;
+        })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Optimistic check to make sure reshapes are moved if they could block fusion.
+static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
+  auto isFusableOp = [](Operation *op) {
+    if (!op) {
+      return false;
+    }
+    return isa_and_nonnull<linalg::LinalgDialect,
+                           IREE::LinalgExt::IREELinalgExtDialect,
+                           tensor::TensorDialect>(op->getDialect());
+  };
+  return isFusableOp(producer) && isFusableOp(consumer);
+}
+
 } // namespace
 
 /// If the domain of the operation is being expanded by unit dimensions, check
@@ -241,32 +268,16 @@ struct BubbleExpandThroughExtract final
 /// on propagating infinitely.
 static bool canCauseReshapingLoopByExpansion(Operation *producer,
                                              Operation *consumer) {
-  bool isExpandingToUnitDims = false;
-  if (auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(consumer)) {
-    // If the expand_shape is only expanding unit dimensions and the producer
-    // has multiple users, there is a possibility of an infinite loop.
-    ArrayRef<int64_t> outputShape = expandShapeOp.getStaticOutputShape();
-    for (auto [idx, indices] :
-         llvm::enumerate(expandShapeOp.getReassociationIndices())) {
-      if (indices.size() == 1) {
-        continue;
-      }
-      // Check if the output shape at any of the reassociation indices is 1.
-      for (int64_t ind : indices) {
-        if (outputShape[ind] == 1) {
-          isExpandingToUnitDims = true;
-        }
-      }
-    }
-
-    // Check for multiple uses. The producer has at least 1 use: the
-    // expand_shape.
-    if (isExpandingToUnitDims && !llvm::hasSingleElement(producer->getUses())) {
-      return true;
-    }
+  auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(consumer);
+  if (!expandShapeOp) {
+    return false;
   }
 
-  return false;
+  // Check for multiple uses. The producer has at least 1 use: the
+  // expand_shape.
+  return isExpandingUnitDims(expandShapeOp.getReassociationIndices(),
+                             expandShapeOp.getResultType().getShape()) &&
+         !llvm::hasSingleElement(producer->getUses());
 }
 
 void BubbleUpExpandShapesPass::runOnOperation() {
@@ -282,6 +293,26 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         }
 
         if (canCauseReshapingLoopByExpansion(producer, consumer)) {
+          return false;
+        }
+
+        // Don't reintroduce unit dims via propagating edge unit dim reshapes.
+        if (auto expandOp = dyn_cast<tensor::ExpandShapeOp>(consumer);
+            expandOp &&
+            isExpandingUnitDims(expandOp.getReassociationIndices(),
+                                expandOp.getResultType().getShape()) &&
+            llvm::none_of(
+                consumer->getUsers(), [&](Operation *collapseConsumer) {
+                  return isReshapeBlockingFusion(producer, collapseConsumer);
+                })) {
+          return false;
+        }
+        if (auto collapseOp = dyn_cast<tensor::CollapseShapeOp>(producer);
+            collapseOp &&
+            isExpandingUnitDims(collapseOp.getReassociationIndices(),
+                                collapseOp.getSrcType().getShape()) &&
+            !isReshapeBlockingFusion(producer->getOperand(0).getDefiningOp(),
+                                     consumer)) {
           return false;
         }
 
