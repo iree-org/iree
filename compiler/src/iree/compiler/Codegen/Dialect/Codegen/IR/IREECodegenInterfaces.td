@@ -9,6 +9,143 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
+def IREECodegen_InnerTileDescAttrInterface :
+  AttrInterface<"InnerTileDescAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Attribute interface used to descripe an inner tiled operation, such as
+    a (sequence of) matrix multiplications that are performed using
+    intrinsics which have their own inherent tiling.
+
+    Note: this interface is a generalization of MmaInterfaceAttr.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the number of non-accumulator input operands  this inner tiled
+        operation requires.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getExpectedNumInputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this inner tiled operation imposes additional requirements on
+        its indexing maps other than the general ones (todo describe),
+        verify them.
+      }],
+      /*retType=*/"::mlir::LogicalResult",
+      /*methodName=*/"verifyIndexingMaps",
+      /*args=*/(ins "::llvm::ArrayRef<::mlir::AffineMap>":$maps),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::success();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For each operand (including the accumulator, which is the final
+        operand), return the vector type of the inner tile before the operation
+        is distributed (if applicable). This should be the logical type of
+        the operands, ignoring any permutations that may be present on the
+        inner_tiled operation.
+
+        For example, a matrix multiplication that takes a MxK inner tile of A,
+        a KxN inner tile of B, and accumulates into a MxN inner tile of C
+        should return:
+        ```
+          vector<MxKxtA>, vector<KxNxtB>, vector<MxNxtC>
+        ```
+        where `tA`, `tB`, and `tC` are the element types of matrices A, B, and C,
+        respectively.
+
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getUndistributedTileTypes",
+      /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For each operand (including the accumulator, which is the final
+        operand), return the vector type of the inner tile after the operation
+        is distributed to threads. Vectors of this type will be stored into or
+        loaded from registers by inndividual threads.
+
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getDistributedTileTypes",
+      /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the `operandIndex`th operand of this inner tiled operation.
+
+        This method is only applicable when distribution is being performed.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"populateOperandOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "uint32_t":$operandIndex,
+        "::mlir::Value":$lane_id,
+        "::llvm::ArrayRef<int64_t>":$permutation,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$strides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this intrinsic can be mapped from its undistributed to its distributed
+        form using an `scf.forall`, return the attribute describing the mapping
+        kind that is to be used.
+
+        If such a mapping is not supported, return Attribute() (the null attribute).
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getDistributionMappingKind",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::Attribute();
+      }]
+    >
+  ];
+
+  let extraSharedClassDeclaration = [{
+    /// Return the expected size of the undistributed inner tile for each
+    /// operand into `results`.
+    void getUndistributedOperandSize(::llvm::SmallVectorImpl<int64_t>& result) const {
+      result.clear();
+      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes;
+      $_attr.getUndistributedTileTypes(undistributedTypes);
+      ::llvm::append_range(result, ::llvm::map_range(undistributedTypes,
+        [](auto vt) { return vt.getNumElements(); }));
+    }
+
+    /// Return the element element type of each operand into `results`.
+    void getElementTypes(::llvm::SmallVectorImpl<::mlir::Type>& result) const {
+      result.clear();
+      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes;
+      $_attr.getUndistributedTileTypes(undistributedTypes);
+      ::llvm::append_range(result, ::llvm::map_range(undistributedTypes,
+        [](auto vt) { return vt.getElementType(); }));
+    }
+  }];
+}
+
 def IREECodegen_LoweringConfigAttrInterface :
   AttrInterface<"LoweringConfigAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

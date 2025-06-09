@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
