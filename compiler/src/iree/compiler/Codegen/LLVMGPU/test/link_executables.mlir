@@ -135,7 +135,10 @@ hal.executable private @executable1 {
 
 // -----
 
-hal.executable private @executable0 {
+// Tests that externally defined executables (no inner module) don't get linked
+// into internal ones (inner module).
+
+hal.executable private @internal_executable {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @export0 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
@@ -143,7 +146,7 @@ hal.executable private @executable0 {
     }
   }
 }
-hal.executable private @executable1 {
+hal.executable private @external_executable {
   hal.executable.variant public @rocm_hsaco_fb_0 target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @export1 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
@@ -158,11 +161,14 @@ hal.executable private @executable1 {
 //       CHECK:   hal.executable.export public @export1
 //   CHECK-NOT:   hal.executable.export public @export0
 //       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @executable0
+// CHECK-LABEL: hal.executable private @external_executable
 
 // -----
 
-hal.executable private @executable0 {
+// Tests that externally defined executables (no inner module) don't get linked
+// into internal ones (inner module).
+
+hal.executable private @internal_executable {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @export0 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
@@ -172,7 +178,7 @@ hal.executable private @executable0 {
     }
   }
 }
-hal.executable private @executable1 {
+hal.executable private @external_executable {
   hal.executable.variant public @rocm_hsaco_fb_0 target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @export1 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
@@ -184,4 +190,40 @@ hal.executable private @executable1 {
 //       CHECK:   hal.executable.export public @export0
 //   CHECK-NOT:   hal.executable.export public @export1
 //       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @executable1
+// CHECK-LABEL: hal.executable private @external_executable
+
+// -----
+
+// Tests that any variant being externally defined disables linking.
+hal.executable private @internal_executable {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @export0 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+    }
+  }
+}
+hal.executable private @external_executable {
+  hal.executable.variant public @rocm_hsaco_fb_0 target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @export1 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+  }
+  hal.executable.variant public @rocm_hsaco_fb_1 target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @export1 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+    }
+  }
+}
+
+// CHECK-LABEL: hal.executable private
+//       CHECK:   hal.executable.export public @export0
+//   CHECK-NOT:   hal.executable.export public @export1
+//       CHECK:   builtin.module
+// CHECK-LABEL: hal.executable private @external_executable
