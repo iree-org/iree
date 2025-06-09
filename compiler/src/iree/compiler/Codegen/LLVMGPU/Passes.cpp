@@ -74,7 +74,7 @@ static llvm::cl::opt<bool> clLLVMGPUEnableSharedMemoryReuse(
     "iree-llvmgpu-enable-shared-memory-reuse",
     llvm::cl::desc(
         "Enable shared memory reuse in the vector distribute pipeline"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clDistributeToWorkgroupsUsingForall(
     "iree-llvmgpu-test-distribute-to-workgroups-using-forall",
