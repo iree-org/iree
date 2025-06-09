@@ -155,15 +155,37 @@ static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
                          std::multiplies<int64_t>());
 }
 
-LogicalResult MultiMmaOp::verify() {
-  ShapedType lhsType = getLhsType();
-  ShapedType rhsType = getRhsType();
-  ShapedType accType = getAccType();
+static bool countsMatchTileTypes(ArrayRef<int64_t> innerElemCounts,
+                                 ArrayRef<VectorType> tileTypes) {
+  return llvm::all_of_zip(
+      innerElemCounts, tileTypes,
+      [](int64_t ec, VectorType tt) { return ec == tt.getNumElements(); });
+}
 
+static SmallVector<int64_t> getInnerElemCounts(MultiMmaOp mmaOp) {
+  SmallVector<int64_t> result;
+  result.reserve(mmaOp.getNumOperands());
+  for (auto [opType, map] : llvm::zip_equal(
+           mmaOp.getOperandTypes(),
+           mmaOp.getIndexingMapsAttr().getAsValueRange<AffineMapAttr>())) {
+    ArrayRef<int64_t> shape = cast<ShapedType>(opType).getShape();
+    result.push_back(multiplyAcc(shape.drop_front(map.getNumResults())));
+  }
+  return result;
+}
+
+LogicalResult MultiMmaOp::verify() {
+  int64_t expectedNumIns = getKind().getExpectedNumInputs();
+  if (expectedNumIns != 2) {
+    return emitOpError("we're mid-refactoring, input can only be LHS + RHS");
+  }
+
+  SmallVector<ShapedType> opTypes = llvm::map_to_vector(
+      getOperandTypes(), [](auto t) { return llvm::cast<ShapedType>(t); });
   SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
 
   // Verify that an indexing map was specified for each operand.
-  if (indexingMaps.size() != 3)
+  if (indexingMaps.size() != expectedNumIns + 1)
     return emitOpError("expected an indexing map for each operand");
 
   // Verify that each index map has 'numIterators' inputs, no symbols, and
@@ -176,7 +198,7 @@ LogicalResult MultiMmaOp::verify() {
     if (map.getNumSymbols() != 0)
       return emitOpError("expected indexing map ")
              << index << " to have no symbols";
-    auto shapedType = llvm::dyn_cast<ShapedType>(getOperand(index).getType());
+    auto shapedType = opTypes[index];
     unsigned rank = shapedType.getRank();
     // Verify that the map has the right number of inputs, outputs, and indices.
     // This also correctly accounts for (..) -> () for rank-0 results.
@@ -199,78 +221,47 @@ LogicalResult MultiMmaOp::verify() {
     }
   }
 
-  if (failed(linalg::inferContractionDims(indexingMaps))) {
-    return emitOpError("failed to infer contraction dims");
+  if (failed(getKind().verifyIndexingMaps(indexingMaps))) {
+    return emitOpError("failed to verify indexing maps");
   }
 
   SmallVector<int64_t> bounds;
   getIterationBounds(bounds);
   // The truncation functionality of llvm::zip is intentional here to ignore
   // the inner dimensions.
-  auto verifyOperandShape = [&](ShapedType type, AffineMap map) {
+  for (auto [type, map] : llvm::zip_equal(opTypes, indexingMaps)) {
     for (auto [dim, size] : llvm::zip(map.getResults(), type.getShape())) {
       int64_t dimIdx = cast<AffineDimExpr>(dim).getPosition();
       if (size != bounds[dimIdx]) {
-        return failure();
+        return emitOpError("shape does not match iteration bounds");
       }
     }
     return success();
   };
-  if (failed(verifyOperandShape(lhsType, indexingMaps[0]))) {
-    return emitOpError("lhs shape does not match iteration bounds");
-  }
-  if (failed(verifyOperandShape(rhsType, indexingMaps[1]))) {
-    return emitOpError("rhs shape does not match iteration bounds");
-  }
-  if (failed(verifyOperandShape(accType, indexingMaps[2]))) {
-    return emitOpError("accumulator shape does not match iteration bounds");
-  }
 
-  // Verify supported combining kind.
-  auto [lType, rType, aType] = getKind().getABCElementTypes();
-  if (lType != lhsType.getElementType()) {
-    return emitOpError("lhs element type ")
-           << lhsType.getElementType()
-           << " does not match expected element type " << lType
-           << " for intrinsic";
-  }
-  if (rType != rhsType.getElementType()) {
-    return emitOpError("rhs element type ")
-           << rhsType.getElementType()
-           << " does not match expected element type " << rType
-           << " for intrinsic";
-  }
-  if (aType != accType.getElementType()) {
-    return emitOpError("accumulator element type ")
-           << accType.getElementType()
-           << " does not match expected element type " << aType
-           << " for intrinsic";
-  }
+  SmallVector<VectorType> preThreadTypes;
+  getKind().getUndistributedTileTypes(preThreadTypes);
+  SmallVector<VectorType> threadTypes;
+  getKind().getDistributedTileTypes(threadTypes);
 
-  int64_t lhsInnerElementCount = multiplyAcc(getLhsInnerShape());
-  int64_t rhsInnerElementCount = multiplyAcc(getRhsInnerShape());
-  int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
-
-  auto [m, n, k] = getKind().getMNKShape();
-  int64_t expectedNumLhsElem = m * k;
-  int64_t expectedNumRhsElem = n * k;
-  int64_t expectedNumAccElem = m * n;
-
-  if (expectedNumLhsElem != lhsInnerElementCount ||
-      expectedNumRhsElem != rhsInnerElementCount ||
-      expectedNumAccElem != accInnerElementCount) {
-    auto [lhsThreadType, rhsThreadType, accThreadType] =
-        getKind().getABCVectorTypes();
-    int64_t lhsThreadElementCount = multiplyAcc(lhsThreadType.getShape());
-    int64_t rhsThreadElementCount = multiplyAcc(rhsThreadType.getShape());
-    int64_t accThreadElementCount = multiplyAcc(accThreadType.getShape());
-    if (lhsInnerElementCount != lhsThreadElementCount ||
-        rhsInnerElementCount != rhsThreadElementCount ||
-        accInnerElementCount != accThreadElementCount) {
-      return emitOpError("operation parallel semantics can't be inferred as "
-                         "either thread or subgroup");
+  SmallVector<int64_t> innerElemCounts = getInnerElemCounts(*this);
+  for (auto [opNum, opType, tileType] :
+       llvm::enumerate(opTypes, preThreadTypes)) {
+    if (opType.getElementType() != tileType.getElementType()) {
+      return emitOpError("operand " + Twine(opNum) + " element type ")
+             << opType.getElementType() << " does not match expected tile type "
+             << tileType << " for operator";
     }
+  }
 
+  bool hasSubgroupSemantics =
+      countsMatchTileTypes(innerElemCounts, preThreadTypes);
+  bool hasThreadSemantics = countsMatchTileTypes(innerElemCounts, threadTypes);
+  if (!hasSubgroupSemantics && !hasThreadSemantics) {
+    return emitOpError("operation parallel semantics can't be inferred as "
+                       "either thread or subgroup");
+  }
+  if (hasThreadSemantics) {
     if (getLhsPermutation() || getRhsPermutation() || getAccPermutation()) {
       return emitOpError("permutations require subgroup semantics");
     }
@@ -290,14 +281,10 @@ LogicalResult MultiMmaOp::verify() {
 }
 
 bool MultiMmaOp::hasThreadSemantics() {
-  int64_t lhsInnerElementCount = multiplyAcc(getLhsInnerShape());
-  int64_t rhsInnerElementCount = multiplyAcc(getRhsInnerShape());
-  int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
-
-  // If it does not have subgroup semantics, then it must have thread semantics.
-  auto [m, n, k] = getKind().getMNKShape();
-  return m * k != lhsInnerElementCount || n * k != rhsInnerElementCount ||
-         m * n != accInnerElementCount;
+  SmallVector<int64_t> innerElemCounts = getInnerElemCounts(*this);
+  SmallVector<VectorType> preThreadTiles;
+  getKind().getUndistributedTileTypes(preThreadTiles);
+  return !countsMatchTileTypes(innerElemCounts, preThreadTiles);
 }
 
 static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
@@ -316,6 +303,7 @@ void MultiMmaOp::getIterationBounds(SmallVectorImpl<int64_t> &iterationBounds) {
     // Search lhs/rhs map results for 'targetExpr'.
     auto targetExpr = getAffineDimExpr(it.index(), getContext());
     auto iteratorType = llvm::cast<IteratorTypeAttr>(it.value()).getValue();
+    // TODO: search all input indexing maps
     if (iteratorType == utils::IteratorType::reduction) {
       // Get reduction dim size from lhs shape (same size in rhsShape).
       int64_t lhsDimIndex = getResultIndex(indexingMaps[0], targetExpr);
