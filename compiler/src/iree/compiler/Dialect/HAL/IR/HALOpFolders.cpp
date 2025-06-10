@@ -121,6 +121,41 @@ void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 // hal.allocator.*
 //===----------------------------------------------------------------------===//
+namespace {
+
+struct FoldAllocatorResolveMemoryProperties
+    : public OpRewritePattern<AllocatorResolveMemoryPropertiesOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AllocatorResolveMemoryPropertiesOp op,
+                                PatternRewriter &rewriter) const override {
+    // needs to get resolved by a runtime device query or by using the
+    // topology attribute later on.
+    if (op.getAffinity() &&
+        isa<IREE::HAL::DeviceOptimalAttr>(*op.getAffinity())) {
+      return failure();
+    }
+    auto loc = op.getLoc();
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    if (failed(deriveAllowedResourceBufferBits(loc, op.getResourceLifetime(),
+                                               memoryTypes, bufferUsage))) {
+      return failure();
+    }
+    auto memoryTypeOp =
+        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+    auto bufferUsageOp =
+        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+    rewriter.replaceOp(op, {memoryTypeOp, bufferUsageOp});
+    return success();
+  }
+};
+
+} // namespace
+
+void AllocatorResolveMemoryPropertiesOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<FoldAllocatorResolveMemoryProperties>(context);
+}
 
 namespace {
 

@@ -83,7 +83,7 @@ util.func public @resourceAllocaOptimal(%size: index) -> (!stream.resource<trans
   // CHECK: %[[DEVICE:.+]], %[[QUEUE_AFFINITY:.+]] = hal.allocator.select from([
   // CHECK: (%[[DEVICE_A]], %[[AFFINITY_A]] : !hal.device, i64),
   // CHECK: (%[[DEVICE_B]], %[[AFFINITY_B]] : !hal.device, i64)
-  // CHECK: ]) type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]]) : !hal.device, i64
+  // CHECK: ]) type(%[[MEMORY_TYPES]]) usage(%[[BUFFER_USAGE]]) : !hal.device, i64
   // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: %[[POOL:.+]] = arith.constant 0 : i64
@@ -93,7 +93,7 @@ util.func public @resourceAllocaOptimal(%size: index) -> (!stream.resource<trans
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: pool(%[[POOL]])
-  // CHECK-SAME: type(%[[MEMORY_TYPE]])
+  // CHECK-SAME: type(%[[MEMORY_TYPES]])
   // CHECK-SAME: usage(%[[BUFFER_USAGE]])
   // CHECK-SAME: flags("None")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
