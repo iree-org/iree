@@ -2,11 +2,11 @@
 // RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow),cse,canonicalize)" %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
 
 // CHECK-ALL-LABEL: @fission_global_read_to_private_write
-// MULTI-SAME: %[[ARG0:.*]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
-// MULTI-SAME: %[[ARG1:.*]]: index
-// MULTI-SAME: %[[ARG2:.*]]: i1
-// MULTI-SAME: %[[ARG3:.*]]: vector<1x1x1x8xbf16>
-// MULTI-SAME: %[[ARG4:.*]]: memref<1x1x1x8xbf16, #gpu.address_space<private>>
+// CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %[[ARG1:.*]]: index
+// CHECK-ALL-SAME: %[[ARG2:.*]]: i1
+// CHECK-ALL-SAME: %[[ARG3:.*]]: vector<1x1x1x8xbf16>
+// CHECK-ALL-SAME: %[[ARG4:.*]]: memref<1x1x1x8xbf16, #gpu.address_space<private>>
 func.func @fission_global_read_to_private_write(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: i1, %arg3: vector<1x1x1x8xbf16>, %arg4: memref<1x1x1x8xbf16, #gpu.address_space<private>>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -35,9 +35,9 @@ func.func @fission_global_read_to_private_write(%arg0: memref<1x?x?x8xbf16, #amd
 // -----
 
 // CHECK-ALL-LABEL: @fission_global_read_to_workgroup_write
-// MULTI-SAME: %[[ARG0:.*]]: index
-// MULTI-SAME: %[[ARG1:.*]]: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
-// MULTI-SAME: %[[ARG2:.*]]: memref<1x4xf32, #gpu.address_space<workgroup>>
+// CHECK-ALL-SAME: %[[ARG0:.*]]: index
+// CHECK-ALL-SAME: %[[ARG1:.*]]: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %[[ARG2:.*]]: memref<1x4xf32, #gpu.address_space<workgroup>>
 func.func @fission_global_read_to_workgroup_write(%arg0: index, %arg1: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>, %arg2: memref<1x4xf32, #gpu.address_space<workgroup>>) {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
@@ -71,9 +71,9 @@ func.func @fission_global_read_to_workgroup_write(%arg0: index, %arg1: memref<?x
 // -----
 
 // CHECK-ALL-LABEL: @no_fission_global_read_to_global_write
-// MULTI-SAME: %[[ARG0:.*]]: memref<1x?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
-// MULTI-SAME: %[[ARG1:.*]]: memref<1x?x?xf32, #gpu.address_space<global>>
-// MULTI-SAME: %[[ARG2:.*]]: index
+// CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %[[ARG1:.*]]: memref<1x?x?xf32, #gpu.address_space<global>>
+// CHECK-ALL-SAME: %[[ARG2:.*]]: index
 func.func @no_fission_global_read_to_global_write(%arg0: memref<1x?x?xf32, #amdgpu.address_space<fat_raw_buffer>>, %arg1: memref<1x?x?xf32, #gpu.address_space<global>>, %arg2: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

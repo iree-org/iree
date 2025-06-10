@@ -271,12 +271,10 @@ struct FissionTransferOpsInControlFlowPass final
       if (failed(result)) {
         continue;
       }
-      FissionTarget currentTarget = result.value();
-      if (!FissionMultiTrip &&
-          !neverRunsSecondIteration(currentTarget.parent)) {
+      if (!FissionMultiTrip && !neverRunsSecondIteration(forOp)) {
         return;
       }
-      fissionTargets.push_back(currentTarget);
+      fissionTargets.push_back(result.value());
     }
 
     for (const FissionTarget &target : fissionTargets) {
