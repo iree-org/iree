@@ -10,7 +10,7 @@
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
 #define IREE_UK_MMT4D_TILE(ARCH, LHS, RHS, OUT, M0, K0, SUFFIX) \
-  IREE_UK_MMT4D_TILE_FUNC_DECL(                                     \
+  IREE_UK_MMT4D_TILE_FUNC_DECL(                                 \
       iree_uk_mmt4d_tile_##LHS##RHS##OUT##_##M0##xXXx##K0##_##ARCH##SUFFIX)
 
 #include "iree/builtins/ukernel/arch/riscv_64/mmt4d_riscv_64_tiles.inl"

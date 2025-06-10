@@ -42,7 +42,7 @@ iree_bitcode_library(
         "mmt4d_riscv_64_entry_point.c",
         "pack_riscv_64_entry_point.c",
         "unpack_riscv_64_entry_point.c",
-         ],
+    ],
     arch = "riscv_64",
     internal_hdrs = UKERNEL_RISCV_64_INTERNAL_HEADERS,
 )
@@ -51,12 +51,11 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_riscv_64_v",
     srcs = [
         "mmt4d_riscv_64_v.c",
-        ],
+    ],
     arch = "riscv_64",
     copts = ["-march=rv64gcv"],
     internal_hdrs = UKERNEL_RISCV_64_INTERNAL_HEADERS,
 )
-
 
 iree_link_bitcode(
     name = "ukernel_bitcode_arch_riscv_64",

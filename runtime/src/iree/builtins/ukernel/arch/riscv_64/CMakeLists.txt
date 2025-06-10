@@ -127,4 +127,3 @@ iree_cc_library(
 
 set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::riscv_64" PARENT_SCOPE)
 endif()  # IREE_UK_BUILD_RISCV_64_V
-
