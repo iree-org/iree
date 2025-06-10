@@ -10,10 +10,12 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -29,6 +31,66 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
+
+struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
+  using Base = OpRewritePattern<vector::TransferReadOp>;
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp op,
+                                PatternRewriter &rewriter) const override {
+    // Fail to match if it doesn't have pure tensor semantics
+    if (!op.hasPureTensorSemantics())
+      return failure();
+
+    // Try to get the producing write op
+    auto writeOp =
+        dyn_cast_or_null<vector::TransferWriteOp>(op.getBase().getDefiningOp());
+    if (!writeOp)
+      return failure();
+
+    Value valToStore = writeOp.getValueToStore();
+    // Fail to match if the in/out types are different
+    if (valToStore.getType() != op.getType())
+      return failure();
+
+    // Work only with trivial indices
+    if (llvm::any_of(op.getIndices(),
+                     [](Value v) { return !isZeroInteger(v); }) ||
+        llvm::any_of(writeOp.getIndices(),
+                     [](Value v) { return !isZeroInteger(v); }))
+      return failure();
+
+    // Work only with minor identity mappings
+    if (!op.getPermutationMap().isMinorIdentity() ||
+        !writeOp.getPermutationMap().isMinorIdentity())
+      return failure();
+
+    TypedValue<VectorType> wMask = writeOp.getMask();
+    Value rPad = op.getPadding();
+    Value rMask = op.getMask();
+
+    // Match only if the write op has a mask and the read only has a pad value
+    // and no mask. TODO: It should be straightforward to handle the case were
+    // the read has a mask as long it can be proved that the masks are
+    // compatible.
+    if (!(wMask && rPad && !rMask))
+      return failure();
+
+    // NOTE[FoldMaskedTransferRAW]: since masking is not supported on shaped
+    // types with vector element types (see `verifyTransferOp` in upstream MLIR
+    // VectorOps.cpp), and the write op has a mask, it can be assumed `rPad`
+    // never has a vector type. But for sanity add an assert in case things
+    // change upstream.
+    assert(!isa<VectorType>(rPad.getType()) &&
+           "search `NOTE[FoldMaskedTransferRAW]` in "
+           "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
+    // Materialize the padding with a constant.
+    auto padVal = rewriter.create<vector::SplatOp>(rPad.getLoc(),
+                                                   valToStore.getType(), rPad);
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
+    return success();
+  }
+};
 
 // Returns the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
@@ -257,6 +319,7 @@ void GenericVectorizationPass::runOnOperation() {
     vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                          funcOp.getContext());
   }
+  vectorizationPatterns.add<FoldMaskedTransferRAW>(funcOp.getContext());
   (void)applyPatternsGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
