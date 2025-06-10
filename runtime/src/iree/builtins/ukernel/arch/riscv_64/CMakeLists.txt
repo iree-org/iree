@@ -105,7 +105,6 @@ iree_cc_library(
 list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_v")
 endif()  # IREE_UK_BUILD_RISCV_64_V
 
-if(IREE_UK_BUILD_RISCV_64_V)
 iree_cc_library(
   NAME
     riscv_64
@@ -114,8 +113,6 @@ iree_cc_library(
     "pack_riscv_64_entry_point.c"
     "unpack_riscv_64_entry_point.c"
     "query_tile_sizes_riscv_64_entry_point.c"
-  COPTS
-    "${IREE_UK_COPTS_RISCV_64_V}"
   DEPS
     ::common_riscv_64
     iree::base::core_headers
@@ -126,4 +123,3 @@ iree_cc_library(
 )
 
 set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::riscv_64" PARENT_SCOPE)
-endif()  # IREE_UK_BUILD_RISCV_64_V

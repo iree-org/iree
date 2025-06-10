@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <riscv_vector.h>
+
 #include "iree/builtins/ukernel/arch/riscv_64/common_riscv_64.h"
 #include "iree/builtins/ukernel/arch/riscv_64/mmt4d_riscv_64_internal.h"
 

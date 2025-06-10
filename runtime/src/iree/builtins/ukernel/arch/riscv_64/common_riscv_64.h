@@ -7,8 +7,6 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_COMMON_RISCV_64_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_COMMON_RISCV_64_H_
 
-#include <riscv_vector.h>
-
 #include "iree/builtins/ukernel/common.h"
 #include "iree/schemas/cpu_data.h"
 
