@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -44,6 +45,10 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {
+      return failure();
+    }
+
     // Get the outer most non-unit dim to transpose to.
     RankedTensorType concatType = concatOp.getResultType();
     ArrayRef<int64_t> concatShape = concatType.getShape();
@@ -89,6 +94,10 @@ struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {
+      return failure();
+    }
+
     if (concatOp.getDim() == 0) {
       return rewriter.notifyMatchFailure(
           concatOp, "non-outer dim concats are not decomposed");
