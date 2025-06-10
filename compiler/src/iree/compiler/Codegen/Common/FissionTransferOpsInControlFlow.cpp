@@ -271,6 +271,9 @@ struct FissionTransferOpsInControlFlowPass final
       if (failed(result)) {
         continue;
       }
+      // When not doing multi-trip fission if we have even one multi-trip loop
+      // we bail-out from this pass and dont do fission as we wont be doing any
+      // prefetching which is the point of doing fission.
       if (!FissionMultiTrip && !neverRunsSecondIteration(forOp)) {
         return;
       }
