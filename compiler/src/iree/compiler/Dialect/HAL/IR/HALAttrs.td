@@ -1064,7 +1064,8 @@ def HAL_DeviceOptimalAttr : AttrDef<HAL_Dialect, "DeviceOptimal", [
 
 def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
   DeclareAttrInterfaceMethods<Stream_AffinityTopologyAttr, [
-    "requiresTransfer",
+    "hasTransparentAccess",
+    "hasUnifiedMemory",
   ]>
 ]> {
   let mnemonic = "device.topology";

@@ -1109,26 +1109,48 @@ static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
   return {};
 }
 
-bool DeviceTopologyAttr::requiresTransfer(
+bool DeviceTopologyAttr::hasTransparentAccess(
     IREE::Stream::AffinityAttr source,
     IREE::Stream::AffinityAttr target) const {
   Attribute sourceDevice = getAffinityDevice(source);
   Attribute targetDevice = getAffinityDevice(target);
 
+  // Same device has transparent access
   if (!sourceDevice || !targetDevice)
-    return true;
-  if (sourceDevice == targetDevice)
     return false;
+  if (sourceDevice == targetDevice)
+    return true;
 
   // Search for a matching link and check if it has transparent access
-  // or unified memory.
   for (DeviceLinkAttr link : getLinks()) {
     if ((sourceDevice == link.getSourceDevice() &&
          targetDevice == link.getTargetDevice())) {
-      return !link.getTransparentAccess() && !link.getUnifiedMemory();
+      return link.getTransparentAccess();
     }
   }
-  return true;
+  return false;
+}
+
+bool DeviceTopologyAttr::hasUnifiedMemory(
+    IREE::Stream::AffinityAttr source,
+    IREE::Stream::AffinityAttr target) const {
+  Attribute sourceDevice = getAffinityDevice(source);
+  Attribute targetDevice = getAffinityDevice(target);
+
+  // Same device has unified memory
+  if (!sourceDevice || !targetDevice)
+    return false;
+  if (sourceDevice == targetDevice)
+    return true;
+
+  // Search for a matching link and check if it has unified memory
+  for (DeviceLinkAttr link : getLinks()) {
+    if ((sourceDevice == link.getSourceDevice() &&
+         targetDevice == link.getTargetDevice())) {
+      return link.getUnifiedMemory();
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

@@ -44,6 +44,7 @@ iree_cc_library(
     "ResolveDeviceAliases.cpp"
     "ResolveDevicePromises.cpp"
     "ResolveExportOrdinals.cpp"
+    "ResolveTopologyQueries.cpp"
     "SerializeExecutables.cpp"
     "StripExecutableContents.cpp"
     "SubstituteExecutables.cpp"

@@ -506,6 +506,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // cache them at initialization-time.
   passManager.addPass(IREE::HAL::createMaterializeResourceCachesPass());
 
+  // Try to resolve hal.allocator.resolve_memory_properties and
+  // hal.allocator.select_device statically if we have topology information to
+  // do so.
+  passManager.addPass(IREE::HAL::createResolveTopologyQueriesPass());
+
   //----------------------------------------------------------------------------
   // Device management and specialization
   //----------------------------------------------------------------------------

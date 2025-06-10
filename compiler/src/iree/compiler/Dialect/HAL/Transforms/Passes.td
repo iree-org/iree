@@ -249,6 +249,23 @@ def MemoizeDeviceQueriesPass :
   ];
 }
 
+def ResolveTopologyQueriesPass :
+    Pass<"iree-hal-resolve-topology-queries", "mlir::ModuleOp"> {
+  let summary = "Try to statically resolve ops using topology information.";
+  let description = [{
+    Attempts to statically resolve `hal.allocator.resolve_memory_properties` ops
+    that have the `device.optimal` attribute by checking the topology information
+    for transparent access between devices. If transparent access is available,
+    the operation is resolved to the default flags according to the lifetime and
+    an additional MAPPING bit. Otherwise, the operation is left unmodified to be
+    resolved at runtime.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::HAL::HALDialect",
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Executable translation
 //===----------------------------------------------------------------------===//
