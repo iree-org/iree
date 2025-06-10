@@ -24,8 +24,12 @@ iree_bitcode_library(
     "common_riscv_64.h"
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
+    "pack_riscv_64_internal.h"
+    "unpack_riscv_64_internal.h"
   SRCS
     "mmt4d_riscv_64_entry_point.c"
+    "pack_riscv_64_entry_point.c"
+    "unpack_riscv_64_entry_point.c"
 )
 
 iree_bitcode_library(
@@ -39,6 +43,8 @@ iree_bitcode_library(
     "common_riscv_64.h"
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
+    "pack_riscv_64_internal.h"
+    "unpack_riscv_64_internal.h"
   SRCS
     "mmt4d_riscv_64_v.c"
   COPTS
@@ -49,8 +55,8 @@ iree_link_bitcode(
   NAME
     ukernel_bitcode_arch_riscv_64
   SRCS
-    "ukernel_bitcode_arch_riscv_64_v.bc"
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
+    "ukernel_bitcode_arch_riscv_64_v.bc"
 
 )
 
@@ -71,7 +77,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_V
 
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
 
-# Placeholder for now
+
 configure_file("config_riscv_64.h.in" "config_riscv_64.h")
 
 iree_cc_library(
@@ -99,6 +105,7 @@ iree_cc_library(
 list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_v")
 endif()  # IREE_UK_BUILD_RISCV_64_V
 
+if(IREE_UK_BUILD_RISCV_64_V)
 iree_cc_library(
   NAME
     riscv_64
@@ -107,6 +114,8 @@ iree_cc_library(
     "pack_riscv_64_entry_point.c"
     "unpack_riscv_64_entry_point.c"
     "query_tile_sizes_riscv_64_entry_point.c"
+  COPTS
+    "${IREE_UK_COPTS_RISCV_64_V}"
   DEPS
     ::common_riscv_64
     iree::base::core_headers
@@ -117,3 +126,5 @@ iree_cc_library(
 )
 
 set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::riscv_64" PARENT_SCOPE)
+endif()  # IREE_UK_BUILD_RISCV_64_V
+
