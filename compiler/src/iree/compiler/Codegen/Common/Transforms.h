@@ -26,6 +26,22 @@ public:
   void notifyOperationReplaced(Operation *op, ValueRange replacement) override;
 };
 
+/// Fold a tensor::ExpandShapeOp into a consumer `mapScatterOp`, by linearizing
+/// and then delinearizing the source indices of the `mapScatterOp`s index
+/// transformation.
+IREE::LinalgExt::MapScatterOp
+foldExpandShapeIntoMapScatter(RewriterBase &rewriter,
+                              tensor::ExpandShapeOp expandShapeOp,
+                              IREE::LinalgExt::MapScatterOp mapScatterOp);
+
+/// Fold a tensor::CollapseShapeOp into a consumer `mapScatterOp`, by
+/// linearizing and then delinearizing the source indices of the
+/// `mapScatterOp`s index transformation.
+IREE::LinalgExt::MapScatterOp
+foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
+                                tensor::CollapseShapeOp collapseShapeOp,
+                                IREE::LinalgExt::MapScatterOp mapScatterOp);
+
 using IGEMMConfigFn =
     std::function<LogicalResult(linalg::GenericOp, IREE::LinalgExt::Im2colOp)>;
 using IGEMMControlFn = std::function<bool(Operation *)>;
@@ -93,6 +109,9 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
+
+/// Populate patterns to fold relayout operations into map_scatter ops.
+void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

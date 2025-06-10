@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -107,43 +108,6 @@ static MapScatterOp foldTransposeIntoMapScatter(RewriterBase &rewriter,
     mapScatterOp.insertTransformationAtStart(rewriter, indexTransformBuilder,
                                              perm.size());
     mapScatterOp.getInputMutable().assign(transposeOp.getInput());
-  });
-  return mapScatterOp;
-}
-
-/// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
-/// `mapScatterOp`, by linearizing and then delinearizing the source indices
-/// of the `mapScatterOp`s index transformation.
-template <typename ReshapeOpTy>
-static MapScatterOp foldReshapeIntoMapScatter(RewriterBase &rewriter,
-                                              ReshapeOpTy reshapeOp,
-                                              MapScatterOp mapScatterOp) {
-  assert(mapScatterOp.getInput() == reshapeOp->getResult(0) &&
-         "expected reshapeOp to be the producer of mapScatterOp");
-  Location loc = reshapeOp->getLoc();
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointAfter(reshapeOp);
-  SmallVector<OpFoldResult> srcDims =
-      tensor::getMixedSizes(rewriter, loc, reshapeOp.getSrc());
-  // There can be leftover tensor.dim ops consuming the result of the reshape,
-  // but they will be folded into some affine.apply ops on the source sizes by
-  // later cleanup patterns.
-  SmallVector<OpFoldResult> resultDims =
-      tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
-
-  auto indexTransformBuilder =
-      [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
-    auto linearizeIndexOp = rewriter.create<affine::AffineLinearizeIndexOp>(
-        mapScatterOp->getLoc(), srcIndices, srcDims, /*disjoint=*/true);
-    auto delinearizeIndexOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-        mapScatterOp->getLoc(), linearizeIndexOp.getResult(), resultDims,
-        /*hasOuterBound=*/true);
-    return delinearizeIndexOp->getResults();
-  };
-  rewriter.modifyOpInPlace(mapScatterOp, [&]() {
-    mapScatterOp.insertTransformationAtStart(rewriter, indexTransformBuilder,
-                                             srcDims.size());
-    mapScatterOp.getInputMutable().assign(reshapeOp->getOperand(0));
   });
   return mapScatterOp;
 }
@@ -368,10 +332,11 @@ foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
         return foldTransposeIntoMapScatter(rewriter, transposeOp, mapScatterOp);
       })
       .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expandOp) {
-        return foldReshapeIntoMapScatter(rewriter, expandOp, mapScatterOp);
+        return foldExpandShapeIntoMapScatter(rewriter, expandOp, mapScatterOp);
       })
       .Case<tensor::CollapseShapeOp>([&](tensor::CollapseShapeOp collapseOp) {
-        return foldReshapeIntoMapScatter(rewriter, collapseOp, mapScatterOp);
+        return foldCollapseShapeIntoMapScatter(rewriter, collapseOp,
+                                               mapScatterOp);
       })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp extractSliceOp) {
         return foldExtractSliceIntoMapScatter(rewriter, extractSliceOp,
