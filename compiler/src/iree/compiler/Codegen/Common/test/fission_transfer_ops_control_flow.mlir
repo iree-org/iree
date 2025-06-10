@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow{fission-multi-trip}),cse,canonicalize)" %s | FileCheck %s --check-prefixes=CHECK-ALL,MULTI
-// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow),cse,canonicalize)" %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
+// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow),cse)" %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
 
 // CHECK-ALL-LABEL: @fission_global_read_to_private_write
 // CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
