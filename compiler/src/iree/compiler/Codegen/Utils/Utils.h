@@ -322,6 +322,14 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value);
 
+/// Return true if we can prove that the we always run at least the first
+/// iteration of the ForOp.
+bool alwaysRunsFirstIteration(scf::ForOp op);
+
+/// Return true if we can prove that the we never run more than one iteration of
+/// the ForOp.
+bool neverRunsSecondIteration(scf::ForOp op);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

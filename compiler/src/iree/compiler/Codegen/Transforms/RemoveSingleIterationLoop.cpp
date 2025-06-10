@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -58,36 +59,6 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
     rewriter.create<scf::YieldOp>(ifOp.getLoc(), initArgs);
   }
   rewriter.replaceOp(op, ifOp);
-}
-
-/// Return true if we can prove that the we always run at least the first
-/// iteration of the ForOp.
-static bool alwaysRunsFirstIteration(scf::ForOp op) {
-  // Can't perform the analysis if the loops's bounds aren't index-typed.
-  if (!op.getInductionVar().getType().isIndex())
-    return false;
-  FailureOr<bool> isLb = ValueBoundsConstraintSet::compare(
-      getAsOpFoldResult(op.getLowerBound()), ValueBoundsConstraintSet::LT,
-      getAsOpFoldResult(op.getUpperBound()));
-  return isLb.value_or(false);
-}
-
-/// Return true if we can prove that the we never run more than one iteration of
-/// the ForOp.
-static bool neverRunsSecondIteration(scf::ForOp op) {
-  // Can't perform the analysis if the loops's bounds aren't index-typed.
-  if (!op.getInductionVar().getType().isIndex())
-    return false;
-  // If the upper bound (ub) is less than or equal to the loop step, then
-  // lower bound  + step must be greater than the upper bound, assuming the
-  // lower bound is non-negative.
-  FailureOr<bool> isUbUnderStep = ValueBoundsConstraintSet::compare(
-      getAsOpFoldResult(op.getUpperBound()), ValueBoundsConstraintSet::LE,
-      getAsOpFoldResult(op.getStep()));
-  FailureOr<bool> isLbNonNegative = ValueBoundsConstraintSet::compare(
-      getAsOpFoldResult(op.getLowerBound()), ValueBoundsConstraintSet::GE,
-      getAsIndexOpFoldResult(op.getContext(), 0));
-  return isUbUnderStep.value_or(false) && isLbNonNegative.value_or(false);
 }
 
 namespace {
