@@ -131,7 +131,7 @@ struct FoldAllocatorResolveMemoryProperties
     // needs to get resolved by a runtime device query or by using the
     // topology attribute later on.
     if (op.getAffinity() &&
-        isa<IREE::HAL::DeviceOptimalAttr>(*op.getAffinity())) {
+        isa_and_nonnull<IREE::HAL::DeviceOptimalAttr>(op.getAffinity())) {
       return failure();
     }
     auto loc = op.getLoc();

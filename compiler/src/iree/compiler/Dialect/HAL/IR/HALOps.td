@@ -686,19 +686,16 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
   let description = [{
     Resolves the required memory types and buffer usage for a resource with
     the given lifetime and affinity. This operation encapsulates the logic
-    for deriving buffer properties based on stream resource semantics, allowing
-    for cleaner separation between stream-to-HAL conversion patterns and the
-    actual property resolution logic.
+    for deriving buffer properties based on stream resource semantics.
 
-    This operation can be resolved later in compilation by either constant
-    folding when the affinity is statically known or by runtime device
-    selection when the affinity is dynamic.
+    This operation can be resolved later in compilation either by canonicalization
+    for single device affinties or using the topology attribute for multiple devices.
 
     Example:
     ```mlir
     %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
         for(#hal.device.affinity<@device_a>)
-        lifetime(variable) : i32, i32
+        lifetime(transient) : i32, i32
     ```
   }];
 
