@@ -112,6 +112,37 @@ void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
+  // Early application of simplifying patterns that rewrite favorable pad + vector.transfer pairs
+  // for better vectorization outcomes.
+  if (vectorizePadding) {
+    RewritePatternSet patterns(funcOp.getContext());
+    linalg::populatePadOpVectorizationPatterns(patterns);
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
+  }
+  // With the above, we get:
+  // ```
+  //   %17 = vector.create_mask %dim : vector<128xi1>
+  //   %18 = vector.transfer_read %extracted_slice_6[%c0], %cst, %17 {in_bounds = [true]} : tensor<?xf32>, vector<128xf32>
+  //   %19 = arith.truncf %18 : vector<128xf32> to vector<128xf16>
+  //   %20 = vector.transfer_write %19, %16[%c0], %17 {in_bounds = [true]} : vector<128xf16>, tensor<?xf16>
+  //   %21 = vector.transfer_read %20[%c0], %cst_2 : tensor<?xf16>, vector<128xf16>
+  // ```
+  // Now, wecan think of adding to populatePadOpVectorizationPatterns
+  // third_party/llvm-project/mlir/lib/Dialect/Linalg/Transforms/Vectorization.cpp
+  // a new
+  // Rewrite a sequence of 
+  //   vector.mask -> vector.transfer_write -> vector.transfer_read 
+  // to 
+  //   masked transfer_read
+  // struct MaskedTransferWriteToReadOp
+  //     : public MaskedTransferWriteToReadOp<vector::TransferReadOp> {
+  //   LogicalResult rewriteUser(PatternRewriter &rewriter, vector::TransferReadOp xferOp) const override {
+  //     llvm::dyn_cast<vector::TransferWriteOp>(xferOp.get);
+  //     xferOp.
+  //     return success();
+  //   }
+  // };
+
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
@@ -227,16 +258,6 @@ void GenericVectorizationPass::runOnOperation() {
                                                          funcOp.getContext());
   }
   (void)applyPatternsGreedily(funcOp, std::move(vectorizationPatterns));
-
-  // Apply the pad tensor op vectorization separately to avoid running the
-  // GenericPadOpVectorizationPattern too early.
-  // TODO: Improve once we have better infrastructure to control pattern
-  // application.
-  if (vectorizePadding) {
-    RewritePatternSet patterns(funcOp.getContext());
-    linalg::populatePadOpVectorizationPatterns(patterns);
-    (void)applyPatternsGreedily(funcOp, std::move(patterns));
-  }
 }
 
 } // namespace
