@@ -25,6 +25,34 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
+static bool hasExternalCapture(linalg::GenericOp genericOp) {
+  Block &body = genericOp.getRegion().front();
+  for (Operation &op : body.getOperations()) {
+    for (Value operand : op.getOperands()) {
+      if (auto bArg = dyn_cast<BlockArgument>(operand)) {
+        // Check whether the operand lies in the same block.
+        if (bArg.getOwner() == &body) {
+          continue;
+        }
+        return true;
+      }
+      Operation *defOp = operand.getDefiningOp();
+      // Scalar constant is allowed.
+      if (defOp && defOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
+        Type type = operand.getType();
+        if (type.isIntOrFloat() || type.isIndex()) {
+          continue;
+        }
+      }
+      // If defining op is not inside the block, it’s an external value.
+      if (!defOp || defOp->getBlock() != &body) {
+        return true;
+      }
+    }
+  }
+  return false; // All operands are locally defined or block arguments
+}
+
 /// Rematerialize all parallel elementwise operations into its users within a
 /// `flow.dispatch.region`.
 struct RematerializeParallelOpsPattern
@@ -44,9 +72,13 @@ struct RematerializeParallelOpsPattern
 
     // Find the first operand that is defined by another generic op on tensors.
     for (OpOperand &opOperand : genericOp->getOpOperands()) {
-      if (!linalg::areElementwiseOpsFusable(&opOperand))
+      if (!linalg::areElementwiseOpsFusable(&opOperand)) {
         continue;
-
+      }
+      auto producer = opOperand.get().getDefiningOp<linalg::GenericOp>();
+      if (producer && hasExternalCapture(producer)) {
+        continue;
+      }
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
       if (succeeded(fusionResult)) {

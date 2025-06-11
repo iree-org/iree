@@ -865,6 +865,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                /*convertToDpsOptions=*/std::nullopt,
                                /*reorderStrategy=*/reorderStrategy);
 
+  // Some of the elementwise fusion can benefit from this pass.
+  funcPassManager.addPass(createRematerializeParallelOpsPass());
+
   if (usePadToModelSharedMemcpy) {
     funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
   }
