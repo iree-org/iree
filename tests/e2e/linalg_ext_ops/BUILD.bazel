@@ -127,6 +127,7 @@ ROCM_HIP_SRCS = enforce_glob(
     # keep sorted
     [
         "gather.mlir",
+        "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -138,7 +139,6 @@ ROCM_HIP_SRCS = enforce_glob(
         "top-k.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "map_scatter.mlir",
     ],
 )
 
