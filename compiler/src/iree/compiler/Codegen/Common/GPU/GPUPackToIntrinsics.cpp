@@ -116,7 +116,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     }
   }
 
-  // Step 2. Convert configured linalg ops to inner_tiled ops witt multi-MMA
+  // Step 2. Convert configured linalg ops to inner_tiled ops with multi-MMA
   // intrinsic kinds.
   {
     RewritePatternSet patterns(context);
