@@ -669,7 +669,13 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 }
 
 def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+        ["getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "generateResultTileValue"]>
 ]> {
   let summary = "Argmax reduction op.";
   let description = [{

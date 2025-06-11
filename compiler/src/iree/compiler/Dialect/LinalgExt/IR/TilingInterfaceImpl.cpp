@@ -1341,6 +1341,116 @@ LogicalResult TopkOp::getResultTilePosition(
 }
 
 //===----------------------------------------------------------------------===//
+// ArgmaxOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> ArgmaxOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
+    OpFoldResult ub = getDim(builder, loc, getInputValue(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+SmallVector<utils::IteratorType> ArgmaxOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult>
+ArgmaxOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+
+  SmallVector<Operation *> slices;
+  SmallVector<Value> tiledOperands;
+
+  SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+  Operation *inputSlice =
+      getSlice(builder, loc, getInputValue(), offsets, sizes, strides);
+
+  if (!inputSlice)
+    return emitOpError("failed to slice input");
+  tiledOperands.push_back(inputSlice->getResult(0));
+  slices.push_back(inputSlice);
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return emitOpError("failed to compute output tile position");
+  }
+
+  SmallVector<OpFoldResult> outputStrides(outputOffsets.size(),
+                                          builder.getIndexAttr(1));
+  Operation *outputValSlice = getSlice(
+      builder, loc, outputValue(), outputOffsets, outputSizes, outputStrides);
+  if (!outputValSlice)
+    return emitOpError("failed to slice output value");
+  tiledOperands.push_back(outputValSlice->getResult(0));
+  slices.push_back(outputValSlice);
+
+  Operation *outputIdxSlice = getSlice(
+      builder, loc, outputIndex(), outputOffsets, outputSizes, outputStrides);
+  if (!outputIdxSlice)
+    return emitOpError("failed to slice output index");
+  tiledOperands.push_back(outputIdxSlice->getResult(0));
+  slices.push_back(outputIdxSlice);
+
+  SmallVector<Type> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValSlice->getResult(0).getType());
+    resultTypes.push_back(outputIdxSlice->getResult(0).getType());
+  }
+
+  Operation *tiledArgmaxOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{
+      {tiledArgmaxOp}, SmallVector<Value>(tiledArgmaxOp->getResults()), slices};
+}
+
+LogicalResult ArgmaxOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  int64_t dim = getDimension();
+  int64_t inputRank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(inputRank));
+  assert(sizes.size() == static_cast<size_t>(inputRank));
+
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i == dim)
+      continue;
+    resultOffsets.push_back(offsets[i]);
+    resultSizes.push_back(sizes[i]);
+  }
+
+  assert(resultSizes.size() == static_cast<size_t>(inputRank - 1) &&
+         "Argmax output rank should be one less than input rank");
+  return success();
+}
+
+FailureOr<TilingResult>
+ArgmaxOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
