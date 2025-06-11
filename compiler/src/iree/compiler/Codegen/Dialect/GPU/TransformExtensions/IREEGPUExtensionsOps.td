@@ -29,12 +29,12 @@ def ApplyDropInnerTiledOpUnitDims : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLowerMultiMmaOp : Op<Transform_Dialect,
-    "apply_patterns.iree.lower_multi_mma",
+def ApplyLowerInnerTiledOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_inner_tiled",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate patterns to lowering multi_mma ops to the intrinsic specified by
+    Populate patterns to lowering inner_tiled ops to the intrinsic specified by
     the |kind| attribute.
   }];
 

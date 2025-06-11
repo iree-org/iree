@@ -169,8 +169,8 @@ struct LowerMultiMmaToUKernelPattern
     Value subgroupsN = constI32(mma.getSubgroupsN());
     Value intrinsicsK = constI32(mma.getIntrinsicsK());
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
-        op, TypeRange{op.getAccType()}, ukernelAttr.getName(), op.getInputs(),
-        op.getAcc(),
+        op, op.getOutputs().getTypes(), ukernelAttr.getName(), op.getInputs(),
+        op.getOutputs(),
         ValueRange{sharedMemory, constI32(sharedMemoryBytes), k, intrinsicsM,
                    subgroupsM, intrinsicsN, subgroupsN, intrinsicsK},
         ukernelAttr.getDefAttrs(),

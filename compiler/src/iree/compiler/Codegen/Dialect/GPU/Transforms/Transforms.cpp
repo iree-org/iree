@@ -776,57 +776,60 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
-// Multi-MMA Lowering to InnerTiledDescOp
+// InnerTiledOp lowering to underlying operation
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerMultiMmaPattern
+struct LowerInnerTiledPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using OpRewritePattern<IREE::Codegen::InnerTiledOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp mmaOp,
+  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
-    if (mmaOp.hasTensorSemantics()) {
+    if (tiledOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
-          mmaOp, "lowering to concrete op requires vector semantics");
-    }
-    auto mmaKind = dyn_cast<MmaInterfaceAttr>(mmaOp.getKind());
-    if (!mmaKind) {
-      return rewriter.notifyMatchFailure(
-          mmaOp, "Don't yet know how to lower a non-MMA op");
+          tiledOp, "lowering to concrete op requires vector semantics");
     }
     SmallVector<int64_t> bounds;
-    mmaOp.getIterationBounds(bounds);
+    tiledOp.getIterationBounds(bounds);
     if (!bounds.empty()) {
-      return rewriter.notifyMatchFailure(mmaOp,
-                                         "must be a single mma operation");
+      return rewriter.notifyMatchFailure(
+          tiledOp, "must be a single inner tiled operation");
     }
 
-    SmallVector<Value> operands = mmaOp.getOperands();
+    SmallVector<Value> operands = tiledOp.getOperands();
     SmallVector<VectorType> regTypes;
-    mmaOp.getKind().getDistributedTileTypes(regTypes);
+    tiledOp.getKind().getDistributedTileTypes(regTypes);
 
-    for (auto [input, regType] : llvm::zip_equal(operands, regTypes)) {
-      if (input.getType() != regType) {
-        input = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(), regType,
-                                                     input);
+    for (auto [operand, regType] : llvm::zip_equal(operands, regTypes)) {
+      if (operand.getType() != regType) {
+        operand = rewriter.create<vector::ShapeCastOp>(tiledOp.getLoc(),
+                                                       regType, operand);
       }
     }
 
-    // Mark for future commit: the method here could go on
-    // InnerTiledDescAttrInterface and be called something like
-    // "materializeIntrinsic()" as best I (krzysz00) can tell.
-    FailureOr<Value> concreteMmaOp = mmaKind.buildMmaOperation(
-        rewriter, mmaOp.getLoc(), operands.back().getType(), operands);
-    assert(succeeded(concreteMmaOp) && "Failed to create mma op");
-    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
-        mmaOp, mmaOp.getAcc().getType(), *concreteMmaOp);
+    SmallVector<Value> concreteResults;
+    int64_t numInputs = tiledOp.getNumInputs();
+    LogicalResult couldLower = tiledOp.getKind().buildUnderlyingOperations(
+        rewriter, tiledOp.getLoc(), ValueRange{operands}.take_front(numInputs),
+        ValueRange{operands}.drop_front(numInputs), concreteResults);
+    if (failed(couldLower)) {
+      tiledOp.emitOpError("failed to lower to concrete inner tiled operations, "
+                          "shouldn't happen");
+      return failure();
+    }
+    for (auto [result, externalShape] :
+         llvm::zip_equal(concreteResults, tiledOp.getResultTypes())) {
+      result = rewriter.create<vector::ShapeCastOp>(tiledOp.getLoc(),
+                                                    externalShape, result);
+    }
+    rewriter.replaceOp(tiledOp, concreteResults);
     return success();
   }
 };
 } // namespace
 
-void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns) {
-  patterns.add<LowerMultiMmaPattern>(patterns.getContext());
+void populateIREEGPULowerInnerTiledPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerInnerTiledPattern>(patterns.getContext());
 }
 
 //===----------------------------------------------------------------------===//
@@ -853,8 +856,9 @@ AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
 // Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
 // op with a MMA-like intrinsic descriptor.
 FailureOr<IREE::Codegen::InnerTiledOp>
-convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                             IREE::GPU::MmaInterfaceAttr mmaKind) {
+convertContractionToInnerTiledMma(RewriterBase &rewriter,
+                                  linalg::LinalgOp linalgOp,
+                                  IREE::GPU::MmaInterfaceAttr mmaKind) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -973,7 +977,8 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       getLoweringConfig(linalgOp);
 
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
-      linalgOp, inputs,
+      linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
+      /*inits=*/ValueRange{inputs}.back(),
       ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
       mmaKind, perms);
   if (maybeLoweringConfig) {
@@ -983,7 +988,7 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 }
 
 //===----------------------------------------------------------------------===//
-// InnerTiledOp (aka old MultiMmaOp) Distribution
+// InnerTiledOp Distribution
 //===----------------------------------------------------------------------===//
 
 FailureOr<Operation *>
@@ -1004,43 +1009,39 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   OpFoldResult one = rewriter.getIndexAttr(1);
 
   // Step 1. Create the new scf.forall op with a lane id mapping.
+  Attribute mappingType;
   OpFoldResult ub;
-  Attribute mappingType = tiledOp.getKind().getDistributionMappingKind();
+  std::tie(mappingType, ub) = tiledOp.getKind().getDistributionMappingKind();
   if (!mappingType)
     return failure();
   if (isa<gpu::GPUThreadMappingAttr>(mappingType)) {
-    if (!workgroupSize) {
+    if (!workgroupSize && !ub) {
       tiledOp.emitOpError(
           "Inner tiled op with workgroup scope needs workgroup size.");
       return failure();
     }
     ub = rewriter.getIndexAttr(
         ShapedType::getNumElements(workgroupSize.value()));
-  } else if (isa<LaneIdAttr>(mappingType)) {
-    // TODO: If scaled mma aren't MmaInterfaceAttr, find some other way to get
-    // their desired subgroup size.
-    ub = rewriter.getIndexAttr(
-        cast<MmaInterfaceAttr>(tiledOp.getKind()).getSubgroupSize());
-  } else {
-    tiledOp.emitOpError("expected workgroup or subgroup distribution type");
+  } else if (!ub) {
+    tiledOp.emitOpError(
+        "non-workgroup distribution type doesn't have an upper bound");
     return failure();
   }
 
   auto newForallOp = rewriter.create<scf::ForallOp>(
       loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
-      ArrayRef<OpFoldResult>{one}, tiledOp.getAcc(),
+      ArrayRef<OpFoldResult>{one}, tiledOp.getOutputs(),
       ArrayAttr::get(context, {mappingType}));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
 
   // Step 2. Compute the offsets/sizes/strides for each of the operands.
   Value id = newForallOp.getInductionVar(0);
-  SmallVector<Value> operandSlices;
+  SmallVector<Value> inputSlices, initSlices;
+  SmallVector<tensor::ExtractSliceOp> initSliceOps;
   std::optional<ArrayAttr> maybePerms = tiledOp.getPermutations();
-  int64_t accIndex = tiledOp.getKind().getExpectedNumInputs();
+  int64_t firstOutIdx = tiledOp.getNumInputs();
 
-  // Save these so we can do a parallel_insert_slice.
-  SmallVector<OpFoldResult> accOffsets, accSizes, accStrides;
   for (auto [opIndex, operand] : llvm::enumerate(tiledOp.getOperands())) {
     int64_t outerRank = tiledOp.getOperandOuterRank(opIndex);
     SmallVector<OpFoldResult> offsets(outerRank, zero);
@@ -1065,26 +1066,27 @@ distributeInnerTiledOp(RewriterBase &rewriter,
       return tiledOp->emitOpError("failed to populate offsets for operand " +
                                   Twine(opIndex));
     }
-    // Extract the rank-reduced slice of the operandbased on the expected inner
+    // Extract the rank-reduced slice of the operand based on the expected inner
     // vector shape. If we're slicing the accumulator, extract from the loop
     // variable, since the accumulator operand has been used to create the
     // forall.
-    Value argToSlice = operand;
-    if (opIndex == accIndex) {
-      accOffsets = offsets;
-      accSizes = sizes;
-      accStrides = strides;
-      argToSlice = newForallOp.getRegionIterArgs()[0];
+    if (opIndex >= firstOutIdx) {
+      auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
+          loc, newForallOp.getRegionIterArgs()[opIndex - firstOutIdx], offsets,
+          sizes, strides);
+      initSliceOps.push_back(sliceOp);
+      initSlices.push_back(sliceOp);
+    } else {
+      Value slice = rewriter.create<tensor::ExtractSliceOp>(
+          loc, operand, offsets, sizes, strides);
+      inputSlices.push_back(slice);
     }
-    Value slice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, argToSlice, offsets, sizes, strides);
-    operandSlices.push_back(slice);
   }
 
   // Step 3. Create the new inner_tiled op.
   auto newTiledOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
-      loc, operandSlices, tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
-      tiledOp.getKind());
+      loc, inputSlices, initSlices, tiledOp.getIndexingMaps(),
+      tiledOp.getIteratorTypes(), tiledOp.getKind());
 
   newTiledOp->setDiscardableAttrs(tiledOp->getDiscardableAttrDictionary());
 
@@ -1092,9 +1094,12 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   // as the accumulator slice.
   scf::InParallelOp terminator = newForallOp.getTerminator();
   rewriter.setInsertionPointToStart(terminator.getBody());
-  rewriter.create<tensor::ParallelInsertSliceOp>(
-      loc, newTiledOp.getResult(), newForallOp.getRegionIterArgs()[0],
-      accOffsets, accSizes, accStrides);
+  for (auto [newResult, extractOp] :
+       llvm::zip_equal(newTiledOp.getResults(), initSliceOps)) {
+    rewriter.create<tensor::ParallelInsertSliceOp>(
+        loc, newResult, extractOp.getSource(), extractOp.getMixedOffsets(),
+        extractOp.getMixedSizes(), extractOp.getMixedStrides());
+  }
 
   rewriter.replaceOp(tiledOp, newForallOp);
 
@@ -1146,11 +1151,18 @@ struct DropInnerTiledUnitDimsPattern
     SmallVector<AffineMap> emptyMaps(tiledOp.getNumOperands(),
                                      AffineMap::get(rewriter.getContext()));
     auto newTiledOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
-        loc, newOperands, rewriter.getAffineMapArrayAttr(emptyMaps),
-        rewriter.getArrayAttr({}), tiledOp.getKind());
+        loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
+        ValueRange{newOperands}.drop_front(tiledOp.getNumInputs()),
+        rewriter.getAffineMapArrayAttr(emptyMaps), rewriter.getArrayAttr({}),
+        tiledOp.getKind());
 
-    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        tiledOp, tiledOp.getResultType(), newTiledOp);
+    SmallVector<Value> newResults(newTiledOp.getResults());
+    for (auto [newResult, externalShape] :
+         llvm::zip_equal(newResults, tiledOp.getResultTypes())) {
+      newResult =
+          rewriter.create<vector::BroadcastOp>(loc, externalShape, newResult);
+    }
+    rewriter.replaceOp(tiledOp, newResults);
     return success();
   }
 };
@@ -1207,6 +1219,10 @@ struct UnrollInnerTiledPattern
 
   LogicalResult matchAndRewrite(Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
+    if (tiledOp.getNumResults() != 1) {
+      return rewriter.notifyMatchFailure(
+          tiledOp, "don't know how to unroll multiple accumulators yet");
+    }
     if (options.filterConstraint && failed(options.filterConstraint(tiledOp))) {
       return rewriter.notifyMatchFailure(tiledOp, "unrolling filter");
     }
@@ -1239,7 +1255,7 @@ struct UnrollInnerTiledPattern
           tiledOp, "operation already unrolled to native shape");
     }
 
-    auto dstVecType = cast<VectorType>(tiledOp.getResultType());
+    auto dstVecType = cast<VectorType>(tiledOp.getResultTypes().front());
     SmallVector<int64_t, 4> originalSize = *maybeUnrollShape;
 
     Location loc = tiledOp.getLoc();
@@ -1286,8 +1302,8 @@ struct UnrollInnerTiledPattern
       if (accIt != accCache.end()) {
         slicesOperands[accIndex] = accIt->second;
       } else {
-        extractOperand(accIndex, tiledOp.getAcc(), accPermutationMap,
-                       accOffets);
+        extractOperand(accIndex, tiledOp.getOutputs().front(),
+                       accPermutationMap, accOffets);
       }
 
       SmallVector<int64_t> dstShape = applyPermutationMap(
@@ -1303,7 +1319,7 @@ struct UnrollInnerTiledPattern
           applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(offsets));
       // Save the accumulated value until all the loops are unrolled since
       // reduction loop keep updating the accumulator.
-      accCache[dstOffets] = newOp.getResult();
+      accCache[dstOffets] = newOp.getResults().front();
     }
     // Assemble back the accumulator into a single vector.
     Value result = rewriter.create<arith::ConstantOp>(
@@ -1518,19 +1534,26 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
         rewriter, loc, operand, type.getShape(), padValue,
         /*useInBoundsInsteadOfMasking=*/true);
   }
-  auto newMmaOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
-      loc, newOperands, tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
-      tiledOp.getKind());
+  auto newTiledOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
+      loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
+      ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
+      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind());
 
-  // Create the write back to a tensor.
-  int64_t rank = tiledOp.getResultType().getRank();
   auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-      tiledOp,
-      /*vector=*/newMmaOp,
-      /*source=*/tiledOp.getAcc(),
-      /*indices=*/SmallVector<Value>(rank, zero),
-      /*inBounds=*/SmallVector<bool>(rank, true));
+  SmallVector<Value> transferWrites;
+  for (auto [result, tensorAcc] :
+       llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
+    // Create the write back to a tensor.
+    int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
+    auto write = rewriter.create<vector::TransferWriteOp>(
+        loc,
+        /*vector=*/result,
+        /*source=*/tensorAcc,
+        /*indices=*/SmallVector<Value>(rank, zero),
+        /*inBounds=*/SmallVector<bool>(rank, true));
+    transferWrites.push_back(write.getResults().front());
+  }
+  rewriter.replaceOp(tiledOp, transferWrites);
   return success();
 }
 

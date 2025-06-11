@@ -148,8 +148,9 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 // Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
 // op with a multi-MMA-like intrinsic descriptor.
 FailureOr<IREE::Codegen::InnerTiledOp>
-convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                             IREE::GPU::MmaInterfaceAttr mmaKind);
+convertContractionToInnerTiledMma(RewriterBase &rewriter,
+                                  linalg::LinalgOp linalgOp,
+                                  IREE::GPU::MmaInterfaceAttr mmaKind);
 
 // Helper to distribute an inner_tiled op to lanes.
 FailureOr<Operation *> distributeInnerTiledOp(
@@ -162,7 +163,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 
 // Various populate pattern methods.
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
-void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerInnerTiledPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorUnrollPatterns(

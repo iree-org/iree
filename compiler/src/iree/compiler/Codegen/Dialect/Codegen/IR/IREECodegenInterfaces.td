@@ -32,6 +32,15 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the number of accumulator initilizer operands  this inner tiled
+        operation requires. This is equivalent to the expected number of results.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getExpectedNumOutputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         If this inner tiled operation imposes additional requirements on
         its indexing maps other than the general ones (todo describe),
         verify them.
@@ -46,9 +55,8 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each operand (including the accumulator, which is the final
-        operand), return the vector type of the inner tile before the operation
-        is distributed (if applicable). This should be the logical type of
+        For each  operand(, return the vector type of the inner tile before the
+        operation is distributed (if applicable). This should be the logical type of
         the operands, ignoring any permutations that may be present on the
         inner_tiled operation.
 
@@ -70,8 +78,7 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each operand (including the accumulator, which is the final
-        operand), return the vector type of the inner tile after the operation
+        For each operand, return the vector type of the inner tile after the operation
         is distributed to threads. Vectors of this type will be stored into or
         loaded from registers by inndividual threads.
 
@@ -110,18 +117,42 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*desc=*/[{
         If this intrinsic can be mapped from its undistributed to its distributed
         form using an `scf.forall`, return the attribute describing the mapping
-        kind that is to be used.
+        kind that is to be used. The second return value is the upper bound
+        on the size of the mapping kind that'll be passed to the forall, if known.
 
-        If such a mapping is not supported, return Attribute() (the null attribute).
+        If such a mapping is not supported, return a pair of Attribute()
+        (the null attribute) and a null OpFoldResult.
       }],
-      /*retTy=*/"::mlir::Attribute",
+      /*retTy=*/"std::tuple<::mlir::Attribute, ::mlir::OpFoldResult>",
       /*methodName=*/"getDistributionMappingKind",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return ::mlir::Attribute();
+        return {::mlir::Attribute(), ::mlir::OpFoldResult()};
       }]
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Given (distributed, if applicable) arguments whose types correspond
+        to `getDistributedTileShapes()`, construct, if possible, construct
+        the operations that implement this kind and place the results
+        (which will be used to replace the inner_tiled op) nito the `results`
+        vector.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"buildUnderlyingOperations",
+      /*args=*/(ins
+        "::mlir::RewriterBase&":$rewriter,
+        "::mlir::Location":$loc,
+        "::mlir::ValueRange":$inputs,
+        "::mlir::ValueRange":$outputs,
+        "::llvm::SmallVectorImpl<::mlir::Value>&":$results
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
   ];
 
   let extraSharedClassDeclaration = [{

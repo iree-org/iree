@@ -25,33 +25,32 @@ SmallVector<Range> InnerTiledOp::getIterationDomain(OpBuilder &builder) {
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   SmallVector<AffineMap> indexingMaps = getIndexingMapsArray();
+  int64_t numInputs = getNumInputs();
+  auto inputMaps = ArrayRef<AffineMap>(indexingMaps).take_front(numInputs);
+  auto outputMaps = ArrayRef<AffineMap>(indexingMaps).drop_front(numInputs);
   for (const auto &it : llvm::enumerate(getIteratorTypes())) {
     // Search input map results for 'targetExpr'.
     auto targetExpr = getAffineDimExpr(it.index(), builder.getContext());
     auto iteratorType =
         llvm::cast<linalg::IteratorTypeAttr>(it.value()).getValue();
-    if (iteratorType == utils::IteratorType::reduction) {
-      OpFoldResult ub;
-      for (auto [map, op] : llvm::zip_equal(indexingMaps, getOperands())) {
-        // Get reduction dim size from first applicable shape, since they should
-        // all match.
-        std::optional<int64_t> dimIndex = map.getResultPosition(targetExpr);
-        if (!dimIndex) {
-          continue;
-        }
-        ub = tensor::getMixedSize(builder, loc, op, *dimIndex);
-        ranges.emplace_back(Range{zero, ub, one});
-        break;
+    ArrayRef<AffineMap> maps =
+        iteratorType == utils::IteratorType::reduction ? inputMaps : outputMaps;
+    ValueRange ops = iteratorType == utils::IteratorType::reduction
+                         ? getInputs()
+                         : getOutputs();
+    OpFoldResult ub;
+    for (auto [map, op] : llvm::zip_equal(maps, ops)) {
+      // Get dim size from first applicable input/output shape, since they
+      // should all match.
+      std::optional<int64_t> dimIndex = map.getResultPosition(targetExpr);
+      if (!dimIndex) {
+        continue;
       }
-      assert(ub && "Reduction dimension must appera in some map");
-      continue;
+      ub = tensor::getMixedSize(builder, loc, op, *dimIndex);
+      break;
     }
-    // Get parallel dimension size from result shape.
-    std::optional<int64_t> resDimIndex =
-        indexingMaps.back().getResultPosition(targetExpr);
-    assert(resDimIndex && "invalid result map");
-    OpFoldResult ub =
-        tensor::getMixedSize(builder, loc, getAcc(), *resDimIndex);
+    assert(ub &&
+           "Reduction/parallel dimension must appear in some input/output map");
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -147,19 +146,19 @@ LogicalResult InnerTiledOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  assert(resultNumber == 0);
   if (!hasTensorSemantics()) {
     return failure();
   }
 
-  AffineMap resultMap = getIndexingMapsArray().back();
+  AffineMap resultMap =
+      getIndexingMapsArray()[getInputs().size() + resultNumber];
   if (resultMap.getNumDims() != offsets.size() ||
       offsets.size() != sizes.size()) {
     return failure();
   }
 
-  populateSliceIndices(builder, getLoc(), getAcc(), offsets, sizes,
-                       resultOffsets, resultSizes, resultMap);
+  populateSliceIndices(builder, getLoc(), getOutputs()[resultNumber], offsets,
+                       sizes, resultOffsets, resultSizes, resultMap);
   return success();
 }
 

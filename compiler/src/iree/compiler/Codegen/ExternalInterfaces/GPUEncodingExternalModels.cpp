@@ -303,8 +303,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
 
   Location loc = linalgOp.getLoc();
   Operation *mmaOp = builder.create<Codegen::InnerTiledOp>(
-      loc, operands, ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
-      mma);
+      loc, operands.take_front(inputs.size()),
+      operands.take_back(outputs.size()),
+      ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma);
   return mmaOp;
 }
 

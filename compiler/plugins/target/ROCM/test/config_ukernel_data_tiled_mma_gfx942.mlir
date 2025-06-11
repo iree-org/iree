@@ -6,7 +6,7 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x4x16x2x8xi8>,
     -> tensor<1x1x8x4x2x4x16x4xi32> attributes {
   hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "multi_mma"}>
 } {
-  %d = iree_codegen.inner_tiled ins(%a, %b) acc(%c) {indexing_maps = [
+  %d = iree_codegen.inner_tiled ins(%a, %b) outs(%c) {indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d2)>,
       affine_map<(d0, d1, d2) -> (d1, d2)>,
       affine_map<(d0, d1, d2) -> (d0, d1)>

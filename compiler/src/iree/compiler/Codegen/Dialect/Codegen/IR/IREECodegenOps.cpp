@@ -130,8 +130,8 @@ void StoreToBufferOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 void InnerTiledOp::build(
-    OpBuilder &builder, OperationState &result, ValueRange operands,
-    ArrayRef<AffineMap> indexingMaps,
+    OpBuilder &builder, OperationState &result, ValueRange inputs,
+    ValueRange outputs, ArrayRef<AffineMap> indexingMaps,
     ArrayRef<utils::IteratorType> iteratorTypes,
     InnerTileDescAttrInterface kind,
     std::optional<SmallVector<SmallVector<int64_t>>> permutations) {
@@ -147,34 +147,38 @@ void InnerTiledOp::build(
           return builder.getDenseI64ArrayAttr(perm);
         }));
   }
-  build(builder, result, operands, indexingMapsAttr, iteratorTypesAttr, kind,
-        permutationsAttr);
+  build(builder, result, inputs, outputs, indexingMapsAttr, iteratorTypesAttr,
+        kind, permutationsAttr);
 }
 
 void InnerTiledOp::build(
-    OpBuilder &builder, OperationState &result, ValueRange operands,
-    ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
+    OpBuilder &builder, OperationState &result, ValueRange inputs,
+    ValueRange outputs, ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
     ArrayRef<utils::IteratorType> iteratorTypes,
     InnerTileDescAttrInterface kind,
     std::optional<SmallVector<SmallVector<int64_t>>> permutations) {
   SmallVector<AffineMap> indexingMaps =
       AffineMap::inferFromExprList(indexingExprs, builder.getContext());
-  build(builder, result, operands, indexingMaps, iteratorTypes, kind,
+  build(builder, result, inputs, outputs, indexingMaps, iteratorTypes, kind,
         permutations);
 }
 
 void InnerTiledOp::build(OpBuilder &builder, OperationState &result,
-                         ValueRange operands, ArrayAttr indexingMaps,
-                         ArrayAttr iteratorTypes,
+                         ValueRange inputs, ValueRange outputs,
+                         ArrayAttr indexingMaps, ArrayAttr iteratorTypes,
                          InnerTileDescAttrInterface kind,
                          std::optional<ArrayAttr> permutations) {
-  result.addOperands(operands);
-  result.addTypes(operands.back().getType());
-  result.addAttribute(getIndexingMapsAttrName(result.name), indexingMaps);
-  result.addAttribute(getIteratorTypesAttrName(result.name), iteratorTypes);
-  result.addAttribute(getKindAttrName(result.name), kind);
+  result.addOperands(inputs);
+  result.addOperands(outputs);
+  result.addTypes(outputs.getTypes());
+  Properties &inherentAttrs = result.getOrAddProperties<Properties>();
+  inherentAttrs.setOperandSegmentSizes(
+      {static_cast<int>(inputs.size()), static_cast<int>(outputs.size())});
+  inherentAttrs.setIndexingMaps(indexingMaps);
+  inherentAttrs.setIteratorTypes(iteratorTypes);
+  inherentAttrs.setKind(kind);
   if (permutations) {
-    result.addAttribute(getPermutationsAttrName(result.name), *permutations);
+    inherentAttrs.setPermutations(*permutations);
   }
 }
 
@@ -185,7 +189,7 @@ LogicalResult
 InnerTiledOp::inferReturnTypes(MLIRContext *, std::optional<Location>,
                                Adaptor adaptor,
                                SmallVectorImpl<Type> &inferredReturnTypes) {
-  inferredReturnTypes.assign({adaptor.getAcc().getType()});
+  llvm::append_range(inferredReturnTypes, adaptor.getOutputs().getTypes());
   return success();
 }
 
@@ -215,15 +219,28 @@ static SmallVector<int64_t> getInnerElemCounts(InnerTiledOp tiledOp) {
 
 LogicalResult InnerTiledOp::verify() {
   int64_t expectedNumIns = getKind().getExpectedNumInputs();
-  if (expectedNumIns != getInputs().size()) {
-    return emitOpError(
-        "number of inputs doesn't match expected number from intrinsic");
+  if (expectedNumIns != getNumInputs()) {
+    return emitOpError("number of inputs (" + Twine(getNumInputs()) +
+                       ") doesn't match expected number from kind (" +
+                       Twine(expectedNumIns) + ")");
+  }
+  int64_t expectedNumOuts = getKind().getExpectedNumOutputs();
+  if (expectedNumOuts != getNumOutputs()) {
+    return emitOpError("number of outputs (" + Twine(getNumOutputs()) +
+                       ")doesn't match expected number from kind (" +
+                       Twine(expectedNumOuts) + ")");
   }
 
-  if (getAcc().getType() != getResult().getType()) {
-    return emitOpError("accumulator type '")
-           << getAcc().getType() << "' does not match result type '"
-           << getResult().getType() << "'";
+  if (getNumResults() != expectedNumOuts) {
+    return emitOpError("number of results (" + Twine(getNumResults()) +
+                       ") does't match expected number from kind (" +
+                       Twine(expectedNumOuts) + ")");
+  }
+
+  if (!llvm::equal(getResultTypes(), getOutputs().getTypes())) {
+    return emitOpError("output types '")
+           << getOutputs().getTypes() << "' do not match result type '"
+           << getResultTypes() << "'";
   }
 
   SmallVector<ShapedType> opTypes = llvm::map_to_vector(
@@ -231,7 +248,7 @@ LogicalResult InnerTiledOp::verify() {
   SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
 
   // Verify that an indexing map was specified for each operand.
-  if (indexingMaps.size() != expectedNumIns + 1)
+  if (indexingMaps.size() != expectedNumIns + expectedNumOuts)
     return emitOpError("expected an indexing map for each operand");
 
   // Verify that each index map has 'numIterators' inputs, no symbols, and
@@ -340,35 +357,36 @@ static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
 void InnerTiledOp::getIterationBounds(
     SmallVectorImpl<int64_t> &iterationBounds) {
   SmallVector<ShapedType> operandTypes = getOperandShapedTypes();
-  auto resType = getResultType();
   SmallVector<AffineMap, 4> indexingMaps(getIndexingMapsArray());
-  SmallVector<int64_t, 2> iterationShape;
+  size_t numInputs = getNumInputs();
+  auto inputMaps = ArrayRef<AffineMap>(indexingMaps).take_front(numInputs);
+  auto outputMaps = ArrayRef<AffineMap>(indexingMaps).drop_front(numInputs);
+  auto inputTypes = ArrayRef<ShapedType>(operandTypes).take_front(numInputs);
+  auto outputTypes = ArrayRef<ShapedType>(operandTypes).drop_front(numInputs);
   for (const auto &it : llvm::enumerate(getIteratorTypes())) {
     // Search lhs/rhs map results for 'targetExpr'.
     auto targetExpr = getAffineDimExpr(it.index(), getContext());
     auto iteratorType =
         llvm::cast<linalg::IteratorTypeAttr>(it.value()).getValue();
-    if (iteratorType == utils::IteratorType::reduction) {
-      std::optional<int64_t> reductionLen;
-      for (auto [map, opType] : llvm::zip_equal(indexingMaps, operandTypes)) {
-        // Get reduction dim size from first applicable shape, since they should
-        // all match.
-        int64_t dimIndex = getResultIndex(map, targetExpr);
-        if (dimIndex < 0) {
-          continue;
-        }
-        reductionLen = opType.getShape()[dimIndex];
-        break;
+    auto maps =
+        iteratorType == utils::IteratorType::reduction ? inputMaps : outputMaps;
+    auto types = iteratorType == utils::IteratorType::reduction ? inputTypes
+                                                                : outputTypes;
+    std::optional<int64_t> dimLen;
+    for (auto [map, opType] : llvm::zip_equal(maps, types)) {
+      // Get dim dim size from first applicable input/output shape, since they
+      // should all match.
+      int64_t dimIndex = getResultIndex(map, targetExpr);
+      if (dimIndex < 0) {
+        continue;
       }
-      assert(reductionLen &&
-             "reduction dimensions must appear in some oprerand");
-      iterationBounds.push_back(*reductionLen);
-    } else {
-      // Get parallel dimension size from result shape.
-      int64_t resDimIndex = getResultIndex(indexingMaps.back(), targetExpr);
-      assert(resDimIndex >= 0);
-      iterationBounds.push_back(resType.getShape()[resDimIndex]);
+      dimLen = opType.getShape()[dimIndex];
+      break;
     }
+    assert(
+        dimLen &&
+        "reduction/parallel dimensions must appear in some input/output map");
+    iterationBounds.push_back(*dimLen);
   }
 }
 

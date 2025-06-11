@@ -281,7 +281,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
-  Value computeMMA(OpBuilder &builder, Location loc,
+  Value computeMMA(RewriterBase &builder, Location loc,
                    IREE::GPU::MmaInterfaceAttr mmaKind, Value a, Value b,
                    Value c) const {
     // Get the storage vector types that each thread is in charge of.
@@ -292,10 +292,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         builder.create<vector::ShapeCastOp>(b.getLoc(), bVectorType, b);
     Value cCast =
         builder.create<vector::ShapeCastOp>(c.getLoc(), cVectorType, c);
-    FailureOr<Value> mmaOp = mmaKind.buildMmaOperation(
-        builder, loc, cVectorType, {aCast, bCast, cCast});
+    SmallVector<Value> results;
+    LogicalResult mmaOp = mmaKind.buildUnderlyingOperations(
+        builder, loc, {aCast, bCast}, {cCast}, results);
     assert(succeeded(mmaOp) && "Failed to construct mma op");
-    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), *mmaOp);
+    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(),
+                                               results[0]);
   }
 };
 

@@ -82,7 +82,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!kind) {
       return failure();
     }
-    if (failed(convertContractionToMultiMma(rewriter, linalgOp, kind))) {
+    if (failed(convertContractionToInnerTiledMma(rewriter, linalgOp, kind))) {
       return failure();
     }
     return success();

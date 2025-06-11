@@ -308,17 +308,22 @@ struct InnerTiledOpTiedOpInterface
     : public IREE::Util::TiedOpInterface::ExternalModel<
           InnerTiledOpTiedOpInterface, IREE::Codegen::InnerTiledOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto linalgOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(linalgOp.getAcc());
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    return IREE::Util::TiedOpInterface::findTiedBaseValue(
+        tiledOp.getOutputs()[resultIndex]);
   }
 
   ::std::optional<unsigned>
   getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    return {2}; // acc
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    return {tiledOp.getOutputs().getBeginOperandIndex() + resultIndex};
   }
 
   SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    return {2}; // acc
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    return llvm::to_vector(llvm::seq(
+        static_cast<int64_t>(tiledOp.getOutputs().getBeginOperandIndex()),
+        static_cast<int64_t>(tiledOp.getNumOperands())));
   }
 };
 

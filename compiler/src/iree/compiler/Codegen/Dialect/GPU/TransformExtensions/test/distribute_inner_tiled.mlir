@@ -6,7 +6,7 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @distribute_inner_tiled_F16_16x16x16_F32(%lhs: tensor<2x2x16x16xf16>, %rhs: tensor<2x2x16x16xf16>, %acc: tensor<2x2x16x16xf32>) -> tensor<2x2x16x16xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -41,7 +41,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:       [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x16x16xf16> to tensor<2x2x4x1xf16>
 //       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ITER_ARG]][0, 0, %[[ID1]], %[[ID]]#2]
 //  CHECK-SAME:       [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x16x16xf32> to tensor<2x2x4x1xf32>
-//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) acc(%[[ACC_SLICE]])
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       : tensor<2x2x1x4xf16>, tensor<2x2x4x1xf16> into tensor<2x2x4x1xf32>
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[ID1]], %[[ID]]#2]
@@ -56,7 +56,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @distribute_inner_tiled_I8_16x16x32_I32(%lhs: tensor<2x2x16x32xi8>, %rhs: tensor<2x2x16x32xi8>, %acc: tensor<2x2x16x16xi32>) -> tensor<2x2x16x16xi32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
@@ -96,7 +96,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:     %[[ID1_2:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (4, 4)
 //       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ITER_ARG]][0, 0, %[[ID1_2]], %[[ID]]#2]
 //  CHECK-SAME:       [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x16x16xi32> to tensor<2x2x4x1xi32>
-//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) acc(%[[ACC_SLICE]])
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       : tensor<2x2x1x8xi8>, tensor<2x2x1x8xi8> into tensor<2x2x4x1xi32>
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[ID1_2]], %[[ID]]#2]

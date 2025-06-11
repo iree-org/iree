@@ -36,12 +36,12 @@ void transform_dialect::ApplyDropInnerTiledOpUnitDims::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyLowerMultiMmaOp
+// ApplyLowerInnerTiledOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
+void transform_dialect::ApplyLowerInnerTiledOp::populatePatterns(
     RewritePatternSet &patterns) {
-  IREE::GPU::populateIREEGPULowerMultiMmaPatterns(patterns);
+  IREE::GPU::populateIREEGPULowerInnerTiledPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//
@@ -89,8 +89,8 @@ DiagnosedSilenceableFailure transform_dialect::ConvertToMultiMmaOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   rewriter.setInsertionPoint(target);
-  auto multiMmaOp =
-      GPU::convertContractionToMultiMma(rewriter, target, getIntrinsicKind());
+  auto multiMmaOp = GPU::convertContractionToInnerTiledMma(rewriter, target,
+                                                           getIntrinsicKind());
   if (failed(multiMmaOp)) {
     return mlir::emitDefiniteFailure(
         target, "conversion to multi-MMA inner_tiled failed");

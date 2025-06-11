@@ -233,6 +233,7 @@ def IREECodegen_StoreToBufferOp : Op<IREECodegen_Dialect, "store_to_buffer",
 
 def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     Pure,
+    AttrSizedOperandSegments,
     InferTypeOpAdaptor,
     DestinationStyleOpInterface,
     DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
@@ -280,12 +281,12 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
       iterator_types = ["parallel", "parallel", "reduction"],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
     }
-    %3 = iree_codegen.inner_tiled ins(%0, %1) acc(%2) #contraction_trait
+    %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
       : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
 
     // Takes tensors as well, however the inner dimensions must always be
     // static.
-    %7 = iree_codegen.inner_tiled ins(%4, %5) acc(%6) #contraction_trait
+    %7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
       : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
     ```
 
@@ -323,7 +324,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
       iterator_types = [],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
     }
-    %3 = iree_codegen.inner_tiled ins(%0, %1) acc(%2) #contraction_trait
+    %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
       : vector<4xf16>, vector<4xf16> into vector<4xf32>
     ```
 
@@ -360,7 +361,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
       permutations = [[0, 1], [1, 0], [0, 1]]
     }
-    %7 = iree_codegen.inner_tiled ins(%4, %5) acc(%6) #contraction_trait
+    %7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
       : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
     ```
 
@@ -391,32 +392,32 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
 
   let arguments = (ins
     Variadic<AnyRankedTensorOrVector>:$inputs,
-    AnyRankedTensorOrVector:$acc,
+    Variadic<AnyRankedTensorOrVector>:$outputs,
     TypedArrayAttrBase<AffineMapAttr, "indxing affine maps">:$indexing_maps,
     IteratorTypeArrayAttr:$iterator_types,
     IREECodegen_AnyInnerTileDescAttr:$kind,
     OptionalAttr<TypedArrayAttrBase<DenseI64ArrayAttr, "permutations">>:$permutations
   );
   let results = (outs
-    AnyRankedTensorOrVector:$result
+    Variadic<AnyRankedTensorOrVector>:$result
   );
 
   let assemblyFormat = [{
-    `ins` `(` $inputs `)` `acc` `(` $acc `)` attr-dict
-    `:` type($inputs) `into` type($acc)
+    `ins` `(` $inputs `)` `outs` `(` $outputs `)` attr-dict
+    `:` type($inputs) `into` type($outputs)
   }];
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$operands,
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
       "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes,
       "InnerTileDescAttrInterface":$intrinsic,
       CArg<"std::optional<ArrayAttr>", "std::nullopt">:$permutations)>,
-    OpBuilder<(ins "ValueRange":$operands,
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
       "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
       "ArrayRef<utils::IteratorType>":$iteratorTypes,
       "InnerTileDescAttrInterface":$intrinsic,
       CArg<"std::optional<SmallVector<SmallVector<int64_t>>>", "std::nullopt">:$permutationss)>,
-    OpBuilder<(ins "ValueRange":$operands,
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
       "ArrayRef<AffineMap>":$indexingMaps,
       "ArrayRef<utils::IteratorType>":$iteratorTypes,
       "InnerTileDescAttrInterface":$intrinsic,
@@ -429,15 +430,16 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
       });
     }
 
-    ::mlir::ShapedType getAccType() {
-      return ::llvm::cast<::mlir::ShapedType>(getAcc().getType());
+    int64_t getNumInputs() {
+      return getInputs().size();
     }
-    ::mlir::ShapedType getResultType() {
-      return ::llvm::cast<::mlir::ShapedType>(getResult().getType());
+
+    int64_t getNumOutputs() {
+      return getOutputs().size();
     }
 
     bool hasTensorSemantics() {
-      return isa<RankedTensorType>(getAccType());
+      return isa<RankedTensorType>(getOutputs().front().getType());
     }
 
     bool hasThreadSemantics();
@@ -471,7 +473,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
       if (hasTensorSemantics()) {
-        return getAccMutable();
+        return getOutputsMutable();
       }
       // There are no destinations with vector semantics.
       return MutableOperandRange(*this, 0, 0);

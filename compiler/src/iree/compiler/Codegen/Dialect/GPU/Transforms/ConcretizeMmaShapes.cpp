@@ -189,8 +189,9 @@ struct ConcretizeMmaOperandShape final
     operands[opIndex] = concreteOperand;
     // Create the new inner_tiled op with the concrete type.
     auto concreteMmaOp = rewriter.create<Codegen::InnerTiledOp>(
-        loc, operands, mmaOp.getIndexingMaps(), mmaOp.getIteratorTypes(),
-        mmaOp.getKind(), newPermutationsAttr);
+        loc, /*inputs=*/ValueRange{operands}.drop_back(),
+        /*inits=*/ValueRange{operands}.back(), mmaOp.getIndexingMaps(),
+        mmaOp.getIteratorTypes(), mmaOp.getKind(), newPermutationsAttr);
 
     if (auto config = getLoweringConfig(mmaOp)) {
       setLoweringConfig(concreteMmaOp, config);
@@ -204,7 +205,8 @@ struct ConcretizeMmaOperandShape final
     // For the Acc operand, the result needs to be collapsed back to the
     // original type so that types match with consumers.
     rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
-        mmaOp, mmaOp.getAccType(), concreteMmaOp.getResult(), reassociations);
+        mmaOp, mmaOp.getOutputs().front().getType(),
+        concreteMmaOp.getResults().front(), reassociations);
 
     return success();
   }

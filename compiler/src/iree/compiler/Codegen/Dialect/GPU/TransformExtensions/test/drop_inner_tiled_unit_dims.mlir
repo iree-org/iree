@@ -6,7 +6,7 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @drop_inner_tiled_unit_dims(%lhs: vector<1x1x4xf16>, %rhs: vector<1x1x4xf16>, %acc: vector<1x1x4xf32>) -> vector<1x1x4xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -33,7 +33,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LHS_EXT:.+]] = vector.extract %[[LHS]][0, 0] : vector<4xf16> from vector<1x1x4xf16>
 //       CHECK:   %[[RHS_EXT:.+]] = vector.extract %[[RHS]][0, 0] : vector<4xf16> from vector<1x1x4xf16>
 //       CHECK:   %[[ACC_EXT:.+]] = vector.extract %[[ACC]][0, 0] : vector<4xf32> from vector<1x1x4xf32>
-//       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_EXT]], %[[RHS_EXT]]) acc(%[[ACC_EXT]])
+//       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_EXT]], %[[RHS_EXT]]) outs(%[[ACC_EXT]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = []
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   vector.broadcast %[[MMA]] : vector<4xf32> to vector<1x1x4xf32>
@@ -46,7 +46,7 @@ module attributes { transform.with_named_sequence } {
  affine_map<(i) -> (i)>
 ]
 func.func @drop_inner_tiled_unit_dims_no_kn(%lhs: vector<1x4xf16>, %rhs: vector<4xf16>, %acc: vector<1x4xf32>) -> vector<1x4xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -72,7 +72,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<1x4xf32>
 //       CHECK:   %[[LHS_EXT:.+]] = vector.extract %[[LHS]][0] : vector<4xf16> from vector<1x4xf16>
 //       CHECK:   %[[ACC_EXT:.+]] = vector.extract %[[ACC]][0] : vector<4xf32> from vector<1x4xf32>
-//       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_EXT]], %[[RHS]]) acc(%[[ACC_EXT]])
+//       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_EXT]], %[[RHS]]) outs(%[[ACC_EXT]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = []
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   vector.broadcast %[[MMA]] : vector<4xf32> to vector<1x4xf32>

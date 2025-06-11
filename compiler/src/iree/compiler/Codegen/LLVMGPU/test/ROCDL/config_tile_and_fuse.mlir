@@ -258,7 +258,7 @@ module {
     %c0 = arith.constant 0 : index
     %c65536 = arith.constant 65536 : index
     %c131072 = arith.constant 131072 : index
-    %6 = iree_codegen.inner_tiled ins(%3, %4) acc(%5) {
+    %6 = iree_codegen.inner_tiled ins(%3, %4) outs(%5) {
         indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                          affine_map<(d0, d1, d2) -> (d1, d2)>,
                          affine_map<(d0, d1, d2) -> (d0, d1)>],

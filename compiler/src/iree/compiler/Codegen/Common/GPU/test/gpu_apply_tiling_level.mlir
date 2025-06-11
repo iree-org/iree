@@ -215,7 +215,7 @@ func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tens
 
 module {
   func.func @tensor_multi_mma_inner_tiled(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) acc(%acc) {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -241,7 +241,7 @@ module {
 //  CHECK-SAME:       [%[[I]], 0, 0] [%[[MIN]], %[[NDIM]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
 //       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[INIT]]
 //  CHECK-SAME:       [0, 0, 0] [%[[MDIM]], %[[NDIM]], 4] [1, 1, 1] : tensor<?x?x4xf32> to tensor<?x?x4xf32>
-//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) acc(%[[ACC_SLICE]]) {{.*}} lowering_config
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]]) {{.*}} lowering_config
 //       CHECK:     tensor.insert_slice %[[MMA]] into %[[INIT]]
 //  CHECK-SAME:       [0, 0, 0] [%[[MDIM]], %[[NDIM]], 4] [1, 1, 1]
 //       CHECK:     scf.yield
@@ -267,7 +267,7 @@ module {
 //  SUBGROUP-SAME:       [0, %[[IDY]], 0] [%[[KDIM]], %[[NMIN]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
 //       SUBGROUP:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[INIT]]
 //  SUBGROUP-SAME:       [%[[IDX]], %[[IDY]], 0] [%[[MMIN]], %[[NMIN]], 4] [1, 1, 1] : tensor<?x?x4xf32> to tensor<?x?x4xf32>
-//       SUBGROUP:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) acc(%[[ACC_SLICE]]) {{.*}} lowering_config
+//       SUBGROUP:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]]) {{.*}} lowering_config
 //       SUBGROUP:     scf.forall.in_parallel
 //       SUBGROUP:       tensor.parallel_insert_slice %[[MMA]] into %[[INIT]]
 //       SUBGROUP:   return

@@ -57,7 +57,7 @@ util.func public @multi_mma(
     %arg1: tensor<4x16x4x2x4x16x2x4xf16>,
     %arg2: tensor<4x4x8x4x2x4x16x4xf32>) -> (tensor<4x4x8x4x2x4x16x4xf32>) {
   %9 = flow.dispatch.region -> (tensor<4x4x8x4x2x4x16x4xf32>) {
-    %13 = iree_codegen.inner_tiled ins(%arg0, %arg1) acc(%arg2) {
+    %13 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) {
         indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                          affine_map<(d0, d1, d2) -> (d1, d2)>,
                          affine_map<(d0, d1, d2) -> (d0, d1)>],
@@ -79,7 +79,7 @@ util.func public @multi_mma(
 //   CHECK-DAG:     %[[loadLHS:.*]] = iree_tensor_ext.dispatch.tensor.load %[[arg3]]
 //   CHECK-DAG:     %[[loadRHS:.*]] = iree_tensor_ext.dispatch.tensor.load %[[arg4]]
 //   CHECK-DAG:     %[[loadACC:.*]] = iree_tensor_ext.dispatch.tensor.load %[[arg5]]
-//       CHECK:     %[[MULTI_MMA:.*]] = iree_codegen.inner_tiled ins(%[[loadLHS]], %[[loadRHS]]) acc(%[[loadACC]])
+//       CHECK:     %[[MULTI_MMA:.*]] = iree_codegen.inner_tiled ins(%[[loadLHS]], %[[loadRHS]]) outs(%[[loadACC]])
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[MULTI_MMA]], %[[arg5]]
 //       CHECK:     flow.return
 //       CHECK:   }
