@@ -234,12 +234,11 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel,
-                                             bool tileUsingForAll) {
+createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel) {
   LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = false;
-  options.tileUsingForall = tileUsingForAll;
+  options.tileUsingForall = false;
   return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
