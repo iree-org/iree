@@ -50,7 +50,6 @@ static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
 }
 
 // Checks if the given device has transparent access to all other devices
-// This includes both topology-based transparent access and same-backend access
 static bool hasTransparentAccessToAll(IREE::HAL::DeviceTopologyAttr topology,
                                       IREE::Stream::AffinityAttr source,
                                       DeviceOptimalAttr optimalAttr) {
@@ -118,13 +117,6 @@ struct ResolveMemoryPropertiesPattern
     auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(*affinity);
     if (!optimalAttr) {
       LLVM_DEBUG(llvm::dbgs() << "  -> Affinity is not device.optimal\n");
-      // should be handled by canonicalizer
-      return failure();
-    }
-
-    // Get the device affinities from the optimal attribute
-    auto affinities = optimalAttr.getAffinities();
-    if (affinities.size() < 2) {
       // should be handled by canonicalizer
       return failure();
     }
