@@ -60,6 +60,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   // Pad the tile sizes with zero.
   int64_t numLoops = tilingInterfaceOp.getLoopIteratorTypes().size();
   if (tileSizes.size() > numLoops) {
+    tilingInterfaceOp.emitWarning("tileSizes.size() > numLoops");
     return failure();
   }
   while (tileSizes.size() < numLoops) {
@@ -90,6 +91,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
     }
     rewriter.replaceOp(linalgOp, paddedOp);
   } else {
+    tilingInterfaceOp.emitWarning("not a linalg op");
     return failure();
   }
 
@@ -103,9 +105,8 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
 
   IRRewriter rewriter(funcOp);
   for (TilingInterface op : targetOps) {
-    if (failed(applyPaddingLevel(rewriter, op, tilingLevel))) {
-      return signalPassFailure();
-    }
+    // If some op does not get padded, that is fine for now.
+    (void)applyPaddingLevel(rewriter, op, tilingLevel);
   }
 }
 
