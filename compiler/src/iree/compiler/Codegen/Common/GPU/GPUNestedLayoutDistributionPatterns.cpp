@@ -560,7 +560,7 @@ struct DistributeTransferGather final
 
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
     // to tensors or memrefs.
-    if (!isa<MemRefType>(gatherOp.getSource().getType())) {
+    if (!isa<MemRefType>(gatherOp.getBase().getType())) {
       return rewriter.notifyMatchFailure(gatherOp,
                                          "distribution expects memrefs");
     }
@@ -569,7 +569,7 @@ struct DistributeTransferGather final
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     int64_t rank = vectorLayout.getRank();
 
-    Type elementType = gatherOp.getSource().getType().getElementType();
+    Type elementType = gatherOp.getBase().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
     // The shape of the vector we read is pre-permutation. The permutation is
     // a transpose on the resulting read vector.
@@ -650,7 +650,7 @@ struct DistributeTransferGather final
 
       VectorValue slicedGather =
           rewriter.create<IREE::VectorExt::TransferGatherOp>(
-              gatherOp.getLoc(), innerVectorType, gatherOp.getSource(),
+              gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
               slicedIndices, slicedIndexVecs, gatherOp.getIndexed(),
               gatherOp.getIndexedMaps(), gatherOp.getPermutationMapAttr(),
               gatherOp.getPadding(), slicedMask, gatherOp.getInBoundsAttr());
