@@ -104,4 +104,83 @@ void collectTiledAndFusedOps(Operation *rootOp,
     }
   }
 }
+
+FailureOr<std::queue<Operation *>>
+fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
+              MutableArrayRef<LoopLikeOpInterface> loops,
+              bool useWARForConsumerFusionSSAViolation) {
+  auto addCandidateSlices = [](Operation *fusedOp,
+                               std::queue<Operation *> &candidates) {
+    for (auto *userOp : fusedOp->getResults().getUsers()) {
+      if (llvm::isa<tensor::InsertSliceOp, tensor::ParallelInsertSliceOp>(
+              userOp)) {
+        candidates.push(userOp);
+      }
+    }
+  };
+
+  // Collect the candidate slices which can be potential consumers that can be
+  // fused.
+  std::queue<Operation *> candidates;
+  addCandidateSlices(tiledOp, candidates);
+
+  std::queue<Operation *> newFusionOpportunities;
+  while (!candidates.empty()) {
+    // Traverse the slices in BFS fashion.
+    Operation *candidateSliceOp = candidates.front();
+    candidates.pop();
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
+                                              loops);
+    if (failed(fusedResult)) {
+      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
+                              << candidateSliceOp << "\n");
+      continue;
+    }
+
+    // Implement the WAR for consumer fusion SSA violation (as described below
+    // in the comments for `warForConsumerFusionSSAViolation`)
+    if (useWARForConsumerFusionSSAViolation) {
+      for (auto [tiledOpResult, loopResult] :
+           llvm::zip(tiledOp->getResults(), loops.back()->getResults())) {
+        for (OpOperand &use : loopResult.getUses()) {
+          Operation *user = use.getOwner();
+          if (user->getParentOp() != loops.back()) {
+            continue;
+          }
+          auto slice = dyn_cast<tensor::ExtractSliceOp>(user);
+          if (!slice) {
+            return failure();
+          }
+          rewriter.replaceAllOpUsesWith(slice, tiledOpResult);
+        }
+      }
+    }
+
+    // Replace the original consumer operation with the tiled implementation.
+    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+                       fusedResult->tiledOps.front());
+
+    // The result of the fused consumers might themselves be slices of
+    // values produced by operations that implement the `TilingInterface`.
+    // Add these operations to the worklist.
+    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
+                       candidates);
+
+    // Add the list of new producer fusion opportunities.
+    for (auto tiledOp : fusedResult.value().tiledOps) {
+      for (auto operand : tiledOp->getOperands()) {
+        if (auto sliceProducer =
+                operand.getDefiningOp<tensor::ExtractSliceOp>()) {
+          if (llvm::isa_and_present<TilingInterface>(
+                  sliceProducer.getSource().getDefiningOp())) {
+            newFusionOpportunities.push(sliceProducer);
+          }
+        }
+      }
+    }
+  }
+  return newFusionOpportunities;
+}
 } // namespace mlir::iree_compiler

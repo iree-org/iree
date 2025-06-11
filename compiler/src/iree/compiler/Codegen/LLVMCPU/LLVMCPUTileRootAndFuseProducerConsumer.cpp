@@ -134,14 +134,8 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   SmallVector<LoopLikeOpInterface> tilingLoops = tiledResults->loops;
 
   if (!onlyFuseProducerInputOperands) {
-    FailureOr<std::queue<Operation *>> newFusionOpportunities;
-    if (tileUsingForall) {
-      newFusionOpportunities = fuseConsumersInto<scf::ForallOp>(
-          rewriter, *tiledOp, tilingLoops, useWARForConsumerFusionSSAViolation);
-    } else {
-      newFusionOpportunities =
-          fuseConsumersInto<scf::ForOp>(rewriter, *tiledOp, tilingLoops, false);
-    }
+    FailureOr<std::queue<Operation *>> newFusionOpportunities = fuseConsumers(
+        rewriter, *tiledOp, tilingLoops, useWARForConsumerFusionSSAViolation);
 
     if (failed(newFusionOpportunities)) {
       tiledOp.value()->emitOpError("failed to fuse consumers");
