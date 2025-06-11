@@ -173,3 +173,21 @@ func.func @sort_unit_dim(%arg0 : tensor<?x1xf32>) -> tensor<?x1xf32> {
 }
 // CHECK-LABEL: func.func @sort_unit_dim(
 //       CHECK:   util.unfoldable_constant dense<1> : tensor<1xi32>
+
+// -----
+
+func.func @concat_along_last(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = tensor.concat dim(1) %arg0, %arg1 {__test_interface__ = true} : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @concat_along_last(
+//       CHECK:   util.unfoldable_constant dense<0> : tensor<1xi32>
+
+// -----
+
+func.func @concat_along_first(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = tensor.concat dim(0) %arg0, %arg1 {__test_interface__ = true} : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @concat_along_first(
+//       CHECK:   util.unfoldable_constant dense<1> : tensor<1xi32>
