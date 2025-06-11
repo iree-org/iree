@@ -788,6 +788,179 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @argmax_tile_tensor(
+    %input: tensor<?x?xf32>,
+    %outv: tensor<?xf32>,
+    %outi: tensor<?xindex>
+) -> (tensor<?xf32>, tensor<?xindex>) {
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<?x?xf32>)
+    outs(%outv, %outi : tensor<?xf32>, tensor<?xindex>)
+    : tensor<?xf32>, tensor<?xindex>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xindex>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.argmax"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK:       func.func @argmax_tile_tensor
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0:.+]], %[[C0]]
+// CHECK:         %[[D1:.+]] = tensor.dim %[[ARG0:.+]], %[[C1]]
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG3:.+]] = %[[C0]] to %[[D0]] step %[[C10]] iter_args(%[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]])
+// CHECK:           %[[D2:.+]] = affine.min #[[MAP0]](%[[ARG3]])[%[[D0]]]
+// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], 0] [%[[D2]], %[[D1]]] [1, 1]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG4]][%[[ARG3]]] [%[[D2]]] [1]
+// CHECK:           %[[D5:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG3]]] [%[[D2]]] [1]
+// CHECK:           %[[D6:.+]]:2 = iree_linalg_ext.argmax
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[D3]]
+// CHECK-SAME:      outs(%[[D4]], %[[D5]]
+// CHECK:           %[[D7:.+]] = tensor.insert_slice %[[D6]]#0 into %[[ARG4]][%[[ARG3]]] [%[[D2]]] [1]
+// CHECK:           %[[D8:.+]] = tensor.insert_slice %[[D6]]#1 into %[[ARG5]][%[[ARG3]]] [%[[D2]]] [1]
+// CHECK:           scf.yield %[[D7]], %[[D8]]
+// CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @argmax_tile_memref(
+    %input: memref<?x?xf32>,
+    %outv: memref<?xf32>,
+    %outi: memref<?xindex>
+) {
+  iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : memref<?x?xf32>)
+    outs(%outv, %outi : memref<?xf32>, memref<?xindex>)
+  return
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.argmax"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK:       func.func @argmax_tile_memref
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+// CHECK:         %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
+// CHECK:         scf.for %[[ARG3:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
+// CHECK:           %[[D2:.+]] = affine.min #[[MAP0]](%[[ARG3]])[%[[D0]]]
+// CHECK:           %[[D3:.+]] = memref.subview %[[ARG0]][%[[ARG3]], 0] [%[[D2]], %[[D1]]] [1, 1]
+// CHECK:           %[[D4:.+]] = memref.subview %[[ARG1]][%[[ARG3]]] [%[[D2]]] [1]
+// CHECK:           %[[D5:.+]] = memref.subview %[[ARG2]][%[[ARG3]]] [%[[D2]]] [1]
+// CHECK:           iree_linalg_ext.argmax
+// CHECK-SAME:        dimension(1)
+// CHECK-SAME:        ins(%[[D3]]
+// CHECK-SAME:        outs(%[[D4]], %[[D5]]
+// CHECK:           return
+
+// -----
+
+func.func @argmax_1d(%input: tensor<128xf32>) -> tensor<index> {
+  %outv = tensor.empty() : tensor<f32>
+  %outi = tensor.empty() : tensor<index>
+  %result:2 = iree_linalg_ext.argmax
+    dimension(0)
+    ins(%input : tensor<128xf32>)
+    outs(%outv, %outi : tensor<f32>, tensor<index>)
+    : tensor<f32>, tensor<index>
+  return %result#1 : tensor<index>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.argmax"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.tile_using_for %0 tile_sizes [0]
+         : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+//      CHECK: func.func @argmax_1d(
+// CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xf32>
+//      CHECK:   %[[ACCV:.+]] = tensor.empty() : tensor<f32>
+//      CHECK:   %[[ACCI:.+]] = tensor.empty() : tensor<index>
+//      CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.argmax
+// CHECK-SAME:       ins(%[[OPERAND]] :
+// CHECK-SAME:       outs(%[[ACCV]], %[[ACCI]] :
+//      CHECK:   return %[[RESULT]]#1
+
+// -----
+
+func.func @argmax_2d_dim0(%input: tensor<16x32xf32>) -> tensor<32xindex> {
+  %outv = tensor.empty() : tensor<32xf32>
+  %outi = tensor.empty() : tensor<32xindex>
+  %result:2 = iree_linalg_ext.argmax
+    dimension(0)
+    ins(%input : tensor<16x32xf32>)
+    outs(%outv, %outi : tensor<32xf32>, tensor<32xindex>)
+    : tensor<32xf32>, tensor<32xindex>
+  return %result#1 : tensor<32xindex>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.argmax"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    // Only tile the non-reduction dimension: columns.
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0) -> (-d0 + 32, 20)>
+//      CHECK:  func.func @argmax_2d_dim0(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
+//  CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+//  CHECK-DAG:    %[[C20:.+]] = arith.constant 20 : index
+//  CHECK-DAG:    %[[ACCV:.+]] = tensor.empty() : tensor<32xf32>
+//  CHECK-DAG:    %[[ACCI:.+]] = tensor.empty() : tensor<32xindex>
+//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
+// CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[ACCV]], %[[ARG3:.+]] = %[[ACCI]])
+//      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])
+//      CHECK:      %[[UPDATE_SLICE_IN:.+]] = tensor.extract_slice %[[ARG0]][0, %[[I]]] [16, %[[SIZE]]] [1, 1]
+//      CHECK:      %[[UPDATE_SLICE_OUTV:.+]] = tensor.extract_slice %[[ARG2]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:      %[[UPDATE_SLICE_OUTI:.+]] = tensor.extract_slice %[[ARG3]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:      %[[ARGMAX_TILE:.+]]:2 = iree_linalg_ext.argmax
+// CHECK-SAME:       dimension(0)
+// CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
+// CHECK-SAME:       outs(%[[UPDATE_SLICE_OUTV]], %[[UPDATE_SLICE_OUTI]]
+//      CHECK:       %[[ACCV_YIELD:.+]] = tensor.insert_slice %[[ARGMAX_TILE]]#0 into %[[ARG2]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:       %[[ACCI_YIELD:.+]] = tensor.insert_slice %[[ARGMAX_TILE]]#1 into %[[ARG3]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:       scf.yield %[[ACCV_YIELD]], %[[ACCI_YIELD]] : tensor<32xf32>, tensor<32xindex>
+//      CHECK:   return %[[RESULT]]#1
+
+// -----
+
 func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
