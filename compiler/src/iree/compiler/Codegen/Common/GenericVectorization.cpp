@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -34,8 +35,8 @@ namespace {
 
 /// Folds IR resembling:
 /// ```
-///   %20 = vector.transfer_write %19, %16[%c0], %17 {in_bounds = [true]} 
-//      : vector<128xf16>, tensor<?xf16> 
+///   %20 = vector.transfer_write %19, %16[%c0], %17 {in_bounds = [true]}
+//      : vector<128xf16>, tensor<?xf16>
 //    %21 = vector.transfer_read %20[%c0], %cst_2
 ///     : tensor<?xf16>, vector<128xf16>
 /// ```
@@ -188,14 +189,6 @@ void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  // Early application of simplifying patterns that rewrite favorable pad +
-  // vector.transfer pairs for better vectorization outcomes.
-  if (vectorizePadding) {
-    RewritePatternSet patterns(funcOp.getContext());
-    linalg::populatePadOpVectorizationPatterns(patterns);
-    (void)applyPatternsGreedily(funcOp, std::move(patterns));
-  }
-
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
@@ -273,6 +266,10 @@ void GenericVectorizationPass::runOnOperation() {
   {
     // Canonicalize mask related ops before we lower them.
     RewritePatternSet maskCanonPatterns(funcOp.getContext());
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
+        maskCanonPatterns);
+    memref::populateResolveShapedTypeResultDimsPatterns(maskCanonPatterns);
+    tensor::DimOp::getCanonicalizationPatterns(maskCanonPatterns, context);
     vector::CreateMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                       funcOp.getContext());
     vector::ConstantMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
