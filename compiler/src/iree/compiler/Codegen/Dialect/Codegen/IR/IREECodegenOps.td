@@ -244,20 +244,14 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     ]> {
   let summary = [{Models an inner-tiled operation that may perform contractions.}];
   let description = [{
-    Represents an operation that updates "inner tiles" (vector slices) of an
-    accumulator using inner tiles of its input operands using some target-specific
-    intrinsic.
-
-    This operation grew out of a general representation for matrix multiplication
-    intrinsics on GPUs, where the inner tiles would be the tiles of the A, B,
-    and C matrices that were computed by an entire GPU workgroup or subgroup. It
-    is now used for generalizations of such multiplications. Currently,
-    the only usage is for scaled matrix-multiply-accumulate, where block scales
-    must be passed in as additional inputs, but it's possible more uses
-    will be possible in the future.
+    Represents an operation that updates "inner tiles" (vector slices) of its accumulator
+    outputs usin.g inner tiles of its input operands. The way the inner tiles are
+    used is determined by the semantics of the `kind` attribute. These inner tiles
+    are the trailing dimensions of the tensor/vector operands that are not present
+    in the indexing maps.
 
     In the case of a matrix-multiply-accumulate (MMA) inner tiled operation,
-    the semastics logically match `vector.contraction`. However, instead of a
+    the semantics logically match `vector.contraction`. However, instead of a
     combiner type, it has a intrinsic description that specifies how the inner tiles
     are combined.
 
@@ -371,6 +365,14 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     ```
 
     #### Motivation, Design Choices, and Pitfalls
+
+    This operation grew out of a general representation for matrix multiplication
+    intrinsics on GPUs, where the inner tiles would be the tiles of the A, B,
+    and C matrices that were computed by an entire GPU workgroup or subgroup. It
+    is now used for generalizations of such multiplications. Currently,
+    the only usage is for scaled matrix-multiply-accumulate, where block scales
+    must be passed in as additional inputs, but it's possible more uses
+    will be possible in the future.
 
     The idea behind this operation is to decouple the layout setting/tiling
     required to target certain intrinsics from the lowering to them. Because
