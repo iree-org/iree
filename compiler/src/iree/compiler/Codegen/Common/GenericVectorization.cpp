@@ -32,81 +32,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-
-/// Folds IR resembling:
-/// ```
-///   %20 = vector.transfer_write %19, %16[%c0], %17 {in_bounds = [true]}
-//      : vector<128xf16>, tensor<?xf16>
-//    %21 = vector.transfer_read %20[%c0], %cst_2
-///     : tensor<?xf16>, vector<128xf16>
-/// ```
-/// into a simpler masked vector.transfer_read.
-/// After bufferization, this generally removes the need for materializing the
-/// write to memory.
-// TODO: Consider upstreaming
-struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
-  using Base = OpRewritePattern<vector::TransferReadOp>;
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(vector::TransferReadOp op,
-                                PatternRewriter &rewriter) const override {
-    // Fail to match if the read doesn't have pure tensor semantics.
-    if (!op.hasPureTensorSemantics())
-      return failure();
-
-    // Try to get the producing write op.
-    auto writeOp =
-        dyn_cast_or_null<vector::TransferWriteOp>(op.getBase().getDefiningOp());
-    // Fail to match if the write doesn't have pure tensor semantics.
-    if (!writeOp || !writeOp.hasPureTensorSemantics())
-      return failure();
-
-    Value valToStore = writeOp.getValueToStore();
-    // Fail to match if the in/out types are different
-    if (valToStore.getType() != op.getType())
-      return failure();
-
-    // Work only with trivial indices.
-    // TODO: relax to "equal indices".
-    if (llvm::any_of(op.getIndices(),
-                     [](Value v) { return !isZeroInteger(v); }) ||
-        llvm::any_of(writeOp.getIndices(),
-                     [](Value v) { return !isZeroInteger(v); }))
-      return failure();
-
-    // Work only with minor identity mappings.
-    if (!op.getPermutationMap().isMinorIdentity() ||
-        !writeOp.getPermutationMap().isMinorIdentity())
-      return failure();
-
-    TypedValue<VectorType> wMask = writeOp.getMask();
-    Value rPad = op.getPadding();
-    Value rMask = op.getMask();
-
-    // Match only if the write op has a mask and the read only has a pad value
-    // and no mask.
-    // TODO: It should be straightforward to handle the case were the read has
-    // a mask as long it can be proved that the masks are compatible.
-    if (!(wMask && rPad && !rMask))
-      return failure();
-
-    // NOTE[FoldMaskedTransferRAW]: since masking is not supported on shaped
-    // types with vector element types (see `verifyTransferOp` in upstream MLIR
-    // VectorOps.cpp), and the write op has a mask, it can be assumed `rPad`
-    // never has a vector type. But for sanity add an assert in case things
-    // change upstream.
-    assert(!isa<VectorType>(rPad.getType()) &&
-           "search `NOTE[FoldMaskedTransferRAW]` in "
-           "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
-
-    // Materialize the padding with a constant.
-    auto padVal = rewriter.create<vector::SplatOp>(rPad.getLoc(),
-                                                   valToStore.getType(), rPad);
-    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
-    return success();
-  }
-};
-
 // Returns the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
 static std::optional<SizesAndScalableFlags>
@@ -307,10 +232,6 @@ void GenericVectorizationPass::runOnOperation() {
     vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                          funcOp.getContext());
   }
-  // Apply masked transfer_write + transfer_read folding to avoid spurious
-  // (future) roundtrips to memory.
-  // TODO: consider upstreaming.
-  vectorizationPatterns.add<FoldMaskedTransferRAW>(funcOp.getContext());
   (void)applyPatternsGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
