@@ -27,7 +27,7 @@ namespace mlir::iree_compiler {
 namespace {
 struct GPUApplyPaddingLevelPass final
     : impl::GPUApplyPaddingLevelPassBase<GPUApplyPaddingLevelPass> {
-  using GPUApplyPaddingLevelPassBase::GPUApplyPaddingLevelPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
