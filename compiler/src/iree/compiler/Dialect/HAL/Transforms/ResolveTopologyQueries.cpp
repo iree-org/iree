@@ -171,13 +171,11 @@ struct ResolveTopologyQueriesPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // Run device analysis to get concrete device targets
     DeviceAnalysis deviceAnalysis(moduleOp);
     if (failed(deviceAnalysis.run())) {
       return signalPassFailure();
     }
 
-    // Apply the pattern to resolve memory properties
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<ResolveMemoryPropertiesPattern>(context, deviceAnalysis);
