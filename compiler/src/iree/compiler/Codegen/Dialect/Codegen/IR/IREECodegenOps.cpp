@@ -185,7 +185,7 @@ void InnerTiledOp::build(OpBuilder &builder, OperationState &result,
 
 // Note: we can't use an "AllTypesMatch" constraint because it will cause an
 // inferReturnTypes() method that doesn't understand variadic inputs to
-// begenerated.
+// be generated.
 LogicalResult
 InnerTiledOp::inferReturnTypes(MLIRContext *, std::optional<Location>,
                                Adaptor adaptor,

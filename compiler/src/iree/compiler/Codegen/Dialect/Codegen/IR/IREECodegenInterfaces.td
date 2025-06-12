@@ -32,7 +32,7 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the number of accumulator initilizer operands  this inner tiled
+        Returns the number of accumulator initilizer operands this inner tiled
         operation requires. This is equivalent to the expected number of results.
       }],
       /*retTy=*/"int64_t",
