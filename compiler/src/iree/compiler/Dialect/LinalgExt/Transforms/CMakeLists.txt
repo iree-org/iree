@@ -42,6 +42,7 @@ iree_cc_library(
     "TestReshapeFusion.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
+    "VectorizeIREELinalgExtOps.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
