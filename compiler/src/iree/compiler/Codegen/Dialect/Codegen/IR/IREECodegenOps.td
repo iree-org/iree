@@ -246,7 +246,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
   let summary = [{Models an inner-tiled operation that may perform contractions.}];
   let description = [{
     Represents an operation that updates "inner tiles" (vector slices) of its accumulator
-    outputs usin.g inner tiles of its input operands. The way the inner tiles are
+    outputs using inner tiles of its input operands. The way the inner tiles are
     used is determined by the semantics of the `kind` attribute. These inner tiles
     are the trailing dimensions of the tensor/vector operands that are not present
     in the indexing maps.
@@ -256,13 +256,13 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     combiner type, it has a intrinsic description that specifies how the inner tiles
     are combined.
 
-    Similar to `vector.contraction`, an iterator type attribute list must be
+    Similar to `vector.contract`, an iterator type attribute list must be
     specified, where each element of the list represents an iterator over one
     of the outer dimensions. Iteration of inner dimensions is defined solely by
     the intrinsic and may be opaque.
 
-    An indexing map attribute list must be specified with an entry for lhs, rhs
-    and acc arguments. An indexing map attribute specifies a mapping from each
+    An indexing map attribute list must be specified with an entry for input and
+    output arguments. An indexing map attribute specifies a mapping from each
     outer loop iterator in the iterator type list, to each dimension of each
     operand.
 
@@ -399,7 +399,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     OptionalAttr<TypedArrayAttrBase<DenseI64ArrayAttr, "permutations">>:$permutations
   );
   let results = (outs
-    Variadic<AnyRankedTensorOrVector>:$result
+    Variadic<AnyRankedTensorOrVector>:$results
   );
 
   let assemblyFormat = [{

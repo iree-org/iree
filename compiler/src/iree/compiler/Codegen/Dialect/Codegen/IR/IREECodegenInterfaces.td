@@ -80,7 +80,7 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*desc=*/[{
         For each operand, return the vector type of the inner tile after the operation
         is distributed to threads. Vectors of this type will be stored into or
-        loaded from registers by inndividual threads.
+        loaded from registers by individual threads.
 
         The returned values are placed into the `result` vector, which will have
         its existing contents overwritten if there is any.
@@ -134,10 +134,9 @@ def IREECodegen_InnerTileDescAttrInterface :
     InterfaceMethod<
       /*desc=*/[{
         Given (distributed, if applicable) arguments whose types correspond
-        to `getDistributedTileShapes()`, construct, if possible, construct
-        the operations that implement this kind and place the results
-        (which will be used to replace the inner_tiled op) nito the `results`
-        vector.
+        to `getDistributedTileShapes()`, construct, if possible, the operations
+        that implement this kind and place the results (which will be used to
+        replace the inner_tiled op) into the `results` vector.
       }],
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildUnderlyingOperations",
