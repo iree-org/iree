@@ -1,6 +1,4 @@
-// RUN: iree-opt %s | FileCheck %s
-
-// -----
+// RUN: iree-opt %s -split-input-file | FileCheck %s
 
 #contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
