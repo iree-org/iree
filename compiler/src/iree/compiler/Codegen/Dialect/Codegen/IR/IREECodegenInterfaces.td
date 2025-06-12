@@ -117,15 +117,23 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*desc=*/[{
         If this intrinsic can be mapped from its undistributed to its distributed
         form using an `scf.forall`, return the attribute describing the mapping
-        kind that is to be used. The second return value is the upper bound
-        on the size of the mapping kind that'll be passed to the forall, if known.
+        kind that is to be used for the forall's single dimension.
+
+        If the underlying operation requires a specific size for this distributed
+        dimension - such as a particular subgroup size for distribution to
+        workitems in a subgroup, that bound is returned as the second return value,
+        which is the OpFoldResult. Similarly, if that information must be
+        inferred from the InnerTiledOp or its context (for example, workgroup sizes),
+        `Operation* opToDistribute` may be used to look up that context and construct
+        the upper bound. Note that, `opToDistribute` may be null in cases such as
+        determining a lowering configuration.esult).
 
         If such a mapping is not supported, return a pair of Attribute()
         (the null attribute) and a null OpFoldResult.
       }],
       /*retTy=*/"std::tuple<::mlir::Attribute, ::mlir::OpFoldResult>",
       /*methodName=*/"getDistributionMappingKind",
-      /*args=*/(ins),
+      /*args=*/(ins "::mlir::Operation*":$opToDistribute),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return {::mlir::Attribute(), ::mlir::OpFoldResult()};
@@ -141,7 +149,7 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildUnderlyingOperations",
       /*args=*/(ins
-        "::mlir::RewriterBase&":$rewriter,
+        "::mlir::OpBuilder&":$builder,
         "::mlir::Location":$loc,
         "::mlir::ValueRange":$inputs,
         "::mlir::ValueRange":$outputs,

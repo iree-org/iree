@@ -993,14 +993,13 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 
 FailureOr<Operation *>
 distributeInnerTiledOp(RewriterBase &rewriter,
-                       IREE::Codegen::InnerTiledOp tiledOp,
-                       std::optional<SmallVector<int64_t>> workgroupSize) {
+                       IREE::Codegen::InnerTiledOp tiledOp) {
   if (!tiledOp.hasTensorSemantics() || tiledOp.hasThreadSemantics()) {
     return rewriter.notifyMatchFailure(
         tiledOp, "tiledOp must have vector and subgroup for distribution.");
   }
 
-  OpBuilder::InsertionGuard g(rewriter);
+  RewriterBase::InsertionGuard g(rewriter);
 
   Location loc = tiledOp.getLoc();
   MLIRContext *context = rewriter.getContext();
@@ -1011,21 +1010,12 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   // Step 1. Create the new scf.forall op with a lane id mapping.
   Attribute mappingType;
   OpFoldResult ub;
-  std::tie(mappingType, ub) = tiledOp.getKind().getDistributionMappingKind();
-  if (!mappingType)
-    return failure();
-  if (isa<gpu::GPUThreadMappingAttr>(mappingType)) {
-    if (!workgroupSize && !ub) {
-      tiledOp.emitOpError(
-          "Inner tiled op with workgroup scope needs workgroup size.");
-      return failure();
-    }
-    ub = rewriter.getIndexAttr(
-        ShapedType::getNumElements(workgroupSize.value()));
-  } else if (!ub) {
-    tiledOp.emitOpError(
-        "non-workgroup distribution type doesn't have an upper bound");
-    return failure();
+  std::tie(mappingType, ub) =
+      tiledOp.getKind().getDistributionMappingKind(tiledOp);
+  if (!mappingType || !ub) {
+    return tiledOp.emitOpError(
+        "Inner tiled op doesn't specify distribution mapping kind or the bound "
+        "on the resulting forall.");
   }
 
   auto newForallOp = rewriter.create<scf::ForallOp>(

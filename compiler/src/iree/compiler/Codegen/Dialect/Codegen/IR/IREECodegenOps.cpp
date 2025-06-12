@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
@@ -358,36 +359,14 @@ void InnerTiledOp::getIterationBounds(
     SmallVectorImpl<int64_t> &iterationBounds) {
   SmallVector<ShapedType> operandTypes = getOperandShapedTypes();
   SmallVector<AffineMap, 4> indexingMaps(getIndexingMapsArray());
-  size_t numInputs = getNumInputs();
-  auto inputMaps = ArrayRef<AffineMap>(indexingMaps).take_front(numInputs);
-  auto outputMaps = ArrayRef<AffineMap>(indexingMaps).drop_front(numInputs);
-  auto inputTypes = ArrayRef<ShapedType>(operandTypes).take_front(numInputs);
-  auto outputTypes = ArrayRef<ShapedType>(operandTypes).drop_front(numInputs);
-  for (const auto &it : llvm::enumerate(getIteratorTypes())) {
-    // Search lhs/rhs map results for 'targetExpr'.
-    auto targetExpr = getAffineDimExpr(it.index(), getContext());
-    auto iteratorType =
-        llvm::cast<linalg::IteratorTypeAttr>(it.value()).getValue();
-    auto maps =
-        iteratorType == utils::IteratorType::reduction ? inputMaps : outputMaps;
-    auto types = iteratorType == utils::IteratorType::reduction ? inputTypes
-                                                                : outputTypes;
-    std::optional<int64_t> dimLen;
-    for (auto [map, opType] : llvm::zip_equal(maps, types)) {
-      // Get dim dim size from first applicable input/output shape, since they
-      // should all match.
-      int64_t dimIndex = getResultIndex(map, targetExpr);
-      if (dimIndex < 0) {
-        continue;
-      }
-      dimLen = opType.getShape()[dimIndex];
-      break;
-    }
-    assert(
-        dimLen &&
-        "reduction/parallel dimensions must appear in some input/output map");
-    iterationBounds.push_back(*dimLen);
+  AffineMap combinedMap = concatAffineMaps(indexingMaps, getContext());
+  SmallVector<int64_t> combinedOuterShapes;
+  for (auto [opType, map] : llvm::zip_equal(operandTypes, indexingMaps)) {
+    llvm::append_range(combinedOuterShapes,
+                       opType.getShape().take_front(map.getNumResults()));
   }
+  AffineMap inverseMap = inversePermutation(combinedMap);
+  iterationBounds.append(inverseMap.compose(combinedOuterShapes));
 }
 
 std::optional<SmallVector<int64_t, 4>> InnerTiledOp::getShapeForUnroll() {

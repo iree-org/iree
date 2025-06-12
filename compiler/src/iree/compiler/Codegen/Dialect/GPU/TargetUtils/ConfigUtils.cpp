@@ -133,7 +133,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   SmallVector<GPUMatmulShapeType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a distribution kind cannot be distributed.
-    if (std::get<0>(mma.getDistributionMappingKind()) == Attribute())
+    if (std::get<0>(mma.getDistributionMappingKind(
+            /*opToDistribute=*/nullptr)) == Attribute())
       continue;
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;

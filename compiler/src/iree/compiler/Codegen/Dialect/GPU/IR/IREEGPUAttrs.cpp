@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include <numeric>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -562,7 +563,7 @@ int64_t MMAAttr::getSubgroupSize() const {
 }
 
 std::tuple<Attribute, OpFoldResult>
-MMAAttr::getDistributionMappingKind() const {
+MMAAttr::getDistributionMappingKind(Operation *) const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
   if (intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16 ||
@@ -624,7 +625,7 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
 LogicalResult
-MMAAttr::buildUnderlyingOperations(RewriterBase &builder, Location loc,
+MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
                                    ValueRange inputs, ValueRange outputs,
                                    SmallVectorImpl<Value> &results) const {
   if (inputs.size() != 2) {
@@ -802,10 +803,19 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
 }
 
 std::tuple<Attribute, OpFoldResult>
-DataTiledMMAAttr::getDistributionMappingKind() const {
+DataTiledMMAAttr::getDistributionMappingKind(Operation *opToDistribute) const {
+  OpFoldResult workgroupSize;
+  if (opToDistribute) {
+    if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
+      if (auto wgSizes = getWorkgroupSize(func)) {
+        workgroupSize = getAsIndexOpFoldResult(
+            getContext(), ShapedType::getNumElements(*wgSizes));
+      }
+    }
+  }
   return {
       gpu::GPUThreadMappingAttr::get(getContext(), gpu::MappingId::LinearDim0),
-      OpFoldResult()};
+      workgroupSize};
 }
 
 LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
@@ -958,7 +968,7 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
 }
 
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
-    RewriterBase &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
   // Validation. Similar to MMAAttr::buildMmaOperation.
   if (inputs.size() != 2) {
@@ -1136,7 +1146,7 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
 }
 
 std::tuple<Attribute, OpFoldResult>
-VirtualMMAAttr::getDistributionMappingKind() const {
+VirtualMMAAttr::getDistributionMappingKind(Operation *) const {
   return {IREE::GPU::LaneIdAttr::get(getContext(), 0),
           getAsIndexOpFoldResult(getContext(), getSubgroupSize())};
 }
@@ -1181,7 +1191,7 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
 LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
-    RewriterBase &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
   if (inputs.size() != 2) {
     return failure();

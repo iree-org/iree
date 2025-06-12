@@ -93,13 +93,11 @@ void DistributeInnerTiledToLanesPass::runOnOperation() {
     return;
   }
 
-  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
-
   IRRewriter rewriter(funcOp);
   for (auto tiledOp : tiledOps) {
     rewriter.setInsertionPoint(tiledOp);
     FailureOr<scf::ForallOp> maybeLaneForall =
-        distributeInnerTiledOp(rewriter, tiledOp, workgroupSize);
+        distributeInnerTiledOp(rewriter, tiledOp);
     if (failed(maybeLaneForall)) {
       funcOp.emitError() << "failed to distribute inner_tiled ops to lanes";
       return signalPassFailure();

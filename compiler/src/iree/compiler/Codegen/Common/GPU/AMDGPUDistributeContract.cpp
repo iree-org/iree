@@ -281,7 +281,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
-  Value computeMMA(RewriterBase &builder, Location loc,
+  Value computeMMA(OpBuilder &builder, Location loc,
                    IREE::GPU::MmaInterfaceAttr mmaKind, Value a, Value b,
                    Value c) const {
     // Get the storage vector types that each thread is in charge of.

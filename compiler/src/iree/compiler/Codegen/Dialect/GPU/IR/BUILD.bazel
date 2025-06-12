@@ -177,7 +177,10 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEGPUInterfaces.td",
-    deps = [":td_files"],
+    deps = [
+        ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/LoweringConfigInterfaceGen:td_files",
+    ],
 )
 
 iree_gentbl_cc_library(

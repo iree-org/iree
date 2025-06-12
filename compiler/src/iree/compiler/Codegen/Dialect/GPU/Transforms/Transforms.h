@@ -153,9 +153,9 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
                                   IREE::GPU::MmaInterfaceAttr mmaKind);
 
 // Helper to distribute an inner_tiled op to lanes.
-FailureOr<Operation *> distributeInnerTiledOp(
-    RewriterBase &rewriter, IREE::Codegen::InnerTiledOp mmaOp,
-    std::optional<SmallVector<int64_t>> workgroupSize = std::nullopt);
+FailureOr<Operation *>
+distributeInnerTiledOp(RewriterBase &rewriter,
+                       IREE::Codegen::InnerTiledOp tiledOp);
 
 // Helper to map all scf.forall ops on lanes.
 void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,

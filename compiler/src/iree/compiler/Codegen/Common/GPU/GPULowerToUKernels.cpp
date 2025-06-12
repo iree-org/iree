@@ -131,9 +131,9 @@ static Value createSharedMemory(PatternRewriter &rewriter, Location loc,
   return allocOp;
 }
 
-struct LowerMultiMmaToUKernelPattern
+struct LowerInnerTiledMmaToUKernelPattern
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  LowerMultiMmaToUKernelPattern(MLIRContext *context)
+  LowerInnerTiledMmaToUKernelPattern(MLIRContext *context)
       : OpRewritePattern<IREE::Codegen::InnerTiledOp>(context) {}
 
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp op,
@@ -196,8 +196,9 @@ struct GPULowerToUKernelsPass final
     // evidence that it is difficult for codegen to consistently approach
     // microkernels performance, and that consideration overrides the benefit of
     // fusions for these ops.
-    patterns.add<LowerArgmaxToUKernelPattern, LowerMultiMmaToUKernelPattern>(
-        context);
+    patterns
+        .add<LowerArgmaxToUKernelPattern, LowerInnerTiledMmaToUKernelPattern>(
+            context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
