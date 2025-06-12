@@ -60,7 +60,6 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   // Pad the tile sizes with zero.
   int64_t numLoops = tilingInterfaceOp.getLoopIteratorTypes().size();
   if (tileSizes.size() > numLoops) {
-    tilingInterfaceOp.emitWarning("tileSizes.size() > numLoops");
     return failure();
   }
   while (tileSizes.size() < numLoops) {
@@ -86,12 +85,11 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
     SmallVector<tensor::PadOp> padOps;
     if (failed(linalg::rewriteAsPaddedOp(rewriter, linalgOp, options, paddedOp,
                                          newResults, padOps))) {
-      linalgOp.emitWarning("failed to pad ops");
+      linalgOp.emitWarning("failed to pad op");
       return failure();
     }
     rewriter.replaceOp(linalgOp, paddedOp);
   } else {
-    tilingInterfaceOp.emitWarning("not a linalg op");
     return failure();
   }
 
