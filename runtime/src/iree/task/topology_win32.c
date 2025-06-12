@@ -54,14 +54,15 @@ static void iree_task_topology_set_affinity_from_processor(
     const PROCESSOR_RELATIONSHIP* processor,
     iree_thread_affinity_t* out_affinity) {
   memset(out_affinity, 0, sizeof(*out_affinity));
-  out_affinity->specified = 1;
+
+  out_affinity->group = processor->GroupMask[0].Group;
+
+  out_affinity->id_assigned = 1;
+  out_affinity->id =
+      iree_task_count_trailing_zeros_kaffinity(processor->GroupMask[0].Mask);
 
   // Special bit to indicate that (if required) we want the entire core.
   out_affinity->smt = (processor->Flags & LTP_PC_SMT) == LTP_PC_SMT;
-
-  out_affinity->group = processor->GroupMask[0].Group;
-  out_affinity->id =
-      iree_task_count_trailing_zeros_kaffinity(processor->GroupMask[0].Mask);
 }
 
 // Uses |group_mask| to assign |cache| information to select topology groups.
@@ -303,10 +304,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
         // Pin group to the processor.
         iree_thread_affinity_t* affinity = &group->ideal_thread_affinity;
         memset(affinity, 0, sizeof(*affinity));
-        affinity->specified = 1;
-        affinity->smt = (p->Processor.Flags & LTP_PC_SMT) == LTP_PC_SMT;
+        affinity->group_any = 0;
         affinity->group = p->Processor.GroupMask[0].Group;
+        affinity->id_assigned = 1;
         affinity->id = group_offset + bit_offset;
+        affinity->smt = (p->Processor.Flags & LTP_PC_SMT) == LTP_PC_SMT;
       }
       group_offset += bit_offset + 1;
       if (out_topology->group_count >= cpu_count) break;

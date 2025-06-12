@@ -175,7 +175,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   if (params.priority_class != IREE_THREAD_PRIORITY_CLASS_NORMAL) {
     iree_thread_set_priority_class(thread, params.priority_class);
   }
-  if (params.initial_affinity.specified) {
+  if (!iree_thread_affinity_is_unspecified(params.initial_affinity)) {
     iree_thread_request_affinity(thread, params.initial_affinity);
   }
 
@@ -262,24 +262,41 @@ void iree_thread_override_end(iree_thread_override_t* override) {
 
 void iree_thread_request_affinity(iree_thread_t* thread,
                                   iree_thread_affinity_t affinity) {
-  if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  char affinity_desc[32];
-  int affinity_desc_length = snprintf(
-      affinity_desc, IREE_ARRAYSIZE(affinity_desc), "group=%d, id=%d, smt=%d",
-      affinity.group, affinity.id, affinity.smt);
+  char affinity_desc[64];
+  int affinity_desc_length =
+      snprintf(affinity_desc, IREE_ARRAYSIZE(affinity_desc),
+               "group_any=%u, group=%u, id_assigned=%u, id=%u, smt=%u",
+               affinity.group_any, affinity.group, affinity.id_assigned,
+               affinity.id, affinity.smt);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, affinity_desc, affinity_desc_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+  // TODO(benvanik): switch to the Windows 11 APIs when available (dynamically)
+  // for specifying groups with more than 64 processors. Prior to the new APIs
+  // each group was limited to 64 logical processors and that resulted in groups
+  // being sharded. We need to update our task topology code (which is the
+  // primary caller of this function) as well as others to assign the newer
+  // group IDs and this code to do the same.
+  //
+  // See:
+  // https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support
+  // KeQueryNodeActiveAffinity2
+  // (probably SetThreadSelectedCpuSets?)
 
   GROUP_AFFINITY group_affinity;
   memset(&group_affinity, 0, sizeof(group_affinity));
   group_affinity.Group = affinity.group;
-  KAFFINITY affinity_mask = 1ull << affinity.id;
-  if (affinity.smt) {
-    affinity_mask |= 1ull << (affinity.id + 1);
+  if (affinity.group_any) {
+    group_affinity.Mask = (KAFFINITY)UINTPTR_MAX;
+  } else {
+    KAFFINITY affinity_mask = 1ull << affinity.id;
+    if (affinity.smt) {
+      affinity_mask |= 1ull << (affinity.id + 1);
+    }
+    group_affinity.Mask = affinity_mask;
   }
-  group_affinity.Mask = affinity_mask;
   SetThreadGroupAffinity(thread->handle, &group_affinity, NULL);
 
   // TODO(benvanik): figure out of this is a bad thing; sometimes it can result

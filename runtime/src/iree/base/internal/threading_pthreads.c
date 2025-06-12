@@ -179,7 +179,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   if (params.priority_class != IREE_THREAD_PRIORITY_CLASS_NORMAL) {
     iree_thread_set_priority_class(thread, params.priority_class);
   }
-  if (params.initial_affinity.specified) {
+  if (!iree_thread_affinity_is_unspecified(params.initial_affinity)) {
     iree_thread_request_affinity(thread, params.initial_affinity);
   }
 
@@ -297,17 +297,124 @@ void iree_thread_override_end(iree_thread_override_t* override) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+// Sets all CPU bits in the given |out_set|.
+// The platform is allowed to place the thread on any CPU.
+static void iree_thread_make_cpu_set_all(cpu_set_t* out_set) {
+  for (uint32_t i = 0; i < CPU_SETSIZE; ++i) {
+    CPU_SET(i, out_set);
+  }
+}
+
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
+
+// Sets CPU bits associated with the given NUMA node ID.
+// If the platform query fails then all CPU bits are set.
+static void iree_thread_make_cpu_set_from_node_id(uint32_t node_id,
+                                                  cpu_set_t* out_set) {
+  // e.g. /sys/devices/system/node/node0/cpumap
+  char cpumap_path[256];
+  snprintf(cpumap_path, sizeof(cpumap_path),
+           "/sys/devices/system/node/node%u/cpumap", node_id);
+
+  // Open file for reading. This should succeed under hypervisors/lockdown.
+  FILE* file = fopen(cpumap_path, "r");
+  if (!file) {
+    // Permission denied or not found (not a conformant Linux kernel).
+    iree_thread_make_cpu_set_all(out_set);
+    return;
+  }
+
+  // Read the entire file to EOF and get the cpumap line.
+  // After trimming we expect |line| to be something like:
+  // 'ffffffff,ffffffff,ffffffff,00000000,00000000,00000000'
+  char line_buffer[512];
+  const size_t read_length = fread(line_buffer, 1, sizeof(line_buffer), file);
+  if (ferror(file)) {
+    // Read should never fail, but may if the CPU set grows to thousands. We'd
+    // probably want to then query the file length and allocate a heap buffer.
+    // For now all systems we can observe easily fit into our stack buffer.
+    iree_thread_make_cpu_set_all(out_set);
+    return;
+  }
+  iree_string_view_t line =
+      iree_string_view_trim(iree_make_string_view(line_buffer, read_length));
+
+  // Parse each comma-delimited segment. Segments are a base-16 encoded uint32_t
+  // value. Each segment contains 32 CPU bits and we track the current index
+  // as we walk them to get the absolute cpu_set_t index.
+  intptr_t split_index = 0;
+  iree_host_size_t cpu_index = 0;
+  do {
+    iree_string_view_t segment_str;
+    split_index = iree_string_view_split(line, ',', &segment_str, &line);
+    uint32_t segment = 0;
+    if (!iree_string_view_atoi_uint32_base(segment_str, 16, &segment)) {
+      // Failed to parse segment as an integer.
+      iree_thread_make_cpu_set_all(out_set);
+      return;
+    }
+    for (iree_host_size_t i = 0; i < 32; ++i) {
+      if (segment & (1ull << i)) {
+        CPU_SET(cpu_index + i, out_set);
+      }
+    }
+    cpu_index += 32;
+  } while (split_index != -1);
+
+  fclose(file);
+}
+
+#else
+
+// No implementation available. BSD may have some equivalent to the Linux
+// cpumap we could use.
+static void iree_thread_make_cpu_set_from_node_id(uint32_t node_id,
+                                                  cpu_set_t* out_set) {
+  iree_thread_make_cpu_set_all(out_set);
+}
+
+#endif  // IREE_PLATFORM_EMSCRIPTEN
+
+static void iree_thread_make_cpu_set_from_affinity(
+    iree_thread_affinity_t affinity, cpu_set_t* out_set) {
+  CPU_ZERO(out_set);
+
+  // Assign to any processor in the group.
+  if (affinity.group_any) {
+    iree_thread_make_cpu_set_from_node_id(affinity.group, out_set);
+    return;
+  }
+
+  // Specific processors can be set directly and optionally we also set its
+  // paired SMT processor. Note that we don't check whether SMT is enabled and
+  // assume the smt field is only assigned if it is.
+  if (affinity.id_assigned) {
+    CPU_SET(affinity.id, out_set);
+    if (affinity.smt) {
+      CPU_SET(affinity.id + 1, out_set);
+    }
+    return;
+  }
+
+  // No specific affinity specified; use any CPU.
+  iree_thread_make_cpu_set_all(out_set);
+}
+
 void iree_thread_request_affinity(iree_thread_t* thread,
                                   iree_thread_affinity_t affinity) {
-  if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  char affinity_desc[64];
+  int affinity_desc_length =
+      snprintf(affinity_desc, IREE_ARRAYSIZE(affinity_desc),
+               "group_any=%u, group=%u, id_assigned=%u, id=%u, smt=%u",
+               affinity.group_any, affinity.group, affinity.id_assigned,
+               affinity.id, affinity.smt);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, affinity_desc, affinity_desc_length);
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set);
-  CPU_SET(affinity.id, &cpu_set);
-  if (affinity.smt) {
-    CPU_SET(affinity.id + 1, &cpu_set);
-  }
+  iree_thread_make_cpu_set_from_affinity(affinity, &cpu_set);
 
 #if defined(IREE_PLATFORM_ANDROID)
   // `pthread_gettid_np` is only available on API 21+ and it is needed to set

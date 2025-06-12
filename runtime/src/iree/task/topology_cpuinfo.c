@@ -74,7 +74,7 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     // really used on Linux today anyway.
     iree_thread_affinity_t* affinity = &group->ideal_thread_affinity;
     memset(affinity, 0, sizeof(*affinity));
-    affinity->specified = 1;
+    affinity->id_assigned = 1;
     affinity->id = cpu_ids[i];
   }
 
@@ -143,12 +143,6 @@ static void iree_task_topology_set_affinity_from_processor(
     const struct cpuinfo_processor* processor,
     iree_thread_affinity_t* out_affinity) {
   memset(out_affinity, 0, sizeof(*out_affinity));
-  out_affinity->specified = 1;
-
-  // Special bit to indicate that (if required) we want the entire core.
-  if (processor->core->processor_count > 1) {
-    out_affinity->smt = 1;
-  }
 
   // cpuinfo #ifdefs the fields we need to extract the right platform IDs.
   // We purposefully use the same exact macros they do there so that we don't
@@ -161,14 +155,21 @@ static void iree_task_topology_set_affinity_from_processor(
   // the kernel to distribute the threads so the exact bits don't matter as long
   // as they are unique per group we want isolated.
   out_affinity->group = processor->cluster->cluster_id;
+  out_affinity->id_assigned = 1;
   out_affinity->id = (uint32_t)(uintptr_t)processor;
 #elif defined(__linux__)
   out_affinity->group = processor->cluster->cluster_id;
+  out_affinity->id_assigned = 1;
   out_affinity->id = processor->linux_id;
 #else
   // WASM? Unusued today.
-  out_affinity->specified = 0;
+  out_affinity->id_assigned = 0;
 #endif  // cpuinfo-like platform field
+
+  // Special bit to indicate that (if required) we want the entire core.
+  if (processor->core->processor_count > 1) {
+    out_affinity->smt = 1;
+  }
 }
 
 // Populates |out_group| with the information from |processor|.
