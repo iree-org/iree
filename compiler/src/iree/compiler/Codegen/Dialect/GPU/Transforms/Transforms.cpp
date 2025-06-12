@@ -813,7 +813,8 @@ struct LowerInnerTiledPattern
         rewriter, tiledOp.getLoc(), ValueRange{operands}.take_front(numInputs),
         ValueRange{operands}.drop_front(numInputs), concreteResults);
     if (failed(couldLower)) {
-      tiledOp.emitOpError("failed to lower to concrete inner tiled operations.");
+      tiledOp.emitOpError(
+          "failed to lower to concrete inner tiled operations.");
       return failure();
     }
     for (auto [result, externalShape] :
