@@ -655,6 +655,112 @@ void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
       ctx);
 }
 
+//===----------------------------------------------------------------------===//
+// LayoutedExpandOp
+//===----------------------------------------------------------------------===//
+
+ShapedType
+LayoutedExpandOp::computeLayoutedExpandedType(ShapedType ty,
+                                              NestedLayoutAttr layout) {
+  auto memTy = dyn_cast<MemRefType>(ty);
+  if (!memTy) {
+    // NYI.
+    return ShapedType();
+  }
+
+  auto [strides, offset] = memTy.getStridesAndOffset();
+
+  // Since we offset the type by dynamic offsets, we assume the offset is
+  // dynamic.
+  offset = ShapedType::kDynamic;
+
+  int64_t rank = layout.getRank();
+
+  SmallVector<int64_t> expandedStrides;
+  SmallVector<int64_t> expandedShape;
+  for (auto i : llvm::seq<int64_t>(rank)) {
+    SmallVector<int64_t> innerTileShape =
+        layout.getPackedShapeForUndistributedDim(i);
+    // Append the inner shape.
+    expandedShape.append(innerTileShape.begin(), innerTileShape.end());
+    // Since the inner tile is always static, we can always compute the
+    // resulting strides.
+    SmallVector<int64_t> reverseTileStrides;
+    int64_t currentStride = strides[i];
+    for (int64_t tile : llvm::reverse(innerTileShape)) {
+      reverseTileStrides.push_back(currentStride);
+      currentStride =
+          (SaturatedInteger::wrap(currentStride) * SaturatedInteger::wrap(tile))
+              .asInteger();
+    }
+    expandedStrides.append(llvm::to_vector(llvm::reverse(reverseTileStrides)));
+  }
+
+  SmallVector<int64_t> packPerm(5 * rank);
+  for (auto i : llvm::seq<int64_t>(rank)) {
+    packPerm[0 * rank + i] = i * 5;
+    packPerm[1 * rank + i] = i * 5 + 1;
+    packPerm[2 * rank + i] = i * 5 + 2;
+    packPerm[3 * rank + i] = i * 5 + 3;
+    packPerm[4 * rank + i] = i * 5 + 4;
+  }
+  SmallVector<int64_t> outputShape = applyPermutation(expandedShape, packPerm);
+  SmallVector<int64_t> outputStrides =
+      applyPermutation(expandedStrides, packPerm);
+
+  return MemRefType::get(
+      outputShape, ty.getElementType(),
+      StridedLayoutAttr::get(memTy.getContext(), offset, outputStrides),
+      memTy.getMemorySpace());
+}
+
+void LayoutedExpandOp::build(OpBuilder &b, OperationState &odsState,
+                             Value input, ValueRange indices,
+                             NestedLayoutAttr layout) {
+  ShapedType inputTy = dyn_cast<ShapedType>(input.getType());
+  assert(inputTy && "Expected input type to be a shaped type");
+  assert(isa<MemRefType>(inputTy) && "Only MemRefType supported for now");
+
+  assert(inputTy.getRank() == layout.getRank() &&
+         "Expected input type rank to be same as layout rank");
+  ShapedType outputTy = computeLayoutedExpandedType(inputTy, layout);
+  build(b, odsState, outputTy, input, indices, layout);
+}
+
+LogicalResult LayoutedExpandOp::verify() {
+  // Only memref supported for now.
+  ShapedType inputTy = getInput().getType();
+  ValueRange offsets = getOffsets();
+  NestedLayoutAttr layout = getLayout();
+  ShapedType outputTy = getOutput().getType();
+
+  // Only support memref types for now.
+  if (!isa<MemRefType>(inputTy) || !isa<MemRefType>(outputTy)) {
+    return emitOpError("only memref semantics supported for now");
+  }
+
+  if (inputTy.getRank() != offsets.size()) {
+    return emitOpError("offset rank should match input type rank");
+  }
+
+  if (inputTy.getElementType() != outputTy.getElementType()) {
+    return emitOpError("expected same element type");
+  }
+
+  if (layout.getRank() != inputTy.getRank()) {
+    return emitOpError("expected input type to be same rank as layout");
+  }
+
+  ShapedType expectedType = computeLayoutedExpandedType(inputTy, layout);
+
+  if (expectedType != outputTy) {
+    return emitOpError("expected output type to be: ")
+           << expectedType << ", got: " << outputTy;
+  }
+
+  return success();
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep

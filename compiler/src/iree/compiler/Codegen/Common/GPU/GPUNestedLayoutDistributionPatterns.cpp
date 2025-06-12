@@ -269,233 +269,214 @@ static VectorValue projectVector(RewriterBase &rewriter, Location loc,
   return cast<VectorValue>(sliced.getResult());
 }
 
+NestedLayoutAttr getSourceLayoutFromVector(NestedLayoutAttr layout,
+                                           AffineMap permMap) {
+  SmallVector<unsigned> permutation;
+  if (!permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation)) {
+    return NestedLayoutAttr();
+  }
+
+  SmallVector<int64_t> subgroupTile(permMap.getNumDims(), 1);
+  SmallVector<int64_t> batchTile(permMap.getNumDims(), 1);
+  SmallVector<int64_t> outerTile(permMap.getNumDims(), 1);
+  SmallVector<int64_t> threadTile(permMap.getNumDims(), 1);
+  SmallVector<int64_t> elementTile(permMap.getNumDims(), 1);
+  SmallVector<int64_t> subgroupStrides(permMap.getNumDims(), 0);
+  SmallVector<int64_t> threadStrides(permMap.getNumDims(), 0);
+
+  int64_t leadingDims = permMap.getNumInputs() - permutation.size();
+
+  for (auto [i, perm] : llvm::enumerate(permutation)) {
+    AffineExpr expr = permMap.getResult(i);
+
+    if (auto c = dyn_cast<AffineConstantExpr>(expr)) {
+      if (c.getValue() != 0) {
+        return NestedLayoutAttr();
+      }
+      continue;
+    }
+
+    if (isa<AffineDimExpr>(expr)) {
+      subgroupTile[perm + leadingDims] = layout.getSubgroupTile()[i];
+      batchTile[perm + leadingDims] = layout.getBatchTile()[i];
+      outerTile[perm + leadingDims] = layout.getOuterTile()[i];
+      threadTile[perm + leadingDims] = layout.getThreadTile()[i];
+      elementTile[perm + leadingDims] = layout.getElementTile()[i];
+      subgroupStrides[perm + leadingDims] = layout.getSubgroupStrides()[i];
+      threadStrides[perm + leadingDims] = layout.getThreadStrides()[i];
+      continue;
+    }
+
+    return NestedLayoutAttr();
+  }
+
+  return NestedLayoutAttr::get(layout.getContext(), subgroupTile, batchTile,
+                               outerTile, threadTile, elementTile,
+                               subgroupStrides, threadStrides);
+}
+
 namespace {
 
-/// Pattern to distribute `vector.transfer_read` ops with nested layouts.
-struct DistributeTransferRead final
-    : OpDistributionPattern<vector::TransferReadOp> {
-  using OpDistributionPattern::OpDistributionPattern;
-
-  DistributeTransferRead(MLIRContext *context, Value threadId,
-                         int64_t subgroupSize)
-      : OpDistributionPattern(context), threadId(threadId),
+template <typename T>
+struct DistributeXfer : OpDistributionPattern<T> {
+  DistributeXfer(MLIRContext *context, Value threadId, int64_t subgroupSize)
+      : OpDistributionPattern<T>(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
 
-  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
+  virtual void replaceXferOp(T xferOp, Value expandedBase,
+                             VectorLayoutInterface vectorLayout,
+                             ArrayRef<Value> packedOffsets,
+                             AffineMap expandedPermMap, Value mask,
+                             ArrayRef<bool> expandedInBounds,
+                             RewriterBase &rewriter) const = 0;
 
-    NestedLayoutAttr vectorLayout =
-        dyn_cast<NestedLayoutAttr>(signature[readOp.getResult()]);
+  LogicalResult matchAndRewrite(T xferOp, DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    MLIRContext *ctx = xferOp.getContext();
+    NestedLayoutAttr vectorLayout = dyn_cast<NestedLayoutAttr>(
+        signature[cast<VectorValue>(xferOp.getVector())]);
     if (!vectorLayout) {
-      return rewriter.notifyMatchFailure(readOp,
+      return rewriter.notifyMatchFailure(xferOp,
                                          "non-nested transfer_read layout");
     }
 
-    VectorValue mask = readOp.getMask();
+    VectorValue mask = xferOp.getMask();
     NestedLayoutAttr maskLayout;
     if (mask) {
       maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
       if (!maskLayout) {
-        return rewriter.notifyMatchFailure(readOp,
+        return rewriter.notifyMatchFailure(xferOp,
                                            "non-nested mask vector layout");
       }
-      mask = getDistributed(rewriter, mask, maskLayout);
-      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+      mask =
+          OpDistributionPattern<T>::getDistributed(rewriter, mask, maskLayout);
+      // "unpack" the mask, as the input memref is unpacked.
     }
 
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
     // to tensors or memrefs.
-    if (!isa<MemRefType>(readOp.getBase().getType())) {
-      return rewriter.notifyMatchFailure(readOp,
+    if (!isa<MemRefType>(xferOp.getBase().getType())) {
+      return rewriter.notifyMatchFailure(xferOp,
                                          "distribution expects memrefs");
     }
 
-    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
-    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
-    int64_t rank = vectorLayout.getRank();
+    // Create a "view" layout for the source.
+    NestedLayoutAttr sourceLayout =
+        getSourceLayoutFromVector(vectorLayout, xferOp.getPermutationMap());
 
-    Type elementType = readOp.getBase().getType().getElementType();
-    auto vectorType = VectorType::get(distShape, elementType);
-    // The shape of the vector we read is pre-permutation. The permutation is
-    // a transpose on the resulting read vector.
-    auto innerVectorType =
-        VectorType::get(vectorLayout.getElementTile(), elementType);
+    // Create a expanded memref using layouted_expand op.
+    TypedValue<ShapedType> expandedBase =
+        rewriter.create<IREE::VectorExt::LayoutedExpandOp>(
+            xferOp.getLoc(), xferOp.getBase(), xferOp.getIndices(),
+            sourceLayout);
 
-    // Initialize the full distributed vector for unrolling the batch/outer
-    // vector dimensions.
-    Value zero = rewriter.create<arith::ConstantOp>(
-        readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
-    VectorValue acc = cast<VectorValue>(zero);
-
-    SmallVector<Value> warpIndices, threadIndices;
+    // Populate subgroup/thread indices.
+    SmallVector<Value> subgroupIndices, threadIndices;
     if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
-                                            vectorLayout, warpIndices,
+                                            sourceLayout, subgroupIndices,
                                             threadIndices))) {
       return rewriter.notifyMatchFailure(
-          readOp, "warp or thread tiles have overlapping strides");
+          xferOp, "failed to populate subgroup/thread indices");
     }
 
-    ValueRange indices = readOp.getIndices();
-    AffineMap permMap = readOp.getPermutationMap();
-    SmallVector<int64_t> strides(rank, 1);
+    int64_t sourceRank = sourceLayout.getRank();
 
-    SmallVector<SmallVector<int64_t>> allMaskOffsets;
-    if (mask) {
-      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-      SmallVector<int64_t> maskTileShape =
-          getElementVectorTileShape(maskLayout);
-      allMaskOffsets =
-          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+    // Read from the expanded memref using subgroup/thread indices.
+    Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(xferOp.getLoc(), 0);
+    SmallVector<Value> packedOffsets(5 * sourceRank, zeroIdx);
+    for (auto [i, readOffset] : llvm::enumerate(subgroupIndices)) {
+      packedOffsets[0 * sourceRank + i] = readOffset;
+    }
+    for (auto [i, readOffset] : llvm::enumerate(threadIndices)) {
+      packedOffsets[3 * sourceRank + i] = readOffset;
     }
 
-    for (auto [idx, offsets] :
-         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
-      SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
-          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
-          threadIndices);
+    // Expand the in_bounds attribute to the output rank.
+    SmallVector<bool> expandedInBounds;
+    for (bool inBound : xferOp.getInBoundsValues()) {
+      expandedInBounds.append({inBound, inBound, inBound});
+    }
+    // Expand the permutation map attribute to the output rank.
+    //  result -> remaining, subgroup, batch, outer, thread, element
+    // The result dimensions are expanded to:
+    //  result -> batch, outer, element
+    int64_t vectorRank = vectorLayout.getRank();
+    SmallVector<AffineExpr> expandedResultExprs(3 * vectorRank, 0);
+    for (auto [idx, expr] :
+         llvm::enumerate(xferOp.getPermutationMap().getResults())) {
+      AffineExpr &batchPos = expandedResultExprs[0 * vectorRank + idx];
+      AffineExpr &outerPos = expandedResultExprs[1 * vectorRank + idx];
+      AffineExpr &elementPos = expandedResultExprs[2 * vectorRank + idx];
 
-      VectorValue slicedMask = nullptr;
-      if (mask) {
-        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-        SmallVector<int64_t> maskTileShape =
-            getElementVectorTileShape(maskLayout);
-        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(), permMap,
-                                           maskOffsets, maskLayout, mask);
-      }
-
-      VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
-          readOp.getLoc(), innerVectorType, readOp.getBase(), slicedIndices,
-          readOp.getPermutationMapAttr(), readOp.getPadding(), slicedMask,
-          readOp.getInBoundsAttr());
-
-      if (acc.getType().getRank() == 0) {
-        // TODO: This should really be a folding pattern in
-        // insert_strided_slice, but instead insert_strided_slice just doesn't
-        // support 0-d vectors...
-        acc = slicedRead;
+      if (auto c = dyn_cast<AffineConstantExpr>(expr)) {
+        assert(c.getValue() == 0 && "Invalid permutation map");
+        AffineExpr zero = getAffineConstantExpr(0, ctx);
+        batchPos = zero;
+        outerPos = zero;
+        elementPos = zero;
+      } else if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+        unsigned pos = dim.getPosition();
+        batchPos = getAffineDimExpr(1 * sourceRank + pos, ctx);
+        outerPos = getAffineDimExpr(2 * sourceRank + pos, ctx);
+        elementPos = getAffineDimExpr(4 * sourceRank + pos, ctx);
       } else {
-        acc = rewriter.create<vector::InsertStridedSliceOp>(
-            readOp.getLoc(), slicedRead, acc, offsets, strides);
+        assert(false && "Invalid permutation map");
       }
     }
+    auto expandedPermMap = AffineMap::get(
+        /*dimCount=*/5 * sourceRank, /*symbolCount=*/0, expandedResultExprs,
+        xferOp.getContext());
 
-    replaceOpWithDistributedValues(rewriter, readOp, acc);
+    replaceXferOp(xferOp, expandedBase, vectorLayout, packedOffsets,
+                  expandedPermMap, mask, expandedInBounds, rewriter);
     return success();
   }
 
+private:
   Value threadId;
   int64_t subgroupSize;
 };
 
-/// Pattern to distribute `vector.transfer_write` ops with nested layouts.
-struct DistributeTransferWrite final
-    : OpDistributionPattern<vector::TransferWriteOp> {
-  using OpDistributionPattern::OpDistributionPattern;
+struct DistributeTransferReadV3 final : DistributeXfer<vector::TransferReadOp> {
+  using DistributeXfer::DistributeXfer;
 
-  DistributeTransferWrite(MLIRContext *context, Value threadId,
-                          int64_t subgroupSize)
-      : OpDistributionPattern(context), threadId(threadId),
-        subgroupSize(subgroupSize) {}
-
-  LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    NestedLayoutAttr vectorLayout =
-        dyn_cast<NestedLayoutAttr>(signature[writeOp.getValueToStore()]);
-    if (!vectorLayout) {
-      return rewriter.notifyMatchFailure(writeOp,
-                                         "non-nested transfer_write layout");
-    }
-
-    if (!isa<MemRefType>(writeOp.getBase().getType())) {
-      return rewriter.notifyMatchFailure(writeOp,
-                                         "distribution expects memrefs");
-    }
-
-    VectorValue mask = writeOp.getMask();
-    NestedLayoutAttr maskLayout;
-    if (mask) {
-      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
-      if (!maskLayout) {
-        return rewriter.notifyMatchFailure(writeOp,
-                                           "non-nested mask vector layout");
-      }
-      mask = getDistributed(rewriter, mask, maskLayout);
-      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
-    }
-
+  void replaceXferOp(vector::TransferReadOp xferOp, Value expandedBase,
+                     VectorLayoutInterface vectorLayout,
+                     ArrayRef<Value> packedOffsets, AffineMap expandedPermMap,
+                     Value mask, ArrayRef<bool> expandedInBounds,
+                     RewriterBase &rewriter) const override {
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
-    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
-    int64_t rank = vectorLayout.getRank();
+    Type elementType = xferOp.getBase().getType().getElementType();
+    auto vectorType = VectorType::get(distShape, elementType);
 
-    SmallVector<Value> warpIndices, threadIndices;
-    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
-                                            vectorLayout, warpIndices,
-                                            threadIndices))) {
-      return rewriter.notifyMatchFailure(
-          writeOp, "warp or thread tiles have overlapping strides");
-    }
+    Value packedRead = rewriter.create<vector::TransferReadOp>(
+        xferOp.getLoc(), vectorType, expandedBase, packedOffsets,
+        expandedPermMap, xferOp.getPadding(), mask,
+        rewriter.getBoolArrayAttr(expandedInBounds));
 
-    Value distributedVector =
-        getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
-
-    ValueRange indices = writeOp.getIndices();
-    AffineMap permMap = writeOp.getPermutationMap();
-
-    SmallVector<SmallVector<int64_t>> allMaskOffsets;
-    if (mask) {
-      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-      SmallVector<int64_t> maskTileShape =
-          getElementVectorTileShape(maskLayout);
-      allMaskOffsets =
-          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
-    }
-
-    for (auto [idx, offsets] :
-         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
-      SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
-          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
-          threadIndices);
-
-      // Extract the "element vector" from the inner most dimensions. All outer
-      // dimensions are either unrolled or distributed such that this is a
-      // contiguous slice.
-      ArrayRef<int64_t> offsetArray(offsets);
-      Value slicedVector = rewriter.create<vector::ExtractOp>(
-          writeOp.getLoc(), distributedVector,
-          offsetArray.take_front(rank * 2));
-      // Promote the slicedVector to 0-d vector if it is a scalar.
-      if (!isa<VectorType>(slicedVector.getType())) {
-        auto promotedType =
-            VectorType::get({}, getElementTypeOrSelf(slicedVector));
-        slicedVector = rewriter.create<vector::BroadcastOp>(
-            writeOp.getLoc(), promotedType, slicedVector);
-      }
-
-      VectorValue slicedMask = nullptr;
-      if (mask) {
-        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-        SmallVector<int64_t> maskTileShape =
-            getElementVectorTileShape(maskLayout);
-        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(), permMap,
-                                           maskOffsets, maskLayout, mask);
-      }
-
-      rewriter.create<vector::TransferWriteOp>(
-          writeOp.getLoc(), slicedVector, writeOp.getBase(), slicedIndices,
-          writeOp.getPermutationMapAttr(), slicedMask,
-          writeOp.getInBoundsAttr());
-    }
-
-    rewriter.eraseOp(writeOp);
-    return success();
+    replaceOpWithDistributedValues(rewriter, xferOp, packedRead);
   }
+};
 
-  Value threadId;
-  int64_t subgroupSize;
+struct DistributeTransferWriteV3 final
+    : DistributeXfer<vector::TransferWriteOp> {
+  using DistributeXfer::DistributeXfer;
+
+  void replaceXferOp(vector::TransferWriteOp xferOp, Value expandedBase,
+                     VectorLayoutInterface vectorLayout,
+                     ArrayRef<Value> packedOffsets, AffineMap expandedPermMap,
+                     Value mask, ArrayRef<bool> expandedInBounds,
+                     RewriterBase &rewriter) const override {
+    Value distributedVector =
+        getDistributed(rewriter, xferOp.getValueToStore(), vectorLayout);
+
+    auto packedWrite = rewriter.create<vector::TransferWriteOp>(
+        xferOp.getLoc(), distributedVector, expandedBase, packedOffsets,
+        AffineMapAttr::get(expandedPermMap), mask,
+        rewriter.getBoolArrayAttr(expandedInBounds));
+
+    rewriter.replaceOp(xferOp, packedWrite);
+  }
 };
 
 static VectorValue broadcastToShape(RewriterBase &rewriter, Value source,
@@ -1812,7 +1793,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    Value threadId,
                                                    int64_t subgroupSize,
                                                    int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferWrite>(
+  patterns.add<DistributeTransferReadV3, DistributeTransferWriteV3>(
       patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,

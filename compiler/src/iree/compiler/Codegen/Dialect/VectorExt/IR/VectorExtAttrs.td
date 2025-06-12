@@ -240,9 +240,6 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     // thread ID. Returns the empty vector on failure.
     SmallVector<Value> computeThreadIds(Value threadId, int64_t subgroupSize, RewriterBase &rewriter) const;
 
-    // Get the undistributed shape that is subgroup x batch x outer x thread x element
-    SmallVector<int64_t> getUndistributedPackedShape() const;
-
     // Get the subgroup x batch x outer x thread x element shape for original dim
     SmallVector<int64_t> getPackedShapeForUndistributedDim(int64_t dim) const;
 

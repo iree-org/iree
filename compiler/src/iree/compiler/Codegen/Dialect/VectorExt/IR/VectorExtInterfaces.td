@@ -42,6 +42,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*args=*/(ins)
     >,
     InterfaceMethod<
+      /*description=*/"Get the expected undistributed packed shape for the given vector type.",
+      /*retTy=*/"SmallVector<int64_t>",
+      /*methodName=*/"getUndistributedPackedShape",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
       /*description=*/"Get the distributed shape for the given vector type.",
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getDistributedShape",

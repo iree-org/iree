@@ -507,6 +507,14 @@ def IREEInjectAssumeAlignmentPass :
   ];
 }
 
+def IREEFoldMemRefAliasOpsPass : Pass<"iree-codegen-fold-memref-alias-ops-pass"> {
+  let summary = "Upstream FoldMemRefAlias patterns with IREE folding patterns";
+  let dependentDialects = [
+      "memref::MemRefDialect",
+      "affine::AffineDialect"
+  ];
+}
+
 def InstrumentMemoryAccessesPass :
     InterfacePass<"iree-codegen-instrument-memory-accesses", "mlir::FunctionOpInterface"> {
   let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";

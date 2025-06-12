@@ -116,6 +116,11 @@ def LLVMGPUVectorDistributePass :
   let summary = "Pass to distribute vectorized functions.";
 }
 
+def LLVMGPUVectorTransferUnrollingPass :
+    InterfacePass<"iree-llvmgpu-vector-transfer-unrolling", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to unroll vector transfer ops.";
+}
+
 def LLVMGPUVectorLoweringPass :
     InterfacePass<"iree-llvmgpu-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
