@@ -16,8 +16,12 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
+    "channel.c"
+    "channel.h"
     "driver.c"
     "driver.h"
+    "event.c"
+    "event.h"
     "executable.c"
     "executable.h"
     "executable_cache.c"
