@@ -87,25 +87,44 @@ typedef enum iree_thread_priority_class_e {
 //       id: GROUP_AFFINITY::Mask bit/PROCESSOR_NUMBER::Number.
 //      smt: whether to set both the base ID and the subsequent ID in Mask.
 typedef struct iree_thread_affinity_t {
-  // When 0 the affinity is undefined and the system may place the thread
-  // anywhere and migrate it as much as it likes. In practice it may do that
-  // even when specified.
-  uint32_t specified : 1;
-  // When 1 and the specified processor is part of an SMT set all logical cores
-  // in the set should be reserved for the thread to avoid contention.
-  uint32_t smt : 1;
+  // When 1 the processor ID will be ignored and the platform will choose any
+  // processor associated with the specified group (NUMA node ID).
+  uint32_t group_any : 1;
   // Processor group the thread should be assigned to, aka NUMA node, cluster,
   // etc depending on platform. On platforms where the processor ID is unique
   // for the purposes of scheduling (e.g. Linux) this is used for related APIs
-  // like mbind/set_mempolicy.
-  uint32_t group : 7;
+  // like mbind/set_mempolicy. If group_any is set and id_assigned is not then
+  // any processor associated with the group will be used.
+  uint32_t group : 8;
+
+  uint32_t reserved : 23;
+
+  // When 0 the affinity is undefined and the system may place the thread
+  // anywhere and migrate it as much as it likes. In practice it may do that
+  // even when specified.
+  uint32_t id_assigned : 1;
   // Processor ID the thread should be scheduled on. The interpretation and
   // efficacy of this request varies per platform.
-  uint32_t id : 23;
+  uint32_t id : 30;
+  // When 1 and the specified processor ID is part of an SMT set all logical
+  // cores in the set should be reserved for the thread to avoid contention.
+  uint32_t smt : 1;
 } iree_thread_affinity_t;
 
-// Sets |thread_affinity| to match with any processor in the system.
+// Sets |out_thread_affinity| to match with any processor in the system.
 void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity);
+
+// Returns true if |thread_affinity| does not specify any particular processor.
+static inline bool iree_thread_affinity_is_unspecified(
+    iree_thread_affinity_t thread_affinity) {
+  return !thread_affinity.group_any && !thread_affinity.id_assigned;
+}
+
+// Sets |out_thread_affinity| to match all processors associated with the given
+// processor group (aka NUMA node ID). Any processor within the group may be
+// selected by the platform.
+void iree_thread_affinity_set_group_any(
+    uint32_t group, iree_thread_affinity_t* out_thread_affinity);
 
 // Thread creation parameters.
 // All are optional and the entire struct can safely be zero-initialized.
