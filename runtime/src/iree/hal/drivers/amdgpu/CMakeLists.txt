@@ -30,6 +30,8 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "system.c"
+    "system.h"
   DEPS
     iree::base
     iree::base::internal
