@@ -95,6 +95,7 @@ iree_check_single_backend_test_suite(
     check_rocm_hip
   SRCS
     "gather.mlir"
+    "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
