@@ -347,8 +347,16 @@ static iree_status_t iree_hal_hip_driver_select_default_device(
   return status;
 }
 
-static const iree_string_view_t key_hip_external_stream =
-    iree_string_view_literal("hip_external_stream");
+static iree_status_t iree_hal_hip_try_parse_uint64_option(
+    iree_string_view_t name, iree_string_view_t value, uint64_t* out_value) {
+  if (!iree_string_view_atoi_uint64(value, out_value)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "option '%*.s' expected a uint64 value, got: '%.*s'", (int)name.size,
+        name.data, (int)value.size, value.data);
+  }
+  return iree_ok_status();
+}
 
 static iree_status_t iree_hal_hip_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
@@ -376,15 +384,11 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
 
   iree_hal_hip_device_params_t device_params = driver->device_params;
   for (iree_host_size_t i = 0; i < param_count; ++i) {
-    if (iree_string_view_equal(params[i].key, key_hip_external_stream)) {
-      uint64_t luvalue = 0;
-      if (!iree_string_view_atoi_uint64(params[i].value, &luvalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "option 'hip_external_stream' expected to be uint64, Got: '%.*s'",
-            (int)params[i].value.size, params[i].value.data);
-      }
-      device_params.external_stream = luvalue;
+    if (iree_string_view_equal(params[i].key, IREE_SV("hip_external_stream"))) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0,
+          iree_hal_hip_try_parse_uint64_option(params[i].key, params[i].value,
+                                               &device_params.external_stream));
     }
   }
 
