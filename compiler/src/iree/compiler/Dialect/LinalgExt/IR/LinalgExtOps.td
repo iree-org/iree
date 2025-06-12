@@ -348,7 +348,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     the mask value is true, the input value will be written.
   }];
   let arguments = (ins
-      AnyRankedTensorOrMemRefType:$input,
+      AnyShaped:$input,
       AnyRankedTensorOrMemRefType:$output
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);

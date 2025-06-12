@@ -45,6 +45,7 @@ iree_compiler_cc_library(
         "TestReshapeFusion.cpp",
         "TileAttention.cpp",
         "TransposeFusion.cpp",
+        "VectorizeIREELinalgExtOps.cpp",
     ],
     hdrs = [
         "Passes.h",

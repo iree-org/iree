@@ -26,6 +26,7 @@ iree_lit_test_suite(
     "reshape_fusion.mlir"
     "split_reduction.mlir"
     "tiling.mlir"
+    "vectorize_iree_linalg_ext_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
