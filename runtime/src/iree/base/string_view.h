@@ -232,10 +232,19 @@ IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
     iree_string_view_t source_value, iree_string_view_t* target_value,
     char* buffer);
 
+IREE_API_EXPORT bool iree_string_view_atoi_int32_base(iree_string_view_t value,
+                                                      int base,
+                                                      int32_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atoi_int32(iree_string_view_t value,
                                                  int32_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atoi_uint32_base(iree_string_view_t value,
+                                                       int base,
+                                                       uint32_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atoi_uint32(iree_string_view_t value,
                                                   uint32_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atoi_int64_base(iree_string_view_t value,
+                                                      int base,
+                                                      int64_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
                                                  int64_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atoi_uint64_base(iree_string_view_t value,
