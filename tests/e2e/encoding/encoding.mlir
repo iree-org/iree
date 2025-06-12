@@ -162,3 +162,49 @@ func.func @elementwise_with_broadcast_3d() {
   check.expect_almost_eq(%6, %expected) : tensor<2x128x64xf32>
   return
 }
+
+#fusion_encoding_f32f32f32_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+#fusion_encoding_f32f32f32_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+func.func @unset_encoding_set_encoding_fusion() {
+  %height = arith.constant 129 : index
+  %width = arith.constant 255 : index
+  %cst = arith.constant 1.0 : f32
+  %cst_tensor = arith.constant dense<1.0> : tensor<129x255xf32>
+  %0 = call @generate_2D_source_f32(%height, %width) : (index, index) -> tensor<?x?xf32>
+  %source = tensor.cast %0 : tensor<?x?xf32> to tensor<129x255xf32>
+
+  %1 = iree_encoding.set_encoding %source : tensor<129x255xf32> -> tensor<129x255xf32, #fusion_encoding_f32f32f32_result>
+  %src_barrier = util.optimization_barrier %1 : tensor<129x255xf32, #fusion_encoding_f32f32f32_result>
+
+  %dispatch = flow.dispatch.region -> (tensor<129x255xf32, #fusion_encoding_f32f32f32_lhs>) {
+    %4 = iree_encoding.unset_encoding %src_barrier : tensor<129x255xf32, #fusion_encoding_f32f32f32_result> -> tensor<129x255xf32>
+    %5 = tensor.empty() : tensor<129x255xf32>
+    %6 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%4 : tensor<129x255xf32>) outs(%5 : tensor<129x255xf32>) {
+    ^bb0(%in: f32, %out: f32):
+        %8 = arith.addf %in, %cst : f32
+        linalg.yield %8 : f32
+    } -> tensor<129x255xf32>
+    %7 = iree_encoding.set_encoding %6 : tensor<129x255xf32> -> tensor<129x255xf32, #fusion_encoding_f32f32f32_lhs>
+    flow.return %7 : tensor<129x255xf32, #fusion_encoding_f32f32f32_lhs>
+  }
+
+  %result_barrier = util.optimization_barrier %dispatch : tensor<129x255xf32, #fusion_encoding_f32f32f32_lhs>
+  %2 = iree_encoding.unset_encoding %result_barrier : tensor<129x255xf32, #fusion_encoding_f32f32f32_lhs> -> tensor<129x255xf32>
+
+  %3 = tensor.empty() : tensor<129x255xf32>
+  %expected = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                      affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%source : tensor<129x255xf32>) outs(%3 : tensor<129x255xf32>) {
+  ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %cst : f32
+      linalg.yield %4 : f32
+  } -> tensor<129x255xf32>
+  check.expect_almost_eq(%2, %expected) : tensor<129x255xf32>
+  return
+}
