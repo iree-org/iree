@@ -335,10 +335,8 @@ builtin.module attributes { transform.with_named_sequence } {
 
 func.func @masked_read_write_unaligned(%arg0 : memref<17x128xf16>, %arg1 : memref<17x128xf16>) {
   %c0 = arith.constant 0 : index
-  %c17 = arith.constant 17 : index
-  %c128 = arith.constant 128 : index
   %cst_6 = arith.constant 0.000000e+00 : f16
-  %41 = vector.create_mask %c17, %c128 : vector<256x128xi1>
+  %41 = vector.constant_mask [17, 128] : vector<256x128xi1>
   %42 = vector.transfer_read %arg0[%c0, %c0], %cst_6, %41 {in_bounds = [true, true]} : memref<17x128xf16>, vector<256x128xf16>
   %43 = iree_vector_ext.to_layout %42 to layout(#nested) : vector<256x128xf16>
   vector.transfer_write %43, %arg1[%c0, %c0], %41 {in_bounds = [true, true]} : vector<256x128xf16>, memref<17x128xf16>
