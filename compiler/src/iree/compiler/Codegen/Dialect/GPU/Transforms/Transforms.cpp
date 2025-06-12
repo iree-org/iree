@@ -1008,14 +1008,17 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   OpFoldResult one = rewriter.getIndexAttr(1);
 
   // Step 1. Create the new scf.forall op with a lane id mapping.
-  Attribute mappingType;
-  OpFoldResult ub;
-  std::tie(mappingType, ub) =
-      tiledOp.getKind().getDistributionMappingKind(tiledOp);
-  if (!mappingType || !ub) {
-    return tiledOp.emitOpError(
-        "Inner tiled op doesn't specify distribution mapping kind or the bound "
-        "on the resulting forall.");
+  Attribute mappingType = tiledOp.getKind().getDistributionMappingKind();
+  if (!mappingType) {
+    return rewriter.notifyMatchFailure(
+        tiledOp, "doesn't specify how it's to be distributed");
+  }
+  OpFoldResult ub =
+      tiledOp.getKind().getDistributionWorkerCount(rewriter, loc, tiledOp);
+  ;
+  if (!ub) {
+    return tiledOp.emitOpError("failed to specify a worker count for the "
+                               "forall it's to be distributed into.");
   }
 
   auto newForallOp = rewriter.create<scf::ForallOp>(

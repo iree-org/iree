@@ -562,16 +562,21 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-std::tuple<Attribute, OpFoldResult>
-MMAAttr::getDistributionMappingKind(Operation *) const {
+Attribute MMAAttr::getDistributionMappingKind() const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
   if (intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16 ||
       intrinsic == MMAIntrinsic::NV_WMMA_F32_16x16x16_F16) {
-    return {Attribute(), OpFoldResult()};
+    return Attribute();
   }
-  return {IREE::GPU::LaneIdAttr::get(getContext(), 0),
-          getAsIndexOpFoldResult(getContext(), getSubgroupSize())};
+  return IREE::GPU::LaneIdAttr::get(getContext(), 0);
+}
+
+OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                                 Operation *) const {
+  if (!getDistributionMappingKind())
+    return OpFoldResult();
+  return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
 // Get virtual intrinsics that is composed/based on queried op.
@@ -802,20 +807,21 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-std::tuple<Attribute, OpFoldResult>
-DataTiledMMAAttr::getDistributionMappingKind(Operation *opToDistribute) const {
-  OpFoldResult workgroupSize;
-  if (opToDistribute) {
-    if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
-      if (auto wgSizes = getWorkgroupSize(func)) {
-        workgroupSize = getAsIndexOpFoldResult(
-            getContext(), ShapedType::getNumElements(*wgSizes));
-      }
+Attribute DataTiledMMAAttr::getDistributionMappingKind() const {
+  return gpu::GPUThreadMappingAttr::get(getContext(),
+                                        gpu::MappingId::LinearDim0);
+}
+
+OpFoldResult
+DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                             Operation *opToDistribute) const {
+  if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
+    if (auto wgSizes = getWorkgroupSize(func)) {
+      return getAsIndexOpFoldResult(getContext(),
+                                    ShapedType::getNumElements(*wgSizes));
     }
   }
-  return {
-      gpu::GPUThreadMappingAttr::get(getContext(), gpu::MappingId::LinearDim0),
-      workgroupSize};
+  return OpFoldResult();
 }
 
 LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
@@ -1145,10 +1151,13 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   return 0;
 }
 
-std::tuple<Attribute, OpFoldResult>
-VirtualMMAAttr::getDistributionMappingKind(Operation *) const {
-  return {IREE::GPU::LaneIdAttr::get(getContext(), 0),
-          getAsIndexOpFoldResult(getContext(), getSubgroupSize())};
+Attribute VirtualMMAAttr::getDistributionMappingKind() const {
+  return IREE::GPU::LaneIdAttr::get(getContext(), 0);
+}
+
+OpFoldResult VirtualMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                                        Operation *) const {
+  return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
 LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(

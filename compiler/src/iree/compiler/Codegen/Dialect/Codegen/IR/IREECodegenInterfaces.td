@@ -119,24 +119,36 @@ def IREECodegen_InnerTileDescAttrInterface :
         form using an `scf.forall`, return the attribute describing the mapping
         kind that is to be used for the forall's single dimension.
 
-        If the underlying operation requires a specific size for this distributed
-        dimension - such as a particular subgroup size for distribution to
-        workitems in a subgroup, that bound is returned as the second return value,
-        which is the OpFoldResult. Similarly, if that information must be
-        inferred from the InnerTiledOp or its context (for example, workgroup sizes),
-        `Operation* opToDistribute` may be used to look up that context and construct
-        the upper bound. Note that, `opToDistribute` may be null in cases such as
-        determining a lowering configuration.esult).
-
-        If such a mapping is not supported, return a pair of Attribute()
-        (the null attribute) and a null OpFoldResult.
+        If such a mapping is not supported, return an Attribute() (the null attribute.)
       }],
-      /*retTy=*/"std::tuple<::mlir::Attribute, ::mlir::OpFoldResult>",
+      /*retTy=*/"::mlir::Attribute",
       /*methodName=*/"getDistributionMappingKind",
-      /*args=*/(ins "::mlir::Operation*":$opToDistribute),
+      /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return {::mlir::Attribute(), ::mlir::OpFoldResult()};
+        return ::mlir::Attribute();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this intrinsic can be mapped from its undistributed to its distributed
+        form using an `scf.forall`, return an OpFoldResult corresponding to the worker
+        count for that forall's single dimension. For example, if a particular inner
+        tiled operation must be distributed to subgroups of a particular size,
+        this method returns that required size.
+
+        If it is needed, `opToDistribute` is the `InnerTiledOp` that is being
+        distributed.
+
+        If the value of the bound cannot be determined, returns the null OpFoldResult.
+      }],
+      /*retTy=*/"::mlir::OpFoldResult",
+      /*methodName=*/"getDistributionWorkerCount",
+      /*args=*/(ins "::mlir::OpBuilder&":$builder, "::mlir::Location":$loc,
+        "::mlir::Operation *":$opToDistribute),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::OpFoldResult();
       }]
     >,
     InterfaceMethod<

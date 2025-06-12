@@ -147,6 +147,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "getDistributedTileTypes",
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
+    "getDistributionWorkerCount",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -205,6 +206,7 @@ def IREEGPU_DataTiledMMAAttr :
     "getDistributedTileTypes",
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
+    "getDistributionWorkerCount",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -251,6 +253,7 @@ def IREEGPU_VirtualMMAAttr :
     "getDistributedTileTypes",
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
+    "getDistributionWorkerCount",
     "buildUnderlyingOperations",
   ]>
 ]> {
