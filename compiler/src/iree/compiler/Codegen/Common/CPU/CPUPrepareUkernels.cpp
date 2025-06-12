@@ -75,7 +75,7 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
     FailureOr<scf::SCFTilingResult> tilingResult =
         scf::tileUsingSCF(rewriter, tilingInterfaceOp, options);
     assert(succeeded(tilingResult));
-    rewriter.replaceOp(packOp, tilingResult->mergeResult.replacements);
+    rewriter.replaceOp(packOp, tilingResult->replacements);
   });
 }
 
@@ -110,7 +110,7 @@ static void tileNonPackedDimsFor5DPUnpackOps(RewriterBase &rewriter,
     FailureOr<scf::SCFTilingResult> tilingResult =
         scf::tileUsingSCF(rewriter, tilingInterfaceOp, options);
     assert(succeeded(tilingResult));
-    rewriter.replaceOp(unpackOp, tilingResult->mergeResult.replacements);
+    rewriter.replaceOp(unpackOp, tilingResult->replacements);
   });
 }
 
