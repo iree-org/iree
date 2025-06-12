@@ -234,7 +234,9 @@ static void iree_task_flags_dump_task_topology(
     fprintf(stdout, "# group[%d]: '%s'\n", group->group_index, group->name);
     fprintf(stdout, "#      processor: %u\n", group->processor_index);
     fprintf(stdout, "#       affinity: ");
-    if (group->ideal_thread_affinity.specified) {
+    if (group->ideal_thread_affinity.group_any) {
+      fprintf(stdout, "group=%u (any)", group->ideal_thread_affinity.group);
+    } else if (group->ideal_thread_affinity.id_assigned) {
       fprintf(
           stdout, "group=%u, id=%u, smt=%u", group->ideal_thread_affinity.group,
           group->ideal_thread_affinity.id, group->ideal_thread_affinity.smt);
