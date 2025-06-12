@@ -55,7 +55,7 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each  operand(, return the vector type of the inner tile before the
+        For each operand, return the vector type of the inner tile before the
         operation is distributed (if applicable). This should be the logical type of
         the operands, ignoring any permutations that may be present on the
         inner_tiled operation.

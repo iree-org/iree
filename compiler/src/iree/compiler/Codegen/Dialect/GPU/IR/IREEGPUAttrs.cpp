@@ -642,8 +642,9 @@ MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
   SmallVector<VectorType> threadTypes;
   getDistributedTileTypes(threadTypes);
   if (!llvm::equal(threadTypes,
-                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes())))
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
+  }
 
   if (Value value =
           createMmaOp(builder, loc, getIntrinsic(), outputs[0].getType(),
@@ -1211,8 +1212,9 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
   SmallVector<VectorType> threadTypes;
   getDistributedTileTypes(threadTypes);
   if (!llvm::equal(threadTypes,
-                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes())))
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
+  }
 
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:

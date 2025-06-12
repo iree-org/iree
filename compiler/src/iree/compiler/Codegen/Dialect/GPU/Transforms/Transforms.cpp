@@ -1015,7 +1015,6 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   }
   OpFoldResult ub =
       tiledOp.getKind().getDistributionWorkerCount(rewriter, loc, tiledOp);
-  ;
   if (!ub) {
     return tiledOp.emitOpError("failed to specify a worker count for the "
                                "forall it's to be distributed into.");

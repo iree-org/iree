@@ -266,17 +266,20 @@ LogicalResult InnerTiledOp::verify() {
     unsigned rank = shapedType.getRank();
     // Verify that the map has the right number of inputs, outputs, and indices.
     // This also correctly accounts for (..) -> () for rank-0 results.
-    if (map.getNumDims() != numIterators)
+    if (map.getNumDims() != numIterators) {
       return emitOpError("expected indexing map ")
              << index << " to have " << numIterators << " number of inputs";
-    if (map.getNumResults() >= rank)
+    }
+    if (map.getNumResults() >= rank) {
       return emitOpError("expected indexing map ")
              << index << " to have fewer than " << rank << " number of outputs";
-    if (!map.isProjectedPermutation())
+    }
+    if (!map.isProjectedPermutation()) {
       return emitOpError("expected indexing map ")
              << index << " to be a projected permutation of its inputs";
+    }
 
-    for (auto size :
+    for (int64_t size :
          shapedType.getShape().take_back(rank - map.getNumResults())) {
       if (ShapedType::isDynamic(size)) {
         return emitOpError("Unexpected dynamic inner dim for operand ")
@@ -291,9 +294,9 @@ LogicalResult InnerTiledOp::verify() {
 
   SmallVector<int64_t> bounds;
   getIterationBounds(bounds);
-  // The truncation functionality of llvm::zip is intentional here to ignore
-  // the inner dimensions.
   for (auto [type, map] : llvm::zip_equal(opTypes, indexingMaps)) {
+    // The truncation functionality of llvm::zip is intentional here to ignore
+    // the inner dimensions.
     for (auto [dim, size] : llvm::zip(map.getResults(), type.getShape())) {
       int64_t dimIdx = cast<AffineDimExpr>(dim).getPosition();
       if (size != bounds[dimIdx]) {
@@ -318,16 +321,17 @@ LogicalResult InnerTiledOp::verify() {
     }
   }
 
-  bool hasSubgroupSemantics =
+  bool hasUndistributedSemantics =
       countsMatchTileTypes(innerElemCounts, preThreadTypes);
-  bool hasThreadSemantics = countsMatchTileTypes(innerElemCounts, threadTypes);
-  if (!hasSubgroupSemantics && !hasThreadSemantics) {
+  bool hasDistributedSemantics =
+      countsMatchTileTypes(innerElemCounts, threadTypes);
+  if (!hasUndistributedSemantics && !hasDistributedSemantics) {
     return emitOpError("operation parallel semantics can't be inferred as "
-                       "either thread or subgroup");
+                       "either distributed or undistributed");
   }
-  if (hasThreadSemantics) {
+  if (hasDistributedSemantics) {
     if (getPermutations()) {
-      return emitOpError("permutations require subgroup semantics");
+      return emitOpError("permutations require undistributed semantics");
     }
   }
 
