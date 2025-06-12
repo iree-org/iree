@@ -127,7 +127,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
     LDBG("failed on step 1 (SCFTiling)");
     return failure();
   }
-  rewriter.replaceOp(linalgOp, tileResFirst->mergeResult.replacements);
+  rewriter.replaceOp(linalgOp, tileResFirst->replacements);
 
   // 2) Apply splitReduction on the single vector-length array.
   // splitReduction already replaces the op.
@@ -154,8 +154,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
     LDBG("failed on step 3 (SCFTiling)");
     return failure();
   }
-  rewriter.replaceOp(splitRes->splitLinalgOp,
-                     tileRes->mergeResult.replacements);
+  rewriter.replaceOp(splitRes->splitLinalgOp, tileRes->replacements);
   return success();
 }
 

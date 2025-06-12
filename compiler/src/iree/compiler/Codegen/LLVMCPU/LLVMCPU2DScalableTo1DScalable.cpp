@@ -161,7 +161,7 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
         setLoweringConfig(newOp, newLoweringConfig);
     }
 
-    rewriter.replaceOp(tilingOp, tilingResult->mergeResult.replacements);
+    rewriter.replaceOp(tilingOp, tilingResult->replacements);
   }
   return success();
 }
