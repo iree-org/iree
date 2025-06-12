@@ -69,53 +69,44 @@ static iree_status_t iree_hal_hip_driver_factory_enumerate(
   return iree_ok_status();
 }
 
-// Option key constants.
-static const iree_string_view_t key_hip_dylib_path =
-    iree_string_view_literal("hip_dylib_path");
-static const iree_string_view_t key_hip_use_streams =
-    iree_string_view_literal("hip_use_streams");
-static const iree_string_view_t key_hip_allow_inline_execution =
-    iree_string_view_literal("hip_allow_inline_execution");
-static const iree_string_view_t key_hip_async_allocations =
-    iree_string_view_literal("hip_async_allocations");
-static const iree_string_view_t key_hip_async_caching =
-    iree_string_view_literal("hip_async_caching");
-static const iree_string_view_t key_hip_tracing =
-    iree_string_view_literal("hip_tracing");
-static const iree_string_view_t key_hip_default_index =
-    iree_string_view_literal("hip_default_index");
-
 // Parses flags and environment variables into a string pair builder.
 static iree_status_t iree_hal_hip_driver_parse_flags(
     iree_string_pair_builder_t* builder) {
   const iree_flag_string_list_t dylib_path_list = FLAG_hip_dylib_path_list();
 
   // hip_dylib_path
+  // TODO: make this a single key-value pair (semicolon separated).
+  // Repeated fields don't work in things like python dictionaries/JSON and we
+  // want to match the environment variable formatting.
   for (iree_host_size_t i = 0; i < dylib_path_list.count; ++i) {
     IREE_RETURN_IF_ERROR(iree_string_pair_builder_add(
-        builder,
-        iree_make_string_pair(key_hip_dylib_path, dylib_path_list.values[i])));
+        builder, iree_make_string_pair(IREE_SV("hip_dylib_path"),
+                                       dylib_path_list.values[i])));
   }
 
   // bool and int flags
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
-      builder, key_hip_use_streams, FLAG_hip_use_streams));
+      builder, IREE_SV("hip_use_streams"), FLAG_hip_use_streams));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
-      builder, key_hip_allow_inline_execution,
+      builder, IREE_SV("hip_allow_inline_execution"),
       FLAG_hip_allow_inline_execution));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
-      builder, key_hip_async_allocations, FLAG_hip_async_allocations));
+      builder, IREE_SV("hip_async_allocations"), FLAG_hip_async_allocations));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
-      builder, key_hip_async_caching, FLAG_hip_async_caching));
+      builder, IREE_SV("hip_async_caching"), FLAG_hip_async_caching));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
-      builder, key_hip_tracing, FLAG_hip_tracing));
+      builder, IREE_SV("hip_tracing"), FLAG_hip_tracing));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
-      builder, key_hip_default_index, FLAG_hip_default_index));
+      builder, IREE_SV("hip_default_index"), FLAG_hip_default_index));
 
   // If there were no flag-based dylib paths, consult the environment
   // variable.
   // Read from the IREE_HIP_DYLIB_PATH env var and split by ';' (regardless
   // of platform).
+  //
+  // TODO: make this a single key-value pair (semicolon separated).
+  // Repeated fields don't work in things like python dictionaries/JSON and we
+  // want to match the environment variable formatting.
   if (dylib_path_list.count == 0) {
     char* raw_dylib_path_env = getenv("IREE_HIP_DYLIB_PATH");
     if (raw_dylib_path_env) {
@@ -123,22 +114,44 @@ static iree_status_t iree_hal_hip_driver_parse_flags(
           iree_make_cstring_view(raw_dylib_path_env);
       IREE_RETURN_IF_ERROR(
           iree_string_pair_builder_emplace_string(builder, &dylib_path_env));
-      while (true) {
-        iree_string_view_t first, rest;
-        intptr_t index =
-            iree_string_view_split(dylib_path_env, ';', &first, &rest);
+      intptr_t split_index = 0;
+      do {
+        iree_string_view_t value;
+        split_index = iree_string_view_split(dylib_path_env, ';', &value,
+                                             &dylib_path_env);
         IREE_RETURN_IF_ERROR(iree_string_pair_builder_add(
-            builder, iree_make_string_pair(key_hip_dylib_path, first)));
-
-        if (index < 0) {
-          break;
-        }
-
-        dylib_path_env = rest;
-      }
+            builder, iree_make_string_pair(IREE_SV("hip_dylib_path"), value)));
+      } while (split_index != -1);
     }
   }
 
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_hip_try_parse_int32_option(
+    iree_string_view_t name, iree_string_view_t value, int32_t* out_value) {
+  if (!iree_string_view_atoi_int32(value, out_value)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "option '%*.s' expected an int32 value, got: '%.*s'", (int)name.size,
+        name.data, (int)value.size, value.data);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_hip_try_parse_bool_option(
+    iree_string_view_t name, iree_string_view_t value, bool* out_value) {
+  if (iree_string_view_equal(value, IREE_SV("true"))) {
+    *out_value = 1;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(value, IREE_SV("false"))) {
+    *out_value = 0;
+    return iree_ok_status();
+  }
+  int32_t int_value = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_try_parse_int32_option(name, value, &int_value));
+  *out_value = int_value != 0;
   return iree_ok_status();
 }
 
@@ -152,72 +165,43 @@ static iree_status_t iree_hal_hip_driver_populate_options(
   for (iree_host_size_t i = 0; i < pairs_size; ++i) {
     iree_string_view_t key = pairs[i].key;
     iree_string_view_t value = pairs[i].value;
-    int32_t ivalue;
-
-    if (iree_string_view_equal(key, key_hip_dylib_path)) {
+    if (iree_string_view_equal(key, IREE_SV("hip_dylib_path"))) {
       ++dylib_path_count;
-    } else if (iree_string_view_equal(key, key_hip_use_streams)) {
-      if (!iree_string_view_atoi_int32(value, &ivalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_use_streams' expected to be int. Got: '%.*s'",
-            (int)value.size, value.data);
-      }
+    } else if (iree_string_view_equal(key, IREE_SV("hip_use_streams"))) {
+      bool use_streams = false;
+      IREE_RETURN_IF_ERROR(
+          iree_hal_hip_try_parse_bool_option(key, value, &use_streams));
       device_params->command_buffer_mode =
-          ivalue ? IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM
-                 : IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
-    } else if (iree_string_view_equal(key, key_hip_allow_inline_execution)) {
-      if (!iree_string_view_atoi_int32(value, &ivalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_allow_inline_execution' expected to be "
-            "int. Got: '%.*s'",
-            (int)value.size, value.data);
-      }
-      if (ivalue) {
-        device_params->allow_inline_execution = ivalue ? true : false;
-      }
-    } else if (iree_string_view_equal(key, key_hip_async_allocations)) {
-      if (!iree_string_view_atoi_int32(value, &ivalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_async_allocations' expected to be int Got: '%.*s'",
-            (int)value.size, value.data);
-      }
-      device_params->async_allocations = ivalue ? true : false;
-    } else if (iree_string_view_equal(key, key_hip_async_caching)) {
-      if (!iree_string_view_atoi_int32(value, &ivalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_async_caching' expected to be int Got: '%.*s'",
-            (int)value.size, value.data);
-      }
-      device_params->async_caching = ivalue ? true : false;
-    } else if (iree_string_view_equal(key, key_hip_tracing)) {
-      if (!iree_string_view_atoi_int32(value, &ivalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_tracing' expected to be int. Got: '%.*s'",
-            (int)value.size, value.data);
-      }
-      device_params->stream_tracing = ivalue;
-    } else if (iree_string_view_equal(key, key_hip_default_index)) {
-      if (!iree_string_view_atoi_int32(value, &ivalue)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_default_index' expected to be int. Got: '%.*s'",
-            (int)value.size, value.data);
-        ;
-      }
-      driver_options->default_device_index = ivalue;
+          use_streams ? IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM
+                      : IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
+    } else if (iree_string_view_equal(key,
+                                      IREE_SV("hip_allow_inline_execution"))) {
+      IREE_RETURN_IF_ERROR(iree_hal_hip_try_parse_bool_option(
+          key, value, &device_params->allow_inline_execution));
+    } else if (iree_string_view_equal(key, IREE_SV("hip_async_allocations"))) {
+      IREE_RETURN_IF_ERROR(iree_hal_hip_try_parse_bool_option(
+          key, value, &device_params->async_allocations));
+    } else if (iree_string_view_equal(key, IREE_SV("hip_async_caching"))) {
+      IREE_RETURN_IF_ERROR(iree_hal_hip_try_parse_bool_option(
+          key, value, &device_params->async_caching));
+    } else if (iree_string_view_equal(key, IREE_SV("hip_tracing"))) {
+      IREE_RETURN_IF_ERROR(iree_hal_hip_try_parse_int32_option(
+          key, value, &device_params->stream_tracing));
+    } else if (iree_string_view_equal(key, IREE_SV("hip_default_index"))) {
+      IREE_RETURN_IF_ERROR(iree_hal_hip_try_parse_int32_option(
+          key, value, &driver_options->default_device_index));
     } else {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "Unrecognized options: %.*s", (int)key.size,
+                              "unrecognized option: '%.*s'", (int)key.size,
                               key.data);
     }
   }
 
   // Populate dynamic sized values.
+  //
+  // TODO: make this a single key-value pair (semicolon separated).
+  // Repeated fields don't work in things like python dictionaries/JSON and we
+  // want to match the environment variable formatting.
   if (dylib_path_count > 0) {
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(
         host_allocator,
@@ -226,7 +210,7 @@ static iree_status_t iree_hal_hip_driver_populate_options(
     for (iree_host_size_t i = 0; i < pairs_size; ++i) {
       iree_string_view_t key = pairs[i].key;
       iree_string_view_t value = pairs[i].value;
-      if (iree_string_view_equal(key, key_hip_dylib_path)) {
+      if (iree_string_view_equal(key, IREE_SV("hip_dylib_path"))) {
         driver_options->hip_lib_search_paths
             [driver_options->hip_lib_search_path_count++] = value;
       }

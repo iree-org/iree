@@ -126,7 +126,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
 typedef struct iree_hal_hip_driver_options_t {
   // The index of the default HIP device to use within the list of available
   // devices.
-  int default_device_index;
+  int32_t default_device_index;
 
   // List of paths to guide searching for the dynamic libamdhip64.so (or
   // amdhip64.dll), which contains the backing HIP runtime library. If this
