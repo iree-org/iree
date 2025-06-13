@@ -1991,30 +1991,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_gpumulti_mma-gpumultimmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.multi_mma (GPU::MultiMmaOp)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="iree_gpu.multi_mma (GPU::MultiMmaOp)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#motivation-design-choices-and-pitfalls" class="md-nav__link">
-    <span class="md-ellipsis">
-      Motivation, Design Choices, and Pitfalls
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.value_barrier (GPU::ValueBarrierOp)
@@ -2038,7 +2014,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
+  <a href="#attributes" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -2105,15 +2081,6 @@
   <a href="#gpupipelineoptionsattr" class="md-nav__link">
     <span class="md-ellipsis">
       GPUPipelineOptionsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iteratortypeattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      IteratorTypeAttr
     </span>
   </a>
   
@@ -5151,30 +5118,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_gpumulti_mma-gpumultimmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.multi_mma (GPU::MultiMmaOp)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="iree_gpu.multi_mma (GPU::MultiMmaOp)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#motivation-design-choices-and-pitfalls" class="md-nav__link">
-    <span class="md-ellipsis">
-      Motivation, Design Choices, and Pitfalls
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.value_barrier (GPU::ValueBarrierOp)
@@ -5198,7 +5141,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
+  <a href="#attributes" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5265,15 +5208,6 @@
   <a href="#gpupipelineoptionsattr" class="md-nav__link">
     <span class="md-ellipsis">
       GPUPipelineOptionsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iteratortypeattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      IteratorTypeAttr
     </span>
   </a>
   
@@ -5721,15 +5655,11 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#iree_gpubarrier_region-gpubarrierregionop">iree_gpu.barrier_region (GPU::BarrierRegionOp)</a></li>
 <li><a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop">iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)</a></li>
 <li><a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop">iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)</a></li>
-<li><a href="#iree_gpumulti_mma-gpumultimmaop">iree_gpu.multi_mma (GPU::MultiMmaOp)</a><ul>
-<li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
-</ul>
-</li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_1">Attributes</a><ul>
+<li><a href="#attributes">Attributes</a><ul>
 <li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
 <li><a href="#derivedthreadconfigattr">DerivedThreadConfigAttr</a></li>
@@ -5737,7 +5667,6 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#gpuencodinglayoutattr">GPUEncodingLayoutAttr</a></li>
 <li><a href="#gpupadlayoutattr">GPUPadLayoutAttr</a></li>
 <li><a href="#gpupipelineoptionsattr">GPUPipelineOptionsAttr</a></li>
-<li><a href="#iteratortypeattr">IteratorTypeAttr</a></li>
 <li><a href="#laneidattr">LaneIdAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#mmaattr">MMAAttr</a></li>
@@ -5990,169 +5919,6 @@ Collectively, all threads in the subgroup orchestrate the load DMA operation.</p
 </tr>
 </tbody>
 </table>
-<h3 id="iree_gpumulti_mma-gpumultimmaop"><code>iree_gpu.multi_mma</code> (GPU::MultiMmaOp)<a class="headerlink" href="#iree_gpumulti_mma-gpumultimmaop" title="Permanent link">link</a></h3>
-<p><em>Models a contraction of multiple mma operations.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.multi_mma` $lhs `,` $rhs `,` $acc attr-dict
-              `:` type($lhs) `,` type($rhs) `into` type($acc)
-</code></pre></div>
-<p>Computes the sum of inner MMA operations along a set of outer dimensions.
-Logically matches closely with a <code>vector.contraction</code> operation, however
-the combiner type is a specific intrinsic rather than a generic combiner
-type.</p>
-<p>Similar to <code>vector.contraction</code>, an iterator type attribute list must be
-specified, where each element of the list represents an iterator over one
-of the outer dimensions. Iteration of inner dimensions is defined solely by
-the intrinsic and may be opaque.</p>
-<p>An indexing map attribute list must be specified with an entry for lhs, rhs
-and acc arguments. An indexing map attribute specifies a mapping from each
-outer loop iterator in the iterator type list, to each dimension of each
-operand.</p>
-<p>The combiner type is defined by the intrinsic.</p>
-<p>Example:</p>
-<div class="highlight"><pre><span></span><code>#contraction_accesses = [
- affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
- affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
- affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-]
-#contraction_trait = {
-  indexing_maps = #contraction_accesses,
-  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;
-}
-%3 = iree_gpu.multi_mma %0, %1, %2 #contraction_trait
-  : vector&lt;2x3x4xf16&gt;, vector&lt;3x5x4xf16&gt; into vector&lt;2x5x4xf32&gt;
-
-// Takes tensors as well, however the inner dimensions must always be
-// static.
-%7 = iree_gpu.multi_mma %4, %5, %6 #contraction_trait
-  : tensor&lt;?x?x4xf16&gt;, tensor&lt;?x?x4xf16&gt; into tensor&lt;?x?x4xf32&gt;
-</code></pre></div>
-<p>The example above can be logically lowered directly to loops like this
-(ignoring type conversions from tensor to vector needed for the mfma).
-<div class="highlight"><pre><span></span><code>%outer_m = tensor.dim %6, %c0 : index
-%outer_n = tensor.dim %6, %c1 : index
-%outer_k = tensor.dim %4, %c1 : index
-%7 = scf.for %i = %c0 to %outer_m iter_args(%arg0 = %6) {
-  %8 = scf.for %j = %c0 to %outer_n iter_args(%arg1 = %arg0) {
-    %9 = scf.for %k = %c0 to %outer_k iter_args(%arg2 = %arg1) {
-      %lhs = tensor.extract_slice %4 [%i, %k, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;4xf16&gt;
-      %rhs = tensor.extract_slice %5 [%k, %j, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;4xf16&gt;
-      %acc = tensor.extract_slice %arg2 [%i, %j, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;4xf32&gt;
-      %res = amdgpu.mfma %lhs, %rhs, %acc : tensor&lt;4xf32&gt;
-      %ret = tensor.insert_slice %acc into %arg2 [%i, %j, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;?x?x4xf32&gt;
-      scf.yield %ret : tensor&lt;?x?x4xf32&gt;
-    }
-    scf.yield %9 : tensor&lt;?x?x4xf32&gt;
-  }
-  scf.yield %8 : tensor&lt;?x?x4xf32&gt;
-}
-</code></pre></div></p>
-<p>Or alternatively unrolled to a single intrinsic when operation on vectors.
-<div class="highlight"><pre><span></span><code>#contraction_accesses = [
- affine_map&lt;() -&gt; ()&gt;,
- affine_map&lt;() -&gt; ()&gt;,
- affine_map&lt;() -&gt; ()&gt;
-]
-#contraction_trait = {
-  indexing_maps = #contraction_accesses,
-  iterator_types = [],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;
-}
-%3 = iree_gpu.multi_mma %0, %1, %2 #contraction_trait
-  : vector&lt;4xf16&gt;, vector&lt;4xf16&gt; into vector&lt;4xf32&gt;
-</code></pre></div></p>
-<p>This operation can represent an intrinsic both in subgroup/warp and
-distributed (thread) abstractions through the intrinsic attribute interface.
-It does so semi-opaquely by including optional permutations of each MMA
-fragment with respect to the "canonical" MNK row major matrix multiply.</p>
-<p>The permutations represents the permutation that takes the canonical
-(row major) layout and converts it to the current layout.</p>
-<p>Since the canonical dimensionality of the inner dimensions are somewhat
-intrinsic specific, verification of this op requires only that element
-counts of the inner dimensions match the intrinsic.</p>
-<p>For example, an MMT product of inner dimensions with warp semantics can be
-represented with the following. Permutations are only allowed for ops with
-subgroup semantics and must be resolved before distribution.</p>
-<div class="highlight"><pre><span></span><code>#contraction_accesses = [
- affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
- affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
- affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-]
-#contraction_trait = {
-  indexing_maps = #contraction_accesses,
-  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
-  rhs_permutation = [1, 0]
-}
-%7 = iree_gpu.multi_mma %4, %5, %6 #contraction_trait
-  : tensor&lt;?x?x16x16xf16&gt;, tensor&lt;?x?x16x16xf16&gt; into tensor&lt;?x?x16x16xf32&gt;
-</code></pre></div>
-<h4 id="motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls<a class="headerlink" href="#motivation-design-choices-and-pitfalls" title="Permanent link">link</a></h4>
-<p>The idea behind this operation is to decouple the layout setting/tiling
-required to target certain intrinsics from the lowering to them. Because
-typically tiling of this sort happens on tensor operands, however the target
-intrinsics operate on vectors, we use this operation to bridge the gap. The
-choice for a shared operation is intended to ease the lowering process and
-allow for different transformations at different stages of the pipeline
-without needing to essentially clone this op.</p>
-<p>The choice to let the inner dimensions required to compute the intrinsic be
-implicit based on the indexing maps was made to make this operation easier
-to generate and to skip the need for type conversion ops. However this comes
-at the expense of ease of verification for the operation. It is also
-implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>DestinationStyleOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TilingInterface</code>, <code>VectorUnrollOpInterface</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
-<tr><td><code>iterator_types</code></td><td>::mlir::ArrayAttr</td><td>Iterator type should be an enum.</td></tr>
-<tr><td><code>kind</code></td><td>IREE::GPU::MmaInterfaceAttr</td><td>buffer-like constant attribute values</td></tr>
-<tr><td><code>lhs_permutation</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>rhs_permutation</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>acc_permutation</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-</table>
-
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>lhs</code></td>
-<td>ranked tensor or vector of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>rhs</code></td>
-<td>ranked tensor or vector of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>acc</code></td>
-<td>ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
 <h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
 <p><em>Synchronizes workers on a value semantic tensor or vector.</em></p>
 <p>Syntax:</p>
@@ -6170,7 +5936,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6185,7 +5951,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6209,7 +5975,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6224,7 +5990,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
+<h2 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">link</a></h2>
 <h3 id="computebitwidthsattr">ComputeBitwidthsAttr<a class="headerlink" href="#computebitwidthsattr" title="Permanent link">link</a></h3>
 <p><em>Supported bitwidths for compute</em></p>
 <p>Syntax:</p>
@@ -6458,30 +6224,6 @@ See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iteratortypeattr">IteratorTypeAttr<a class="headerlink" href="#iteratortypeattr" title="Permanent link">link</a></h3>
-<p><em>Iterator type</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.iterator_type&lt;
-  ::mlir::utils::IteratorType   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::utils::IteratorType</code></td>
-<td>an enum of type IteratorType</td>
-</tr>
-</tbody>
-</table>
 <h3 id="laneidattr">LaneIdAttr<a class="headerlink" href="#laneidattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.lane_id&lt;
@@ -6489,7 +6231,7 @@ See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 &gt;
 </code></pre></div>
 <p>An attribute for mapping scf.forall ops to subgroup lanes.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6516,7 +6258,7 @@ See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <p>GPU specific implementation of a lowering config. This carries just a
 dictionary attribute to store any relevant fields. This is the simplest
 form of a lowering config, offering flexibility at the cost of structure.</p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6552,7 +6294,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 column major. This is equivalent to instead computing:</p>
 <div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
 </code></pre></div>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6581,7 +6323,7 @@ column major. This is equivalent to instead computing:</p>
   ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6604,7 +6346,7 @@ column major. This is equivalent to instead computing:</p>
   ::llvm::ArrayRef&lt;MMAAttr&gt;   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6631,7 +6373,7 @@ column major. This is equivalent to instead computing:</p>
 </code></pre></div>
 <p>A schedule of MMA intrinsic instruction and various levels of tile sizes
 to solve a specific contraction problem.</p>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6665,7 +6407,7 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6689,7 +6431,7 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::StorageBitwidths   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6713,7 +6455,7 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::SubgroupOps   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6748,7 +6490,7 @@ to solve a specific contraction problem.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6793,7 +6535,7 @@ to solve a specific contraction problem.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6845,7 +6587,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6938,7 +6680,7 @@ NVIDIA GPUs.</p>
 </code></pre></div>
 <p>An attribute that can be applied to any operation to specify that it has
 been matched with a ukernel that is a legal lowering for it.</p>
-<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6983,7 +6725,7 @@ field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
 in a chained-matmul operation.</p>
-<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
+<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7007,7 +6749,7 @@ in a chained-matmul operation.</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
+<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
