@@ -11,12 +11,14 @@
 set(_BITCODE_SRCS
   "buffer.c"
   "dummy.c"
+  "tracing.c"
 )
 
 set(_BITCODE_HDRS
   "buffer.h"
   "kernel_tables.h"
   "kernels.h"
+  "tracing.h"
   "support/common.h"
   "support/kernel_args.h"
   "support/mutex.h"
