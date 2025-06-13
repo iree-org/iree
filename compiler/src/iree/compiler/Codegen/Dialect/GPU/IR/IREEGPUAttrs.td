@@ -54,7 +54,8 @@ def IREEGPU_DerivedThreadConfig :
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
         "hasTilingLevel",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr>
     ]> {
   let mnemonic = "derived_thread_config";
   let summary = [{
@@ -77,7 +78,8 @@ def IREEGPU_UseGlobalLoadDma :
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
         "hasTilingLevel",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr>
     ]> {
   let mnemonic = "use_global_load_dma";
   let summary = [{
