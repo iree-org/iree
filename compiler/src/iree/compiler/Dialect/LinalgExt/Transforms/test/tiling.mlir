@@ -2740,3 +2740,63 @@ module attributes { transform.with_named_sequence } {
 // CHECK-NEXT:       ^bb0(%[[IDX:.+]]: index):
 //  CHECK-DAG:         %[[IDX_OFFSET:.+]] = affine.apply #[[MAP1]](%[[IDX]], %[[IV]])
 //      CHECK:         iree_linalg_ext.yield %[[IDX_OFFSET]], %[[TRUE]]
+
+// -----
+
+func.func @concat_dynamic(%arg0 : tensor<?x64xi32>, %arg1 : tensor<?x64xi32>) -> tensor<?x128xi32> {
+  %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
+  return %0 : tensor<?x128xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["tensor.concat"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-LABEL: func @concat_dynamic
+//   CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//   CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor
+//    CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//    CHECK-DAG:   %[[C10:.+]] = arith.constant 10
+//    CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//        CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[DIM]] step %[[C10]]
+//        CHECK:     %[[MIN:.+]] = affine.min
+//    CHECK-DAG:     %[[EXTRACT0:.+]] = tensor.extract_slice %[[ARG0]]
+//   CHECK-SAME:       [%[[I]], 0] [%[[MIN]], 64] [1, 1]
+//    CHECK-DAG:     %[[EXTRACT1:.+]] = tensor.extract_slice %[[ARG1]]
+//   CHECK-SAME:       [%[[I]], 0] [%[[MIN]], 64] [1, 1]
+//        CHECK:     tensor.concat dim(1) %[[EXTRACT0]], %[[EXTRACT1]]
+//   CHECK-SAME:       : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
+
+// -----
+
+func.func @no_tile_concat_dynamic(%arg0 : tensor<?x?xi32>, %arg1 : tensor<?x?xi32>) -> tensor<?x?xi32> {
+ // expected-error @below {{faild to tile operation}}
+ // expected-error @below {{failed to generate tiling loops}}
+  %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x?xi32>, tensor<?x?xi32>) -> tensor<?x?xi32>
+  return %0 : tensor<?x?xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["tensor.concat"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+func.func @no_tile_concat_concated_dim(%arg0 : tensor<?x64xi32>, %arg1 : tensor<?x64xi32>) -> tensor<?x128xi32> {
+ // expected-error @below {{faild to tile operation}}
+ // expected-error @below {{failed to generate tiling loops}}
+  %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
+  return %0 : tensor<?x128xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["tensor.concat"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 64] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
