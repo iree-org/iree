@@ -150,6 +150,11 @@ struct ConcatOpPartitionableLoops
     uint64_t concatDim = concatOp.getDim();
     SmallVector<unsigned> partitionableLoops;
     partitionableLoops.reserve(rank - 1);
+
+    // All loops are partitionable except the concated dimension. Consider a
+    // concat 5 + 15 and trying to partition with a tile size of 10. This would
+    // mean that the first tile would operate on (5 + 5) and the second would
+    // operate on (0 + 10).
     for (unsigned i = 0; i < rank; ++i) {
       if (i != concatDim) {
         partitionableLoops.push_back(i);
