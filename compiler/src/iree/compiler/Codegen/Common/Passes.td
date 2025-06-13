@@ -142,6 +142,16 @@ def CombineLayoutTransformationPass :
   ];
 }
 
+def FoldLayoutTransformationPass :
+    InterfacePass<"iree-codegen-fold-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Fold layout transformation operations on a single consumer operation";
+  let dependentDialects = [
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
