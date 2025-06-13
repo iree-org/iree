@@ -15,9 +15,9 @@
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
 //
-//   1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
-//      its semantics from the wrapped intrinsic, we can't rely on any kind of
-//      LHS<->RHS symmetry.
+//   1. As linalg.matmul materializes into iree_codegen.inner_tiled, which
+//      inherits its semantics from the wrapped intrinsic, we can't rely on any
+//      kind of LHS<->RHS symmetry.
 //   2. We do not currently use ukernels, which would be one of the main areas
 //      to benefit from transposeNarrowN.
 //   3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
@@ -28,6 +28,7 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -301,8 +302,9 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
       linalgOp.getIteratorTypesArray();
 
   Location loc = linalgOp.getLoc();
-  Operation *mmaOp = builder.create<MultiMmaOp>(
-      loc, operands[0], operands[1], operands[2],
+  Operation *mmaOp = builder.create<Codegen::InnerTiledOp>(
+      loc, operands.take_front(inputs.size()),
+      operands.take_back(outputs.size()),
       ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma);
   return mmaOp;
 }

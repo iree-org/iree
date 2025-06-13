@@ -131,11 +131,12 @@ static Value createSharedMemory(PatternRewriter &rewriter, Location loc,
   return allocOp;
 }
 
-struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
-  LowerMultiMmaToUKernelPattern(MLIRContext *context)
-      : OpRewritePattern<IREE::GPU::MultiMmaOp>(context) {}
+struct LowerInnerTiledMmaToUKernelPattern
+    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+  LowerInnerTiledMmaToUKernelPattern(MLIRContext *context)
+      : OpRewritePattern<IREE::Codegen::InnerTiledOp>(context) {}
 
-  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp op,
+  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp op,
                                 PatternRewriter &rewriter) const override {
     auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
     if (!loweringConfig) {
@@ -161,15 +162,15 @@ struct LowerMultiMmaToUKernelPattern : OpRewritePattern<IREE::GPU::MultiMmaOp> {
     int64_t sharedMemoryBytes = ukernelAttr.getSharedMemoryBytes();
     auto sharedMemory = createSharedMemory(rewriter, loc, sharedMemoryBytes);
     Value k = castIndexToI32(
-        rewriter.create<tensor::DimOp>(op.getLoc(), op.getLhs(), 1));
+        rewriter.create<tensor::DimOp>(op.getLoc(), op.getInputs()[0], 1));
     Value intrinsicsM = constI32(mma.getIntrinsicsM());
     Value subgroupsM = constI32(mma.getSubgroupsM());
     Value intrinsicsN = constI32(mma.getIntrinsicsN());
     Value subgroupsN = constI32(mma.getSubgroupsN());
     Value intrinsicsK = constI32(mma.getIntrinsicsK());
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
-        op, TypeRange{op.getAccType()}, ukernelAttr.getName(),
-        ValueRange{op.getLhs(), op.getRhs()}, op.getAcc(),
+        op, op.getOutputs().getTypes(), ukernelAttr.getName(), op.getInputs(),
+        op.getOutputs(),
         ValueRange{sharedMemory, constI32(sharedMemoryBytes), k, intrinsicsM,
                    subgroupsM, intrinsicsN, subgroupsN, intrinsicsK},
         ukernelAttr.getDefAttrs(),
@@ -195,8 +196,9 @@ struct GPULowerToUKernelsPass final
     // evidence that it is difficult for codegen to consistently approach
     // microkernels performance, and that consideration overrides the benefit of
     // fusions for these ops.
-    patterns.add<LowerArgmaxToUKernelPattern, LowerMultiMmaToUKernelPattern>(
-        context);
+    patterns
+        .add<LowerArgmaxToUKernelPattern, LowerInnerTiledMmaToUKernelPattern>(
+            context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

@@ -6,9 +6,9 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @unroll_multi_mma_order(%lhs: vector<2x2x4xf16>, %rhs: vector<2x2x4xf16>, %acc: vector<2x2x4xf32>) -> vector<2x2x4xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<2x2x4xf16>, vector<2x2x4xf16> into vector<2x2x4xf32>
   return %0 : vector<2x2x4xf32>
@@ -33,31 +33,31 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 0]
 //       CHECK:   %[[ACC0:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [0, 0]
-//       CHECK:   %[[MMA0_K0:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[ACC0]]
+//       CHECK:   %[[MMA0_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC0]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 1]
 //       CHECK:   %[[ACC1:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [0, 1]
-//       CHECK:   %[[MMA1_K0:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[ACC1]]
+//       CHECK:   %[[MMA1_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC1]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 0]
 //       CHECK:   %[[ACC2:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [1, 0]
-//       CHECK:   %[[MMA2_K0:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[ACC2]]
+//       CHECK:   %[[MMA2_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC2]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 0]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [0, 1]
 //       CHECK:   %[[ACC3:.+]] = vector.extract_strided_slice %[[ACC]] {offsets = [1, 1]
-//       CHECK:   %[[MMA3_K0:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[ACC3]]
+//       CHECK:   %[[MMA3_K0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[ACC3]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 1]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [1, 0]
-//       CHECK:   %[[MMA0:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[MMA0_K0]]
+//       CHECK:   %[[MMA0:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[MMA0_K0]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [0, 1]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [1, 1]
-//       CHECK:   %[[MMA1:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[MMA1_K0]]
+//       CHECK:   %[[MMA1:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[MMA1_K0]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 1]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [1, 0]
-//       CHECK:   %[[MMA2:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[MMA2_K0]]
+//       CHECK:   %[[MMA2:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[MMA2_K0]])
 //       CHECK:   vector.extract_strided_slice %[[LHS]] {offsets = [1, 1]
 //       CHECK:   vector.extract_strided_slice %[[RHS]] {offsets = [1, 1]
-//       CHECK:   %[[MMA3:.+]] = iree_gpu.multi_mma %{{.*}}, %{{.*}}, %[[MMA3_K0]]
+//       CHECK:   %[[MMA3:.+]] = iree_codegen.inner_tiled ins(%{{.*}}, %{{.*}}) outs(%[[MMA3_K0]])
 //       CHECK:   %[[IN0:.+]] = vector.insert_strided_slice %[[MMA0]], %[[DEST]] {offsets = [0, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf32> into vector<2x2x4xf32>
 //       CHECK:   %[[IN1:.+]] = vector.insert_strided_slice %[[MMA1]], %[[IN0]] {offsets = [0, 1, 0]
 //       CHECK:   %[[IN2:.+]] = vector.insert_strided_slice %[[MMA2]], %[[IN1]] {offsets = [1, 0, 0]
@@ -72,9 +72,9 @@ module attributes { transform.with_named_sequence } {
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @unroll_multi_mma_count(%lhs: vector<2x3x4xf16>, %rhs: vector<3x5x4xf16>, %acc: vector<2x5x4xf32>) -> vector<2x5x4xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
   return %0 : vector<2x5x4xf32>
@@ -91,5 +91,5 @@ module attributes { transform.with_named_sequence } {
 }
 
 //    CHECK-LABEL: func @unroll_multi_mma_count
-// CHECK-COUNT-30:   %[[MMA:.+]] = iree_gpu.multi_mma {{.*}} : vector<1x1x4xf16>, vector<1x1x4xf16> into vector<1x1x4xf32>
+// CHECK-COUNT-30:   %[[MMA:.+]] = iree_codegen.inner_tiled {{.*}} : vector<1x1x4xf16>, vector<1x1x4xf16> into vector<1x1x4xf32>
 // CHECK-COUNT-10:   vector.insert_strided_slice {{.*}} : vector<1x1x4xf32> into vector<2x5x4xf32>

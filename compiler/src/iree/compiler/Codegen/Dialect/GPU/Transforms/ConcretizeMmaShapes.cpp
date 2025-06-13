@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -96,40 +96,45 @@ LogicalResult materializeOperandConcreteShape(
   return success();
 }
 
-struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
+struct ConcretizeMmaOperandShape final
+    : OpRewritePattern<Codegen::InnerTiledOp> {
   using OpRewritePattern::OpRewritePattern;
 
   ConcretizeMmaOperandShape(MLIRContext *context, MMAFragment fragment)
-      : OpRewritePattern<MultiMmaOp>(context), fragment(fragment) {}
+      : OpRewritePattern<Codegen::InnerTiledOp>(context), fragment(fragment) {}
 
-  LogicalResult matchAndRewrite(MultiMmaOp mmaOp,
+  LogicalResult matchAndRewrite(Codegen::InnerTiledOp mmaOp,
                                 PatternRewriter &rewriter) const override {
     if (!mmaOp.hasTensorSemantics()) {
       return failure();
     }
+    auto kind = dyn_cast<MMAAttr>(mmaOp.getKind());
+    if (!kind) {
+      return rewriter.notifyMatchFailure(
+          mmaOp, "don't know how to concretize non-mma ops");
+    }
 
     // Get the right operand and permutation for the `fragment`.
-    Value operand;
-    std::optional<ArrayRef<int64_t>> permutation;
+    SmallVector<Value> operands = mmaOp.getOperands();
+    std::optional<ArrayAttr> permutationsAttr = mmaOp.getPermutations();
+    int64_t opIndex;
     switch (fragment) {
     case MMAFragment::Lhs:
-      operand = mmaOp.getLhs();
-      permutation = mmaOp.getLhsPermutation();
+      opIndex = 0;
       break;
     case MMAFragment::Rhs:
-      operand = mmaOp.getRhs();
-      permutation = mmaOp.getRhsPermutation();
+      opIndex = 1;
       break;
     case MMAFragment::Acc:
-      operand = mmaOp.getAcc();
-      permutation = mmaOp.getAccPermutation();
+      opIndex = 2;
       break;
     }
 
-    // Get the reassociation indices and result type of the expand_shape op.
-    MMAAttr kind = dyn_cast<MMAAttr>(mmaOp.getKind());
-    if (!kind) {
-      return failure();
+    Value operand = operands[opIndex];
+    std::optional<ArrayRef<int64_t>> permutation;
+    if (permutationsAttr) {
+      permutation =
+          cast<DenseI64ArrayAttr>((*permutationsAttr)[opIndex]).asArrayRef();
     }
     SmallVector<ReassociationIndices> reassociations;
     RankedTensorType concreteType;
@@ -154,16 +159,12 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
                                 .getResult();
 
     // Expand the permutation for the new inner dimensions of the expanded
-    // multi_mma operand.
-    auto expandPerm =
-        [&](std::optional<ArrayRef<int64_t>> perm, MMAFragment frag,
-            int64_t outerRank) -> std::optional<DenseI64ArrayAttr> {
-      if (!perm.has_value()) {
-        return std::nullopt;
-      }
-      if (frag != fragment) {
-        return rewriter.getDenseI64ArrayAttr(perm.value());
-      }
+    // inner_tiled operand.
+    std::optional<ArrayAttr> newPermutationsAttr;
+    if (permutationsAttr) {
+      SmallVector<Attribute> newPermutations =
+          llvm::to_vector(*permutationsAttr);
+      int64_t outerRank = mmaOp.getOperandOuterRank(opIndex);
       SmallVector<ReassociationIndices> innerReInds(
           reassociations.begin() + outerRank, reassociations.end());
       for (auto &reInd : innerReInds) {
@@ -174,29 +175,23 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
       // |perm| represents the permutation that takes the canonical (row major)
       // layout and converts it to the current layout. Take the inverse to
       // update to the expanded permutation and then invert back
-      SmallVector<int64_t> invertPerm = invertPermutationVector(perm.value());
+      SmallVector<int64_t> invertPerm =
+          invertPermutationVector(permutation.value());
       SmallVector<int64_t> expandedPerm;
       for (auto reInd : applyPermutation(innerReInds, invertPerm)) {
         expandedPerm.append(reInd);
       }
       expandedPerm = invertPermutationVector(expandedPerm);
-      return rewriter.getDenseI64ArrayAttr(expandedPerm);
-    };
-    std::optional<DenseI64ArrayAttr> lhsPerm = expandPerm(
-        mmaOp.getLhsPermutation(), MMAFragment::Lhs, mmaOp.getLhsOuterRank());
-    std::optional<DenseI64ArrayAttr> rhsPerm = expandPerm(
-        mmaOp.getRhsPermutation(), MMAFragment::Rhs, mmaOp.getRhsOuterRank());
-    std::optional<DenseI64ArrayAttr> accPerm = expandPerm(
-        mmaOp.getAccPermutation(), MMAFragment::Acc, mmaOp.getAccOuterRank());
+      newPermutations[opIndex] = rewriter.getDenseI64ArrayAttr(expandedPerm);
+      newPermutationsAttr = rewriter.getArrayAttr(newPermutations);
+    }
 
-    // Create the new multi_mma op with the concrete type.
-    auto concreteMmaOp = rewriter.create<MultiMmaOp>(
-        loc,
-        /*lhs=*/fragment == MMAFragment::Lhs ? concreteOperand : mmaOp.getLhs(),
-        /*rhs=*/fragment == MMAFragment::Rhs ? concreteOperand : mmaOp.getRhs(),
-        /*acc=*/fragment == MMAFragment::Acc ? concreteOperand : mmaOp.getAcc(),
-        mmaOp.getIndexingMaps(), mmaOp.getIteratorTypes(), mmaOp.getKind(),
-        lhsPerm, rhsPerm, accPerm);
+    operands[opIndex] = concreteOperand;
+    // Create the new inner_tiled op with the concrete type.
+    auto concreteMmaOp = rewriter.create<Codegen::InnerTiledOp>(
+        loc, /*inputs=*/ValueRange{operands}.drop_back(),
+        /*inits=*/ValueRange{operands}.back(), mmaOp.getIndexingMaps(),
+        mmaOp.getIteratorTypes(), mmaOp.getKind(), newPermutationsAttr);
 
     if (auto config = getLoweringConfig(mmaOp)) {
       setLoweringConfig(concreteMmaOp, config);
@@ -210,7 +205,8 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
     // For the Acc operand, the result needs to be collapsed back to the
     // original type so that types match with consumers.
     rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
-        mmaOp, mmaOp.getAccType(), concreteMmaOp.getResult(), reassociations);
+        mmaOp, mmaOp.getOutputs().front().getType(),
+        concreteMmaOp.getResults().front(), reassociations);
 
     return success();
   }

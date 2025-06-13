@@ -40,7 +40,7 @@ iree_cc_library(
     MLIRMLProgramDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
-    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

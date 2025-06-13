@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -45,7 +46,7 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
-  auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
+  auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
   }
@@ -68,7 +69,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 
   // Set all workgroup and reduction tile sizes to 1, since the data tiled
   // kernel has the scope of an entire workgroup, and the reduction tiling is
-  // already baked into the "opaque" data tiled inner layout of the multi_mma.
+  // already baked into the "opaque" data tiled inner layout of the inner_tiled.
   SmallVector<AffineMap> indexingMaps = multiMmaOp.getIndexingMapsArray();
   mlir::linalg::ContractionDimensions contractionDims =
       mlir::linalg::inferContractionDims(indexingMaps).value();

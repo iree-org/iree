@@ -474,7 +474,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.tilingLevel = IREE::GPU::TilingLevel::Subgroup;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
   }
-  funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
+  funcPassManager.addPass(IREE::GPU::createDistributeInnerTiledToLanesPass());
 
   // Step 4.5. Things that need to happen right after distribution to threads.
   funcPassManager.addPass(createGPULowerToUKernelsPass());

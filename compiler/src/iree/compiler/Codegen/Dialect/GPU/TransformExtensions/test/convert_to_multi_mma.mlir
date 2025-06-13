@@ -32,9 +32,9 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<2x2x16x16xf32>
-//       CHECK:   iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+//       CHECK:   iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
-//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+//  CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     : tensor<2x2x16x16xf16>, tensor<2x2x16x16xf16> into tensor<2x2x16x16xf32>
 
@@ -70,7 +70,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<16x16xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<16x16xf32>
-//       CHECK:   iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+//       CHECK:   iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]],
 //  CHECK-SAME:     iterator_types = [],
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -109,9 +109,9 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<2x16x16xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<16x16xf32>
-//       CHECK:   iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+//       CHECK:   iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP1]]],
-//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<reduction>],
+//  CHECK-SAME:     iterator_types = [#linalg.iterator_type<reduction>],
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-//  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>
+//  CHECK-SAME:     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
 //  CHECK-SAME:     : tensor<2x16x16xf16>, tensor<2x16x16xf16> into tensor<16x16xf32>

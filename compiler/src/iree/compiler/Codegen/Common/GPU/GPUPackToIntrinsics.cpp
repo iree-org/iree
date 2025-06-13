@@ -82,7 +82,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!kind) {
       return failure();
     }
-    if (failed(convertContractionToMultiMma(rewriter, linalgOp, kind))) {
+    if (failed(convertContractionToInnerTiledMma(rewriter, linalgOp, kind))) {
       return failure();
     }
     return success();
@@ -116,12 +116,13 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     }
   }
 
-  // Step 2. Convert configured linalg ops to multi_mma.
+  // Step 2. Convert configured linalg ops to inner_tiled ops with multi-MMA
+  // intrinsic kinds.
   {
     RewritePatternSet patterns(context);
     patterns.add<ConvertToMultiMma>(context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitError() << "failed to convert linalg to multi_mma";
+      funcOp.emitError() << "failed to convert linalg to multi-MMA inner_tiled";
       return signalPassFailure();
     }
   }

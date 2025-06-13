@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -274,11 +274,11 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     tensor::PadOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::PadOp>>(*ctx);
   });
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
-        IREE::GPU::MultiMmaOp::attachInterface<
-            OuterParallelAsPartitionableLoops<IREE::GPU::MultiMmaOp>>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    IREE::Codegen::InnerTiledOp::attachInterface<
+        OuterParallelAsPartitionableLoops<IREE::Codegen::InnerTiledOp>>(*ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler

@@ -44,6 +44,7 @@ iree_cc_library(
     "IREECodegenLibraryManager.cpp"
     "IREECodegenOps.cpp"
     "IREECodegenTypes.cpp"
+    "TilingInterfaceImpl.cpp"
     "UKernelOps.cpp"
   DEPS
     ::IREECodegenDialectGen
@@ -62,12 +63,16 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRParser
     MLIRSCFDialect
     MLIRSupport
+    MLIRTensorDialect
+    MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransformDialectTransforms
+    MLIRVectorInterfaces
     MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Dialect::Util::IR

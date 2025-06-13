@@ -32,9 +32,9 @@ def ConcretizeMmaShapesPass :
   ];
 }
 
-def DistributeMmaToLanesPass :
-    InterfacePass<"iree-gpu-distribute-mma-to-lanes", "mlir::FunctionOpInterface"> {
-  let summary = "Distributes iree_gpu.multi_mma ops to lanes";
+def DistributeInnerTiledToLanesPass :
+    InterfacePass<"iree-gpu-distribute-inner-tiled-to-lanes", "mlir::FunctionOpInterface"> {
+  let summary = "Distributes iree_codegen.inner_tiled ops to lanes";
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
     "::mlir::affine::AffineDialect",

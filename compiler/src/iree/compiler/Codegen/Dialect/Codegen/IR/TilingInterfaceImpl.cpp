@@ -4,46 +4,53 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir::iree_compiler::IREE::GPU {
+namespace mlir::iree_compiler::IREE::Codegen {
 
 //===----------------------------------------------------------------------===//
-// MultiMmaOp
+// InnerTiledOp
 //===----------------------------------------------------------------------===//
 
-SmallVector<utils::IteratorType> MultiMmaOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> InnerTiledOp::getLoopIteratorTypes() {
   return getIteratorTypesArray();
 }
 
-SmallVector<Range> MultiMmaOp::getIterationDomain(OpBuilder &builder) {
+SmallVector<Range> InnerTiledOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   SmallVector<AffineMap> indexingMaps = getIndexingMapsArray();
+  int64_t numInputs = getNumInputs();
+  auto inputMaps = ArrayRef<AffineMap>(indexingMaps).take_front(numInputs);
+  auto outputMaps = ArrayRef<AffineMap>(indexingMaps).drop_front(numInputs);
   for (const auto &it : llvm::enumerate(getIteratorTypes())) {
-    // Search lhs/rhs map results for 'targetExpr'.
+    // Search input map results for 'targetExpr'.
     auto targetExpr = getAffineDimExpr(it.index(), builder.getContext());
-    auto iteratorType = llvm::cast<IteratorTypeAttr>(it.value()).getValue();
-    if (iteratorType == utils::IteratorType::reduction) {
-      // Get reduction dim size from lhs shape (same size in rhsShape).
-      std::optional<int64_t> lhsDimIndex =
-          indexingMaps[0].getResultPosition(targetExpr);
-      assert(lhsDimIndex && "invalid lhs map");
-      OpFoldResult ub =
-          tensor::getMixedSize(builder, loc, getLhs(), *lhsDimIndex);
-      ranges.emplace_back(Range{zero, ub, one});
-      continue;
+    auto iteratorType =
+        llvm::cast<linalg::IteratorTypeAttr>(it.value()).getValue();
+    ArrayRef<AffineMap> maps =
+        iteratorType == utils::IteratorType::reduction ? inputMaps : outputMaps;
+    ValueRange ops = iteratorType == utils::IteratorType::reduction
+                         ? getInputs()
+                         : getOutputs();
+    OpFoldResult ub;
+    for (auto [map, op] : llvm::zip_equal(maps, ops)) {
+      // Get dim size from first applicable input/output shape, since they
+      // should all match.
+      std::optional<int64_t> dimIndex = map.getResultPosition(targetExpr);
+      if (!dimIndex) {
+        continue;
+      }
+      ub = tensor::getMixedSize(builder, loc, op, *dimIndex);
+      break;
     }
-    // Get parallel dimension size from result shape.
-    std::optional<int64_t> resDimIndex =
-        indexingMaps[2].getResultPosition(targetExpr);
-    assert(resDimIndex && "invalid result map");
-    OpFoldResult ub =
-        tensor::getMixedSize(builder, loc, getAcc(), *resDimIndex);
+    assert(ub &&
+           "Reduction/parallel dimension must appear in some input/output map");
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -100,9 +107,9 @@ static tensor::ExtractSliceOp extractSlice(OpBuilder &b, Location loc,
 }
 
 FailureOr<TilingResult>
-MultiMmaOp::getTiledImplementation(OpBuilder &builder,
-                                   ArrayRef<OpFoldResult> offsets,
-                                   ArrayRef<OpFoldResult> sizes) {
+InnerTiledOp::getTiledImplementation(OpBuilder &builder,
+                                     ArrayRef<OpFoldResult> offsets,
+                                     ArrayRef<OpFoldResult> sizes) {
   if (!hasTensorSemantics()) {
     return failure();
   }
@@ -117,39 +124,14 @@ MultiMmaOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> slices;
 
-  // LHS
-  {
-    Operation *lhsSlice =
-        extractSlice(builder, loc, getLhs(), offsets, sizes, indexingMaps[0]);
-    if (!lhsSlice) {
-      return emitOpError("failed to get lhs slice");
+  for (auto [map, operand] : llvm::zip_equal(indexingMaps, getOperands())) {
+    Operation *slice = extractSlice(builder, loc, operand, offsets, sizes, map);
+    if (!slice) {
+      return emitOpError("failed to get operand slice");
     }
-    tiledOperands.emplace_back(lhsSlice->getResult(0));
-    slices.push_back(lhsSlice);
+    tiledOperands.emplace_back(slice->getResult(0));
+    slices.push_back(slice);
   }
-
-  // RHS
-  {
-    Operation *rhsSlice =
-        extractSlice(builder, loc, getRhs(), offsets, sizes, indexingMaps[1]);
-    if (!rhsSlice) {
-      return emitOpError("failed to get rhs slice");
-    }
-    tiledOperands.emplace_back(rhsSlice->getResult(0));
-    slices.push_back(rhsSlice);
-  }
-
-  // Acc
-  {
-    Operation *accSlice =
-        extractSlice(builder, loc, getAcc(), offsets, sizes, indexingMaps[2]);
-    if (!accSlice) {
-      return emitOpError("failed to get accumulator slice");
-    }
-    tiledOperands.emplace_back(accSlice->getResult(0));
-    slices.push_back(accSlice);
-  }
-
   SmallVector<Type, 4> resultTypes;
   resultTypes.push_back(tiledOperands.back().getType());
 
@@ -160,24 +142,24 @@ MultiMmaOp::getTiledImplementation(OpBuilder &builder,
       {tiledMmaOp}, SmallVector<Value>(tiledMmaOp->getResults()), slices};
 }
 
-LogicalResult MultiMmaOp::getResultTilePosition(
+LogicalResult InnerTiledOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  assert(resultNumber == 0);
   if (!hasTensorSemantics()) {
     return failure();
   }
 
-  AffineMap resultMap = getIndexingMapsArray()[2];
+  AffineMap resultMap =
+      getIndexingMapsArray()[getInputs().size() + resultNumber];
   if (resultMap.getNumDims() != offsets.size() ||
       offsets.size() != sizes.size()) {
     return failure();
   }
 
-  populateSliceIndices(builder, getLoc(), getAcc(), offsets, sizes,
-                       resultOffsets, resultSizes, resultMap);
+  populateSliceIndices(builder, getLoc(), getOutputs()[resultNumber], offsets,
+                       sizes, resultOffsets, resultSizes, resultMap);
   return success();
 }
 
-} // namespace mlir::iree_compiler::IREE::GPU
+} // namespace mlir::iree_compiler::IREE::Codegen
