@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -374,6 +375,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // "pushed-down" `tensor.collapse_shape` operation with their interface
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
+    populateCombineRelayoutOpPatterns(bubbleExpandShapePatterns);
     populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
     tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
@@ -409,6 +411,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // Add patterns to fold the remaining reshape operation with their interface
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(removeBarrierOpsPatterns);
+    populateCombineRelayoutOpPatterns(removeBarrierOpsPatterns);
     populateFoldTensorReshapeIntoBufferPatterns(removeBarrierOpsPatterns);
     tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
     linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,

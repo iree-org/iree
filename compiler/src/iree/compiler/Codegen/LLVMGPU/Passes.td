@@ -91,11 +91,6 @@ def LLVMGPUPrefetchSharedMemoryPass :
   let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
 }
 
-def LLVMGPUPromoteMatmulToFitMMAPass :
-    InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to promote contraction ops to fit mma shapes";
-}
-
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";

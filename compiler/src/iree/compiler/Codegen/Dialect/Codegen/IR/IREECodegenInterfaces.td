@@ -32,6 +32,15 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the number of accumulator initilizer operands this inner tiled
+        operation requires. This is equivalent to the expected number of results.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getExpectedNumOutputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         If this inner tiled operation imposes additional requirements on
         its indexing maps other than the general ones (todo describe),
         verify them.
@@ -46,9 +55,8 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each operand (including the accumulator, which is the final
-        operand), return the vector type of the inner tile before the operation
-        is distributed (if applicable). This should be the logical type of
+        For each operand, return the vector type of the inner tile before the
+        operation is distributed (if applicable). This should be the logical type of
         the operands, ignoring any permutations that may be present on the
         inner_tiled operation.
 
@@ -70,10 +78,9 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For each operand (including the accumulator, which is the final
-        operand), return the vector type of the inner tile after the operation
+        For each operand, return the vector type of the inner tile after the operation
         is distributed to threads. Vectors of this type will be stored into or
-        loaded from registers by inndividual threads.
+        loaded from registers by individual threads.
 
         The returned values are placed into the `result` vector, which will have
         its existing contents overwritten if there is any.
@@ -110,9 +117,9 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*desc=*/[{
         If this intrinsic can be mapped from its undistributed to its distributed
         form using an `scf.forall`, return the attribute describing the mapping
-        kind that is to be used.
+        kind that is to be used for the forall's single dimension.
 
-        If such a mapping is not supported, return Attribute() (the null attribute).
+        If such a mapping is not supported, return an Attribute() (the null attribute.)
       }],
       /*retTy=*/"::mlir::Attribute",
       /*methodName=*/"getDistributionMappingKind",
@@ -121,7 +128,50 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*defaultImplementation=*/[{
         return ::mlir::Attribute();
       }]
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this intrinsic can be mapped from its undistributed to its distributed
+        form using an `scf.forall`, return an OpFoldResult corresponding to the worker
+        count for that forall's single dimension. For example, if a particular inner
+        tiled operation must be distributed to subgroups of a particular size,
+        this method returns that required size.
+
+        If it is needed, `opToDistribute` is the `InnerTiledOp` that is being
+        distributed.
+
+        If the value of the bound cannot be determined, returns the null OpFoldResult.
+      }],
+      /*retTy=*/"::mlir::OpFoldResult",
+      /*methodName=*/"getDistributionWorkerCount",
+      /*args=*/(ins "::mlir::OpBuilder&":$builder, "::mlir::Location":$loc,
+        "::mlir::Operation *":$opToDistribute),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::OpFoldResult();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Given (distributed, if applicable) arguments whose types correspond
+        to `getDistributedTileShapes()`, construct, if possible, the operations
+        that implement this kind and place the results (which will be used to
+        replace the inner_tiled op) into the `results` vector.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"buildUnderlyingOperations",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::ValueRange":$inputs,
+        "::mlir::ValueRange":$outputs,
+        "::llvm::SmallVectorImpl<::mlir::Value>&":$results
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
   ];
 
   let extraSharedClassDeclaration = [{
@@ -144,6 +194,14 @@ def IREECodegen_InnerTileDescAttrInterface :
         [](auto vt) { return vt.getElementType(); }));
     }
   }];
+}
+
+def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
+  CPred<"isa<IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
+]>, "buffer-like constant attribute values"> {
+  let storageType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
+  let returnType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
+  let convertFromStorage = "$_self";
 }
 
 def IREECodegen_LoweringConfigAttrInterface :

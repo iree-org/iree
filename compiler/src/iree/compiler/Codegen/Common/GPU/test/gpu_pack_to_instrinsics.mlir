@@ -15,7 +15,7 @@ module {
 //   CHECK-DAG:   %[[A_PACK:.+]] = linalg.pack %[[A]] inner_dims_pos = [0, 1] inner_tiles = [32, 8]
 //   CHECK-DAG:   %[[B_PACK:.+]] = linalg.pack %[[B]] inner_dims_pos = [1, 0] inner_tiles = [32, 8]
 //   CHECK-DAG:   %[[C_PACK:.+]] = linalg.pack %[[C]] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
-//       CHECK:   iree_gpu.multi_mma %[[A_PACK]], %[[B_PACK]], %[[C_PACK]]
+//       CHECK:   iree_codegen.inner_tiled ins(%[[A_PACK]], %[[B_PACK]]) outs(%[[C_PACK]])
 //  CHECK-SAME:     indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -23,7 +23,7 @@ module {
 //  CHECK-SAME:     iterator_types = {{.*}}parallel{{.*}}parallel{{.*}}reduction
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>}>
-//  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>
+//  CHECK-SAME:     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
 
 // -----
 
@@ -51,7 +51,7 @@ module {
 }
 
 // CHECK-LABEL: func.func @matmul_16x16x16
-//       CHECK:   iree_gpu.multi_mma
+//       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:     indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d2, d0, d3, d4)>

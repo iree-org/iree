@@ -355,6 +355,11 @@ def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-tr
   let dependentDialects = [
       "memref::MemRefDialect"
   ];
+  let options = [
+    Option<"FissionMultiTrip", "fission-multi-trip",
+           "bool", /*default=*/"false",
+           "Allow fission in presence of loops with greater than one trip count.">
+  ];
 }
 
 def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {

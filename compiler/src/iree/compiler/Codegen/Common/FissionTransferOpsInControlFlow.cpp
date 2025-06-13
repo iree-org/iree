@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -254,6 +255,9 @@ static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
 struct FissionTransferOpsInControlFlowPass final
     : impl::FissionTransferOpsInControlFlowPassBase<
           FissionTransferOpsInControlFlowPass> {
+  using impl::FissionTransferOpsInControlFlowPassBase<
+      FissionTransferOpsInControlFlowPass>::
+      FissionTransferOpsInControlFlowPassBase;
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp.getContext());
@@ -266,6 +270,12 @@ struct FissionTransferOpsInControlFlowPass final
       auto result = populateFissionTarget(forOp);
       if (failed(result)) {
         continue;
+      }
+      // When not doing multi-trip fission if we have even one multi-trip loop
+      // we bail-out from this pass and dont do fission as we wont be doing any
+      // prefetching which is the point of doing fission.
+      if (!FissionMultiTrip && !neverRunsSecondIteration(forOp)) {
+        return;
       }
       fissionTargets.push_back(result.value());
     }

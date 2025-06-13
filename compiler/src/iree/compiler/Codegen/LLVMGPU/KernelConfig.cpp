@@ -150,8 +150,7 @@ static bool needsLoweringConfigPropagation(
   using Pipeline = IREE::Codegen::DispatchLoweringPassPipeline;
   // Pipelines that do not need propagation of lowering config.
   Pipeline supportedPipelines[] = {Pipeline::LLVMGPUTileAndFuse,
-                                   Pipeline::LLVMGPUVectorDistribute,
-                                   Pipeline::LLVMGPUPadAndVectorDistribute};
+                                   Pipeline::LLVMGPUVectorDistribute};
   return !llvm::is_contained(supportedPipelines, pipeline);
 }
 
@@ -1197,26 +1196,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                           /*canUpcastAcc=*/true);
   }
 
-  // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
-  // pipeline.
-  // TODO(hanchung): Support cases that there are fused producers.
-  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op) &&
-      clGPUUnalignedGEMMVectorDistribution) {
-    LDBG("Matmul Pad and Vector Distribute");
-    pipeline = CodeGenPipeline::LLVMGPUPadAndVectorDistribute;
-    bool mustBeAligned = false;
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, transposedLhs, transposedRhs,
-                          /*canUpcastAcc=*/false, mustBeAligned);
-    if (!schedule) {
-      // Then try again by allowing upcasting accumulator.
-      schedule =
-          deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                            targetSubgroupSize, transposedLhs, transposedRhs,
-                            /*canUpcastAcc=*/true, mustBeAligned);
-    }
-  }
   if (!schedule) {
     LDBG("Failed to deduce MMA schedule");
     return failure();
@@ -2506,6 +2485,20 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumParallelLoops(), 1);
 
+  int64_t reductionSize = 1;
+  for (int64_t dim : reductionDims)
+    reductionSize *= bounds[dim];
+
+  int64_t subgroupSize = 0;
+  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
+    if (reductionSize % s == 0) {
+      subgroupSize = s;
+      break;
+    }
+  }
+  if (subgroupSize == 0)
+    return failure();
+
   // Without any bounds on dynamic dims, we need specialization to
   // get peak performance. For now, just use the warp size.
   if (numDynamicDims > 0) {
@@ -2537,20 +2530,6 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
     }
     return success();
   }
-
-  int64_t reductionSize = 1;
-  for (int64_t dim : reductionDims)
-    reductionSize *= bounds[dim];
-
-  int64_t subgroupSize = 0;
-  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0) {
-      subgroupSize = s;
-      break;
-    }
-  }
-  if (subgroupSize == 0)
-    return failure();
 
   const Type elementType =
       llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
@@ -2981,7 +2960,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   });
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
                                                    computeOp, ukernelConfig))) {
-    LDBG("Tile and fuse data tiled multi_mma config");
+    LDBG("Tile and fuse data tiled MMA inner_tiled config");
     return success();
   }
   if (clGPUEarlyTileAndFuseMatmul) {
@@ -3035,14 +3014,20 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       return success();
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
-    if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
-      LDBG("Transpose Config");
-      return success();
-    } else if (genericOp && ukernelConfig &&
-               succeeded(setArgmaxUkernelConfig(target, entryPointFn, genericOp,
-                                                ukernelConfig))) {
-      LDBG("Argmax Ukernel Config");
-      return success();
+    if (genericOp) {
+      if (succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+        LDBG("Transpose Config");
+        return success();
+      } else if (ukernelConfig &&
+                 succeeded(setArgmaxUkernelConfig(target, entryPointFn,
+                                                  genericOp, ukernelConfig))) {
+        LDBG("Argmax Ukernel Config");
+        return success();
+      } else if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
+                     target, entryPointFn, linalgOp))) {
+        LDBG("Tile and Fuse Config");
+        return success();
+      }
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)

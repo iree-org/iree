@@ -319,3 +319,49 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP_PACKED]], %[[RHS]], %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
 
 // CHECK: vector.contract {{.*}} %[[LHS_SELECT]], %[[RHS_SELECT]]
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 1],
+  batch_tile = [2, 1],
+  outer_tile = [2, 1],
+  thread_tile = [16, 16],
+  element_tile = [2, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [16, 1]
+>
+
+func.func @masked_read_write_unaligned(%arg0 : memref<17x128xf16>, %arg1 : memref<17x128xf16>) {
+  %c0 = arith.constant 0 : index
+  %cst_6 = arith.constant 0.000000e+00 : f16
+  %41 = vector.constant_mask [17, 128] : vector<256x128xi1>
+  %42 = vector.transfer_read %arg0[%c0, %c0], %cst_6, %41 {in_bounds = [true, true]} : memref<17x128xf16>, vector<256x128xf16>
+  %43 = iree_vector_ext.to_layout %42 to layout(#nested) : vector<256x128xf16>
+  vector.transfer_write %43, %arg1[%c0, %c0], %41 {in_bounds = [true, true]} : vector<256x128xf16>, memref<17x128xf16>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @masked_read_write_unaligned
+// CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64) : index, index, index
+// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 16) : index, index, index
+
+// CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %c8 : index
+// CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %c8 : index
+// CHECK: %[[EQ_BOUND_SID:.+]] = arith.cmpi eq, %[[VSID]]#1, %c0 : index
+// CHECK: %[[LT_BOUND_SID:.+]] = arith.cmpi slt, %[[VSID]]#1, %c0 : index
+
+// CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %c2, %c0 : index
+// CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %c1, %[[SELTREE0]] : index
+// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c8, %c0 : index
+// CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
+// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<8x8xi1>

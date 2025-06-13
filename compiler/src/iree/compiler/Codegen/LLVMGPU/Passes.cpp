@@ -474,7 +474,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.tilingLevel = IREE::GPU::TilingLevel::Subgroup;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
   }
-  funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
+  funcPassManager.addPass(IREE::GPU::createDistributeInnerTiledToLanesPass());
 
   // Step 4.5. Things that need to happen right after distribution to threads.
   funcPassManager.addPass(createGPULowerToUKernelsPass());
@@ -855,8 +855,7 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 }
 
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
-                                        const GPUPipelineOptions &options,
-                                        bool usePadToModelSharedMemcpy) {
+                                        const GPUPipelineOptions &options) {
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
@@ -865,9 +864,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                /*convertToDpsOptions=*/std::nullopt,
                                /*reorderStrategy=*/reorderStrategy);
 
-  if (usePadToModelSharedMemcpy) {
-    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
-  }
+  // Some of the elementwise fusion can benefit from this pass.
+  funcPassManager.addPass(createRematerializeParallelOpsPass());
 
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
@@ -913,8 +911,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // be safely dropped. This additionally allows vectorization of convolution to
   // `vector.contract` as filter dimensions are expected to be tiled to 1 by
   // this point.
-  funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
-  if (!usePadToModelSharedMemcpy) {
+  {
+    funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
     funcPassManager.addPass(IREE::LinalgExt::createFoldUnitExtentDimsPass());

@@ -131,7 +131,7 @@ iree_cc_library(
     MLIRLinalgStructuredOpsIncGenLib
     MLIRSupport
     MLIRTensorDialect
-    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )

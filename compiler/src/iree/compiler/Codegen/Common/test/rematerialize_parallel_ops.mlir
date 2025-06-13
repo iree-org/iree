@@ -138,3 +138,34 @@ func.func @no_rematerialize_scalar_ops(%arg0 : tensor<f32>) -> tensor<f32> {
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// Do not fuse generic that has external caputure.
+func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<4096x64xf16>, %arg2: tensor<4096x64xf16>, %arg3: f32, %arg4: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
+  %empty = tensor.empty() : tensor<4096x64xf16>
+  %0 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<4096x64xi64>) outs(%arg1 : tensor<4096x64xf16>) {
+  ^bb0(%in: i64, %out: f16):
+    %3 = linalg.index 0 : index
+    %4 = arith.index_cast %in : i64 to index
+    %extracted = tensor.extract %empty[%3, %4] : tensor<4096x64xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<4096x64xf16>
+  %1 = linalg.fill ins(%arg3 : f32) outs(%arg4 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  %2 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg2, %0 : tensor<4096x64xf16>, tensor<4096x64xf16>) outs(%1 : tensor<4096x4096xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %3 = arith.extf %in : f16 to f32
+    %4 = arith.extf %in_0 : f16 to f32
+    %5 = arith.mulf %3, %4 : f32
+    %6 = arith.addf %out, %5 : f32
+    linalg.yield %6 : f32
+  } -> tensor<4096x4096xf32>
+  return %2 : tensor<4096x4096xf32>
+}
+// CHECK-LABEL: func @no_external_capture_fusion(
+//       CHECK:   linalg.generic
+//       CHECK:   linalg.generic

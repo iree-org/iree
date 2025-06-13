@@ -66,6 +66,7 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR

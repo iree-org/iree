@@ -49,7 +49,7 @@ iree_cc_library(
   SRCS
     "CombineBarrierRegions.cpp"
     "ConcretizeMmaShapes.cpp"
-    "DistributeMmaToLanes.cpp"
+    "DistributeInnerTiledToLanes.cpp"
     "LowerIREEGPUOps.cpp"
     "Passes.cpp"
     "Transforms.cpp"
