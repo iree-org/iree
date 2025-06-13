@@ -391,73 +391,73 @@ struct VerifyDevicesPass
     }
 
     // Enhanced reporting
-    if (anyconvolution) {
-      llvm::outs() << "Module contains "
-                   << EXSLERATEV2::globalParamas.layers.size()
-                   << " convolution operations with extracted weights\n";
+    // if (anyconvolution) {
+    //   llvm::outs() << "Module contains "
+    //                << EXSLERATEV2::globalParamas.layers.size()
+    //                << " convolution operations with extracted weights\n";
 
-      if (EXSLERATEV2::globalParamas.layers.empty()) {
-        llvm::outs()
-            << "Warning: Found convolutions but no weights extracted\n";
-      } else {
-        for (size_t i = 0; i < EXSLERATEV2::globalParamas.layers.size(); ++i) {
-          const auto &layer = EXSLERATEV2::globalParamas.layers[i];
+    //   if (EXSLERATEV2::globalParamas.layers.empty()) {
+    //     llvm::outs()
+    //         << "Warning: Found convolutions but no weights extracted\n";
+    //   } else {
+    //     for (size_t i = 0; i < EXSLERATEV2::globalParamas.layers.size(); ++i) {
+    //       const auto &layer = EXSLERATEV2::globalParamas.layers[i];
 
-          if (layer.convWeight) {
-            llvm::outs() << "Layer " << i << " weight elements: "
-                         << layer.convWeight.getType().getNumElements() << "\n";
-          } else {
-            llvm::outs() << "Layer " << i << " has empty weight\n";
-          }
+    //       if (layer.convWeight) {
+    //         llvm::outs() << "Layer " << i << " weight elements: "
+    //                      << layer.convWeight.getType().getNumElements() << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has empty weight\n";
+    //       }
 
-          if (layer.convBias) {
-            llvm::outs() << "Layer " << i << " bias elements: "
-                         << layer.convBias.getType().getNumElements() << "\n";
-          } else {
-            llvm::outs() << "Layer " << i << " has no bias\n";
-          }
+    //       if (layer.convBias) {
+    //         llvm::outs() << "Layer " << i << " bias elements: "
+    //                      << layer.convBias.getType().getNumElements() << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no bias\n";
+    //       }
 
-          // Your existing BN parameter reporting...
-          if (layer.bnGamma) {
-            llvm::outs() << "Layer " << i << " BN gamma elements: "
-                         << layer.bnGamma.getType().getNumElements() << "\n";
-          } else {
-            llvm::outs() << "Layer " << i << " has no BN gamma\n";
-          }
+    //       // Your existing BN parameter reporting...
+    //       if (layer.bnGamma) {
+    //         llvm::outs() << "Layer " << i << " BN gamma elements: "
+    //                      << layer.bnGamma.getType().getNumElements() << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN gamma\n";
+    //       }
 
-          if (layer.bnBeta) {
-            llvm::outs() << "Layer " << i << " BN beta elements: "
-                         << layer.bnBeta.getType().getNumElements() << "\n";
-          } else {
-            llvm::outs() << "Layer " << i << " has no BN beta\n";
-          }
+    //       if (layer.bnBeta) {
+    //         llvm::outs() << "Layer " << i << " BN beta elements: "
+    //                      << layer.bnBeta.getType().getNumElements() << "\n";
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN beta\n";
+    //       }
 
-          if (layer.bnMean) {
-            auto meanType = dyn_cast<RankedTensorType>(layer.bnMean.getType());
-            if (meanType) {
-              llvm::outs() << "Layer " << i
-                           << " BN mean elements: " << meanType.getNumElements()
-                           << "\n";
-            }
-          } else {
-            llvm::outs() << "Layer " << i << " has no BN mean\n";
-          }
+    //       if (layer.bnMean) {
+    //         auto meanType = dyn_cast<RankedTensorType>(layer.bnMean.getType());
+    //         if (meanType) {
+    //           llvm::outs() << "Layer " << i
+    //                        << " BN mean elements: " << meanType.getNumElements()
+    //                        << "\n";
+    //         }
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN mean\n";
+    //       }
 
-          if (layer.bnVar) {
-            auto varType = dyn_cast<RankedTensorType>(layer.bnVar.getType());
-            if (varType) {
-              llvm::outs() << "Layer " << i
-                           << " BN var elements: " << varType.getNumElements()
-                           << "\n";
-            }
-          } else {
-            llvm::outs() << "Layer " << i << " has no BN var\n";
-          }
-        }
-      }
-    } else {
-      llvm::outs() << "No convolution operations found in module\n";
-    }
+    //       if (layer.bnVar) {
+    //         auto varType = dyn_cast<RankedTensorType>(layer.bnVar.getType());
+    //         if (varType) {
+    //           llvm::outs() << "Layer " << i
+    //                        << " BN var elements: " << varType.getNumElements()
+    //                        << "\n";
+    //         }
+    //       } else {
+    //         llvm::outs() << "Layer " << i << " has no BN var\n";
+    //       }
+    //     }
+    //   }
+    // } else {
+    //   llvm::outs() << "No convolution operations found in module\n";
+    // }
 
     // TODO(multi-device): the logic above is insufficient; we only need devices
     // if the program will end up requiring them but we don't know that here.
