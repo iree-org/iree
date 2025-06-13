@@ -79,6 +79,15 @@ def GPULowerToGlobalLoadsPass :
   ];
 }
 
+def GPUFoldTransposeLoadsPass :
+    InterfacePass<"iree-codegen-gpu-folds-to-transpose-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Folds vector.transpose_read and vector.transpose into transpose_load.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";

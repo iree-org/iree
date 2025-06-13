@@ -23,11 +23,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -178,25 +176,11 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
   return success();
 }
 
-template <typename T>
-struct SubgroupTransformPatternBase : public OpRewritePattern<T> {
-  SubgroupTransformPatternBase(MLIRContext *context,
-                               ArrayRef<int64_t> workgroupSize,
-                               int64_t subgroupSize)
-      : OpRewritePattern<T>(context), workgroupSize(workgroupSize),
+struct LowerToDMAPattern : public OpRewritePattern<linalg::CopyOp> {
+  LowerToDMAPattern(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
+                    int64_t subgroupSize)
+      : OpRewritePattern<linalg::CopyOp>(context), workgroupSize(workgroupSize),
         subgroupSize(subgroupSize) {}
-
-protected:
-  ArrayRef<int64_t> workgroupSize;
-  int64_t subgroupSize;
-};
-
-struct LowerCopyToDMAPattern
-    : public SubgroupTransformPatternBase<linalg::CopyOp> {
-  LowerCopyToDMAPattern(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
-                        int64_t subgroupSize)
-      : SubgroupTransformPatternBase<linalg::CopyOp>(context, workgroupSize,
-                                                     subgroupSize) {}
 
   LogicalResult matchAndRewrite(linalg::CopyOp copy,
                                 PatternRewriter &rewriter) const override {
@@ -206,59 +190,10 @@ struct LowerCopyToDMAPattern
     return distributeLinalgCopyToThreads(rewriter, copy, workgroupSize,
                                          subgroupSize);
   }
-};
 
-struct CombineTransferReadWriteToDMAPattern
-    : SubgroupTransformPatternBase<vector::TransferWriteOp> {
-  CombineTransferReadWriteToDMAPattern(MLIRContext *context,
-                                       ArrayRef<int64_t> workgroupSize,
-                                       int64_t subgroupSize)
-      : SubgroupTransformPatternBase<vector::TransferWriteOp>(
-            context, workgroupSize, subgroupSize) {}
-  LogicalResult matchAndRewrite(vector::TransferWriteOp op,
-                                PatternRewriter &rewriter) const override {
-    auto transferReadOp = op.getBase().getDefiningOp<vector::TransferReadOp>();
-    if (!transferReadOp || transferReadOp.getMask() ||
-        transferReadOp.hasOutOfBoundsDim()) {
-      return failure();
-    }
-
-    if (op.getVectorType() != transferReadOp.getVectorType()) {
-      return rewriter.notifyMatchFailure(
-          op, "Transfer read and write ops have different vector types.");
-    }
-
-    auto sourceType = cast<MemRefType>(transferReadOp.getBase().getType());
-    auto targetType = cast<MemRefType>(op.getResult().getType());
-    if (!hasGlobalMemoryAddressSpace(sourceType) ||
-        !hasSharedMemoryAddressSpace(targetType)) {
-      return rewriter.notifyMatchFailure(
-          op, "Transfer read and write ops have incompatible address spaces.");
-    }
-
-    if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
-      return rewriter.notifyMatchFailure(
-          op,
-          "Transfer write target is not static or not contiguous row major.");
-    }
-
-    return failure();
-  }
-};
-
-struct CombineVectorTransposeWithTransferReadOpPattern
-    : SubgroupTransformPatternBase<vector::TransposeOp> {
-  CombineVectorTransposeWithTransferReadOpPattern(
-      MLIRContext *context, ArrayRef<int64_t> workgroupSize,
-      int64_t subgroupSize)
-      : SubgroupTransformPatternBase<vector::TransposeOp>(
-            context, workgroupSize, subgroupSize) {}
-  LogicalResult matchAndRewrite(vector::TransposeOp op,
-                                PatternRewriter &rewriter) const override {
-    return rewriter.notifyMatchFailure(
-        op,
-        "Transpose ops are not supported on MMA types, use mma.load instead.");
-  }
+private:
+  ArrayRef<int64_t> workgroupSize;
+  int64_t subgroupSize;
 };
 
 namespace {
@@ -284,8 +219,7 @@ struct GPULowerToGlobalLoadsPass final
     }
 
     RewritePatternSet patterns(context);
-    patterns.add<LowerCopyToDMAPattern, CombineTransferReadWriteToDMAPattern>(
-        context, *workgroupSize, *subgroupSize);
+    patterns.add<LowerToDMAPattern>(context, *workgroupSize, *subgroupSize);
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
 };
