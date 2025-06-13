@@ -125,10 +125,10 @@ struct LoadOpConversion
             getStringRodata(loadOp.getLoc(), adaptor.getSourceScopeAttr(),
                             rewriter),
             adaptor.getQueueAffinity(),
-            rewriter.create<IREE::VM::ConstI32Op>(
-                loadOp.getLoc(), (uint32_t)adaptor.getMemoryTypes()),
-            rewriter.create<IREE::VM::ConstI32Op>(
-                loadOp.getLoc(), (uint32_t)adaptor.getBufferUsage()),
+            castToImportType(adaptor.getMemoryTypes(), rewriter.getI32Type(),
+                             rewriter),
+            castToImportType(adaptor.getBufferUsage(), rewriter.getI32Type(),
+                             rewriter),
             keyTable,
             keyData,
             spans,
