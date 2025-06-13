@@ -9,10 +9,12 @@
 #===------------------------------------------------------------------------===#
 
 set(_BITCODE_SRCS
+  "buffer.c"
   "dummy.c"
 )
 
 set(_BITCODE_HDRS
+  "buffer.h"
   "kernel_tables.h"
   "kernels.h"
   "support/common.h"
