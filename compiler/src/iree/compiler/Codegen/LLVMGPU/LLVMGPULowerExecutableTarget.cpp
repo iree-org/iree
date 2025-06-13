@@ -142,13 +142,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     addGPUTransposePassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
-    addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
-                                       /*usePadToModelSharedMemcpy=*/false);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::
-      LLVMGPUPadAndVectorDistribute:
-    addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
-                                       /*usePadToModelSharedMemcpy=*/true);
+    addGPUVectorDistributePassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
     addGPUWarpReductionPassPipeline(pipeline, forROCDL);
