@@ -81,6 +81,11 @@ static llvm::cl::opt<bool> clDistributeToWorkgroupsUsingForall(
     llvm::cl::desc("Use scf.forall for distribution to workgroups"),
     llvm::cl::init(false), llvm::cl::Hidden);
 
+static llvm::cl::opt<bool> clCombineLayoutTransformation(
+    "iree-llvmgpu-test-combine-layout-transformation",
+    llvm::cl::desc("Combine relayout ops during dispatch configuration"),
+    llvm::cl::init(false), llvm::cl::Hidden);
+
 static llvm::cl::opt<IREE::Codegen::WorkgroupId>
     clSetWorkgroupDistributionAlong(
         "iree-llvmgpu-set-workgroup-distribution-along",
@@ -1223,6 +1228,15 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+    if (clCombineLayoutTransformation) {
+      funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass);
+      funcPassManager.addPass(createGPUCombineLayoutTransformationPass);
+      // GPUCombineLayoutTransformationPass specializes transpose ops, so they
+      // need to be generalized again.
+      // TODO(Max191): Re-generalize in the GPUCombineLayoutTransformationPass,
+      // and remove the extra GPUGeneralizeNamedOpsPass invocation.
+      funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    }
     // This materializes into 'nop' in the absence of pad encoding layout
     // attributes.
     funcPassManager.addPass(createBlockDynamicDimensionsPass);
