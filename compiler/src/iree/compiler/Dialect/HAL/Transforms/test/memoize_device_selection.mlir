@@ -11,8 +11,8 @@ util.global private @device_c : !hal.device
 // CHECK: util.global private @__allocator_select_affinity[[AFFINITY_0:.*]] : i64
 // CHECK: util.initializer
 // CHECK:   %[[I0_DEVICE_A:.+]] = util.global.load @device_a
-// CHECK:   %[[I0_DEVICE_B:.+]] = util.global.load @device_b
 // CHECK:   %[[I0_AFFINITY_A:.+]] = arith.constant -1
+// CHECK:   %[[I0_DEVICE_B:.+]] = util.global.load @device_b
 // CHECK:   %[[I0_AFFINITY_B:.+]] = arith.constant -1
 // CHECK:   %[[I0_MEMORY_TYPE:.+]] = hal.memory_type<{{.+}}Host{{.+}}> : i32
 // CHECK:   %[[I0_BUFFER_USAGE:.+]] = hal.buffer_usage<{{.+}}Transfer{{.+}}> : i32

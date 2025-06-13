@@ -42,7 +42,7 @@ static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
           builder.getI64Type(),
       },
       affinityAttr);
-  return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
+  return {resolveOp.getResult(0), resolveOp.getResult(1)};
 }
 
 static std::tuple<SmallVector<Value>, SmallVector<Value>>
@@ -51,25 +51,25 @@ lookupDevicesAndQueueAffintiesFor(Operation *op, OpBuilder &builder) {
   SmallVector<Value> devices;
   SmallVector<Value> queueAffinities;
   if (auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
-    for (auto device : optimalAttr.getAffinities()) {
-      std::tuple<Value, Value> deviceAndQueueAffinity =
-          lookupDeviceAndQueueAffinityFor(op->getLoc(), device, builder);
-      devices.push_back(std::get<0>(deviceAndQueueAffinity));
-      queueAffinities.push_back(std::get<1>(deviceAndQueueAffinity));
+    for (auto affinity : optimalAttr.getAffinities()) {
+      auto [device, queueAffinity] =
+          lookupDeviceAndQueueAffinityFor(op->getLoc(), affinity, builder);
+      devices.push_back(device);
+      queueAffinities.push_back(queueAffinity);
     }
   } else {
-    std::tuple<Value, Value> deviceAndQueueAffinity =
+    auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(op->getLoc(), affinityAttr, builder);
-    devices.push_back(std::get<0>(deviceAndQueueAffinity));
-    queueAffinities.push_back(std::get<1>(deviceAndQueueAffinity));
+    devices.push_back(device);
+    queueAffinities.push_back(queueAffinity);
   }
-  return std::make_tuple(devices, queueAffinities);
+  return {devices, queueAffinities};
 }
 
 std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          OpBuilder &builder) {
-  auto affinity = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  return lookupDeviceAndQueueAffinityFor(op->getLoc(), affinity, builder);
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  return lookupDeviceAndQueueAffinityFor(op->getLoc(), affinityAttr, builder);
 }
 
 std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
@@ -78,13 +78,13 @@ std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          OpBuilder &builder) {
   auto [devices, queueAffinities] =
       lookupDevicesAndQueueAffintiesFor(op, builder);
-  // return the device and queue affinity for the first device if there is only
-  // one
+  // Returns the device and queue affinity for the first device, if only one
+  // exists.
   if (devices.size() == 1) {
     return {devices[0], queueAffinities[0]};
   }
   // Emit a select op to let the runtime decide which device/queue affinity to
-  // use if required.
+  // use, if required.
   auto selectOp = builder.create<IREE::HAL::AllocatorSelectOp>(
       op->getLoc(), devices, queueAffinities, memoryTypes, bufferUsage);
   return {selectOp.getResult(0), selectOp.getResult(1)};
