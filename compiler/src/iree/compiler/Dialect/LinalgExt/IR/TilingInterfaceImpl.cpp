@@ -2558,7 +2558,8 @@ FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
     OpBuilder &b, Location loc, ReductionTilingStrategy strategy,
     ValueRange init, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes,
-    const llvm::SetVector<unsigned> &reductionDims) {
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2753,9 +2754,10 @@ FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
 }
 
 LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
-    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
+    OpBuilder &b, unsigned resultNumber, ReductionTilingStrategy tilingStrategy,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
     const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs,
     SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
 
