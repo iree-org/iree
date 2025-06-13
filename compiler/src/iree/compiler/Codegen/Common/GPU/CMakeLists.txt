@@ -51,6 +51,7 @@ iree_cc_library(
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
     "GPUAllocPrivateMemoryForDPSOps.cpp"
+    "GPUApplyPaddingLevel.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUBubbleResourceCasts.cpp"
     "GPUCheckResourceUsage.cpp"

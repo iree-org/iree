@@ -546,17 +546,13 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK-DAG:     %[[OUT_GLOBAL_BIND:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c0) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK-DAG:     %[[ASSUMED_OUT_GLOBAL_BIND:.+]] = memref.assume_alignment %[[OUT_GLOBAL_BIND]], 64
 // CHECK-DAG:     %[[OUT_GLOBAL:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_OUT_GLOBAL_BIND]] resetOffset : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>> to memref<64x968x1281xf16, #amdgpu.address_space<fat_raw_buffer>>
-// CHECK-DAG:     %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
-// CHECK-DAG:     %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
-// CHECK-DAG:     %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]
-// CHECK-DAG:     %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK-DAG:     %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL]]{{.+}} {in_bounds = [true, true, true]}
+// CHECK-DAG:     %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL]]{{.+}} {in_bounds = [true, true, true]}
 // CHECK:         vector.transfer_write %[[LHS_LOAD]], %[[LHS_SHARED]]
 // CHECK:         vector.transfer_write %[[RHS_LOAD]], %[[RHS_SHARED]]
 // CHECK:         %[[RES:.+]] scf.for {{.*}} = %c0 to %c1280 step %c16 iter_args({{.*}}) -> (vector<1x1x1x1x1x1x1x4x1xf16>)
-// CHECK-DAG:       %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
-// CHECK-DAG:       %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]
-// CHECK-DAG:       %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]
-// CHECK-DAG:       %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK-DAG:       %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL]]
+// CHECK-DAG:       %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL]]{{.+}} {in_bounds = [true, true, true]}
 // CHECK:           gpu.barrier
 // CHECK-DAG:       %{{.+}} = vector.transfer_read %[[LHS_SHARED]]
 // CHECK-DAG:       %{{.+}} = vector.transfer_read %[[RHS_SHARED]]
@@ -622,8 +618,8 @@ hal.executable public @pad_batch_matmul {
 // CHECK-SAME:        vector<1x1x1xf32>
 // RHS
 // CHECK:             vector.transfer_read
-// CHECK-SAME:        in_bounds = [true, true, false]
-// CHECK-SAME:        memref<1x8x24xf32
+// CHECK-SAME:        in_bounds = [true, true, true]
+// CHECK-SAME:        memref<196x24x24xf32
 // CHECK-SAME:        vector<1x1x2xf32>
 // CHECK:           scf.yield
 // OUTPUT
