@@ -881,15 +881,24 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // all instances of schedule->m/nSubgroupCounts[0] and
   // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
   // just the first element.
-  GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
+  GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem, 0);
 
+  IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getWgp().getMma();
   SmallVector<GPUMatmulShapeType> intrinsics;
-  intrinsics.reserve(target.getWgp().getMma().size());
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-  }
+  // intrinsics.reserve(target.getWgp().getMma().size());
+  // for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+  //   auto [mSize, nSize, kSize] = mma.getMNKShape();
+  //   auto [aType, bType, cType] = mma.getABCElementTypes();
+  //   intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, index);
+  // }
+  intrinsics = llvm::map_to_vector(
+      llvm::enumerate(mmaKinds), [](const auto &indexedMMA) {
+        IREE::GPU::MMAAttr mma = indexedMMA.value();
+        auto [mSize, nSize, kSize] = mma.getMNKShape();
+        auto [aType, bType, cType] = mma.getABCElementTypes();
+        return GPUMatmulShapeType(mSize, nSize, kSize, aType, bType, cType,
+                                  indexedMMA.index());
+      });
 
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};

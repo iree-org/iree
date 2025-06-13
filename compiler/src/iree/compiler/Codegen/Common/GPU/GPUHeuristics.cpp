@@ -416,27 +416,27 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
     bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
-  for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
+  // for (auto [index, mmaIntrinsic] : llvm::enumerate(intrinsics)) {
+  for (auto intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
     GPUMMASchedule schedule =
-        getOptimalMMASchedule(problem, intrinsic, seeds, index);
+        getOptimalMMASchedule(problem, intrinsic, seeds, intrinsic.index);
+    // schedule.mTileSizes = {1, 1, 1};
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
       llvm::dbgs() << "  " << schedule << "\n";
+      llvm::dbgs() << " schedule index: " << schedule.index << "\n";
     });
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
-      int64_t lhsBitwidth =
-          intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth =
-          intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
-      int64_t resultBitwidth =
-          intrinsics[schedule.index].cType.getIntOrFloatBitWidth();
+      int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
+      int64_t rhsBitwidth = intrinsic.bType.getIntOrFloatBitWidth();
+      int64_t resultBitwidth = intrinsic.cType.getIntOrFloatBitWidth();
       bool isAligned =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);

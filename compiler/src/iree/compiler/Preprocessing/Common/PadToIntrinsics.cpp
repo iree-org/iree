@@ -163,11 +163,14 @@ getIntrinsics(linalg::LinalgOp linalgOp,
 
   IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getWgp().getMma();
 
-  return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
-  });
+  return llvm::map_to_vector(
+      llvm::enumerate(mmaKinds), [](const auto &indexedMMA) {
+        IREE::GPU::MMAAttr mma = indexedMMA.value();
+        auto [mSize, nSize, kSize] = mma.getMNKShape();
+        auto [aType, bType, cType] = mma.getABCElementTypes();
+        return GPUMatmulShapeType{
+            mSize, nSize, kSize, aType, bType, cType, indexedMMA.index()};
+      });
 }
 
 static void

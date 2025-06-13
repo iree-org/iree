@@ -10,6 +10,8 @@ namespace mlir::iree_compiler {
 
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
+  // Index of the MMA intrinsic into the list of given MMA intrinsics.
+  unsigned index;
   SmallVector<int64_t, 2> mSizes;
   SmallVector<int64_t, 2> nSizes;
   SmallVector<int64_t, 2> kSizes;
@@ -18,9 +20,10 @@ struct GPUMatmulShapeType {
   Type bType;
   Type cType;
 
-  GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c)
-      : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
-        bType(b), cType(c) {}
+  GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c,
+                     uint64_t idx)
+      : index(idx), mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}),
+        aType(a), bType(b), cType(c) {}
   GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
                      ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
                      Type b, Type c)
