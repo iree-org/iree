@@ -30,6 +30,9 @@ struct SelectOpOperands {
   IntegerAttr memoryType;
   IntegerAttr bufferUsage;
 
+  // Ideally the SelectOpOperands should be a valid key to the DenseMap, so we
+  // could use it directly. However, we just take the shortcut of
+  // converting to an ArrayAttr and using that as the key.
   ArrayAttr toArrayAttr(MLIRContext *context) const {
     SmallVector<Attribute> components;
     for (auto deviceSymbol : deviceSymbols) {
@@ -203,7 +206,7 @@ struct MemoizeDeviceSelectionPass
 
         auto &selectOpBucket =
             selectOps[selectOpOperands.toArrayAttr(moduleOp.getContext())];
-        selectOpBucket.first = selectOpOperands;
+        selectOpBucket.first = std::move(selectOpOperands);
         selectOpBucket.second.push_back(selectOp);
       });
     }
