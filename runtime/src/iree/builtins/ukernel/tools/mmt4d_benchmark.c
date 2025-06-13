@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
                                    "avx512_vnni");
 #elif defined(IREE_ARCH_RISCV_64)
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 7, 16, 1,
-                                   "v");                                   
+                                   "v");
 #else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.

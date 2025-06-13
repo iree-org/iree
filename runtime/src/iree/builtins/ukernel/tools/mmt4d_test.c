@@ -604,7 +604,7 @@ int main(int argc, char** argv) {
 
 #elif defined(IREE_ARCH_RISCV_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 7, 16, 1, "v");
-  
+
 #endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();
