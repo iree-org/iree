@@ -371,7 +371,6 @@ LogicalResult linkExecutablesInto(
   // Remove if we didn't add anything.
   if (linkedTargetOp.getExportOps().empty()) {
     linkedTargetOp.erase();
-    linkedExecutableOp.erase();
   }
 
   return success();
