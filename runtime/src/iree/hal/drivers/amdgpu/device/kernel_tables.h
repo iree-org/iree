@@ -5,21 +5,41 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //===----------------------------------------------------------------------===//
-// Blits (buffer.h)
+// Blits (blit.h)
 //===----------------------------------------------------------------------===//
 
-// NOTE: these workgroup sizes are guesses and need to be changed.
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x1, 32, 1, 1)
-#if 0
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x2, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x4, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x8, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_x1, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_x2, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_x4, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_x8, 32, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_x64, 32, 1, 1)
-#endif
+#define IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X 32
+#define IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y 1
+#define IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z 1
+
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x1,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x2,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x4,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_x8,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_fill_block_x16,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_x1,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_block_x16,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
 
 //===----------------------------------------------------------------------===//
 // Command buffers (command_buffer.h)
