@@ -340,6 +340,69 @@ enumerateMatmulTileRiscv32(DictionaryAttr config) {
   // Fallback - no architecture-optimized tile size for this case.
   return {};
 }
+// RISC-V has vector register length extensions: zvl128b, zvl256b etc.
+// If these extension are specified in target cpu feature,
+// they can be used to determine VLEN. This function assumes that
+// 'v' feature is present
+size_t getRISCVVVlenFromCPUFeatures(DictionaryAttr config) {
+  // If +zvl* feature is not explicitly specified,
+  // fallback to +zvl128b, as spec specifies minimum VLEN
+  // of 128b for the V extension: https://rb.gy/p8rbzv
+  size_t vlen;
+  if (hasFeature(config, "+zvl65536b")) {
+    vlen = 65536;
+  } else if (hasFeature(config, "+zvl32768b")) {
+    vlen = 32768;
+  } else if (hasFeature(config, "+zvl16384b")) {
+    vlen = 16384;
+  } else if (hasFeature(config, "+zvl8192b")) {
+    vlen = 8192;
+  } else if (hasFeature(config, "+zvl4096b")) {
+    vlen = 4096;
+  } else if (hasFeature(config, "+zvl2048b")) {
+    vlen = 2048;
+  } else if (hasFeature(config, "+zvl1024b")) {
+    vlen = 1024;
+  } else if (hasFeature(config, "+zvl512b")) {
+    vlen = 512;
+  } else if (hasFeature(config, "+zvl256b")) {
+    vlen = 256;
+  } else {
+    vlen = 128;
+  }
+  return vlen;
+}
+// Enumerate tile sizes to choose from on riscv64.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+static SmallVector<TileMxNxK>
+enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
+
+  // Data-Tiling is only implemented for the V extension
+  if (!hasFeature(config, "+v")) {
+    return {};
+  }
+  size_t vlen = getRISCVVVlenFromCPUFeatures(config);
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+  if (lhs.isF32() && rhs.isF32() && out.isF32()) {
+    // VLEN-aware Tile size selection
+    // One concern that needs to be addressed here is that
+    // for larger VLENs tile sizes would be very large
+    // leading to a very high padding overhead
+    int N0 = vlen / 8;
+    return {
+        TileMxNxK{7, N0, 1}, // Aim to use vfmacc, 100% register utilization.
+        TileMxNxK{4, N0, 1}, // Truncation of the above.
+        TileMxNxK{2, N0, 1}, // Truncation of the above.
+        TileMxNxK{1, N0, 1}, // Truncation of the above.
+    };
+  }
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
 
 // Enumerate tile sizes to choose from on arm64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
@@ -350,7 +413,6 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
   if (hasFeature(config, "+sve") || hasFeature(config, "+sve2")) {
     return {};
   }
-
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -382,7 +444,6 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
       };
     }
   }
-
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(config, "+i8mm")) {
@@ -402,7 +463,6 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
       };
     }
   }
-
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(config, "+i8mm")) {
@@ -426,7 +486,6 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
         TileMxNxK{1, 16, 2},
     };
   }
-
   // Fallback - no architecture-optimized tile size for this case.
   return {};
 }
@@ -558,6 +617,9 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   }
   if (isRISCV32(config)) {
     return enumerateMatmulTileRiscv32(config);
+  }
+  if (isRISCV64(config)) {
+    return enumerateMatmulTileRiscv64(elementTypes, config);
   }
   return {};
 }

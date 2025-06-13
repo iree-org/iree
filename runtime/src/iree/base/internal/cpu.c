@@ -322,7 +322,7 @@ static void iree_cpu_initialize_from_platform_x86_64(uint64_t* out_fields) {
 
 static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
   unsigned long hwcap = getauxval(AT_HWCAP);
-  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, hwcap,
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_V, hwcap,
                  IREE_HWCAP_ISA_V);
 }
 
