@@ -16,6 +16,8 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
+    "allocator.c"
+    "allocator.h"
     "buffer.c"
     "buffer.h"
     "buffer_pool.c"
@@ -60,6 +62,7 @@ iree_cc_library(
   NAME
     headers
   HDRS
+    "allocator.h"
     "buffer.h"
     "buffer_pool.h"
     "channel.h"
