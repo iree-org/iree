@@ -3139,29 +3139,18 @@ SmallVector<Range>
 ConcatOpTilingExternalModel::getIterationDomain(Operation *op,
                                                 OpBuilder &builder) const {
   auto concatOp = cast<tensor::ConcatOp>(op);
-  Location loc = concatOp.getLoc();
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
+
+  ReifiedRankedShapedTypeDims reifiedDims;
+  LogicalResult result = concatOp.reifyResultShapes(builder, reifiedDims);
+  (void)result;
+  assert(succeeded(result));
+
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, concatOp.getResultType().getRank())) {
-    if (dim != concatOp.getDim()) {
-      OpFoldResult size = getDim(builder, loc, concatOp.getOperand(0), dim);
-      ranges.push_back(Range{zero, size, one});
-      continue;
-    }
-    SmallVector<AffineExpr> exprs(concatOp.getNumOperands());
-    bindSymbolsList(builder.getContext(), MutableArrayRef<AffineExpr>(exprs));
-    AffineExpr sum = exprs.front();
-    for (auto expr : llvm::drop_begin(exprs)) {
-      sum = sum + expr;
-    }
-    SmallVector<OpFoldResult> concatedDims =
-        llvm::map_to_vector(concatOp.getOperands(), [&](Value operand) {
-          return getDim(builder, loc, operand, dim);
-        });
-    OpFoldResult size =
-        affine::makeComposedFoldedAffineApply(builder, loc, sum, concatedDims);
-    ranges.push_back(Range{zero, size, one});
+    ranges.push_back(Range{zero, reifiedDims[0][dim], one});
+    continue;
   }
 
   return ranges;
