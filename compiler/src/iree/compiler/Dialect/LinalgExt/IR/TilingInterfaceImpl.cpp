@@ -2556,7 +2556,7 @@ OnlineAttentionOp::generateInitialTensorForPartialReduction(
 
 FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
     OpBuilder &b, Location loc, ReductionTilingStrategy strategy,
-    ValueRange init, ArrayRef<OpFoldResult> offsets,
+    ValueRange init, ValueRange ivs, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes,
     const llvm::SetVector<unsigned> &reductionDims) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
@@ -2753,7 +2753,8 @@ FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
 }
 
 LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
-    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    OpBuilder &b, unsigned resultNumber, ValueRange ivs,
+    ReductionTilingStrategy tilingStrategy, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes,
     const llvm::SetVector<unsigned> &reductionDims,
     SmallVector<OpFoldResult> &resultOffsets,
