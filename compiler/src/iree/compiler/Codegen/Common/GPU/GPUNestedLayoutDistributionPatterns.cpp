@@ -1589,6 +1589,127 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   int64_t subgroupSize;
 };
 
+SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
+                                               Location loc,
+                                               ValueRange upperBounds,
+                                               NestedLayoutAttr layout,
+                                               ArrayRef<Value> subgroupIndices,
+                                               ArrayRef<Value> threadIndices) {
+  constexpr int64_t subgroupIdx = 0;
+  constexpr int64_t batchIdx = 1;
+  constexpr int64_t outerIdx = 2;
+  constexpr int64_t threadIdx = 3;
+  constexpr int64_t elementIdx = 4;
+  SmallVector<Value> bounds;
+  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+
+  for (auto [unDistributedDim, upperBound] : llvm::enumerate(upperBounds)) {
+    SmallVector<int64_t> undistributedShape =
+        layout.getPackedShapeForUndistributedDim(unDistributedDim);
+    std::array<int64_t, 3> distrShape{undistributedShape[batchIdx],
+                                      undistributedShape[outerIdx],
+                                      undistributedShape[elementIdx]};
+    int64_t elementPerThread = ShapedType::getNumElements(distrShape);
+    auto allValid =
+        rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread);
+    int64_t elementTileSize = distrShape.back();
+    auto elementTileLastIdx =
+        rewriter.create<arith::ConstantIndexOp>(loc, elementTileSize - 1);
+
+    // A special condition if the pre-distribution bounds match
+    // the mask dimension length, then the distributed bounds
+    // should exhibit the same property.
+    APInt constUpperBound;
+    if (matchPattern(upperBound.getDefiningOp(),
+                     m_ConstantInt(&constUpperBound))) {
+      int64_t undistributedDimLen =
+          ShapedType::getNumElements(undistributedShape);
+      if (constUpperBound.getZExtValue() == undistributedDimLen) {
+        bounds.push_back(allValid);
+        continue;
+      }
+    }
+    auto lastValidIdx = rewriter.create<arith::SubIOp>(loc, upperBound, one);
+    auto delineraizedLastValidIdx =
+        rewriter.create<affine::AffineDelinearizeIndexOp>(loc, lastValidIdx,
+                                                          undistributedShape);
+    SmallVector<Value> packedLastValidIdx =
+        delineraizedLastValidIdx.getResults();
+
+    // When subgroup id is equal to the subgroup that encounters the bound,
+    // Every [vtid] less than [vtid that encounters last valid element] should
+    // have a all valid element tile
+    auto linearizedLastValidIdxPreThreads =
+        rewriter.create<affine::AffineLinearizeIndexOp>(
+            loc,
+            ValueRange{packedLastValidIdx[batchIdx],
+                       packedLastValidIdx[outerIdx], elementTileLastIdx},
+            distrShape);
+    // Bound is defined as lastIdx + 1;
+    auto distrUpperBoundPreThreads = rewriter.create<arith::AddIOp>(
+        loc, linearizedLastValidIdxPreThreads, one);
+
+    auto linearizedLastValidIdx =
+        rewriter.create<affine::AffineLinearizeIndexOp>(
+            loc,
+            ValueRange{packedLastValidIdx[batchIdx],
+                       packedLastValidIdx[outerIdx],
+                       packedLastValidIdx[elementIdx]},
+            distrShape);
+    auto distrUpperBound =
+        rewriter.create<arith::AddIOp>(loc, linearizedLastValidIdx, one);
+
+    // The following code constructs a selection tree
+    // that in effect follows the code:
+    // * upperbound --> delinearize --> u0, u1, u2, u3, u4
+    //
+    // if sg < u0,
+    //   all valid.
+    // elif sg > u0,
+    //   all invalid.
+    // elif sg == u0,
+    //   if tid < u3:
+    //     [u1][u2][max]
+    //   if tid > u3:
+    //     all invalid.
+    //   if tid == u3:
+    //     [u1][u2][u4]
+
+    // tid == u3
+    auto cmpBoundTidEq = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, threadIndices[unDistributedDim],
+        packedLastValidIdx[threadIdx]);
+    // tid < u3
+    auto cmpBoundTidSlt = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, threadIndices[unDistributedDim],
+        packedLastValidIdx[threadIdx]);
+    // sg == u0
+    auto cmpBoundSgEq = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, subgroupIndices[unDistributedDim],
+        packedLastValidIdx[subgroupIdx]);
+    // sg < u0
+    auto cmpBoundSgSlt = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, subgroupIndices[unDistributedDim],
+        packedLastValidIdx[subgroupIdx]);
+
+    // selectTid0 = tid < u3 ? [u1][u2][max] : all invalid
+    auto selectTid0 = rewriter.create<arith::SelectOp>(
+        loc, cmpBoundTidSlt, distrUpperBoundPreThreads, zero);
+    // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
+    auto selectTid1 = rewriter.create<arith::SelectOp>(
+        loc, cmpBoundTidEq, distrUpperBound, selectTid0);
+    // selectSg0 = sg < u0 ? all valid : all invalid
+    auto selectSg0 =
+        rewriter.create<arith::SelectOp>(loc, cmpBoundSgSlt, allValid, zero);
+    // selectSg1 = sg == u0 ? selectTid1 : selectSg0
+    auto selectSg1 = rewriter.create<arith::SelectOp>(loc, cmpBoundSgEq,
+                                                      selectTid1, selectSg0);
+    bounds.push_back(selectSg1);
+  }
+  return bounds;
+}
+
 struct DistributeCreateMask final
     : OpDistributionPattern<vector::CreateMaskOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -1597,157 +1718,88 @@ struct DistributeCreateMask final
       : OpDistributionPattern(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
 
-  SmallVector<Value>
-  createDistributedBounds(PatternRewriter &rewriter, Location loc,
-                          OperandRange upperBounds, NestedLayoutAttr layout,
-                          ArrayRef<Value> subgroupIndices,
-                          ArrayRef<Value> threadIndices) const {
-    constexpr int64_t subgroupIdx = 0;
-    constexpr int64_t batchIdx = 1;
-    constexpr int64_t outerIdx = 2;
-    constexpr int64_t threadIdx = 3;
-    constexpr int64_t elementIdx = 4;
-    SmallVector<Value> bounds;
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-
-    for (auto [unDistributedDim, upperBound] : llvm::enumerate(upperBounds)) {
-      SmallVector<int64_t> undistributedShape =
-          layout.getPackedShapeForUndistributedDim(unDistributedDim);
-      SmallVector<int64_t> distrShape{undistributedShape[batchIdx],
-                                      undistributedShape[outerIdx],
-                                      undistributedShape[elementIdx]};
-      int64_t elementPerThread = ShapedType::getNumElements(distrShape);
-      auto allValid =
-          rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread);
-      int64_t elementTileSize = distrShape.back();
-      auto elementTileLastIdx =
-          rewriter.create<arith::ConstantIndexOp>(loc, elementTileSize - 1);
-
-      // A special condition if the pre-distribution bounds match
-      // the mask dimension length, then the distributed bounds
-      // should exhibit the same property.
-      if (auto constUpperBound = dyn_cast_or_null<arith::ConstantIndexOp>(
-              upperBound.getDefiningOp())) {
-        int64_t undistributedDimLen =
-            ShapedType::getNumElements(undistributedShape);
-        if (constUpperBound.value() == undistributedDimLen) {
-          bounds.push_back(allValid);
-          continue;
-        }
-      }
-      auto lastValidIdx = rewriter.create<arith::SubIOp>(loc, upperBound, one);
-      auto delineraizedLastValidIdx =
-          rewriter.create<affine::AffineDelinearizeIndexOp>(loc, lastValidIdx,
-                                                            undistributedShape);
-      SmallVector<Value> packedLastValidIdx =
-          delineraizedLastValidIdx.getResults();
-
-      // When subgroup id is equal to the subgroup that encounters the bound,
-      // Every [vtid] less than [vtid that encounters last valid element] should
-      // have a all valid element tile
-      auto linearizedLastValidIdxPreThreads =
-          rewriter.create<affine::AffineLinearizeIndexOp>(
-              loc,
-              ValueRange{packedLastValidIdx[batchIdx],
-                         packedLastValidIdx[outerIdx], elementTileLastIdx},
-              distrShape);
-      // Bound is defined as lastIdx + 1;
-      auto distrUpperBoundPreThreads = rewriter.create<arith::AddIOp>(
-          loc, linearizedLastValidIdxPreThreads, one);
-
-      auto linearizedLastValidIdx =
-          rewriter.create<affine::AffineLinearizeIndexOp>(
-              loc,
-              ValueRange{packedLastValidIdx[batchIdx],
-                         packedLastValidIdx[outerIdx],
-                         packedLastValidIdx[elementIdx]},
-              distrShape);
-      auto distrUpperBound =
-          rewriter.create<arith::AddIOp>(loc, linearizedLastValidIdx, one);
-
-      // The following code constructs a selection tree
-      // that in effect follows the code:
-      // * upperbound --> delinearize --> u0, u1, u2, u3, u4
-      //
-      // if sg < u0,
-      //   all valid.
-      // elif sg > u0,
-      //   all invalid.
-      // elif sg == u0,
-      //   if tid < u3:
-      //     [u1][u2][max]
-      //   if tid > u3:
-      //     all invalid.
-      //   if tid == u3:
-      //     [u1][u2][u4]
-
-      // tid == u3
-      auto cmpBoundTidEq = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::eq, threadIndices[unDistributedDim],
-          packedLastValidIdx[threadIdx]);
-      // tid < u3
-      auto cmpBoundTidSlt = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::slt, threadIndices[unDistributedDim],
-          packedLastValidIdx[threadIdx]);
-      // sg == u0
-      auto cmpBoundSgEq = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::eq, subgroupIndices[unDistributedDim],
-          packedLastValidIdx[subgroupIdx]);
-      // sg < u0
-      auto cmpBoundSgSlt = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::slt, subgroupIndices[unDistributedDim],
-          packedLastValidIdx[subgroupIdx]);
-
-      // selectTid0 = tid < u3 ? [u1][u2][max] : all invalid
-      auto selectTid0 = rewriter.create<arith::SelectOp>(
-          loc, cmpBoundTidSlt, distrUpperBoundPreThreads, zero);
-      // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
-      auto selectTid1 = rewriter.create<arith::SelectOp>(
-          loc, cmpBoundTidEq, distrUpperBound, selectTid0);
-      // selectSg0 = sg < u0 ? all valid : all invalid
-      auto selectSg0 =
-          rewriter.create<arith::SelectOp>(loc, cmpBoundSgSlt, allValid, zero);
-      // selectSg1 = sg == u0 ? selectTid1 : selectSg0
-      auto selectSg1 = rewriter.create<arith::SelectOp>(loc, cmpBoundSgEq,
-                                                        selectTid1, selectSg0);
-      bounds.push_back(selectSg1);
-    }
-    return bounds;
-  }
-
-  LogicalResult matchAndRewrite(vector::CreateMaskOp creatMaskOp,
+  LogicalResult matchAndRewrite(vector::CreateMaskOp maskOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    Location loc = creatMaskOp.getLoc();
-    VectorValue result = creatMaskOp.getResult();
+    Location loc = maskOp.getLoc();
+    VectorValue result = maskOp.getResult();
     NestedLayoutAttr resultLayout =
         dyn_cast<NestedLayoutAttr>(signature[result]);
     if (!resultLayout) {
       return rewriter.notifyMatchFailure(
-          creatMaskOp, "missing nested layout for step op result");
+          maskOp, "missing nested layout for step op result");
     }
     SmallVector<Value> subgroupIndices, threadIndices;
     if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
                                             resultLayout, subgroupIndices,
                                             threadIndices))) {
       return rewriter.notifyMatchFailure(
-          creatMaskOp, "warp or thread tiles have overlapping strides");
+          maskOp, "warp or thread tiles have overlapping strides");
     }
 
-    SmallVector<Value> distributedBounds =
-        createDistributedBounds(rewriter, loc, creatMaskOp.getOperands(),
-                                resultLayout, subgroupIndices, threadIndices);
+    SmallVector<Value> distributedBounds = createDistributedMaskBounds(
+        rewriter, loc, maskOp.getOperands(), resultLayout, subgroupIndices,
+        threadIndices);
 
-    Type elemType = creatMaskOp.getType().getElementType();
+    Type elemType = maskOp.getType().getElementType();
     auto distrUnpackedType =
         VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
     auto distrMask = rewriter.create<vector::CreateMaskOp>(
         loc, distrUnpackedType, distributedBounds);
     VectorValue interleavedDistrMask =
         getInterleavedPackedForm(rewriter, distrMask, resultLayout);
-    replaceOpWithDistributedValues(rewriter, creatMaskOp,
-                                   {interleavedDistrMask});
+    replaceOpWithDistributedValues(rewriter, maskOp, {interleavedDistrMask});
+    return success();
+  }
+  Value threadId;
+  int64_t subgroupSize;
+};
+
+struct DistributeConstantMask final
+    : OpDistributionPattern<vector::ConstantMaskOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+  DistributeConstantMask(MLIRContext *context, Value threadId,
+                         int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(vector::ConstantMaskOp maskOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    Location loc = maskOp.getLoc();
+    VectorValue result = maskOp.getResult();
+    NestedLayoutAttr resultLayout =
+        dyn_cast<NestedLayoutAttr>(signature[result]);
+    if (!resultLayout) {
+      return rewriter.notifyMatchFailure(
+          maskOp, "missing nested layout for step op result");
+    }
+    SmallVector<Value> subgroupIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            resultLayout, subgroupIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          maskOp, "warp or thread tiles have overlapping strides");
+    }
+
+    SmallVector<Value> constOperands;
+    for (int64_t size : maskOp.getMaskDimSizes()) {
+      Value index = rewriter.create<arith::ConstantIndexOp>(loc, size);
+      constOperands.push_back(index);
+    }
+
+    SmallVector<Value> distributedBounds =
+        createDistributedMaskBounds(rewriter, loc, constOperands, resultLayout,
+                                    subgroupIndices, threadIndices);
+
+    Type elemType = maskOp.getType().getElementType();
+    auto distrUnpackedType =
+        VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
+    auto distrMask = rewriter.create<vector::CreateMaskOp>(
+        loc, distrUnpackedType, distributedBounds);
+    VectorValue interleavedDistrMask =
+        getInterleavedPackedForm(rewriter, distrMask, resultLayout);
+    replaceOpWithDistributedValues(rewriter, maskOp, {interleavedDistrMask});
     return success();
   }
   Value threadId;
@@ -1768,8 +1820,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
   patterns.add<DistributeContract>(patterns.getContext());
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
-  patterns.add<DistributeCreateMask>(patterns.getContext(), threadId,
-                                     subgroupSize);
+  patterns.add<DistributeCreateMask, DistributeConstantMask>(
+      patterns.getContext(), threadId, subgroupSize);
 }
 
 }; // namespace mlir::iree_compiler
