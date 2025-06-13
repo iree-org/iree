@@ -90,23 +90,14 @@ func.func @erf_fastmath(%arg0: f32) -> f32 attributes {
   
   // Then region - verify we have exactly 6 FMA operations.
   // CHECK: %[[T:.*]] = arith.mulf %[[AX]], %[[AX]] : f32
-  // CHECK: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
+  // CHECK-COUNT-5: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : f32
   // CHECK: scf.yield %{{.*}} : f32
   
   // CHECK: } else {
   
   // Else region - verify we have exactly 6 FMA operations.
-  // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
-  // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
+  // CHECK-COUNT-6: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
   
   // CHECK: %{{.*}} = arith.negf %{{.*}} : f32
   // CHECK: %{{.*}} = math.exp %{{.*}} : f32

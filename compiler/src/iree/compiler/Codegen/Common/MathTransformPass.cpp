@@ -122,10 +122,10 @@ static bool predicateApprox(StringRef name,
     return false;
   }
   
-  // Compute hasFastExp from target attribute
+  // Compute hasFastExp from target attribute.
   bool hasFastExp = isROCMBackend(target);
   
-  // Continue with the existing list for standard approximations
+  // Continue with the existing list for standard approximations.
   StringRef acos = math::AcosOp::getOperationName();
   StringRef asin = math::AsinOp::getOperationName();
   StringRef atan = math::AtanOp::getOperationName();
@@ -155,10 +155,10 @@ static bool predicateApprox(StringRef name,
                             name);
 }
 
-// Add a new predicate function for device-lib implementations
+// Add a new predicate function for device-lib implementations.
 static bool predicateDeviceLibImpl(StringRef name,
                              IREE::HAL::ExecutableTargetAttr target) {
-  // Compute hasFastExp from target attribute
+  // Compute hasFastExp from target attribute.
   bool hasFastExp = isROCMBackend(target);
   
   // If fast exp is not available, don't use device-lib implementations.
