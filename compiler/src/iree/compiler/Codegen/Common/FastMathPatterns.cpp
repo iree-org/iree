@@ -13,7 +13,8 @@
 namespace mlir::iree_compiler {
 
 namespace {
-// Pattern to lower math.erf to its device lib implementation (from erfF.cl)
+// Pattern to lower math.erf to its device lib implementation
+// (from https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ocml/src/erfF.cl#L11)
 struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
   using OpRewritePattern<math::ErfOp>::OpRewritePattern;
 
