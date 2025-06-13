@@ -116,7 +116,13 @@ struct LLVMGPULinkExecutablesPass
         return signalPassFailure();
       }
     }
+
+    // Remove if we didn't add anything.
+    if (linkedExecutableOp.getBody().empty()) {
+      linkedExecutableOp.erase();
+    }
   }
 };
+
 } // namespace
 } // namespace mlir::iree_compiler
