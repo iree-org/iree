@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "gpu_set_num_workgroups.mlir",
             "gpu_pipeline_data_tiling.mlir",
             "gpu_pipeline_generalize_named_ops.mlir",
+            "gpu_pipeline_relayout_ops.mlir",
             "horizontal_fusion_pipeline.mlir",
             "link_executables.mlir",
             "nvvm_extract_address_computation.mlir",
