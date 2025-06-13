@@ -2960,7 +2960,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   });
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
                                                    computeOp, ukernelConfig))) {
-    LDBG("Tile and fuse data tiled multi_mma config");
+    LDBG("Tile and fuse data tiled MMA inner_tiled config");
     return success();
   }
   if (clGPUEarlyTileAndFuseMatmul) {

@@ -15,10 +15,10 @@ iree_lit_test_suite(
     lit
   SRCS
     "convert_to_multi_mma.mlir"
+    "distribute_inner_tiled.mlir"
     "distribute_lane_forall.mlir"
-    "distribute_multi_mma.mlir"
-    "drop_multi_mma_unit_dims.mlir"
-    "lower_multi_mma.mlir"
+    "drop_inner_tiled_unit_dims.mlir"
+    "lower_inner_tiled.mlir"
     "lower_vector_barrier.mlir"
     "transform_fuse_collapse_shape_with_forall.mlir"
     "transform_fuse_extract_slice_with_forall.mlir"

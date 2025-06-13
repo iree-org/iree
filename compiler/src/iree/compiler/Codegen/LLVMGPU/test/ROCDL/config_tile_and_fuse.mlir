@@ -258,13 +258,13 @@ module {
     %c0 = arith.constant 0 : index
     %c65536 = arith.constant 65536 : index
     %c131072 = arith.constant 131072 : index
-    %6 = iree_gpu.multi_mma %3, %4, %5 {
+    %6 = iree_codegen.inner_tiled ins(%3, %4) outs(%5) {
         indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                          affine_map<(d0, d1, d2) -> (d1, d2)>,
                          affine_map<(d0, d1, d2) -> (d0, d1)>],
-        iterator_types = [#iree_gpu.iterator_type<parallel>,
-                          #iree_gpu.iterator_type<parallel>,
-                          #iree_gpu.iterator_type<reduction>],
+        iterator_types = [#linalg.iterator_type<parallel>,
+                          #linalg.iterator_type<parallel>,
+                          #linalg.iterator_type<reduction>],
         kind = #iree_gpu.data_tiled_mma_layout<
                           intrinsic =  MFMA_F32_16x16x4_F32,
                           intrinsics_m = 8, intrinsics_n = 2,
@@ -278,7 +278,7 @@ module {
 // CHECK-LABEL: func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
-//       CHECK:   iree_gpu.multi_mma {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     reduction = [0, 0, 1]
 //  CHECK-SAME:     workgroup = [1, 1, 0]
 

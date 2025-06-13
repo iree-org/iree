@@ -725,16 +725,16 @@ hal.executable public @main {
         %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [4, 1, 8, 4, 4, 4, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1x8x4x4x4x4xf32>> -> tensor<4x1x8x4x4x4x4xf32>
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [4, 1, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1x4x2x4x16x4xf32>> -> tensor<4x1x4x2x4x16x4xf32>
         %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4x4x8x2x4x16x4xf32>> -> tensor<4x4x4x8x2x4x16x4xf32>
-        %6 = iree_gpu.multi_mma %3, %4, %5 {
+        %6 = iree_codegen.inner_tiled ins(%3, %4) outs(%5) {
           lowering_config = #config,
           indexing_maps = [
             affine_map<(d0, d1, d2) -> (d0, d2)>,
             affine_map<(d0, d1, d2) -> (d1, d2)>,
             affine_map<(d0, d1, d2) -> (d0, d1)>],
           iterator_types = [
-            #iree_gpu.iterator_type<parallel>,
-            #iree_gpu.iterator_type<parallel>,
-            #iree_gpu.iterator_type<reduction>],
+            #linalg.iterator_type<parallel>,
+            #linalg.iterator_type<parallel>,
+            #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<
             intrinsic = MFMA_F32_16x16x4_F32,
             intrinsics_m = 8,
