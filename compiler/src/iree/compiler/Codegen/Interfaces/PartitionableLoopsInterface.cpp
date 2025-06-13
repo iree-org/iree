@@ -139,6 +139,35 @@ struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
   }
 };
 
+struct ConcatOpPartitionableLoops
+    : public PartitionableLoopsInterface::ExternalModel<
+          ConcatOpPartitionableLoops, tensor::ConcatOp> {
+  llvm::SmallVector<unsigned>
+  getPartitionableLoops(Operation *op,
+                        std::optional<unsigned> maxNumPartitionedLoops) const {
+    auto concatOp = cast<tensor::ConcatOp>(op);
+    int64_t rank = concatOp.getResultType().getRank();
+    uint64_t concatDim = concatOp.getDim();
+    SmallVector<unsigned> partitionableLoops;
+    partitionableLoops.reserve(rank - 1);
+
+    // All loops are partitionable except the concated dimension. Consider a
+    // concat 5 + 15 and trying to partition with a tile size of 10. This would
+    // mean that the first tile would operate on (5 + 5) and the second would
+    // operate on (0 + 10).
+    for (unsigned i = 0; i < rank; ++i) {
+      if (i != concatDim) {
+        partitionableLoops.push_back(i);
+      }
+    }
+    if (maxNumPartitionedLoops.has_value() &&
+        partitionableLoops.size() > maxNumPartitionedLoops.value()) {
+      partitionableLoops.truncate(maxNumPartitionedLoops.value());
+    }
+    return partitionableLoops;
+  }
+};
+
 /// External model implementation for specifying partitionable loops of FftOp.
 struct FftOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
@@ -278,6 +307,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
                             IREE::Codegen::IREECodegenDialect *dialect) {
     IREE::Codegen::InnerTiledOp::attachInterface<
         OuterParallelAsPartitionableLoops<IREE::Codegen::InnerTiledOp>>(*ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::ConcatOp::attachInterface<ConcatOpPartitionableLoops>(*ctx);
   });
 }
 
