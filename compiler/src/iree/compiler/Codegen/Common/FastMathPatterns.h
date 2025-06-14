@@ -7,16 +7,14 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_FASTMATHPATTERNS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_FASTMATHPATTERNS_H_
 
-#include "mlir/IR/PatternMatch.h"
 #include <functional>
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler {
 
 // Populates patterns that implement device library versions of math operations.
-void populateFastMathPatterns(
-    RewritePatternSet &patterns,
-    const std::function<bool(StringRef)> &predicate);
-
+void populateFastMathPatterns(RewritePatternSet &patterns,
+                              const std::function<bool(StringRef)> &predicate);
 } // namespace mlir::iree_compiler
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_FASTMATHPATTERNS_H_ 
+#endif // IREE_COMPILER_CODEGEN_COMMON_FASTMATHPATTERNS_H_
