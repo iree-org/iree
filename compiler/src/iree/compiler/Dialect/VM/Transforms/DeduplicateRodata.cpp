@@ -18,24 +18,12 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_DEDUPLICATERODATAPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 class DeduplicateRodataPass
-    : public PassWrapper<DeduplicateRodataPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-vm-deduplicate-rodata";
-  }
-
-  StringRef getDescription() const override {
-    return "Deduplicates vm.rodata ops in the module.";
-  }
-
+    : public IREE::VM::impl::DeduplicateRodataPassBase<DeduplicateRodataPass> {
   using RodataKey = std::tuple<StringRef, Attribute>;
-
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -96,12 +84,5 @@ public:
     moduleOp.walk([&](Operation *op) { replacer.replaceElementsIn(op); });
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createDeduplicateRodataPass() {
-  return std::make_unique<DeduplicateRodataPass>();
-}
-
-static PassRegistration<DeduplicateRodataPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

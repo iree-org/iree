@@ -262,8 +262,8 @@ func.func @matmul_interchange(%0 : tensor<?x?xf32>,
 // -----
 
 func.func @no_compute(%arg0 : memref<?x?x?xf32>, %arg1 : memref<?x?x?xf32>) {
-  memref.assume_alignment %arg0, 64 : memref<?x?x?xf32>
-  memref.assume_alignment %arg1, 64 : memref<?x?x?xf32>
+  util.optimization_barrier %arg0 : memref<?x?x?xf32>
+  util.optimization_barrier %arg1 : memref<?x?x?xf32>
   return
 }
 // CHECK-LABEL: @no_compute(
@@ -945,3 +945,47 @@ func.func @horizontal_fusion_consumer_fusion2(%arg0 : tensor<2x4096x640xi8>,
 //       CHECK:     %[[CONSUMER:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[ROOT]]#1, %[[ROOT]]#0 :
 //   CHECK-DAG:     tensor.parallel_insert_slice %[[CONSUMER]] into %[[OUTS0]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+#map2 = affine_map<(d0, d1) -> (d1)>
+func.func @only_producer_fusion_multiple_result(%arg0: tensor<77x4096xf16>, %arg1: tensor<77x4096xf32>, %arg2: tensor<4096xf16>) -> (tensor<77x4096xf16>, tensor<77x4096xf16>) {
+  %cst = arith.constant 9.99999997E-7 : f32
+  %cst_0 = arith.constant 4.096000e+03 : f16
+  %cst_1 = arith.constant 0.000000e+00 : f16
+  %c2_i64 = arith.constant 2 : i64
+  %0 = tensor.empty() : tensor<77xf16>
+  %1 = tensor.empty() : tensor<77x4096xf16>
+  %2 = linalg.fill ins(%cst_1 : f16) outs(%0 : tensor<77xf16>) -> tensor<77xf16>
+  %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<77x4096xf16>, tensor<77x4096xf32>) outs(%1 : tensor<77x4096xf16>) {
+  ^bb0(%in: f16, %in_2: f32, %out: f16):
+    %6 = arith.truncf %in_2 : f32 to f16
+    %7 = arith.addf %in, %6 : f16
+    linalg.yield %7 : f16
+  } -> tensor<77x4096xf16>
+  %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%3 : tensor<77x4096xf16>) outs(%2 : tensor<77xf16>)  {
+  ^bb0(%in: f16, %out: f16):
+    %6 = math.fpowi %in, %c2_i64 : f16, i64
+    %7 = arith.addf %6, %out : f16
+    linalg.yield %7 : f16
+  } -> tensor<77xf16>
+  %5 = linalg.generic {indexing_maps = [#map2, #map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%arg2, %3, %4 : tensor<4096xf16>, tensor<77x4096xf16>, tensor<77xf16>) outs(%1 : tensor<77x4096xf16>) attrs =  {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 0]}>} {
+  ^bb0(%in: f16, %in_2: f16, %in_3: f16, %out: f16):
+    %6 = arith.divf %in_3, %cst_0 : f16
+    %7 = arith.truncf %cst : f32 to f16
+    %8 = arith.addf %6, %7 : f16
+    %9 = math.rsqrt %8 : f16
+    %10 = arith.mulf %in_2, %9 : f16
+    %11 = arith.mulf %in, %10 : f16
+    linalg.yield %11 : f16
+  } -> tensor<77x4096xf16>
+  return %3, %5 : tensor<77x4096xf16>, tensor<77x4096xf16>
+}
+// CHECK-LABEL: func @only_producer_fusion_multiple_result
+//       CHECK:   %[[RESULT:.+]]:2 = scf.forall
+//       CHECK:     linalg.generic
+//       CHECK:     linalg.generic
+//       CHECK:     linalg.generic
+//       CHECK:   return %[[RESULT]]#1, %[[RESULT]]#0

@@ -16,6 +16,8 @@ ALL_SRCS = enforce_glob(
     # keep sorted
     [
         "attention.mlir",
+        "gather.mlir",
+        "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -63,6 +65,8 @@ iree_check_single_backend_test_suite(
 VMVX_SRCS = enforce_glob(
     # keep sorted
     [
+        "gather.mlir",
+        "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -87,6 +91,7 @@ iree_check_single_backend_test_suite(
 LLVM_GPU_SRCS = enforce_glob(
     # keep sorted
     [
+        "gather.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -98,6 +103,7 @@ LLVM_GPU_SRCS = enforce_glob(
     exclude = [
         "attention.mlir",
         "attention_i1_mask.mlir",
+        "map_scatter.mlir",
     ],
 )
 
@@ -120,6 +126,8 @@ iree_check_single_backend_test_suite(
 ROCM_HIP_SRCS = enforce_glob(
     # keep sorted
     [
+        "gather.mlir",
+        "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -146,6 +154,7 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "gather.mlir",
             "scan.mlir",
             "scatter.mlir",
             "sort.mlir",
@@ -156,6 +165,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "map_scatter.mlir",
             "top-k.mlir",
         ],
     ),
@@ -168,6 +178,7 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "gather.mlir",
             "scan.mlir",
             "scatter.mlir",
             "sort.mlir",
@@ -178,6 +189,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "map_scatter.mlir",
             "top-k.mlir",
         ],
     ),

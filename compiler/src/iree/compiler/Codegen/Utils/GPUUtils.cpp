@@ -16,6 +16,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -425,7 +426,8 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 /// Emit warp reduction code sequence for a given scalar input value.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
-                           uint32_t numLaneToReduce) {
+                           uint32_t numLaneToReduce,
+                           bool expandSubgroupReduce) {
   assert(llvm::isPowerOf2_32(numLaneToReduce));
   assert((llvm::isa<IntegerType, FloatType>(input.getType())) &&
          "Input must be a scalar");
@@ -437,9 +439,26 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   const bool needsPacking = kShuffleBitWidth != origBitWidth;
   IntegerType equivIntType = builder.getIntegerType(origBitWidth);
 
-  // Always perform the shuffles over the supported scalar type. For inputs of
-  // smaller bitwidth, perform packing and unpacking via the supported integer
-  // type.
+  // Defer expansion of subgroup reduction until later in pass pipeline to
+  // enable conditional lowering to DPP ops, for potential perf gains over
+  // gpu.shuffle ops.
+  if (!expandSubgroupReduce && numLaneToReduce <= warpSize &&
+      warpSize % numLaneToReduce == 0) {
+    gpu::AllReduceOperation gpuReduceKind = combiningKindToAllReduce(kind);
+
+    // SPIRV currently doesn't have a lowering for clustered reduction,
+    // so if possible avoid adding problematic attribute until it is supported.
+    if (numLaneToReduce == warpSize) {
+      return builder.create<gpu::SubgroupReduceOp>(loc, input, gpuReduceKind,
+                                                   /*uniform=*/false);
+    }
+    return builder.create<gpu::SubgroupReduceOp>(
+        loc, input, gpuReduceKind, /*uniform=*/false, numLaneToReduce);
+  }
+
+  // Otherwise, perform the shuffles over the supported scalar type. For inputs
+  // of smaller bitwidth, perform packing and unpacking via the supported
+  // integer type.
   auto unpack = [loc, &builder, needsPacking, equivIntType,
                  origInputType](Value packedVal) -> Value {
     if (!needsPacking)
@@ -576,20 +595,17 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
 
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize,
+                          expandSubgroupReduce);
+  // Simple case -- emit `gpu.subgroup_reduce` directly.
   if (!expandSubgroupReduce && size == warpSize) {
-    auto gpuReduceKind = combiningKindToAllReduce(kind);
-    // Simple case -- emit `gpu.subgroup_reduce` directly.
-    Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-    return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, gpuReduceKind,
-                                                 /*uniform=*/false);
+    return laneVal;
   }
 
   // More-involved case -- generate `gpu.shuffle` ops over i32 values (using the
   // butterfly shuffle algorithm).
-  //
-  // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
     uint32_t numWarp = size / warpSize;
@@ -633,7 +649,8 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
                                                 identity, loadVal);
     }
-    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
+    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
+                            /*expandSubgroupReduce=*/true);
   }
 
   return laneVal;
@@ -781,10 +798,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     // to 1.
     SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
-    LLVM_DEBUG({
-      llvm::interleaveComma(mmaShape, DBGS() << "shape for vector.contract: ");
-      llvm::dbgs() << "\n";
-    });
+    LDBG("shape for vector.contract: " << llvm::interleaved(mmaShape));
     return mmaShape;
   }
 
@@ -794,11 +808,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       return std::nullopt;
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
-    LLVM_DEBUG({
-      llvm::interleaveComma(outputShape,
-                            DBGS() << "shape for vector.xfer_write: ");
-      llvm::dbgs() << "\n";
-    });
+    LDBG("shape for vector.xfer_write: " << llvm::interleaved(outputShape));
     return outputShape;
   }
 
@@ -811,10 +821,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     std::optional<int> operandId =
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      LLVM_DEBUG({
-        DBGS() << "Failed to get operandId for vector::xfer_read: " << *op
-               << "\n";
-      });
+      LDBG("Failed to get operandId for vector::xfer_read: " << *op);
       return std::nullopt;
     }
 
@@ -866,22 +873,14 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
-        LLVM_DEBUG({
-          llvm::interleaveComma(readShape,
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
-        LLVM_DEBUG({
-          llvm::interleaveComma(readShape,
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
         return readShape;
       }
       // For matrixB.
@@ -900,11 +899,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
             return std::nullopt;
           sliceType = vecType;
         }
-        LLVM_DEBUG({
-          llvm::interleaveComma(sliceType.getShape(),
-                                DBGS() << "shape for vector.xfer_read: ");
-          llvm::dbgs() << "\n";
-        });
+        LDBG("shape for vector.xfer_read: "
+             << llvm::interleaved(sliceType.getShape()));
         return llvm::to_vector(sliceType.getShape());
       }
     }
@@ -929,6 +925,19 @@ bool hasGlobalMemoryAddressSpace(MemRefType memrefType) {
   if (amdgpuAttr && amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer)
     return true;
   return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
+}
+
+bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace) {
+    return false;
+  }
+  auto amdgpuAttr = dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr &&
+      amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer) {
+    return true;
+  }
+  return false;
 }
 
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {

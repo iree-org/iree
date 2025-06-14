@@ -32,7 +32,7 @@ Compiler target backends are used to generate executable code for hardware APIs
 and device architectures. Compiler targets may implement special optimizations
 or generate distinct code for certain device/architecture/performance profiles.
 
-When compiling programs, a list of target backends must be specified via
+When compiling programs, a list of target backends can be specified via
 
 * `--iree-hal-target-backends=` (command-line)
 * `target_backends=[...]` (Python)
@@ -87,10 +87,11 @@ focus and the build configuration.
 | ------------ | ----------- |
 | `local-sync` | Synchronous local CPU device with inline execution |
 | `local-task` | Multithreaded local CPU device using a 'task' executor |
-| `vulkan`     | Portable GPU execution using the Vulkan API |
-| `hip`        | AMD GPU execution using HIP |
+| `amdgpu`     | **Experimental** <br> AMD GPU execution using HSA |
 | `cuda`       | NVIDIA GPU execution using CUDA |
 | `metal`      | GPU execution on Apple platforms using Metal |
+| `hip`        | AMD GPU execution using HIP |
+| `vulkan`     | Portable GPU execution using the Vulkan API |
 | `webgpu`     | **Experimental** <br> GPU execution on the web using WebGPU |
 
 !!! tip "Tip - External HAL drivers"

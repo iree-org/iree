@@ -87,7 +87,7 @@ util.func public @fix_dominance_on_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tenso
 //  CHECK-SAME:         outs(%[[FILL]] :
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[GEMM]],
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC]]
 //       CHECK:   util.return %[[RESULT]]
 
 // -----
@@ -117,10 +117,10 @@ util.func @mixed_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x32
 //       CHECK:     %[[FILL:.+]] = linalg.fill
 //       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:         outs(%[[FILL]] :
-//       CHECK:     flow.dispatch.tensor.store
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC]]
 //       CHECK:   util.return %[[DISPATCH1]]
 
 util.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf16> {
@@ -143,5 +143,5 @@ util.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf16> {
 //       CHECK:     %[[SOFTMAX:.+]] = linalg.softmax
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[SOFTMAX]]
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC]]
 //       CHECK:   util.return %[[DISPATCH1]]

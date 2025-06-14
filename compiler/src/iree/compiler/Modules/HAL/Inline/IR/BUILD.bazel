@@ -99,6 +99,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "HALInlineDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

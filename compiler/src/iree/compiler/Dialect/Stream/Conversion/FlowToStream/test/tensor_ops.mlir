@@ -225,8 +225,8 @@ util.global private @device : !hal.device
 util.func public @tensorBarrierDispatch(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
   // CHECK: %[[BARRIER:.+]] = stream.async.barrier on(#hal.device.affinity<@device>) %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]}
   %barrier = flow.tensor.barrier %input : tensor<?x128xi8>{%dim0} on #hal.device.affinity<@device>
-  // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<?x128xi8>{%[[DIM0]]} : index
-  // CHECK: %[[RESULT:.+]] = stream.tensor.dispatch @ex::@entry(%[[BARRIER]])
+  // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof on(#hal.device.affinity<@device>)  tensor<?x128xi8>{%[[DIM0]]} : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.dispatch on(#hal.device.affinity<@device>)  @ex::@entry(%[[BARRIER]])
   %0 = flow.dispatch @ex::@entry(%barrier) : (tensor<?x128xi8>{%dim0}) -> tensor<?x128xi8>{%dim0}
   // CHECK: util.return %[[RESULT]], %[[RESULT_SIZE]]
   util.return %0 : tensor<?x128xi8>

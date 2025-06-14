@@ -4,7 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
 include(FetchContent)
 
 # disable some targets we don't use
@@ -69,6 +68,9 @@ function(iree_pjrt_protobuf_cc_library)
     TARGET ${_NAME}
     LANGUAGE cpp
     PROTOC_OPTIONS ${_RULE_PROTOC_ARGS}
+    IMPORT_DIRS
+      ${protobuf_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}
   )
   target_include_directories(${_NAME}
     PUBLIC

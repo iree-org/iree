@@ -76,10 +76,15 @@ bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
 //   lhs == rhs || (isfinite(rhs) && abs(lhs - rhs) <= atol + rtol * abs(rhs)).
 // Note that the `lhs == rhs` part is needed for the case (lhs=+inf, rhs+inf)
 // to return true. Indeed, in that case, lhs-rhs is NaN.
+// Finally, unlike the above NumPy code, we also tolerate the case where both
+// lhs and rhs are NaN. That avoids nonsensical test failures whenever a NaN
+// is the legitimate result.
 template <typename T>
 bool NumpyFuzzyCompare(T lhs, T rhs, float atol, float rtol) {
-  return lhs == rhs || (std::isfinite(rhs) &&
-                        std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs));
+  return lhs == rhs ||
+         (std::isfinite(rhs) &&
+          std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs)) ||
+         (std::isnan(lhs) && std::isnan(rhs));
 }
 
 // Records information about some LHS/RHS scalars that failed a fuzzy comparison
@@ -164,6 +169,15 @@ struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ> {
   }
 };
 
+template <>
+struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU> {
+  using ArithmeticType = float;
+  using StorageType = uint8_t;
+  static ArithmeticType load(StorageType val) {
+    return iree_math_f8e8m0fnu_to_f32(val);
+  }
+};
+
 // Fuzzy comparison of spans.
 // The meaning of atol, rtol is explained in the comment on NumpyFuzzyCompare.
 // On failure, false is returned, and information about a specific failed
@@ -209,6 +223,7 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
     IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ)
     IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
     IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
+    IREE_ALMOSTEQBYTESPAN_CASE(IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU)
 #undef IREE_ALMOSTEQBYTESPAN_CASE
     default:
       break;

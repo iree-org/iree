@@ -31,16 +31,16 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::MatmulKAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-Value setEncoding(OpBuilder &builder, Location loc, Value source,
-                  EncodingAttr encodingAttr) {
-  auto sourceType = cast<RankedTensorType>(source.getType());
-  auto resultType = RankedTensorType::get(
-      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
+static Value setEncoding(OpBuilder &builder, Location loc, Value source,
+                         Attribute encodingAttr) {
+  auto resultType =
+      cast<RankedTensorType>(source.getType()).cloneWithEncoding(encodingAttr);
   return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
@@ -163,11 +163,13 @@ class SetContractionOpEncoding final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  explicit SetContractionOpEncoding(MLIRContext *ctx)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx) {}
+  explicit SetContractionOpEncoding(MLIRContext *ctx, EncodingOptions &option)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx),
+        encodingOption(option) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+
     if (!linalgOp.hasPureTensorSemantics()) {
       return failure();
     }
@@ -228,14 +230,39 @@ public:
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-      auto encoding =
-          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
-                            elemTypes, maps, iterationSizes);
+      MLIRContext *ctx = linalgOp.getContext();
+      Attribute encoding;
+      switch (encodingOption) {
+      case EncodingOptions::Generic: {
+        encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
+                                     iterationSizes);
+        break;
+      }
+      case EncodingOptions::MatmulK: {
+        SmallVector<int32_t> kDims;
+        AffineMap indexingMap = maps[operandIndex];
+        auto cDims = linalg::inferContractionDims(linalgOp);
+        for (auto k : cDims->k) {
+          std::optional<unsigned> dimIdx =
+              indexingMap.getResultPosition(rewriter.getAffineDimExpr(k));
+          if (!dimIdx) {
+            continue;
+          }
+          kDims.push_back(dimIdx.value());
+        }
+        encoding = MatmulKAttr::get(ctx, kDims);
+        break;
+      }
+      default: {
+        assert(false && "Unsupported encoding option");
+        return Value();
+      }
+      }
       return setEncoding(rewriter, loc, src, encoding);
     };
-    Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
-    Value encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
-    Value encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
+    auto encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
+    auto encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
+    auto encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
     Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
                           ValueRange{encodedLhs, encodedRhs, encodedOut})
                         ->getResult(0);
@@ -248,6 +275,9 @@ public:
     rewriter.replaceOp(linalgOp, result);
     return success();
   }
+
+private:
+  EncodingOptions encodingOption;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
@@ -276,17 +306,285 @@ struct FoldFillWithSetEncoding final
   }
 };
 
+//===---------------------------------------------------------------------===//
+// Set padding encodings
+//===---------------------------------------------------------------------===//
+
+struct PaddedValue {
+  Value paddedValue;
+  SmallVector<Value> dynamicDims;
+};
+
+// For a given `operand`, if its producer is a `flow.dispatch.region`,
+// generate a new value for `operand` that has the padding encoding.
+// The producer `flow.dispatch.region` need not be the immediate defining op
+// of `operand`. This method tracks through operations like
+// `tensor.expand_shape/tensor.collapse_shape` to get to the producer dispatch.
+// Once the producer dispatch is found, its result is modified to be of the same
+// type as `operand` but with the padding encodings. To keep things consistent,
+// the operations that are encountered before getting to the original producing
+// `flow.dispatch.region` are replicated into the producer dispatch.
+static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
+                                                     Value operand) {
+  auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+  if (!operandType || operandType.getRank() == 0) {
+    return std::nullopt;
+  }
+
+  SmallVector<Operation *> opChain;
+  auto producerValue = dyn_cast<OpResult>(operand);
+  while (producerValue &&
+         !isa<IREE::Flow::DispatchRegionOp>(producerValue.getOwner())) {
+    if (!llvm::hasSingleElement(producerValue.getUses())) {
+      return std::nullopt;
+    }
+
+    // If it is an operation that we want to look past, add it to the chain
+    // and update the `producerValue`.
+    Operation *currOperation = producerValue.getOwner();
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(currOperation)) {
+      opChain.push_back(currOperation);
+      producerValue = dyn_cast<OpResult>(currOperation->getOperand(0));
+      continue;
+    }
+
+    // Conservative, bail out.
+    return std::nullopt;
+  }
+
+  if (!producerValue) {
+    return std::nullopt;
+  }
+
+  auto producerDispatch =
+      dyn_cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
+  // TODO(MaheshRavishankar): Multi-result producer dispatches can be supported.
+  // Will require to move the consumer dispatch immediately after the producer
+  // instead of what is done below and move other operands of the consumer
+  // dispatch before the producer dispatch.
+  if (!producerDispatch ||
+      !llvm::hasSingleElement(producerDispatch.getBody()) ||
+      producerDispatch->getNumResults() != 1) {
+    return std::nullopt;
+  }
+  if (!llvm::hasSingleElement(producerValue.getUses())) {
+    return std::nullopt;
+  }
+
+  Location loc = producerDispatch.getLoc();
+  unsigned resultNumber = producerValue.getResultNumber();
+  // Compute the padding encoding.  Set to dynamic for backend to pick the right
+  // value.
+  SmallVector<int64_t> paddingValue(operandType.getRank(), 0);
+  paddingValue.back() = ShapedType::kDynamic;
+  auto encoding = IREE::Encoding::PadEncodingLayoutAttr::get(
+      rewriter.getContext(), paddingValue);
+
+  // Compute the result types of the new dispatch.
+  auto newResultType = operandType.cloneWithEncoding(encoding);
+  auto newResultTypes = llvm::to_vector(producerDispatch->getResultTypes());
+  newResultTypes[resultNumber] = newResultType;
+
+  // Compute the result dynamic dims.
+  SmallVector<OpFoldResult> operandDims =
+      tensor::getMixedSizes(rewriter, loc, operand);
+  SmallVector<Value> operandDynamicDims;
+  std::tie(std::ignore, operandDynamicDims) = decomposeMixedValues(operandDims);
+
+  SmallVector<Value> newResultDynamicDims;
+  for (OpResult producerDispatchResult : producerDispatch.getResults()) {
+    if (producerDispatchResult != producerValue) {
+      llvm::append_range(newResultDynamicDims,
+                         producerDispatch.getResultDynamicDims(
+                             producerDispatchResult.getResultNumber()));
+      continue;
+    }
+    llvm::append_range(newResultDynamicDims, operandDynamicDims);
+  }
+
+  auto newDispatchOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
+      producerDispatch->getLoc(), newResultTypes, newResultDynamicDims,
+      producerDispatch.getWorkload());
+
+  // Move over the body of the old dispatch.
+  Region &newBody = newDispatchOp.getBody();
+  Region &producerDispatchBody = producerDispatch.getBody();
+  rewriter.cloneRegionBefore(producerDispatchBody, newBody, newBody.begin());
+
+  // Move over the slice operations if needed.
+  Region &producerWorkgroupCountBody = producerDispatch.getWorkgroupCount();
+  if (!producerWorkgroupCountBody.empty()) {
+    Region &newWorkgroupCountBody = newDispatchOp.getWorkgroupCount();
+    rewriter.cloneRegionBefore(producerWorkgroupCountBody,
+                               newWorkgroupCountBody,
+                               newWorkgroupCountBody.begin());
+  }
+
+  // Clone the operation chain.
+  IRMapping map;
+  auto returnOp = cast<IREE::Flow::ReturnOp>(newBody.front().getTerminator());
+  Value yieldedVal = returnOp.getOperand(resultNumber);
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(returnOp);
+  map.map(producerValue, yieldedVal);
+
+  for (Operation *op : llvm::reverse(opChain)) {
+    rewriter.clone(*op, map);
+  }
+  // Find the new value to yield.
+  Value newYieldedVal = map.lookup(operand);
+  auto encodingOp = rewriter.create<IREE::Encoding::SetEncodingOp>(
+      returnOp->getLoc(), newResultType, newYieldedVal);
+  rewriter.modifyOpInPlace(
+      returnOp, [&]() { returnOp.setOperand(resultNumber, encodingOp); });
+
+  return PaddedValue{newDispatchOp->getResult(resultNumber),
+                     operandDynamicDims};
+}
+
+// For a given operation, pad the operands corresponding to `operandNums`.
+static SmallVector<unsigned> padOperandsOfOp(RewriterBase &rewriter,
+                                             Operation *op,
+                                             ArrayRef<unsigned> operandNums) {
+  // Do not pad the operands of operations not within dispatches.
+  auto dispatchOp = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+  if (!dispatchOp) {
+    return {};
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(dispatchOp);
+
+  SmallVector<unsigned> paddedOperands;
+  for (auto operandNum : operandNums) {
+    OpOperand &operand = op->getOpOperand(operandNum);
+    std::optional<PaddedValue> paddedVal =
+        padProducerOfValue(rewriter, operand.get());
+    if (!paddedVal) {
+      continue;
+    }
+    rewriter.modifyOpInPlace(op, [&]() {
+      OpBuilder::InsertionGuard g2(rewriter);
+      rewriter.setInsertionPoint(op);
+      Type operandType = operand.get().getType();
+      auto unsetEncodignOp = rewriter.create<IREE::Encoding::UnsetEncodingOp>(
+          op->getLoc(), operandType, paddedVal->paddedValue,
+          paddedVal->dynamicDims);
+      op->setOperand(operandNum, unsetEncodignOp.getResult());
+    });
+  }
+  return paddedOperands;
+}
+
+// Return a list of operands to be padded for each `op`.
+SmallVector<unsigned> getOperandsToPad(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
+    return {};
+  }
+
+  // Bail out on matvec / vecmat and skinny matmul problems.
+  // TODO(MaheshRavishankar): There is a possibility to use a more specialized
+  // encoding for making this decision late and using `SpecializeEncoding`
+  // as the place where this gets resolved to the pad encoding. That was
+  // initially tried, but rolled back cause the design of the encoding needs to
+  // be flushed out a bit more. So currently moving this logic during set
+  // encoding itself. Also this logic might require clean up (see
+  // https://github.com/iree-org/iree/pull/20732/files#r2087241983)
+  SmallVector<unsigned> reductionDims;
+  linalgOp.getReductionDims(reductionDims);
+  int64_t parallelDimSize = 1;
+  llvm::SmallSetVector<int32_t, 4> reductionDimsSet;
+  reductionDimsSet.insert_range(reductionDims);
+  SmallVector<int64_t, 4> loopRanges = linalgOp.getStaticLoopRanges();
+  for (auto [idx, dimSize] : llvm::enumerate(loopRanges)) {
+    if (reductionDimsSet.contains(idx)) {
+      // Bail if the reduction dimension is dynamic.
+      if (ShapedType::isDynamic(dimSize)) {
+        return {};
+      }
+      continue;
+    }
+    if (!ShapedType::isDynamic(parallelDimSize)) {
+      if (ShapedType::isDynamic(dimSize)) {
+        parallelDimSize = ShapedType::kDynamic;
+        continue;
+      }
+      parallelDimSize *= dimSize;
+    }
+  }
+
+  // TODO(MaheshRavishankar): Make this command line controllable.
+  static constexpr int64_t kSkinnyMatmulThreshold = 64;
+  if (!ShapedType::isDynamic(parallelDimSize) &&
+      parallelDimSize < kSkinnyMatmulThreshold) {
+    // This matmul is skinny, do not pad.
+    return {};
+  }
+
+  return {0, 1};
+}
+
+// Main driver method to add encodings to pad. Typically these are
+// intermediate values produced by `flow.dispatch.region`.
+static LogicalResult setPaddingEncodings(MLIRContext *context,
+                                         FunctionOpInterface funcOp) {
+  IRRewriter rewriter(context);
+
+  // Collect all operations whose operands can be padded.
+  using OpListType =
+      SmallVector<std::tuple<Operation *, SmallVector<unsigned>>>;
+  OpListType paddedOps;
+  funcOp.walk([&](Operation *op) {
+    SmallVector<unsigned> paddedOperands = getOperandsToPad(op);
+    if (paddedOperands.empty()) {
+      return;
+    }
+    paddedOps.emplace_back(std::tuple{op, std::move(paddedOperands)});
+  });
+  for (auto [op, operandsNums] : paddedOps) {
+    // Only pad LHS or RHS of matmul ops.
+    padOperandsOfOp(rewriter, op, operandsNums);
+  }
+
+  // Apply the dim resolution patterns.
+  RewritePatternSet dimResolutionPatterns(context);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(
+      dimResolutionPatterns);
+  GreedyRewriteConfig config;
+  config.enableFolding(true).setMaxIterations(GreedyRewriteConfig::kNoLimit);
+  if (failed(applyPatternsGreedily(funcOp, std::move(dimResolutionPatterns),
+                                   config))) {
+    return funcOp.emitOpError("failed to resolve tensor.dim operations");
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// Pass definition
+//===---------------------------------------------------------------------===//
+
 struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
   using Base::Base;
   void runOnOperation() override {
+    auto funcOp = getOperation();
     MLIRContext *context = &getContext();
+
+    // Implement the padding encoding.
+    if (encodingOption == DispatchCreation::EncodingOptions::Padding) {
+      if (failed(setPaddingEncodings(context, funcOp))) {
+        return signalPassFailure();
+      }
+      return;
+    }
+
     RewritePatternSet patterns(context);
-    patterns.add<SetContractionOpEncoding>(context);
+    patterns.add<SetContractionOpEncoding>(context, encodingOption.getValue());
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.add<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     GreedyRewriteConfig config;
-    config.cseConstants = false;
+    config.enableConstantCSE(false);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns),
                                      config))) {
       return signalPassFailure();

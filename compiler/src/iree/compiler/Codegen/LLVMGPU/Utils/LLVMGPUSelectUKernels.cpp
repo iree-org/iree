@@ -5,9 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
@@ -39,9 +40,10 @@ getUKernelNameAndSuffixForArgmax(linalg::GenericOp op) {
                                   indexType.getElementType())};
 }
 
-// Returns ukernel name and suffix for multi_mma. Empty name = no ukernel.
+// Returns ukernel name and suffix for inner_tiled operations. Empty name = no
+// ukernel.
 static UKernelNameAndSuffix
-getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
+getUKernelNameAndSuffixForInnerTiled(IREE::Codegen::InnerTiledOp op) {
   auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
   if (!mma) {
     return {}; // Only handling DataTiledMMAAttr for now.
@@ -52,11 +54,11 @@ getUKernelNameAndSuffixForMultiMma(IREE::GPU::MultiMmaOp op) {
 // Returns ukernel name and suffix for any op. Empty name = no ukernel.
 static UKernelNameAndSuffix getUKernelNameAndSuffix(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    if (succeeded(isArgmaxOp(genericOp))) {
+    if (IREE::LinalgExt::isArgmaxOp(genericOp)) {
       return getUKernelNameAndSuffixForArgmax(genericOp);
     }
-  } else if (auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op)) {
-    return getUKernelNameAndSuffixForMultiMma(multiMmaOp);
+  } else if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
+    return getUKernelNameAndSuffixForInnerTiled(innerTiledOp);
   }
   return {};
 }
@@ -178,7 +180,7 @@ static std::string getBitcodeFilename(IREE::GPU::TargetAttr gpuTarget,
 // interpreting a bitcode function with a specific name.
 // On failure, an op warning is emitted and {} is returned.
 static std::optional<int> expensivelyEvaluateSharedMemoryBytes(
-    IREE::GPU::MultiMmaOp op, IREE::GPU::UKernelConfigAttr ukernelConfig,
+    IREE::Codegen::InnerTiledOp op, IREE::GPU::UKernelConfigAttr ukernelConfig,
     IREE::HAL::ExecutableObjectAttr bitcodeObject,
     IREE::GPU::TargetAttr gpuTarget) {
   auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
@@ -259,7 +261,7 @@ static std::optional<int> expensivelyEvaluateSharedMemoryBytes(
 // Uses a static cache to avoid calling expensivelyEvaluateSharedMemoryBytes
 // more than once per DataTiledMMAAttr value.
 static std::optional<int>
-getSharedMemoryBytes(IREE::GPU::MultiMmaOp op,
+getSharedMemoryBytes(IREE::Codegen::InnerTiledOp op,
                      IREE::GPU::UKernelConfigAttr ukernelConfig,
                      IREE::HAL::ExecutableObjectAttr bitcodeObject,
                      IREE::GPU::TargetAttr gpuTarget) {
@@ -316,7 +318,7 @@ getSharedMemoryBytes(IREE::GPU::MultiMmaOp op,
 // Returns the finalized UKernelConfigAttr to use for `op`, or {} if `op` should
 // not use a ukernel.
 static IREE::GPU::UKernelConfigAttr
-finalizeConfig(IREE::GPU::MultiMmaOp op,
+finalizeConfig(IREE::Codegen::InnerTiledOp op,
                IREE::GPU::UKernelConfigAttr ukernelConfig,
                IREE::HAL::ExecutableObjectAttr bitcodeObject,
                IREE::GPU::TargetAttr gpuTarget) {
@@ -337,8 +339,11 @@ static IREE::GPU::UKernelConfigAttr
 finalizeConfig(Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig,
                IREE::HAL::ExecutableObjectAttr bitcodeObject,
                IREE::GPU::TargetAttr gpuTarget) {
-  if (auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op)) {
-    return finalizeConfig(multiMmaOp, ukernelConfig, bitcodeObject, gpuTarget);
+  if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
+    if (isa<IREE::GPU::MmaInterfaceAttr>(innerTiledOp.getKind())) {
+      return finalizeConfig(innerTiledOp, ukernelConfig, bitcodeObject,
+                            gpuTarget);
+    }
   }
   return ukernelConfig;
 }

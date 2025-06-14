@@ -10,12 +10,12 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
@@ -28,78 +28,12 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
+
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileSwizzle;
-
-//===---------------------------------------------------------------------===//
-// Utility methods
-//===---------------------------------------------------------------------===//
-
-// Utility to apply a tile-swizzling to a packed shape.
-static SmallVector<OpFoldResult>
-getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
-                 MaterializeEncodingInfo encodingInfo) {
-  if (packedShape.empty() || !encodingInfo.swizzle) {
-    return SmallVector<OpFoldResult>(packedShape);
-  }
-
-  int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
-  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
-  for (auto i : encodingInfo.swizzle->permutation) {
-    perm.push_back(i + srcRank);
-  }
-
-  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
-  SmallVector<int64_t> expandedTileShape =
-      IREE::Codegen::getExpandedTileShape(encodingInfo.swizzle->expandShape);
-  MLIRContext *ctx = packedShape[0].getContext();
-  Builder b(ctx);
-  for (int64_t d : expandedTileShape) {
-    newShape.push_back(b.getIndexAttr(d));
-  }
-  applyPermutationToVector(newShape, perm);
-
-  return newShape;
-}
-
-static FailureOr<SmallVector<OpFoldResult>>
-getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
-                     RankedTensorType tensorType,
-                     const MaterializeEncodingInfo &materializeEncodingInfo,
-                     MaterializeEncodingValueFn materializeEncodingValueFn) {
-  ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
-  if (llvm::all_of(staticTileSizes,
-                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
-    return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
-  }
-  assert(materializeEncodingValueFn &&
-         "When dynamic tile sizes are generated, a MaterializeEncodingValueFn "
-         "should be provided.");
-
-  FailureOr<MaterializeEncodingValueInfo> materializeEncodingValueInfo =
-      materializeEncodingValueFn(tensorType, rewriter, loc);
-  if (failed(materializeEncodingValueInfo)) {
-    return failure();
-  }
-  ArrayRef<Value> innerTileSizeValues =
-      materializeEncodingValueInfo->innerTileSizes;
-
-  SmallVector<OpFoldResult> result(staticTileSizes.size());
-  for (size_t i = 0; i < result.size(); ++i) {
-    if (ShapedType::isDynamic(staticTileSizes[i])) {
-      result[i] = innerTileSizeValues[i];
-    } else if (tensorType.isDynamicDim(i)) {
-      result[i] =
-          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
-              .getResult();
-    } else {
-      result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
-    }
-  }
-  return result;
-}
 
 //===---------------------------------------------------------------------===//
 // Methods to convert `set_encoding` and `unset_encoding` operations
@@ -108,8 +42,7 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
 
 FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
-    Value source, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
+    Value source, const MaterializeEncodingTypeConverter &typeConverter) {
   RankedTensorType resultType = encodingOp.getResultType();
   MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(resultType);
@@ -121,8 +54,9 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
 
   // Create `tensor.empty` operation for the result of the pack operation.
   Location loc = encodingOp.getLoc();
-  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, resultType, encodingInfo, materializeEncodingValueFn);
+  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
+      typeConverter.getInnerTileSizesOfr(rewriter, loc, resultType,
+                                         encodingInfo);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
@@ -145,8 +79,7 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
 
 FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
-    Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
+    Value packedValue, const MaterializeEncodingTypeConverter &typeConverter) {
   RankedTensorType sourceType = encodingOp.getSourceType();
   MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(sourceType);
@@ -163,8 +96,9 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
                      encodingOp.getResultDims(), rewriter);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   sourceType.getElementType());
-  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, sourceType, encodingInfo, materializeEncodingValueFn);
+  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
+      typeConverter.getInnerTileSizesOfr(rewriter, loc, sourceType,
+                                         encodingInfo);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
@@ -181,8 +115,7 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     ValueRange convertedOperands,
-                    const MaterializeEncodingTypeConverter &typeConverter,
-                    MaterializeEncodingValueFn materializeEncodingValueFn) {
+                    const MaterializeEncodingTypeConverter &typeConverter) {
   auto emptyType = cast<RankedTensorType>(emptyOp->getResultTypes()[0]);
   MaterializeEncodingInfo encodingInfo =
       typeConverter.getEncodingInfo(emptyType);
@@ -194,8 +127,9 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
         .getOperation();
   }
 
-  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr = getInnerTileSizesOfr(
-      rewriter, loc, emptyType, encodingInfo, materializeEncodingValueFn);
+  FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
+      typeConverter.getInnerTileSizesOfr(rewriter, loc, emptyType,
+                                         encodingInfo);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         emptyOp, "failed to generate runtime tile size query");
@@ -459,8 +393,7 @@ static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                     ValueRange convertedInputOperands,
                     ValueRange convertedOutputOperands,
-                    const MaterializeEncodingTypeConverter &typeConverter,
-                    MaterializeEncodingValueFn) {
+                    const MaterializeEncodingTypeConverter &typeConverter) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return rewriter.notifyMatchFailure(linalgOp, "Not pure tensor semantics");
   }
@@ -489,58 +422,17 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
-/// returns the materialized shape of the `dispatchTensorType`. The
-/// dynamic dimensions of the `dispatchTensorType` are provided in
-/// `dynamicDims`.
-static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
-    OpBuilder &builder, Location loc,
-    const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
-  auto boundTensorType =
-      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-  if (!boundTensorType) {
-    return failure();
-  }
-
-  MaterializeEncodingInfo encodingInfo;
-  if (auto maybeEncodingInfo = getEncodingInfoFromLayouts(boundTensorType)) {
-    encodingInfo = maybeEncodingInfo.value();
-  } else {
-    encodingInfo = typeConverter.getEncodingInfo(boundTensorType);
-  }
-
-  if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-    return failure();
-  }
-
-  SmallVector<OpFoldResult> targetShape =
-      getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
-  auto innerTileSizes = getInnerTileSizesOfr(
-      builder, loc, boundTensorType, encodingInfo, materializeEncodingValueFn);
-  if (failed(innerTileSizes)) {
-    return failure();
-  }
-  SmallVector<OpFoldResult> convertedTargetShape =
-      linalg::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
-                                     encodingInfo.innerDimsPos,
-                                     encodingInfo.outerDimsPerm);
-  return getSwizzledShape(convertedTargetShape, encodingInfo);
-}
-
-/// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the dynamic dimensions of the materialized shape of the
 /// `dispatchTensorType`. The dynamic dimensions of the `dispatchTensorType` are
 /// provided in `dynamicDims`.
 static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
     const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
+    IREE::TensorExt::DispatchTensorType dispatchTensorType,
+    ValueRange dynamicDims) {
   FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
-      getPackedDimsForDispatchTensor(builder, loc, typeConverter,
-                                     dispatchTensorType, dynamicDims,
-                                     materializeEncodingValueFn);
+      typeConverter.getPackedDimsForDispatchTensor(
+          builder, loc, dispatchTensorType, dynamicDims);
   if (failed(convertedTargetShape)) {
     return failure();
   }
@@ -556,20 +448,20 @@ namespace {
 /// Pattern to materialize the encoding for `hal.interface.binding.subspan`
 /// operations.
 struct MaterializeInterfaceBindingEncoding
-    : public OpMaterializeEncodingPattern<
-          IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::HAL::InterfaceBindingSubspanOp>::OpMaterializeEncodingPattern;
+    : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using OpConversionPattern<
+      IREE::HAL::InterfaceBindingSubspanOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+    auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
         subspanOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
-          subspanOp, "expected result type to be !flow.dispatch.tensor");
+          subspanOp,
+          "expected result type to be !iree_tensor_ext.dispatch.tensor");
     }
     auto boundTensorType =
         llvm::dyn_cast<RankedTensorType>(resultType.getBoundType());
@@ -589,15 +481,15 @@ struct MaterializeInterfaceBindingEncoding
     Location loc = subspanOp.getLoc();
     SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
     FailureOr<SmallVector<Value>> convertedDynamicDims =
-        getPackedDynamicDimsForDispatchTensor(
-            rewriter, loc, *typeConverter, resultType,
-            subspanOp.getDynamicDims(), this->materializeEncodingValueFn);
+        getPackedDynamicDimsForDispatchTensor(rewriter, loc, *typeConverter,
+                                              resultType,
+                                              subspanOp.getDynamicDims());
     // Drop the encoding if the target does not support it.
     if (succeeded(convertedDynamicDims)) {
       newDynamicDims = convertedDynamicDims.value();
     }
 
-    auto newResultType = IREE::Flow::DispatchTensorType::get(
+    auto newResultType = IREE::TensorExt::DispatchTensorType::get(
         resultType.getAccess(), convertedBoundType);
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
@@ -607,18 +499,19 @@ struct MaterializeInterfaceBindingEncoding
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.load` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
 /// materializing the encoding.
-struct MaterializeFlowDispatchTensorLoadOp
-    : public OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorLoadOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Flow::DispatchTensorLoadOp>::OpMaterializeEncodingPattern;
+struct MaterializeTensorExtDispatchTensorLoadOp
+    : public OpConversionPattern<IREE::TensorExt::DispatchTensorLoadOp> {
+  using OpConversionPattern<
+      IREE::TensorExt::DispatchTensorLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
+                  OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the load covers the entire
-    // `!flow.dispatch.tensor` type.
+    // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial loads.
     if (!loadOp.isLoadOfWholeSource()) {
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
@@ -632,43 +525,36 @@ struct MaterializeFlowDispatchTensorLoadOp
       return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
     }
 
-    Location loc = loadOp.getLoc();
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
-    FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
-        getPackedDimsForDispatchTensor(rewriter, loc, *typeConverter,
-                                       sourceType, loadOp.getSourceDims(),
-                                       this->materializeEncodingValueFn);
-    if (succeeded(convertedMixedSizes)) {
-      newMixedSizes = convertedMixedSizes.value();
+    SmallVector<OpFoldResult> newOffsets, newMixedSizes, newStrides;
+    if (failed(typeConverter->getOffsetsSizesStrides(
+            rewriter, loadOp.getLoc(), sourceType, loadOp.getSourceDims(),
+            loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+            loadOp.getMixedStrides(), newOffsets, newMixedSizes, newStrides))) {
+      return failure();
     }
-    SmallVector<OpFoldResult> newOffsets(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(1));
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
         loadOp, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
         newStrides);
-
     return success();
   }
 };
 
-/// Pattern to convert `flow.dispatch.tensor.store` operation when
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
 /// materializing the encoding.
-struct MaterializeFlowDispatchTensorStoreOp
-    : public OpMaterializeEncodingPattern<IREE::Flow::DispatchTensorStoreOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Flow::DispatchTensorStoreOp>::OpMaterializeEncodingPattern;
+struct MaterializeTensorExtDispatchTensorStoreOp
+    : public OpConversionPattern<IREE::TensorExt::DispatchTensorStoreOp> {
+  using OpConversionPattern<
+      IREE::TensorExt::DispatchTensorStoreOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
+                  OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the store covers the entire
-    // `!flow.dispatch.tensor` type.
+    // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial stores.
     if (!storeOp.isStoreToWholeTarget()) {
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
@@ -683,24 +569,18 @@ struct MaterializeFlowDispatchTensorStoreOp
       return rewriter.notifyMatchFailure(storeOp, "bound type already valid");
     }
 
-    Location loc = storeOp.getLoc();
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        boundTensorType.getShape(), storeOp.getTargetDims(), rewriter);
-    FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
-        getPackedDimsForDispatchTensor(rewriter, loc, *typeConverter,
-                                       targetType, storeOp.getTargetDims(),
-                                       this->materializeEncodingValueFn);
-    if (succeeded(convertedMixedSizes)) {
-      newMixedSizes = convertedMixedSizes.value();
+    SmallVector<OpFoldResult> newOffsets, newMixedSizes, newStrides;
+    if (failed(typeConverter->getOffsetsSizesStrides(
+            rewriter, storeOp.getLoc(), targetType, storeOp.getTargetDims(),
+            storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+            storeOp.getMixedStrides(), newOffsets, newMixedSizes,
+            newStrides))) {
+      return failure();
     }
-    SmallVector<OpFoldResult> newOffsets(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(1));
     SmallVector<int64_t> newStaticDims;
     SmallVector<Value> newDynamicDims;
     dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         storeOp, adaptor.getValue(), adaptor.getTarget(), newDynamicDims,
         newOffsets, newMixedSizes, newStrides);
     return success();
@@ -715,8 +595,8 @@ struct MaterializeFlowDispatchTensorStoreOp
 
 /// Generic pattern to convert operation that is in Destination Passing Style.
 template <typename OpTy>
-struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
-  using OpMaterializeEncodingPattern<OpTy>::OpMaterializeEncodingPattern;
+struct MaterializeDPSOperation : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(OpTy dpsOp, typename OpTy::Adaptor adaptor,
@@ -724,8 +604,7 @@ struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
     FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
-        rewriter, dpsOp, adaptor.getInputs(), adaptor.getOutputs(), *converter,
-        this->materializeEncodingValueFn);
+        rewriter, dpsOp, adaptor.getInputs(), adaptor.getOutputs(), *converter);
     if (failed(convertedOp)) {
       return failure();
     }
@@ -736,8 +615,8 @@ struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
 
 /// Generic pattern to convert an operation.
 template <typename OpTy>
-struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
-  using OpMaterializeEncodingPattern<OpTy>::OpMaterializeEncodingPattern;
+struct MaterializeOperation : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -745,8 +624,7 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
     FailureOr<Operation *> convertedOp =
-        lowerOpWithEncoding(rewriter, op, adaptor.getOperands(), *converter,
-                            this->materializeEncodingValueFn);
+        lowerOpWithEncoding(rewriter, op, adaptor.getOperands(), *converter);
     if (failed(convertedOp))
       return failure();
 
@@ -763,9 +641,9 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
 };
 
 struct MaterializeOptimizationBarrierOp
-    : public OpMaterializeEncodingPattern<IREE::Util::OptimizationBarrierOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Util::OptimizationBarrierOp>::OpMaterializeEncodingPattern;
+    : public OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
+  using OpConversionPattern<
+      IREE::Util::OptimizationBarrierOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::Util::OptimizationBarrierOp op,
@@ -803,9 +681,8 @@ getReassociationIndices(int outerDims,
 /// Convert iree_linalg_ext.set_encoding op to pack + tile swizzling ops. We use
 /// expand_shape + linalg.transpose to represent a tile swizzling op.
 struct SetEncodingOpLoweringConversion
-    : public OpMaterializeEncodingPattern<IREE::Encoding::SetEncodingOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Encoding::SetEncodingOp>::OpMaterializeEncodingPattern;
+    : public OpConversionPattern<IREE::Encoding::SetEncodingOp> {
+  using OpConversionPattern<IREE::Encoding::SetEncodingOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
@@ -813,8 +690,7 @@ struct SetEncodingOpLoweringConversion
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
     auto packedValue = lowerSetEncodingOpToPackOp(
-        rewriter, encodingOp, adaptor.getSource(), *converter,
-        this->materializeEncodingValueFn);
+        rewriter, encodingOp, adaptor.getSource(), *converter);
     if (failed(packedValue)) {
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
@@ -869,9 +745,9 @@ struct SetEncodingOpLoweringConversion
 };
 
 struct UnsetEncodingOpLoweringConversion
-    : public OpMaterializeEncodingPattern<IREE::Encoding::UnsetEncodingOp> {
-  using OpMaterializeEncodingPattern<
-      IREE::Encoding::UnsetEncodingOp>::OpMaterializeEncodingPattern;
+    : public OpConversionPattern<IREE::Encoding::UnsetEncodingOp> {
+  using OpConversionPattern<
+      IREE::Encoding::UnsetEncodingOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(IREE::Encoding::UnsetEncodingOp unsetEncodingOp,
@@ -927,9 +803,8 @@ struct UnsetEncodingOpLoweringConversion
           loc, unpackSrcType, transposeOp->getResult(0), reassociation);
     }
 
-    auto unpackedValue = lowerUnsetEncodingToUnpackOp(
-        rewriter, unsetEncodingOp, unpackSrc, *converter,
-        this->materializeEncodingValueFn);
+    auto unpackedValue = lowerUnsetEncodingToUnpackOp(rewriter, unsetEncodingOp,
+                                                      unpackSrc, *converter);
     if (failed(unpackedValue)) {
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getResultType());
@@ -948,13 +823,10 @@ class MaterializeContractionOp
     : public OpInterfaceConversionPattern<linalg::LinalgOp> {
 public:
   MaterializeContractionOp(
-      MLIRContext *context,
       const MaterializeEncodingTypeConverter &typeConverter,
-      MaterializeEncodingValueFn materializeEncodingValueFn = {},
-      PatternBenefit benefit = 1)
+      MLIRContext *context, PatternBenefit benefit = 1)
       : OpInterfaceConversionPattern<linalg::LinalgOp>(typeConverter, context,
-                                                       benefit),
-        materializeEncodingValueFn(materializeEncodingValueFn) {}
+                                                       benefit) {}
 
   LogicalResult
   matchAndRewrite(linalg::LinalgOp op, ArrayRef<Value> operands,
@@ -967,7 +839,8 @@ public:
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
 
-    IREE::Codegen::LayoutAttrInterface layoutAttr = converter->getLayoutAttr();
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr =
+        converter->getLayoutAttr();
     SmallVector<Type> convertedResTypes;
     for (auto init : op.getDpsInits()) {
       convertedResTypes.push_back(converter->convertType(init.getType()));
@@ -977,37 +850,53 @@ public:
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
-
-protected:
-  const MaterializeEncodingValueFn materializeEncodingValueFn;
 };
 
 } // namespace
 
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
-    MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
+    MaterializeEncodingTypeConverter &typeConverter) {
   MLIRContext *context = patterns.getContext();
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
             subspanOp.getResult().getType());
-        // For types that are not `Flow::DispatchTensorType` mark as legal.
+        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
+        if (!resultType)
+          return true;
+        return resultType == typeConverter.convertType(resultType);
+      });
+  target.addIllegalOp<IREE::Encoding::SetEncodingOp,
+                      IREE::Encoding::UnsetEncodingOp>();
+  target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorStoreOp>(
+      [&typeConverter](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+            storeOp.getTargetType());
+        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
+        if (!resultType)
+          return true;
+        return resultType == typeConverter.convertType(resultType);
+      });
+  target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorLoadOp>(
+      [&typeConverter](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+            loadOp.getSourceType());
+        // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
           return true;
         return resultType == typeConverter.convertType(resultType);
       });
 
-  patterns.insert<
-      MaterializeContractionOp, SetEncodingOpLoweringConversion,
-      UnsetEncodingOpLoweringConversion,
-      MaterializeDPSOperation<linalg::FillOp>,
-      MaterializeDPSOperation<linalg::GenericOp>,
-      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
-      MaterializeFlowDispatchTensorLoadOp, MaterializeFlowDispatchTensorStoreOp,
-      MaterializeInterfaceBindingEncoding>(context, typeConverter,
-                                           materializeEncodingValueFn);
+  patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
+                  UnsetEncodingOpLoweringConversion,
+                  MaterializeDPSOperation<linalg::FillOp>,
+                  MaterializeDPSOperation<linalg::GenericOp>,
+                  MaterializeOperation<tensor::EmptyOp>,
+                  MaterializeOptimizationBarrierOp,
+                  MaterializeTensorExtDispatchTensorLoadOp,
+                  MaterializeTensorExtDispatchTensorStoreOp,
+                  MaterializeInterfaceBindingEncoding>(typeConverter, context);
 };
 
 } // namespace mlir::iree_compiler

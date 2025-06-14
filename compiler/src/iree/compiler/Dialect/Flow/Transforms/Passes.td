@@ -22,10 +22,12 @@ def AnnotateDispatchesPass :
   let summary = "Annotates executable dispatches based on their contents.";
 }
 
-def CanonicalizerPass :
+def CanonicalizePass :
     Pass<"iree-flow-canonicalize", ""> {
   let summary = "Flow specific canonicalization pass";
   let options = [
+    Option<"cseConstants", "cse-constants", "bool",
+            /*default=*/"true", "Do Not CSE constants on canonicalization">,
     Option<"testConvergence", "test-convergence", "bool",
            /*default=*/"false", "Fails if the patterns fail to converge">
   ];
@@ -131,7 +133,11 @@ def DumpDispatchGraphPass : Pass<"iree-flow-dump-dispatch-graph-pass"> {
     Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
            /*default=*/"true", "Print data flow edges">,
     Option<"printResultTypes", "print-result-types", "bool",
-            /*default=*/"true", "Print result types of operations">
+            /*default=*/"true", "Print result types of operations">,
+    Option<"emitDispatchBody", "emit-dispatch-body", "bool",
+            /*default=*/"false", "Emit dispatch body in label">,
+    Option<"emitInitializers", "emit-initializers", "bool",
+            /*default=*/"false", "Emit initializers">
   ];
 }
 

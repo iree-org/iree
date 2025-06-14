@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-#include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
+#include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -61,10 +61,22 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
+enum class ContainerType {
+  // Automatically detect the container type from the target ABI attribute.
+  Auto,
+  // HIP ExecutableDef flatbuffer.
+  HIP,
+  // AMDGPU ExecutableDef flatbuffer.
+  AMDGPU,
+  // Raw HSACO image (ELF).
+  HSACO,
+};
+
 // TODO(#18792): rename flags back to iree-rocm- as they are not HIP-specific.
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
+  ContainerType containerType = ContainerType::Auto;
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
@@ -80,6 +92,7 @@ struct ROCMOptions {
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
     static cl::OptionCategory category("HIP HAL Target");
+
     binder.opt<std::string>(
         "iree-hip-target", target, cl::cat(category),
         cl::desc(
@@ -93,16 +106,34 @@ struct ROCMOptions {
             "for more details."
             // clang-format on
             ));
+
     binder.opt<std::string>(
         "iree-hip-target-features", targetFeatures, cl::cat(category),
         cl::desc("HIP target features as expected by LLVM AMDGPU backend; "
                  "e.g., '+sramecc,+xnack'."));
+
+    binder.opt<ContainerType>(
+        "iree-rocm-container-type", containerType,
+        llvm::cl::desc("Serialized executable container type."),
+        llvm::cl::cat(category),
+        llvm::cl::values(clEnumValN(ContainerType::Auto, "auto",
+                                    "Automatically detect the container type "
+                                    "from the target ABI attribute."),
+                         clEnumValN(ContainerType::HIP, "hip",
+                                    "HIP ExecutableDef flatbuffer."),
+                         clEnumValN(ContainerType::AMDGPU, "amdgpu",
+                                    "AMDGPU ExecutableDef flatbuffer."),
+                         clEnumValN(ContainerType::HSACO, "hsaco",
+                                    "Raw HSACO image (ELF).")));
+
     binder.opt<std::string>("iree-hip-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of HIP Bitcode."));
+
     binder.opt<int>("iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
+
     binder.opt<std::string>(
         "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
@@ -124,6 +155,7 @@ struct ROCMOptions {
                  "to be passed to the target backend compiler during HIP "
                  "executable serialization"),
         cl::ZeroOrMore, cl::cat(category));
+
     binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
@@ -266,6 +298,35 @@ public:
           addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
+
+      // Look for a default tuning spec.
+      auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
+      // First check for a spec based on the sku.
+      std::optional<std::string> maybeSpecName = std::nullopt;
+      if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
+        if (StringAttr sku = chip.getSku()) {
+          std::string specName =
+              llvm::formatv("iree_default_tuning_spec_{}.mlir", sku.strref());
+          if (!rocmDialect->hasBuiltin(specName)) {
+            maybeSpecName = specName;
+          }
+        }
+      }
+
+      // Then, if none was found, look for one based on the target arch.
+      if (!maybeSpecName) {
+        std::string specName =
+            llvm::formatv("iree_default_tuning_spec_{}.mlir", target.getArch());
+        if (rocmDialect->hasBuiltin(specName)) {
+          maybeSpecName = specName;
+        }
+      }
+
+      if (maybeSpecName) {
+        addConfig("iree_codegen.default_tuning_spec",
+                  IREE::ROCM::BuiltinTuningModuleAttr::get(
+                      context, maybeSpecName.value()));
+      }
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
@@ -285,6 +346,7 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
+    registry.insert<IREE::ROCM::ROCMDialect>();
     // Configuration may load and manipulate transform dialect libraries.
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -612,17 +674,30 @@ public:
                          ".linked.ll", *llvmModule);
       }
 
+      // For example 'gfx942'
+      StringRef targetCPU = targetMachine->getTargetCPU();
+
+      // For example 'amdgcn-amd-amdhsa'
+      std::string targetTriple = targetMachine->getTargetTriple().str();
+
       // Run LLVM optimization passes.
       std::string passesString;
       optimizeModule(*llvmModule, *targetMachine, options.passPlugins,
                      options.slpVectorization, passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
-        std::string header = llvm::formatv(R"TXT(
+
+        // Additional context on '-mcpu' flag in PR comments, see for example:
+        // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
+        std::string header =
+            llvm::formatv(R"TXT(
 ; To reproduce the .optimized.ll from the .linked.ll, run:
-; opt --passes='{}'
+; opt -S -mtriple={} -mcpu={} --passes='{}'
+; The flag '-S' to emit LLVMIR.
+; The behavior of some passes depends on '-mtriple' and '-mcpu'
 
 )TXT",
-                                           passesString);
+                          targetTriple, targetCPU, passesString);
+
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
                          ".optimized.ll", *llvmModule, header);
@@ -660,14 +735,44 @@ public:
                      ".hsaco", targetHSACO);
     }
 
-    // Wrap the HSACO ELF binary in a Flatbuffers container.
+    // Determine container type from the target ABI attribute.
+    ContainerType containerType = options.containerType;
+    if (containerType == ContainerType::Auto) {
+      if (getABI(targetAttr) == "amdgpu") {
+        containerType = ContainerType::AMDGPU;
+      } else {
+        containerType = ContainerType::HIP;
+      }
+    }
+
+    // Wrap the HSACO ELF binary in the requested container type (if any).
     FailureOr<DenseIntElementsAttr> binaryContainer;
-    if (getABI(targetAttr) == "amdgpu") {
+    switch (containerType) {
+    case ContainerType::Auto: {
+      // Resolved above; unreachable. Fall-through to error case.
+      assert(false && "auto container type must have resolved earlier");
+      break;
+    }
+    case ContainerType::AMDGPU: {
       binaryContainer = serializeAMDGPUBinaryContainer(
           serializationOptions, variantOp, exportOps, targetHSACO);
-    } else {
+      break;
+    }
+    case ContainerType::HIP: {
       binaryContainer = serializeHIPBinaryContainer(
           serializationOptions, variantOp, exportOps, targetHSACO);
+      break;
+    }
+    case ContainerType::HSACO: {
+      SmallVector<uint8_t> image;
+      image.resize(targetHSACO.size());
+      std::memcpy(image.data(), targetHSACO.data(), image.size());
+      binaryContainer = DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(targetHSACO.size())},
+                          executableBuilder.getI8Type()),
+          image);
+      break;
+    }
     }
     if (failed(binaryContainer) || !binaryContainer.value()) {
       return failure();
@@ -921,6 +1026,9 @@ namespace {
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
+  void onRegisterDialects(DialectRegistry &registry) {
+    registry.insert<IREE::ROCM::ROCMDialect>();
+  }
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"amdgpu", ...
     targets.add("amdgpu", [&]() {
@@ -954,18 +1062,6 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
   });
 }
 
-// Iterate over default tuning spec embedded-data files, and insert them into
-// the EmbeddedDataDirectory singleton.
-static void addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory() {
-  EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
-    const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
-    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
-         ++i) {
-      dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
-    }
-  });
-}
-
 } // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL
@@ -976,8 +1072,6 @@ extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
       "hal_target_rocm");
   mlir::iree_compiler::IREE::HAL::
       addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
-  mlir::iree_compiler::IREE::HAL::
-      addAMDGPUDefaultTuningSpecsToGlobalEmbeddedDataDirectory();
   return true;
 }
 

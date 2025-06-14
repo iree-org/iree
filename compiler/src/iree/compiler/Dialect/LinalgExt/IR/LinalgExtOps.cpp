@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -133,29 +135,35 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
                       });
 }
 
-//===----------------------------------------------------------------------===//
-// ScatterOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult ScatterOp::verify() {
-  Operation *op = getOperation();
-  if (getInputs().size() != 2) {
-    return op->emitOpError("expected two input operands");
+/// Helper function to verify both `scatter` and `gather`. Since both ops share
+/// the same sementics, we can use the same function to verify them. Note: this
+/// is written from the perspective of `scatter` op. For gather, `updateType`
+/// maps to the type of the output and `originalType` maps to the type of the
+/// `source`.
+template <typename OpTy>
+static LogicalResult
+verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
+                    ShapedType updateType, StringRef originalName,
+                    StringRef updateName) {
+  static_assert(llvm::is_one_of<OpTy, GatherOp, ScatterOp>::value,
+                "applies to only gather or scatter operations");
+  if (op.getInputs().size() != 2) {
+    return op.emitOpError("expected two input operands");
   }
-  if (getOutputs().size() != 1) {
-    return op->emitOpError("expected one output operand");
+  if (op.getOutputs().size() != 1) {
+    return op.emitOpError("expected one output operand");
   }
 
-  auto indicesType = getIndicesType();
+  auto indicesType = op.getIndicesType();
   if (indicesType.getRank() < 1 ||
       !isa<IntegerType>(indicesType.getElementType())) {
     return op->emitOpError("expected indices to be of rank 1 or greater and of "
                            "integer element type");
   }
 
-  ArrayRef<int64_t> dimMap = getDimensionMap();
+  ArrayRef<int64_t> dimMap = op.getDimensionMap();
   if (failed(isPermSequence(
-          [&]() { return this->emitOpError("dimension map is invalid."); },
+          [&]() { return op->emitOpError("dimension map is invalid."); },
           dimMap))) {
     return failure();
   }
@@ -164,23 +172,24 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError("dimension map must have at least one element");
   }
 
-  const size_t indexDepth = getIndexDepth();
-  auto originalType = getOriginalType();
-  auto updateType = getUpdateType();
+  const size_t indexDepth = op.getIndexDepth();
   const auto originalSliceRank = originalType.getRank() - indexDepth;
   if (originalSliceRank < 0) {
-    return op->emitOpError(
-        "expected original rank to be greater or equal to index depth");
+    return op->emitOpError("expected " + originalName +
+                           " rank to be greater or equal to index depth");
   }
   if (updateType.getRank() < originalSliceRank) {
-    return op->emitOpError(
-        "expected update to be at least the rank of non indexed original dims");
+    return op->emitOpError("expected " + updateName +
+                           " to be at least the rank of non indexed " +
+                           originalName + " dims");
   }
   const size_t batchRank = updateType.getRank() - originalSliceRank;
 
   if (updateType.getRank() - batchRank != originalSliceRank) {
-    return op->emitOpError("expected rank of update value - batch rank to be "
-                           "equal to rank of original value - index depth");
+    return op->emitOpError("expected rank of " + updateName +
+                           " value - batch rank to be "
+                           "equal to rank of " +
+                           originalName + " value - index depth");
   }
 
   if ((indicesType.getRank() != batchRank || indexDepth != 1) &&
@@ -196,8 +205,8 @@ LogicalResult ScatterOp::verify() {
         llvm::mismatch(indicesType.getShape().take_front(batchRank),
                        updateType.getShape().take_front(batchRank));
     if (indicesIt != indicesType.getShape().take_front(batchRank).end()) {
-      return op->emitOpError(
-                 "mismatch in shape of indices and update value at dim#")
+      return op->emitOpError("mismatch in shape of indices and " + updateName +
+                             " value at dim#")
              << (indicesIt - indicesType.getShape().begin());
     }
   }
@@ -208,7 +217,7 @@ LogicalResult ScatterOp::verify() {
   }
 
   {
-    for (auto idx : llvm::seq<int64_t>(0, getUpdateSliceRank())) {
+    for (auto idx : llvm::seq<int64_t>(0, sliceRank)) {
       int64_t updateDim = idx + batchRank;
       int64_t origDim = idx + indexDepth;
       if (originalType.isDynamicDim(origDim) ||
@@ -217,15 +226,31 @@ LogicalResult ScatterOp::verify() {
       }
       if (originalType.getDimSize(origDim) !=
           updateType.getDimSize(updateDim)) {
-        return op->emitOpError("shape of update value dim#")
-               << (updateDim) << " must match original value at dim#"
-               << (origDim);
+        return op->emitOpError("shape of " + updateName + " value dim#")
+               << (updateDim)
+               << " must match " + originalName + " value at dim#" << (origDim);
       }
     }
   }
 
-  Region &region = this->getRegion();
-  Block *body = &region.front();
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ScatterOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ScatterOp::verify() {
+  ShapedType originalType = getOriginalType();
+  ShapedType updateType = getUpdateType();
+  ScatterOp op = *this;
+
+  if (failed(verifyGatherScatter(op, getUpdateSliceRank(), originalType,
+                                 updateType, "original", "update"))) {
+    return failure();
+  }
+
+  Block *body = &getRegion().front();
   if (body->getNumArguments() != 2) {
     return op->emitOpError("expected region to have two arguments");
   }
@@ -259,6 +284,7 @@ LogicalResult ScatterOp::verify() {
     return yieldOp.emitOpError("mismatch in type of yielded value ")
            << yieldedType << " and argument of the region " << arg0Type;
   }
+
   return success();
 }
 
@@ -283,6 +309,250 @@ SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
   return {AffineMap(nullptr)};
+}
+
+//===----------------------------------------------------------------------===//
+// GatherOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult GatherOp::verify() {
+  return verifyGatherScatter(*this, getOutputSliceRank(), getSourceType(),
+                             getOutputType(), "source", "output");
+}
+
+LogicalResult
+GatherOp::reifyResultShapes(OpBuilder &b,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+  return SmallVector<int64_t>(getOutputType().getShape());
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForOperands() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      AffineMap(nullptr),
+      builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
+SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
+  Builder builder(getContext());
+  return SmallVector<AffineMap>{
+      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+}
+
+namespace {
+struct ConvertGatherToExtract
+    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
+                                PatternRewriter &rewriter) const override {
+    // TODO: support memref case.
+    if (!gatherOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    auto loc = gatherOp.getLoc();
+    ArrayRef<int64_t> indicesShape = gatherOp.getIndicesType().getShape();
+    ArrayRef<int64_t> batchShape =
+        indicesShape.take_front(gatherOp.getBatchRank());
+    if (!llvm::all_of(batchShape, [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+
+    // Get all `indexDepth` indices as scalars.
+    SmallVector<Value> indices(indicesShape.size(),
+                               rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    SmallVector<OpFoldResult> offsets(gatherOp.getIndexDepth());
+    for (int64_t i = 0; i < gatherOp.getIndexDepth(); ++i) {
+      indices.back() = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value elem = rewriter.create<tensor::ExtractOp>(
+          loc, gatherOp.getIndices(), indices);
+      offsets[i] =
+          rewriter
+              .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
+              .getResult();
+    }
+
+    applyPermutationToVector(offsets, gatherOp.getDimensionMap());
+    int64_t sourceRank = gatherOp.getSourceType().getRank();
+    offsets.resize(sourceRank, rewriter.getIndexAttr(0));
+
+    // Create the new `tensor.extract_slice`.
+    SmallVector<OpFoldResult> strides(sourceRank, rewriter.getIndexAttr(1));
+    SmallVector<int64_t> resultShape(gatherOp.getIndexDepth(), 1);
+    SmallVector<OpFoldResult> sizes(gatherOp.getIndexDepth(),
+                                    rewriter.getIndexAttr(1));
+    for (int64_t i = gatherOp.getIndexDepth(); i < sourceRank; ++i) {
+      sizes.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, gatherOp.getSource(), i));
+      resultShape.push_back(gatherOp.getSourceType().getDimSize(i));
+    }
+    auto resultType =
+        cast<RankedTensorType>(gatherOp.getSourceType()).clone(resultShape);
+    auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
+        loc, resultType, gatherOp.getSource(), offsets, sizes, strides);
+
+    // `sliceOp` may differ from the expected result type by leading unit
+    // dimensions. Reshape so that the types match.
+    int64_t sliceRank = sliceOp.getResultType().getRank();
+    int64_t gatherRank = gatherOp.getOutputType().getRank();
+    if (sliceRank < gatherRank) {
+      SmallVector<ReassociationIndices> reassoc(1);
+      llvm::append_range(reassoc[0], llvm::seq(gatherOp.getBatchRank()));
+      for (int64_t i = 0; i < sourceRank - 1; ++i) {
+        reassoc.emplace_back(1, i + gatherOp.getBatchRank());
+      }
+
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
+          gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
+    } else if (sliceRank > gatherRank) {
+      SmallVector<ReassociationIndices> reassoc(1);
+      llvm::append_range(reassoc[0], llvm::seq(sliceRank - gatherRank + 1));
+      for (int64_t i = sliceRank - gatherRank + 1; i < sliceRank; ++i) {
+        reassoc.emplace_back(1, i);
+      }
+
+      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
+          gatherOp, gatherOp.getOutputType(), sliceOp.getResult(), reassoc);
+    } else {
+      rewriter.replaceOp(gatherOp, sliceOp);
+    }
+    return success();
+  }
+};
+} // namespace
+
+void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *ctx) {
+  results.add<ConvertGatherToExtract>(ctx);
+}
+
+//===----------------------------------------------------------------------===//
+// MapScatterOp
+//===----------------------------------------------------------------------===//
+
+MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
+                                                    Location loc, Value input,
+                                                    Value output) {
+  assert(input.getType() == output.getType() &&
+         "expected input and output types to match");
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  auto mapScatterOp =
+      builder.create<MapScatterOp>(loc, resultType, input, output);
+
+  // Add the transformation block with an identity transformation.
+  Region &region = mapScatterOp.getTransformationRegion();
+  auto inputType = cast<ShapedType>(input.getType());
+  SmallVector<Location> blockArgLocs(inputType.getRank(), loc);
+  SmallVector<Type> indexTypes(inputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+  Value mask = builder.create<arith::ConstantIntOp>(loc, /*value=*/1,
+                                                    /*width=*/1);
+  yieldedValues.push_back(mask);
+  builder.create<IREE::LinalgExt::YieldOp>(loc, yieldedValues);
+  return mapScatterOp;
+}
+
+LogicalResult MapScatterOp::verify() {
+  if (getInputType().getElementType() != getOutputType().getElementType()) {
+    return emitOpError("expected input and output element types to match");
+  }
+  Region &transformRegion = getTransformationRegion();
+  Block &transformBody = transformRegion.getBlocks().front();
+  if (transformBody.getNumArguments() != getInputRank()) {
+    return emitOpError("expected number of block arguments to be equal "
+                       "to the input rank");
+  }
+  if (!llvm::all_of(transformBody.getArgumentTypes(),
+                    llvm::IsaPred<IndexType>)) {
+    return emitOpError("expected block arguments to be index types");
+  }
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  if (yieldOp->getNumOperands() != getOutputRank() + 1) {
+    return yieldOp.emitOpError("expected transformation_region to yield a "
+                               "value for each output dimension and a mask");
+  }
+  for (int operandIdx = 0; operandIdx < getOutputRank(); ++operandIdx) {
+    if (!isa<IndexType>(yieldOp.getOperandTypes()[operandIdx])) {
+      return yieldOp.emitOpError("expected yielded indices to be index types");
+    }
+  }
+  auto maskType =
+      dyn_cast<IntegerType>(yieldOp.getOperandTypes()[getOutputRank()]);
+  if (!maskType || maskType.getIntOrFloatBitWidth() != 1) {
+    return yieldOp.emitOpError("expected yielded mask to be i1 type");
+  }
+  return success();
+}
+
+void MapScatterOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numSourceIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldSourceIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numSourceIndices, builder.getIndexType());
+  SmallVector<Location> locs(numSourceIndices, getLoc());
+
+  // Create the new block arguments for the new source indices, and transform
+  // them using the callback.
+  SmallVector<BlockArgument> newSourceIndices(
+      transformBody.addArguments(indexTypes, locs));
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(&transformBody);
+  SmallVector<Value> newSourceIndicesTransformed(
+      transformationBuilder(newSourceIndices));
+
+  // Replace the old source indices with the results of the transformation on
+  // the new source indices.
+  assert(oldSourceIndices.size() == newSourceIndicesTransformed.size() &&
+         "expected transformation to produce the same number of Values as the "
+         "previous number of source indices.");
+  for (auto [oldIdx, newIdx] :
+       llvm::zip_equal(oldSourceIndices, newSourceIndicesTransformed)) {
+    SmallVector<OpOperand *> uses(llvm::make_pointer_range(oldIdx.getUses()));
+    for (OpOperand *use : uses) {
+      use->set(newIdx);
+    }
+  }
+  transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
+bool MapScatterOp::isIdentity() {
+  if (getInputType() != getOutputType()) {
+    return false;
+  }
+
+  // Check that the mask is always true.
+  Block &transformBody = getTransformationRegion().getBlocks().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  Value mask = yieldOp->getOperands().back();
+  std::optional<int64_t> constMask = getConstantIntValue(mask);
+  if (!constMask.has_value() || *constMask == 0) {
+    return false;
+  }
+
+  // Check that the block arguments are directly yielded in the order that they
+  // are defined in the block.
+  for (int i = 0; i < getOutputRank(); ++i) {
+    auto yieldedBbArg = dyn_cast<BlockArgument>(yieldOp.getOperand(i));
+    if (yieldedBbArg != transformBody.getArgument(i)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -350,6 +620,92 @@ SortOp::reifyResultShapes(OpBuilder &b,
                           ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+namespace {
+
+/// This pattern removes unused results from SortOp. The SortOp uses the
+/// Destination Passing Style interface so it's results are tied to it's
+/// operands as well as it's comparitor block arguments. So, to remove unused
+/// results we must also remove the associated operands and block arguments.
+///
+/// For example:
+///
+/// %0:2 = iree_linalg_ext.sort dimension(1) outs(%arg0, %arg1:
+/// tensor<?x10xf32>, tensor<?x10xi64>) {
+///   ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
+///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
+///    iree_linalg_ext.yield %42 : i1
+/// } -> tensor<?x10xf32>, tensor<?x10xi64>
+///
+/// ->
+///
+/// %0 = iree_linalg_ext.sort dimension(1) outs(%arg0: tensor<?x10xf32>) {
+///   ^bb0(%arg2: f32, %arg3: f32):
+///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
+///    iree_linalg_ext.yield %42 : i1
+/// } -> tensor<?x10xf32>
+///
+/// Note: that we will not remove unused results if their associated block
+/// arguments are used within the comparitor because that's needed for op
+/// functionality.
+struct RemoveUnusedSortOpResults
+    : public OpRewritePattern<IREE::LinalgExt::SortOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
+                                PatternRewriter &rewriter) const override {
+    // To avoid problems in dispatches associated with unused results, prune
+    // them here.
+    Location loc = sortOp->getLoc();
+    auto operands = sortOp.getOutputs();
+    auto results = sortOp.getResults();
+    unsigned numRes = sortOp.getNumResults();
+
+    // # TODO(#20831): Add support for removing unused operands when the op has
+    // pure buffer semantics.
+    if (sortOp.hasPureBufferSemantics()) {
+      return failure();
+    }
+
+    Block &block = sortOp.getRegion().front();
+    auto blockArgs = block.getArguments();
+    SmallVector<Value> usedBlockArgs, usedOperands, usedResults;
+    SmallVector<Type> usedResultTypes;
+    BitVector eraseArg(numRes * 2, false);
+    for (auto idx : llvm::seq<unsigned>(numRes)) {
+      // If result or associated block arg is used, do not erase.
+      if (!results[idx].use_empty() || !blockArgs[2 * idx].use_empty() ||
+          !blockArgs[2 * idx + 1].use_empty()) {
+        usedOperands.push_back(operands[idx]);
+        usedResults.push_back(results[idx]);
+        usedResultTypes.push_back(results[idx].getType());
+        continue;
+      }
+      eraseArg.set(2 * idx, 2 * idx + 2);
+    }
+
+    // Bail out if no pruning required.
+    if (eraseArg.none()) {
+      return failure();
+    }
+
+    // Create new op using only operands associated to used results or block
+    // args.
+    auto newSortOp = rewriter.create<IREE::LinalgExt::SortOp>(
+        loc, usedResultTypes,
+        /*inputs=*/ValueRange{}, usedOperands, sortOp.getDimension());
+    newSortOp.getRegion().takeBody(sortOp.getRegion());
+    newSortOp.getRegion().front().eraseArguments(eraseArg);
+    rewriter.replaceAllUsesWith(usedResults, newSortOp.getResults());
+    rewriter.eraseOp(sortOp);
+    return success();
+  }
+};
+} // namespace
+
+void SortOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *ctx) {
+  results.add<RemoveUnusedSortOpResults>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -554,13 +910,79 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// ArgmaxOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgmaxOp::verify() {
+  Operation *op = getOperation();
+
+  if (getNumDpsInputs() != 1) {
+    return op->emitOpError(
+               "expected exactly one input operand (values), but got ")
+           << getNumDpsInputs();
+  }
+
+  if (getNumDpsInits() != 2) {
+    return op->emitOpError(
+               "expected two output operands (value and index), but got ")
+           << getNumDpsInits();
+  }
+
+  uint64_t dim = getDimension();
+  int64_t rank = getInputRank();
+  if (dim >= rank) {
+    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
+           << "got dimension: " << dim << ", but input rank is: " << rank;
+  }
+
+  ShapedType inputType = getInputType();
+  auto outputValueType = getOutputValueType();
+  auto outputIndexType = getOutputIndexType();
+
+  if (inputType.getElementType() != outputValueType.getElementType()) {
+    return op->emitOpError("input and output value element types must match. ")
+           << "Input type: " << inputType.getElementType()
+           << ", output value type: " << outputValueType.getElementType();
+  }
+
+  if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
+    return op->emitOpError("output indices/values shape must match. ")
+           << "Output value shape: "
+           << llvm::interleaved_array(outputValueType.getShape())
+           << ", output index shape: "
+           << llvm::interleaved_array(outputIndexType.getShape());
+  }
+
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < getInputRank(); ++i) {
+    if (i != dim)
+      expectedShape.push_back(inputType.getDimSize(i));
+  }
+  if (!llvm::equal(expectedShape, outputValueType.getShape())) {
+    return op->emitOpError("output shape must match input shape with reduction "
+                           "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: "
+           << llvm::interleaved_array(outputValueType.getShape());
+  }
+
+  return success();
+}
+
+LogicalResult
+ArgmaxOp::reifyResultShapes(OpBuilder &b,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
 /// Return true if at least one element in `tiles` is zero.
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
-  return llvm::any_of(
-      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
+  return llvm::any_of(tiles, isZeroInteger);
 }
 
 /// Check if we have enough static information to catch undefined behavior when
@@ -1614,13 +2036,16 @@ SmallVector<int64_t> Im2colOp::getKOutputDims() {
 }
 
 /// Custom builder methods for im2col op.
-void Im2colOp::build(
-    OpBuilder &builder, OperationState &state, Value input, Value output,
-    ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations,
-    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
-    ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
-    ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
-    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
+void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
+                     Value output, ArrayRef<int64_t> strides,
+                     ArrayRef<int64_t> dilations,
+                     ArrayRef<OpFoldResult> kernelSize,
+                     ArrayRef<OpFoldResult> mOffset,
+                     ArrayRef<OpFoldResult> mStrides,
+                     ArrayRef<OpFoldResult> kOffset,
+                     ArrayRef<OpFoldResult> kStrides,
+                     ArrayRef<int64_t> batchPos, ArrayRef<int64_t> mPos,
+                     ArrayRef<int64_t> kPos, ArrayRef<int64_t> inputKPerm) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
@@ -1648,7 +2073,8 @@ void Im2colOp::build(
         builder.getDenseI64ArrayAttr(staticKOffset), dynamicKStrides,
         builder.getDenseI64ArrayAttr(staticKStrides),
         builder.getDenseI64ArrayAttr(batchPos),
-        builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos));
+        builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos),
+        builder.getDenseI64ArrayAttr(inputKPerm));
 }
 
 LogicalResult Im2colOp::verify() {
@@ -1711,6 +2137,7 @@ LogicalResult Im2colOp::verify() {
   ArrayRef<int64_t> strides = getStrides();
   ArrayRef<int64_t> dilations = getDilations();
   SmallVector<OpFoldResult> kernelSize = getMixedKernelSize();
+  ArrayRef<int64_t> inputKPerm = getInputKPerm();
   if (kernelSize.size() != mPos.size()) {
     return op->emitOpError(
         "expected kernel rank to be equal to the m_pos rank");
@@ -1722,6 +2149,23 @@ LogicalResult Im2colOp::verify() {
   if (dilations.size() != kernelSize.size()) {
     return op->emitOpError(
         "expected dilations rank to be equal to the kernel rank");
+  }
+
+  size_t sharedRank = mPos.size() + kPos.size();
+  if (inputKPerm.size() != sharedRank) {
+    return op->emitOpError("expected input_k_perm size (")
+           << inputKPerm.size()
+           << ") to match the number of shared dimensions (m_Pos + k_pos = "
+           << sharedRank << ")";
+  }
+  SmallVector<int64_t> permVec(inputKPerm.begin(), inputKPerm.end());
+  llvm::sort(permVec);
+  for (int64_t i = 0; i < static_cast<int64_t>(sharedRank); ++i) {
+    if (permVec[i] != i) {
+      return op->emitOpError(
+                 "expected input_k_perm to be a permutation of [0, ")
+             << sharedRank << ")";
+    }
   }
 
   // Verify input and output shapes.
@@ -1950,10 +2394,13 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
   }
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
+DEFINE_OP_GET_EFFECTS(GatherOp)
+DEFINE_OP_GET_EFFECTS(MapScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
+DEFINE_OP_GET_EFFECTS(ArgmaxOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)

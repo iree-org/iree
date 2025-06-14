@@ -77,266 +77,6 @@ LogicalResult BarrierRegionOp::verifyRegions() {
 }
 
 //===----------------------------------------------------------------------===//
-// MultiMmaOp
-//===----------------------------------------------------------------------===//
-
-void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
-                       Value rhs, Value acc, ArrayRef<AffineMap> indexingMaps,
-                       ArrayRef<utils::IteratorType> iteratorTypes,
-                       MmaInterfaceAttr kind,
-                       std::optional<SmallVector<int64_t>> lhsPermutation,
-                       std::optional<SmallVector<int64_t>> rhsPermutation,
-                       std::optional<SmallVector<int64_t>> accPermutation) {
-  result.addOperands({lhs, rhs, acc});
-  result.addTypes(acc.getType());
-  result.addAttribute(getIndexingMapsAttrName(result.name),
-                      builder.getAffineMapArrayAttr(indexingMaps));
-  result.addAttribute(
-      getIteratorTypesAttrName(result.name),
-      builder.getArrayAttr(llvm::to_vector(llvm::map_range(
-          iteratorTypes, [&](utils::IteratorType t) -> mlir::Attribute {
-            return IteratorTypeAttr::get(builder.getContext(), t);
-          }))));
-  result.addAttribute(getKindAttrName(result.name), kind);
-  if (lhsPermutation) {
-    result.addAttribute(getLhsPermutationAttrName(result.name),
-                        builder.getDenseI64ArrayAttr(*lhsPermutation));
-  }
-  if (rhsPermutation) {
-    result.addAttribute(getRhsPermutationAttrName(result.name),
-                        builder.getDenseI64ArrayAttr(*rhsPermutation));
-  }
-  if (accPermutation) {
-    result.addAttribute(getAccPermutationAttrName(result.name),
-                        builder.getDenseI64ArrayAttr(*accPermutation));
-  }
-}
-
-void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
-                       Value rhs, Value acc,
-                       ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
-                       ArrayRef<utils::IteratorType> iteratorTypes,
-                       MmaInterfaceAttr kind,
-                       std::optional<SmallVector<int64_t>> lhsPermutation,
-                       std::optional<SmallVector<int64_t>> rhsPermutation,
-                       std::optional<SmallVector<int64_t>> accPermutation) {
-  build(builder, result, lhs, rhs, acc,
-        AffineMap::inferFromExprList(indexingExprs, builder.getContext()),
-        iteratorTypes, kind, lhsPermutation, rhsPermutation, accPermutation);
-}
-
-void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
-                       Value rhs, Value acc, ArrayAttr indexingMaps,
-                       ArrayAttr iteratorTypes, MmaInterfaceAttr kind,
-                       std::optional<DenseI64ArrayAttr> lhsPermutation,
-                       std::optional<DenseI64ArrayAttr> rhsPermutation,
-                       std::optional<DenseI64ArrayAttr> accPermutation) {
-  result.addOperands({lhs, rhs, acc});
-  result.addTypes(acc.getType());
-  result.addAttribute(getIndexingMapsAttrName(result.name), indexingMaps);
-  result.addAttribute(getIteratorTypesAttrName(result.name), iteratorTypes);
-  result.addAttribute(getKindAttrName(result.name), kind);
-  if (lhsPermutation) {
-    result.addAttribute(getLhsPermutationAttrName(result.name),
-                        *lhsPermutation);
-  }
-  if (rhsPermutation) {
-    result.addAttribute(getRhsPermutationAttrName(result.name),
-                        *rhsPermutation);
-  }
-  if (accPermutation) {
-    result.addAttribute(getAccPermutationAttrName(result.name),
-                        *accPermutation);
-  }
-}
-
-static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
-  return std::accumulate(shape.begin(), shape.end(), 1,
-                         std::multiplies<int64_t>());
-}
-
-LogicalResult MultiMmaOp::verify() {
-  ShapedType lhsType = getLhsType();
-  ShapedType rhsType = getRhsType();
-  ShapedType accType = getAccType();
-
-  SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
-
-  // Verify that an indexing map was specified for each operand.
-  if (indexingMaps.size() != 3)
-    return emitOpError("expected an indexing map for each operand");
-
-  // Verify that each index map has 'numIterators' inputs, no symbols, and
-  // that the number of map outputs equals the rank of its associated
-  // vector operand.
-  unsigned numIterators = getIteratorTypes().getValue().size();
-  for (const auto &it : llvm::enumerate(indexingMaps)) {
-    auto index = it.index();
-    auto map = it.value();
-    if (map.getNumSymbols() != 0)
-      return emitOpError("expected indexing map ")
-             << index << " to have no symbols";
-    auto shapedType = llvm::dyn_cast<ShapedType>(getOperand(index).getType());
-    unsigned rank = shapedType.getRank();
-    // Verify that the map has the right number of inputs, outputs, and indices.
-    // This also correctly accounts for (..) -> () for rank-0 results.
-    if (map.getNumDims() != numIterators)
-      return emitOpError("expected indexing map ")
-             << index << " to have " << numIterators << " number of inputs";
-    if (map.getNumResults() >= rank)
-      return emitOpError("expected indexing map ")
-             << index << " to have fewer than " << rank << " number of outputs";
-    if (!map.isProjectedPermutation())
-      return emitOpError("expected indexing map ")
-             << index << " to be a projected permutation of its inputs";
-
-    for (auto size :
-         shapedType.getShape().take_back(rank - map.getNumResults())) {
-      if (ShapedType::isDynamic(size)) {
-        return emitOpError("Unexpected dynamic inner dim for operand ")
-               << index << " of type " << shapedType;
-      }
-    }
-  }
-
-  if (failed(linalg::inferContractionDims(indexingMaps))) {
-    return emitOpError("failed to infer contraction dims");
-  }
-
-  SmallVector<int64_t> bounds;
-  getIterationBounds(bounds);
-  // The truncation functionality of llvm::zip is intentional here to ignore
-  // the inner dimensions.
-  auto verifyOperandShape = [&](ShapedType type, AffineMap map) {
-    for (auto [dim, size] : llvm::zip(map.getResults(), type.getShape())) {
-      int64_t dimIdx = cast<AffineDimExpr>(dim).getPosition();
-      if (size != bounds[dimIdx]) {
-        return failure();
-      }
-    }
-    return success();
-  };
-  if (failed(verifyOperandShape(lhsType, indexingMaps[0]))) {
-    return emitOpError("lhs shape does not match iteration bounds");
-  }
-  if (failed(verifyOperandShape(rhsType, indexingMaps[1]))) {
-    return emitOpError("rhs shape does not match iteration bounds");
-  }
-  if (failed(verifyOperandShape(accType, indexingMaps[2]))) {
-    return emitOpError("accumulator shape does not match iteration bounds");
-  }
-
-  // Verify supported combining kind.
-  auto [lType, rType, aType] = getKind().getABCElementTypes();
-  if (lType != lhsType.getElementType()) {
-    return emitOpError("lhs element type ")
-           << lhsType.getElementType()
-           << " does not match expected element type " << lType
-           << " for intrinsic";
-  }
-  if (rType != rhsType.getElementType()) {
-    return emitOpError("rhs element type ")
-           << rhsType.getElementType()
-           << " does not match expected element type " << rType
-           << " for intrinsic";
-  }
-  if (aType != accType.getElementType()) {
-    return emitOpError("accumulator element type ")
-           << accType.getElementType()
-           << " does not match expected element type " << aType
-           << " for intrinsic";
-  }
-
-  int64_t lhsInnerElementCount = multiplyAcc(getLhsInnerShape());
-  int64_t rhsInnerElementCount = multiplyAcc(getRhsInnerShape());
-  int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
-
-  auto [m, n, k] = getKind().getMNKShape();
-  int64_t expectedNumLhsElem = m * k;
-  int64_t expectedNumRhsElem = n * k;
-  int64_t expectedNumAccElem = m * n;
-
-  if (expectedNumLhsElem != lhsInnerElementCount ||
-      expectedNumRhsElem != rhsInnerElementCount ||
-      expectedNumAccElem != accInnerElementCount) {
-    auto [lhsThreadType, rhsThreadType, accThreadType] =
-        getKind().getABCVectorTypes();
-    int64_t lhsThreadElementCount = multiplyAcc(lhsThreadType.getShape());
-    int64_t rhsThreadElementCount = multiplyAcc(rhsThreadType.getShape());
-    int64_t accThreadElementCount = multiplyAcc(accThreadType.getShape());
-    if (lhsInnerElementCount != lhsThreadElementCount ||
-        rhsInnerElementCount != rhsThreadElementCount ||
-        accInnerElementCount != accThreadElementCount) {
-      return emitOpError("operation parallel semantics can't be inferred as "
-                         "either thread or subgroup");
-    }
-
-    if (getLhsPermutation() || getRhsPermutation() || getAccPermutation()) {
-      return emitOpError("permutations require subgroup semantics");
-    }
-  }
-
-  if (getLhsPermutation() && !isPermutationVector(*getLhsPermutation())) {
-    return emitOpError("invalid lhs permutation");
-  }
-  if (getRhsPermutation() && !isPermutationVector(*getRhsPermutation())) {
-    return emitOpError("invalid rhs permutation");
-  }
-  if (getAccPermutation() && !isPermutationVector(*getAccPermutation())) {
-    return emitOpError("invalid accumulator permutation");
-  }
-
-  return success();
-}
-
-bool MultiMmaOp::hasThreadSemantics() {
-  int64_t lhsInnerElementCount = multiplyAcc(getLhsInnerShape());
-  int64_t rhsInnerElementCount = multiplyAcc(getRhsInnerShape());
-  int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
-
-  // If it does not have subgroup semantics, then it must have thread semantics.
-  auto [m, n, k] = getKind().getMNKShape();
-  return m * k != lhsInnerElementCount || n * k != rhsInnerElementCount ||
-         m * n != accInnerElementCount;
-}
-
-static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
-  for (int64_t i = 0, e = map.getNumResults(); i < e; ++i)
-    if (targetExpr == map.getResult(i))
-      return i;
-  return -1;
-}
-
-void MultiMmaOp::getIterationBounds(SmallVectorImpl<int64_t> &iterationBounds) {
-  auto lhsShape = getLhsType().getShape();
-  auto resType = getResultType();
-  SmallVector<AffineMap, 4> indexingMaps(getIndexingMapsArray());
-  SmallVector<int64_t, 2> iterationShape;
-  for (const auto &it : llvm::enumerate(getIteratorTypes())) {
-    // Search lhs/rhs map results for 'targetExpr'.
-    auto targetExpr = getAffineDimExpr(it.index(), getContext());
-    auto iteratorType = llvm::cast<IteratorTypeAttr>(it.value()).getValue();
-    if (iteratorType == utils::IteratorType::reduction) {
-      // Get reduction dim size from lhs shape (same size in rhsShape).
-      int64_t lhsDimIndex = getResultIndex(indexingMaps[0], targetExpr);
-      assert(lhsDimIndex >= 0);
-      iterationBounds.push_back(lhsShape[lhsDimIndex]);
-      continue;
-    }
-    // Get parallel dimension size from result shape.
-    int64_t resDimIndex = getResultIndex(indexingMaps[2], targetExpr);
-    assert(resDimIndex >= 0);
-    iterationBounds.push_back(resType.getShape()[resDimIndex]);
-  }
-}
-
-std::optional<SmallVector<int64_t, 4>> MultiMmaOp::getShapeForUnroll() {
-  SmallVector<int64_t, 4> shape;
-  getIterationBounds(shape);
-  return shape;
-}
-
-//===----------------------------------------------------------------------===//
 // ValueBarrierOp
 //===----------------------------------------------------------------------===//
 
@@ -368,6 +108,81 @@ LogicalResult ValueBarrierOp::verify() {
   }
 
   return success();
+}
+
+// AMD Specific Operations
+
+//===----------------------------------------------------------------------===//
+// BufferResourceCastOp
+//===----------------------------------------------------------------------===//
+
+static RankedTensorType getMaximumStaticType(tensor::CastOp castOp) {
+  auto inputType = dyn_cast<RankedTensorType>(castOp.getSource().getType());
+  auto resultType = dyn_cast<RankedTensorType>(castOp.getType());
+  if (!inputType || !resultType) {
+    return RankedTensorType();
+  }
+
+  assert(inputType.getRank() == resultType.getRank() &&
+         "Rank must match for ranked -> ranked cast");
+
+  SmallVector<int64_t> join;
+  join.reserve(inputType.getRank());
+  for (int64_t i = 0; i < inputType.getRank(); ++i) {
+    if (inputType.isDynamicDim(i)) {
+      join.push_back(resultType.getDimSize(i));
+      continue;
+    }
+    if (resultType.isDynamicDim(i)) {
+      join.push_back(inputType.getDimSize(i));
+      continue;
+    }
+
+    // Cast verifier requires that static sizes match.
+    join.push_back(inputType.getDimSize(i));
+  }
+  return RankedTensorType::get(join, inputType.getElementType());
+}
+
+struct FoldBufferCastOfTensorCast final
+    : OpRewritePattern<BufferResourceCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferResourceCastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    // Check whether the cast increases the amount of available static info.
+    auto tensorCast = castOp.getInput().getDefiningOp<tensor::CastOp>();
+    if (!tensorCast) {
+      return failure();
+    }
+
+    RankedTensorType maxStaticType = getMaximumStaticType(tensorCast);
+    if (!maxStaticType || maxStaticType == castOp.getInput().getType()) {
+      return failure();
+    }
+
+    Value newSource = tensorCast.getSource();
+    if (newSource.getType() != maxStaticType) {
+      // Cast to the type with maximum static information if the input and
+      // result types contain different static info.
+      newSource = rewriter.create<tensor::CastOp>(castOp.getLoc(),
+                                                  maxStaticType, newSource);
+    }
+    auto newBufferCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
+        castOp.getLoc(), maxStaticType, newSource,
+        castOp.getCacheSwizzleStride());
+    newBufferCast->setDiscardableAttrs(castOp->getDiscardableAttrDictionary());
+
+    // Cast back to the original result type.
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(
+        castOp, castOp.getResult().getType(), newBufferCast);
+    return success();
+  };
+};
+
+void BufferResourceCastOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *ctx) {
+  results.add<FoldBufferCastOfTensorCast>(ctx);
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

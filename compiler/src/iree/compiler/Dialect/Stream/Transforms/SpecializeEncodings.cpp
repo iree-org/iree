@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -63,7 +64,7 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 } // namespace
 
 /// Returns true iff the type is a RankedTensorType and it has an encoding that
-/// implements SerializableEncodingAttrInterface.
+/// implements SerializableAttr.
 static bool isRecognizedEncodingType(Type type) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
@@ -73,7 +74,7 @@ static bool isRecognizedEncodingType(Type type) {
   if (!encoding) {
     return false;
   }
-  return isa<IREE::Encoding::SerializableEncodingAttrInterface>(encoding);
+  return isa<IREE::Encoding::SerializableAttr>(encoding);
 }
 
 /// Returns the type with updated encoding, if any. Returns the original type if
@@ -85,31 +86,26 @@ static bool isRecognizedEncodingType(Type type) {
 /// There are requirements to get the resolved layouts. Otherwise, the encodings
 /// are dropped.
 ///   - All attributes in the `layoutResolvers` must implement
-///     EncodingLayoutResolverAttrInterface. Otherwise, there is no way to query
-///     layouts.
-///   - The encoding on the type must implement
-///     SerializableEncodingAttrInterface. Otherwise, there is no way to update
-///     encodings.
+///     LayoutResolverAttr. Otherwise, there is no way to query layouts.
+///   - The encoding on the type must implement SerializableAttr. Otherwise,
+///     there is no way to update encodings.
 static Type getTypeWithResolvedEncodingLayouts(
     Type type, const SetVector<Attribute> &layoutResolvers) {
   if (!isRecognizedEncodingType(type)) {
     return type;
   }
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
-  auto encodingAttr =
-      IREE::Encoding::getSerializableEncodingAttrInterface(rankedTensorType);
+  auto encodingAttr = IREE::Encoding::getSerializableAttr(rankedTensorType);
   if (encodingAttr.isSerialized()) {
     return type;
   }
-  if (!llvm::all_of(
-          layoutResolvers,
-          llvm::IsaPred<IREE::Encoding::EncodingLayoutResolverAttrInterface>)) {
+  if (!llvm::all_of(layoutResolvers,
+                    llvm::IsaPred<IREE::Encoding::LayoutResolverAttr>)) {
     return rankedTensorType.dropEncoding();
   }
   SmallVector<Attribute> layouts;
   for (auto attr : layoutResolvers) {
-    auto encodingLayoutAttr =
-        cast<IREE::Encoding::EncodingLayoutResolverAttrInterface>(attr);
+    auto encodingLayoutAttr = cast<IREE::Encoding::LayoutResolverAttr>(attr);
     Attribute layout = encodingLayoutAttr.getLayout(rankedTensorType);
     if (!layout) {
       return nullptr;
@@ -117,7 +113,7 @@ static Type getTypeWithResolvedEncodingLayouts(
     layouts.push_back(layout);
   }
   Attribute newEncoding = encodingAttr.cloneWithLayouts(layouts);
-  assert(isa<IREE::Encoding::SerializableEncodingAttrInterface>(newEncoding));
+  assert(isa<IREE::Encoding::SerializableAttr>(newEncoding));
   return rankedTensorType.cloneWithEncoding(newEncoding);
 };
 
@@ -144,14 +140,11 @@ updateBindingEncodings(FunctionOpInterface funcOp,
                  << "Skip, the new type is not RankedTensorType.\n");
       continue;
     }
-    auto encodingAttr =
-        IREE::Encoding::getSerializableEncodingAttrInterface(newType);
+    auto encodingAttr = IREE::Encoding::getSerializableAttr(newType);
     if (!encodingAttr) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "Skip, the binding layout attribute is not "
-             "SerializableEncodingAttrInterface, which means that the type "
-             "does not have a valid encoding.\n");
+      LLVM_DEBUG(llvm::dbgs() << "Skip, the binding layout attribute is not "
+                                 "SerializableAttr, which means that the type "
+                                 "does not have a valid encoding.\n");
       continue;
     }
     for (auto user : arg.getUsers()) {
@@ -656,8 +649,7 @@ static bool isUnrecognizedOrSerializedEncodingType(Type type) {
     return true;
   }
   auto rankedTensorType = cast<RankedTensorType>(type);
-  return IREE::Encoding::getSerializableEncodingAttrInterface(rankedTensorType)
-      .isSerialized();
+  return IREE::Encoding::getSerializableAttr(rankedTensorType).isSerialized();
 }
 
 /// Updates the target encoding of `op` with resolved layouts.

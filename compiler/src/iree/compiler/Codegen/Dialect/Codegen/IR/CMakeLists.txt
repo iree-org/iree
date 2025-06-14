@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "IREECodegenAttrs.h"
     "IREECodegenDialect.h"
+    "IREECodegenEnums.h"
     "IREECodegenInterfaces.h"
     "IREECodegenOps.h"
     "IREECodegenTypes.h"
@@ -25,6 +26,8 @@ iree_cc_library(
     "IREECodegenAttrs.h.inc"
     "IREECodegenDialect.cpp.inc"
     "IREECodegenDialect.h.inc"
+    "IREECodegenEnums.cpp.inc"
+    "IREECodegenEnums.h.inc"
     "IREECodegenInterfaces.cpp.inc"
     "IREECodegenInterfaces.h.inc"
     "IREECodegenOps.cpp.inc"
@@ -32,8 +35,6 @@ iree_cc_library(
     "IREECodegenTypes.cpp.inc"
     "IREECodegenTypes.h"
     "IREECodegenTypes.h.inc"
-    "LoweringConfigEnums.cpp.inc"
-    "LoweringConfigEnums.h.inc"
     "UKernelOps.cpp.inc"
     "UKernelOps.h.inc"
   SRCS
@@ -43,6 +44,7 @@ iree_cc_library(
     "IREECodegenLibraryManager.cpp"
     "IREECodegenOps.cpp"
     "IREECodegenTypes.cpp"
+    "TilingInterfaceImpl.cpp"
     "UKernelOps.cpp"
   DEPS
     ::IREECodegenDialectGen
@@ -52,6 +54,7 @@ iree_cc_library(
     ::LoweringConfigInterfaceGen
     ::UKernelOpsGen
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
     MLIRBufferizationDialect
@@ -60,14 +63,19 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRParser
     MLIRSCFDialect
     MLIRSupport
+    MLIRTensorDialect
+    MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransformDialectTransforms
+    MLIRVectorInterfaces
     MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
@@ -109,8 +117,8 @@ iree_tablegen_library(
   OUTS
     --gen-attrdef-decls IREECodegenAttrs.h.inc
     --gen-attrdef-defs IREECodegenAttrs.cpp.inc
-    --gen-enum-decls LoweringConfigEnums.h.inc
-    --gen-enum-defs LoweringConfigEnums.cpp.inc
+    --gen-enum-decls IREECodegenEnums.h.inc
+    --gen-enum-defs IREECodegenEnums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -136,6 +144,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     IREECodegenDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "IREECodegenOps.td"
   OUTS

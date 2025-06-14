@@ -6,8 +6,7 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -126,11 +125,29 @@ struct UtilAssumeIntValueBoundsOpInterface
     auto [min, max] =
         assumeOp.getUnionedUnsignedRange(result.getResultNumber());
 
+    std::optional<int64_t> udiv =
+        assumeOp.getUnionedUnsignedDivisor(result.getResultNumber());
+
     if (min) {
       cstr.bound(result) >= *min;
     }
     if (max) {
       cstr.bound(result) <= *max;
+    }
+    if (udiv) {
+      // To represent the divisibility guarantee, emit a bound clamping the
+      // value to the udiv value. i.e.
+      //
+      // v == floordiv(v, udiv) * udiv
+      //
+      // Mod/divide folders can cleanup such terms with the appropriate bounds
+      // query.
+      AffineExpr expr =
+          cstr.getExpr(assumeOp.getOperand(result.getResultNumber()));
+      AffineExpr udivCst =
+          getAffineConstantExpr(udiv.value(), op->getContext());
+      AffineExpr clampExpr = expr.floorDiv(udivCst) * udivCst;
+      cstr.bound(result) == clampExpr;
     }
   }
 };
@@ -284,23 +301,29 @@ struct LinalgOpTiedOpInterfaceHelper {
 };
 
 // TODO(Max191): Remove this interface once GPU data tiling stops using early
-// materialization. This only exists for handling multi_mma ops before dispatch
-// workgroups are created, which only happens with early materialization.
-struct MultiMmaOpTiedOpInterface
+// materialization. This only exists for handling inner_tiled ops before
+// dispatch workgroups are created, which only happens with early
+// materialization.
+struct InnerTiledOpTiedOpInterface
     : public IREE::Util::TiedOpInterface::ExternalModel<
-          MultiMmaOpTiedOpInterface, IREE::GPU::MultiMmaOp> {
+          InnerTiledOpTiedOpInterface, IREE::Codegen::InnerTiledOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto linalgOp = cast<IREE::GPU::MultiMmaOp>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(linalgOp.getAcc());
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    return IREE::Util::TiedOpInterface::findTiedBaseValue(
+        tiledOp.getOutputs()[resultIndex]);
   }
 
   ::std::optional<unsigned>
   getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    return {2}; // acc
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    return {tiledOp.getOutputs().getBeginOperandIndex() + resultIndex};
   }
 
   SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    return {2}; // acc
+    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
+    return llvm::to_vector(llvm::seq(
+        static_cast<int64_t>(tiledOp.getOutputs().getBeginOperandIndex()),
+        static_cast<int64_t>(tiledOp.getNumOperands())));
   }
 };
 
@@ -353,13 +376,10 @@ struct HoistableLinalgOpInterface
       return !isa<linalg::FillOp>(op);
     }
 
-    // Don't hoist ops with no inputs, their result is defined by `linalg.index`
-    // ops and should be fused with their consumers.
-    if (genericOp.getNumDpsInputs() == 0) {
-      return false;
-    }
-
-    if (linalg::isaFillOpInterface(genericOp).has_value()) {
+    // Don't hoist ops with no tensor inputs. They are likely to be fill-like
+    // or sequences (from `linalg.index`) which can be fused with their
+    // consumers.
+    if (IREE::LinalgExt::hasOnlyScalarInputs(genericOp)) {
       return false;
     }
 
@@ -445,8 +465,9 @@ void registerUtilExternalModels(DialectRegistry &registry) {
       });
 
   registry.addExtension(+[](MLIRContext *context,
-                            IREE::GPU::IREEGPUDialect *dialect) {
-    IREE::GPU::MultiMmaOp::attachInterface<MultiMmaOpTiedOpInterface>(*context);
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    IREE::Codegen::InnerTiledOp::attachInterface<InnerTiledOpTiedOpInterface>(
+        *context);
   });
 
   registry.addExtension(

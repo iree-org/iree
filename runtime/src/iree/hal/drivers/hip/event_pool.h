@@ -34,6 +34,10 @@ void iree_hal_hip_event_retain(iree_hal_hip_event_t* event);
 // |event| will be returned to its owning pool when the reference count is 0.
 void iree_hal_hip_event_release(iree_hal_hip_event_t* event);
 
+// Marks the event as exported, meaning it will not be returned to the
+// pool when it goes out of scope.
+iree_status_t iree_hal_hip_event_export(iree_hal_hip_event_t* event);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_event_pool_t
 //===----------------------------------------------------------------------===//
@@ -68,5 +72,10 @@ void iree_hal_hip_event_pool_release(iree_hal_hip_event_pool_t* event_pool);
 iree_status_t iree_hal_hip_event_pool_acquire(
     iree_hal_hip_event_pool_t* event_pool, iree_host_size_t event_count,
     iree_hal_hip_event_t** out_events);
+
+// Imports an external hip_event_t to the pool.
+iree_status_t iree_hal_hip_event_pool_import(
+    iree_hal_hip_event_pool_t* event_pool, hipEvent_t event,
+    iree_hal_hip_event_t** out_event);
 
 #endif  // IREE_HAL_DRIVERS_HIP_EVENT_POOL_H_

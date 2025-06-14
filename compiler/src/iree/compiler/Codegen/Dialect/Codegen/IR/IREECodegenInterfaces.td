@@ -9,6 +9,201 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
+def IREECodegen_InnerTileDescAttrInterface :
+  AttrInterface<"InnerTileDescAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Attribute interface used to descripe an inner tiled operation, such as
+    a (sequence of) matrix multiplications that are performed using
+    intrinsics which have their own inherent tiling.
+
+    Note: this interface is a generalization of MmaInterfaceAttr.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the number of non-accumulator input operands  this inner tiled
+        operation requires.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getExpectedNumInputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the number of accumulator initilizer operands this inner tiled
+        operation requires. This is equivalent to the expected number of results.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getExpectedNumOutputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this inner tiled operation imposes additional requirements on
+        its indexing maps other than the general ones (todo describe),
+        verify them.
+      }],
+      /*retType=*/"::mlir::LogicalResult",
+      /*methodName=*/"verifyIndexingMaps",
+      /*args=*/(ins "::llvm::ArrayRef<::mlir::AffineMap>":$maps),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::success();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For each operand, return the vector type of the inner tile before the
+        operation is distributed (if applicable). This should be the logical type of
+        the operands, ignoring any permutations that may be present on the
+        inner_tiled operation.
+
+        For example, a matrix multiplication that takes a MxK inner tile of A,
+        a KxN inner tile of B, and accumulates into a MxN inner tile of C
+        should return:
+        ```
+          vector<MxKxtA>, vector<KxNxtB>, vector<MxNxtC>
+        ```
+        where `tA`, `tB`, and `tC` are the element types of matrices A, B, and C,
+        respectively.
+
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getUndistributedTileTypes",
+      /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For each operand, return the vector type of the inner tile after the operation
+        is distributed to threads. Vectors of this type will be stored into or
+        loaded from registers by individual threads.
+
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getDistributedTileTypes",
+      /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the `operandIndex`th operand of this inner tiled operation.
+
+        This method is only applicable when distribution is being performed.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"populateOperandOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "uint32_t":$operandIndex,
+        "::mlir::Value":$lane_id,
+        "::llvm::ArrayRef<int64_t>":$permutation,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$strides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this intrinsic can be mapped from its undistributed to its distributed
+        form using an `scf.forall`, return the attribute describing the mapping
+        kind that is to be used for the forall's single dimension.
+
+        If such a mapping is not supported, return an Attribute() (the null attribute.)
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getDistributionMappingKind",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::Attribute();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        If this intrinsic can be mapped from its undistributed to its distributed
+        form using an `scf.forall`, return an OpFoldResult corresponding to the worker
+        count for that forall's single dimension. For example, if a particular inner
+        tiled operation must be distributed to subgroups of a particular size,
+        this method returns that required size.
+
+        If it is needed, `opToDistribute` is the `InnerTiledOp` that is being
+        distributed.
+
+        If the value of the bound cannot be determined, returns the null OpFoldResult.
+      }],
+      /*retTy=*/"::mlir::OpFoldResult",
+      /*methodName=*/"getDistributionWorkerCount",
+      /*args=*/(ins "::mlir::OpBuilder&":$builder, "::mlir::Location":$loc,
+        "::mlir::Operation *":$opToDistribute),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::OpFoldResult();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Given (distributed, if applicable) arguments whose types correspond
+        to `getDistributedTileShapes()`, construct, if possible, the operations
+        that implement this kind and place the results (which will be used to
+        replace the inner_tiled op) into the `results` vector.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"buildUnderlyingOperations",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::ValueRange":$inputs,
+        "::mlir::ValueRange":$outputs,
+        "::llvm::SmallVectorImpl<::mlir::Value>&":$results
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+  ];
+
+  let extraSharedClassDeclaration = [{
+    /// Return the expected size of the undistributed inner tile for each
+    /// operand into `results`.
+    void getUndistributedOperandSize(::llvm::SmallVectorImpl<int64_t>& result) const {
+      result.clear();
+      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes;
+      $_attr.getUndistributedTileTypes(undistributedTypes);
+      ::llvm::append_range(result, ::llvm::map_range(undistributedTypes,
+        [](auto vt) { return vt.getNumElements(); }));
+    }
+
+    /// Return the element element type of each operand into `results`.
+    void getElementTypes(::llvm::SmallVectorImpl<::mlir::Type>& result) const {
+      result.clear();
+      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes;
+      $_attr.getUndistributedTileTypes(undistributedTypes);
+      ::llvm::append_range(result, ::llvm::map_range(undistributedTypes,
+        [](auto vt) { return vt.getElementType(); }));
+    }
+  }];
+}
+
+def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
+  CPred<"isa<IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
+]>, "buffer-like constant attribute values"> {
+  let storageType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
+  let returnType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
+  let convertFromStorage = "$_self";
+}
+
 def IREECodegen_LoweringConfigAttrInterface :
   AttrInterface<"LoweringConfigAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
@@ -112,15 +307,30 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*defaultImplementation=*/[{
         return ::llvm::SmallVector<OpFoldResult>();
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the name of the custom lowering strategy to apply to the annotated
+        operation.
+      }],
+      /*retTy=*/"::std::optional<::llvm::StringRef>",
+      /*methodName=*/"getLoweringStrategy",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
     >
   ];
 }
 
-def IREECodegen_LayoutAttrInterface :
-  AttrInterface<"LayoutAttrInterface"> {
+def IREECodegen_PackedLayoutMaterializerAttr :
+  AttrInterface<"PackedLayoutMaterializerAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   let description = [{
-    An interface that collects a set of methods for encoding materialization.
+    An interface that collects a set of methods for packed encoding materialization.
+    This helps generalizing materialization for encodings that perform some kind of
+    packing and/or swizzling.
   }];
 
   let methods = [
@@ -136,24 +346,56 @@ def IREECodegen_LayoutAttrInterface :
         assert(false && "unimplemented interface method");
         return MaterializeEncodingInfo{};
       }]
+    >
+  ];
+}
+
+def IREECodegen_SwizzleAttrInterface :
+  AttrInterface<"SwizzleAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that describes 1D memref swizzling patterns.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Swizzles |offset| into memref |src|.
+      }],
+      /*retTy=*/"::mlir::OpFoldResult",
+      /*methodName=*/"swizzleOffset",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::mlir::OpFoldResult":$offset,
+                    "::mlir::Value":$src),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return offset;
+      }]
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the layout of materialized encoding for a tensor type.
+        Returns the number of elements that remain contiguous with the swizzling
+        pattern. This unrolls all accesses to this element count.
+
+        Currently swizzling is only supported if all accesses are multiples of
+        this value.
+
+        TODO: Support non-width aligned swizzling.
       }],
-      /*retTy=*/"::mlir::Operation *",
-      /*methodName=*/"lowerOp",
-      /*args=*/(ins "::mlir::OpBuilder &":$b,
-                    "::mlir::Operation *":$op,
-                    "::mlir::TypeRange":$convertedResTypes,
-                    "::mlir::ValueRange":$convertedOperands),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        assert(false && "unimplemented interface method");
-        return nullptr;
-      }]
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getAccessElementCount",
+      /*args=*/(ins)
     >
   ];
+}
+
+def IREECodegen_AnySwizzleAttr : Attr<Or<[
+  CPred<"isa<IREE::Codegen::SwizzleAttrInterface>($_self)">,
+]>, "swizzling descriptor attributes"> {
+  let storageType = [{ IREE::Codegen::SwizzleAttrInterface }];
+  let returnType = [{ IREE::Codegen::SwizzleAttrInterface }];
+  let convertFromStorage = "$_self";
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES

@@ -14,8 +14,8 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 // Attribute Interfaces
 //===----------------------------------------------------------------------===//
 
-def IREEEncoding_EncodingLayoutResolverAttrInterface :
-  AttrInterface<"EncodingLayoutResolverAttrInterface"> {
+def IREEEncoding_LayoutResolverAttr :
+  AttrInterface<"LayoutResolverAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     Interface used to query layout information needed to materialize encoding
@@ -55,7 +55,7 @@ def IREEEncoding_EncodingLayoutResolverAttrInterface :
       /*desc=*/[{
         Returns the an attribute implementing the  which is either common format
         or wrapped by an attribute that implements the
-        `SerializableEncodingAttrInterface` interface.
+        `SerializableAttr` interface.
         If it is in common format (e.g., a regular tensor type), we can easily
         calculate the storage size. Otherwise, we will need a hook from
         external, and the hook can come from an attribute that implements the
@@ -76,8 +76,8 @@ def IREEEncoding_EncodingLayoutResolverAttrInterface :
   ];
 }
 
-def IREEEncoding_SerializableEncodingAttrInterface :
-  AttrInterface<"SerializableEncodingAttrInterface"> {
+def IREEEncoding_SerializableAttr :
+  AttrInterface<"SerializableAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
     Interface for encoding attributes that can be attached on a tensor type. An
@@ -161,12 +161,12 @@ def IREEEncoding_SerializableEncodingAttrInterface :
       /*retTy=*/"bool",
       /*methodName=*/"isCompatibleWith",
       /*args=*/(ins
-        "IREE::Encoding::SerializableEncodingAttrInterface":$other
+        "IREE::Encoding::SerializableAttr":$other
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         auto attr =
-          llvm::dyn_cast_or_null<SerializableEncodingAttrInterface>($_attr);
+          llvm::dyn_cast_or_null<SerializableAttr>($_attr);
         if (!attr) {
           return false;
         }
@@ -201,10 +201,85 @@ def IREEEncoding_SerializableEncodingAttrInterface :
 
   let extraClassDeclaration = [{
     /// Returns true if they are the same attribute. Otherwise, returns true if
-    /// both attributes implement SerializableEncodingAttrInterface interface
+    /// both attributes implement SerializableAttr interface
     /// and they are compatible with each other.
     static bool areCompatible(Attribute lhs, Attribute rhs);
   }];
+}
+
+def IREEEncoding_LayoutMaterializerAttr :
+  AttrInterface<"LayoutMaterializerAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    An interface that collects a set of methods for encoding materialization.
+
+    These are the core methods:
+    - `convertType`: converts a type to its materialized form.
+    - `getOffsetsSizesStrides`: to retrieve the materialized new
+      offsets, sizes and strides for load/store type operations.
+    - `lowerOp`: converts an operation to its materialized form.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the materialized form for the provided type.
+      }],
+      /*retTy=*/"::mlir::Type",
+      /*methodName=*/"convertType",
+      /*args=*/(ins
+        "::mlir::Type":$type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return type;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns success if materialized `newOffsets`, `newSizes` and
+        `newStrides` can be calculated and set for the slice specified by
+        `offsets`, `sizes` and `strides` on the dispatch tensor `type` with
+        potential `dynamicDims` sizes.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"getOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder &":$builder,
+        "::mlir::Location":$loc,
+        "IREE::TensorExt::DispatchTensorType":$type,
+        "::mlir::ValueRange":$dynamicDims,
+        "ArrayRef<OpFoldResult>":$offsets,
+        "ArrayRef<OpFoldResult>":$sizes,
+        "ArrayRef<OpFoldResult>":$strides,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newOffsets,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newSizes,
+        "::llvm::SmallVectorImpl<OpFoldResult> &":$newStrides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the materialized form for the provided operation.
+      }],
+      /*retTy=*/"::mlir::Operation *",
+      /*methodName=*/"lowerOp",
+      /*args=*/(ins "::mlir::OpBuilder &":$b,
+                    "::mlir::Operation *":$op,
+                    "::mlir::TypeRange":$convertedResTypes,
+                    "::mlir::ValueRange":$convertedOperands),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return nullptr;
+      }]
+    >
+  ];
 }
 
 def IREEEncoding_ContractionEncodingAttrInterface :
@@ -261,6 +336,81 @@ def IREEEncoding_EncodingTypeInterface :
       /*args=*/(ins
         "::mlir::Attribute":$encoding)
     >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// Encoding Propagation Attribute & Op Interfaces
+//===----------------------------------------------------------------------===//
+
+def IREEEncoding_PropagationAttrInterface :
+  AttrInterface<"EncodingPropagationAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query new encoding attributes that can be propagated to
+    the operands and result of the operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+        [{
+          Returns true if the encodings can be propagated across the operation.
+        }],
+        /*retTy=*/"bool",
+        /*methodName=*/"isPropagable",
+        /*args=*/(ins
+          "::mlir::Value":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+            return false;
+        }]
+    >,
+    InterfaceMethod<
+        [{
+          Returns the new encodings for operand and result types for the given
+          operation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
+        /*methodName=*/"generateEncodings",
+        /*args=*/(ins
+          "::mlir::Value":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >
+  ];
+}
+
+def IREEEncoding_PropagationOpInterface :
+  OpInterface<"EncodingPropagationOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+      Interface used to generate new operations with new encodings.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+        [{
+          Returns a list of transformed operations, set_encoding/unset_encoding
+          operations and the transformed result for further transformation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationResult>",
+        /*methodName=*/"propagateEncoding",
+        /*args=*/(ins
+          "::mlir::RewriterBase &":$builder,
+          "::mlir::iree_compiler::IREE::Encoding::PropagationEncoding":$encodings,
+          "::mlir::OpResult":$opResult
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >
   ];
 }
 

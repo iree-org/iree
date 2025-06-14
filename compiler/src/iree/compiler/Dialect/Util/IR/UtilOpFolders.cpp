@@ -30,6 +30,20 @@ namespace mlir::iree_compiler::IREE::Util {
 // util.assume.int
 //===----------------------------------------------------------------------===//
 
+static std::optional<uint64_t>
+getIntAssumptionFixedValue(ArrayAttr assumptions) {
+  if (assumptions.size() != 1) {
+    return std::nullopt;
+  } else if (auto assumption = dyn_cast<IREE::Util::IntAssumptionAttr>(
+                 assumptions.getValue().front())) {
+    if (assumption.getUmin().has_value() && assumption.getUmax().has_value() &&
+        assumption.getUmin() == assumption.getUmax()) {
+      return assumption.getUmin();
+    }
+  }
+  return std::nullopt;
+}
+
 LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
                                         PatternRewriter &rewriter) {
   bool needsRewrite = false;
@@ -63,7 +77,8 @@ LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
       continue;
     }
 
-    // Detect whether assumptions need to be normalized.
+    // Detect whether assumptions need to be normalized or can fold to a single
+    // value.
     ArrayAttr assumptionRow = llvm::cast<ArrayAttr>(assumptions[idx]);
     if (assumptionRow.size() > 1) {
       bool allAssumptionsSame = true;
@@ -74,8 +89,11 @@ LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
         }
       }
       if (allAssumptionsSame) {
+        // May _also_ fold to a single fixed value once normalized below.
         needsRewrite = true;
       }
+    } else if (getIntAssumptionFixedValue(assumptionRow).has_value()) {
+      needsRewrite = true;
     }
   }
   if (!needsRewrite)
@@ -107,16 +125,35 @@ LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
   SmallVector<Value> retainedResults;
   bool madeChange = false;
   for (auto [idx, operand] : llvm::enumerate(op.getOperands())) {
+    Value result = op.getResult(idx);
+
     // If the result has no uses, do not retain it.
-    if (op.getResult(idx).use_empty()) {
+    if (result.use_empty()) {
       madeChange = true;
       continue;
     }
 
-    newAssumptions.push_back(
-        normalizeAssumptions(assumptions[idx], madeChange));
+    // If the assumption expresses a single possible value then replace all uses
+    // with that constant value and do not retain it.
+    auto newAssumption = normalizeAssumptions(assumptions[idx], madeChange);
+    auto fixedValue = getIntAssumptionFixedValue(newAssumption);
+    if (fixedValue.has_value()) {
+      Value constantValue;
+      if (result.getType().isIndex()) {
+        constantValue =
+            rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *fixedValue);
+      } else {
+        constantValue = rewriter.create<arith::ConstantIntOp>(
+            op.getLoc(), *fixedValue, result.getType());
+      }
+      rewriter.replaceAllUsesWith(result, constantValue);
+      madeChange = true;
+      continue;
+    }
+
+    newAssumptions.push_back(newAssumption);
     newOperands.push_back(operand);
-    retainedResults.push_back(op.getResult(idx));
+    retainedResults.push_back(result);
   }
 
   // It is important to avoid canonicalizer looping that if we determined at
@@ -683,44 +720,11 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
   }
 };
 
-// Inlines constant stores from initializers into the global initializer.
-// This is not strictly required but can help our initialization code perform
-// more efficient initialization of large numbers of primitive values.
-struct InlineConstantGlobalInitializer
-    : public OpRewritePattern<InitializerOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(InitializerOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Operation *> deadOps;
-    op.walk([&](GlobalStoreOpInterface storeOp) {
-      Attribute valueAttr;
-      if (!matchPattern(storeOp.getStoredGlobalValue(),
-                        m_Constant(&valueAttr))) {
-        return;
-      }
-      auto globalOp =
-          SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
-              storeOp->getParentOp(), storeOp.getGlobalAttr());
-      rewriter.modifyOpInPlace(
-          globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
-
-      deadOps.push_back(storeOp);
-    });
-    if (deadOps.empty())
-      return failure();
-    for (auto deadOp : deadOps)
-      rewriter.eraseOp(deadOp);
-    return success();
-  }
-};
-
 } // namespace
 
 void InitializerOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  results.insert<DropEmptyInitializerOp, InlineConstantGlobalInitializer>(
-      context);
+  results.insert<DropEmptyInitializerOp>(context);
 }
 
 void GlobalOp::getCanonicalizationPatterns(RewritePatternSet &results,

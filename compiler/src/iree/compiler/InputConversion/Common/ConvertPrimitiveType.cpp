@@ -124,7 +124,6 @@ template <typename SourceType, typename TargetType>
 struct FloatTypeConverter
     : public PrimitiveTypeConverter<SourceType, TargetType> {
   explicit FloatTypeConverter() {
-    this->addArgumentMaterialization(convertRankedFloat);
     this->addSourceMaterialization(convertRankedFloat);
     this->addTargetMaterialization(convertRankedFloat);
   }
@@ -134,7 +133,6 @@ template <typename SourceType, typename TargetType>
 struct IntegerTypeConverter
     : public PrimitiveTypeConverter<SourceType, TargetType> {
   explicit IntegerTypeConverter() {
-    this->addArgumentMaterialization(convertRankedInteger);
     this->addSourceMaterialization(convertRankedInteger);
     this->addTargetMaterialization(convertRankedInteger);
   }
@@ -156,8 +154,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
     llvm::SmallVector<NamedAttribute> newAttrs;
-    if (op->hasTrait<OpTrait::ConstantLike>() ||
-        isa<IREE::Util::GlobalOpInterface>(op)) {
+    if (op->hasTrait<OpTrait::ConstantLike>()) {
       for (auto attr : op->getAttrs()) {
         auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
                                         *getTypeConverter());
@@ -182,6 +179,27 @@ struct GenericTypeConversionPattern : public ConversionPattern {
       rewriter.applySignatureConversion(&newRegion->front(), result);
     }
 
+    Operation *newOp = rewriter.create(state);
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
+
+struct GlobalOpConversionPattern
+    : public OpInterfaceConversionPattern<IREE::Util::GlobalOpInterface> {
+  GlobalOpConversionPattern(MLIRContext *context, TypeConverter &typeConverter)
+      : OpInterfaceConversionPattern(typeConverter, context) {}
+  LogicalResult
+  matchAndRewrite(IREE::Util::GlobalOpInterface op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    llvm::SmallVector<NamedAttribute> newAttrs;
+    for (auto attr : op->getAttrs()) {
+      auto newAttr =
+          convertAttribute(op->getLoc(), attr.getValue(), *getTypeConverter());
+      newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
+    }
+    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
+                         {}, newAttrs, op->getSuccessors());
     Operation *newOp = rewriter.create(state);
     rewriter.replaceOp(op, newOp->getResults());
     return success();
@@ -228,8 +246,29 @@ struct ConvertTypesPass : public Base {
   using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
+
+    // Scan the module to detect external functions with types that would be
+    // converted. This pass cannot be used with them.
+    auto moduleOp = this->getOperation();
+    SmallVector<std::pair<mlir::FunctionOpInterface, FunctionType>>
+        exportedFuncOps;
+    for (auto funcOp : moduleOp.template getOps<mlir::FunctionOpInterface>()) {
+      const auto funcType = cast<FunctionType>(funcOp.getFunctionType());
+      if (funcOp.isExternal() && !typeConverter.isSignatureLegal(funcType)) {
+        funcOp.emitError()
+            << "external functions with types that are being demoted are not "
+               "allowed; do not use the pass or manually convert the function "
+               "signature as required prior to running it";
+        return this->signalPassFailure();
+      }
+      if (funcOp.isPublic()) {
+        exportedFuncOps.push_back({funcOp, funcType});
+      }
+    }
+
     RewritePatternSet patterns(context);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
+    patterns.insert<GlobalOpConversionPattern>(context, typeConverter);
     patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
                                                     std::greater<unsigned>>>(
         typeConverter, context);
@@ -287,6 +326,30 @@ struct ConvertTypesPass : public Base {
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
       return this->signalPassFailure();
+    }
+
+    // Warn any public functions changed as part of the conversion.
+    bool hasWarned = false;
+    for (auto [funcOp, oldType] : exportedFuncOps) {
+      const auto newType = cast<FunctionType>(funcOp.getFunctionType());
+      if (newType != oldType) {
+        if (!hasWarned) {
+          hasWarned = true;
+          llvm::errs()
+              << "\n"
+              << "WARNING: ConvertTypesPass (--iree-input-demote-*-to-*) "
+                 "changed public function signatures; callers at runtime must "
+                 "match the new expected I/O types:\n";
+        }
+        llvm::errs() << "\n"
+                     << "  Old signature:\n"
+                     << "    @" << funcOp.getName() << oldType << "\n"
+                     << "  New signature:\n"
+                     << "    @" << funcOp.getName() << newType << "\n";
+      }
+    }
+    if (hasWarned) {
+      llvm::errs() << "\n";
     }
   }
 
@@ -356,4 +419,5 @@ class DemoteF64ToF32Pass final
     : public ConvertTypesPass<impl::DemoteF64ToF32PassBase<DemoteF64ToF32Pass>,
                               DemoteF64ToF32Converter> {};
 } // namespace
+
 } // namespace mlir::iree_compiler::InputConversion

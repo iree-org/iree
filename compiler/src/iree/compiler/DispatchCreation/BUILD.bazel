@@ -4,7 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -16,10 +21,8 @@ iree_compiler_cc_library(
     name = "DispatchCreation",
     srcs = [
         "BubbleUpExpandShapes.cpp",
-        "BubbleUpExtractSlices.cpp",
         "CloneProducersIntoDispatchRegions.cpp",
         "CollapseDimensions.cpp",
-        "CollapseReductionDimensions.cpp",
         "ConvertDispatchRegionsToWorkgroups.cpp",
         "ConvertEncodingToFlow.cpp",
         "ConvertTensorToFlow.cpp",
@@ -35,6 +38,7 @@ iree_compiler_cc_library(
         "HoistEncodingOps.cpp",
         "MaterializeDefaultWorkgroupCountRegion.cpp",
         "Passes.cpp",
+        "PropagateEncodings.cpp",
         "SetEncoding.cpp",
         "SinkReshapes.cpp",
         "SplitReduction.cpp",
@@ -57,6 +61,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Attributes",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",
@@ -128,5 +134,23 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "DispatchCreationPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "DispatchCreationPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )

@@ -20,15 +20,11 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_SINKDEFININGOPSPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 class SinkDefiningOpsPass
-    : public PassWrapper<SinkDefiningOpsPass, OperationPass<ModuleOp>> {
-public:
-  StringRef getArgument() const override { return "iree-vm-sink-defining-ops"; }
-
-  StringRef getDescription() const override {
-    return "Sinks defining ops with few uses to their use-sites.";
-  }
-
+    : public IREE::VM::impl::SinkDefiningOpsPassBase<SinkDefiningOpsPass> {
   void runOnOperation() override {
     for (auto funcOp : getOperation().getOps<FuncOp>()) {
       DominanceInfo domInfo(funcOp);
@@ -80,11 +76,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>> createSinkDefiningOpsPass() {
-  return std::make_unique<SinkDefiningOpsPass>();
-}
-
-static PassRegistration<SinkDefiningOpsPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

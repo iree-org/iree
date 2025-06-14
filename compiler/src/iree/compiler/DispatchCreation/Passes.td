@@ -32,14 +32,8 @@ def BubbleUpExpandShapesPass :
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
-  ];
-}
-
-def CollapseReductionDimensionsPass :
-    Pass<"iree-dispatch-creation-collapse-reduction-dimensions", ""> {
-  let summary = "Collapse reduction dimensions when possible.";
-  let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 
@@ -164,6 +158,7 @@ def SplitReductionPass :
   let summary = "Split reduction dimension to increase parallelism.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 
@@ -189,13 +184,6 @@ def TransposeGenericOpsPass :
   let summary = "Transpose generic op loops.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
-  ];
-}
-
-def BubbleUpExtractSlicesPass : Pass<"iree-dispatch-creation-bubble-up-extract-slices"> {
-  let summary = "Bubble up `extract_slice` ops through Linalg-like ops";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
   ];
 }
 
@@ -259,6 +247,7 @@ def FormDispatchRegionsPass :
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
     "IREE::LinalgExt::IREELinalgExtDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 
@@ -297,14 +286,40 @@ def HoistEncodingOpsPass :
   ];
 }
 
+def PropagateEncodingsPass :
+    InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
+  let summary = "Propagate encodings across other operations.";
+  let dependentDialects = [
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
 
-def SetEncodingPass :
-    InterfacePass<"iree-dispatch-creation-set-encoding", "mlir::FunctionOpInterface"> {
+def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
+                                    "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
+  ];
+  let options = [
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
+                "matmulk", "Only encodes reduction dimensions in the encoding."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
   ];
 }
 
@@ -338,6 +353,7 @@ def ConvertDispatchRegionsToWorkgroupsPass :
     "mlir::scf::SCFDialect",
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
   let statistics = [
     Statistic<"numDispatches", "num-dispatches", "Number of dispatches created">
@@ -371,11 +387,13 @@ def MaterializeDefaultWorkgroupCountRegionPass:
         Apply dispatch workgroups canonicalization patterns.
       }];
       let dependentDialects = [
+        "IREE::TensorExt::IREETensorExtDialect",
         "mlir::affine::AffineDialect",
         "mlir::arith::ArithDialect",
         "mlir::linalg::LinalgDialect",
         "mlir::scf::SCFDialect",
         "IREE::Flow::FlowDialect",
+
       ];
 }
 

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -46,7 +47,7 @@ OpFoldResult ToSIMTOp::fold(FoldAdaptor) {
 VectorType TransferGatherOp::getVectorType() { return getType(); }
 
 Speculation::Speculatability TransferGatherOp::getSpeculatability() {
-  if (isa<RankedTensorType>(getSource().getType())) {
+  if (isa<RankedTensorType>(getBase().getType())) {
     return Speculation::Speculatable;
   }
   return Speculation::NotSpeculatable;
@@ -55,8 +56,8 @@ Speculation::Speculatability TransferGatherOp::getSpeculatability() {
 void TransferGatherOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  if (llvm::isa<MemRefType>(getSource().getType())) {
-    effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
+  if (llvm::isa<MemRefType>(getBase().getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(), &getBaseMutable(),
                          SideEffects::DefaultResource::get());
   }
 }
@@ -135,16 +136,14 @@ static void printTransferAttrs(OpAsmPrinter &p, VectorTransferOpInterface op,
 }
 
 void TransferGatherOp::print(OpAsmPrinter &p) {
-  p << " " << getSource() << "[" << getIndices() << "]";
+  p << " " << getBase() << "[" << getIndices() << "]";
   printIndexVecs(p, *this, getIndexVecs(), getIndexVecs().getTypes(),
                  getIndexedAttr());
+  p << ", " << getPadding();
   if (getMask())
     p << ", " << getMask();
   printTransferAttrs(p, *this, {"indexed"});
-  p << " : ";
-  p << getShapedType() << ", ";
-  llvm::interleaveComma(getIndexVecs().getType(), p);
-  p << ", " << getType();
+  p << " : " << getShapedType() << ", " << getType();
 }
 
 static LogicalResult
@@ -493,7 +492,7 @@ static Value foldTransferGatherIndexVecs(
   SmallVector<int32_t> operandSegmentSizes;
 
   // Source.
-  operands.push_back(gatherOp.getSource());
+  operands.push_back(gatherOp.getBase());
   operandSegmentSizes.push_back(1);
   // Indices.
   SmallVector<Value> indices = gatherOp.getIndices();
@@ -643,7 +642,7 @@ struct FoldContigousGatherToTransferRead final
 
     // Canonicalize to vector.transfer_read.
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        xferOp, xferOp.getType(), xferOp.getSource(), xferOp.getIndices(),
+        xferOp, xferOp.getType(), xferOp.getBase(), xferOp.getIndices(),
         xferOp.getPermutationMap(), xferOp.getPadding(), xferOp.getMask(),
         xferOp.getInBounds());
     return success();

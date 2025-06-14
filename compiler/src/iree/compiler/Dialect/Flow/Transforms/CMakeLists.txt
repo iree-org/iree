@@ -30,7 +30,7 @@ iree_cc_library(
     "RegionOpUtils.h"
   SRCS
     "AnnotateDispatches.cpp"
-    "Canonicalizer.cpp"
+    "Canonicalize.cpp"
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
     "ConvertMeshToFlow.cpp"
@@ -96,6 +96,7 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
@@ -107,5 +108,16 @@ set_property(SOURCE
   FormDispatchRegions.cpp
   FormDispatchWorkgroups.cpp
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
+
+iree_tablegen_doc(
+  NAME
+    FlowPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc FlowPasses.md
+)
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

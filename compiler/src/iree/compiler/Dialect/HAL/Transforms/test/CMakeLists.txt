@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_target_devices.mlir"
     "assign_legacy_target_devices.mlir"
     "assign_target_devices.mlir"
     "capture_executable_sources.mlir"
@@ -29,6 +30,7 @@ iree_lit_test_suite(
     "materialize_resource_caches.mlir"
     "materialize_target_devices.mlir"
     "memoize_device_queries.mlir"
+    "memoize_device_selection.mlir"
     "outline_memoize_regions.mlir"
     "preprocess_executables.mlir"
     "prune_executables.mlir"

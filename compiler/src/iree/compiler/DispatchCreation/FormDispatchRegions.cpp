@@ -174,7 +174,7 @@ static bool isRootOp(Operation *op) {
     return !isa<linalg::FillOp>(op);
   }
   if (isa<TilingInterface>(op)) {
-    return !isa<tensor::PadOp, linalg::PackOp>(op);
+    return !isa<IREE::LinalgExt::GatherOp, tensor::PadOp, linalg::PackOp>(op);
   }
   return isa<linalg::UnPackOp>(op);
 }
@@ -715,12 +715,7 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
-    // Fuse with the rope computation if the query is a gather operation.
-    if (IREE::LinalgExt::isGatherlikeOp(producer) &&
-        attentionOp.getQuery() == operand.get()) {
-      return true;
-    }
-    // Disable all other producer fusion. TODO: Enable other producer fusions.
+    // Disable all other producer fusion. TODO: Enable some producer fusions.
     return false;
   }
 
@@ -1055,8 +1050,7 @@ void FormDispatchRegionsPass::runOnOperation() {
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(patterns, context);
   GreedyRewriteConfig config;
-  config.maxIterations = GreedyRewriteConfig::kNoLimit;
-  config.fold = true;
+  config.setMaxIterations(GreedyRewriteConfig::kNoLimit).enableFolding(true);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
     funcOp.emitOpError("failed in cleanup patterns");
     return signalPassFailure();

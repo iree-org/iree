@@ -426,7 +426,7 @@ util.func public @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32
 // CHECK-SAME:       %[[D1]]
 //      CHECK:   flow.dispatch.region[%[[WL0]], %[[WL1]]]
 //      CHECK:     count(%[[B0:.+]]: index, %[[B1:.+]]: index)
-//      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
+//      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
 //      CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
 
 // -----
@@ -1323,10 +1323,10 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20x30x50xbf16>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x20x40x50xbf16>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x20x40x50xbf16>
+//       CHECK:   %[[Q:.+]] = linalg.generic
 //       CHECK:   %[[K:.+]] = linalg.generic
 //       CHECK:   %[[V:.+]] = linalg.generic
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[Q:.+]] = linalg.generic
 //       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
 //       CHECK:     flow.return %[[ATTENTION]]

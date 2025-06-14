@@ -17,7 +17,7 @@ hal.executable public @executable {
   hal.executable.variant public @backend target(#hal.executable.target<"backend", "format">) objects([
     #hal.executable.object<{path = "existing_variant.obj"}>
   ]) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>
     ]>)
     builtin.module {

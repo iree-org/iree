@@ -424,6 +424,94 @@ util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index)
 
 // -----
 
+// CHECK-LABEL: @ElideIntermediateTransferTwoTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTransferTwoTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @DontElideIntermediateTransferBetweenBarrier
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @DontElideIntermediateTransferBetweenBarrier(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  // CHECK: %[[TRANSFERED:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target0"
+  %transfered = flow.tensor.transfer %operand : tensor<1xf16> to "target0"
+  // CHECK: %[[BARRIERED:.+]] = flow.tensor.barrier %[[TRANSFERED]] : tensor<1xf16> on "target0"
+  %barriered = flow.tensor.barrier %transfered : tensor<1xf16> on "target0"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[BARRIERED]] : tensor<1xf16> to "target2"
+  %result = flow.tensor.transfer %barriered : tensor<1xf16> to "target2"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideIntermediateTransferFourTransfers
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<1xf16>)
+util.func public @ElideIntermediateTransferFourTransfers(%operand: tensor<1xf16>) -> tensor<1xf16> {
+  %redundant = flow.tensor.transfer %operand : tensor<1xf16> to "target1"
+  %redundant2 = flow.tensor.transfer %redundant : tensor<1xf16> to "target2"
+  %redundant3 = flow.tensor.transfer %redundant2 : tensor<1xf16> to "target3"
+  // CHECK: %[[RESULT:.+]] = flow.tensor.transfer %[[OPERAND]] : tensor<1xf16> to "target4"
+  %result = flow.tensor.transfer %redundant3 : tensor<1xf16> to "target4"
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<1xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @SinkCastLikeOpAcrossBarrier
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossBarrier(%origin: tensor<?x4xf16>, %dim: index) -> tensor<4x?xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[BARRIER:.+]] = flow.tensor.barrier %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.barrier %source : tensor<4x?xf16>{%dim} on "foo"
+  // CHECK: %[[RESHAPE:.+]] = flow.tensor.reshape %[[BARRIER]] : tensor<?x4xf16>{%[[DIM]]} -> tensor<4x?xf16>{%[[DIM]]}
+  // CHECK: util.return %[[RESHAPE]]
+  util.return %transfer : tensor<4x?xf16>
+}
+
+// -----
+
+// CHECK-LABEL: @SinkCastLikeOpAcrossTransfer
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossTransfer(%origin: tensor<?x4xf16>, %dim: index) -> tensor<4x?xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[TRANSFER:.+]] = flow.tensor.transfer %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.transfer %source : tensor<4x?xf16>{%dim} to "foo"
+  // CHECK: %[[RESHAPE:.+]] = flow.tensor.reshape %[[TRANSFER]] : tensor<?x4xf16>{%[[DIM]]} -> tensor<4x?xf16>{%[[DIM]]}
+  // CHECK: util.return %[[RESHAPE]]
+  util.return %transfer : tensor<4x?xf16>
+}
+
+// -----
+
+// Tests that a sandwich of cast -> transfer -> cast from/to the same type is
+// folded away. This example is a combination of SinkCastLikeOpAcrossTransfer
+// and simple reshape-reshape fold.
+
+// CHECK-LABEL: @SinkCastLikeOpAcrossTransferSandwich
+//  CHECK-SAME: (%[[ORIGIN:.+]]: tensor<?x4xf16>, %[[DIM:.+]]: index)
+util.func public @SinkCastLikeOpAcrossTransferSandwich(%origin: tensor<?x4xf16>, %dim: index) -> tensor<?x4xf16> {
+  // CHECK-NOT: flow.tensor.reshape
+  %source = flow.tensor.reshape %origin : tensor<?x4xf16>{%dim} -> tensor<4x?xf16>{%dim}
+  // CHECK: %[[TARGET:.+]] = flow.tensor.transfer %[[ORIGIN]] : tensor<?x4xf16>{%[[DIM]]}
+  %transfer = flow.tensor.transfer %source : tensor<4x?xf16>{%dim} to "foo"
+  // CHECK-NOT: flow.tensor.reshape
+  %target = flow.tensor.reshape %transfer : tensor<4x?xf16>{%dim} -> tensor<?x4xf16>{%dim}
+  // CHECK: util.return %[[TARGET]]
+  util.return %target : tensor<?x4xf16>
+}
+
+// -----
+
 // CHECK-LABEL: @sliceConst0D
 util.func public @sliceConst0D() -> tensor<i32> {
   %0 = arith.constant dense<0> : tensor<i32>
@@ -784,14 +872,14 @@ util.func public @foldSplatReshapeIntoSplatAfterDefs(%arg0 : f32) -> tensor<?x?x
 
 // -----
 
-util.func public @innermost_unit_dim(%4: !flow.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>>,
+util.func public @innermost_unit_dim(%4: !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>>,
     %arg0: index, %arg2 : index, %10 : index, %9 : index) -> tensor<?x?x?xf16> {
   %c16 = arith.constant 16 : index
   %c1 = arith.constant 1 : index
-  %11 = flow.dispatch.tensor.load %4, offsets = [1, 0, %arg0, %10, %arg2], sizes = [1, 1, %c16, %9, %c1], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>> -> tensor<?x?x?xf16>
+  %11 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [1, 0, %arg0, %10, %arg2], sizes = [1, 1, %c16, %9, %c1], strides = [1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>> -> tensor<?x?x?xf16>
   util.return %11 : tensor<?x?x?xf16>
 }
 // CHECK-LABEL: util.func public @innermost_unit_dim
 //  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
-//       CHECK:   flow.dispatch.tensor.load
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]

@@ -162,6 +162,9 @@ struct IGEMMGenericConvDetails {
   SmallVector<Value> igemmOperands;
   /// The inferred convolution dimensions.
   mlir::linalg::ConvolutionDimensions convDims;
+  /// Mapping from dimensions in 'convDims' to dimensions in
+  /// 'igemmContractionMaps'. This only includes parallel dimensions.
+  DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   /// The reassociation indices used to computer the collapse shape of the
   /// filter in IGEMM transformation.
   SmallVector<ReassociationIndices> filterReassocIndices;
@@ -170,6 +173,11 @@ struct IGEMMGenericConvDetails {
   /// Indicates if the OutputChannel is before the OutputImage in the output.
   /// This determines our lhs/rhs ordering.
   bool isOutputChannelFirst;
+
+  // Get the indexing map for the IGEMM image operand.
+  AffineMap getIgemmInputImageMap() {
+    return igemmContractionMaps[isOutputChannelFirst ? 1 : 0];
+  }
 };
 
 /// Populate `IGEMMGenericConvDetails` for a given convolution operation.
@@ -215,6 +223,13 @@ bool isGatherlikeOp(Operation *op);
 /// The expectation is that the LHS is common, and all the operands are
 /// different RHS.
 bool isaHorizontallyFusedContraction(Operation *op);
+
+/// Check if a linalg.generic is representing an argmax operation.
+bool isArgmaxOp(linalg::GenericOp genericOp);
+
+/// Returns true if the operation is a GenericOp that has no tensor inputs,
+/// either as inputs or as implicit captures.
+bool hasOnlyScalarInputs(linalg::GenericOp op);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

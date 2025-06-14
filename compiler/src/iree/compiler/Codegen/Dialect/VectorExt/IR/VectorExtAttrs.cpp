@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
@@ -171,14 +172,11 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
                             getOuterTile()[i] * getThreadTile()[i] *
                             getElementTile()[i];
     if (!ShapedType::isDynamic(shape[i]) && expectedShape != shape[i]) {
-      std::string shapeStr;
-      llvm::raw_string_ostream shapeOs(shapeStr);
-      llvm::interleaveComma(shape, shapeOs);
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
       printStripped(layoutOs);
-      return emitError(loc, "Vector shape: [")
-             << shapeStr << "] does not match the layout ("
+      return emitError(loc, "Vector shape: ")
+             << llvm::interleaved_array(shape) << " does not match the layout ("
              << layoutStr + ") at dim " << i
              << ". Dimension expected by layout: " << expectedShape
              << " actual: " << shape[i];

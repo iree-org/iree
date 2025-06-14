@@ -10,12 +10,12 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -40,25 +41,6 @@ namespace mlir::iree_compiler {
 using namespace IREE::Encoding;
 
 namespace {
-
-static FailureOr<MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc) {
-  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
-  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
-      loc, resultTypes, TypeAttr::get(tensorType));
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getResults();
-  return result;
-}
-
-static MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
-    return chooseDynamicEncodingInfoVMVXMicrokernels;
-  }
-  return {};
-}
 
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
@@ -82,11 +64,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     }
 
     auto getTestTargetOrNopLayout =
-        [&]() -> IREE::Codegen::LayoutAttrInterface {
+        [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
         LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
              "(testCLGPUTarget)");
-        return cast<IREE::Codegen::LayoutAttrInterface>(
+        return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingLayoutAttr::get(
                 ctx,
                 DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
@@ -94,7 +76,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       }
       LDBG("Select EncodingNopLayoutAttr attribute as the layout "
            "attribute (Encoding resolver unknown or unsupported).");
-      return IREE::Codegen::EncodingNopLayoutAttr::get(ctx);
+      return cast<IREE::Encoding::LayoutMaterializerAttr>(
+          IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
 
     // The layoutAttr should come in without any target info attached to it,
@@ -104,27 +87,26 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // If the layoutAttr was not found, or if it does not implement the layout
     // resolver interface, fall back to the resolver for getCLGPUTarget. If
     // there is also no test target set, fall back to the nop layout.
-    IREE::Codegen::LayoutAttrInterface layoutAttr =
-        targetConfig ? targetConfig.getAs<IREE::Codegen::LayoutAttrInterface>(
-                           IREE::Encoding::kEncodingResolverAttrName)
-                     : nullptr;
-    auto resolverAttr = llvm::dyn_cast_or_null<
-        IREE::Encoding::EncodingLayoutResolverAttrInterface>(layoutAttr);
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr =
+        targetConfig
+            ? targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
+                  IREE::Encoding::kEncodingResolverAttrName)
+            : nullptr;
+    auto resolverAttr =
+        llvm::dyn_cast_or_null<IREE::Encoding::LayoutResolverAttr>(layoutAttr);
 
-    IREE::Codegen::LayoutAttrInterface layoutAttrWithTargetInfo =
+    IREE::Encoding::LayoutMaterializerAttr layoutAttrWithTargetInfo =
         layoutAttr && resolverAttr
-            ? cast<IREE::Codegen::LayoutAttrInterface>(
+            ? cast<IREE::Encoding::LayoutMaterializerAttr>(
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
             : getTestTargetOrNopLayout();
 
-    LDBG("Selected LayoutAttrInterface with target configuration: "
+    LDBG("Selected Encoding::LayoutMaterializerAttr with target configuration: "
          << layoutAttrWithTargetInfo);
 
     MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);
-    auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
-    populateMaterializeEncodingPatterns(patterns, target, typeConverter,
-                                        materializeEncodingValueFn);
+    populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       funcOp.emitOpError("materialization failed");
@@ -132,20 +114,26 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     }
   }
 
-  // Add patterns to fold pack/unpack ops with pad/extract_slice ops and
-  // resolve dims ops.
+  // Run patterns to fold pack/unpack ops with pad/extract_slice ops, resolve
+  // dims ops, and eliminate common sub-expressions.
   {
     RewritePatternSet patterns(ctx);
     populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::PackOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
       return failure();
     }
+
+    IRRewriter rewriter(ctx);
+    DominanceInfo domInfo;
+    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
   }
 
   return success();

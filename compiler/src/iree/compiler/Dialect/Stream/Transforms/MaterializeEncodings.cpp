@@ -6,11 +6,10 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -108,30 +107,30 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   for (auto argument : block.getArguments().drop_front(1).take_front(
            encodeOp.getSourceEncodingDims().size())) {
     sourceDynamicDims.push_back(
-        builder.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
+        builder.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
             loc, argument, builder.getIndexAttr(ordinalCount++)));
   }
   for (auto argument : block.getArguments().drop_back(1).take_back(
            encodeOp.getResultEncodingDims().size())) {
     destinationDynamicDims.push_back(
-        builder.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
+        builder.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
             loc, argument, builder.getIndexAttr(ordinalCount++)));
   }
 
   auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  auto sourceDispatchType = IREE::Flow::DispatchTensorType::get(
-      IREE::Flow::TensorAccess::ReadOnly, encodeOp.getSourceEncoding());
+  auto sourceDispatchType = IREE::TensorExt::DispatchTensorType::get(
+      IREE::TensorExt::TensorAccess::ReadOnly, encodeOp.getSourceEncoding());
   Value source = builder.create<IREE::Stream::BindingSubspanOp>(
       loc, sourceDispatchType, block.getArgument(0), zero, sourceDynamicDims);
-  auto destinationDispatchType = IREE::Flow::DispatchTensorType::get(
-      IREE::Flow::TensorAccess::WriteOnly, encodeOp.getResultEncoding());
+  auto destinationDispatchType = IREE::TensorExt::DispatchTensorType::get(
+      IREE::TensorExt::TensorAccess::WriteOnly, encodeOp.getResultEncoding());
   Value destination = builder.create<IREE::Stream::BindingSubspanOp>(
       loc, destinationDispatchType, block.getArguments().back(), zero,
       destinationDynamicDims);
 
   // Load the value from the source binding.
   RankedTensorType sourceType = sourceDispatchType.asRankedTensorType();
-  Value value = builder.create<IREE::Flow::DispatchTensorLoadOp>(
+  Value value = builder.create<IREE::TensorExt::DispatchTensorLoadOp>(
       loc, sourceType, source, sourceDynamicDims);
 
   // We can only add/remove encodings using set_encoding/unset_encoding ops
@@ -151,8 +150,8 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   }
 
   // Store the value to the destination binding.
-  builder.create<IREE::Flow::DispatchTensorStoreOp>(loc, value, destination,
-                                                    destinationDynamicDims);
+  builder.create<IREE::TensorExt::DispatchTensorStoreOp>(
+      loc, value, destination, destinationDynamicDims);
   builder.create<func::ReturnOp>(loc);
 
   return funcOp;
@@ -191,7 +190,7 @@ createExportOp(RewriterBase &rewriter, Location loc,
                                       workloadTypes, workloadLocs);
   rewriter.setInsertionPointToStart(block);
   auto defaultCountOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromSliceOp>(
+      rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
           loc, block->getArguments());
   rewriter.create<IREE::Stream::ReturnOp>(loc, defaultCountOp.getResults());
   return exportOp;

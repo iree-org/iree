@@ -7,10 +7,14 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-linalg-ext-convert-conv-to-im2col-op"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -60,6 +64,42 @@ static SmallVector<int64_t> getBasisFromShape(ArrayRef<int64_t> shape) {
   return basis;
 }
 
+// Computes `inputKPerm` that maps the input spatial and channel dimension order
+// to filter's.
+static SmallVector<int64_t>
+computeInputKPerm(AffineMap inputMap, AffineMap filterMap,
+                  const mlir::linalg::ConvolutionDimensions &convDims) {
+  // Get reduction dims from input and filter in order of appearance.
+  auto reductionDims =
+      llvm::concat<const unsigned>(convDims.inputChannel, convDims.filterLoop);
+  SmallVector<int64_t> inputReductionDims;
+  for (AffineExpr dimExpr : inputMap.getResults()) {
+    for (unsigned reductionDim : reductionDims) {
+      if (dimExpr.isFunctionOfDim(reductionDim)) {
+        inputReductionDims.push_back(reductionDim);
+      }
+    }
+  }
+  SmallVector<int64_t> filterReductionDims;
+  for (AffineExpr dimExpr : filterMap.getResults()) {
+    for (unsigned reductionDim : reductionDims) {
+      if (dimExpr.isFunctionOfDim(reductionDim)) {
+        filterReductionDims.push_back(reductionDim);
+      }
+    }
+  }
+
+  // Compute the permutation that maps inputSharedDims to filterSharedDims.
+  SmallVector<int64_t> inputKPerm;
+  for (int64_t dim : filterReductionDims) {
+    auto it = llvm::find(inputReductionDims, dim);
+    assert(it != inputReductionDims.end() &&
+           "Filter dimension not found in input shared dimensions");
+    inputKPerm.push_back(std::distance(inputReductionDims.begin(), it));
+  }
+  return inputKPerm;
+}
+
 namespace {
 
 using ControlFnTy = std::function<bool(Operation *)>;
@@ -67,7 +107,7 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // and linalg.matmul.
 // The following explains this for a linalg.conv_2d_nhwc_hwcf op.
 //
-// A convolution operaton can be written as a matrix-matrix multiplication by
+// A convolution operation can be written as a matrix-matrix multiplication by
 // unfolding the cross correlation between input and filter and explicitly copy
 // overlapped sliding window inputs.
 //
@@ -83,7 +123,7 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // size, |columns| = filter spatial size. To compute the output Y(i, j) we need
 // to calculate the dot product between filter window at input X(x, y)) and the
 // filter which will look like the following where r.h.s is the img2col matrix
-// and l.h.s is the flattned filter:
+// and l.h.s is the flattened filter:
 //
 // clang-format off
 // [x(0, 0), x(0, 1), x(1, 0), x(1, 1)]
@@ -93,10 +133,10 @@ using ControlFnTy = std::function<bool(Operation *)>;
 // clang-format on
 //
 // In general for 2D case with (N, H, W, C) input and (Kh, Kw, C, D) filter
-// and output (N, Ho, Wo, D) the convolutin is the following matrix-matrix
+// and output (N, Ho, Wo, D) the convolution is the following matrix-matrix
 // multiplication (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in
-// the N input. For the case where N > 1 its a batched matrxi-matrix
-// multplication.
+// the N batches. For the case where N > 1 its a batched matrxi-matrix
+// multiplication.
 
 class ConvertConvGeneric final
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
@@ -157,18 +197,20 @@ public:
           rewriter.getIndexAttr(filterShape[maybeDim.value()]));
     }
 
-    // Shape of the resulting tensor from im2col.
-    SmallVector<int64_t> colTensorShape;
-    SmallVector<int64_t> batchPos;
-    for (auto batch : convDims.batch) {
-      std::optional<int64_t> maybeBatch = inputMap.getResultPosition(
-          getAffineDimExpr(batch, inputMap.getContext()));
-      if (!maybeBatch) {
-        return rewriter.notifyMatchFailure(linalgOp,
-                                           "Failed to infer batch shape.");
-      }
-      batchPos.push_back(maybeBatch.value());
-      colTensorShape.push_back(inputShape[maybeBatch.value()]);
+    // Batch dims for the im2col also include the depth/group dimensions of the
+    // conv.
+    auto im2colBatchIterDims =
+        llvm::to_vector(llvm::concat<unsigned>(convDims.depth, convDims.batch));
+    SmallVector<int64_t> batchPos(im2colBatchIterDims.size());
+    for (int64_t convDim : im2colBatchIterDims) {
+      AffineExpr convDimExpr = getAffineDimExpr(convDim, getContext());
+      int64_t im2colInputDim = inputMap.getResultPosition(convDimExpr).value();
+
+      AffineExpr igemmDimExpr = igemmConvDetails.convToIgemmDimMap.at(convDim);
+      int64_t igemmInputDim = igemmConvDetails.getIgemmInputImageMap()
+                                  .getResultPosition(igemmDimExpr)
+                                  .value();
+      batchPos[igemmInputDim] = im2colInputDim;
     }
 
     SmallVector<int64_t> mPos;
@@ -182,7 +224,6 @@ public:
       for (auto [idx, e] : llvm::enumerate(outputMap.getResults())) {
         if (e.isFunctionOfDim(outputImage)) {
           mShape.push_back(outputShape[idx]);
-          colTensorShape.push_back(outputShape[idx]);
         }
       }
     }
@@ -197,12 +238,11 @@ public:
     }
     // The index at which the reduction dimension bounds starts in
     // igemmLoopBounds.
-    int64_t reductionBoundIndex = convDims.batch.size() +
-                                  convDims.outputImage.size() +
-                                  convDims.outputChannel.size();
+    int64_t reductionBoundIndex =
+        convDims.batch.size() + convDims.depth.size() +
+        convDims.outputImage.size() + convDims.outputChannel.size();
     SmallVector<int64_t> kShape(igemmLoopBounds.begin() + reductionBoundIndex,
                                 igemmLoopBounds.end());
-    colTensorShape.insert(colTensorShape.end(), kShape.begin(), kShape.end());
 
     SmallVector<OpFoldResult> mBasis =
         getAsIndexOpFoldResult(getContext(), getBasisFromShape(mShape));
@@ -211,7 +251,18 @@ public:
 
     SmallVector<OpFoldResult> kOffset(kBasis.size(), rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> mOffset(mBasis.size(), rewriter.getIndexAttr(0));
+
+    SmallVector<int64_t> inputKPerm =
+        computeInputKPerm(inputMap, filterMap, convDims);
+
     auto loc = linalgOp.getLoc();
+    // Shape of the resulting tensor from im2col.
+    SmallVector<int64_t> colTensorShape;
+    for (int64_t dim : batchPos) {
+      colTensorShape.push_back(inputShape[dim]);
+    }
+    colTensorShape.append(mShape);
+    colTensorShape.append(kShape);
     Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
     Value img2ColTensor =
@@ -219,7 +270,7 @@ public:
             .create<IREE::LinalgExt::Im2colOp>(
                 loc, input, /*output=*/colTensor, convDims.strides,
                 convDims.dilations, kernelSizes, mOffset, mBasis, kOffset,
-                kBasis, batchPos, mPos, kPos)
+                kBasis, batchPos, mPos, kPos, inputKPerm)
             .getResult(0);
 
     Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(

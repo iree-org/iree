@@ -16,6 +16,102 @@ endif()
 
 iree_amdgpu_bitcode_library(
   NAME
+    iree_uk_amdgpu_argmax_bf16i32_gfx90a
+  GPU_ARCH
+    gfx90a
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i32.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i32.gfx90a.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i32_gfx942
+  GPU_ARCH
+    gfx942
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i32.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i32.gfx942.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i32_gfx1030
+  GPU_ARCH
+    gfx1030
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i32.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i32.gfx1030.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i32_gfx1100
+  GPU_ARCH
+    gfx1100
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i32.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i32.gfx1100.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i64_gfx90a
+  GPU_ARCH
+    gfx90a
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i64.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i64.gfx90a.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i64_gfx942
+  GPU_ARCH
+    gfx942
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i64.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i64.gfx942.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i64_gfx1030
+  GPU_ARCH
+    gfx1030
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i64.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i64.gfx1030.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
+    iree_uk_amdgpu_argmax_bf16i64_gfx1100
+  GPU_ARCH
+    gfx1100
+  SRCS
+    "common.h"
+    "iree_uk_amdgpu_argmax_bf16i64.c"
+  OUT
+    "iree_uk_amdgpu_argmax_bf16i64.gfx1100.bc"
+)
+
+iree_amdgpu_bitcode_library(
+  NAME
     iree_uk_amdgpu_argmax_f16i32_gfx90a
   GPU_ARCH
     gfx90a
@@ -222,6 +318,14 @@ iree_c_embed_data(
   NAME
     iree_uk_amdgpu_bitcode
   SRCS
+    "iree_uk_amdgpu_argmax_bf16i32.gfx1030.bc"
+    "iree_uk_amdgpu_argmax_bf16i32.gfx1100.bc"
+    "iree_uk_amdgpu_argmax_bf16i32.gfx90a.bc"
+    "iree_uk_amdgpu_argmax_bf16i32.gfx942.bc"
+    "iree_uk_amdgpu_argmax_bf16i64.gfx1030.bc"
+    "iree_uk_amdgpu_argmax_bf16i64.gfx1100.bc"
+    "iree_uk_amdgpu_argmax_bf16i64.gfx90a.bc"
+    "iree_uk_amdgpu_argmax_bf16i64.gfx942.bc"
     "iree_uk_amdgpu_argmax_f16i32.gfx1030.bc"
     "iree_uk_amdgpu_argmax_f16i32.gfx1100.bc"
     "iree_uk_amdgpu_argmax_f16i32.gfx90a.bc"

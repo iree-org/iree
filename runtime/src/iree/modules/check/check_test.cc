@@ -45,7 +45,8 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
     IREE_ASSERT_OK(iree_hal_module_create(
-        instance_, /*device_count=*/1, &device_, IREE_HAL_MODULE_FLAG_NONE,
+        instance_, iree_hal_module_device_policy_default(), /*device_count=*/1,
+        &device_, IREE_HAL_MODULE_FLAG_NONE,
         iree_hal_module_debug_sink_stdio(stderr), iree_allocator_system(),
         &hal_module_));
     iree_hal_driver_release(hal_driver);
@@ -232,27 +233,6 @@ iree_hal_device_t* CheckTest::device_ = nullptr;
 iree_vm_instance_t* CheckTest::instance_ = nullptr;
 iree_vm_module_t* CheckTest::check_module_ = nullptr;
 iree_vm_module_t* CheckTest::hal_module_ = nullptr;
-
-TEST_F(CheckTest, HalModuleDebugSinkDestroyCallbackIsCalled) {
-  struct UserData {
-    bool is_callback_called = false;
-  };
-
-  iree_hal_module_debug_sink_t sink = {};
-  sink.destroy.fn = [](void* user_data) {
-    reinterpret_cast<UserData*>(user_data)->is_callback_called = true;
-    return iree_ok_status();
-  };
-  UserData user_data;
-  sink.destroy.user_data = &user_data;
-  iree_vm_module_t* hal_module;
-  IREE_ASSERT_OK(iree_hal_module_create(
-      instance(), /*device_count=*/1, &device(), IREE_HAL_MODULE_FLAG_NONE,
-      sink, iree_allocator_system(), &hal_module));
-  IREE_ASSERT_FALSE(user_data.is_callback_called);
-  iree_vm_module_release(hal_module);
-  IREE_ASSERT_TRUE(user_data.is_callback_called);
-}
 
 TEST_F(CheckTest, ExpectTrueSuccess) {
   IREE_ASSERT_OK(InvokeValue("expect_true", {iree_vm_value_make_i32(1)}));

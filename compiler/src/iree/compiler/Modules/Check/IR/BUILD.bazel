@@ -88,6 +88,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "CheckDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

@@ -30,6 +30,26 @@ def GPUCheckResourceUsagePass :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCombineLayoutTransformationPass :
+    InterfacePass<"iree-codegen-gpu-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations into a single map_scatter operation.";
+  let description = [{
+    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
+    layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
+    etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
+    ops, the writing of pad values is distributed to workgroups and threads, and
+    then the padding values are written directly to the output buffer of the
+    store_to_buffer op.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "gpu::GPUDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def GPUCombineValueBarriersPass :
     Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
   let summary = "Combines `iree_gpu.value_barrier` ops";
@@ -47,6 +67,15 @@ def GPUDistributeCopyUsingForallPass :
   let summary = "Pass to distribute copies to threads.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
+  ];
+}
+
+def GPULowerToGlobalLoadsPass :
+    InterfacePass<"iree-codegen-gpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Emit direct global loads instructions.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 
@@ -87,6 +116,14 @@ def GPUDistributeScfForPass :
     Option<"useBlockDims", "use-block-dims", "bool",
            /*default=*/"true",
            "Use gpu.block_dim ops to query distribution sizes.">,
+  ];
+}
+
+def GPUBubbleResourceCastsPass :
+    Pass<"iree-codegen-gpu-bubble-resource-casts", ""> {
+  let summary = "Bubbles iree_gpu.buffer_resource_cast ops upwards.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 
@@ -150,9 +187,10 @@ def GPUMultiBufferingPass :
 
 def GPUPackToIntrinsicsPass :
     InterfacePass<"iree-codegen-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
-  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
+  let summary = "Packs matmul like operations and converts to iree_codegen.inner_tiled";
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -198,6 +236,22 @@ def GPUPromoteMatmulOperandsPass :
     "::mlir::gpu::GPUDialect",
     "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def GPUAllocPrivateMemoryForDPSOpsPass :
+    InterfacePass<"iree-codegen-gpu-alloc-private-memory-for-dps-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to add private memory allocations prior to DPS interface ops.";
+  let description = [{
+    Creates a `bufferization.alloc_tensor` in private space for all DPS ops
+    with unused results that can't be removed. These unused results, if
+    originating from loads from global memory, trigger allocations in global
+    memory space during bufferization, which will fail. So, the allocations
+    must be made earlier to avoid failed bufferization.
+  }];
+  let dependentDialects = [
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::gpu::GPUDialect"
   ];
 }
 
@@ -321,10 +375,14 @@ def ReorderWorkgroupsPass :
 def VectorReductionToGPUPass :
     InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
   let summary = "Convert vector reduction to GPU ops.";
-  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
+  ];
+  let options = [
+    Option<"expandSubgroupReduction", "expand-subgroup-reduction", "bool",
+           /*default=*/"true",
+           "Lower subgroup reductions to gpu ops immediately where possible.">,
   ];
 }
 

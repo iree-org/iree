@@ -118,6 +118,123 @@ void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// hal.allocator.*
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Tries to fold either the device or queue affinity of a select when all
+/// potential values of either match.
+struct FoldAllocatorSelectAttr
+    : public OpRewritePattern<AllocatorSelectAttrOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AllocatorSelectAttrOp op,
+                                PatternRewriter &rewriter) const override {
+    // Calculate the unique set of devices and unique set of queue affinities.
+    DenseSet<SymbolRefAttr> deviceAttrs;
+    DenseSet<int64_t> queueAffinities;
+    for (auto affinityAttr : op.getOptimalSet().getAffinities()) {
+      auto deviceAffinityAttr =
+          dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
+      if (!deviceAffinityAttr) {
+        return rewriter.notifyMatchFailure(op, "non-device affinity present");
+      }
+      deviceAttrs.insert(deviceAffinityAttr.getDevice());
+      queueAffinities.insert(deviceAffinityAttr.getQueueMask());
+    }
+    if (deviceAttrs.size() == 1 && queueAffinities.size() == 1) {
+      // Only a single selected combination.
+      SymbolRefAttr commonDeviceAttr = *deviceAttrs.begin();
+      int64_t commonQueueAffinityMask = *queueAffinities.begin();
+      rewriter.replaceOpWithNewOp<IREE::HAL::DeviceResolveOp>(
+          op, op.getResultTypes(),
+          rewriter.getAttr<IREE::HAL::DeviceAffinityAttr>(
+              commonDeviceAttr, commonQueueAffinityMask));
+      return success();
+    } else if (deviceAttrs.size() == 1 && !op.getSelectedDevice().use_empty()) {
+      // Device is common but queue masks are not.
+      // This is unlikely to arise naturally.
+      SymbolRefAttr commonDeviceAttr = *deviceAttrs.begin();
+      auto resolveOp = rewriter.create<IREE::HAL::DeviceResolveOp>(
+          op.getLoc(), rewriter.getType<IREE::HAL::DeviceType>(),
+          rewriter.getAttr<IREE::HAL::DeviceAffinityAttr>(commonDeviceAttr,
+                                                          -1));
+      rewriter.replaceAllUsesWith(op.getSelectedDevice(),
+                                  resolveOp.getResult(0));
+      return success();
+    } else if (queueAffinities.size() == 1 &&
+               !op.getSelectedQueueAffinity().use_empty()) {
+      // Queue affinities are common (likely "any") but devices are not.
+      // We can fold the queue affinity mask to a constant now to allow it to
+      // propagate.
+      int64_t commonQueueAffinityMask = *queueAffinities.begin();
+      auto queueAffinityValue = rewriter.create<arith::ConstantIntOp>(
+          op.getLoc(), commonQueueAffinityMask, 64);
+      rewriter.replaceAllUsesWith(op.getSelectedQueueAffinity(),
+                                  queueAffinityValue);
+      return success();
+    }
+    return failure();
+  }
+};
+
+} // namespace
+
+void AllocatorSelectAttrOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<FoldAllocatorSelectAttr>(context);
+}
+
+namespace {
+
+/// Tries to fold either the device or queue affinity of a select when all
+/// potential values of either match.
+struct FoldAllocatorSelect : public OpRewritePattern<AllocatorSelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AllocatorSelectOp op,
+                                PatternRewriter &rewriter) const override {
+    // Calculate the unique set of devices and unique set of queue affinities.
+    DenseSet<Value> devices;
+    DenseSet<Value> queueAffinities;
+    for (auto [device, queueAffinity] :
+         llvm::zip_equal(op.getDevices(), op.getQueueAffinities())) {
+      devices.insert(device);
+      queueAffinities.insert(queueAffinity);
+    }
+    if (devices.size() == 1 && queueAffinities.size() == 1) {
+      // Only a single selected combination.
+      Value commonDevice = *devices.begin();
+      Value commonQueueAffinityMask = *queueAffinities.begin();
+      rewriter.replaceOp(op, {commonDevice, commonQueueAffinityMask});
+      return success();
+    } else if (devices.size() == 1 && !op.getSelectedDevice().use_empty()) {
+      // Device is common but queue masks are not.
+      // This is unlikely to arise naturally.
+      Value commonDevice = *devices.begin();
+      rewriter.replaceAllUsesWith(op.getSelectedDevice(), commonDevice);
+      return success();
+    } else if (queueAffinities.size() == 1 &&
+               !op.getSelectedQueueAffinity().use_empty()) {
+      // Queue affinities are common (likely "any") but devices are not.
+      // We can fold the queue affinity mask to a constant now to allow it to
+      // propagate.
+      Value commonQueueAffinityMask = *queueAffinities.begin();
+      rewriter.replaceAllUsesWith(op.getSelectedQueueAffinity(),
+                                  commonQueueAffinityMask);
+      return success();
+    }
+    return failure();
+  }
+};
+
+} // namespace
+
+void AllocatorSelectOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                    MLIRContext *context) {
+  results.insert<FoldAllocatorSelect>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer_view.*
 //===----------------------------------------------------------------------===//
 
@@ -661,6 +778,47 @@ void DeviceQueueBarrierOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Removes the condition region and fallback from an export that will always be
+/// selected. This happens if the condition region is folded using a specialized
+/// target environment that allows for compile-time query evaluation.
+struct DropTrueConditionRegion : public OpRewritePattern<ExecutableExportOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExecutableExportOp exportOp,
+                                PatternRewriter &rewriter) const override {
+    auto *block = exportOp.getConditionBody();
+    if (!block) {
+      return rewriter.notifyMatchFailure(exportOp, "no condition region");
+    }
+
+    auto returnOp =
+        dyn_cast_if_present<IREE::HAL::ReturnOp>(block->getTerminator());
+    if (!returnOp) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "invalid condition terminator");
+    }
+
+    Value conditionResult = returnOp.getOperand(0);
+    if (!matchPattern(conditionResult, m_One())) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "non-constant true condition result");
+    }
+
+    rewriter.eraseBlock(block);
+    rewriter.modifyOpInPlace(exportOp,
+                             [&]() { exportOp.removeConditionFallbackAttr(); });
+    return success();
+  }
+};
+
+} // namespace
+
+void ExecutableExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<DropTrueConditionRegion>(context);
+}
+
+namespace {
+
 // Returns a set of fused locations for each result from all return sites.
 static SmallVector<Location> gatherResultLocations(int numResults,
                                                    Region &region) {
@@ -855,7 +1013,8 @@ struct DropUnusedExecutableConstantBlockDeviceArg
     if (!deviceArg.use_empty())
       return failure();
     rewriter.modifyOpInPlace(blockOp, [&]() {
-      blockOp.eraseArgument(0);
+      // Type conversion here shouldn't fail.
+      (void)blockOp.eraseArgument(0);
       blockOp.setFunctionTypeAttr(TypeAttr::get(
           rewriter.getFunctionType(/*inputs=*/{}, blockOp.getResultTypes())));
     });

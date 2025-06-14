@@ -66,7 +66,7 @@ public:
       return failure();
     if (xferOp.getMask())
       return failure();
-    auto extractOp = xferOp.getSource().getDefiningOp<tensor::ExtractSliceOp>();
+    auto extractOp = xferOp.getBase().getDefiningOp<tensor::ExtractSliceOp>();
     if (!extractOp)
       return failure();
     if (!extractOp.hasUnitStride())
@@ -148,7 +148,7 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
     vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
   }
 
-  Value dest = writeOp.getSource();
+  Value dest = writeOp.getBase();
   ArrayRef<int64_t> destShape = writeOp.getShapedType().getShape();
 
   // Attempts to resolve the size of a dim within the destination.
@@ -289,7 +289,7 @@ public:
           extractSliceOp,
           "expect it is not a rank-reduced tensor.extract_slice op");
     }
-    if (!llvm::all_of(extractSliceOp.getMixedOffsets(), isZeroIndex)) {
+    if (!llvm::all_of(extractSliceOp.getMixedOffsets(), isZeroInteger)) {
       return rewriter.notifyMatchFailure(extractSliceOp,
                                          "expect all the offsets are zeros");
     }
@@ -305,7 +305,7 @@ public:
           extractSliceOp,
           "expect the transfer.vector_write op has only one use");
     }
-    if (!xferOp.getSource().getDefiningOp<tensor::EmptyOp>()) {
+    if (!xferOp.getBase().getDefiningOp<tensor::EmptyOp>()) {
       return rewriter.notifyMatchFailure(
           extractSliceOp, "expect the transfer.vector_write op to write into a "
                           "tensor.empty op");

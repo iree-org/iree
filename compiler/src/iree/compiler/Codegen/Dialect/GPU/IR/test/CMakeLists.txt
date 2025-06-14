@@ -14,7 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "canonicalize.mlir"
     "iree_gpu_attrs.mlir"
+    "iree_gpu_inner_tiled_ops.mlir"
     "iree_gpu_ops.mlir"
     "target_attrs.mlir"
   TOOLS

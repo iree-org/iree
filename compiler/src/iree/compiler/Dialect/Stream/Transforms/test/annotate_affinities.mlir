@@ -1,4 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-stream-annotate-affinities %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-annotate-affinities --iree-stream-affinity-solver-max-iterations=8 %s | FileCheck %s
+
+// Note: nothing in here is crazy enough that it should trigger the max
+// iteration count. Nearly everything should complete in 1-4 iterations.
 
 // Tests that we can track affinity through optimization barriers. They're meant
 // to block optimization but we really can't do much if we don't track affinity.
@@ -10,14 +13,17 @@ util.func private @optimization_barrier_consumer() -> tensor<1xi32> {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %cst = flow.tensor.constant dense<123> : tensor<1xi32>
   // CHECK: util.optimization_barrier
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %cst_dno = util.optimization_barrier %cst : tensor<1xi32>
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %cst_a = flow.tensor.transfer %cst_dno : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
@@ -100,14 +106,17 @@ util.func private @splat_op_ambiguous() -> (tensor<1xi32>, tensor<1xi32>) {
   // CHECK: flow.tensor.splat
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %splat = flow.tensor.splat %splat_value : tensor<1xi32>
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %splat_a = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
   %splat_b = flow.tensor.transfer %splat : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_b>]]
@@ -195,22 +204,28 @@ util.func public @exported_producer(%fence: !hal.fence) -> !hal.buffer_view {
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %cst = flow.tensor.constant dense<123> : tensor<1xi32>
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %cst_a = flow.tensor.transfer %cst : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK: flow.tensor.clone
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %clone_a = flow.tensor.clone %cst_a : tensor<1xi32>
   // CHECK: hal.tensor.barrier
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]}
   %clone_ready_a = hal.tensor.barrier join(%clone_a : tensor<1xi32>) => %fence : !hal.fence
   // CHECK: hal.tensor.export
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %buffer_view = hal.tensor.export on(#hal.device.promise<@dev_b>) %clone_ready_a "output" : tensor<1xi32> -> !hal.buffer_view
   // CHECK: util.return
   util.return %buffer_view : !hal.buffer_view
@@ -223,24 +238,34 @@ util.func public @exported_producer(%fence: !hal.fence) -> !hal.buffer_view {
 // introducing transfers such that the operation is not in-place.
 
 // CHECK-LABEL: @aliased_storage
-util.func public @aliased_storage(%view: !hal.buffer_view, %storage: !hal.buffer, %fence: !hal.fence) {
+util.func public @aliased_storage(%view: !hal.buffer_view, %storage: !hal.buffer, %fence: !hal.fence) -> tensor<4xi32> {
   // CHECK: hal.tensor.import
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %arg_a = hal.tensor.import on(#hal.device.promise<@dev_a>) %view : !hal.buffer_view -> tensor<4xi32>
   // CHECK: flow.dispatch @dispatch
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %ret_b = flow.dispatch @dispatch(%arg_a) : (tensor<4xi32>) -> tensor<4xi32>
   // CHECK: hal.tensor.alias
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %alias_b = hal.tensor.alias on(#hal.device.promise<@dev_b>) %ret_b : tensor<4xi32> to %storage : !hal.buffer
   // CHECK: hal.tensor.barrier
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
-  hal.tensor.barrier join(%alias_b : tensor<4xi32>) => %fence : !hal.fence
-  util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %barrier = hal.tensor.barrier join(%alias_b : tensor<4xi32>) => %fence : !hal.fence
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  util.return %barrier : tensor<4xi32>
 }
 
 // -----
@@ -260,20 +285,26 @@ util.func public @tied_aliased_storage(%view: !hal.buffer_view, %storage: !hal.b
   // CHECK: flow.dispatch @dispatch0
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
-  %t0 = flow.dispatch @dispatch0(%cst) : (tensor<4xi32>) -> tensor<4xi32>
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %t0 = flow.dispatch @dispatch0(%cst_a) : (tensor<4xi32>) -> tensor<4xi32>
   // CHECK: flow.dispatch @dispatch1
-  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %t1 = flow.dispatch @dispatch1(%t0) : (tensor<4xi32>) -> %t0
   // CHECK: hal.tensor.alias
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]}
   %alias = hal.tensor.alias on(#hal.device.promise<@dev_b>) %t1 : tensor<4xi32> to %storage : !hal.buffer
   // CHECK: hal.tensor.barrier
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
-  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   hal.tensor.barrier join(%alias : tensor<4xi32>) => %fence : !hal.fence
   util.return
 }
@@ -314,24 +345,29 @@ util.func private @tied_constant_multi_consumer() -> (tensor<1xi32>, tensor<1xi3
   // CHECK: flow.tensor.constant
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %cst = flow.tensor.constant dense<123> : tensor<1xi32>
   // CHECK: flow.dispatch @a
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %tied_0 = flow.dispatch @a(%cst) : (tensor<1xi32>) -> %cst
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %tied_0_a = flow.tensor.transfer %tied_0 : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK: flow.dispatch @b
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %tied_1 = flow.dispatch @b(%cst) : (tensor<1xi32>) -> %cst
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
   %tied_1_b = flow.tensor.transfer %tied_1 : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_b>]]
@@ -1079,7 +1115,8 @@ util.func private @scf_if_capture_consumer(%cond: i1) -> tensor<1xi32> {
     // CHECK: scf.yield
     // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
     scf.yield %cst_b : tensor<1xi32>
-  // CHECK{LITERAL}: } {stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK{LITERAL}: } {
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   }
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
@@ -1115,7 +1152,8 @@ util.func private @scf_if_capture_producer(%cond: i1) -> tensor<1xi32> {
     // CHECK: scf.yield
     // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
     scf.yield %cst_c : tensor<1xi32>
-  // CHECK{LITERAL}: } {stream.affinities.results = [[#hal.device.promise<@dev_b>, #hal.device.promise<@dev_c>]]
+  // CHECK{LITERAL}: } {
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>, #hal.device.promise<@dev_c>]]
   }
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>, #hal.device.promise<@dev_c>]]
@@ -1147,7 +1185,8 @@ util.func private @scf_if_consumer_yield(%cond: i1) -> tensor<1xi32> {
     // CHECK: scf.yield
     // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
     scf.yield %cst_1 : tensor<1xi32>
-  // CHECK{LITERAL}: } {stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK{LITERAL}: } {
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
   }
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
@@ -1534,18 +1573,22 @@ util.func private @scf_while_capture_producer_body() -> tensor<1xi32> {
 util.func public @simple_program(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> !hal.buffer_view {
   // CHECK: hal.tensor.import
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %0 = hal.tensor.import on(#hal.device.promise<@dev_a>) wait(%arg1) => %arg0 "input0" : !hal.buffer_view -> tensor<1xi32>
   // CHECK: util.call @_simple_program
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %1 = util.call @_simple_program(%0) : (tensor<1xi32>) -> tensor<1xi32>
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %2 = flow.tensor.transfer %1 : tensor<1xi32> to #hal.device.promise<@dev_a>
   // CHECK: hal.tensor.barrier
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
   %3 = hal.tensor.barrier join(%2 : tensor<1xi32>) => %arg2 : !hal.fence
   // CHECK: hal.tensor.export
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
@@ -1557,14 +1600,17 @@ util.func private @_simple_program(%arg0: tensor<1xi32>) -> tensor<1xi32> {
   // CHECK: util.call @dispatch_a
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %0 = util.call @dispatch_a(%arg0) : (tensor<1xi32>) -> tensor<1xi32>
   // CHECK: flow.tensor.transfer
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
   %1 = flow.tensor.transfer %0 : tensor<1xi32> to #hal.device.promise<@dev_b>
   // CHECK: util.call @dispatch_b
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %2 = util.call @dispatch_b(%1) : (tensor<1xi32>) -> tensor<1xi32>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
@@ -1580,6 +1626,7 @@ util.func private @dispatch_a(%arg0: tensor<1xi32>) -> tensor<1xi32> {
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_a>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %0 = flow.dispatch @dispatch_a(%arg0, %cst) : (tensor<1xi32>, tensor<1xi32>) -> tensor<1xi32>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
@@ -1595,8 +1642,281 @@ util.func private @dispatch_b(%arg0: tensor<1xi32>) -> tensor<1xi32> {
   // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>], [#hal.device.promise<@dev_b>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
   %0 = flow.dispatch @dispatch_b(%arg0, %cst) : (tensor<1xi32>, tensor<1xi32>) -> tensor<1xi32>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
   util.return %0 : tensor<1xi32>
+}
+
+// -----
+
+// Tests that a value returned from a stream.yield takes on the consumer
+// affinities of the parent region.
+
+// CHECK-LABEL: @stream_yield_consumer_affinity
+util.func public @stream_yield_consumer_affinity(%size: index) -> !stream.resource<transient> {
+  %input = stream.async.constant on(#hal.device.promise<@dev_a>) : !stream.resource<transient>{%size} = dense<3> : tensor<8xi32>
+  // CHECK: stream.async.execute
+  %result_a, %timepoint_a = stream.async.execute on(#hal.device.promise<@dev_a>) with(%input as %capture_a: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    // CHECK: stream.async.clone
+    // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    %t_a = stream.async.clone %capture_a : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+    stream.yield %t_a : !stream.resource<transient>{%size}
+  // CHECK{LITERAL}: => !stream.timepoint attributes {
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  } => !stream.timepoint
+  // CHECK: stream.async.execute
+  %result_b, %timepoint_b = stream.async.execute on(#hal.device.promise<@dev_b>) await(%timepoint_a) => with(%result_a as %capture_b: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    %t_b = stream.async.clone %capture_b : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+    stream.yield %t_b : !stream.resource<transient>{%size}
+  // CHECK{LITERAL}: => !stream.timepoint attributes {
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+  } => !stream.timepoint
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  util.return %result_b : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that a tied value through an execution region has its producer/consumer
+// affinity assigned based on subsequent usage.
+
+// CHECK-LABEL: @stream_yield_consumer_affinity_tied
+util.func public @stream_yield_consumer_affinity_tied(%size: index) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %input = stream.async.constant on(#hal.device.promise<@dev_a>) : !stream.resource<transient>{%size} = dense<3> : tensor<8xi32>
+  // CHECK: stream.async.execute
+  %result_a, %timepoint_a = stream.async.execute on(#hal.device.promise<@dev_a>) with(%input as %capture_a: !stream.resource<transient>{%size}) -> %input{%size} {
+    // CHECK: stream.async.dispatch
+    // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    %t_a = stream.async.dispatch @executable::@dispatch(%capture_a[%c0 to %size for %size]) : (!stream.resource<transient>{%size}) -> %capture_a{%size}
+    stream.yield %t_a : !stream.resource<transient>{%size}
+  // CHECK{LITERAL}: => !stream.timepoint attributes {
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  } => !stream.timepoint
+  // CHECK: stream.async.execute
+  %result_b, %timepoint_b = stream.async.execute on(#hal.device.promise<@dev_b>) await(%timepoint_a) => with(%result_a as %capture_b: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    // CHECK: stream.async.clone
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+    %t_b = stream.async.clone %capture_b : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+    stream.yield %t_b : !stream.resource<transient>{%size}
+  // CHECK{LITERAL}: => !stream.timepoint attributes {
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+  } => !stream.timepoint
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  util.return %result_b : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that pinning a value will always result in a valid analysis result even
+// if we couldn't exhaustively analyze the value. Here %arg0 has producers (in
+// the callers) and consumers (in the callers after return) we don't know about
+// and would otherwise mark the value has having an unknown affinity.
+// Note that %arg0 has no operand affinity/usage - we can only make assertions
+// about the result.
+
+// CHECK-LABEL: @pinning_overrides_invalid
+util.func public @pinning_overrides_invalid(%arg0: tensor<128xi8>) -> tensor<128xi8> {
+  // CHECK: flow.tensor.barrier
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@device>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@device>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@device>]]
+  %0 = flow.tensor.barrier %arg0 : tensor<128xi8> on #hal.device.promise<@device>
+  // CHECK: flow.dispatch
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@device>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@device>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@device>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@device>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@device>]]
+  %1 = flow.dispatch @ex::@entry(%0) : (tensor<128xi8>) -> tensor<128xi8>
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@device>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@device>]]
+  util.return %1 : tensor<128xi8>
+}
+
+// -----
+
+// Tests that pinning can be used to control I/O to external methods.
+
+util.func private @extern(tensor<128xi8>) -> tensor<128xi8>
+
+// CHECK-LABEL: @pinning_overrides_invalid_call
+util.func public @pinning_overrides_invalid_call() -> tensor<128xi8> {
+  // CHECK: %[[CST:.+]] = flow.tensor.constant
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
+  %cst = flow.tensor.constant dense<123> : tensor<128xi8>
+  // CHECK: flow.tensor.barrier %[[CST]]
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
+  %cst_barrier = flow.tensor.barrier %cst : tensor<128xi8> on #hal.device.promise<@dev_a>
+  // CHECK: %[[RESULT:.+]] = util.call
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+  %result = util.call @extern(%cst_barrier) : (tensor<128xi8>) -> tensor<128xi8>
+  // CHECK: flow.tensor.barrier %[[RESULT]]
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+  %result_barrier = flow.tensor.barrier %result : tensor<128xi8> on #hal.device.promise<@dev_b>
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_b>]]
+  util.return %result_barrier : tensor<128xi8>
+}
+
+// -----
+
+// Tests that very long chains of tied ops still resolve.
+// This is a stress test for the solver; with the way it works and our elements
+// are defined each level of the dependency DAG requires one iteration to solve.
+// If you have 100 levels you need 100 iterations. The real problem is needing
+// 100 levels, but solving that is harder.
+
+// CHECK-LABEL: @long_tied_chain_pinned_bottom
+util.func public @long_tied_chain_pinned_bottom() -> tensor<4xi32> {
+  // CHECK: flow.tensor.constant
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+  %cst = flow.tensor.constant dense<123> : tensor<4xi32>
+  // CHECK: flow.tensor.transfer
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_b>]]
+  %cst_b = flow.tensor.transfer %cst : tensor<4xi32> to #hal.device.promise<@dev_b>
+  // CHECK: flow.dispatch @dispatch0
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %t0 = flow.dispatch @dispatch0(%cst_b) : (tensor<4xi32>) -> tensor<4xi32>
+  // CHECK: flow.dispatch @dispatch1
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %t1 = flow.dispatch @dispatch1(%t0) : (tensor<4xi32>) -> %t0
+  %t2 = flow.dispatch @dispatch2(%t1) : (tensor<4xi32>) -> %t1
+  %t3 = flow.dispatch @dispatch3(%t2) : (tensor<4xi32>) -> %t2
+  %t4 = flow.dispatch @dispatch4(%t3) : (tensor<4xi32>) -> %t3
+  %t5 = flow.dispatch @dispatch5(%t4) : (tensor<4xi32>) -> %t4
+  %t6 = flow.dispatch @dispatch6(%t5) : (tensor<4xi32>) -> %t5
+  %t7 = flow.dispatch @dispatch7(%t6) : (tensor<4xi32>) -> %t6
+  %t8 = flow.dispatch @dispatch8(%t7) : (tensor<4xi32>) -> %t7
+  %t9 = flow.dispatch @dispatch9(%t8) : (tensor<4xi32>) -> %t8
+  %t10 = flow.dispatch @dispatch10(%t9) : (tensor<4xi32>) -> %t9
+  %t11 = flow.dispatch @dispatch11(%t10) : (tensor<4xi32>) -> %t10
+  %t12 = flow.dispatch @dispatch12(%t11) : (tensor<4xi32>) -> %t11
+  %t13 = flow.dispatch @dispatch13(%t12) : (tensor<4xi32>) -> %t12
+  %t14 = flow.dispatch @dispatch14(%t13) : (tensor<4xi32>) -> %t13
+  %t15 = flow.dispatch @dispatch15(%t14) : (tensor<4xi32>) -> %t14
+  %t16 = flow.dispatch @dispatch16(%t15) : (tensor<4xi32>) -> %t15
+  %t17 = flow.dispatch @dispatch17(%t16) : (tensor<4xi32>) -> %t16
+  %t18 = flow.dispatch @dispatch18(%t17) : (tensor<4xi32>) -> %t17
+  %t19 = flow.dispatch @dispatch19(%t18) : (tensor<4xi32>) -> %t18
+  %t20 = flow.dispatch @dispatch20(%t19) : (tensor<4xi32>) -> %t19
+  %t21 = flow.dispatch @dispatch21(%t20) : (tensor<4xi32>) -> %t20
+  // CHECK: flow.dispatch @dispatch22
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %t22 = flow.dispatch @dispatch22(%t21) : (tensor<4xi32>) -> %t21
+  // CHECK: flow.tensor.barrier
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  %barrier = flow.tensor.barrier %t22 : tensor<4xi32> on #hal.device.promise<@dev_a>
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+  util.return %barrier : tensor<4xi32>
+}
+
+// -----
+
+// Similar to @long_tied_chain_pinned_top above but pinning at the top of the
+// use-def chain.
+
+// CHECK-LABEL: @long_tied_chain_pinned_top
+util.func public @long_tied_chain_pinned_top(%buffer_view: !hal.buffer_view) {
+  %storage = hal.tensor.import on(#hal.device.promise<@dev_a>) %buffer_view "input" : !hal.buffer_view -> tensor<4xi32>
+  // CHECK: flow.dispatch @dispatch0
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
+  %t0 = flow.dispatch @dispatch0(%storage) : (tensor<4xi32>) -> %storage
+  %t1 = flow.dispatch @dispatch1(%t0) : (tensor<4xi32>) -> %t0
+  %t2 = flow.dispatch @dispatch2(%t1) : (tensor<4xi32>) -> %t1
+  %t3 = flow.dispatch @dispatch3(%t2) : (tensor<4xi32>) -> %t2
+  %t4 = flow.dispatch @dispatch4(%t3) : (tensor<4xi32>) -> %t3
+  %t5 = flow.dispatch @dispatch5(%t4) : (tensor<4xi32>) -> %t4
+  %t6 = flow.dispatch @dispatch6(%t5) : (tensor<4xi32>) -> %t5
+  %t7 = flow.dispatch @dispatch7(%t6) : (tensor<4xi32>) -> %t6
+  %t8 = flow.dispatch @dispatch8(%t7) : (tensor<4xi32>) -> %t7
+  %t9 = flow.dispatch @dispatch9(%t8) : (tensor<4xi32>) -> %t8
+  %t10 = flow.dispatch @dispatch10(%t9) : (tensor<4xi32>) -> %t9
+  %t11 = flow.dispatch @dispatch11(%t10) : (tensor<4xi32>) -> %t10
+  %t12 = flow.dispatch @dispatch12(%t11) : (tensor<4xi32>) -> %t11
+  %t13 = flow.dispatch @dispatch13(%t12) : (tensor<4xi32>) -> %t12
+  %t14 = flow.dispatch @dispatch14(%t13) : (tensor<4xi32>) -> %t13
+  %t15 = flow.dispatch @dispatch15(%t14) : (tensor<4xi32>) -> %t14
+  %t16 = flow.dispatch @dispatch16(%t15) : (tensor<4xi32>) -> %t15
+  %t17 = flow.dispatch @dispatch17(%t16) : (tensor<4xi32>) -> %t16
+  %t18 = flow.dispatch @dispatch18(%t17) : (tensor<4xi32>) -> %t17
+  %t19 = flow.dispatch @dispatch19(%t18) : (tensor<4xi32>) -> %t18
+  %t20 = flow.dispatch @dispatch20(%t19) : (tensor<4xi32>) -> %t19
+  %t21 = flow.dispatch @dispatch21(%t20) : (tensor<4xi32>) -> %t20
+  // CHECK: flow.dispatch @dispatch22
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
+  %t22 = flow.dispatch @dispatch22(%t21) : (tensor<4xi32>) -> %t21
+  util.return
 }

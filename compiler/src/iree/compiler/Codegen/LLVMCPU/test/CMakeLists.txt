@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "2d-scalable-to-1d-scalable.mlir"
+    "2d_scalable_to_1d_scalable.mlir"
     "aarch64_dotprod_vector_lowering.mlir"
     "aarch64_vector_lowering.mlir"
     "apply_scale_lowering.mlir"
@@ -52,10 +52,9 @@ iree_lit_test_suite(
     "select_x86_64_lowering_strategy.mlir"
     "split_reduction.mlir"
     "synchronize_symbol_visibility.mlir"
-    "tile-root-fuse-consumer-producer.mlir"
     "tile.mlir"
     "tile_and_fuse.mlir"
-    "transform_dialect_bufferize.mlir"
+    "tile_root_and_fuse_producer_consumer.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"

@@ -30,7 +30,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   Pure,
   AllTypesMatch<["input", "output"]>
   ]> {
-  let summary = "Layout conversion operator";
+  let summary = [{Layout conversion operator.}];
   let description = [{
     The layout conversion operator takes a shaped value and a layout and
     transforms the value to have that layout.
@@ -78,7 +78,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
 
 def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
     [SameOperandsAndResultElementType, Pure]> {
-  let summary = "SIMT to SIMD conversion operation";
+  let summary = [{SIMT to SIMD conversion operation.}];
   let description = [{
     This operation is a temporary operation useful for source/target
     materializations when doing type conversions between distributed and not
@@ -97,7 +97,7 @@ def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
 
 def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
     [SameOperandsAndResultElementType, Pure]> {
-  let summary = "SIMD to SIMT conversion operation";
+  let summary = [{SIMD to SIMT conversion operation.}];
   let description = [{
     This operation is a temporary operation useful for source/target
     materializations when doing type conversions between distributed and not
@@ -120,7 +120,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
     AttrSizedOperandSegments
   ]> {
-  let arguments = (ins AnyShaped:$source,
+  let arguments = (ins AnyShaped:$base,
                        Variadic<Index>:$indices,
                        Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
                        BoolArrayAttr:$indexed,
@@ -131,7 +131,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
                        BoolArrayAttr:$in_bounds);
   let results = (outs AnyVectorOfAnyRank:$vector);
 
-  let summary = "Gathers a supervector from memory into an SSA vector value.";
+  let summary = [{Gathers a supervector from memory into an SSA vector value.}];
 
   let description = [{
     The iree_vector_ext.transfer_gather operation provides a structured
@@ -144,7 +144,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     operation.
 
     The operation can be thought of as:
-      1. A contiguous slice gathered from the source as described by the operation
+      1. A contiguous slice gathered from the base as described by the operation
       2. A `vector.transfer_read` on the contiguous slice
 
     The operation defines `permutation_map`, `padding`, `mask`, `in_bounds` in
@@ -161,7 +161,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     gather:
 
     ```
-    slice[i, j, k] = source[i + i_offset][j][indices[i][j][k]]
+    slice[i, j, k] = base[i + i_offset][j][indices[i][j][k]]
     ```
 
     The operation would represent this as:
@@ -178,7 +178,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     indexed. For example, for the following gather:
 
     ```
-    slice[i, j, k] = source[i][indices0[i] + offset][indices1[j, k]]
+    slice[i, j, k] = base[i][indices0[i] + offset][indices1[j, k]]
     ```
 
     The indexing would be described by:
@@ -197,18 +197,18 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     read from a non-contiguous slice. For example:
 
     ```
-    source: memref<8192x8x16xf32>
+    base: memref<8192x8x16xf32>
     indices0 : vector<2xindex>
     indices1 : vector<4x8xindex>
 
-    slice[i, j, k] = source[indices0[k]][j][indices1[i, j]]
+    slice[i, j, k] = base[indices0[k]][j][indices1[i, j]]
     vector = read(slice) : memref<8192x8x16xf32> -> vector<16x8x2xf32>
     ```
 
     Can be represented by:
 
     ```
-    %vector = vector.transfer_gather %source[0, 0, 0](%indices0, %indices1) {
+    %vector = vector.transfer_gather %base[0, 0, 0](%indices0, %indices1) {
       gather_dims = [0, 2],
       index_maps = [
         affine_map<(i, j, k) -> (k)>,

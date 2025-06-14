@@ -347,6 +347,17 @@ static iree_status_t iree_hal_hip_driver_select_default_device(
   return status;
 }
 
+static iree_status_t iree_hal_hip_try_parse_uint64_option(
+    iree_string_view_t name, iree_string_view_t value, uint64_t* out_value) {
+  if (!iree_string_view_atoi_uint64(value, out_value)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "option '%*.s' expected a uint64 value, got: '%.*s'", (int)name.size,
+        name.data, (int)value.size, value.data);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_hip_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
@@ -371,9 +382,19 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
 
   iree_string_view_t device_name = iree_make_cstring_view("hip");
 
+  iree_hal_hip_device_params_t device_params = driver->device_params;
+  for (iree_host_size_t i = 0; i < param_count; ++i) {
+    if (iree_string_view_equal(params[i].key, IREE_SV("hip_external_stream"))) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0,
+          iree_hal_hip_try_parse_uint64_option(params[i].key, params[i].value,
+                                               &device_params.external_stream));
+    }
+  }
+
   // Attempt to create the device now.
   iree_status_t status = iree_hal_hip_device_create(
-      base_driver, device_name, &driver->device_params, &driver->hip_symbols,
+      base_driver, device_name, &device_params, &driver->hip_symbols,
       &driver->nccl_symbols, 1, &device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);

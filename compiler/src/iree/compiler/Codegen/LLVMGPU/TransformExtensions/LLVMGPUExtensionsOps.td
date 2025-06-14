@@ -615,7 +615,7 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
      TransformEachOpTrait,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
-  let summary = "Pack shared memory allocation to reduce memory usage";
+  let summary = [{Pack shared memory allocation to reduce memory usage.}];
   let description = [{
     Looks for allocs in shared memory space with overlapping liveness and
     groups them, then packs all the allocations in each group into one i8

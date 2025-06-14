@@ -32,7 +32,7 @@ def HALInline_BufferAllocateOp : HALInline_Op<"buffer.allocate", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{empty buffer allocation operation}];
+  let summary = [{Empty buffer allocation operation.}];
   let description = [{
     Allocates a buffer of the given size.
     The size of the buffer returned may be larger than the requested size if the
@@ -59,7 +59,7 @@ def HALInline_BufferAllocateInitializedOp : HALInline_Op<"buffer.allocate.initia
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{buffer allocation with cloning}];
+  let summary = [{Buffer allocation with cloning.}];
   let description = [{
     Allocates a buffer with a copy of the provided contents.
   }];
@@ -87,7 +87,7 @@ def HALInline_BufferWrapOp : HALInline_Op<"buffer.wrap", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{host buffer wrapping operation}];
+  let summary = [{Host buffer wrapping operation.}];
   let description = [{
     Tries wrapping a !hal.buffer around host memory backed by the given byte
     buffer.
@@ -114,7 +114,7 @@ def HALInline_BufferSubspanOp : HALInline_PureOp<"buffer.subspan", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{buffer subspan operation}];
+  let summary = [{Buffer subspan operation.}];
   let description = [{
     Returns a reference to a subspan of the buffer.
   }];
@@ -141,7 +141,7 @@ def HALInline_BufferSubspanOp : HALInline_PureOp<"buffer.subspan", [
 def HALInline_BufferLengthOp : HALInline_PureOp<"buffer.length", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer byte length accessor}];
+  let summary = [{Buffer byte length accessor.}];
   let description = [{
     Returns the allocated size of a buffer in bytes.
     May be less than the underlying buffer allocation if this is a subspan or
@@ -174,7 +174,7 @@ def HALInline_BufferLengthOp : HALInline_PureOp<"buffer.length", [
 def HALInline_BufferStorageOp : HALInline_PureOp<"buffer.storage", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer backing storage accessor}];
+  let summary = [{Buffer backing storage accessor.}];
   let description = [{
     Returns the host backing storage of the HAL buffer as a subspan limited to
     to the buffer's logical range (meaning that byte 0 of the returned buffer is
@@ -220,7 +220,7 @@ let opDocGroup = OpGroupBufferViewOps in {
 def HALInline_BufferViewCreateOp : HALInline_PureOp<"buffer_view.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer view reference initializer}];
+  let summary = [{Buffer view reference initializer.}];
   let description = [{
     Creates a reference to a buffer with a particular shape and element type.
     The buffer is not copied and both the original and view references must be
@@ -274,7 +274,7 @@ def HALInline_BufferViewCreateOp : HALInline_PureOp<"buffer_view.create", [
 }
 
 def HALInline_BufferViewAssertOp : HALInline_Op<"buffer_view.assert"> {
-  let summary = [{buffer view contents assertion}];
+  let summary = [{Buffer view contents assertion.}];
   let description = [{
     Asserts that the buffer view contains a data compatible tensor with the
     given encoding. Program execution will abort as if `std.assert` had been
@@ -306,7 +306,7 @@ def HALInline_BufferViewAssertOp : HALInline_Op<"buffer_view.assert"> {
 def HALInline_BufferViewBufferOp : HALInline_PureOp<"buffer_view.buffer", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer view buffer accessor}];
+  let summary = [{Buffer view buffer accessor.}];
   let description = [{
     Returns the buffer backing this view's contents.
   }];
@@ -328,7 +328,7 @@ def HALInline_BufferViewBufferOp : HALInline_PureOp<"buffer_view.buffer", [
 }
 
 def HALInline_BufferViewElementTypeOp : HALInline_PureOp<"buffer_view.element_type"> {
-  let summary = [{buffer view element type query}];
+  let summary = [{Buffer view element type query.}];
   let description = [{
     Returns the element type of the buffer view.
   }];
@@ -348,7 +348,7 @@ def HALInline_BufferViewElementTypeOp : HALInline_PureOp<"buffer_view.element_ty
 }
 
 def HALInline_BufferViewEncodingTypeOp : HALInline_PureOp<"buffer_view.encoding_type"> {
-  let summary = [{buffer view encoding type query}];
+  let summary = [{Buffer view encoding type query.}];
   let description = [{
     Returns the encoding type of the buffer view.
   }];
@@ -368,7 +368,7 @@ def HALInline_BufferViewEncodingTypeOp : HALInline_PureOp<"buffer_view.encoding_
 }
 
 def HALInline_BufferViewRankOp : HALInline_PureOp<"buffer_view.rank"> {
-  let summary = [{buffer view rank query}];
+  let summary = [{Buffer view rank query.}];
   let description = [{
     Returns the rank of the buffer view.
   }];
@@ -388,7 +388,7 @@ def HALInline_BufferViewRankOp : HALInline_PureOp<"buffer_view.rank"> {
 }
 
 def HALInline_BufferViewDimOp : HALInline_PureOp<"buffer_view.dim"> {
-  let summary = [{buffer view dimension value query}];
+  let summary = [{Buffer view dimension value query.}];
   let description = [{
     Returns the value of the given dimension.
   }];
@@ -410,7 +410,7 @@ def HALInline_BufferViewDimOp : HALInline_PureOp<"buffer_view.dim"> {
 }
 
 def HALInline_BufferViewTraceOp : HALInline_Op<"buffer_view.trace", []> {
-  let summary = [{trace value(s) operation}];
+  let summary = [{Trace value(s) operation.}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given buffer
     views and titles them with the given key. The key is informational only and
@@ -444,7 +444,7 @@ let opDocGroup = OpGroupDeviceOps in {
 
 def HALInline_DeviceQueryOp :
     HALInline_PureOp<"device.query"> {
-  let summary = [{returns a runtime configuration parameter from the device}];
+  let summary = [{Returns a runtime configuration parameter from the device.}];
   let description = [{
     Queries a device configuration parameter with the given key.
     Returns a status indicating whether the pair was recognized/available and if

@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -33,12 +34,15 @@
 #include "iree/compiler/Dialect/VM/Conversion/UtilToVM/Patterns.h"
 
 namespace mlir::iree_compiler::IREE::VM {
-namespace {
+
+#define GEN_PASS_DEF_CONVERSIONPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
 
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
-SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
+static SmallVector<const T *>
+gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
   moduleOp.walk([&](Operation *op) {
     // Special case for declarations which may reference builtins.
@@ -72,34 +76,19 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   return results;
 }
 
-} // namespace
-
 // Runs conversion with registered input dialects.
 class ConversionPass
-    : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
-public:
-  explicit ConversionPass(TargetOptions targetOptions)
-      : targetOptions_(targetOptions) {}
-
-  StringRef getArgument() const override { return "iree-vm-conversion"; }
-
-  StringRef getDescription() const override {
-    return "Converts from various dialects to the VM dialect";
-  }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
-                    func::FuncDialect, mlir::arith::ArithDialect,
-                    math::MathDialect, affine::AffineDialect>();
-  }
-
+    : public IREE::VM::impl::ConversionPassBase<ConversionPass> {
+  using Base::Base;
   void runOnOperation() override {
     if (getOperation().getBody()->empty())
       return;
 
+    auto targetOptions = targetOptionsFromConversionPass();
+
     auto *context = &getContext();
     VMConversionTarget conversionTarget(context);
-    IREE::VM::TypeConverter typeConverter(targetOptions_);
+    IREE::VM::TypeConverter typeConverter(targetOptions);
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
@@ -172,20 +161,15 @@ public:
     }
   }
 
-private:
-  TargetOptions targetOptions_;
+  IREE::VM::TargetOptions targetOptionsFromConversionPass() {
+    IREE::VM::TargetOptions targetOptions;
+    targetOptions.indexBits = indexBits;
+    targetOptions.f32Extension = f32Extension;
+    targetOptions.f64Extension = f64Extension;
+    targetOptions.truncateUnsupportedFloats = truncateUnsupportedFloats;
+    targetOptions.optimizeForStackSize = optimizeForStackSize;
+    return targetOptions;
+  }
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createConversionPass(TargetOptions targetOptions) {
-  return std::make_unique<ConversionPass>(targetOptions);
-}
-
-static PassRegistration<ConversionPass> pass(
-
-    [] {
-      auto options = TargetOptions::FromFlags::get();
-      return std::make_unique<ConversionPass>(options);
-    });
 
 } // namespace mlir::iree_compiler::IREE::VM

@@ -5,11 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
-#include "llvm/ADT/STLExtras.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -52,19 +50,14 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
 static llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
            const TileSwizzle::ExpandShapeDimVectorType &expandShapeDimVector) {
-  os << "[";
-  llvm::interleaveComma(expandShapeDimVector, os);
-  return os << "]";
+  return os << llvm::interleaved_array(expandShapeDimVector);
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle) {
-  os << "{expandShape = [";
-  llvm::interleaveComma(swizzle.expandShape, os);
-  os << "], permutation = [";
-  llvm::interleaveComma(swizzle.permutation, os);
-  os << "]}";
-  return os;
+  return os << "{expandShape = " << llvm::interleaved_array(swizzle.expandShape)
+            << ", permutation = "
+            << llvm::interleaved_array(swizzle.permutation) << "}";
 }
 
 bool operator==(const MaterializeEncodingInfo &lhs,
@@ -81,14 +74,13 @@ bool operator!=(const MaterializeEncodingInfo &lhs,
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const MaterializeEncodingInfo &encodingInfo) {
-  os << "{innerDimsPos = [";
-  llvm::interleaveComma(encodingInfo.innerDimsPos, os);
-  os << "], innerTileSizes = [";
-  llvm::interleaveComma(encodingInfo.innerTileSizes, os);
-  os << "], outerDimsPerm = [";
-  llvm::interleaveComma(encodingInfo.outerDimsPerm, os);
+  os << "{innerDimsPos = [" << llvm::interleaved(encodingInfo.innerDimsPos)
+     << "], innerTileSizes = ["
+     << llvm::interleaved(encodingInfo.innerTileSizes) << "], outerDimsPerm = ["
+     << llvm::interleaved(encodingInfo.outerDimsPerm);
+
   if (encodingInfo.swizzle) {
-    os << "], swizzle = " << encodingInfo.swizzle.value();
+    os << ", swizzle = " << encodingInfo.swizzle.value();
   }
   os << "]}";
   return os;
@@ -284,7 +276,7 @@ FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
   MaterializeEncodingInfo encodingInfo;
   FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(encoding);
+      Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims)) {
     return failure();
   }

@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <iterator>
 #include <optional>
+#include <utility>
 
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
@@ -21,6 +22,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
+#include "iree/hal/semaphore.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
@@ -888,10 +890,12 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
                                   IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
                                   iree_allocator_system(), &buffer_view);
 
-  if (!iree_status_is_ok(status)) {
-    iree_hal_buffer_release(imported_buffer);
-    CheckApiStatus(status, "Failed to create buffer view");
-  }
+  // If the buffer view was successfully created, remove our ref
+  // since the buffer view incremented it.
+  // If the buffer view failed, then remove our ref so we don't
+  // leak the buffer.
+  iree_hal_buffer_release(imported_buffer);
+  CheckApiStatus(status, "Failed to create buffer view");
 
   return HalBufferView::StealFromRawPtr(buffer_view);
 }
@@ -1020,6 +1024,7 @@ HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
 }
 
 HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
+                                  std::optional<py::dict> params,
                                   std::optional<py::list> allocators) {
   // Since the device ids are supposed to be opaque, we need to verify
   // them by querying available devices.
@@ -1046,11 +1051,24 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
     throw std::invalid_argument(std::move(msg));
   }
 
-  std::vector<iree_string_pair_t> params;
+  std::vector<std::pair<std::string, std::string>> param_strings;
+  std::vector<iree_string_pair_t> passed_params;
+  if (params.has_value()) {
+    for (auto it : params.value()) {
+      param_strings.push_back(std::make_pair(py::cast<std::string>(it.first),
+                                             py::cast<std::string>(it.second)));
+      passed_params.push_back(
+          iree_string_pair_t{{param_strings.back().first.c_str(),
+                              param_strings.back().first.size()},
+                             {param_strings.back().second.c_str(),
+                              param_strings.back().second.size()}});
+    }
+  }
+
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_device_by_id(
-                     raw_ptr(), device_id, params.size(),
-                     (params.empty() ? nullptr : &params.front()),
+                     raw_ptr(), device_id, passed_params.size(),
+                     (passed_params.empty() ? nullptr : &passed_params.front()),
                      iree_allocator_system(), &device),
                  "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
@@ -1111,11 +1129,12 @@ VmModule CreateHalModule(
     iree_hal_module_debug_sink = (*debug_sink)->AsIreeHalModuleDebugSink();
   }
 
-  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
-                                        devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
-                                        iree_hal_module_debug_sink,
-                                        iree_allocator_system(), &module),
-                 "Error creating hal module");
+  CheckApiStatus(
+      iree_hal_module_create(
+          instance->raw_ptr(), iree_hal_module_device_policy_default(),
+          device_count, devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
+          iree_hal_module_debug_sink, iree_allocator_system(), &module),
+      "Error creating hal module");
   VmModule vm_module = VmModule::StealFromRawPtr(module);
   if (debug_sink) {
     // Retain a reference. We want the callback to be valid after
@@ -1136,10 +1155,10 @@ iree_hal_module_debug_sink_t HalModuleDebugSink::AsIreeHalModuleDebugSink()
     const {
   iree_hal_module_debug_sink_t res;
   memset(&res, 0, sizeof(res));
+  res.release.fn = HalModuleDebugSink::ReleaseCallback;
+  res.release.user_data = const_cast<HalModuleDebugSink*>(this);
   res.buffer_view_trace.fn = HalModuleDebugSink::IreeHalModuleBufferViewTrace;
   res.buffer_view_trace.user_data = const_cast<HalModuleDebugSink*>(this);
-  res.destroy.fn = HalModuleDebugSink::DestroyCallback;
-  res.destroy.user_data = const_cast<HalModuleDebugSink*>(this);
   return res;
 }
 
@@ -1160,11 +1179,10 @@ static std::vector<HalBufferView> CreateHalBufferViewVector(
   return res;
 }
 
-iree_status_t HalModuleDebugSink::DestroyCallback(void* user_data) {
+void HalModuleDebugSink::ReleaseCallback(void* user_data) {
   HalModuleDebugSink* debug_sink =
       reinterpret_cast<HalModuleDebugSink*>(user_data);
   debug_sink->dec_ref();
-  return iree_ok_status();
 }
 
 iree_status_t HalModuleDebugSink::IreeHalModuleBufferViewTrace(
@@ -1362,9 +1380,50 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("FLOAT_8_E4M3_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ)
       .value("FLOAT_8_E5M2", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
       .value("FLOAT_8_E5M2_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
+      .value("FLOAT_8_E8M0_FNU", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU)
       .export_values()
       .def("__int__",
            [](enum iree_hal_element_types_t self) { return (uint64_t)self; });
+
+  py::enum_<iree_hal_external_timepoint_type_t>(
+      m, "ExternalTimepointType", py::is_arithmetic(), py::is_flag())
+      .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE)
+      .value("WAIT_PRIMITIVE", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_WAIT_PRIMITIVE)
+      .value("CUDA_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT)
+      .value("HIP_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT)
+      .export_values()
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
+
+  py::enum_<enum iree_hal_semaphore_compatibility_bits_t>(
+      m, "SemaphoreCompatibility", py::is_arithmetic(), py::is_flag())
+      .value("NONE", IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE)
+      .value("HOST_WAIT", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT)
+      .value("DEVICE_WAIT", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT)
+      .value("HOST_SIGNAL", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL)
+      .value("DEVICE_SIGNAL", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL)
+      .value("HOST_ONLY", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY)
+      .value("DEVICE_ONLY", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_ONLY)
+      .value("ALL", IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL)
+      .export_values()
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
+      .def("__and__",
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
+
+  py::enum_<iree_hal_external_timepoint_flag_bits_t>(
+      m, "ExternalTimepointFlags", py::is_arithmetic(), py::is_flag())
+      .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_FLAG_NONE)
+      .export_values()
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
+      .def("__and__",
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(
@@ -1408,22 +1467,24 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("create_default_device", &HalDriver::CreateDefaultDevice,
            py::keep_alive<0, 1>(), py::arg("allocators") = py::none())
       .def("create_device", &HalDriver::CreateDevice, py::keep_alive<0, 1>(),
-           py::arg("device_id"), py::arg("allocators") = py::none())
+           py::arg("device_id"), py::arg("params") = py::none(),
+           py::arg("allocators") = py::none())
       .def("create_device_by_uri", &HalDriver::CreateDeviceByURI,
            py::keep_alive<0, 1>(), py::arg("device_uri"),
            py::arg("allocators") = py::none())
       .def(
           "create_device",
           [](HalDriver& self, py::dict device_info,
+             std::optional<py::dict> params,
              std::optional<py::list> allocators) -> HalDevice {
             // Alias of create_device that takes a dict as returned from
             // query_available_devices for convenience.
             auto device_id =
                 py::cast<iree_hal_device_id_t>(device_info["device_id"]);
-            return self.CreateDevice(device_id, allocators);
+            return self.CreateDevice(device_id, params, allocators);
           },
           py::keep_alive<0, 1>(), py::arg("device_info"),
-          py::arg("allocators") = py::none())
+          py::arg("params") = py::none(), py::arg("allocators") = py::none())
       .def("query_available_devices", &HalDriver::QueryAvailableDevices)
       .def("dump_device_info",
            [](HalDriver& self, iree_hal_device_id_t device_id) {
@@ -1642,7 +1703,33 @@ void SetupHalBindings(nanobind::module_ m) {
             return true;
           },
           py::arg("payload"), py::arg("timeout") = py::none(),
-          py::arg("deadline") = py::none(), kHalWait);
+          py::arg("deadline") = py::none(), kHalWait)
+      .def(
+          "import_timepoint",
+          [](HalSemaphore& self, uint64_t value,
+             HalExternalTimepoint& external_timepoint) {
+            CheckApiStatus(
+                iree_hal_semaphore_import_timepoint(
+                    self.raw_ptr(), value, IREE_HAL_QUEUE_AFFINITY_ANY,
+                    external_timepoint.timepoint()),
+                "importing timepoint");
+          },
+          py::arg("value"), py::arg("external_timepoint"))
+      .def(
+          "export_timepoint",
+          [](HalSemaphore& self, uint64_t value,
+             iree_hal_external_timepoint_type_t requested_type,
+             iree_hal_external_timepoint_flags_t requested_flags,
+             HalExternalTimepoint& out_external_timepoint) {
+            CheckApiStatus(
+                iree_hal_semaphore_export_timepoint(
+                    self.raw_ptr(), value, IREE_HAL_QUEUE_AFFINITY_ANY,
+                    requested_type, requested_flags,
+                    &out_external_timepoint.timepoint()),
+                "exporting timepoint");
+          },
+          py::arg("value"), py::arg("requested_type"),
+          py::arg("requested_flags"), py::arg("out_external_timepoint"));
 
   auto hal_fence = py::class_<HalFence>(m, "HalFence");
   VmRef::BindRefProtocol(hal_fence, iree_hal_fence_type,
@@ -1778,6 +1865,73 @@ void SetupHalBindings(nanobind::module_ m) {
                                             py_mapped_memory);
           },
           py::arg("shape"), py::arg("numpy_dtype_descr"));
+
+  py::class_<HalExternalTimepoint>(m, "HalExternalTimepoint")
+      .def(
+          "__init__",
+          [](HalExternalTimepoint* self) { new (self) HalExternalTimepoint(); })
+      .def_prop_rw(
+          "type",
+          [](HalExternalTimepoint& self) -> int {
+            return static_cast<int>(self.type());
+          },
+          [](HalExternalTimepoint& self, int type) {
+            return self.type() =
+                       static_cast<iree_hal_external_timepoint_type_t>(type);
+          })
+      .def_prop_rw(
+          "flags",
+          [](HalExternalTimepoint& self) -> int {
+            return static_cast<int>(self.flags());
+          },
+          [](HalExternalTimepoint& self, int flags) {
+            return self.flags() =
+                       static_cast<iree_hal_external_timepoint_flags_t>(flags);
+          })
+      .def_prop_rw(
+          "compatibility",
+          [](HalExternalTimepoint& self) -> int {
+            return static_cast<int>(self.compatibility());
+          },
+          [](HalExternalTimepoint& self, int compatibility) {
+            return self.compatibility() =
+                       static_cast<iree_hal_semaphore_compatibility_t>(
+                           compatibility);
+          })
+      .def_prop_rw(
+          "cuda_event",
+          [](HalExternalTimepoint& self) -> uint64_t {
+            return static_cast<uint64_t>(
+                reinterpret_cast<uintptr_t>(self.cuda_event()));
+          },
+          [](HalExternalTimepoint& self, uint64_t cuda_event) {
+            if (self.type() == IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE) {
+              self.type() = IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT;
+            }
+            if (self.type() != IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT) {
+              throw RaiseValueError(
+                  "Unexpected cuda event for non cuda timepoint");
+            }
+            self.cuda_event() =
+                reinterpret_cast<void*>(static_cast<uintptr_t>(cuda_event));
+          })
+      .def_prop_rw(
+          "hip_event",
+          [](HalExternalTimepoint& self) -> uint64_t {
+            return static_cast<uint64_t>(
+                reinterpret_cast<uintptr_t>(self.hip_event()));
+          },
+          [](HalExternalTimepoint& self, uint64_t hip_event) {
+            if (self.type() == IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_NONE) {
+              self.type() = IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT;
+            }
+            if (self.type() != IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT) {
+              throw RaiseValueError(
+                  "Unexpected hip event for non hip timepoint");
+            }
+            self.hip_event() =
+                reinterpret_cast<void*>(static_cast<uintptr_t>(hip_event));
+          });
 
   py::class_<HalShape>(m, "Shape")
       .def("__init__", [](HalShape* self, std::vector<iree_hal_dim_t> indices) {

@@ -533,7 +533,6 @@ struct TypePropagationPass final
     RewritePatternSet patterns(context);
 
     TypePropagationTypeConverter typeConverter;
-    typeConverter.addArgumentMaterialization(materializeAsConvertElementType);
     typeConverter.addSourceMaterialization(materializeAsConvertElementType);
     typeConverter.addTargetMaterialization(materializeAsConvertElementType);
 

@@ -14,13 +14,11 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "attention_fuse_by_expansion.mlir"
     "bubble_up_expand_shapes.mlir"
     "bubble_up_extract_slice.mlir"
     "clone_producers_into_dispatch_regions.mlir"
     "collapse_dimensions.mlir"
     "collapse_linalg_generic_on_tensors.mlir"
-    "collapse_reduction.mlir"
     "convert_encoding_to_flow.mlir"
     "convert_region_to_workgroups.mlir"
     "dispatch_linalg_ext_fusion.mlir"
@@ -41,7 +39,9 @@ iree_lit_test_suite(
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"
+    "propagate_encodings.mlir"
     "set_encoding.mlir"
+    "set_encoding_padding.mlir"
     "set_encoding_pipeline.mlir"
     "sink_reshapes.mlir"
     "split_reduction.mlir"

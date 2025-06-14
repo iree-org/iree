@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-dispatch-creation-fold-unit-extent-dims, iree-dispatch-creation-pipeline)" --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-attr-based-pipeline, iree-dispatch-creation-fold-unit-extent-dims, iree-dispatch-creation-pipeline)" --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -43,16 +43,16 @@ util.func public @main(%arg0: tensor<833xi32>, %arg1: tensor<833x833xf32>, %arg2
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<833x833xf32>
 //  CHECK-SAME:     %[[ARG2:.+]]: tensor<f32>
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups(%[[ARG0]], %[[ARG1]], %[[ARG2]])
-//  CHECK-NEXT:       %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:tensor<833xi32>>
-//  CHECK-SAME:       %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:tensor<833x833xf32>>
-//  CHECK-SAME:       %[[ARG5:.+]]: !flow.dispatch.tensor<readonly:tensor<f32>>
-//  CHECK-SAME:       %[[ARG6:.+]]: !flow.dispatch.tensor<writeonly:tensor<f32>>
-//   CHECK-DAG:     %[[L0:.+]] = flow.dispatch.tensor.load %[[ARG3]]
-//   CHECK-DAG:     %[[L1:.+]] = flow.dispatch.tensor.load %[[ARG4]]
-//   CHECK-DAG:     %[[L2:.+]] = flow.dispatch.tensor.load %[[ARG5]]
+//  CHECK-NEXT:       %[[ARG3:.+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<833xi32>>
+//  CHECK-SAME:       %[[ARG4:.+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<833x833xf32>>
+//  CHECK-SAME:       %[[ARG5:.+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+//  CHECK-SAME:       %[[ARG6:.+]]: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32>>
+//   CHECK-DAG:     %[[L0:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG3]]
+//   CHECK-DAG:     %[[L1:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG4]]
+//   CHECK-DAG:     %[[L2:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG5]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[L0]], %[[L0]], %[[L1]], %[[L2]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG6]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[ARG6]]
 //       CHECK:   return %[[DISPATCH]]
 
 // -----
@@ -98,7 +98,7 @@ util.func public @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi4>, %arg1:
 //       CHECK:     %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC1]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC2]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GENERIC2]]
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
 //       CHECK:   return %[[RESHAPE]]
 
@@ -139,16 +139,16 @@ util.func public @verify_operand_cse(%arg0: !hal.buffer_view, %arg1: !hal.buffer
 
 // CHECK-LABEL: func public @verify_operand_cse
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-//   CHECK-DAG:     %[[DIM1:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 0
-//   CHECK-DAG:     %[[DIM2:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 1
-//   CHECK-DAG:     %[[DIM3:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 2
-//   CHECK-DAG:     %[[DIM4:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 3
-//       CHECK:   flow.dispatch.tensor.load
+//   CHECK-DAG:     %[[DIM1:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
+//   CHECK-DAG:     %[[DIM2:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1
+//   CHECK-DAG:     %[[DIM3:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2
+//   CHECK-DAG:     %[[DIM4:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 3
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [%[[DIM1]], %[[DIM2]], 64]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x64xf32>>{%[[DIM1]], %[[DIM2]]}
-//       CHECK:   flow.dispatch.tensor.load
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x64xf32>>{%[[DIM1]], %[[DIM2]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [%[[DIM3]], 64, %[[DIM4]]]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x64x?xf32>>{%[[DIM3]], %[[DIM4]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x64x?xf32>>{%[[DIM3]], %[[DIM4]]}
 
 // -----
 
@@ -215,13 +215,10 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
 }
 // CHECK-LABEL: util.func public @attention_rope_fusion
 //   CHECK-NOT:   linalg.generic
-//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
+//       CHECK:   flow.dispatch.workgroup
 //       CHECK:     %[[GATHER:.+]] = linalg.generic
+//       CHECK:   flow.dispatch.workgroup
 //       CHECK:     %[[ATTENTION:.+]] = iree_linalg_ext.attention
-//  CHECK-SAME:         ins(%[[GATHER]],
-//       CHECK:      flow.dispatch.tensor.store %[[ATTENTION]]
-//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[DISPATCH]]
-//       CHECK:   util.return %[[RESHAPE]]
 
 // -----
 
@@ -261,7 +258,7 @@ util.func public @verify_bubbling(%arg0: !hal.buffer_view, %arg2: !hal.fence) ->
 //   CHECK-NOT:   linalg.generic
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroup
 //       CHECK:     %[[GEN:.+]] = linalg.generic
-//       CHECK:      flow.dispatch.tensor.store %[[GEN]]
+//       CHECK:      iree_tensor_ext.dispatch.tensor.store %[[GEN]]
 //   CHECK-NOT:   linalg.generic
 
 // -----
@@ -297,3 +294,65 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0: ind
 // CHECK-SAME:    %[[D1:[a-zA-Z0-9]+]]
 // CHECK:         %[[RES:.+]] = flow.tensor.encode %[[SRC]] : tensor<?x?xf32, #iree_encoding.testing_encoding<>>{%[[D0]], %[[D1]]} -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
 // CHECK:         util.return %[[RES]]
+
+// -----
+
+// Check that we are able to collapse in presence of unit dims in the make single dispatch pipeline
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5, d2 + d6, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+util.func public @make_single_dispatch(%arg0: tensor<16x8x32x2048xbf16>, %arg1: tensor<16x8x32x4096xbf16>) -> tensor<4096x1x1x2048xf32>
+ attributes {preprocessing_pipeline = #util.preprocessing_pipeline<"iree-preprocessing-make-single-dispatch">} {
+    %cst = arith.constant 0.000000e+00 : f32
+    %2 = tensor.empty() : tensor<4096x1x1x2048xf32>
+    %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<4096x1x1x2048xf32>) -> tensor<4096x1x1x2048xf32>
+    %4 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x8x32x2048xbf16>, tensor<16x8x32x4096xbf16>) outs(%3 : tensor<4096x1x1x2048xf32>) {
+    ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+      %9 = arith.extf %in : bf16 to f32
+      %10 = arith.extf %in_0 : bf16 to f32
+      %11 = arith.mulf %9, %10 : f32
+      %12 = arith.addf %out, %11 : f32
+      linalg.yield %12 : f32
+    } -> tensor<4096x1x1x2048xf32>
+    util.return %4 : tensor<4096x1x1x2048xf32>
+  }
+
+// CHECK-LABEL: util.func public @make_single_dispatch
+//       CHECK: linalg.generic
+//  CHECK-SAME: ins(%{{.*}}, %{{.*}} : tensor<4096x2048xbf16>, tensor<4096x4096xbf16>)
+//  CHECK-SAME: outs(%{{.*}} :  tensor<4096x2048xf32>)
+
+// -----
+
+util.func public @gather_matmul(%source : tensor<20x20x100xi32>, %indices : tensor<100x2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+  %empty = tensor.empty() : tensor<100x100xi32>
+  %result = iree_linalg_ext.gather dimension_map = [1, 0]
+                          ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
+                          outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
+  %mm = linalg.matmul_transpose_b ins(%result, %arg2 : tensor<100x100xi32>, tensor<100x100xi32>) outs(%arg3 : tensor<100x100xi32>) -> tensor<100x100xi32>
+  util.return %mm : tensor<100x100xi32>
+}
+// CHECK-LABEL: util.func public @gather_matmul
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul_transpose_b
+//  CHECK-SAME:       ins(%[[GATHER]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func public @single_gather(%source : tensor<20x20x100xi32>, %indices : tensor<100x2xi32>, %arg2 : tensor<100x100xi32>, %arg3 : tensor<100x100xi32>) -> tensor<100x100xi32> {
+  %empty = tensor.empty() : tensor<100x100xi32>
+  %result = iree_linalg_ext.gather dimension_map = [1, 0]
+                          ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
+                          outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
+  util.return %result : tensor<100x100xi32>
+}
+// Make sure single gather gets wrapped in dispatch.
+// CHECK-LABEL: util.func public @single_gather
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GATHER]]
+//       CHECK:   util.return %[[DISPATCH]]

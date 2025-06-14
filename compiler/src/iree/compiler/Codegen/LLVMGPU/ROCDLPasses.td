@@ -19,6 +19,17 @@ def ROCDLAnnotateKernelForTranslationPass : Pass<
   let dependentDialects = ["ROCDL::ROCDLDialect"];
 }
 
+def ROCDLBufferInstructionsOptimizationPass :
+    InterfacePass<"iree-rocdl-buffer-instructions-optimization", "mlir::FunctionOpInterface"> {
+  let summary = "Optimizations possible with buffer fat pointers";
+  let description = [{
+    Buffer fat pointers support out of bound access so we can make use of this
+    feature for optimizations.
+
+    This pass is a no-op on non-ROCDL targets.
+  }];
+}
+
 def ROCDLConfigureBufferInstructionsPass :
     InterfacePass<"iree-rocdl-configure-buffer-instructions", "mlir::FunctionOpInterface"> {
   let summary = "Determine which subspans can be implemneted with buffer fat pointers";

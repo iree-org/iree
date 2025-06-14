@@ -15,9 +15,12 @@ iree_lit_test_suite(
     lit
   SRCS
     "decompose_horizontally_fused_gemms.mlir"
+    "gpu_alloc_private_memory_for_dps_ops.mlir"
     "gpu_apply_derived_thread_config.mlir"
     "gpu_apply_tiling_level.mlir"
+    "gpu_bubble_resource_casts.mlir"
     "gpu_check_resource_usage.mlir"
+    "gpu_combine_layout_transformation.mlir"
     "gpu_combine_value_barriers.mlir"
     "gpu_create_fast_slow_path.mlir"
     "gpu_distribute.mlir"
@@ -29,6 +32,7 @@ iree_lit_test_suite(
     "gpu_generalize_named_ops.mlir"
     "gpu_greedily_distribute_to_threads.mlir"
     "gpu_infer_memory_space.mlir"
+    "gpu_lower_to_global_loads.mlir"
     "gpu_lower_to_ukernels.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"

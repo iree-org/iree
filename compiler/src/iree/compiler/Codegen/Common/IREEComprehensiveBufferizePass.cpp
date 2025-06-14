@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -79,7 +78,7 @@ class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
+    registry.insert<tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -106,7 +105,6 @@ public:
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 gpu::GPUDialect,
-                IREE::Flow::FlowDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
                 linalg::LinalgDialect,
@@ -142,11 +140,11 @@ public:
 static IREEOneShotBufferizationOptions getBufferizationOptions() {
   IREEOneShotBufferizationOptions options;
 
-  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
+  // bufferization.to_buffer is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant
-  // as is and insert bufferization.to_memref to convert the tensor to memref.
+  // as is and insert bufferization.to_buffer to convert the tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
-  options.opFilter.denyOperation<bufferization::ToMemrefOp>();
+  options.opFilter.denyOperation<bufferization::ToBufferOp>();
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
@@ -221,13 +219,14 @@ void EliminateEmptyTensorsPass::runOnOperation() {
 // modifications.
 LogicalResult
 runIREEOneShotBufferize(Operation *op,
-                        const IREEOneShotBufferizationOptions &options) {
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state)))
+                        const IREEOneShotBufferizationOptions &options,
+                        bufferization::BufferizationState &state) {
+  OneShotAnalysisState analyzeState(op, options);
+  if (failed(analyzeOp(op, analyzeState)))
     return failure();
   if (options.testAnalysisOnly)
     return success();
-  return bufferization::runOneShotBufferize(op, options);
+  return bufferization::runOneShotBufferize(op, options, state);
 }
 
 /// Run comprehensive bufferize.
@@ -244,7 +243,8 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
-  if (failed(runIREEOneShotBufferize(funcOp, options))) {
+  bufferization::BufferizationState bufferizationState;
+  if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
   }
 
@@ -262,9 +262,10 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
-  if (failed(
-          mlir::bufferization::runOneShotBufferize(getOperation(), opt,
-                                                   /*statistics=*/nullptr))) {
+  bufferization::BufferizationState bufferizationState;
+  if (failed(mlir::bufferization::runOneShotBufferize(
+          getOperation(), opt, bufferizationState,
+          /*statistics=*/nullptr))) {
     signalPassFailure();
     return;
   }
@@ -282,7 +283,11 @@ createIREEComprehensiveBufferizePass(
                                                           memCpyFn.value());
 }
 
-void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
+void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
+                                    bool injectAssumeAlignmentOp) {
+  if (injectAssumeAlignmentOp) {
+    funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
+  }
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -296,12 +301,13 @@ void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
+    bool injectAssumeAlignmentOp) {
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
-  addIREEPostBufferizationPasses(funcPassManager);
+  addIREEPostBufferizationPasses(funcPassManager, injectAssumeAlignmentOp);
 }
 
 } // namespace mlir::iree_compiler

@@ -217,6 +217,22 @@ def OutlineMemoizeRegionsPass :
   ];
 }
 
+def MemoizeDeviceSelectionPass :
+    Pass<"iree-hal-memoize-device-selection", "mlir::ModuleOp"> {
+  let summary = "Finds !hal.device selection ops and creates variables initialized on startup.";
+  let description = [{
+    Finds all `hal.*.select`-related ops that are hoistable and moves them
+    into globals that are initialized on startup. This prevents repeated queries
+    at runtime and allows for optimization as queries are CSEd across the entire
+    program.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::HAL::HALDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
 def MemoizeDeviceQueriesPass :
     Pass<"iree-hal-memoize-device-queries", "mlir::ModuleOp"> {
   let summary = "Finds hal.device.query ops and creates variables initialized on startup.";
@@ -622,6 +638,16 @@ def ElideRedundantCommandsPass :
 //===----------------------------------------------------------------------===//
 // Benchmarking and debugging utilities
 //===----------------------------------------------------------------------===//
+
+def AnnotateTargetDevicesPass :
+    Pass<"iree-hal-annotate-target-devices", "mlir::ModuleOp"> {
+  let summary = "Annotates device values with their analyzed potential target devices.";
+  let description = [{
+    Uses data flow analysis to identify potential targets for `!hal.device`
+    values. This can be used to diagnose device analysis issues and otherwise
+    does not impact compilation.
+  }];
+}
 
 def CaptureExecutableSourcesPass :
     Pass<"iree-hal-capture-executable-sources", "mlir::ModuleOp"> {

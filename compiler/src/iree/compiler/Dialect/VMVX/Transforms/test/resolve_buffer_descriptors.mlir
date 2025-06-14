@@ -84,6 +84,27 @@ func.func @resolve_binding_subspan_zero_offset() -> (!util.buffer, index, index,
   #hal.pipeline.binding<storage_buffer>
 ]>
 
+func.func @resolve_binding_subspan_zero_offset_with_assume_alignment() -> (!util.buffer, index, index, index, index, index) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<512x384xf32>
+  %1 = memref.assume_alignment %0, 64 : memref<512x384xf32>
+  %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %1 : memref<512x384xf32> -> !util.buffer, index, index, index, index, index
+  return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
+}
+//     CHECK: func @resolve_binding_subspan_zero_offset_with_assume_alignment(
+// CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+// CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
+// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) binding(0)
+//     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+
 func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer, index, index, index, index, index) {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%arg0) : memref<512x384xindex>
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xindex> -> !util.buffer, index, index, index, index, index

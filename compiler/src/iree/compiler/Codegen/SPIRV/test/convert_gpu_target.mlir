@@ -8,9 +8,8 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>) {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer>]>
-  ) {
-  ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+  ) count(%arg0: !hal.device) -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -55,9 +54,8 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>) {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer>]>
-  ) {
-  ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+  ) count(%arg0: !hal.device) -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {

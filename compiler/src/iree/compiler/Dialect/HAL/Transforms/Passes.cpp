@@ -466,10 +466,12 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::HAL::createOutlineMemoizeRegionsPass());
   }
 
-  // Prune unused executables and their contents.
-  passManager.addPass(IREE::HAL::createPruneExecutablesPass());
-
   addCleanupPatterns(passManager);
+
+  // Prune unused executables and their contents.
+  // After conversion any unused exports will be dropped allowing for
+  // serialization to drop their contents.
+  passManager.addPass(IREE::HAL::createPruneExecutablesPass());
 
   //----------------------------------------------------------------------------
   // Executable packing and runtime loading
@@ -508,8 +510,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Device management and specialization
   //----------------------------------------------------------------------------
 
-  // Memoize device queries such that we don't need to repeatedly ask the same
-  // information at runtime.
+  // Memoize device queries and selection such that we don't need to repeatedly
+  // ask the same information at runtime.
+  passManager.addPass(IREE::HAL::createMemoizeDeviceSelectionPass());
   passManager.addPass(IREE::HAL::createMemoizeDeviceQueriesPass());
 
   // Big cleanup after all our conversion and materialization.

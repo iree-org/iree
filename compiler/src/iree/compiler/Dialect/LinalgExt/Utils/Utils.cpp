@@ -18,7 +18,9 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-linalgExt-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -382,13 +384,18 @@ bool isGatherlikeOp(Operation *op) {
     }
     return currOp->getBlock() == genericOp.getBody();
   };
-  mlir::getBackwardSlice(yieldOp.getOperand(0), &sliceOps, options);
+  [[maybe_unused]] LogicalResult result =
+      getBackwardSlice(yieldOp.getOperand(0), &sliceOps, options);
+  assert(result.succeeded());
   return hasTensorExtract;
 }
 
+//===---------------------------------------------------------------------===//
+// IGEMM details for generic convolutions
+//===---------------------------------------------------------------------===//
+
 FailureOr<IGEMMGenericConvDetails>
 getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
-
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
   MLIRContext *ctx = linalgOp->getContext();
   if (failed(convDimsOrFailure))
@@ -406,7 +413,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     llvm::interleaveComma(convDims.filterLoop, llvm::dbgs());
     llvm::dbgs() << "\nconv input channel dims: ";
     llvm::interleaveComma(convDims.inputChannel, llvm::dbgs());
-    llvm::dbgs() << "\nconv depth multiplier: ";
+    llvm::dbgs() << "\nconv depth dims: ";
     llvm::interleaveComma(convDims.depth, llvm::dbgs());
     llvm::dbgs() << "\n";
   });
@@ -420,18 +427,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
     LDBG("[unimplemented] expected 'filterType' and 'inputType' to have static "
          "shapes.");
-    return failure();
-  }
-
-  // TODO: Support dilation.
-  if (!hasAllOneValues(convDims.dilations)) {
-    LDBG("[unimplemented] expected no dilations (expected dilations to all be "
-         "one).");
-    return failure();
-  }
-  // TODO: Support depthwise.
-  if (!convDims.depth.empty()) {
-    LDBG("[unimplemented] expected no depth");
     return failure();
   }
 
@@ -469,14 +464,6 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (outputChannelLastDim.value() < outputImageFirstDim.value())
     isOutputChannelFirst = true;
 
-  bool isBatchDimLast = false;
-  int64_t numBDims = (convDims.batch).size();
-  if (numBDims != 0) {
-    std::optional<int64_t> batchFirstDim = outputMap.getResultPosition(
-        getAffineDimExpr(convDims.batch[0], outputMap.getContext()));
-    if (batchFirstDim && outputChannelLastDim.value() < batchFirstDim.value())
-      isBatchDimLast = true;
-  }
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
@@ -504,14 +491,19 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   auto parallel = utils::IteratorType::parallel;
   auto reduction = utils::IteratorType::reduction;
-  SmallVector<utils::IteratorType> filterIterators;
+
+  // Parallel filter dims, in order.
   SmallVector<int64_t> filterNdims;
-  for (auto outputChannel : convDims.outputChannel) {
+  for (auto iterDim :
+       llvm::concat<const unsigned>(convDims.depth, convDims.outputChannel)) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(
-        getAffineDimExpr(outputChannel, filterMap.getContext()));
+        getAffineDimExpr(iterDim, filterMap.getContext()));
     filterNdims.push_back(maybeDim.value());
   }
+  std::sort(filterNdims.begin(), filterNdims.end());
+
   SmallVector<ReassociationIndices> filterReassocIndices;
+  SmallVector<utils::IteratorType> filterIterators;
   // Interleave the parallel dims with the reduction dims.
   int64_t filterNdimPos = 0;
   for (auto collapsedDim : collapsedFilterReductionDim) {
@@ -539,48 +531,63 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     }
   }
 
-  int64_t numMDims = (convDims.outputImage).size();
-  int64_t numNDims = (convDims.outputChannel).size();
-  int64_t numParallelDims = numBDims + numMDims + numNDims;
+  int64_t numParallelDims = convDims.depth.size() + convDims.batch.size() +
+                            convDims.outputImage.size() +
+                            convDims.outputChannel.size();
   int64_t numKDims = collapsedFilterReductionDim.size();
   SmallVector<utils::IteratorType> genericIterators(numParallelDims, parallel);
   genericIterators.insert(genericIterators.end(), numKDims, reduction);
 
   SmallVector<AffineExpr> dims(numParallelDims + numKDims);
   bindDimsList<AffineExpr>(ctx, dims);
+  // Build the result map with dims in canonical order.
   auto resultMap = AffineMap::get(
       numParallelDims + numKDims, 0,
       SmallVector<AffineExpr>(dims.begin(), dims.begin() + numParallelDims),
       ctx);
 
+  // Build a mapping from original conv output map dimensions to their canonical
+  // dimensions, as used by the IGEMM maps.
+  DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
+  for (auto [idx, expr] : llvm::enumerate(outputMap.getResults())) {
+    auto convDimIdx = cast<AffineDimExpr>(expr).getPosition();
+    convToIgemmDimMap[convDimIdx] = getAffineDimExpr(idx, expr.getContext());
+  }
+
+  // Lambda to remap conv dim indices to igemm dimensions.
+  auto remapDims = [&](ArrayRef<unsigned> dims) -> SmallVector<AffineExpr> {
+    SmallVector<AffineExpr> mapped;
+    for (unsigned d : dims)
+      mapped.push_back(convToIgemmDimMap.at(d));
+    return mapped;
+  };
+
   // Prepare the input map.
-  int64_t numBDimsInFront = isBatchDimLast ? 0 : numBDims;
-  int64_t startingMPos =
-      isOutputChannelFirst ? numNDims + numBDimsInFront : numBDimsInFront;
-  int64_t startingBPos = isBatchDimLast ? startingMPos + numMDims : 0;
   SmallVector<AffineExpr> inputDims;
-  // Add the batch dimensions.
-  inputDims.insert(inputDims.end(), dims.begin() + startingBPos,
-                   dims.begin() + startingBPos + numBDims);
+  // Add the batch dims.
+  inputDims.append(remapDims(convDims.batch));
+  // Add the depth (group) dims.
+  inputDims.append(remapDims(convDims.depth));
   // Add the M dims.
-  inputDims.insert(inputDims.end(), dims.begin() + startingMPos,
-                   dims.begin() + startingMPos + numMDims);
-  // Add the reduction dims.
-  inputDims.insert(inputDims.end(), dims.begin() + numParallelDims, dims.end());
+  inputDims.append(remapDims(convDims.outputImage));
+  // Add the reduction dims at the end.
+  inputDims.append(dims.begin() + numParallelDims, dims.end());
   auto inputMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
   // Prepare filter map.
-  int64_t currNPos =
-      isOutputChannelFirst ? numBDimsInFront : numBDimsInFront + numMDims;
-  int64_t currKPos = numBDims + numMDims + numNDims;
+  int64_t currKPos = numParallelDims;
   SmallVector<AffineExpr> filterDims;
-
-  for (auto iter : filterIterators) {
-    if (iter == parallel) {
-      filterDims.push_back(dims[currNPos++]);
-    } else if (iter == reduction) {
+  for (const auto &[iter, indices] :
+       llvm::zip_equal(filterIterators, filterReassocIndices)) {
+    if (iter == reduction) {
       filterDims.push_back(dims[currKPos++]);
+    } else {
+      assert(iter == parallel && "expected a parallel dim");
+      assert(indices.size() == 1 && "expected a single reassociation index");
+      int64_t filterInputIdx = indices.front();
+      auto convDim = cast<AffineDimExpr>(filterMap.getResult(filterInputIdx));
+      filterDims.push_back(convToIgemmDimMap.at(convDim.getPosition()));
     }
   }
   auto filterMapGEMM =
@@ -617,6 +624,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   igemmDetails.filterReassocIndices = filterReassocIndices;
   igemmDetails.isOutputChannelFirst = isOutputChannelFirst;
   igemmDetails.convDims = convDims;
+  igemmDetails.convToIgemmDimMap = convToIgemmDimMap;
   igemmDetails.igemmLoopIterators = igemmLoopIterators;
   return igemmDetails;
 }
@@ -812,6 +820,123 @@ bool isaHorizontallyFusedContraction(Operation *op) {
     }
   }
   return true;
+}
+
+bool isArgmaxOp(linalg::GenericOp genericOp) {
+  // Check for 2 results(value, index), and 1 input
+  if (genericOp.getNumDpsInits() != 2) {
+    return false;
+  }
+
+  if (genericOp.getNumDpsInputs() != 1) {
+    return false;
+  }
+
+  // Argmax will require 1D reduction.
+  if (genericOp.getNumReductionLoops() != 1) {
+    return false;
+  }
+
+  // TODO: Add better affine map checks.
+  auto indexing_maps = genericOp.getIndexingMapsArray();
+  if (!indexing_maps[0].isIdentity())
+    return false;
+
+  // Check that initial value is negative Infinite.
+  // TODO: Move this check to ukernel once we implement
+  //       variant to handle non neg-Inf initial value.
+  Value initVal = genericOp.getDpsInitOperand(0)->get();
+  auto fillOp = initVal.getDefiningOp<linalg::FillOp>();
+  if (!fillOp)
+    return false;
+  Value fillVal = fillOp.getDpsInputOperand(0)->get();
+  if (!matchPattern(fillVal, m_NegInfFloat()))
+    return false;
+
+  // Work back from linalg.yield and check body of genericOp.
+  // The genericOp should yield the result of an arith.select,
+  // preceded by an arith.cmpf, arith.maximumf, and arith.extui
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  Value producerOutput;
+  Operation *producer;
+
+  // Producer of linalg.yield 1st arg is arith.maximumf
+  {
+    producerOutput = yieldOp->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return false;
+    }
+    if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
+      return false;
+    }
+  }
+
+  // Producer of linalg.yield op 2nd arg is arith.select
+  // TODO: Add check that select is selecting between linalg.index and index of
+  // current max.
+  {
+    producerOutput = yieldOp->getOperand(1);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return false;
+    }
+    if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
+      return false;
+    }
+    auto selectOp = cast<arith::SelectOp>(producerOutput.getDefiningOp());
+    Value trueVal = selectOp.getTrueValue();
+    if (auto castOp = trueVal.getDefiningOp<arith::IndexCastOp>())
+      trueVal = castOp.getIn();
+
+    // Ensure the true value is directly produced by linalg.index.
+    auto indexOp = trueVal.getDefiningOp<linalg::IndexOp>();
+    if (!indexOp)
+      return false;
+  }
+
+  // Producer of arith.select op is arith.cmpf
+  {
+    producerOutput = producer->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return false;
+    }
+    auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
+    if (!producerCmpFOp ||
+        producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
+      return false;
+    }
+
+    // Check that in and out of cmpf are loop variables.
+    // Currently first operand is disabled because it may be mixed type
+    // which would lead it to be extf(%arg0).
+    // TODO: Add better mixed type support check.
+    if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
+  // Check if there are any non-scalar inputs or non-scalar captures in the
+  // region.
+  for (Value input : linalgOp.getDpsInputs()) {
+    if (isa<ShapedType>(input.getType())) {
+      return false;
+    }
+  }
+
+  bool foundNonScalar = false;
+  visitUsedValuesDefinedAbove(linalgOp.getRegion(), [&](OpOperand *operand) {
+    if (isa<ShapedType>(operand->get().getType())) {
+      foundNonScalar = true;
+    }
+  });
+
+  return !foundNonScalar;
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

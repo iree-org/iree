@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Pipelines/Options.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -16,6 +17,8 @@
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
+enum class EncodingOptions { Padding, MatmulK, Generic };
 
 //===----------------------------------------------------------------------===//
 // Pipelines

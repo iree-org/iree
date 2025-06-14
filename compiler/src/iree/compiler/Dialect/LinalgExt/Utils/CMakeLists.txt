@@ -28,11 +28,13 @@ iree_cc_library(
     MLIRComplexDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    MLIRTransformUtils
   PUBLIC
 )
 

@@ -74,6 +74,11 @@ def LLVMGPULinkExecutablesPass :
 def LLVMGPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
+  let options = [
+    Option<"forROCDL", "for-rocdl", "bool",
+           /*default=*/"false",
+           "Enable features only supported on ROCDL such as delaying lowering of subgroup reduce.">,
+  ];
 }
 
 def LLVMGPUPackSharedMemoryAllocPass :
@@ -84,11 +89,6 @@ def LLVMGPUPackSharedMemoryAllocPass :
 def LLVMGPUPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
   let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
-}
-
-def LLVMGPUPromoteMatmulToFitMMAPass :
-    InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to promote contraction ops to fit mma shapes";
 }
 
 def LLVMGPUSelectLoweringStrategyPass :

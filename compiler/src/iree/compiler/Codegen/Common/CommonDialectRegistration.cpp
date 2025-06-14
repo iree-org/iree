@@ -13,10 +13,9 @@
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -64,9 +63,9 @@ void registerTransformDialectTranslationDependentDialects(
   registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                   mlir::iree_compiler::IREE::Encoding::IREEEncodingDialect,
                   mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
-                  mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::Codegen::IREECodegenDialect,
                   mlir::iree_compiler::IREE::GPU::IREEGPUDialect,
+                  mlir::iree_compiler::IREE::TensorExt::IREETensorExtDialect,
                   arith::ArithDialect,
                   affine::AffineDialect,
                   bufferization::BufferizationDialect,
@@ -99,7 +98,6 @@ void registerTransformDialectTranslationDependentDialects(
       mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
       transform_ext::StructuredTransformOpsExtension>();
   iree_compiler::registerTransformDialectCommonExtension(registry);
-  iree_compiler::registerTransformDialectFlowExtension(registry);
   iree_compiler::registerTransformDialectLLVMCPUExtension(registry);
   iree_compiler::registerTransformDialectLLVMGPUExtension(registry);
   affine::registerTransformDialectExtension(registry);

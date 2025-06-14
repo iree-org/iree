@@ -181,7 +181,7 @@ void HoistEncodingOpsPass::runOnOperation() {
   RewritePatternSet bubblingPatterns(ctx);
   bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
   GreedyRewriteConfig config;
-  config.cseConstants = false;
+  config.enableConstantCSE(false);
   if (failed(
           applyPatternsGreedily(funcOp, std::move(bubblingPatterns), config))) {
     return signalPassFailure();
@@ -190,6 +190,11 @@ void HoistEncodingOpsPass::runOnOperation() {
   SmallVector<IREE::Encoding::SetEncodingOp> candidates;
   funcOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
     if (!setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+      return;
+    }
+    // Avoid hoisting set encodings that are using the padding encodings.
+    Attribute encoding = setEncodingOp.getResultType().getEncoding();
+    if (isa_and_nonnull<IREE::Encoding::PadEncodingLayoutAttr>(encoding)) {
       return;
     }
     Operation *src = setEncodingOp.getSource().getDefiningOp();

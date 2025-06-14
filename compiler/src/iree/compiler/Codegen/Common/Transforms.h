@@ -26,6 +26,22 @@ public:
   void notifyOperationReplaced(Operation *op, ValueRange replacement) override;
 };
 
+/// Fold a tensor::ExpandShapeOp into a consumer `mapScatterOp`, by linearizing
+/// and then delinearizing the source indices of the `mapScatterOp`s index
+/// transformation.
+IREE::LinalgExt::MapScatterOp
+foldExpandShapeIntoMapScatter(RewriterBase &rewriter,
+                              tensor::ExpandShapeOp expandShapeOp,
+                              IREE::LinalgExt::MapScatterOp mapScatterOp);
+
+/// Fold a tensor::CollapseShapeOp into a consumer `mapScatterOp`, by
+/// linearizing and then delinearizing the source indices of the
+/// `mapScatterOp`s index transformation.
+IREE::LinalgExt::MapScatterOp
+foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
+                                tensor::CollapseShapeOp collapseShapeOp,
+                                IREE::LinalgExt::MapScatterOp mapScatterOp);
+
 using IGEMMConfigFn =
     std::function<LogicalResult(linalg::GenericOp, IREE::LinalgExt::Im2colOp)>;
 using IGEMMControlFn = std::function<bool(Operation *)>;
@@ -45,7 +61,8 @@ LogicalResult eliminateEmptyTensors(
 /// Bufferizes the given op with One-Shot Bufferize.
 LogicalResult
 runIREEOneShotBufferize(Operation *op,
-                        const IREEOneShotBufferizationOptions &options);
+                        const IREEOneShotBufferizationOptions &options,
+                        bufferization::BufferizationState &state);
 
 /// For a given operation within a dispatch, tile and distribute the operation
 /// to workgroups as well as tile + fuse its producers. Returns the
@@ -84,7 +101,7 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
 /// Populate IREE patterns related to resolving
 /// `memref.extract_strided_metadata`.
 void populateIREEResolveExtractStridedMetadataPatterns(
-    RewritePatternSet &patterns);
+    RewritePatternSet &patterns, bool allowSubviewExpansion = false);
 
 /// Populate patterns that replaces maximumf/minimumf with minumf/maxnumf ops.
 /// This is supposed to be used for targets which have faulty codegen
@@ -92,6 +109,9 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
+
+/// Populate patterns to fold relayout operations into map_scatter ops.
+void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

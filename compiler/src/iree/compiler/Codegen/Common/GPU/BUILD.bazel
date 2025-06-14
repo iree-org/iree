@@ -4,7 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -52,8 +57,11 @@ iree_compiler_cc_library(
         "AMDGPUDistributeContract.cpp",
         "DecomposeHorizontallyFusedGemms.cpp",
         "ExpandGPUOps.cpp",
+        "GPUAllocPrivateMemoryForDPSOps.cpp",
         "GPUApplyTilingLevel.cpp",
+        "GPUBubbleResourceCasts.cpp",
         "GPUCheckResourceUsage.cpp",
+        "GPUCombineLayoutTransformation.cpp",
         "GPUCombineValueBarriers.cpp",
         "GPUCreateFastSlowPath.cpp",
         "GPUDistribute.cpp",
@@ -66,6 +74,7 @@ iree_compiler_cc_library(
         "GPUGeneralizeNamedOps.cpp",
         "GPUGreedilyDistributeToThreads.cpp",
         "GPUInferMemorySpace.cpp",
+        "GPULowerToGlobalLoads.cpp",
         "GPULowerToUKernels.cpp",
         "GPUMultiBuffering.cpp",
         "GPUNestedLayoutDistributionPatterns.cpp",
@@ -108,10 +117,13 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AMDGPUDialect",
+        "@llvm-project//mlir:AMDGPUUtils",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineUtils",
@@ -119,6 +131,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationInterfaces",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
@@ -136,6 +149,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LoopLikeInterface",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:MemRefUtils",
         "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
@@ -168,5 +182,23 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "CodegenCommonGPUPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "CodegenCommonGPUPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )

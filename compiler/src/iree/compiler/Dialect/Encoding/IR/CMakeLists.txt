@@ -19,6 +19,7 @@ iree_cc_library(
     "EncodingDialect.h.inc"
     "EncodingEnums.h.inc"
     "EncodingInterfaces.h.inc"
+    "EncodingOpInterfaces.h.inc"
     "EncodingOps.h"
     "EncodingOps.h.inc"
     "EncodingTypeInterfaces.h.inc"
@@ -31,6 +32,7 @@ iree_cc_library(
     "EncodingDialect.cpp.inc"
     "EncodingEnums.cpp.inc"
     "EncodingInterfaces.cpp.inc"
+    "EncodingOpInterfaces.cpp.inc"
     "EncodingOps.cpp"
     "EncodingOps.cpp.inc"
     "EncodingTypeInterfaces.cpp.inc"
@@ -50,6 +52,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 
@@ -85,6 +88,8 @@ iree_tablegen_library(
     --gen-attr-interface-defs EncodingInterfaces.cpp.inc
     --gen-type-interface-decls EncodingTypeInterfaces.h.inc
     --gen-type-interface-defs EncodingTypeInterfaces.cpp.inc
+    --gen-op-interface-decls EncodingOpInterfaces.h.inc
+    --gen-op-interface-defs EncodingOpInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
@@ -102,6 +107,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     EncodingDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "EncodingOps.td"
   OUTS

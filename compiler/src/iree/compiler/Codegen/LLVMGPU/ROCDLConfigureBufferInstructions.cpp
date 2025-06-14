@@ -7,9 +7,8 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -53,7 +52,9 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
   }
   // Note: this is a bit conservative, in that it will traverse all the
   // arguments to a util.assume.int that isn't the immediate parent of val.
-  mlir::getBackwardSlice(arg, &dependencies, opts);
+  [[maybe_unused]] LogicalResult result =
+      getBackwardSlice(arg, &dependencies, opts);
+  assert(result.succeeded());
   return llvm::all_of(dependencies, [&](Operation *op) {
     if (matchPattern(op, m_Constant()))
       return true;
@@ -92,7 +93,7 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   int64_t maxNumElems = 1;
   ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
   if (auto tensorType =
-          dyn_cast<IREE::Flow::DispatchTensorType>(binding.getType())) {
+          dyn_cast<IREE::TensorExt::DispatchTensorType>(binding.getType())) {
     resultTy = tensorType.asRankedTensorType();
   }
   if (!resultTy || !resultTy.hasRank())

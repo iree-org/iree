@@ -10,7 +10,7 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -85,8 +86,8 @@ static void changeArithCstToI64Attr(OpBuilder &b,
 /// This implementation mirrors the implementation in
 /// include/mlir/Dialect/SCF/Transforms/TileUsingInterface.h and
 /// lib/Dialect/SCF/Transforms/TileUsingInterface.cpp. It is adapted to do
-/// distribution and also use `flow.dispatch.tensor.load/store` instead of
-/// `tensor.extract_slice/insert_slice`.
+/// distribution and also use `iree_tensor_ext.dispatch.tensor.load/store`
+/// instead of `tensor.extract_slice/insert_slice`.
 
 /// Generate an empty loop nest that represents the tiled loop nest shell.
 /// - `loopRanges` specifies the lb, ub and step of the untiled iteration space.
@@ -120,7 +121,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   AffineMap minMap = AffineMap::get(1, 2, {s0, s1 - d0}, builder.getContext());
   auto createBoundedTileSize = [&](OpFoldResult iv, OpFoldResult tileSize,
                                    OpFoldResult size) -> OpFoldResult {
-    if (isConstantIntValue(tileSize, 1)) {
+    if (isOneInteger(tileSize)) {
       return tileSize;
     }
     return affine::makeComposedFoldedAffineMin(
@@ -139,7 +140,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     OpFoldResult step = tileSizeVals[index];
     // No loops if tile size is zero. Set offset and size to the loop
     // offset and size.
-    if (isConstantIntValue(tileSizeVals[index], 0)) {
+    if (isZeroInteger(tileSizeVals[index])) {
       offsets[index] = lb;
       sizes[index] = ub;
       continue;
@@ -189,19 +190,20 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   return loops;
 }
 
-/// Replace the `flow.dispatch.tensor.store` of the `untiledValue` with a tiled
-/// `flow.dispatch.tensor.store` that writes only a tile of the result at
-/// offsets given by `tiledOffsets` and sizes given by `tiledSizes`, using
-/// `tiledValue` as the source.
+/// Replace the `iree_tensor_ext.dispatch.tensor.store` of the `untiledValue`
+/// with a tiled `iree_tensor_ext.dispatch.tensor.store` that writes only a tile
+/// of the result at offsets given by `tiledOffsets` and sizes given by
+/// `tiledSizes`, using `tiledValue` as the source.
 static LogicalResult replaceStoresWithTiledVersion(
     RewriterBase &rewriter, OpResult untiledValue, Value tiledValue,
     ArrayRef<OpFoldResult> tileOffsets, ArrayRef<OpFoldResult> tileSizes,
     Block *innerLoopBody) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(innerLoopBody->getTerminator());
-  SmallVector<IREE::Flow::DispatchTensorStoreOp> storeOps;
+  SmallVector<IREE::TensorExt::DispatchTensorStoreOp> storeOps;
   for (OpOperand &use : untiledValue.getUses()) {
-    auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(use.getOwner());
+    auto storeOp =
+        dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(use.getOwner());
     if (storeOp && storeOp.getValue() == use.get()) {
       storeOps.push_back(storeOp);
     }
@@ -226,10 +228,11 @@ static LogicalResult replaceStoresWithTiledVersion(
           storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
           combinedOffsets, combinedSizes, combinedStrides))) {
     return rewriter.notifyMatchFailure(
-        storeOp, "failed to create tiled flow.dispatch.tensor.store op");
+        storeOp,
+        "failed to create tiled iree_tensor_ext.dispatch.tensor.store op");
   }
 
-  rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
+  rewriter.create<IREE::TensorExt::DispatchTensorStoreOp>(
       storeOp.getLoc(), tiledValue, storeOp.getTarget(),
       clonedSliceAndVals.dynamicDims, combinedOffsets, combinedSizes,
       combinedStrides);
@@ -237,9 +240,9 @@ static LogicalResult replaceStoresWithTiledVersion(
   return success();
 }
 
-/// Replace all `flow.dispatch.tensor.store` operations that use values produced
-/// by `untiledOp` as source, with tiled stores, with tiled values produced by
-/// `tiledOp`.
+/// Replace all `iree_tensor_ext.dispatch.tensor.store` operations that use
+/// values produced by `untiledOp` as source, with tiled stores, with tiled
+/// values produced by `tiledOp`.
 static LogicalResult replaceAllStoresWithTiledVersion(
     RewriterBase &rewriter, TilingInterface untiledOp,
     ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
@@ -301,14 +304,14 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
       continue;
     }
     // If tile size is 0, it isnt tiled.
-    if (isConstantIntValue(tileSize, 0)) {
+    if (isZeroInteger(tileSize)) {
       continue;
     }
     // If number of tiles is statically know to be 1, the loop isnt tiled.
     OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
-    if (isConstantIntValue(numTiles, 1)) {
+    if (isOneInteger(numTiles)) {
       continue;
     }
 
@@ -426,8 +429,9 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
   Block *body = tilingResult.loops.empty()
                     ? op->getBlock()
                     : tilingResult.loops.back().getBody();
-  // Rewrite all `flow.dispatch.tensor.store` operation with tiled version
-  // of the store. Its valid to this for all stores of the root untiled op.
+  // Rewrite all `iree_tensor_ext.dispatch.tensor.store` operation with tiled
+  // version of the store. Its valid to this for all stores of the root untiled
+  // op.
   if (failed(replaceAllStoresWithTiledVersion(
           rewriter, op, tilingResult.tileOffsets, tilingResult.tileSizes,
           tilingResult.tiledValues, body))) {
@@ -533,7 +537,8 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
       Block *body = tileAndFuseResult.loops.empty()
                         ? op->getBlock()
                         : tileAndFuseResult.loops.back().getBody();
-      // 2c. Finally replace any `flow.dispatch.tensor.store` operation with
+      // 2c. Finally replace any `iree_tensor_ext.dispatch.tensor.store`
+      // operation with
       //     tiled version of the operation. It is only valid to do this under
       //     the above assumption that the producer and consumer share the loops
       //     that can be tiled.
@@ -556,16 +561,17 @@ namespace {
 // SwapExtractSliceWithDispatchTensorLoad
 //===----------------------------------------------------------------------===//
 
-/// Pattern to swap `flow.dispatch.tensor.load` -> `tensor.extract_slice` with
-/// `flow.dispatch.tensor.load` of the slice.
+/// Pattern to swap `iree_tensor_ext.dispatch.tensor.load` ->
+/// `tensor.extract_slice` with `iree_tensor_ext.dispatch.tensor.load` of the
+/// slice.
 struct SwapExtractSliceWithDispatchTensorLoad
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    auto loadOp =
-        sliceOp.getSource().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+    auto loadOp = sliceOp.getSource()
+                      .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
     if (!loadOp)
       return failure();
 
@@ -576,7 +582,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
       return rewriter.notifyMatchFailure(
           sliceOp, "failed to fold offsets, sizes and strides with load op");
     }
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
         sliceOp, sliceOp.getType(), loadOp.getSource(), loadOp.getSourceDims(),
         combinedOffsets, combinedSizes, combinedStrides);
     return success();

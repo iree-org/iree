@@ -29,6 +29,17 @@
   ((iree_host_size_t)64)
 
 //===----------------------------------------------------------------------===//
+// iree_hal_module_device_policy_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_hal_module_device_policy_t
+iree_hal_module_device_policy_default(void) {
+  iree_hal_module_device_policy_t policy;
+  memset(&policy, 0, sizeof(policy));
+  return policy;
+}
+
+//===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
@@ -39,6 +50,7 @@ typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
   iree_hal_module_flags_t flags;
   iree_hal_module_debug_sink_t debug_sink;
+  iree_hal_module_device_policy_t device_policy;
   iree_host_size_t device_count;
   iree_hal_device_t* devices[];
 } iree_hal_module_t;
@@ -47,15 +59,24 @@ typedef struct iree_hal_module_t {
   (iree_hal_module_t*)((uint8_t*)(module) + iree_vm_native_module_size());
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
 
-  if (module->debug_sink.destroy.fn) {
-    module->debug_sink.destroy.fn(module->debug_sink.destroy.user_data);
+  // Release the debug sink prior to releasing devices as it may be caching
+  // device-specific information that will be unavailable once the devices are
+  // released.
+  if (module->debug_sink.release.fn) {
+    module->debug_sink.release.fn(module->debug_sink.release.user_data);
   }
 
+  // Release all devices. The module may be the last retainer and the devices
+  // (and their corresponding drivers) may be immediately unloaded.
   for (iree_host_size_t i = 0; i < module->device_count; ++i) {
     iree_hal_device_release(module->devices[i]);
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 typedef struct iree_hal_module_state_t {
@@ -67,6 +88,9 @@ typedef struct iree_hal_module_state_t {
 
   // Debug sink for routing debug events.
   iree_hal_module_debug_sink_t debug_sink;
+
+  // Policy for managing device selection and ranking.
+  iree_hal_module_device_policy_t device_policy;
 
   // Total number of devices available to the module.
   iree_host_size_t device_count;
@@ -104,6 +128,7 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
   state->host_allocator = host_allocator;
   state->flags = module->flags;
   state->debug_sink = module->debug_sink;
+  state->device_policy = module->device_policy;
   state->device_count = module->device_count;
   state->devices = module->devices;
   state->loop_status = iree_ok_status();
@@ -311,6 +336,52 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_file_from_memory,  //
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
+
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_select,  //
+                   iree_hal_module_state_t,           //
+                   iiICrID, rI) {
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i0;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i1;
+  iree_hal_module_device_allocator_select_flags_t flags =
+      (iree_hal_module_device_allocator_select_flags_t)args->i2;
+
+  if (args->a3_count == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "at least one device/queue affinity pair must be provided");
+  } else if (!state->device_policy.allocator_select.fn) {
+    // No policy defined, choose the first.
+    iree_hal_device_t* first_device = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_device_check_deref(args->a3[0].r0, &first_device));
+    rets->r0 = iree_hal_device_retain_ref(first_device);
+    rets->i1 = args->a3[0].i1;
+    return iree_ok_status();
+  }
+
+  iree_host_size_t pair_count = iree_hal_cast_host_size(args->a3_count);
+  if (pair_count > 64) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "too many devices (%" PRIhsz ") for a single select call", pair_count);
+  }
+  iree_hal_device_queue_affinity_pair_t* pairs =
+      iree_alloca(pair_count * sizeof(iree_hal_device_queue_affinity_pair_t));
+  for (iree_host_size_t i = 0; i < pair_count; ++i) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_device_check_deref(args->a3[i].r0, &pairs[i].device));
+    pairs[i].queue_affinity = (iree_hal_queue_affinity_t)args->a3[i].i1;
+  }
+
+  iree_host_size_t selection = 0;
+  IREE_RETURN_IF_ERROR(state->device_policy.allocator_select.fn(
+      state->device_policy.allocator_select.user_data, pair_count, pairs,
+      memory_types, buffer_usage, flags, &selection));
+
+  rets->r0 = iree_hal_device_retain_ref(pairs[selection].device);
+  rets->i1 = pairs[selection].queue_affinity;
+  return iree_ok_status();
+}
 
 IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
                    iree_hal_module_state_t,             //
@@ -1945,10 +2016,10 @@ static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
-    iree_vm_instance_t* instance, iree_host_size_t device_count,
-    iree_hal_device_t** devices, iree_hal_module_flags_t flags,
-    iree_hal_module_debug_sink_t debug_sink, iree_allocator_t host_allocator,
-    iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_hal_module_device_policy_t device_policy,
+    iree_host_size_t device_count, iree_hal_device_t** devices,
+    iree_hal_module_flags_t flags, iree_hal_module_debug_sink_t debug_sink,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(device_count);
   IREE_ASSERT_ARGUMENT(devices);
@@ -1988,6 +2059,7 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
   // TODO(benvanik): fix vm yield with result storage.
   module->flags = flags | IREE_HAL_MODULE_FLAG_SYNCHRONOUS;
   module->debug_sink = debug_sink;
+  module->device_policy = device_policy;
   module->device_count = device_count;
   for (iree_host_size_t i = 0; i < device_count; ++i) {
     module->devices[i] = devices[i];

@@ -435,7 +435,6 @@ static iree_status_t iree_hal_metal_device_queue_execute(
   // inconsistent state.
   iree_hal_command_buffer_t* direct_command_buffer = NULL;
   if (iree_status_is_ok(status) && command_buffer) {
-    iree_hal_command_buffer_t* direct_command_buffer = NULL;
     if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
       // Create a temporary command buffer and replay the deferred command buffer with the
       // binding table provided. Note that any resources used will be retained by the command

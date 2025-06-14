@@ -12,7 +12,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -27,7 +27,7 @@ namespace {
 ///
 /// ```mlir
 /// %1 = <cast> %0 : .. to index
-/// %2 = flow.dispatch.workload.ordinal %1, 0
+/// %2 = iree_tensor_ext.dispatch.workload.ordinal %1, 0
 /// %3 = <some_op>(...%1)...
 /// ```
 ///
@@ -35,17 +35,19 @@ namespace {
 ///
 /// ```mlir
 /// %1 = <cast> %0 : .. to index
-/// %2 = flow.dispatch.workload.ordinal %1, 0
+/// %2 = iree_tensor_ext.dispatch.workload.ordinal %1, 0
 /// %3 = <some_op>(...%2)...
 /// ```
 ///
-/// to make all the uses flow through `flow.dispatch.workload.ordinal` ops.
+/// to make all the uses flow through
+/// `iree_tensor_ext.dispatch.workload.ordinal` ops.
 template <typename CastOpTy>
 struct BubbleUpAcrossCastOp
-    : public OpRewritePattern<IREE::Flow::DispatchWorkloadOrdinalOp> {
+    : public OpRewritePattern<IREE::TensorExt::DispatchWorkloadOrdinalOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::Flow::DispatchWorkloadOrdinalOp ordinalOp,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp,
+                  PatternRewriter &rewriter) const override {
     auto sourceCastOp = ordinalOp.getOperand().getDefiningOp<CastOpTy>();
     if (!sourceCastOp || sourceCastOp->hasOneUse()) {
       return failure();
@@ -56,8 +58,9 @@ struct BubbleUpAcrossCastOp
     Location loc = ordinalOp.getLoc();
     Value reverseCastOp = rewriter.create<CastOpTy>(
         loc, rewriter.getIndexType(), sourceCastOp.getIn());
-    Value newOrdinalOp = rewriter.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
-        loc, reverseCastOp, ordinalOp.getOrdinal());
+    Value newOrdinalOp =
+        rewriter.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
+            loc, reverseCastOp, ordinalOp.getOrdinal());
     rewriter.replaceOp(sourceCastOp, newOrdinalOp);
     rewriter.replaceOp(ordinalOp, newOrdinalOp);
     return success();

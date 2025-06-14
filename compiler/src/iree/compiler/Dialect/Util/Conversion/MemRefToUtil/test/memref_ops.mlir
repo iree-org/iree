@@ -25,7 +25,7 @@ util.func @verify_invalid_non_identity_map(%buffer: memref<4xf32, #map>, %idx: i
 // CHECK-LABEL: @assume_alignment
 util.func @assume_alignment(%buffer: memref<?xf32>) {
   // CHECK-NOT: assume_alignment
-  memref.assume_alignment %buffer, 64 : memref<?xf32>
+  %assume_align = memref.assume_alignment %buffer, 64 : memref<?xf32>
   util.return
 }
 
