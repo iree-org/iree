@@ -679,19 +679,21 @@ def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
   let arguments = (ins
     Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
+    Optional<Index>:$index_base,
     I64Attr:$dimension
   );
 
   let results = (outs
     Variadic<AnyRankedTensor>:$results
   );
-
-let assemblyFormat = [{
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
-    (`:` type($results)^)?
+    (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+    $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{

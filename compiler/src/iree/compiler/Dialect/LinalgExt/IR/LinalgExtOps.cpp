@@ -916,16 +916,34 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 LogicalResult ArgmaxOp::verify() {
   Operation *op = getOperation();
 
-  if (getNumDpsInputs() != 1) {
+  unsigned numInputVals = llvm::size(getInputs());
+  if (numInputVals != 1) {
     return op->emitOpError(
-               "expected exactly one input operand (values), but got ")
-           << getNumDpsInputs();
+               "expected exactly one tensor input operand, but got ")
+           << numInputVals;
   }
 
-  if (getNumDpsInits() != 2) {
+  unsigned numInputs = getNumDpsInputs();
+  if (numInputs != 1 && numInputs != 2) {
+    return op->emitOpError("expected 1 (input only) or 2 (input + index_base) "
+                           "input operands, but got ")
+           << numInputs;
+  }
+
+  TypedValue<IndexType> indexBase = getIndexBase();
+  if (indexBase) {
+    Type indexType = indexBase.getType();
+    if (!isa<IndexType>(indexType)) {
+      return op->emitOpError("index_base must be of index type, got: ")
+             << indexType;
+    }
+  }
+
+  unsigned numOutputs = getNumDpsInits();
+  if (numOutputs != 2) {
     return op->emitOpError(
                "expected two output operands (value and index), but got ")
-           << getNumDpsInits();
+           << numOutputs;
   }
 
   uint64_t dim = getDimension();
@@ -954,7 +972,7 @@ LogicalResult ArgmaxOp::verify() {
   }
 
   SmallVector<int64_t> expectedShape;
-  for (int64_t i = 0; i < getInputRank(); ++i) {
+  for (int64_t i = 0; i < rank; ++i) {
     if (i != dim)
       expectedShape.push_back(inputType.getDimSize(i));
   }
@@ -966,6 +984,23 @@ LogicalResult ArgmaxOp::verify() {
            << llvm::interleaved_array(outputValueType.getShape());
   }
 
+  Region &region = getRegion();
+  Block &block = region.front();
+  if (block.getNumArguments() != 2) {
+    return op->emitOpError("region block should have 2 arguments");
+  }
+  Type inputElemType = inputType.getElementType();
+  if (block.getArgument(0).getType() != inputElemType ||
+      block.getArgument(1).getType() != inputElemType) {
+    return op->emitOpError(
+               "comparator region arguments must match input element type: ")
+           << inputElemType;
+  }
+
+  auto terminatorOp = llvm::dyn_cast<YieldOp>(block.getTerminator());
+  if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
+    return op->emitOpError("region block must end with a linalg_ext.yield i1!");
+  }
   return success();
 }
 

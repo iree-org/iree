@@ -572,13 +572,17 @@ func.func @argmax_invalid_too_many_inputs(
     %input_val: tensor<2x10xf32>,
     %input_extra: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
-    %out_idx: tensor<2xi32>) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{expected exactly one input operand (values), but got 2}}
+    %out_idx: tensor<2xi32>
+) -> (tensor<2xf32>, tensor<2xi32>) {
+  // expected-error@+1 {{expected exactly one tensor input operand, but got 2}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val, %input_extra : tensor<2x10xf32>, tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>)
-    : tensor<2xf32>, tensor<2xi32>
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
   return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
 }
 
@@ -591,8 +595,11 @@ func.func @argmax_invalid_missing_output(
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val : tensor<2xf32>)
-    : tensor<2xf32>, tensor<2xi32>
+    outs(%out_val : tensor<2xf32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
   return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
 }
 
@@ -606,8 +613,11 @@ func.func @argmax_invalid_dim(
   %0:2 = iree_linalg_ext.argmax
     dimension(2)
     ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>)
-    : tensor<2xf32>, tensor<2xi32>
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
   return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
 }
 
@@ -621,8 +631,11 @@ func.func @argmax_invalid_type_mismatch(
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<2xf16>, tensor<2xi32>)
-    : tensor<2xf16>, tensor<2xi32>
+    outs(%out_val, %out_idx : tensor<2xf16>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf16>, tensor<2xi32>
   return %0#0, %0#1 : tensor<2xf16>, tensor<2xi32>
 }
 
@@ -636,8 +649,11 @@ func.func @argmax_invalid_output_shape_mismatch(
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<2xf32>, tensor<10xi32>)
-    : tensor<2xf32>, tensor<10xi32>
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<10xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<10xi32>
   return %0#0, %0#1 : tensor<2xf32>, tensor<10xi32>
 }
 
@@ -651,8 +667,11 @@ func.func @argmax_invalid_output_shape_wrong_reduction(
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<1xf32>, tensor<1xi32>)
-    : tensor<1xf32>, tensor<1xi32>
+    outs(%out_val, %out_idx : tensor<1xf32>, tensor<1xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<1xf32>, tensor<1xi32>
   return %0#0, %0#1 : tensor<1xf32>, tensor<1xi32>
 }
 
@@ -666,9 +685,65 @@ func.func @argmax_invalid_output_same_as_input(
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<2x10xf32>, tensor<2x10xi32>)
-    : tensor<2x10xf32>, tensor<2x10xi32>
+    outs(%out_val, %out_idx : tensor<2x10xf32>, tensor<2x10xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2x10xf32>, tensor<2x10xi32>
   return %0#0, %0#1 : tensor<2x10xf32>, tensor<2x10xi32>
+}
+
+// -----
+
+func.func @argmax_missing_region_yield(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{region block should have 2 arguments}}
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {} -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @argmax_invalid_region_argument_type(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{comparator region arguments must match input element type: 'f32'}}
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: i32):
+      %cmp = arith.cmpf ogt, %a, %a : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @argmax_invalid_region_terminator(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{region block must end with a linalg_ext.yield i1!}}
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %add = arith.addf %a, %b : f32
+      iree_linalg_ext.yield %add : f32
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
 }
 
 // -----
