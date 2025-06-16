@@ -129,3 +129,22 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
     ],
 )
+
+iree_runtime_cc_test(
+    name = "host_service_test",
+    srcs = ["host_service_test.cc"],
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/drivers/amdgpu/util",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

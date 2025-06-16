@@ -55,11 +55,11 @@ enum iree_hal_amdgpu_device_host_client_call_e {
 };
 
 // Represents the host runtime thread that is managing host interrupts.
-// One or more schedulers may share a single host queue. An host calls that need
-// to identify the scheduler or scheduler-related resources must pass those as
-// arguments.
+// One or more schedulers may share a single host queue. Any host calls that
+// need to identify the scheduler or scheduler-related resources must pass those
+// as arguments.
 typedef struct iree_hal_amdgpu_device_host_client_t {
-  // Host softqueue processing device requests. May be servicing requests from
+  // Host soft-queue processing device requests. May be servicing requests from
   // multiple device agents. Cached inline in device memory but references a
   // ringbuffer in host memory.
   iree_amd_cached_queue_t service_queue;
@@ -74,7 +74,7 @@ typedef struct iree_hal_amdgpu_device_host_client_t {
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
 // Enqueues a unidirection host agent packet ("post").
-// Since this is device->host only operation this uses an acquire scope only
+// Since this is device->host only operation this only uses an acquire scope
 // from the agent and releases to the entire system so the host agent can
 // observe changes. The completion signal is optional and may be
 // `iree_hsa_signal_null()`.

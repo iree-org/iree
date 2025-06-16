@@ -12,7 +12,42 @@
 #include "iree/base/internal/threading.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
-typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// iree_hal_amdgpu_error_callback_t
+//===----------------------------------------------------------------------===//
+
+// Handles an asynchronous error from a component.
+// May be called from driver threads and must not call back into the originating
+// component or driver APIs. Ownership of |status| is transferred to the callee
+// and must be freed if not retained for later use.
+typedef void(IREE_API_PTR* iree_hal_amdgpu_error_callback_fn_t)(
+    void* user_data, iree_status_t status);
+
+// A callback for handling errors from a component.
+//
+// WARNING: this may be called from arbitrary driver threads and any non-const
+// calls back into either the originating component or underlying driver are
+// disallowed. Implementations should stash the status in a thread-safe manner
+// and schedule their own callbacks to propagate the errors higher up the stack.
+typedef struct iree_hal_amdgpu_error_callback_t {
+  iree_hal_amdgpu_error_callback_fn_t fn;
+  void* user_data;
+} iree_hal_amdgpu_error_callback_t;
+
+// Returns an error callback that does nothing.
+// Not intended for use outside of testing/hacking.
+static inline iree_hal_amdgpu_error_callback_t
+iree_hal_amdgpu_error_callback_null(void) {
+  iree_hal_amdgpu_error_callback_t callback = {
+      /*.fn=*/NULL,
+      /*.user_data=*/NULL,
+  };
+  return callback;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_host_service_t
@@ -34,14 +69,15 @@ typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 //
 // Thread-safe.
 typedef struct iree_hal_amdgpu_host_service_t {
-  // System this worker is used on.
-  iree_hal_amdgpu_system_t* system;
+  // HSA library handle. Unowned.
+  const iree_hal_amdgpu_libhsa_t* libhsa;
 
-  // Host CPU agent the worker is pinned to.
-  // This is likely the nearest agent to the devices managed by the worker.
-  hsa_agent_t host_agent;
-  // Ordinal of the CPU agent within the topology.
-  iree_host_size_t host_ordinal;
+  // Optional callback issued when the failure status is first set.
+  iree_hal_amdgpu_error_callback_t error_callback;
+
+  // If the service has received a fatal error from the device it will be stored
+  // here as a status code to prevent duplicate error callbacks.
+  iree_atomic_uint64_t failure_code;
 
   // OS handle to the worker thread.
   iree_thread_t* thread;
@@ -52,10 +88,6 @@ typedef struct iree_hal_amdgpu_host_service_t {
   // Used to implement the packet barrier bit.
   hsa_signal_t outstanding_signal;
 
-  // If the service has received a fatal error from the device it will be stored
-  // here.
-  iree_atomic_uint64_t failure_status;
-
   // HSA soft queue for incoming requests from devices.
   hsa_queue_t* queue;
   // HSA doorbell indicating the queue has been updated.
@@ -63,24 +95,30 @@ typedef struct iree_hal_amdgpu_host_service_t {
 } iree_hal_amdgpu_host_service_t;
 
 // Initializes the service state and launches the worker thread.
+// |libhsa| must remain valid for the lifetime of the service.
+//
+// The |host_ordinal| and |device_ordinal| are used for naming the service
+// worker thread. The worker thread will be pinned to the CPU |host_agent|
+// affinity and have its underlying HSA queue allocated from |host_fine_region|.
+//
+// An optional |error_callback| can be provided to receive notification of the
+// service entering the failure state. The callback may be issued from driver
+// threads and must not re-enter the host service API or make any stateful HSA
+// calls.
 //
 // TODO(benvanik): change device_ordinal to some other disambiguator if we
-// decide to share host workers across devices.
+// decide to share host workers across devices. Today it is only used for
+// thread/trace naming.
 iree_status_t iree_hal_amdgpu_host_service_initialize(
-    iree_hal_amdgpu_system_t* system, iree_host_size_t host_ordinal,
-    iree_host_size_t device_ordinal, iree_allocator_t host_allocator,
+    const iree_hal_amdgpu_libhsa_t* libhsa, iree_host_size_t host_ordinal,
+    hsa_agent_t host_agent, hsa_region_t host_fine_region,
+    iree_host_size_t device_ordinal,
+    iree_hal_amdgpu_error_callback_t error_callback,
+    iree_allocator_t host_allocator,
     iree_hal_amdgpu_host_service_t* out_service);
 
 // Deinitializes the service and terminates the worker thread.
 void iree_hal_amdgpu_host_service_deinitialize(
-    iree_hal_amdgpu_host_service_t* service);
-
-// Returns a failure status if it is set on the |service|.
-// The caller must propagate the status and assume the worker is dead if it
-// returns a failure. Safe to call from any thread. The failure status is sticky
-// and will be cloned and returned on all queries for the lifetime of the
-// service.
-iree_status_t iree_hal_amdgpu_host_service_query_status(
     iree_hal_amdgpu_host_service_t* service);
 
 // An asynchronous host operation token.
@@ -95,5 +133,9 @@ typedef struct iree_hal_amdgpu_host_async_token_t {
 // failed a |status| can be provided and will be consumed by the call.
 void iree_hal_amdgpu_host_service_notify_completion(
     iree_hal_amdgpu_host_async_token_t async_token, iree_status_t status);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_HOST_SERVICE_H_

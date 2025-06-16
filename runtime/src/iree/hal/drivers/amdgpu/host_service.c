@@ -8,7 +8,10 @@
 
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/device/host_client.h"
-#include "iree/hal/drivers/amdgpu/system.h"
+
+// A signal payload that is unlikely to ever be hit during real execution.
+// This is used to indicate a default state that we want to detect changes on.
+#define IREE_HAL_AMDGPU_INVALID_SIGNAL_VALUE ((hsa_signal_value_t) - 2)
 
 static void iree_hal_amdgpu_host_service_fail(
     iree_hal_amdgpu_host_service_t* service, iree_status_t status);
@@ -31,6 +34,7 @@ static iree_status_t iree_hal_amdgpu_host_service_issue_barrier_and(
   //
   // NOTE: hsa_amd_signal_wait_any has relaxed memory semantics and to have the
   // proper acquire behavior we need to load the signal value ourselves.
+  static_assert(IREE_ARRAYSIZE(packet->dep_signal) == 5, "expecting 5 signals");
   hsa_signal_condition_t conds[5] = {
       HSA_SIGNAL_CONDITION_EQ, HSA_SIGNAL_CONDITION_EQ, HSA_SIGNAL_CONDITION_EQ,
       HSA_SIGNAL_CONDITION_EQ, HSA_SIGNAL_CONDITION_EQ,
@@ -94,6 +98,7 @@ static iree_status_t iree_hal_amdgpu_host_service_issue_barrier_or(
   //
   // NOTE: hsa_amd_signal_wait_any has relaxed memory semantics and to have the
   // proper acquire behavior we need to load the signal value ourselves.
+  static_assert(IREE_ARRAYSIZE(packet->dep_signal) == 5, "expecting 5 signals");
   hsa_signal_condition_t conds[5] = {
       HSA_SIGNAL_CONDITION_EQ, HSA_SIGNAL_CONDITION_EQ, HSA_SIGNAL_CONDITION_EQ,
       HSA_SIGNAL_CONDITION_EQ, HSA_SIGNAL_CONDITION_EQ,
@@ -210,12 +215,12 @@ static iree_status_t iree_hal_amdgpu_host_post_signal(
 
 // IREE_HAL_AMDGPU_DEVICE_HOST_CALL_POST_RELEASE
 static iree_status_t iree_hal_amdgpu_host_post_release(
-    iree_hal_amdgpu_host_service_t* service,
-    iree_hal_resource_t* resources[4]) {
+    iree_hal_amdgpu_host_service_t* service, iree_host_size_t resource_count,
+    iree_hal_resource_t* resources[]) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Release each resource. Some entries may be NULL.
-  for (iree_host_size_t i = 0; i < 4; ++i) {
+  for (iree_host_size_t i = 0; i < resource_count; ++i) {
     iree_hal_resource_release(resources[i]);
   }
 
@@ -244,7 +249,8 @@ static iree_status_t iree_hal_amdgpu_host_service_issue_agent_dispatch(
       break;
     case IREE_HAL_AMDGPU_DEVICE_HOST_CALL_POST_RELEASE:
       status = iree_hal_amdgpu_host_post_release(
-          service, (iree_hal_resource_t**)packet->arg);
+          service, IREE_ARRAYSIZE(packet->arg),
+          (iree_hal_resource_t**)packet->arg);
       break;
     default:
       status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unknown type %u",
@@ -252,7 +258,7 @@ static iree_status_t iree_hal_amdgpu_host_service_issue_agent_dispatch(
       break;
   }
 
-  if (packet->completion_signal.handle != 0) {
+  if (iree_status_is_ok(status) && packet->completion_signal.handle != 0) {
     iree_hsa_signal_subtract_screlease(IREE_LIBHSA(libhsa),
                                        packet->completion_signal, 1);
   }
@@ -294,13 +300,11 @@ static iree_status_t iree_hal_amdgpu_host_service_barrier(
 static int iree_hal_amdgpu_host_service_main(void* entry_arg) {
   iree_hal_amdgpu_host_service_t* service =
       (iree_hal_amdgpu_host_service_t*)entry_arg;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  const iree_hal_amdgpu_libhsa_t* libhsa = &service->system->libhsa;
+  const iree_hal_amdgpu_libhsa_t* libhsa = service->libhsa;
 
   // Main loop.
   const uint64_t queue_mask = service->queue->size - 1;
-  uint64_t last_packet_id = 0;
+  uint64_t last_packet_id = IREE_HAL_AMDGPU_INVALID_SIGNAL_VALUE;
   uint64_t read_index = 0;
   while (true) {
     // Since we are in MULTI mode we just check that the packet ID changed but
@@ -325,6 +329,8 @@ static int iree_hal_amdgpu_host_service_main(void* entry_arg) {
 
       // Reference packet in queue memory. Note that we want to get it out of
       // there ASAP to free up the space in the queue.
+      // NOTE: we cast to an agent packet here but don't yet know the type.
+      // We only use the struct to parse the header bits common to all packets.
       hsa_agent_dispatch_packet_t* packet_ptr =
           (hsa_agent_dispatch_packet_t*)service->queue->base_address +
           (read_index & queue_mask);
@@ -370,6 +376,7 @@ static int iree_hal_amdgpu_host_service_main(void* entry_arg) {
               z_packet,
               iree_status_code_string(iree_status_code(barrier_status)));
           iree_hal_amdgpu_host_service_fail(service, barrier_status);
+          break;
         }
       }
 
@@ -384,11 +391,23 @@ static int iree_hal_amdgpu_host_service_main(void* entry_arg) {
           status = iree_hal_amdgpu_host_service_issue_barrier_or(
               service, libhsa, (const hsa_barrier_or_packet_t*)packet_data);
           break;
-        case HSA_AMD_PACKET_TYPE_BARRIER_VALUE:
-          status = iree_hal_amdgpu_host_service_issue_barrier_value(
-              service, libhsa,
-              (const hsa_amd_barrier_value_packet_t*)packet_data);
+        case HSA_PACKET_TYPE_VENDOR_SPECIFIC: {
+          const hsa_amd_vendor_packet_header_t vendor_header =
+              *(const hsa_amd_vendor_packet_header_t*)packet_data;
+          switch (vendor_header.AmdFormat) {
+            case HSA_AMD_PACKET_TYPE_BARRIER_VALUE:
+              status = iree_hal_amdgpu_host_service_issue_barrier_value(
+                  service, libhsa,
+                  (const hsa_amd_barrier_value_packet_t*)packet_data);
+              break;
+            default:
+              status = iree_make_status(IREE_STATUS_INTERNAL,
+                                        "invalid vendor packet type %u",
+                                        vendor_header.AmdFormat);
+              break;
+          }
           break;
+        }
         case HSA_PACKET_TYPE_AGENT_DISPATCH:
           status = iree_hal_amdgpu_host_service_issue_agent_dispatch(
               service, libhsa, (const hsa_agent_dispatch_packet_t*)packet_data);
@@ -414,29 +433,28 @@ static int iree_hal_amdgpu_host_service_main(void* entry_arg) {
   // do it here.
   IREE_IGNORE_ERROR(iree_hal_amdgpu_host_service_barrier(service, libhsa));
 
-  IREE_TRACE_ZONE_END(z0);
   return 0;
 }
 
 iree_status_t iree_hal_amdgpu_host_service_initialize(
-    iree_hal_amdgpu_system_t* system, iree_host_size_t host_ordinal,
-    iree_host_size_t device_ordinal, iree_allocator_t host_allocator,
+    const iree_hal_amdgpu_libhsa_t* libhsa, iree_host_size_t host_ordinal,
+    hsa_agent_t host_agent, hsa_region_t host_fine_region,
+    iree_host_size_t device_ordinal,
+    iree_hal_amdgpu_error_callback_t error_callback,
+    iree_allocator_t host_allocator,
     iree_hal_amdgpu_host_service_t* out_service) {
   IREE_ASSERT_ARGUMENT(out_service);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  hsa_agent_t host_agent = system->topology.cpu_agents[host_ordinal];
-
   memset(out_service, 0, sizeof(*out_service));
-  out_service->system = system;
-  out_service->host_agent = host_agent;
-  out_service->host_ordinal = host_ordinal;
-  out_service->failure_status = IREE_ATOMIC_VAR_INIT(0);
+  out_service->libhsa = libhsa;
+  out_service->error_callback = error_callback;
+  out_service->failure_code = IREE_ATOMIC_VAR_INIT(0);
 
   // NUMA node.
   uint32_t host_agent_node = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hsa_agent_get_info(IREE_LIBHSA(&system->libhsa), host_agent,
+      z0, iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), host_agent,
                                   HSA_AGENT_INFO_NODE, &host_agent_node));
 
   // Pin the thread to the NUMA node specified.
@@ -449,14 +467,15 @@ iree_status_t iree_hal_amdgpu_host_service_initialize(
   // marked as only being "consumed" by the host agent (waited on). Other agents
   // and threads can signal it.
   iree_status_t status = iree_hsa_amd_signal_create(
-      IREE_LIBHSA(&system->libhsa), 0ull, 1, &host_agent,
+      IREE_LIBHSA(libhsa), 0ull, 1, &host_agent,
       /*attributes=*/0, &out_service->outstanding_signal);
 
   // Create the doorbell for the soft queue. It's marked as only being
   // "consumed" by the host agent (waited on). Other agents can signal it.
   if (iree_status_is_ok(status)) {
     status = iree_hsa_amd_signal_create(
-        IREE_LIBHSA(&system->libhsa), 0ull, 1, &host_agent,
+        IREE_LIBHSA(libhsa), IREE_HAL_AMDGPU_INVALID_SIGNAL_VALUE, 1,
+        &host_agent,
         /*attributes=*/0, &out_service->doorbell);
   }
 
@@ -467,8 +486,7 @@ iree_status_t iree_hal_amdgpu_host_service_initialize(
   // will be producing for it and where this service will be consuming it.
   if (iree_status_is_ok(status)) {
     status = iree_hsa_soft_queue_create(
-        IREE_LIBHSA(&system->libhsa),
-        system->host_memory_pools[host_ordinal].fine_region,
+        IREE_LIBHSA(libhsa), host_fine_region,
         IREE_HAL_AMDGPU_HOST_SERVICE_QUEUE_CAPACITY, HSA_QUEUE_TYPE_MULTI,
         HSA_QUEUE_FEATURE_AGENT_DISPATCH, out_service->doorbell,
         &out_service->queue);
@@ -505,7 +523,7 @@ void iree_hal_amdgpu_host_service_deinitialize(
   IREE_ASSERT_ARGUMENT(service);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const iree_hal_amdgpu_libhsa_t* libhsa = &service->system->libhsa;
+  const iree_hal_amdgpu_libhsa_t* libhsa = service->libhsa;
 
   // Mark the queue as inactive. This is likely a no-op for our soft queue from
   // the API perspective but can help tooling see our intent.
@@ -523,6 +541,7 @@ void iree_hal_amdgpu_host_service_deinitialize(
 
   // Join thread after it has shut down.
   if (service->thread) {
+    iree_thread_join(service->thread);
     iree_thread_release(service->thread);
     service->thread = NULL;
   }
@@ -541,11 +560,6 @@ void iree_hal_amdgpu_host_service_deinitialize(
                                               service->outstanding_signal));
   }
 
-  // If a failure status was set we need to dispose of it.
-  iree_status_t failure_status = (iree_status_t)iree_atomic_exchange(
-      &service->failure_status, 0, iree_memory_order_acquire);
-  iree_status_free(failure_status);
-
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -559,29 +573,28 @@ static void iree_hal_amdgpu_host_service_fail(
 
   // Try to set our local status - we only preserve the first failure so only
   // do this if we are going from a valid status to a failed one.
-  iree_status_t old_status = iree_ok_status();
-  if (!iree_atomic_compare_exchange_strong(
-          &service->failure_status, (intptr_t*)&old_status, (intptr_t)status,
-          iree_memory_order_acq_rel,
-          iree_memory_order_relaxed /* old_status is unused */)) {
-    // Previous status was not OK; drop our new status.
+  uint64_t old_status_code = 0;
+  uint64_t new_status_code = (uint64_t)iree_status_code(status);
+  const bool first_failure = iree_atomic_compare_exchange_strong(
+      &service->failure_code, &old_status_code, new_status_code,
+      iree_memory_order_acq_rel,
+      iree_memory_order_relaxed /* old_status is unused */);
+  if (first_failure && service->error_callback.fn) {
+    // Notify user-provided function; ownership of the status is transferred to
+    // the callee.
+    service->error_callback.fn(service->error_callback.user_data, status);
+  } else {
+    // No callback or callback already issued prior, drop the error.
     IREE_IGNORE_ERROR(status);
   }
 
   // Force the worker to exit (soon).
   if (service->doorbell.handle) {
-    iree_hsa_signal_store_screlease(IREE_LIBHSA(&service->system->libhsa),
+    iree_hsa_signal_store_screlease(IREE_LIBHSA(service->libhsa),
                                     service->doorbell, UINT64_MAX);
   }
 
   IREE_TRACE_ZONE_END(z0);
-}
-
-iree_status_t iree_hal_amdgpu_host_service_query_status(
-    iree_hal_amdgpu_host_service_t* service) {
-  iree_status_t failure_status = (iree_status_t)iree_atomic_load(
-      &service->failure_status, iree_memory_order_acquire);
-  return iree_status_clone(failure_status);
 }
 
 void iree_hal_amdgpu_host_service_notify_completion(
@@ -599,7 +612,7 @@ void iree_hal_amdgpu_host_service_notify_completion(
   }
 
   iree_hal_amdgpu_host_service_t* service = token.service;
-  iree_hsa_signal_subtract_screlease(IREE_LIBHSA(&service->system->libhsa),
+  iree_hsa_signal_subtract_screlease(IREE_LIBHSA(service->libhsa),
                                      service->outstanding_signal, 1);
 
   IREE_TRACE_ZONE_END(z0);
