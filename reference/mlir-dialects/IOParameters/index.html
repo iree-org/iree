@@ -6310,8 +6310,6 @@ used.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-<tr><td><code>memory_types</code></td><td>mlir::iree_compiler::IREE::HAL::MemoryTypeBitfieldAttr</td><td>valid MemoryType</td></tr>
-<tr><td><code>buffer_usage</code></td><td>mlir::iree_compiler::IREE::HAL::BufferUsageBitfieldAttr</td><td>valid BufferUsage</td></tr>
 </table>
 
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
@@ -6342,6 +6340,14 @@ used.</p>
 <tr>
 <td style="text-align: center;"><code>source_offsets</code></td>
 <td>variadic of 64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>memory_types</code></td>
+<td>32-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>buffer_usage</code></td>
+<td>32-bit signless integer</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>lengths</code></td>
