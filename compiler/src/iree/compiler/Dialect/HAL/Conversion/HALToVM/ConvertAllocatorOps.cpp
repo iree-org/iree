@@ -83,10 +83,10 @@ public:
             adaptor.getAllocator(),
             castToImportType(adaptor.getQueueAffinity(), rewriter.getI64Type(),
                              rewriter),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getMemoryTypesAttr().getInt()),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getBufferUsageAttr().getInt()),
+            castToImportType(adaptor.getMemoryTypes(), rewriter.getI32Type(),
+                             rewriter),
+            castToImportType(adaptor.getBufferUsage(), rewriter.getI32Type(),
+                             rewriter),
             castToImportType(adaptor.getResultSize(), rewriter.getI64Type(),
                              rewriter),
         });
@@ -121,10 +121,10 @@ public:
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
             castToImportType(adaptor.getQueueAffinity(), rewriter.getI64Type(),
                              rewriter),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getMemoryTypesAttr().getInt()),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getBufferUsageAttr().getInt()),
+            castToImportType(adaptor.getMemoryTypes(), rewriter.getI32Type(),
+                             rewriter),
+            castToImportType(adaptor.getBufferUsage(), rewriter.getI32Type(),
+                             rewriter),
             adaptor.getSource(),
             castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
                              rewriter),

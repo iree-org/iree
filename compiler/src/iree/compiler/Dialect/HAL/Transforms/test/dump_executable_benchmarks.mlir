@@ -58,7 +58,9 @@ hal.executable private @ex0 {
 
 // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch0_512_buffer : !hal.buffer
 // CHECK-NEXT: util.initializer {
-// CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> affinity(%{{.+}}) type("DeviceVisible|DeviceLocal") usage("{{.+}}Dispatch{{.+}}") : !hal.buffer{%c768}
+// CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
+// CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Dispatch{{.+}}"> : i32
+// CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> affinity(%{{.+}}) type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]]) : !hal.buffer{%c768}
 // CHECK-NEXT: util.global.store %[[BUFFER]], @ex0_embedded_elf_x86_64_dispatch0_512_buffer : !hal.buffer
 
 // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch0_512(%arg0: i32)

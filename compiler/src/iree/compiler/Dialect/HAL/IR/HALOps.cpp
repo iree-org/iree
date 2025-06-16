@@ -984,16 +984,6 @@ void DeviceMemoizeOp::getSuccessorRegions(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.select.attr
-//===----------------------------------------------------------------------===//
-
-void AllocatorSelectAttrOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getSelectedDevice(), "device");
-  setNameFn(getSelectedQueueAffinity(), "queue_affinity");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.allocator.select
 //===----------------------------------------------------------------------===//
 
@@ -1070,6 +1060,24 @@ Value BufferSubspanOp::getResultSize(unsigned idx) { return getLength(); }
 void BufferLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "length");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer_usage
+//===----------------------------------------------------------------------===//
+
+void BufferUsageOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer_usage");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.memory_type
+//===----------------------------------------------------------------------===//
+
+void MemoryTypeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "memory_type");
 }
 
 //===----------------------------------------------------------------------===//

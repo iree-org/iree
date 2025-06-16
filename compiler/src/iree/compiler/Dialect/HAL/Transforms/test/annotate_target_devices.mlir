@@ -82,8 +82,8 @@ util.func private @allocator_select() -> !hal.device {
   %affinity_a = arith.constant 100 : i64
   %device_b = util.global.load immutable @device_b : !hal.device
   %affinity_b = arith.constant 101 : i64
-  %type = arith.constant 2 : i32
-  %usage = arith.constant 3 : i32
+  %type = hal.memory_type<HostLocal> : i32
+  %usage = hal.buffer_usage<Transfer> : i32
   // CHECK: hal.allocator.select
   // CHECK-SAME-LITERAL: hal.device.targets.operands = [[#hal.device.target<"device_a"> : !hal.device], [#hal.device.target<"device_b"> : !hal.device]]
   // CHECK-SAME-LITERAL: hal.device.targets.results = [[#hal.device.target<"device_a"> : !hal.device, #hal.device.target<"device_b"> : !hal.device]]}

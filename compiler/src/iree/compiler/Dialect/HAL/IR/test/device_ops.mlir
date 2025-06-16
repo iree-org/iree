@@ -29,6 +29,10 @@ util.func public @device_queue_alloca(
     // CHECK-SAME:  %[[SIZE:.+]]: index)
     %size: index) -> !hal.buffer {
   %c100_i64 = arith.constant 100 : i64
+  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<{{.+}}> : i32
+  %memory_type = hal.memory_type<"DeviceLocal"> : i32
+  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer"> : i32
+  %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   // CHECK: = hal.device.queue.alloca<%[[DEVICE]] : !hal.device>
   %buffer = hal.device.queue.alloca<%device : !hal.device>
       // CHECK-SAME: affinity(%[[AFFINITY]])
@@ -37,8 +41,8 @@ util.func public @device_queue_alloca(
       wait(%wait_fence) signal(%signal_fence)
       // CHECK-SAME: pool(%c100_i64)
       pool(%c100_i64)
-      // CHECK-SAME: type({{.+}}) usage("{{.+}}Transfer")
-      type(DeviceLocal) usage(Transfer)
+      // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
+      type(%memory_type) usage(%buffer_usage)
       // CHECK-SAME: flags("None")
       flags("None")
       // CHECK-SAME: : !hal.buffer{%[[SIZE]]}

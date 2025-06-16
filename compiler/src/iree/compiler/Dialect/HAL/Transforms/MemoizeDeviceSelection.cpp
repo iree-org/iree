@@ -4,18 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <utility>
-
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Utils/StringUtils.h"
-#include "mlir/IR/Attributes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -29,33 +25,38 @@ namespace {
 // --iree-hal-memoize-device-selection
 //===----------------------------------------------------------------------===//
 
+struct SelectOpOperands {
+  SmallVector<StringAttr, 2> deviceSymbols;
+  SmallVector<IntegerAttr, 2> queueAffinities;
+  IntegerAttr memoryType;
+  IntegerAttr bufferUsage;
+
+  // Ideally the SelectOpOperands should be a valid key to the DenseMap, so we
+  // could use it directly. However, we just take the shortcut of
+  // converting to an ArrayAttr and using that as the key.
+  ArrayAttr toArrayAttr(MLIRContext *context) const {
+    SmallVector<Attribute> components;
+    for (auto deviceSymbol : deviceSymbols) {
+      components.push_back(FlatSymbolRefAttr::get(deviceSymbol));
+    }
+    for (auto queueAffinity : queueAffinities) {
+      components.push_back(queueAffinity);
+    }
+    components.push_back(memoryType);
+    components.push_back(bufferUsage);
+    return ArrayAttr::get(context, components);
+  }
+};
+
 static LogicalResult memoizeAllocatorSelectOp(
-    SmallVectorImpl<IREE::HAL::AllocatorSelectAttrOp> &selectOps,
+    const SelectOpOperands &selectOpOperands,
+    const SmallVectorImpl<IREE::HAL::AllocatorSelectOp> &selectOps,
     SymbolTable &symbolTable) {
   // The ops are in module order.
   auto firstSelectOp = selectOps.front();
   auto selectOpLocs = llvm::map_to_vector(
       selectOps, [](auto selectOp) { return selectOp.getLoc(); });
   auto fusedLoc = FusedLoc::get(firstSelectOp.getContext(), selectOpLocs);
-
-  // Gather the globals for each device and the queue affinity masks 1:1.
-  SmallVector<IREE::Util::GlobalOpInterface> deviceGlobalOps;
-  SmallVector<int64_t> queueMasks;
-  auto optimalSetAttr = firstSelectOp.getOptimalSetAttr();
-  for (auto affinityAttr : optimalSetAttr.getAffinities()) {
-    auto deviceAffinityAttr =
-        dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
-    if (!deviceAffinityAttr) {
-      return firstSelectOp.emitError()
-             << "has invalid affinity " << affinityAttr
-             << "; expected only #hal.device.affinity";
-    }
-    auto deviceGlobalOp =
-        symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
-            firstSelectOp, deviceAffinityAttr.getDevice());
-    deviceGlobalOps.push_back(deviceGlobalOp);
-    queueMasks.push_back(deviceAffinityAttr.getQueueMask());
-  }
 
   // Since all globals must be initialized prior to first use we will insert
   // the new global and initializer immediately prior to the function containing
@@ -87,27 +88,40 @@ static LogicalResult memoizeAllocatorSelectOp(
   {
     auto initializerBuilder =
         OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
+
     SmallVector<Value> deviceValues;
-    SmallVector<Value> queueMaskValues;
-    for (auto [deviceGlobalOp, queueMask] :
-         llvm::zip_equal(deviceGlobalOps, queueMasks)) {
-      deviceValues.push_back(
+    SmallVector<Value> queueAffinityValues;
+    for (auto [deviceSymbol, queueAffinity] :
+         llvm::zip_equal(selectOpOperands.deviceSymbols,
+                         selectOpOperands.queueAffinities)) {
+      auto deviceGlobalOp =
+          symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
+              firstSelectOp, deviceSymbol);
+      Value deviceValue =
           deviceGlobalOp.createLoadOp(fusedLoc, initializerBuilder)
-              .getLoadedGlobalValue());
-      queueMaskValues.push_back(initializerBuilder.create<arith::ConstantIntOp>(
-          fusedLoc, queueMask, 64));
+              .getLoadedGlobalValue();
+      deviceValues.push_back(deviceValue);
+      queueAffinityValues.push_back(
+          initializerBuilder.create<arith::ConstantOp>(fusedLoc,
+                                                       queueAffinity));
     }
-    Value memoryTypesValue = initializerBuilder.create<arith::ConstantIntOp>(
-        fusedLoc, static_cast<int64_t>(firstSelectOp.getMemoryTypes()), 32);
-    Value bufferUsageValue = initializerBuilder.create<arith::ConstantIntOp>(
-        fusedLoc, static_cast<int64_t>(firstSelectOp.getBufferUsage()), 32);
-    auto selectOp = initializerBuilder.create<IREE::HAL::AllocatorSelectOp>(
-        fusedLoc, deviceValues, queueMaskValues, memoryTypesValue,
+
+    Value memoryTypeValue = initializerBuilder.create<IREE::HAL::MemoryTypeOp>(
+        fusedLoc, cast<MemoryTypeBitfieldAttr>(selectOpOperands.memoryType));
+
+    Value bufferUsageValue =
+        initializerBuilder.create<IREE::HAL::BufferUsageOp>(
+            fusedLoc,
+            cast<BufferUsageBitfieldAttr>(selectOpOperands.bufferUsage));
+
+    auto newSelectOp = initializerBuilder.create<IREE::HAL::AllocatorSelectOp>(
+        fusedLoc, deviceValues, queueAffinityValues, memoryTypeValue,
         bufferUsageValue);
-    selectedDeviceGlobalOp.createStoreOp(fusedLoc, selectOp.getSelectedDevice(),
-                                         initializerBuilder);
+
+    selectedDeviceGlobalOp.createStoreOp(
+        fusedLoc, newSelectOp.getSelectedDevice(), initializerBuilder);
     selectedQueueAffinityGlobalOp.createStoreOp(
-        fusedLoc, selectOp.getSelectedQueueAffinity(), initializerBuilder);
+        fusedLoc, newSelectOp.getSelectedQueueAffinity(), initializerBuilder);
     initializerBuilder.create<IREE::Util::ReturnOp>(fusedLoc);
   }
 
@@ -138,22 +152,63 @@ struct MemoizeDeviceSelectionPass
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
+    DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run())) {
+      return signalPassFailure();
+    }
+
     // Gather all select ops in the program and bucket by unique key.
     // For each bucket the first op will be the first that appears in the
     // module for that given bucket.
-    DenseMap<Attribute, SmallVector<IREE::HAL::AllocatorSelectAttrOp>>
+    DenseMap<ArrayAttr, std::pair<SelectOpOperands,
+                                  SmallVector<IREE::HAL::AllocatorSelectOp>>>
         selectOps;
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       // TODO(benvanik): an interface for when we have other select ops. For now
-      // we only have AllocatorSelectAttrOp.
-      callableOp.walk([&](IREE::HAL::AllocatorSelectAttrOp selectOp) {
-        auto fullKey = ArrayAttr::get(moduleOp.getContext(),
-                                      {
-                                          selectOp.getOptimalSetAttr(),
-                                          selectOp.getMemoryTypesAttr(),
-                                          selectOp.getBufferUsageAttr(),
-                                      });
-        selectOps[fullKey].push_back(selectOp);
+      // we only have AllocatorSelectOp.
+      callableOp.walk([&](IREE::HAL::AllocatorSelectOp selectOp) {
+        // Build unique key from device symbols, queue affinities, memory type,
+        // and buffer usage. If we fail to determine any of these values,
+        // we skip the op as we cannot be sure the key is unique.
+        SelectOpOperands selectOpOperands;
+
+        // Add device symbols.
+        for (Value device : selectOp.getDevices()) {
+          auto deviceGlobals = deviceAnalysis.lookupDeviceGlobals(device);
+          // If we cannot find a device or we have more than one, we skip the
+          // op.
+          if (!deviceGlobals || deviceGlobals->size() != 1) {
+            return;
+          }
+          selectOpOperands.deviceSymbols.push_back(
+              deviceGlobals->front().getGlobalName());
+        }
+
+        // Add queue affinities.
+        for (Value queueAffinity : selectOp.getQueueAffinities()) {
+          IntegerAttr queueAffinityAttr;
+          if (!matchPattern(queueAffinity, m_Constant(&queueAffinityAttr))) {
+            return;
+          }
+          selectOpOperands.queueAffinities.push_back(queueAffinityAttr);
+        }
+
+        // Add memory type.
+        if (!matchPattern(selectOp.getMemoryTypes(),
+                          m_Constant(&selectOpOperands.memoryType))) {
+          return;
+        }
+
+        // Add buffer usage.
+        if (!matchPattern(selectOp.getBufferUsage(),
+                          m_Constant(&selectOpOperands.bufferUsage))) {
+          return;
+        }
+
+        auto &selectOpBucket =
+            selectOps[selectOpOperands.toArrayAttr(moduleOp.getContext())];
+        selectOpBucket.first = std::move(selectOpOperands);
+        selectOpBucket.second.push_back(selectOp);
       });
     }
     if (selectOps.empty()) {
@@ -164,7 +219,8 @@ struct MemoizeDeviceSelectionPass
 
     // Insert globals/an initializer/swap ops with lookups.
     for (auto [key, allOps] : selectOps) {
-      if (failed(memoizeAllocatorSelectOp(allOps, symbolTable))) {
+      if (failed(memoizeAllocatorSelectOp(allOps.first, allOps.second,
+                                          symbolTable))) {
         return signalPassFailure();
       }
     }

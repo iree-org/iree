@@ -8,13 +8,15 @@ util.func public @parameterLoad(%device: !hal.device, %queue_affinity: i64, %wai
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
   %c101 = arith.constant 101 : index
+  %memory_type = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
+  %buffer_usage = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable"> : i32
   //      CHECK: %[[KEY_TABLE:.+]], %[[KEY_DATA:.+]] = vm.rodata.table.inline i32 : !vm.buffer, !vm.buffer = ["key0", "key1"]
   //  CHECK-DAG: %[[SPANS:.+]] = vm.rodata.inline : !vm.buffer = dense<[50, 0, 100, 51, 0, 101]> : vector<6xi64>
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
   // CHECK: %[[TARGET_BUFFERS:.+]] = vm.call @io_parameters.load
   // CHECK-SAME: (%[[DEVICE]], %[[QUEUE_AFFINITY]], %[[WAIT]], %[[SIGNAL]],
   // CHECK-SAME:  %[[SCOPE]], %[[QUEUE_AFFINITY]], %c48, %c527363, %[[KEY_TABLE]], %[[KEY_DATA]], %[[SPANS]])
-  %target_buffers:2 = io_parameters.load<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) type("DeviceVisible|DeviceLocal") usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable") {
+  %target_buffers:2 = io_parameters.load<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) type(%memory_type) usage(%buffer_usage) {
     "scope"::"key0"[%c50_i64] : !hal.buffer{%c100},
     "scope"::"key1"[%c51_i64] : !hal.buffer{%c101}
   }
@@ -33,13 +35,15 @@ util.func public @parameterLoad(%device: !hal.device, %queue_affinity: i64, %wai
 util.func public @parameterLoadNoScope(%device: !hal.device, %queue_affinity: i64, %wait: !hal.fence, %signal: !hal.fence) -> !hal.buffer {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
+  %memory_type = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
+  %buffer_usage = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable"> : i32
   //      CHECK: %[[KEY_TABLE:.+]], %[[KEY_DATA:.+]] = vm.rodata.table.inline i32 : !vm.buffer, !vm.buffer = ["key"]
   //  CHECK-DAG: %[[SPANS:.+]] = vm.rodata.inline : !vm.buffer = dense<[50, 0, 100]> : vector<3xi64>
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK: %[[TARGET_BUFFERS:.+]] = vm.call @io_parameters.load
   // CHECK-SAME: (%[[DEVICE]], %[[QUEUE_AFFINITY]], %[[WAIT]], %[[SIGNAL]],
   // CHECK-SAME:  %[[SCOPE]], %[[QUEUE_AFFINITY]], %c48, %c527363, %[[KEY_TABLE]], %[[KEY_DATA]], %[[SPANS]])
-  %target_buffer = io_parameters.load<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) type("DeviceVisible|DeviceLocal") usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable") {
+  %target_buffer = io_parameters.load<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) type(%memory_type) usage(%buffer_usage) {
     "key"[%c50_i64] : !hal.buffer{%c100}
   }
   // CHECK-DAG: %[[C0:.+]] = vm.const.i32 0
