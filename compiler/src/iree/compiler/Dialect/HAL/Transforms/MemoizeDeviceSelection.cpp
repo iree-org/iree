@@ -169,8 +169,8 @@ struct MemoizeDeviceSelectionPass
         // Build unique key from device symbols, queue affinities, memory type,
         // and buffer usage. If we fail to determine any of these values,
         // we skip the op as we cannot be sure the key is unique.
-
         SelectOpOperands selectOpOperands;
+
         // Add device symbols.
         for (Value device : selectOp.getDevices()) {
           auto deviceGlobals = deviceAnalysis.lookupDeviceGlobals(device);
