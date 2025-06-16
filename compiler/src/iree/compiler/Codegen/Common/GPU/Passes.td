@@ -229,8 +229,17 @@ def GPUPipeliningPass :
 def GPUPromoteMatmulOperandsPass :
     InterfacePass<"iree-codegen-gpu-promote-matmul-operands",
                   "mlir::FunctionOpInterface"> {
-  let summary = "Pass to insert copies with a different thread configuration "
+  let summary = "Pass to insert copies with a different lowering configuration "
                 "on matmul operands";
+  let description = [{
+    Looks for all matmuls annotated with `promote_operands = I64Array` and
+    inserts copies on the specified operands with a thread lowering config
+    optimized for coalesced loads.
+
+    If the matmul is also annotated with `promotion_types = ArrayAttr`, the
+    logic for "promoting" an operand is deferred to an attribute interface
+    allowing for custom logic.
+  }];
   let dependentDialects = [
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",

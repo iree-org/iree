@@ -56,14 +56,15 @@ getPromotedOperandList(LoweringConfigAttr config);
 std::optional<ArrayRef<Attribute>>
 getPromotionTypesList(LoweringConfigAttr config);
 /// Append to `attrs` an `ArrayAttr` for `promotedOperands`.
-/// The `directLoadOperands` is an optional list of booleans
-/// indicating whether the corresponding operand should use direct load.
+/// The `promotionTypes` is an optional list of Attributes
+/// describing how to promote each individual operand.
 void appendPromotedOperandsList(MLIRContext *context,
                                 SmallVectorImpl<NamedAttribute> &attrs,
                                 ArrayRef<int64_t> operands,
                                 ArrayRef<Attribute> promotionTypes = {});
 /// Create a new `LoweringConfigAttr` from `currAttr` with the promoted operands
-/// list modified/set to `operands`.
+/// list modified/set to `operands`. Optional `promotionTypes` specifies how to
+/// promote each operand.
 IREE::GPU::LoweringConfigAttr setPromotedOperandsList(
     MLIRContext *context, IREE::GPU::LoweringConfigAttr currAttr,
     ArrayRef<int64_t> operands,
