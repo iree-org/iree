@@ -154,8 +154,8 @@ struct GPUPromoteMatmulOperandsPass final
 
       std::optional<ArrayRef<Attribute>> maybePromotionTypes =
           getPromotionTypesList(loweringConfig);
-      if (maybePromotionTypes && maybePromotionTypes.value().size() !=
-                                     promotedOperands.value().size()) {
+      if (maybePromotionTypes &&
+          maybePromotionTypes->size() != promotedOperands->size()) {
         op->emitOpError(
             "promoted operand and promotion types lists size mismatch");
         return WalkResult::interrupt();

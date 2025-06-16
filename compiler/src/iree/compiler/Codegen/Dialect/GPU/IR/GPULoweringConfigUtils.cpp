@@ -26,7 +26,7 @@ IREE::GPU::MmaInterfaceAttr getMmaKind(LoweringConfigAttr config) {
 
 void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
                 IREE::GPU::MmaInterfaceAttr kind) {
-  attrs.emplace_back(StringAttr::get(context, kMmaKindName), kind);
+  attrs.emplace_back(kMmaKindName, kind);
 }
 
 // TODO: Merge subgroup counts functionality into subgroup tiling level
@@ -56,7 +56,7 @@ void setSubgroupMCount(MLIRContext *context,
                        SmallVectorImpl<NamedAttribute> &attrs,
                        int64_t subgroup_m_count) {
   attrs.emplace_back(
-      StringAttr::get(context, kSubgroupMCountName),
+      kSubgroupMCountName,
       IntegerAttr::get(IntegerType::get(context, 64), subgroup_m_count));
 }
 
@@ -64,7 +64,7 @@ void setSubgroupNCount(MLIRContext *context,
                        SmallVectorImpl<NamedAttribute> &attrs,
                        int64_t subgroup_n_count) {
   attrs.emplace_back(
-      StringAttr::get(context, kSubgroupNCountName),
+      kSubgroupNCountName,
       IntegerAttr::get(IntegerType::get(context, 64), subgroup_n_count));
 }
 
@@ -88,7 +88,7 @@ void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
   Builder b(context);
   ArrayAttr basisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(basis.counts), b.getI64ArrayAttr(basis.mapping)});
-  attrs.emplace_back(b.getNamedAttr(getBasisLevelName(level), basisAttr));
+  attrs.emplace_back(getBasisLevelName(level), basisAttr);
 }
 
 FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
@@ -141,13 +141,11 @@ void appendPromotedOperandsList(MLIRContext *context,
                                 ArrayRef<int64_t> operands,
                                 ArrayRef<Attribute> promotionTypes) {
   Builder b(context);
-  attrs.emplace_back(StringAttr::get(context, kPromoteOperandsName),
-                     b.getI64ArrayAttr(operands));
+  attrs.emplace_back(kPromoteOperandsName, b.getI64ArrayAttr(operands));
   if (!promotionTypes.empty()) {
     assert(promotionTypes.size() == operands.size() &&
            "Promotion types size must match promoted operands size");
-    attrs.emplace_back(StringAttr::get(context, kPromotionTypesName),
-                       b.getArrayAttr(promotionTypes));
+    attrs.emplace_back(kPromotionTypesName, b.getArrayAttr(promotionTypes));
   }
 }
 IREE::GPU::LoweringConfigAttr

@@ -97,8 +97,8 @@ def IREEGPU_PromotionAttr
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Promote the given operand. The operation owning the operand cannot be
-        changed by this method.
+        Returns the promoted operand. The operation owning the operand cannot be
+        modified by this method.
       }],
       /*retType=*/"::mlir::Value",
       /*methodName=*/"promoteOperand",
