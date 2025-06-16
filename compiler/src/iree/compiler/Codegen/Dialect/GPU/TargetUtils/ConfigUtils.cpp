@@ -122,6 +122,20 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+//// Sort the MMA intrinsics by how well they divide the K dimension of the
+//// problem. This is a heuristic to prefer intrinsics that can evenly divide
+//// the K dimension of the problem.
+static void
+prioritizeMMAIntrinsicsByKAlignment(GPUMatmulShapeType problem,
+                                    SmallVector<GPUIntrinsicType> &intrinsics) {
+  llvm::sort(intrinsics, [&](const GPUMatmulShapeType &lhs,
+                             const GPUMatmulShapeType &rhs) {
+    int64_t lhsAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
+    int64_t rhsAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
+    return lhsAligned > rhsAligned;
+  });
+}
+
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
@@ -129,7 +143,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
     bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUIntrinsicType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a distribution kind cannot be distributed.
     if (!mma.getDistributionMappingKind())
@@ -139,10 +153,42 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    LDBG("Adding MMA intrinsic: "
+         << " with mSize: " << mSize << ", nSize: " << nSize
+         << ", kSize: " << kSize << ", aType: " << aType << ", bType: " << bType
+         << ", cType: " << cType);
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   }
   if (intrinsics.empty())
     return std::nullopt;
+
+  auto printVector = [](SmallVector<int64_t, 2> vec) {
+    // return llvm::join(vec, ", ",
+    //                   [](int64_t v) { return std::to_string(v); });
+    std::string vecStr;
+    for (auto &v : vec) {
+      if (!vecStr.empty()) {
+        vecStr += ", ";
+      }
+      vecStr += std::to_string(v);
+    }
+    return vecStr;
+  };
+  LDBG("Igemm problem: " << printVector(problem.mSizes) << "x"
+                         << printVector(problem.nSizes) << "x"
+                         << printVector(problem.kSizes) << ", aType: "
+                         << problem.aType << ", bType: " << problem.bType
+                         << ", cType: " << problem.cType);
+  // Prioritize the intrinsics that can evenly divide on K dimension.
+  prioritizeMMAIntrinsicsByKAlignment(problem, intrinsics);
+  LDBG("Prioritized MMA intrinsics:");
+  for (const auto &intrinsic : intrinsics) {
+    LDBG("  " << printVector(intrinsic.mSizes) << "x"
+              << printVector(intrinsic.nSizes) << "x"
+              << printVector(intrinsic.kSizes) << ", aType: " << intrinsic.aType
+              << ", bType: " << intrinsic.bType
+              << ", cType: " << intrinsic.cType);
+  }
 
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
@@ -346,8 +392,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind =
-      target.getWgp().getMma()[schedule->index];
+  IREE::GPU::MmaInterfaceAttr mmaKind = schedule->mmaKind;
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
