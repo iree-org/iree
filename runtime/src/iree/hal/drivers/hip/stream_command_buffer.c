@@ -578,8 +578,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
           kernel_params->function, workgroup_count[0], workgroup_count[1],
           workgroup_count[2], kernel_params->block_dims[0],
           kernel_params->block_dims[1], kernel_params->block_dims[2],
-          kernel_params->block_shared_memory_size, command_buffer->hip_stream,
-          params_ptr, NULL),
+          /*sharedMemBytes=*/0, command_buffer->hip_stream, params_ptr, NULL),
       "hipModuleLaunchKernel");
 
   IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
