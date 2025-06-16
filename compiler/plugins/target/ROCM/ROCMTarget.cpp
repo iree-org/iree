@@ -920,12 +920,6 @@ protected:
         blockDims.z = cast<IntegerAttr>(workgroupSize[2]).getInt();
       }
 
-      uint32_t blockSharedMemorySize = 0;
-      if (std::optional<APInt> workgroupLocalMemoryAttr =
-              exportOp.getWorkgroupLocalMemory()) {
-        blockSharedMemorySize = workgroupLocalMemoryAttr->getSExtValue();
-      }
-
       auto layoutAttr = exportOp.getLayoutAttr();
       uint32_t constantCount = static_cast<uint32_t>(layoutAttr.getConstants());
       SmallVector<iree_hal_hip_BindingBits_enum_t> bindingFlags;
@@ -948,8 +942,6 @@ protected:
       iree_hal_hip_ExportDef_module_ordinal_add(builder, 0); // always 0 today
       iree_hal_hip_ExportDef_kernel_name_add(builder, kernelNameRef);
       iree_hal_hip_ExportDef_block_dims_add(builder, &blockDims);
-      iree_hal_hip_ExportDef_block_shared_memory_size_add(
-          builder, blockSharedMemorySize);
       iree_hal_hip_ExportDef_constant_count_add(builder, constantCount);
       iree_hal_hip_ExportDef_binding_flags_add(builder, bindingFlagsRef);
       iree_hal_hip_ExportDef_debug_info_add(builder, exportDebugInfos[ordinal]);

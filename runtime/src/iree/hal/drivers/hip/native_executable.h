@@ -37,7 +37,6 @@ typedef struct iree_hal_hip_kernel_params_t {
   uint32_t binding_count;
 
   uint32_t block_dims[3];
-  uint32_t block_shared_memory_size;
 
   IREE_TRACE(iree_hal_hip_kernel_debug_info_t debug_info;)
 } iree_hal_hip_kernel_params_t;
