@@ -30,15 +30,15 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       return rewriter.notifyMatchFailure(op, "Result only supports f32");
     }
 
-    // Create constants
+    // Create constants.
     Type f32Type = rewriter.getF32Type();
     auto oneF = rewriter.create<arith::ConstantOp>(
         loc, f32Type, rewriter.getF32FloatAttr(1.0f));
 
-    // Get abs value
+    // Get abs value.
     Value ax = rewriter.create<math::AbsFOp>(loc, input);
 
-    // Create comparison for |x| < 1.0
+    // Create comparison for |x| < 1.0.
     Value cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
                                                ax, oneF);
 
@@ -49,7 +49,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      // Define polynomial coefficients for |x| < 1.0
+      // Define polynomial coefficients for |x| < 1.0.
       auto c1_0 = rewriter.create<arith::ConstantOp>(
           loc, f32Type, rewriter.getF32FloatAttr(-0x1.268bc2p-11f));
       auto c1_1 = rewriter.create<arith::ConstantOp>(
@@ -71,7 +71,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       Value p = rewriter.create<math::FmaOp>(loc, t, mad4, c1_5);
       Value result = rewriter.create<math::FmaOp>(loc, ax, p, ax);
       rewriter.create<scf::YieldOp>(loc, result);
-    } // End then region
+    } // End then region.
 
     // --- Else region (|x| >= 1.0) ---
     {
@@ -104,7 +104,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       // incorrect based on the standard erf approximation formula and leads to
       // values > 1. The typical approximation leads directly to the exponent
       // term. Value p2 = rewriter.create<math::FmaOp>(loc, ax, mad10, ax); //
-      // Original line based on C code
+      // Original line based on C code.
       Value p2 = mad10; // Corrected based on typical erf formula structure for
                         // |x| >= 1
       Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
@@ -113,7 +113,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       rewriter.create<scf::YieldOp>(loc, result2);
     } // End else region
 
-    // Set insertion point after the if
+    // Set insertion point after the if.
     rewriter.setInsertionPointAfter(ifOp);
 
     // Restore the sign: BUILTIN_COPYSIGN_F32(ret, x)
@@ -125,7 +125,8 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     return success();
   }
 };
-} // anonymous namespace
+}
+// anonymous namespace
 
 void populateFastMathPatterns(RewritePatternSet &patterns,
                               const std::function<bool(StringRef)> &predicate) {
@@ -144,4 +145,5 @@ void populateFastMathPatterns(RewritePatternSet &patterns,
   //   - math.exp/expm1
 }
 
-} // namespace mlir::iree_compiler
+}
+// namespace mlir::iree_compiler

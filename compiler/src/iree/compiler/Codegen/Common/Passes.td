@@ -652,8 +652,8 @@ def MathTransformPass :
     Pass<"iree-codegen-math-transform", ""> {
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
   let dependentDialects = [
-    "::mlir::scf::SCFDialect",
-    "::mlir::arith::ArithDialect"
+    "mlir::scf::SCFDialect",
+    "mlir::arith::ArithDialect"
   ];
 }
 

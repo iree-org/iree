@@ -156,7 +156,7 @@ static bool predicateApprox(StringRef name,
                             name);
 }
 
-// Add a new predicate function for device-lib implementations.
+// Returns true if the given function should be handled by a fast math pattern.
 static bool predicateDeviceLibImpl(StringRef name,
                                    IREE::HAL::ExecutableTargetAttr target) {
   // Compute hasFastExp from target attribute.
@@ -211,7 +211,6 @@ public:
         patterns,
         [target](StringRef name) { return predicateApprox(name, target); });
 
-    // Add device-lib implementation patterns
     populateFastMathPatterns(patterns, [target](StringRef name) {
       return predicateDeviceLibImpl(name, target);
     });
