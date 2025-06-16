@@ -125,8 +125,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     return success();
   }
 };
-}
-// anonymous namespace
+} // anonymous namespace
 
 void populateFastMathPatterns(RewritePatternSet &patterns,
                               const std::function<bool(StringRef)> &predicate) {
