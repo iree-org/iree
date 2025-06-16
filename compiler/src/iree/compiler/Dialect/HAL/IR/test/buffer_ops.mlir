@@ -69,3 +69,21 @@ util.func public @buffer_store(%arg0: !hal.buffer, %arg1: i32) {
   hal.buffer.store<%arg0 : !hal.buffer>[%dst_offset] value(%arg1 : i32)
   util.return
 }
+
+// -----
+
+// CHECK-LABEL: @memory_type
+util.func public @memory_type() -> i32 {
+  // CHECK: hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
+  %memory_type = hal.memory_type<DeviceLocal> : i32
+  util.return %memory_type : i32
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_usage
+util.func public @buffer_usage() -> i32 {
+  // CHECK: hal.buffer_usage<"TransferSource|TransferTarget|Transfer"> : i32
+  %buffer_usage = hal.buffer_usage<Transfer> : i32
+  util.return %buffer_usage : i32
+}

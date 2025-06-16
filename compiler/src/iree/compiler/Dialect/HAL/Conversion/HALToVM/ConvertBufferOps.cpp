@@ -173,10 +173,38 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+struct MemoryTypeOpConversion
+    : public OpConversionPattern<IREE::HAL::MemoryTypeOp> {
+  using OpConversionPattern<IREE::HAL::MemoryTypeOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::MemoryTypeOp op,
+                  IREE::HAL::MemoryTypeOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
+        op, op.getTypeAttr().getInt());
+    return success();
+  }
+};
+
+struct BufferUsageOpConversion
+    : public OpConversionPattern<IREE::HAL::BufferUsageOp> {
+  using OpConversionPattern<IREE::HAL::BufferUsageOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferUsageOp op,
+                  IREE::HAL::BufferUsageOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
+        op, op.getUsageAttr().getInt());
+    return success();
+  }
+};
+
 void populateHALBufferToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    TypeConverter &typeConverter,
                                    RewritePatternSet &patterns) {
+  patterns.insert<MemoryTypeOpConversion>(context);
+  patterns.insert<BufferUsageOpConversion>(context);
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferAssertOp>>(
       context, importSymbols, typeConverter, "hal.buffer.assert");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferAllocationPreserveOp>>(

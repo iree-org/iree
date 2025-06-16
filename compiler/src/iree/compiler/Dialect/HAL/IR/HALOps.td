@@ -570,45 +570,6 @@ def OpGroupAllocatorOps : OpDocGroup {
 
 let opDocGroup = OpGroupAllocatorOps in {
 
-// TODO(benvanik): fix the name to something less wonky or make the op support
-// exclusively an attribute _or_ a set of variadic operands.
-def HAL_AllocatorSelectAttrOp : HAL_PureOp<"allocator.select.attr", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{Selects a device/queue from the given set for allocations.}];
-  let description = [{
-    Chooses one device and queue affinity pair from the given optimal set that
-    can service the requested memory type and usage for all devices in the set.
-    Returns a null device if no pair is able to satisfy the conditions.
-
-    This variant of the op selects from an optimal device affinity set without
-    capturing any SSA values to more easily allow it to be hoisted/memoized.
-    After devices have been materialized and hoisting performed it will be
-    turned into the lower-level `hal.allocator.select` op.
-  }];
-
-  let arguments = (ins
-    HAL_DeviceOptimalAttr:$optimal_set,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage
-  );
-  let results = (outs
-    HAL_Device:$selected_device,
-    HAL_DeviceQueueAffinity:$selected_queue_affinity
-  );
-
-  // TODO(benvanik): change type/usage to ref params.
-  let assemblyFormat = [{
-    `from` `(` qualified($optimal_set) `)`
-    `type` `(` $memory_types `)`
-    `usage` `(` $buffer_usage `)`
-    `:`
-    type($selected_device) `,` type($selected_queue_affinity)
-    attr-dict-with-keyword
-  }];
-
-  let hasCanonicalizer = 1;
-}
 
 def HAL_AllocatorSelectOp : HAL_PureOp<"allocator.select", [
   SameVariadicOperandSize,
@@ -624,8 +585,8 @@ def HAL_AllocatorSelectOp : HAL_PureOp<"allocator.select", [
   let arguments = (ins
     Variadic<HAL_Device>:$devices,
     Variadic<HAL_DeviceQueueAffinity>:$queue_affinities,
-    I32:$memory_types,
-    I32:$buffer_usage
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
   );
   let results = (outs
     HAL_Device:$selected_device,
@@ -658,8 +619,8 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     HAL_DeviceSize:$result_size
   );
   let results = (outs
@@ -693,8 +654,8 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     // TODO(benvanik): support other types (and mutable buffers).
     Util_BufferType:$source,
     HAL_DeviceSize:$offset,
@@ -968,6 +929,56 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
     `value` `(` $value `:` type($value) `)`
     attr-dict-with-keyword
   }];
+}
+
+def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
+  ConstantLike,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{An iree_hal_buffer_usage_t for the given usage bits.}];
+  let description = [{
+    Maps buffer usage bits to a runtime `iree_hal_buffer_usage_t` value.
+  }];
+
+  let arguments = (ins
+    HAL_BufferUsageBitfieldAttr:$usage
+  );
+  let results = (outs
+    HAL_BufferUsage:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $usage `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let hasFolder = 1;
+}
+
+def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
+  ConstantLike,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{An iree_hal_memory_type_t for the given memory type bits.}];
+  let description = [{
+    Maps memory type bits to a runtime `iree_hal_memory_type_t` value.
+  }];
+
+  let arguments = (ins
+    HAL_MemoryTypeBitfieldAttr:$type
+  );
+  let results = (outs
+    HAL_MemoryType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $type `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let hasFolder = 1;
 }
 
 } // OpGroupBufferOps
@@ -1995,8 +2006,8 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
     HAL_DeviceQueuePool:$pool,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     HAL_DeviceSize:$result_size,
     HAL_AllocaFlagBitfieldAttr:$flags
   );

@@ -106,14 +106,19 @@ struct ResourceAllocOpPattern
       return failure();
     }
 
+    Value memoryTypeOp =
+        rewriter.create<IREE::HAL::MemoryTypeOp>(allocOp.getLoc(), memoryTypes);
+    Value bufferUsageOp = rewriter.create<IREE::HAL::BufferUsageOp>(
+        allocOp.getLoc(), bufferUsage);
+
     // Lookup the appropriate allocator/queue for allocation based on the buffer
     // propreties.
     auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
-        allocOp, memoryTypes, bufferUsage, rewriter);
+        allocOp, memoryTypeOp, bufferUsageOp, rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateOp>(
-        allocOp, bufferType, allocator, queueAffinity, memoryTypes, bufferUsage,
-        adaptor.getStorageSize());
+        allocOp, bufferType, allocator, queueAffinity, memoryTypeOp,
+        bufferUsageOp, adaptor.getStorageSize());
     return success();
   }
 };
@@ -136,11 +141,15 @@ struct ResourceAllocaOpPattern
       return failure();
     }
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
+    Value memoryTypeOp =
+        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+    Value bufferUsageOp =
+        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
 
     // Lookup the appropriate device/queue for allocation based on the buffer
     // propreties.
     auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
-        allocaOp, memoryTypes, bufferUsage, rewriter);
+        allocaOp, memoryTypeOp, bufferUsageOp, rewriter);
 
     // Behavior flags.
     IREE::HAL::AllocaFlagBitfield flags = IREE::HAL::AllocaFlagBitfield::None;
@@ -158,7 +167,7 @@ struct ResourceAllocaOpPattern
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
         loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
-        memoryTypes, bufferUsage, adaptor.getStorageSize(), flags);
+        memoryTypeOp, bufferUsageOp, adaptor.getStorageSize(), flags);
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
@@ -186,8 +195,14 @@ struct ResourceDeallocaOpPattern
                                                bufferUsage))) {
       preferOrigin = true;
     }
+
+    Value memoryTypeOp =
+        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+    Value bufferUsageOp =
+        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+
     auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
-        deallocaOp, memoryTypes, bufferUsage, rewriter);
+        deallocaOp, memoryTypeOp, bufferUsageOp, rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -304,14 +319,18 @@ struct ResourceTryMapOpPattern
       break;
     }
 
+    Value bufferUsageOp = rewriter.create<IREE::HAL::BufferUsageOp>(
+        tryMapOp.getLoc(), bufferUsage);
+    Value memoryTypeOp = rewriter.create<IREE::HAL::MemoryTypeOp>(
+        tryMapOp.getLoc(), memoryTypes);
     // Lookup the appropriate allocator/queue for allocation based on the buffer
     // propreties.
     auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
-        tryMapOp, memoryTypes, bufferUsage, rewriter);
+        tryMapOp, memoryTypeOp, bufferUsageOp, rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorImportOp>(
         tryMapOp, rewriter.getI1Type(), bufferType, allocator, queueAffinity,
-        memoryTypes, bufferUsage, adaptor.getSource(),
+        memoryTypeOp, bufferUsageOp, adaptor.getSource(),
         adaptor.getSourceOffset(), adaptor.getResultSize());
     return success();
   }

@@ -211,6 +211,9 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
   // }];
 }
 
+def HAL_BufferUsage : TypeAlias<I32>;
+def HAL_MemoryType : TypeAlias<I32>;
+
 //===----------------------------------------------------------------------===//
 // Base HAL op classes
 //===----------------------------------------------------------------------===//
