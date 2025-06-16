@@ -117,58 +117,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Ubuntu packages.
-          - runs-on: ubuntu-24.04
-            build-family: linux-x86_64
-            build-package: main-dist-linux
-            experimental: false
-          - runs-on: ah-ubuntu_22_04-c7g_4x-50
-            build-family: linux-aarch64
-            build-package: main-dist-linux
-            experimental: true
-          - runs-on: ubuntu-24.04
-            build-family: linux-x86_64
-            build-package: py-compiler-pkg
-            experimental: false
-          - runs-on: ah-ubuntu_22_04-c7g_4x-50
-            build-family: linux-aarch64
-            build-package: py-compiler-pkg
-            experimental: true
-          - runs-on: ubuntu-24.04
-            build-family: linux-x86_64
-            build-package: py-runtime-pkg
-            experimental: false
-          - runs-on: ah-ubuntu_22_04-c7g_4x-50
-            build-family: linux-aarch64
-            build-package: py-runtime-pkg
-            experimental: true
-          - runs-on: ubuntu-24.04
-            build-family: linux-x86_64
-            build-package: py-tf-compiler-tools-pkg
-            experimental: false
-
-          # MacOS packages.
-          # TODO(scotttodd): build on larger runner when available (self-hosted or GitHub)
-          # - runs-on:
-          #     - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-14' }}
-          #     - os-family=macOS
-          - runs-on: macos-14
-            build-family: macos
-            build-package: py-compiler-pkg
-            experimental: true
-          - runs-on: macos-14
-            build-family: macos
-            build-package: py-runtime-pkg
-            experimental: true
-
-          # Windows packages.
-          # TODO(scotttodd): build on larger runner when available (self-hosted or GitHub)
-          # - runs-on:
-          #     - ${{ github.repository == 'iree-org/iree' && 'windows-2022-64core' || 'windows-2022'}}
-          - runs-on: windows-2022
-            build-family: windows
-            build-package: py-compiler-pkg
-            experimental: false
           - runs-on: windows-2022
             build-family: windows
             build-package: py-runtime-pkg
@@ -279,7 +227,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.11 3.12 3.13"
+          override_python_versions: "3.13"
         run: |
           if (Test-Path -Path "${{ github.workspace }}/bindist") {
             Remove-Item -Path "${{ github.workspace }}/bindist" -Recurse -Force
@@ -321,7 +269,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.11 3.12 3.13"
+          override_python_versions: "3.13"
         run: |
           if (Test-Path -Path "${{ github.workspace }}/bindist") {
             Remove-Item -Path "${{ github.workspace }}/bindist" -Recurse -Force
