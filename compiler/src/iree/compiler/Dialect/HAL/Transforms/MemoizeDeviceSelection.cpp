@@ -24,6 +24,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 // --iree-hal-memoize-device-selection
 //===----------------------------------------------------------------------===//
+
 struct SelectOpOperands {
   SmallVector<StringAttr, 2> deviceSymbols;
   SmallVector<IntegerAttr, 2> queueAffinities;
