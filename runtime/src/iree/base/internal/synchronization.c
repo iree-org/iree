@@ -80,6 +80,9 @@ static inline void iree_processor_yield(void) {
   asm volatile("pause");
 #elif defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)
   asm volatile("yield");
+#elif (defined(IREE_ARCH_RISCV_32) || defined(IREE_ARCH_RISCV_64)) && \
+    defined(__riscv_zihintpause)
+  asm volatile("pause");
 #else
   // None available; we'll spin hard.
 #endif  // IREE_ARCH_*
