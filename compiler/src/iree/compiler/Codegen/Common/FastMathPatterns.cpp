@@ -42,7 +42,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     Value cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
                                                ax, oneF);
 
-    // Create if statement
+    // Create if statement.
     auto ifOp = rewriter.create<scf::IfOp>(loc, resultType, cmp, true);
 
     // --- Then region (|x| < 1.0) ---
@@ -119,7 +119,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     // Restore the sign: BUILTIN_COPYSIGN_F32(ret, x)
     Value finalResult =
         rewriter.create<math::CopySignOp>(loc, ifOp.getResult(0), input);
-    // Replace the original op with our implementation
+    // Replace the original op with our implementation.
     rewriter.replaceOp(op, finalResult);
 
     return success();
@@ -132,7 +132,6 @@ void populateFastMathPatterns(RewritePatternSet &patterns,
                               const std::function<bool(StringRef)> &predicate) {
   MLIRContext *ctx = patterns.getContext();
 
-  // Add the device-lib erf pattern if enabled
   if (predicate(math::ErfOp::getOperationName())) {
     patterns.add<FastErfPattern>(ctx);
   }
@@ -145,5 +144,4 @@ void populateFastMathPatterns(RewritePatternSet &patterns,
   //   - math.exp/expm1
 }
 
-}
-// namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler
