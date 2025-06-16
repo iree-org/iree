@@ -106,6 +106,7 @@ bitcode_generic_archs = [
 bitcode_specific_archs = [
     "x86_64",
     "arm_64",
+    "riscv_64",
 ]
 
 [iree_bitcode_library(

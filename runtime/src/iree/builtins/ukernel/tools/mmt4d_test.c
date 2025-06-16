@@ -602,6 +602,9 @@ int main(int argc, char** argv) {
                      "avx512_vnni");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 1, 32, 8, "avx512_vnni");
 
+#elif defined(IREE_ARCH_RISCV_64)
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 7, 16, 1, "v");
+
 #endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();

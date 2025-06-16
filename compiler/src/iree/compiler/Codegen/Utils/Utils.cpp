@@ -287,6 +287,11 @@ bool isRISCV32(Attribute attr) {
   return triple && triple.value().isRISCV32();
 }
 
+bool isRISCV64(Attribute attr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+  return triple && triple.value().isRISCV64();
+}
+
 bool isReadOnly(Value v) {
   Operation *definingOp = v.getDefiningOp();
   if (!definingOp)
