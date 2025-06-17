@@ -363,10 +363,12 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   if (mustBeAligned) {
-    bool directLoadArray[] = {true, true};
-    ArrayRef<bool> directLoadOperands =
-        useDirectLoad ? directLoadArray : ArrayRef<bool>{};
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, directLoadOperands);
+    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
+    ArrayRef<Attribute> promotionTypes =
+        useDirectLoad ? ArrayRef<Attribute>(promotionArray)
+                      : ArrayRef<Attribute>{};
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, promotionTypes);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
