@@ -86,4 +86,31 @@ def IREEGPU_AnyMmaAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+def IREEGPU_PromotionAttr
+    : AttrInterface<"PromotionAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    Interface used to control promotion of operands.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the promoted operand. The operation owning the operand cannot be
+        modified by this method.
+      }],
+      /*retType=*/"::mlir::Value",
+      /*methodName=*/"promoteOperand",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::OpOperand&":$operand),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::mlir::iree_compiler::IREE::GPU::defaultPromotionImpl(builder, operand, $_attr);
+      }]
+    >,
+  ];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES
