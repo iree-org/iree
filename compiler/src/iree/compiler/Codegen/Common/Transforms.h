@@ -93,6 +93,14 @@ FailureOr<IREETilingResult>
 tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
+/// Populate patterns that fold tensor.expand/collapse_shape into the memref
+/// of iree_codegen.load_from_buffer or iree_codegen.store_to_buffer ops.
+void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns that fold tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
 /// Populate patterns related to clean up the IR after tile and distribute
 /// to workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
