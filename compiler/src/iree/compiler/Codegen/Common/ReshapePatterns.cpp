@@ -17,12 +17,25 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-codegen-reshape-patterns"
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_FOLDRESHAPEINTOINTERFACETENSORPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
+
+//===---------------------------------------------------------------------===//
+// Utility functions
+//===---------------------------------------------------------------------===//
+
+static int64_t getProductExcludingDynamic(ArrayRef<int64_t> sizes) {
+  return std::accumulate(
+      sizes.begin(), sizes.end(), 1, [](int64_t res, int64_t size) {
+        return ShapedType::isDynamic(size) ? res : res * size;
+      });
+}
 
 //===---------------------------------------------------------------------===//
 // Patterns to fold tensor.expand/collapse_shape into
@@ -554,10 +567,8 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
   }
 };
 
-/// Folds tensor.collapse_shape with static shape into the source
-/// hal.interface.binding.subspan. The binding is currently required to be
-/// static as well, however it is impossible to generate a dispatch where
-/// this would not be true today.
+/// Folds tensor.collapse_shape with static or partially dynamic shape into the
+/// source hal.interface.binding.subspan.
 ///
 /// For example, this matches the following pattern:
 ///
@@ -587,43 +598,104 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
                                 PatternRewriter &rewriter) const override {
     // Bail out if the strides aren't unit.
     if (!llvm::all_of(storeOp.getMixedStrides(), isOneInteger)) {
-      return failure();
+      return rewriter.notifyMatchFailure(storeOp, "expected unit strides");
     }
 
     auto collapseShape =
         storeOp.getValue().getDefiningOp<tensor::CollapseShapeOp>();
-    // TODO: Support dynamic shapes.
-    if (!collapseShape || !collapseShape.getSrcType().hasStaticShape()) {
-      return failure();
+    if (!collapseShape) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "expected `tensor.collapse_shape` source");
     }
+    if (collapseShape.getType().getRank() !=
+        storeOp.getTargetType().getRank()) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "expected `tensor.collapse_shape` rank to be the same as "
+                   "the `iree_tensor_ext.dispatch.tensor.store` rank.");
+    }
+    RankedTensorType reshapeSrcType = collapseShape.getSrcType();
+    ArrayRef<int64_t> reshapeSrcShape = reshapeSrcType.getShape();
 
     auto subspanOp =
         storeOp.getTarget()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    // TODO: Support dynamic dims.
-    if (!subspanOp || !subspanOp.getDynamicDims().empty()) {
-      return failure();
+    if (!subspanOp) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "expected `hal.interface.binding.subspan` target");
     }
 
     auto subspanType =
         llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
-
-    ArrayRef<int64_t> reshapeSrcShape = collapseShape.getSrcType().getShape();
+    SmallVector<Value> dynamicDims = subspanOp.getDynamicDims();
 
     // Verify the subspan shape against the shape of the slice being inserted.
-    for (auto [size, group] : llvm::zip_equal(
-             subspanType.getShape(), collapseShape.getReassociationIndices())) {
+    for (auto &&[i, subspanSize, group, size, offset] : llvm::enumerate(
+             subspanType.getShape(), collapseShape.getReassociationIndices(),
+             storeOp.getMixedSizes(), storeOp.getMixedOffsets())) {
+      // No limitations on a single dimension.
       if (group.size() == 1) {
         continue;
       }
 
+      // If the offset is static and a multiple of the inner dimensions'
+      // product, we can divide it by the inner product and add it to the first
+      // dimension of the expanded store group. If it's not a multiple, we can't
+      // be sure that we can decompose in a way that the `0 <= offset &&
+      // offset+size <= dim_size` property holds, so we abort the folding. Same
+      // for a dynamic offset.
+      std::optional<int64_t> maybeStaticOffset = getConstantIntValue(offset);
+      if (!maybeStaticOffset.has_value()) {
+        return rewriter.notifyMatchFailure(
+            storeOp, "has dynamic offset in dimension to be expanded");
+      }
+      int64_t staticOffset = maybeStaticOffset.value();
+      if (staticOffset != 0) {
+        int64_t innerDimSize = 1;
+        for (auto i : llvm::drop_begin(group)) {
+          if (ShapedType::isDynamic(reshapeSrcShape[i])) {
+            return rewriter.notifyMatchFailure(
+                storeOp, "has a static offset, but the inner dimension product "
+                         "of the reshape source is dynamic");
+          }
+          innerDimSize *= reshapeSrcShape[i];
+        }
+        if (staticOffset % innerDimSize != 0) {
+          return rewriter.notifyMatchFailure(
+              storeOp, "has a static offset that is not a multiple of the "
+                       "static inner dimension product");
+        }
+      }
+
+      // Check that each reassociation group contains at most a single dynamic
+      // dimension.
+      unsigned numDynamicDims =
+          llvm::count_if(group, [reshapeSrcShape](int64_t dim) {
+            return ShapedType::isDynamic(reshapeSrcShape[dim]);
+          });
+      if (numDynamicDims > 1) {
+        return rewriter.notifyMatchFailure(
+            collapseShape,
+            "got multiple dynamic dimensions in group: " + std::to_string(i));
+      }
+      // In case of a single dynamic dimension, check that the subspan size is
+      // dynamic as well.
+      if (numDynamicDims == 1) {
+        if (!ShapedType::isDynamic(subspanSize)) {
+          return rewriter.notifyMatchFailure(
+              subspanOp, "collapsing and storing with dynamic dimension into a "
+                         "static dimension is not supported");
+        }
+        continue;
+      }
+
+      // Handle static sizes.
       int64_t innerDimSize = 1;
       for (auto i : llvm::drop_begin(group)) {
         innerDimSize *= reshapeSrcShape[i];
       }
-      if (size % innerDimSize != 0) {
+      if (subspanSize % innerDimSize != 0) {
         return rewriter.notifyMatchFailure(
-            storeOp, "Subspan type indivisible by expanded shape");
+            storeOp, "subspan type indivisible by expanded shape");
       }
     }
 
@@ -631,62 +703,114 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     bindDims(rewriter.getContext(), d0, d1);
     AffineExpr div = d0.ceilDiv(d1);
 
+    rewriter.setInsertionPoint(subspanOp);
     Location loc = collapseShape.getLoc();
     SmallVector<int64_t> expandedSubspanShape;
     SmallVector<OpFoldResult> expandedOffsets;
     SmallVector<OpFoldResult> expandedSizes;
+    SmallVector<Value> newSubspanDynamicDims;
     OpFoldResult zero = rewriter.getIndexAttr(0);
-    for (auto [size, group, offset] : llvm::zip_equal(
+    size_t dynIndex = 0;
+    for (auto [subspanSize, group, offset, size] : llvm::zip_equal(
              subspanType.getShape(), collapseShape.getReassociationIndices(),
-             storeOp.getMixedOffsets())) {
-      expandedSizes.push_back(rewriter.getIndexAttr(reshapeSrcShape[group[0]]));
-
-      // Special case for 1 to avoid going through arith folders.
+             storeOp.getMixedOffsets(), storeOp.getMixedSizes())) {
       if (group.size() == 1) {
+        expandedSizes.push_back(size);
         expandedOffsets.push_back(offset);
-        expandedSubspanShape.push_back(size);
+        expandedSubspanShape.push_back(subspanSize);
+        if (ShapedType::isDynamic(subspanSize)) {
+          newSubspanDynamicDims.push_back(dynamicDims[dynIndex++]);
+        }
         continue;
       }
 
-      int64_t innerDimSize = 1;
-      for (auto i : llvm::drop_begin(group)) {
-        innerDimSize *= reshapeSrcShape[i];
+      SmallVector<int64_t> innerDimSizes =
+          llvm::map_to_vector(group, [reshapeSrcShape](int64_t dim) {
+            return reshapeSrcShape[dim];
+          });
+      int64_t totalSize = getProductExcludingDynamic(innerDimSizes);
+      int64_t innerDimSize =
+          getProductExcludingDynamic(llvm::drop_begin(innerDimSizes));
+
+      // The first size can be calculated in the following way:
+      // 1. In case of a dynamic expanded dimension, note that it's guaranteed
+      // above that each group can only contain a single dynamic dimension, so
+      // we can calculate the remainder inner dimension size and divide the
+      // single dynamic dimension by it.
+      // 2. In case of a static expanded dimension with a dynamic subspan size,
+      // use the expanded dimension size directly.
+      // 3. In case of a static expanded dimension with a static subspan size,
+      // divide the subspan size by the inner dimension product size.
+      const int64_t firstDimSize = innerDimSizes[0];
+      if (ShapedType::isDynamic(firstDimSize)) {
+        OpFoldResult totalSizeAttr = rewriter.getIndexAttr(totalSize);
+        Value newDynamicDim =
+            affine::makeComposedAffineApply(
+                rewriter, loc, div, {dynamicDims[dynIndex++], totalSizeAttr})
+                .getResult();
+        expandedSizes.push_back(newDynamicDim);
+        newSubspanDynamicDims.push_back(newDynamicDim);
+        expandedSubspanShape.push_back(firstDimSize);
+      } else if (ShapedType::isDynamic(subspanSize)) {
+        expandedSizes.push_back(rewriter.getIndexAttr(firstDimSize));
+        expandedSubspanShape.push_back(firstDimSize);
+      } else {
+        assert(subspanSize % innerDimSize == 0 &&
+               "The subspan size should be a multiple of the inner dimension "
+               "size of the reshape op source");
+        expandedSizes.push_back(rewriter.getIndexAttr(firstDimSize));
+        expandedSubspanShape.push_back(subspanSize / innerDimSize);
       }
+
+      // Earlier it's guaranteed that the offset is divisible by the inner
+      // dimension product and this is the new first offset of the expanded
+      // store. Accordingly, the other offsets are set to zero.
       OpFoldResult innerDimSizeAttr = rewriter.getIndexAttr(innerDimSize);
       expandedOffsets.push_back(affine::makeComposedFoldedAffineApply(
           rewriter, loc, div, {offset, innerDimSizeAttr}));
-      assert(size % innerDimSize == 0);
-      expandedSubspanShape.push_back(size / innerDimSize);
-      for (auto i : llvm::drop_begin(group)) {
+
+      for (int64_t reshapeSrcSize : llvm::drop_begin(innerDimSizes)) {
         expandedOffsets.push_back(zero);
-        int64_t dimSize = reshapeSrcShape[i];
-        expandedSubspanShape.push_back(dimSize);
-        expandedSizes.push_back(rewriter.getIndexAttr(dimSize));
+        expandedSubspanShape.push_back(reshapeSrcSize);
+        if (ShapedType::isDynamic(reshapeSrcSize)) {
+          OpFoldResult totalSizeAttr = rewriter.getIndexAttr(totalSize);
+          Value newDynamicDim =
+              affine::makeComposedAffineApply(
+                  rewriter, loc, div, {dynamicDims[dynIndex++], totalSizeAttr})
+                  .getResult();
+          expandedSizes.push_back(newDynamicDim);
+          newSubspanDynamicDims.push_back(newDynamicDim);
+        } else {
+          expandedSizes.push_back(rewriter.getIndexAttr(reshapeSrcSize));
+        }
       }
     }
 
     auto newSubspanTensorType = RankedTensorType::get(
-        expandedSubspanShape, collapseShape.getSrcType().getElementType());
+        expandedSubspanShape, reshapeSrcType.getElementType());
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         subspanType.getAccess(), newSubspanTensorType);
 
     Value newSubspanOp;
     {
-      // NOTE: If there were any dynamic dims, they would need to be updated
-      // based on the newly introduced static sizes as well.
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
           subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
           subspanOp.getBinding(), subspanOp.getByteOffset(),
-          subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+          newSubspanDynamicDims, subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
     }
 
     SmallVector<OpFoldResult> expandedStrides(reshapeSrcShape.size(),
                                               rewriter.getIndexAttr(1));
+    SmallVector<int64_t> expandedStaticDims;
+    SmallVector<Value> expandedDynamicDims;
+    dispatchIndexOpFoldResults(expandedSizes, expandedDynamicDims,
+                               expandedStaticDims);
+    rewriter.setInsertionPoint(storeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
-        storeOp, collapseShape.getSrc(), newSubspanOp, storeOp.getTargetDims(),
+        storeOp, collapseShape.getSrc(), newSubspanOp, expandedDynamicDims,
         expandedOffsets, expandedSizes, expandedStrides);
     return success();
   }
