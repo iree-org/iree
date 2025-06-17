@@ -52,6 +52,7 @@ iree_compiler_cc_library(
         "IREEGPUDialect.cpp",
         "IREEGPUInterfaces.cpp",
         "IREEGPUOps.cpp",
+        "PromotionImpls.cpp",
     ],
     hdrs = [
         "DerivedConfigUtils.h",
@@ -88,6 +89,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AMDGPUDialect",

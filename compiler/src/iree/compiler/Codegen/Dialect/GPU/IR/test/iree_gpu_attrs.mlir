@@ -89,3 +89,12 @@ module {
 }
 // CHECK-LABEL: func @test_any_lowering_config
 //  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{thread = [0, 4], workgroup = [16, 16]}>
+
+module {
+  func.func @test_cache_swizzle_promotion() attributes {
+      promotion_types = [#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>]} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_cache_swizzle_promotion
+//  CHECK-SAME:   promotion_types = [#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>]

@@ -94,6 +94,41 @@ def IREEGPU_UseGlobalLoadDma :
   let parameters = (ins);
 }
 
+def IREEGPU_PromoteWithCacheSwizzle :
+    AttrDef<IREEGPU_Dialect, "PromoteWithCacheSwizzle", [
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr, [
+        "promoteOperand",
+      ]>
+    ]> {
+  let mnemonic = "promote_with_cache_swizzle";
+  let summary = [{
+    Indicate promotion of an operand with setting a cache swizzle value.
+  }];
+  let description = [{
+    When promoting, this will create a `linalg.copy` on the input operand,
+    and then the primary producing dispatch input has a buffer cast with cache
+    swizzle inserted if possible. For example,
+
+    ```
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %1 = linalg.matmul ins(%0, ...)
+    ```
+
+    Becomes with `#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>`
+
+    ```
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
+    %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
+    %3 = linalg.matmul ins(%2, ...)
+    ```
+  }];
+  let assemblyFormat = "`<` $copy_config `>`";
+  let parameters = (ins
+    "Attribute":$copy_config
+  );
+}
+
 //===----------------------------------------------------------------------===//
 // GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//
