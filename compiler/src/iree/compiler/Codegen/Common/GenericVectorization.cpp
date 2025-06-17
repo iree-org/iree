@@ -193,7 +193,6 @@ void GenericVectorizationPass::runOnOperation() {
     RewritePatternSet maskCanonPatterns(funcOp.getContext());
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         maskCanonPatterns);
-    memref::populateResolveShapedTypeResultDimsPatterns(maskCanonPatterns);
     tensor::DimOp::getCanonicalizationPatterns(maskCanonPatterns, context);
     vector::CreateMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                       funcOp.getContext());
