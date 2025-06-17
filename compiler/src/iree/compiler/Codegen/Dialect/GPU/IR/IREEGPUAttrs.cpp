@@ -1445,7 +1445,7 @@ void ScaledMMAAttr::getUndistributedTileTypes(
   int64_t m = lhsLayout.outer[0] * lhsLayout.thread[0] * lhsLayout.element[0];
   int64_t kScale =
       lhsLayout.outer[1] * lhsLayout.thread[1] * lhsLayout.element[1];
-  int64_t layoutBlockSize =
+  [[maybe_unused]] int64_t layoutBlockSize =
       lhsLayout.outer[2] * lhsLayout.thread[2] * lhsLayout.element[2];
   assert(blockSize == layoutBlockSize &&
          "expected block size to be set up correctly");
