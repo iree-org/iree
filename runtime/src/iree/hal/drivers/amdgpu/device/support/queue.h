@@ -502,6 +502,48 @@ typedef struct IREE_AMDGPU_ALIGNAS(8) iree_amdgpu_kernel_implicit_args_t {
   // Represented in metadata as:
   //   hidden_grid_dims
   uint16_t grid_dims;  // + 64
+
+  // Represented in metadata as:
+  //   hidden_printf_buffer
+  void* printf_buffer;
+
+  // Represented in metadata as:
+  //   hidden_hostcall_buffer
+  void* hostcall_buffer;
+
+  // Represented in metadata as:
+  //   hidden_multigrid_sync_arg
+  uint64_t multigrid_sync_arg;
+
+  // Represented in metadata as:
+  //   hidden_heap_v1
+  uint64_t heap_v1;
+
+  // Represented in metadata as:
+  //   hidden_default_queue
+  uint64_t default_queue;
+
+  // Represented in metadata as:
+  //   hidden_completion_action
+  uint64_t completion_action;
+
+  // Represented in metadata as:
+  //   hidden_dynamic_lds_size
+  uint32_t dynamic_lds_size;
+
+  uint8_t reserved[68];
+
+  // Represented in metadata as:
+  //   hidden_private_base
+  uint32_t deprecated_private_base;
+
+  // Represented in metadata as:
+  //   hidden_shared_base
+  uint32_t deprecated_shared_base;
+
+  // Represented in metadata as:
+  //   hidden_queue_ptr;
+  iree_hsa_queue_t* queue_ptr;
 } iree_amdgpu_kernel_implicit_args_t;
 
 //===----------------------------------------------------------------------===//
@@ -530,9 +572,25 @@ iree_hal_amdgpu_device_global_id_x(void) {
   const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[0];
   return (group_id * group_size + local_id);
 }
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_global_id_y(void) {
+  const uint32_t local_id = __builtin_amdgcn_workitem_id_y();
+  const uint32_t group_id = __builtin_amdgcn_workgroup_id_y();
+  const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[1];
+  return (group_id * group_size + local_id);
+}
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_global_id_z(void) {
+  const uint32_t local_id = __builtin_amdgcn_workitem_id_z();
+  const uint32_t group_id = __builtin_amdgcn_workgroup_id_z();
+  const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[2];
+  return (group_id * group_size + local_id);
+}
 
 // __ockl_get_group_id(0)
 #define iree_hal_amdgpu_device_group_id_x() __builtin_amdgcn_workgroup_id_x()
+#define iree_hal_amdgpu_device_group_id_y() __builtin_amdgcn_workgroup_id_y()
+#define iree_hal_amdgpu_device_group_id_z() __builtin_amdgcn_workgroup_id_z()
 
 // __ockl_get_num_groups(0)
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
@@ -542,9 +600,25 @@ iree_hal_amdgpu_device_group_count_x(void) {
   const uint32_t q = grid_size / group_size;
   return q + (grid_size > q * group_size);
 }
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_group_count_y(void) {
+  const uint32_t grid_size = iree_amdgcn_dispatch_ptr()->grid_size[1];
+  const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[1];
+  const uint32_t q = grid_size / group_size;
+  return q + (grid_size > q * group_size);
+}
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_group_count_z(void) {
+  const uint32_t grid_size = iree_amdgcn_dispatch_ptr()->grid_size[2];
+  const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[2];
+  const uint32_t q = grid_size / group_size;
+  return q + (grid_size > q * group_size);
+}
 
 // __ockl_get_local_id(0)
 #define iree_hal_amdgpu_device_local_id_x() __builtin_amdgcn_workitem_id_x()
+#define iree_hal_amdgpu_device_local_id_y() __builtin_amdgcn_workitem_id_y()
+#define iree_hal_amdgpu_device_local_id_z() __builtin_amdgcn_workitem_id_z()
 
 // __ockl_get_local_size(0) / get_local_size_x
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
@@ -554,6 +628,56 @@ iree_hal_amdgpu_device_workgroup_size_x(void) {
   const uint32_t grid_size = iree_amdgcn_dispatch_ptr()->grid_size[0];
   const uint32_t r = grid_size - group_id * group_size;
   return (r < group_size) ? r : group_size;
+}
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_workgroup_size_y(void) {
+  const uint32_t group_id = __builtin_amdgcn_workgroup_id_y();
+  const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[1];
+  const uint32_t grid_size = iree_amdgcn_dispatch_ptr()->grid_size[1];
+  const uint32_t r = grid_size - group_id * group_size;
+  return (r < group_size) ? r : group_size;
+}
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_workgroup_size_z(void) {
+  const uint32_t group_id = __builtin_amdgcn_workgroup_id_z();
+  const uint32_t group_size = iree_amdgcn_dispatch_ptr()->workgroup_size[2];
+  const uint32_t grid_size = iree_amdgcn_dispatch_ptr()->grid_size[2];
+  const uint32_t r = grid_size - group_id * group_size;
+  return (r < group_size) ? r : group_size;
+}
+
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_global_linear_id_1d(void) {
+  return iree_hal_amdgpu_device_group_id_x() *
+             iree_amdgcn_dispatch_ptr()->workgroup_size[0] +
+         iree_hal_amdgpu_device_local_id_x();
+}
+
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_global_linear_id_2d(void) {
+  const size_t id_x = iree_hal_amdgpu_device_group_id_x() *
+                          iree_amdgcn_dispatch_ptr()->workgroup_size[0] +
+                      iree_hal_amdgpu_device_local_id_x();
+  const size_t id_y = iree_hal_amdgpu_device_group_id_y() *
+                          iree_amdgcn_dispatch_ptr()->workgroup_size[1] +
+                      iree_hal_amdgpu_device_local_id_y();
+  return id_y * iree_amdgcn_dispatch_ptr()->grid_size[0] + id_x;
+}
+
+static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE size_t
+iree_hal_amdgpu_device_global_linear_id_3d(void) {
+  const size_t id_x = iree_hal_amdgpu_device_group_id_x() *
+                          iree_amdgcn_dispatch_ptr()->workgroup_size[0] +
+                      iree_hal_amdgpu_device_local_id_x();
+  const size_t id_y = iree_hal_amdgpu_device_group_id_y() *
+                          iree_amdgcn_dispatch_ptr()->workgroup_size[1] +
+                      iree_hal_amdgpu_device_local_id_y();
+  const size_t id_z = iree_hal_amdgpu_device_group_id_z() *
+                          iree_amdgcn_dispatch_ptr()->workgroup_size[2] +
+                      iree_hal_amdgpu_device_local_id_z();
+  return (id_z * iree_amdgcn_dispatch_ptr()->grid_size[1] + id_y) *
+             iree_amdgcn_dispatch_ptr()->grid_size[0] +
+         id_x;
 }
 
 #endif  // IREE_AMDGPU_TARGET_DEVICE
