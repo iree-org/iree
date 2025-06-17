@@ -669,6 +669,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 }
 
 def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
 ]> {
   let summary = "Argmax reduction op.";

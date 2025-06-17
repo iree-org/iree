@@ -715,7 +715,7 @@ func.func @argmax_invalid_region_argument_type(
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
-  // expected-error@+1 {{comparator region arguments must match input element type: 'f32'}}
+  // expected-error@+1 {{ comparator region arguments must match input element type. Expected: 'f32', but got: 'f32' and 'i32'}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input : tensor<2x6xf32>)
@@ -729,12 +729,49 @@ func.func @argmax_invalid_region_argument_type(
 
 // -----
 
+func.func @argmax_missing_yield_operand(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>, %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{expected linalg_ext.yield to return 1 operand, but got 0}}
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @argmax_yield_two_operands(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{expected linalg_ext.yield to return 1 operand, but got 2}}
+  %0:2 = iree_linalg_ext.argmax
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      %unused = arith.constant 0 : i1
+      iree_linalg_ext.yield %cmp, %unused : i1, i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
 func.func @argmax_invalid_region_terminator(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
-  // expected-error@+1 {{region block must end with a linalg_ext.yield i1!}}
+  // expected-error@+1 {{region block must end with a linalg_ext.yield i1, but got: 'f32'}}
   %0:2 = iree_linalg_ext.argmax
     dimension(1)
     ins(%input : tensor<2x6xf32>)

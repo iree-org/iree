@@ -923,13 +923,6 @@ LogicalResult ArgmaxOp::verify() {
            << numInputVals;
   }
 
-  unsigned numInputs = getNumDpsInputs();
-  if (numInputs != 1 && numInputs != 2) {
-    return op->emitOpError("expected 1 (input only) or 2 (input + index_base) "
-                           "input operands, but got ")
-           << numInputs;
-  }
-
   TypedValue<IndexType> indexBase = getIndexBase();
   if (indexBase) {
     Type indexType = indexBase.getType();
@@ -986,20 +979,39 @@ LogicalResult ArgmaxOp::verify() {
 
   Region &region = getRegion();
   Block &block = region.front();
-  if (block.getNumArguments() != 2) {
-    return op->emitOpError("region block should have 2 arguments");
+  unsigned numArgs = block.getNumArguments();
+  if (numArgs != 2) {
+    return op->emitOpError("region block should have 2 arguments, but got ")
+           << numArgs;
   }
   Type inputElemType = inputType.getElementType();
-  if (block.getArgument(0).getType() != inputElemType ||
-      block.getArgument(1).getType() != inputElemType) {
+  Type arg0Type = block.getArgument(0).getType();
+  Type arg1Type = block.getArgument(1).getType();
+
+  if (arg0Type != inputElemType || arg1Type != inputElemType) {
     return op->emitOpError(
-               "comparator region arguments must match input element type: ")
-           << inputElemType;
+               "comparator region arguments must match input element type. ")
+           << "Expected: " << inputElemType << ", but got: " << arg0Type
+           << " and " << arg1Type;
   }
 
-  auto terminatorOp = llvm::dyn_cast<YieldOp>(block.getTerminator());
-  if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
-    return op->emitOpError("region block must end with a linalg_ext.yield i1!");
+  auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
+  if (!yieldOp) {
+    return op->emitOpError("linalg_ext.yield is missing");
+  }
+
+  unsigned numOperands = yieldOp->getNumOperands();
+  if (numOperands != 1) {
+    return op->emitOpError(
+               "expected linalg_ext.yield to return 1 operand, but got ")
+           << numOperands;
+  }
+
+  Type yieldType = yieldOp.getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return op->emitOpError(
+               "region block must end with a linalg_ext.yield i1, but got: ")
+           << yieldType;
   }
   return success();
 }
