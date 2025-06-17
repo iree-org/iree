@@ -82,3 +82,24 @@ func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK-NO-FUSE:        } -> tensor<2x16x32xf32>
 // CHECK-NO-FUSE:        return %[[D7]] : tensor<2x16x32xf32>
 // CHECK-NO-FUSE:      }
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @do_not_fuse_gather(%arg0: tensor<4096x64xi64>, %arg1: tensor<4096x64xf32>) -> tensor<4096x64xf32> {
+  %empty = tensor.empty() : tensor<4096x64xf32>
+  %0 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<4096x64xi64>) outs(%empty : tensor<4096x64xf32>) {
+  ^bb0(%in: i64, %out: f32):
+    %3 = linalg.index 0 : index
+    %4 = arith.index_cast %in : i64 to index
+    %extracted = tensor.extract %arg1[%3, %4] : tensor<4096x64xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<4096x64xf32>
+  %s_empty = tensor.empty() : tensor<4096x64xf32>
+  %1 = linalg.softmax dimension(1) ins(%0 : tensor<4096x64xf32>) outs(%s_empty: tensor<4096x64xf32>) -> tensor<4096x64xf32>
+  return %1 : tensor<4096x64xf32>
+}
+//   CHECK-LABEL: func @do_not_fuse_gather(
+//         CHECK:    linalg.generic {{.*}}
+//         CHECK:      tensor.extract {{.*}} : tensor<4096x64xf32>
+// CHECK-COUNT-3:    linalg.generic
