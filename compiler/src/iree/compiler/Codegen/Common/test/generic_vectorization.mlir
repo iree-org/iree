@@ -74,7 +74,6 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
 // CHECK-MASK-LABEL: func.func @single_static_pack_infer_vector_size
 // CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-MASK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK-MASK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-MASK-DAG:     %[[C0_I8:.+]] = arith.constant 0 : i8
 // CHECK-MASK:         scf.for
 // CHECK-MASK:           scf.for
@@ -88,9 +87,7 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
 // CHECK-MASK:             %[[CAST:.+]] = vector.shape_cast %[[READ]] : vector<8x32xi8> to vector<4x2x2x16xi8>
 // CHECK-MASK:             %[[TRANSP:.+]] = vector.transpose %[[CAST]], [2, 0, 3, 1]
 // CHECK-MASK:             %[[EMPTY:.+]] = tensor.empty(%[[WRITE_SZ0]], %[[WRITE_SZ1]]) : tensor<?x?x16x2xi8>
-// CHECK-MASK:             %[[EMPTY_DIM0:.+]] = tensor.dim %[[EMPTY]], %[[C0]]
-// CHECK-MASK:             %[[EMPTY_DIM1:.+]] = tensor.dim %[[EMPTY]], %[[C1]]
-// CHECK-MASK:             %[[WRITE_MASK:.+]] = vector.create_mask %[[EMPTY_DIM0]], %[[EMPTY_DIM1]], {{.+}} : vector<2x4x16x2xi1>
+// CHECK-MASK:             %[[WRITE_MASK:.+]] = vector.create_mask %[[WRITE_SZ0]], %[[WRITE_SZ1]], {{.+}} : vector<2x4x16x2xi1>
 // CHECK-MASK:             vector.transfer_write %[[TRANSP]], %[[EMPTY]][{{.+}}, %[[WRITE_MASK]]
 
 
@@ -158,9 +155,7 @@ func.func @single_dynamic_pack_infer_vector_size(%arg0: tensor<?x?xi8>, %arg1: t
 // CHECK-MASK:             %[[CAST:.+]] = vector.shape_cast %[[READ]] : vector<8x32xi8> to vector<4x2x2x16xi8>
 // CHECK-MASK:             %[[TRANSP:.+]] = vector.transpose %[[CAST]], [2, 0, 3, 1]
 // CHECK-MASK:             %[[EMPTY:.+]] = tensor.empty(%[[WRITE_SZ0]], %[[WRITE_SZ1]]) : tensor<?x?x16x2xi8>
-// CHECK-MASK:             %[[EMPTY_DIM0:.+]] = tensor.dim %[[EMPTY]], %[[C0]]
-// CHECK-MASK:             %[[EMPTY_DIM1:.+]] = tensor.dim %[[EMPTY]], %[[C1]]
-// CHECK-MASK:             %[[WRITE_MASK:.+]] = vector.create_mask %[[EMPTY_DIM0]], %[[EMPTY_DIM1]], {{.+}} : vector<2x4x16x2xi1>
+// CHECK-MASK:             %[[WRITE_MASK:.+]] = vector.create_mask %[[WRITE_SZ0]], %[[WRITE_SZ1]], {{.+}} : vector<2x4x16x2xi1>
 // CHECK-MASK:             vector.transfer_write %[[TRANSP]], %[[EMPTY]][{{.+}}, %[[WRITE_MASK]]
 
 // -----
@@ -252,9 +247,7 @@ func.func @generic_pack_infer_vector_size(%arg0: tensor<?x32x128xf32>) -> tensor
 // CHECK-MASK:           %[[SHAPE_CAST:.+]] = vector.shape_cast %[[PACK_SRC]] : vector<2x12x64xbf16> to vector<2x6x2x4x16xbf16>
 // CHECK-MASK:           %[[PACK_TRANSP:.+]] = vector.transpose %[[SHAPE_CAST]], [0, 3, 1, 4, 2]
 // CHECK-MASK:           %[[EMPTY:.+]] = tensor.empty(%[[DEST_SZ1]], %[[DEST_SZ2]]) : tensor<2x?x?x16x2xbf16>
-// CHECK-MASK:           %[[EMPTY_DIM1:.+]] = tensor.dim %[[EMPTY]], %[[C1]]
-// CHECK-MASK:           %[[EMPTY_DIM2:.+]] = tensor.dim %[[EMPTY]], %[[C2]]
-// CHECK-MASK:           %[[PACK_WRITE_MASK:.+]] = vector.create_mask %[[C2]], %[[EMPTY_DIM1]], %[[EMPTY_DIM2]], %[[C16]], %[[C2]] : vector<2x4x6x16x2xi1>
+// CHECK-MASK:           %[[PACK_WRITE_MASK:.+]] = vector.create_mask %[[C2]], %[[DEST_SZ1]], %[[DEST_SZ2]], %[[C16]], %[[C2]] : vector<2x4x6x16x2xi1>
 // CHECK-MASK:           vector.transfer_write %[[PACK_TRANSP]], %[[EMPTY]]{{.+}}, %[[PACK_WRITE_MASK]]
 
 // -----
@@ -309,9 +302,7 @@ func.func @single_dynamic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>,
 // CHECK-MASK:           %[[TRANSP:.+]] = vector.transpose %[[READ]], [0, 2, 1, 3]
 // CHECK-MASK:           %[[SHAPE_CAST:.+]] = vector.shape_cast %[[TRANSP]] : vector<1x16x2x16xf32> to vector<16x32xf32>
 // CHECK-MASK:           %[[EMPTY:.+]] = tensor.empty(%[[DEST_SZ0]], %[[DEST_SZ1]]) : tensor<?x?xf32>
-// CHECK-MASK:           %[[EMPTY_DIM0:.+]] = tensor.dim %[[EMPTY]], %[[C0]]
-// CHECK-MASK:           %[[EMPTY_DIM1:.+]] = tensor.dim %[[EMPTY]], %[[C1]]
-// CHECK-MASK:           %[[WRITE_MASK:.+]] = vector.create_mask %[[EMPTY_DIM0]], %[[EMPTY_DIM1]] : vector<16x32xi1>
+// CHECK-MASK:           %[[WRITE_MASK:.+]] = vector.create_mask %[[DEST_SZ0]], %[[DEST_SZ1]] : vector<16x32xi1>
 // CHECK-MASK:           vector.transfer_write %[[SHAPE_CAST]], {{.+}}, %[[WRITE_MASK]]
 
 // -----
@@ -371,9 +362,7 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK:           %[[TRANSP:.+]] = vector.transpose %[[READ]], [0, 2, 1, 3]
 // CHECK-MASK:           %[[SHAPE_CAST:.+]] = vector.shape_cast %[[TRANSP]] : vector<1x16x2x16xf32> to vector<16x32xf32>
 // CHECK-MASK:           %[[EMPTY:.+]] = tensor.empty(%[[DEST_SZ0]], %[[DEST_SZ1]]) : tensor<?x?xf32>
-// CHECK-MASK:           %[[EMPTY_DIM0:.+]] = tensor.dim %[[EMPTY]], %[[C0]]
-// CHECK-MASK:           %[[EMPTY_DIM1:.+]] = tensor.dim %[[EMPTY]], %[[C1]]
-// CHECK-MASK:           %[[WRITE_MASK:.+]] = vector.create_mask %[[EMPTY_DIM0]], %[[EMPTY_DIM1]] : vector<16x32xi1>
+// CHECK-MASK:           %[[WRITE_MASK:.+]] = vector.create_mask %[[DEST_SZ0]], %[[DEST_SZ1]] : vector<16x32xi1>
 // CHECK-MASK:           %[[UNPACK_WRITE:.+]] = vector.transfer_write %[[SHAPE_CAST]], {{.+}}, %[[WRITE_MASK]]
 // CHECK-MASK:           %[[D0:.+]] = tensor.dim %[[UNPACK_WRITE]], %[[C0]]
 // CHECK-MASK:           %[[D1:.+]] = tensor.dim %[[UNPACK_WRITE]], %[[C1]]
