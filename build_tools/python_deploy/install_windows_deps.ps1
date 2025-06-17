@@ -43,7 +43,8 @@ for($i=0 ; $i -lt $PYTHON_UNINSTALLER_URLS.Length; $i++) {
 
   Write-Host "::  Running uninstaller: $DOWNLOAD_PATH"
   # https://docs.python.org/3/using/windows.html#installing-without-ui
-  & "$DOWNLOAD_PATH" /quiet /uninstall
+  # & "$DOWNLOAD_PATH" /quiet /uninstall
+  Start-Process -FilePath "$DOWNLOAD_PATH" -ArgumentList "/quiet /uninstall" -Wait
 }
 
 # These can be discovered at https://www.python.org/downloads/windows/
