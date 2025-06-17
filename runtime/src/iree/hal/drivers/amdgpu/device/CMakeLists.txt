@@ -11,6 +11,7 @@
 set(_BITCODE_SRCS
   "blit.c"
   "buffer.c"
+  "host_client.c"
   "tracing.c"
 )
 
@@ -19,6 +20,7 @@ set(_BITCODE_HDRS
   "buffer.h"
   "kernel_tables.h"
   "kernels.h"
+  "host_client.h"
   "tracing.h"
   "support/common.h"
   "support/kernel_args.h"

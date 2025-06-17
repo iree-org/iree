@@ -34,10 +34,10 @@ static uint64_t iree_hal_amdgpu_device_blit_reserve(
 
   // Reserve the next packet in the queue.
   const uint64_t packet_id = iree_hsa_queue_add_write_index(
-      context->queue, 1u, iree_amdgpu_memory_order_relaxed);
+      &context->queue, 1u, iree_amdgpu_memory_order_relaxed);
   while (packet_id - iree_hsa_queue_load_read_index(
-                         context->queue, iree_amdgpu_memory_order_acquire) >=
-         context->queue->size) {
+                         &context->queue, iree_amdgpu_memory_order_acquire) >=
+         context->queue.size) {
     iree_amdgpu_yield();  // spinning
   }
 
@@ -89,7 +89,7 @@ static void iree_hal_amdgpu_device_blit_commit(
       iree_amdgpu_memory_order_release, iree_amdgpu_memory_scope_system);
 
   // Signal the queue doorbell indicating the packet has been updated.
-  iree_hsa_signal_store(context->queue->doorbell_signal, packet_id,
+  iree_hsa_signal_store(context->queue.doorbell_signal, packet_id,
                         iree_amdgpu_memory_order_relaxed);
 }
 
@@ -278,9 +278,9 @@ iree_hal_amdgpu_device_buffer_fill_emplace_reserve(
   }
 
   // Populate the packet.
-  const uint64_t queue_mask = context->queue->size - 1;  // power of two
+  const uint64_t queue_mask = context->queue.size - 1;  // power of two
   iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet =
-      context->queue->base_address + (packet_id & queue_mask) * 64;
+      context->queue.base_address + (packet_id & queue_mask) * 64;
   dispatch_packet->setup = kernel_args->setup;
   dispatch_packet->workgroup_size[0] = kernel_args->workgroup_size[0];
   dispatch_packet->workgroup_size[1] = kernel_args->workgroup_size[1];
@@ -434,9 +434,9 @@ iree_hal_amdgpu_device_buffer_copy_emplace_reserve(
   }
 
   // Populate the packet.
-  const uint64_t queue_mask = context->queue->size - 1;  // power of two
+  const uint64_t queue_mask = context->queue.size - 1;  // power of two
   iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet =
-      context->queue->base_address + (packet_id & queue_mask) * 64;
+      context->queue.base_address + (packet_id & queue_mask) * 64;
   dispatch_packet->setup = kernel_args->setup;
   dispatch_packet->workgroup_size[0] = kernel_args->workgroup_size[0];
   dispatch_packet->workgroup_size[1] = kernel_args->workgroup_size[1];
