@@ -22,31 +22,6 @@ $PYTHON_VERSIONS_NO_DOT = @(
   # "39"
 )
 
-$PYTHON_UNINSTALLER_URLS = @(
-    #"https://www.python.org/ftp/python/3.13.4/python-3.13.4-amd64.exe" #,
-)
-
-# Uninstalling python versions
-for($i=0 ; $i -lt $PYTHON_UNINSTALLER_URLS.Length; $i++) {
-  $PYTHON_UNINSTALLER_URL = $PYTHON_UNINSTALLER_URLS[$i]
-  Write-Host "-- Uninstalling Python from ${PYTHON_UNINSTALLER_URL}"
-
-  $DOWNLOAD_ROOT = "$env:TEMP/iree_python_uninstall"
-  $DOWNLOAD_FILENAME = $PYTHON_UNINSTALLER_URL.Substring($PYTHON_UNINSTALLER_URL.LastIndexOf("/") + 1)
-  $DOWNLOAD_PATH = "${DOWNLOAD_ROOT}/$DOWNLOAD_FILENAME"
-
-  # Create download folder as needed.
-  md -Force ${DOWNLOAD_ROOT} | Out-Null
-
-  Write-Host "::  Downloading $PYTHON_UNINSTALLER_URL -> $DOWNLOAD_PATH"
-  curl $PYTHON_UNINSTALLER_URL -o $DOWNLOAD_PATH
-
-  Write-Host "::  Running uninstaller: $DOWNLOAD_PATH"
-  # https://docs.python.org/3/using/windows.html#installing-without-ui
-  # & "$DOWNLOAD_PATH" /quiet /uninstall
-  Start-Process -FilePath "$DOWNLOAD_PATH" -ArgumentList "/quiet /uninstall" -Wait
-}
-
 # These can be discovered at https://www.python.org/downloads/windows/
 $PYTHON_INSTALLER_URLS = @(
   "https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe" #,
@@ -70,19 +45,23 @@ for($i=0 ; $i -lt $PYTHON_VERSIONS.Length; $i++) {
   $PYTHON_INSTALLER_URL = $PYTHON_INSTALLER_URLS[$i]
   Write-Host "-- Installing Python ${PYTHON_VERSION} from ${PYTHON_INSTALLER_URL}"
 
-  $DOWNLOAD_ROOT = "$env:TEMP/iree_python_install"
-  $DOWNLOAD_FILENAME = $PYTHON_INSTALLER_URL.Substring($PYTHON_INSTALLER_URL.LastIndexOf("/") + 1)
-  $DOWNLOAD_PATH = "${DOWNLOAD_ROOT}/$DOWNLOAD_FILENAME"
+  if ($PYTHON_VERSION -ne "3.13" -and "${INSTALLED_VERSIONS_OUTPUT}" -like "*${PYTHON_VERSION}*") {
+    Write-Host "::  Python version already installed. Not reinstalling."
+  } else {
+    $DOWNLOAD_ROOT = "$env:TEMP/iree_python_install"
+    $DOWNLOAD_FILENAME = $PYTHON_INSTALLER_URL.Substring($PYTHON_INSTALLER_URL.LastIndexOf("/") + 1)
+    $DOWNLOAD_PATH = "${DOWNLOAD_ROOT}/$DOWNLOAD_FILENAME"
 
-  # Create download folder as needed.
-  md -Force ${DOWNLOAD_ROOT} | Out-Null
+    # Create download folder as needed.
+    md -Force ${DOWNLOAD_ROOT} | Out-Null
 
-  Write-Host "::  Downloading $PYTHON_INSTALLER_URL -> $DOWNLOAD_PATH"
-  curl $PYTHON_INSTALLER_URL -o $DOWNLOAD_PATH
+    Write-Host "::  Downloading $PYTHON_INSTALLER_URL -> $DOWNLOAD_PATH"
+    curl $PYTHON_INSTALLER_URL -o $DOWNLOAD_PATH
 
-  Write-Host "::  Running installer: $DOWNLOAD_PATH"
-  # https://docs.python.org/3/using/windows.html#installing-without-ui
-  & "$DOWNLOAD_PATH" /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+    Write-Host "::  Running installer: $DOWNLOAD_PATH"
+    # https://docs.python.org/3/using/windows.html#installing-without-ui
+    & "$DOWNLOAD_PATH" /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+  }
 
   Write-Host "::  Python version $PYTHON_VERSION installed:"
   & py -${PYTHON_VERSION} --version
