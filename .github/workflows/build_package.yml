@@ -227,7 +227,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.13"
+          override_python_versions: "3.13.3"
         run: |
           if (Test-Path -Path "${{ github.workspace }}/bindist") {
             Remove-Item -Path "${{ github.workspace }}/bindist" -Recurse -Force
@@ -269,7 +269,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.13"
+          override_python_versions: "3.13.3"
         run: |
           if (Test-Path -Path "${{ github.workspace }}/bindist") {
             Remove-Item -Path "${{ github.workspace }}/bindist" -Recurse -Force
