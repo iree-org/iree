@@ -41,13 +41,13 @@ static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
                                                allPossibleTargets);
   }
   if (allPossibleTargets.empty()) {
-  return false;
+    return false;
   }
   StringAttr firstDeviceId = allPossibleTargets.front().getDeviceID();
   for (IREE::HAL::DeviceTargetAttr target : allPossibleTargets) {
-      if (firstDeviceId != target.getDeviceID()) {
-          return false;
-      }
+    if (firstDeviceId != target.getDeviceID()) {
+      return false;
+    }
   }
   return true;
 }
