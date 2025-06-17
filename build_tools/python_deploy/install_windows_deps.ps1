@@ -7,7 +7,7 @@
 # Installs dependencies on Windows necessary to build IREE Python wheels.
 
 $PYTHON_VERSIONS = @(
-  "3.13.3" #,
+  "3.13" #,
   "3.12" #,
   "3.11" #,
   # "3.10",
@@ -21,6 +21,30 @@ $PYTHON_VERSIONS_NO_DOT = @(
   # "310",
   # "39"
 )
+
+$PYTHON_UNINSTALLER_URLS = @(
+    "https://www.python.org/ftp/python/3.13.4/python-3.13.4-amd64.exe" #,
+)
+
+# Uninstalling python versions
+for($i=0 ; $i -lt $PYTHON_UNINSTALLER_URLS.Length; $i++) {
+  $PYTHON_UNINSTALLER_URL = $PYTHON_UNINSTALLER_URLS[$i]
+  Write-Host "-- Uninstalling Python from ${PYTHON_UNINSTALLER_URL}"
+
+  $DOWNLOAD_ROOT = "$env:TEMP/iree_python_uninstall"
+  $DOWNLOAD_FILENAME = $PYTHON_UNINSTALLER_URL.Substring($PYTHON_UNINSTALLER_URL.LastIndexOf("/") + 1)
+  $DOWNLOAD_PATH = "${DOWNLOAD_ROOT}/$DOWNLOAD_FILENAME"
+
+  # Create download folder as needed.
+  md -Force ${DOWNLOAD_ROOT} | Out-Null
+
+  Write-Host "::  Downloading $PYTHON_UNINSTALLER_URL -> $DOWNLOAD_PATH"
+  curl $PYTHON_UNINSTALLER_URL -o $DOWNLOAD_PATH
+
+  Write-Host "::  Running uninstaller: $DOWNLOAD_PATH"
+  # https://docs.python.org/3/using/windows.html#installing-without-ui
+  & "$DOWNLOAD_PATH" /quiet /uninstall
+}
 
 # These can be discovered at https://www.python.org/downloads/windows/
 $PYTHON_INSTALLER_URLS = @(
@@ -64,9 +88,6 @@ for($i=0 ; $i -lt $PYTHON_VERSIONS.Length; $i++) {
   }
 
   Write-Host "::  Python version $PYTHON_VERSION installed:"
-  if ($PYTHON_VERSION -eq "3.13.3") {
-    $PYTHON_VERSION = "3.13"
-  }
   & py -${PYTHON_VERSION} --version
   & py -${PYTHON_VERSION} -m pip --version
 
