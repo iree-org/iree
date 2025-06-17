@@ -54,7 +54,7 @@ util.global private @device_b : !hal.device = #hal.device.target<"local">
 util.func public @resolve_with_same_backend() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK: %[[MEMORY_TYPES:.+]] = hal.memory_type<{{.*}}Device{{.*}}> : i32
-  // Should not add mapping usage bit because we are on the same device
+  // Should not add mapping usage bit because we are on the same device.
   // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<{{.*}}Transfer{{.*}}|{{.*}}Dispatch{{.*}}> : i32
   %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
       for(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
@@ -71,7 +71,7 @@ util.global private @device_b : !hal.device = #hal.device.target<"local", {ordin
 util.func public @resolve_with_different_ordinals() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK: %[[MEMORY_TYPES:.+]] = hal.memory_type<{{.*}}Device{{.*}}> : i32
-  // Should not add mapping usage bit because we are on the same device
+  // Should not add mapping usage bit because we are on the same device.
   // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<{{.*}}Transfer{{.*}}|{{.*}}Dispatch{{.*}}> : i32
   %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
       for(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)

@@ -1115,13 +1115,12 @@ bool DeviceTopologyAttr::hasTransparentAccess(
   Attribute sourceDevice = getAffinityDevice(source);
   Attribute targetDevice = getAffinityDevice(target);
 
-  // Same device has transparent access
   if (!sourceDevice || !targetDevice)
     return false;
   if (sourceDevice == targetDevice)
-    return true;
+    return true; // Same device has transparent access.
 
-  // Search for a matching link and check if it has transparent access
+  // Search for a matching link and check if it has transparent access.
   for (DeviceLinkAttr link : getLinks()) {
     if ((sourceDevice == link.getSourceDevice() &&
          targetDevice == link.getTargetDevice())) {
@@ -1137,13 +1136,12 @@ bool DeviceTopologyAttr::hasUnifiedMemory(
   Attribute sourceDevice = getAffinityDevice(source);
   Attribute targetDevice = getAffinityDevice(target);
 
-  // Same device has unified memory
   if (!sourceDevice || !targetDevice)
     return false;
   if (sourceDevice == targetDevice)
-    return true;
+    return true; // Same device has unified memory.
 
-  // Search for a matching link and check if it has unified memory
+  // Search for a matching link and check if it has unified memory.
   for (DeviceLinkAttr link : getLinks()) {
     if ((sourceDevice == link.getSourceDevice() &&
          targetDevice == link.getTargetDevice())) {

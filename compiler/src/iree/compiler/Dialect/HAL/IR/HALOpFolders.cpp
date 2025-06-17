@@ -128,7 +128,7 @@ struct FoldAllocatorResolveMemoryProperties
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AllocatorResolveMemoryPropertiesOp op,
                                 PatternRewriter &rewriter) const override {
-    // needs to get resolved by a runtime device query or by using the
+    // Needs to get resolved by a runtime device query or by using the
     // topology attribute later on.
     if (op.getAffinity() &&
         isa<IREE::HAL::DeviceOptimalAttr>(*op.getAffinity())) {

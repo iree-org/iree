@@ -31,7 +31,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-// Check if all affinities of the optimal attribute refer to the same device ID
+// Check if all affinities of the optimal attribute refer to the same device ID.
 static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
                                  DeviceAnalysis &deviceAnalysis,
                                  Operation *fromOp) {
@@ -40,16 +40,19 @@ static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
     deviceAnalysis.gatherDeviceAffinityTargets(affinity, fromOp,
                                                allPossibleTargets);
   }
-
-  auto mappedRange = llvm::map_range(
-      allPossibleTargets,
-      [&](IREE::HAL::DeviceTargetAttr target) { return target.getDeviceID(); });
-  SetVector<StringAttr> allDeviceIDs(mappedRange.begin(), mappedRange.end());
-
-  return allDeviceIDs.size() == 1;
+  if (allPossibleTargets.empty()) {
+  return false;
+  }
+  StringAttr firstDeviceId = allPossibleTargets.front().getDeviceID();
+  for (IREE::HAL::DeviceTargetAttr target : allPossibleTargets) {
+      if (firstDeviceId != target.getDeviceID()) {
+          return false;
+      }
+  }
+  return true;
 }
 
-// Checks if the given device has transparent access to all other devices
+// Checks if the given device has transparent access to all other devices.
 static bool hasTransparentAccessToAll(IREE::HAL::DeviceTopologyAttr topology,
                                       IREE::Stream::AffinityAttr source,
                                       DeviceOptimalAttr optimalAttr) {
@@ -79,12 +82,12 @@ static bool tryAddSharedUsageBits(IREE::HAL::DeviceTopologyAttr topology,
                                   IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                   DeviceAnalysis &deviceAnalysis,
                                   Operation *fromOp) {
-  // if all affinities refer to the same device, we dont need to add any
-  // extra usage bits
+  // If all affinities refer to the same device, we don't need to add any
+  // extra usage bits.
   if (allReferToSameDevice(optimalAttr, deviceAnalysis, fromOp)) {
     return true;
   }
-  // check if any device has transparent access to all other devices
+  // Check if any device has transparent access to all other devices.
   for (auto affinity : optimalAttr.getAffinities()) {
     if (hasTransparentAccessToAll(topology, affinity, optimalAttr)) {
       bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
@@ -106,18 +109,18 @@ struct ResolveMemoryPropertiesPattern
                                 PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "[resolve_topology_queries] Op: " << op << "\n");
 
-    // Check if the affinity has device.optimal attribute
+    // Check if the affinity has device.optimal attribute.
     auto affinity = op.getAffinity();
     if (!affinity) {
       LLVM_DEBUG(llvm::dbgs() << "  -> No affinity found\n");
-      // should be handled by canonicalizer
+      // Should be handled by the canonicalizer.
       return failure();
     }
 
     auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(*affinity);
     if (!optimalAttr) {
       LLVM_DEBUG(llvm::dbgs() << "  -> Affinity is not device.optimal\n");
-      // should be handled by canonicalizer
+      // Should be handled by the canonicalizer.
       return failure();
     }
 
@@ -130,7 +133,7 @@ struct ResolveMemoryPropertiesPattern
       return failure();
     }
 
-    // Get the module to access the topology attribute
+    // Get the module to access the topology attribute.
     auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
     if (!moduleOp) {
       return failure();
@@ -141,7 +144,7 @@ struct ResolveMemoryPropertiesPattern
 
     LLVM_DEBUG(llvm::dbgs() << "  -> Topology attr: " << topologyAttr << "\n");
 
-    // Try to resolve shared usage bits if possible
+    // Try to resolve shared usage bits if possible.
     if (!tryAddSharedUsageBits(topologyAttr, optimalAttr, bufferUsage,
                                memoryTypes, deviceAnalysis,
                                op.getOperation())) {
@@ -151,7 +154,7 @@ struct ResolveMemoryPropertiesPattern
 
     LLVM_DEBUG(llvm::dbgs() << "  -> Successfully resolved memory properties "
                                "with shared usage bits\n");
-    // Create the resolved memory type and buffer usage ops
+    // Create the resolved memory type and buffer usage ops.
     auto memoryTypeOp =
         rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
     auto bufferUsageOp =
