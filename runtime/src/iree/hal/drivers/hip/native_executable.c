@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
+#include "iree/base/status.h"
 #include "iree/hal/drivers/hip/context_util.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
@@ -430,6 +431,18 @@ iree_status_t iree_hal_hip_native_executable_create(
             iree_hal_hip_ExportDef_binding_flags_get(export_def);
         kernel_info->binding_count =
             iree_hal_hip_BindingBits_vec_len(binding_flags_vec);
+
+        if (iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def) !=
+            0) {
+          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                    "exports[%" PRIhsz
+                                    "] for kernel `%s` specified non-zero "
+                                    "deprecated field block_shared_memory_size "
+                                    "in modules[%u]. Verify matching compiler "
+                                    "and runtime versions.",
+                                    i, kernel_name, module_ordinal);
+          break;
+        }
 
         IREE_TRACE({
           iree_hal_debug_export_info_t* export_info =
