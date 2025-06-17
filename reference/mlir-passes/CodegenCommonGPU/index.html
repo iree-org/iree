@@ -5611,7 +5611,13 @@ store_to_buffer op.</p>
 -transform-file-name : Optional filename containing a transform dialect specification to apply. If left empty, the IR is assumed to contain one top-level transform dialect operation somewhere in the module.
 </code></pre></div>
 <h3 id="-iree-codegen-gpu-promote-matmul-operands"><code>-iree-codegen-gpu-promote-matmul-operands</code><a class="headerlink" href="#-iree-codegen-gpu-promote-matmul-operands" title="Permanent link">link</a></h3>
-<p><em>Pass to insert copies with a different thread configuration on matmul operands</em></p>
+<p><em>Pass to insert copies with a different lowering configuration on matmul operands</em></p>
+<p>Looks for all matmuls annotated with <code>promote_operands = I64Array</code> and
+inserts copies on the specified operands with a thread lowering config
+optimized for coalesced loads.</p>
+<p>If the matmul is also annotated with <code>promotion_types = ArrayAttr</code>, the
+logic for "promoting" an operand is deferred to an attribute interface
+allowing for custom logic.</p>
 <h3 id="-iree-codegen-gpu-reduce-bank-conflicts"><code>-iree-codegen-gpu-reduce-bank-conflicts</code><a class="headerlink" href="#-iree-codegen-gpu-reduce-bank-conflicts" title="Permanent link">link</a></h3>
 <p><em>Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.</em></p>
 <h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
