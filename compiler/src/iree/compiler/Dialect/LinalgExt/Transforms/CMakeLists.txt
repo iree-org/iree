@@ -32,6 +32,7 @@ iree_cc_library(
     "ConvertToLoops.cpp"
     "DecomposeAttention.cpp"
     "DecomposeIm2col.cpp"
+    "DecomposeMapScatter.cpp"
     "DecomposeWinogradPass.cpp"
     "FoldUnitExtentDims.cpp"
     "PadContractionToBlockSize.cpp"
