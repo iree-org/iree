@@ -668,13 +668,22 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
-def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
+def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
 ]> {
-  let summary = "Argmax reduction op.";
+  let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
-    An argmax op that reduces along a given dimension, returning the max value and its index.
+    The `arg_compare` op performs a reduction over a given dimension of a tensor,
+    returning both the selected value and its corresponding index. The selection
+    logic is defined by a user-specified comparator region.
+
+    The comparator region receives two candidate values and returns a single `i1`
+    result indicating whether the first argument should be preferred over the second.
+
+    This region defines the sorting rule, e.g., "greater than" for argmax or
+    "less than" for argmin. It allows for generalization beyond simple argmax-style
+    behavior.
   }];
 
   let arguments = (ins
@@ -687,7 +696,7 @@ def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
   let results = (outs
     Variadic<AnyRankedTensor>:$results
   );
-  let regions = (region AnyRegion:$region);
+  let regions = (region SizedRegion<1>:$region);
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`

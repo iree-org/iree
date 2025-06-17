@@ -568,14 +568,14 @@ func.func @map_scatter_wrong_num_yielded_values(
 
 // -----
 
-func.func @argmax_invalid_too_many_inputs(
+func.func @arg_compare_invalid_too_many_inputs(
     %input_val: tensor<2x10xf32>,
     %input_extra: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
     %out_idx: tensor<2xi32>
 ) -> (tensor<2xf32>, tensor<2xi32>) {
   // expected-error@+1 {{expected exactly one tensor input operand, but got 2}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val, %input_extra : tensor<2x10xf32>, tensor<2x10xf32>)
     outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
@@ -588,11 +588,11 @@ func.func @argmax_invalid_too_many_inputs(
 
 // -----
 
-func.func @argmax_invalid_missing_output(
+func.func @arg_compare_invalid_missing_output(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>) -> (tensor<2xf32>, tensor<2xi32>) {
   // expected-error@+1 {{expected two output operands (value and index), but got 1}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
     outs(%out_val : tensor<2xf32>) {
@@ -605,12 +605,12 @@ func.func @argmax_invalid_missing_output(
 
 // -----
 
-func.func @argmax_invalid_dim(
+func.func @arg_compare_invalid_dim(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
     %out_idx: tensor<2xi32>) -> (tensor<2xf32>, tensor<2xi32>) {
   // expected-error@+1 {{reduction dimension exceeds or equals input rank. got dimension: 2, but input rank is: 2}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(2)
     ins(%input_val : tensor<2x10xf32>)
     outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
@@ -623,12 +623,12 @@ func.func @argmax_invalid_dim(
 
 // -----
 
-func.func @argmax_invalid_type_mismatch(
+func.func @arg_compare_invalid_type_mismatch(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf16>,
     %out_idx: tensor<2xi32>) -> (tensor<2xf16>, tensor<2xi32>) {
   // expected-error@+1 {{input and output value element types must match. Input type: 'f32', output value type: 'f16'}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
     outs(%out_val, %out_idx : tensor<2xf16>, tensor<2xi32>) {
@@ -641,12 +641,12 @@ func.func @argmax_invalid_type_mismatch(
 
 // -----
 
-func.func @argmax_invalid_output_shape_mismatch(
+func.func @arg_compare_invalid_output_shape_mismatch(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
     %out_idx: tensor<10xi32>) -> (tensor<2xf32>, tensor<10xi32>) {
   // expected-error@+1 {{output indices/values shape must match. Output value shape: [2], output index shape: [10]}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
     outs(%out_val, %out_idx : tensor<2xf32>, tensor<10xi32>) {
@@ -659,12 +659,12 @@ func.func @argmax_invalid_output_shape_mismatch(
 
 // -----
 
-func.func @argmax_invalid_output_shape_wrong_reduction(
+func.func @arg_compare_invalid_output_shape_wrong_reduction(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<1xf32>,
     %out_idx: tensor<1xi32>) -> (tensor<1xf32>, tensor<1xi32>) {
   // expected-error@+1 {{output shape must match input shape with reduction dimension removed. Expected: [2], but got: [1]}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
     outs(%out_val, %out_idx : tensor<1xf32>, tensor<1xi32>) {
@@ -677,12 +677,12 @@ func.func @argmax_invalid_output_shape_wrong_reduction(
 
 // -----
 
-func.func @argmax_invalid_output_same_as_input(
+func.func @arg_compare_invalid_output_same_as_input(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2x10xf32>,
     %out_idx: tensor<2x10xi32>) -> (tensor<2x10xf32>, tensor<2x10xi32>) {
   // expected-error@+1 {{output shape must match input shape with reduction dimension removed. Expected: [2], but got: [2, 10]}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val : tensor<2x10xf32>)
     outs(%out_val, %out_idx : tensor<2x10xf32>, tensor<2x10xi32>) {
@@ -695,13 +695,13 @@ func.func @argmax_invalid_output_same_as_input(
 
 // -----
 
-func.func @argmax_missing_region_yield(
+func.func @arg_compare_missing_region_yield(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
   // expected-error@+1 {{region block should have 2 arguments}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {} -> tensor<2xf32>, tensor<2xindex>
@@ -710,13 +710,13 @@ func.func @argmax_missing_region_yield(
 
 // -----
 
-func.func @argmax_invalid_region_argument_type(
+func.func @arg_compare_invalid_region_argument_type(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
   // expected-error@+1 {{ comparator region arguments must match input element type. Expected: 'f32', but got: 'f32' and 'i32'}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
@@ -729,12 +729,12 @@ func.func @argmax_invalid_region_argument_type(
 
 // -----
 
-func.func @argmax_missing_yield_operand(
+func.func @arg_compare_missing_yield_operand(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>, %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
   // expected-error@+1 {{expected linalg_ext.yield to return 1 operand, but got 0}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
@@ -746,13 +746,13 @@ func.func @argmax_missing_yield_operand(
 
 // -----
 
-func.func @argmax_yield_two_operands(
+func.func @arg_compare_yield_two_operands(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
   // expected-error@+1 {{expected linalg_ext.yield to return 1 operand, but got 2}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
@@ -766,13 +766,13 @@ func.func @argmax_yield_two_operands(
 
 // -----
 
-func.func @argmax_invalid_region_terminator(
+func.func @arg_compare_invalid_region_terminator(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
   // expected-error@+1 {{region block must end with a linalg_ext.yield i1, but got: 'f32'}}
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {

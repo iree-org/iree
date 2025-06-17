@@ -913,7 +913,7 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 // ArgmaxOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult ArgmaxOp::verify() {
+LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
   unsigned numInputVals = llvm::size(getInputs());
@@ -995,11 +995,7 @@ LogicalResult ArgmaxOp::verify() {
            << " and " << arg1Type;
   }
 
-  auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
-  if (!yieldOp) {
-    return op->emitOpError("linalg_ext.yield is missing");
-  }
-
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
   unsigned numOperands = yieldOp->getNumOperands();
   if (numOperands != 1) {
     return op->emitOpError(
@@ -1016,9 +1012,8 @@ LogicalResult ArgmaxOp::verify() {
   return success();
 }
 
-LogicalResult
-ArgmaxOp::reifyResultShapes(OpBuilder &b,
-                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult ArgCompareOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -2447,7 +2442,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
-DEFINE_OP_GET_EFFECTS(ArgmaxOp)
+DEFINE_OP_GET_EFFECTS(ArgCompareOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)

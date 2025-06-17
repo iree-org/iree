@@ -833,11 +833,11 @@ func.func @map_scatter_memref_static(
 
 // -----
 
-func.func @argmax_static(
+func.func @arg_compare_static(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>, %outi : tensor<2xindex>
 ) -> (tensor<2xf32>, tensor<2xindex>) {
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
@@ -848,11 +848,11 @@ func.func @argmax_static(
   return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
 }
 
-// CHECK-LABEL: func.func @argmax_static(
+// CHECK-LABEL: func.func @arg_compare_static(
 // CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x6xf32>
 // CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
 // CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xindex>
-// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.argmax
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[INPUT]] : tensor<2x6xf32>)
 // CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<2xf32>, tensor<2xindex>)
@@ -863,11 +863,11 @@ func.func @argmax_static(
 
 // -----
 
-func.func @argmax_dynamic(
+func.func @arg_compare_dynamic(
     %input : tensor<?x?xf32>,
     %outv : tensor<?xf32>, %outi : tensor<?xindex>
 ) -> (tensor<?xf32>, tensor<?xindex>) {
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<?x?xf32>)
     outs(%outv, %outi : tensor<?xf32>, tensor<?xindex>) {
@@ -878,11 +878,11 @@ func.func @argmax_dynamic(
   return %0#0, %0#1 : tensor<?xf32>, tensor<?xindex>
 }
 
-// CHECK-LABEL: func.func @argmax_dynamic(
+// CHECK-LABEL: func.func @arg_compare_dynamic(
 // CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<?xf32>
 // CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<?xindex>
-// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.argmax
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[INPUT]] : tensor<?x?xf32>)
 // CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<?xf32>, tensor<?xindex>)
@@ -893,11 +893,11 @@ func.func @argmax_dynamic(
 
 // -----
 
-func.func @argmax_static_memref(
+func.func @arg_compare_static_memref(
     %input : memref<2x6xf32>,
     %outv : memref<2xf32>, %outi : memref<2xindex>
 ) {
-  iree_linalg_ext.argmax
+  iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : memref<2x6xf32>)
     outs(%outv, %outi : memref<2xf32>, memref<2xindex>) {
@@ -908,11 +908,11 @@ func.func @argmax_static_memref(
   return
 }
 
-// CHECK-LABEL: func.func @argmax_static_memref(
+// CHECK-LABEL: func.func @arg_compare_static_memref(
 // CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: memref<2x6xf32>
 // CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: memref<2xf32>
 // CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: memref<2xindex>
-// CHECK:   iree_linalg_ext.argmax
+// CHECK:   iree_linalg_ext.arg_compare
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[INPUT]] : memref<2x6xf32>)
 // CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : memref<2xf32>, memref<2xindex>)
@@ -922,11 +922,11 @@ func.func @argmax_static_memref(
 
 // -----
 
-func.func @argmax_dynamic_memref(
+func.func @arg_compare_dynamic_memref(
     %input : memref<?x?xf32>,
     %outv : memref<?xf32>, %outi : memref<?xindex>
 ) {
-  iree_linalg_ext.argmax
+  iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : memref<?x?xf32>)
     outs(%outv, %outi : memref<?xf32>, memref<?xindex>) {
@@ -937,11 +937,11 @@ func.func @argmax_dynamic_memref(
   return
 }
 
-// CHECK-LABEL: func.func @argmax_dynamic_memref(
+// CHECK-LABEL: func.func @arg_compare_dynamic_memref(
 // CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: memref<?x?xf32>
 // CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: memref<?xf32>
 // CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: memref<?xindex>
-// CHECK:   iree_linalg_ext.argmax
+// CHECK:   iree_linalg_ext.arg_compare
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[INPUT]] : memref<?x?xf32>)
 // CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : memref<?xf32>, memref<?xindex>)
@@ -951,13 +951,13 @@ func.func @argmax_dynamic_memref(
 
 // -----
 
-func.func @argmax_with_base(
+func.func @arg_compare_with_base(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>,
     %outi : tensor<2xindex>,
     %base : index
 ) -> (tensor<2xf32>, tensor<2xindex>) {
-  %0:2 = iree_linalg_ext.argmax
+  %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<2x6xf32>)
     outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>)
@@ -969,12 +969,12 @@ func.func @argmax_with_base(
   return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
 }
 
-// CHECK-LABEL: func.func @argmax_with_base(
+// CHECK-LABEL: func.func @arg_compare_with_base(
 // CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x6xf32>
 // CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
 // CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xindex>
 // CHECK-SAME:   %[[BASE:[a-zA-Z0-9_]+]]: index
-// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.argmax
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[INPUT]] : tensor<2x6xf32>)
 // CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<2xf32>, tensor<2xindex>)
