@@ -1620,6 +1620,7 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
     // A special condition if the pre-distribution bounds match
     // the mask dimension length, then the distributed bounds
     // should exhibit the same property.
+
     APInt constUpperBound;
     if (matchPattern(upperBound.getDefiningOp(),
                      m_ConstantInt(&constUpperBound))) {

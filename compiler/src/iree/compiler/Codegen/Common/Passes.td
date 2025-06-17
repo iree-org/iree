@@ -435,6 +435,9 @@ def GenericVectorizationPass :
             /*default=*/"2147483647",
            "Max vector size allowed to avoid creating large vectors.">
   ];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect"
+  ];
 }
 
 def OptimizeTensorInsertExtractSlicesPass

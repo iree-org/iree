@@ -10,10 +10,13 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -29,7 +32,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-
 // Returns the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
 static std::optional<SizesAndScalableFlags>
@@ -189,6 +191,9 @@ void GenericVectorizationPass::runOnOperation() {
   {
     // Canonicalize mask related ops before we lower them.
     RewritePatternSet maskCanonPatterns(funcOp.getContext());
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
+        maskCanonPatterns);
+    tensor::DimOp::getCanonicalizationPatterns(maskCanonPatterns, context);
     vector::CreateMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                       funcOp.getContext());
     vector::ConstantMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
@@ -227,16 +232,6 @@ void GenericVectorizationPass::runOnOperation() {
                                                          funcOp.getContext());
   }
   (void)applyPatternsGreedily(funcOp, std::move(vectorizationPatterns));
-
-  // Apply the pad tensor op vectorization separately to avoid running the
-  // GenericPadOpVectorizationPattern too early.
-  // TODO: Improve once we have better infrastructure to control pattern
-  // application.
-  if (vectorizePadding) {
-    RewritePatternSet patterns(funcOp.getContext());
-    linalg::populatePadOpVectorizationPatterns(patterns);
-    (void)applyPatternsGreedily(funcOp, std::move(patterns));
-  }
 }
 
 } // namespace
