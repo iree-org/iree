@@ -785,6 +785,27 @@ func.func @arg_compare_invalid_region_terminator(
 
 // -----
 
+func.func @arg_compare_invalid_index_base_type(
+    %input: tensor<2x10xf32>,
+    %outv: tensor<2xf32>,
+    %outi: tensor<2xindex>,
+    %bad_index_base: i32
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{operand #3 must be index, but got 'i32'}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x10xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>)
+    index_base(%bad_index_base : i32) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
 func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
   // expected-error@+1 {{expected one or two input operands}}
   %0:2 = iree_linalg_ext.topk

@@ -923,15 +923,6 @@ LogicalResult ArgCompareOp::verify() {
            << numInputVals;
   }
 
-  TypedValue<IndexType> indexBase = getIndexBase();
-  if (indexBase) {
-    Type indexType = indexBase.getType();
-    if (!isa<IndexType>(indexType)) {
-      return op->emitOpError("index_base must be of index type, got: ")
-             << indexType;
-    }
-  }
-
   unsigned numOutputs = getNumDpsInits();
   if (numOutputs != 2) {
     return op->emitOpError(
