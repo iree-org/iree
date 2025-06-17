@@ -15,8 +15,8 @@
 // iree_hal_amdgpu_device_host_client_t
 //===----------------------------------------------------------------------===//
 
-typedef uint16_t iree_hal_amdgpu_device_host_client_call_t;
-enum iree_hal_amdgpu_device_host_client_call_e {
+typedef uint16_t iree_hal_amdgpu_device_host_call_t;
+enum iree_hal_amdgpu_device_host_call_e {
   // Host will notify any registered listeners of the semaphore signal.
   // The semaphore provided is a host handle to a generic HAL semaphore and may
   // be of any device in the system - not just AMDGPU semaphores.
