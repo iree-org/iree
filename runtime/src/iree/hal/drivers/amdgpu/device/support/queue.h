@@ -131,6 +131,66 @@ typedef struct IREE_AMDGPU_ALIGNAS(64) iree_amd_queue_t {
 } iree_amd_queue_t;
 
 //===----------------------------------------------------------------------===//
+// Cached HSA/AMD Queue
+//===----------------------------------------------------------------------===//
+
+// A variant of iree_hsa_queue_t/iree_amd_queue_t with all of the hot fields
+// hoisted into the struct. Queue metadata is immutable so it is always safe to
+// cache the fields and doing so allows us to avoid one indirection on every
+// access. Since queue metadata may live in either host or device memory it also
+// prevents the device from possibly needing to dereference the host-side
+// metadata in order to get the ringbuffer pointer or indices.
+//
+// NOTE: we try to keep this to the smallest possible set so that it can fit in
+// a single cache line. We want one fetch from local memory to get all the info
+// needed to start pushing writes.
+typedef IREE_AMDGPU_ALIGNAS(
+    iree_amdgpu_destructive_interference_size) struct iree_amd_cached_queue_t {
+  // Packet storage. Must be accessible on any agents that may operate on it and
+  // aligned to at least 64 (the size of an AQL packet).
+  void* base_address;
+
+  // Maximum number of packets the queue can hold. Must be a power of 2.
+  uint32_t size;
+
+  uint32_t reserved;
+
+  // Signal object used by the application to indicate the ID of a packet that
+  // is ready to be processed. The HSA runtime or hardware packet processor
+  // manages the doorbell signal. If the application tries to replace or destroy
+  // this signal the behavior is undefined.
+  iree_hsa_signal_t doorbell_signal;
+
+  // Pointer to the ringbuffer write dispatch ID atomic.
+  iree_amdgpu_scoped_atomic_uint64_t* write_dispatch_id;
+
+  // Pointer to the ringbuffer read dispatch ID atomic.
+  iree_amdgpu_scoped_atomic_uint64_t* read_dispatch_id;
+
+  // Backing queue that may live in host or device memory.
+  iree_amd_queue_t* queue;
+} iree_amd_cached_queue_t;
+
+// Returns an HSA queue reference with the important
+static inline iree_amd_cached_queue_t iree_amd_make_cached_queue(
+    iree_hsa_queue_t* queue) {
+  iree_amd_cached_queue_t result = {
+      /*.base_address=*/queue->base_address,
+      /*.size=*/queue->size,
+      /*.reserved=*/0u,
+      /*.doorbell_signal=*/{(uint64_t)&queue->doorbell_signal},
+      /*.write_dispatch_id=*/
+      (iree_amdgpu_scoped_atomic_uint64_t*)&((iree_amd_queue_t*)queue)
+          ->write_dispatch_id,
+      /*.read_dispatch_id=*/
+      (iree_amdgpu_scoped_atomic_uint64_t*)&((iree_amd_queue_t*)queue)
+          ->read_dispatch_id,
+      /*.queue=*/(iree_amd_queue_t*)queue,
+  };
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
 // HSA/AMDGPU AQL Packets
 //===----------------------------------------------------------------------===//
 
@@ -692,66 +752,56 @@ iree_hal_amdgpu_device_global_linear_id_3d(void) {
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE uint64_t
-iree_hsa_queue_load_read_index(const iree_hsa_queue_t* IREE_AMDGPU_RESTRICT
-                                   queue,
-                               iree_amdgpu_memory_order_t memory_order) {
-  const iree_amd_queue_t* q = (const iree_amd_queue_t*)queue;
-  return iree_amdgpu_scoped_atomic_load(
-      (iree_amdgpu_scoped_atomic_uint64_t*)&q->read_dispatch_id, memory_order,
-      iree_amdgpu_memory_scope_system);
+iree_hsa_queue_load_read_index(
+    const iree_amd_cached_queue_t* IREE_AMDGPU_RESTRICT queue,
+    iree_amdgpu_memory_order_t memory_order) {
+  return iree_amdgpu_scoped_atomic_load(queue->read_dispatch_id, memory_order,
+                                        iree_amdgpu_memory_scope_system);
 }
 
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE void
-iree_hsa_queue_store_read_index(iree_hsa_queue_t* IREE_AMDGPU_RESTRICT queue,
-                                uint64_t value,
-                                iree_amdgpu_memory_order_t memory_order) {
-  iree_amd_queue_t* q = (iree_amd_queue_t*)queue;
-  iree_amdgpu_scoped_atomic_store(
-      (iree_amdgpu_scoped_atomic_uint64_t*)&q->read_dispatch_id, value,
-      memory_order, iree_amdgpu_memory_scope_system);
+iree_hsa_queue_store_read_index(
+    const iree_amd_cached_queue_t* IREE_AMDGPU_RESTRICT queue, uint64_t value,
+    iree_amdgpu_memory_order_t memory_order) {
+  iree_amdgpu_scoped_atomic_store(queue->read_dispatch_id, value, memory_order,
+                                  iree_amdgpu_memory_scope_system);
 }
 
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE uint64_t
-iree_hsa_queue_load_write_index(const iree_hsa_queue_t* IREE_AMDGPU_RESTRICT
-                                    queue,
-                                iree_amdgpu_memory_order_t memory_order) {
-  const iree_amd_queue_t* q = (const iree_amd_queue_t*)queue;
-  return iree_amdgpu_scoped_atomic_load(
-      (iree_amdgpu_scoped_atomic_uint64_t*)&q->write_dispatch_id, memory_order,
-      iree_amdgpu_memory_scope_system);
+iree_hsa_queue_load_write_index(
+    const iree_amd_cached_queue_t* IREE_AMDGPU_RESTRICT queue,
+    iree_amdgpu_memory_order_t memory_order) {
+  return iree_amdgpu_scoped_atomic_load(queue->write_dispatch_id, memory_order,
+                                        iree_amdgpu_memory_scope_system);
 }
 
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE uint64_t
-iree_hsa_queue_add_write_index(iree_hsa_queue_t* IREE_AMDGPU_RESTRICT queue,
-                               uint64_t value,
-                               iree_amdgpu_memory_order_t memory_order) {
-  iree_amd_queue_t* q = (iree_amd_queue_t*)queue;
-  return iree_amdgpu_scoped_atomic_fetch_add(
-      (iree_amdgpu_scoped_atomic_uint64_t*)&q->write_dispatch_id, value,
-      memory_order, iree_amdgpu_memory_scope_system);
+iree_hsa_queue_add_write_index(
+    const iree_amd_cached_queue_t* IREE_AMDGPU_RESTRICT queue, uint64_t value,
+    iree_amdgpu_memory_order_t memory_order) {
+  return iree_amdgpu_scoped_atomic_fetch_add(queue->write_dispatch_id, value,
+                                             memory_order,
+                                             iree_amdgpu_memory_scope_system);
 }
 
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE uint64_t
-iree_hsa_queue_cas_write_index(iree_hsa_queue_t* IREE_AMDGPU_RESTRICT queue,
-                               uint64_t expected, uint64_t value,
-                               iree_amdgpu_memory_order_t memory_order) {
-  iree_amd_queue_t* q = (iree_amd_queue_t*)queue;
+iree_hsa_queue_cas_write_index(
+    const iree_amd_cached_queue_t* IREE_AMDGPU_RESTRICT queue,
+    uint64_t expected, uint64_t value,
+    iree_amdgpu_memory_order_t memory_order) {
   uint64_t e = expected;
   iree_amdgpu_scoped_atomic_compare_exchange_strong(
-      (iree_amdgpu_scoped_atomic_uint64_t*)&q->write_dispatch_id, &e, value,
-      memory_order, iree_amdgpu_memory_order_relaxed,
-      iree_amdgpu_memory_scope_system);
+      queue->write_dispatch_id, &e, value, memory_order,
+      iree_amdgpu_memory_order_relaxed, iree_amdgpu_memory_scope_system);
   return e;
 }
 
 static inline IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE void
-iree_hsa_queue_store_write_index(iree_hsa_queue_t* IREE_AMDGPU_RESTRICT queue,
-                                 uint64_t value,
-                                 iree_amdgpu_memory_order_t memory_order) {
-  iree_amd_queue_t* q = (iree_amd_queue_t*)queue;
-  iree_amdgpu_scoped_atomic_store(
-      (iree_amdgpu_scoped_atomic_uint64_t*)&q->write_dispatch_id, value,
-      memory_order, iree_amdgpu_memory_scope_system);
+iree_hsa_queue_store_write_index(
+    const iree_amd_cached_queue_t* IREE_AMDGPU_RESTRICT queue, uint64_t value,
+    iree_amdgpu_memory_order_t memory_order) {
+  iree_amdgpu_scoped_atomic_store(queue->write_dispatch_id, value, memory_order,
+                                  iree_amdgpu_memory_scope_system);
 }
 
 #endif  // IREE_AMDGPU_TARGET_DEVICE

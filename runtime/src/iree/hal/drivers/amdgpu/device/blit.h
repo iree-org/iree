@@ -19,9 +19,7 @@
 // Context used when scheduling transfer commands.
 typedef struct iree_hal_amdgpu_device_buffer_transfer_context_t {
   // Target queue that will execute the transfer operation.
-  // TODO(benvanik): hoist size/base address so we don't have to touch the queue
-  // descriptor memory (which may be in host memory).
-  iree_hsa_queue_t* queue;
+  iree_amd_cached_queue_t queue;
   // Handles to opaque kernel objects used to dispatch builtin kernels.
   const iree_hal_amdgpu_device_kernels_t* kernels;
   // Optional trace buffer used when tracing infrastructure is available.

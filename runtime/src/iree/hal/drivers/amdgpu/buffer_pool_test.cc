@@ -22,13 +22,14 @@ namespace {
 using iree::testing::status::StatusIs;
 
 struct BufferPoolTest : public ::testing::Test {
-  iree_allocator_t host_allocator = iree_allocator_system();
-  iree_hal_amdgpu_libhsa_t libhsa;
-  iree_hal_amdgpu_topology_t topology;
-  hsa_amd_memory_pool_t gpu_memory_pool;
+  static iree_allocator_t host_allocator;
+  static iree_hal_amdgpu_libhsa_t libhsa;
+  static iree_hal_amdgpu_topology_t topology;
+  static hsa_amd_memory_pool_t gpu_memory_pool;
 
-  void SetUp() override {
+  static void SetUpTestSuite() {
     IREE_TRACE_SCOPE();
+    host_allocator = iree_allocator_system();
     iree_status_t status = iree_hal_amdgpu_libhsa_initialize(
         IREE_HAL_AMDGPU_LIBHSA_FLAG_NONE, iree_string_view_list_empty(),
         host_allocator, &libhsa);
@@ -48,12 +49,16 @@ struct BufferPoolTest : public ::testing::Test {
         &libhsa, gpu_agent, &gpu_memory_pool));
   }
 
-  void TearDown() override {
+  static void TearDownTestSuite() {
     IREE_TRACE_SCOPE();
     iree_hal_amdgpu_topology_deinitialize(&topology);
     iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
   }
 };
+iree_allocator_t BufferPoolTest::host_allocator;
+iree_hal_amdgpu_libhsa_t BufferPoolTest::libhsa;
+iree_hal_amdgpu_topology_t BufferPoolTest::topology;
+hsa_amd_memory_pool_t BufferPoolTest::gpu_memory_pool;
 
 // Tests that a pool can be initialized/deinitialized successfully.
 // Note that pools do not allocate anything on initialization so this should

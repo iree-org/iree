@@ -19,12 +19,13 @@ namespace {
 // succeed as well. We need information we can only get from HSA to make the
 // ioctls so we have to setup a full topology here.
 struct KFDTest : public ::testing::Test {
-  iree_allocator_t host_allocator = iree_allocator_system();
-  iree_hal_amdgpu_libhsa_t libhsa;
-  iree_hal_amdgpu_topology_t topology;
+  static iree_allocator_t host_allocator;
+  static iree_hal_amdgpu_libhsa_t libhsa;
+  static iree_hal_amdgpu_topology_t topology;
 
-  void SetUp() override {
+  static void SetUpTestSuite() {
     IREE_TRACE_SCOPE();
+    host_allocator = iree_allocator_system();
     iree_status_t status = iree_hal_amdgpu_libhsa_initialize(
         IREE_HAL_AMDGPU_LIBHSA_FLAG_NONE, iree_string_view_list_empty(),
         host_allocator, &libhsa);
@@ -40,7 +41,7 @@ struct KFDTest : public ::testing::Test {
     }
   }
 
-  void TearDown() override {
+  static void TearDownTestSuite() {
     IREE_TRACE_SCOPE();
     iree_hal_amdgpu_topology_deinitialize(&topology);
     iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
@@ -58,6 +59,9 @@ struct KFDTest : public ::testing::Test {
     return gpu_uid;
   }
 };
+iree_allocator_t KFDTest::host_allocator;
+iree_hal_amdgpu_libhsa_t KFDTest::libhsa;
+iree_hal_amdgpu_topology_t KFDTest::topology;
 
 // Tests opening and closing the KFD. It should not crash/leak/etc.
 // Note that we currently no-op the helpers on non-Linux platforms and this
