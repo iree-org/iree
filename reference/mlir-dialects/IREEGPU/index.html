@@ -2141,6 +2141,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#promotewithcacheswizzleattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PromoteWithCacheSwizzleAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reorderworkgroupsstrategyattr" class="md-nav__link">
     <span class="md-ellipsis">
       ReorderWorkgroupsStrategyAttr
@@ -5268,6 +5277,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#promotewithcacheswizzleattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PromoteWithCacheSwizzleAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reorderworkgroupsstrategyattr" class="md-nav__link">
     <span class="md-ellipsis">
       ReorderWorkgroupsStrategyAttr
@@ -5673,6 +5691,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
 <li><a href="#mmaopsarrayattr">MMAOpsArrayAttr</a></li>
 <li><a href="#mmascheduleattr">MMAScheduleAttr</a></li>
+<li><a href="#promotewithcacheswizzleattr">PromoteWithCacheSwizzleAttr</a></li>
 <li><a href="#reorderworkgroupsstrategyattr">ReorderWorkgroupsStrategyAttr</a></li>
 <li><a href="#storagebitwidthsattr">StorageBitwidthsAttr</a></li>
 <li><a href="#subgroupopsattr">SubgroupOpsAttr</a></li>
@@ -6400,6 +6419,42 @@ to solve a specific contraction problem.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="promotewithcacheswizzleattr">PromoteWithCacheSwizzleAttr<a class="headerlink" href="#promotewithcacheswizzleattr" title="Permanent link">link</a></h3>
+<p><em>Indicate promotion of an operand with setting a cache swizzle value.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.promote_with_cache_swizzle&lt;
+  Attribute   # copy_config
+&gt;
+</code></pre></div>
+<p>When promoting, this will create a <code>linalg.copy</code> on the input operand,
+and then the primary producing dispatch input has a buffer cast with cache
+swizzle inserted if possible. For example,</p>
+<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x8192&gt;
+%1 = linalg.matmul ins(%0, ...)
+</code></pre></div>
+<p>Becomes with <code>#iree_gpu.promote_with_cache_swizzle&lt;#iree_gpu.derived_thread_config&gt;</code></p>
+<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x8192&gt;
+%1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
+%2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
+%3 = linalg.matmul ins(%2, ...)
+</code></pre></div>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">copy_config</td>
+<td style="text-align: center;"><code>Attribute</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="reorderworkgroupsstrategyattr">ReorderWorkgroupsStrategyAttr<a class="headerlink" href="#reorderworkgroupsstrategyattr" title="Permanent link">link</a></h3>
 <p><em>Strategy for workgroup reordering</em></p>
 <p>Syntax:</p>
@@ -6407,7 +6462,7 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6431,7 +6486,7 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::StorageBitwidths   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6455,7 +6510,7 @@ to solve a specific contraction problem.</p>
   ::mlir::iree_compiler::IREE::GPU::SubgroupOps   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6490,7 +6545,7 @@ to solve a specific contraction problem.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6535,7 +6590,7 @@ to solve a specific contraction problem.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
+<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6587,7 +6642,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6680,7 +6735,7 @@ NVIDIA GPUs.</p>
 </code></pre></div>
 <p>An attribute that can be applied to any operation to specify that it has
 been matched with a ukernel that is a legal lowering for it.</p>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6725,7 +6780,7 @@ field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
 in a chained-matmul operation.</p>
-<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
+<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6749,7 +6804,7 @@ in a chained-matmul operation.</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
+<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
