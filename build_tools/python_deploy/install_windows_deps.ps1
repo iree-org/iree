@@ -64,6 +64,9 @@ for($i=0 ; $i -lt $PYTHON_VERSIONS.Length; $i++) {
   }
 
   Write-Host "::  Python version $PYTHON_VERSION installed:"
+  if ($PYTHON_VERSION -eq "3.13.3") {
+    $PYTHON_VERSION = "3.13"
+  }
   & py -${PYTHON_VERSION} --version
   & py -${PYTHON_VERSION} -m pip --version
 
