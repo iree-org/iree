@@ -33,32 +33,61 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   return resolveOp.getResult(0);
 }
 
-std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
-                                                         OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
+    Location loc, IREE::Stream::AffinityAttr affinityAttr, OpBuilder &builder) {
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
+      loc,
       TypeRange{
           builder.getType<IREE::HAL::DeviceType>(),
           builder.getI64Type(),
       },
       affinityAttr);
-  return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
+  return {resolveOp.getResult(0), resolveOp.getResult(1)};
 }
 
-std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
-    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
-    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder) {
-  // Emit a select op to let the runtime decide which device/queue affinity to
-  // use if required.
+static std::tuple<SmallVector<Value>, SmallVector<Value>>
+lookupDevicesAndQueueAffintiesFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  SmallVector<Value> devices;
+  SmallVector<Value> queueAffinities;
   if (auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
-    auto selectOp = builder.create<IREE::HAL::AllocatorSelectAttrOp>(
-        op->getLoc(), optimalAttr, memoryTypes, bufferUsage);
-    return {selectOp.getResult(0), selectOp.getResult(1)};
+    for (auto affinity : optimalAttr.getAffinities()) {
+      auto [device, queueAffinity] =
+          lookupDeviceAndQueueAffinityFor(op->getLoc(), affinity, builder);
+      devices.push_back(device);
+      queueAffinities.push_back(queueAffinity);
+    }
+  } else {
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(op->getLoc(), affinityAttr, builder);
+    devices.push_back(device);
+    queueAffinities.push_back(queueAffinity);
   }
-  // Unconditionally routed affinities go down the normal resolve path.
-  return lookupDeviceAndQueueAffinityFor(op, builder);
+  return {devices, queueAffinities};
+}
+
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
+                                                         OpBuilder &builder) {
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  return lookupDeviceAndQueueAffinityFor(op->getLoc(), affinityAttr, builder);
+}
+
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
+                                                         Value memoryTypes,
+                                                         Value bufferUsage,
+                                                         OpBuilder &builder) {
+  auto [devices, queueAffinities] =
+      lookupDevicesAndQueueAffintiesFor(op, builder);
+  // Returns the device and queue affinity for the first device, if only one
+  // exists.
+  if (devices.size() == 1) {
+    return {devices[0], queueAffinities[0]};
+  }
+  // Emit a select op to let the runtime decide which device/queue affinity to
+  // use, if required.
+  auto selectOp = builder.create<IREE::HAL::AllocatorSelectOp>(
+      op->getLoc(), devices, queueAffinities, memoryTypes, bufferUsage);
+  return {selectOp.getResult(0), selectOp.getResult(1)};
 }
 
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
@@ -72,9 +101,9 @@ Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   return resolveOp.getResult(0);
 }
 
-std::tuple<Value, Value> lookupAllocatorAndQueueAffinityFor(
-    Operation *op, IREE::HAL::MemoryTypeBitfield memoryTypes,
-    IREE::HAL::BufferUsageBitfield bufferUsage, OpBuilder &builder) {
+std::tuple<Value, Value>
+lookupAllocatorAndQueueAffinityFor(Operation *op, Value memoryTypes,
+                                   Value bufferUsage, OpBuilder &builder) {
   auto [device, queueAffinity] =
       lookupDeviceAndQueueAffinityFor(op, memoryTypes, bufferUsage, builder);
   Value allocator =

@@ -48,7 +48,7 @@ int32_t iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_query_shared_memory_bytes(
   return get_shared_memory_bytes(a_tile, b_tile);
 }
 
-// Microkernel for iree_gpu.multi_mma with DataTiledMMAAttr with
+// Microkernel for iree_codegen.inner_tiled with DataTiledMMAAttr with
 // intrinsic = MFMA_I32_16x16x32_I8 and a shape with outer M and N dimensions
 // equal to 1 (so that this is just doing the inner loop on the K dimension).
 //

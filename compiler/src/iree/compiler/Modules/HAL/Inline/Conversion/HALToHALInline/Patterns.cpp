@@ -50,6 +50,30 @@ struct EncodingTypeOpConversion
   }
 };
 
+struct MemoryTypeOpConversion
+    : public OpConversionPattern<IREE::HAL::MemoryTypeOp> {
+  using OpConversionPattern<IREE::HAL::MemoryTypeOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::MemoryTypeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(
+        op, op.getTypeAttr().getInt(), 32);
+    return success();
+  }
+};
+
+struct BufferUsageOpConversion
+    : public OpConversionPattern<IREE::HAL::BufferUsageOp> {
+  using OpConversionPattern<IREE::HAL::BufferUsageOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferUsageOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(
+        op, op.getUsageAttr().getInt(), 32);
+    return success();
+  }
+};
+
 struct BufferSubspanOpPattern
     : public OpConversionPattern<IREE::HAL::BufferSubspanOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -250,6 +274,8 @@ void populateHALToHALInlinePatterns(MLIRContext *context,
 
   patterns.insert<ElementTypeOpConversion>(context);
   patterns.insert<EncodingTypeOpConversion>(context);
+  patterns.insert<MemoryTypeOpConversion>(context);
+  patterns.insert<BufferUsageOpConversion>(context);
 
   patterns.insert<BufferViewCreateOpPattern>(typeConverter, context);
   patterns.insert<BufferViewAssertOpPattern>(typeConverter, context);

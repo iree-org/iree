@@ -710,7 +710,7 @@ iree_status_t iree_hal_amdgpu_executable_create(
   // Pick a device to be our template for device queries. All devices in the
   // topology are expected to be the same. This should have been checked
   // earlier but we do it here in case the user is bypassing that code.
-  IREE_ASSERT_GT(topology->gpu_agent_count, 1);
+  IREE_ASSERT_GE(topology->gpu_agent_count, 1);
   if (IREE_UNLIKELY(topology->gpu_agent_count == 0)) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

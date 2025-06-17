@@ -292,10 +292,13 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         builder.create<vector::ShapeCastOp>(b.getLoc(), bVectorType, b);
     Value cCast =
         builder.create<vector::ShapeCastOp>(c.getLoc(), cVectorType, c);
-    FailureOr<Value> mmaOp = mmaKind.buildMmaOperation(
-        builder, loc, cVectorType, aCast, bCast, cCast);
-    assert(succeeded(mmaOp) && "Failed to construct mma op");
-    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), *mmaOp);
+    SmallVector<Value> results;
+    [[maybe_unused]] LogicalResult createdMmaOp =
+        mmaKind.buildUnderlyingOperations(builder, loc, {aCast, bCast}, {cCast},
+                                          results);
+    assert(succeeded(createdMmaOp) && "Should never fail to construct mma op");
+    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(),
+                                               results[0]);
   }
 };
 

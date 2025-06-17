@@ -187,9 +187,10 @@ def GPUMultiBufferingPass :
 
 def GPUPackToIntrinsicsPass :
     InterfacePass<"iree-codegen-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
-  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
+  let summary = "Packs matmul like operations and converts to iree_codegen.inner_tiled";
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }

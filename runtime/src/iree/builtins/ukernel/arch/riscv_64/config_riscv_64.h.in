@@ -1,0 +1,16 @@
+// Copyright 2025 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// Source for configured header. Processed by CMake configure_file.
+// Only used in the system-toolchain build, not in standalone builds such as
+// bitcode where we use our own Clang.
+
+#ifndef IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_CONFIG_RISCV_64_H_
+#define IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_CONFIG_RISCV_64_H_
+
+#cmakedefine IREE_UK_BUILD_RISCV_64_V
+
+#endif  // IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_CONFIG_RISCV_64_H_

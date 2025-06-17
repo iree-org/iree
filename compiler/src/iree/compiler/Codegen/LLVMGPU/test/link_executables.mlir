@@ -227,3 +227,47 @@ hal.executable private @external_executable {
 //   CHECK-NOT:   hal.executable.export public @export1
 //       CHECK:   builtin.module
 // CHECK-LABEL: hal.executable private @external_executable
+
+// -----
+
+// Tests that linking handles external executables with different target attrs.
+// Here the external executable includes a different config even though it's
+// the same target backend/format. This leads to attempted linking that bails
+// early on the external executable but that should progress on the other
+// internal executables.
+hal.executable private @external_executable {
+  hal.executable.variant public @rocm_hsaco_fb_0 target(<"rocm", "rocm-hsaco-fb", {some.thing}>) {
+    hal.executable.export public @export0 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+  }
+}
+hal.executable private @internal_executable0 {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @export1 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+    }
+  }
+}
+hal.executable private @internal_executable1 {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @export2 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>) count(%arg0: !hal.device) -> (index, index, index) {
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+    }
+  }
+}
+
+// CHECK-LABEL: hal.executable private
+//       CHECK:   hal.executable.export public @export0
+//   CHECK-NOT:   hal.executable.export public @export1
+//       CHECK:   hal.executable.export public @export2
+//       CHECK:   builtin.module
+// CHECK-LABEL: hal.executable private @external_executable
+//       CHECK:   hal.executable.export public @export1

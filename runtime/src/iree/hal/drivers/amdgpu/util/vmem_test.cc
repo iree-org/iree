@@ -15,12 +15,13 @@ namespace iree::hal::amdgpu {
 namespace {
 
 struct VMemTest : public ::testing::Test {
-  iree_allocator_t host_allocator = iree_allocator_system();
-  iree_hal_amdgpu_libhsa_t libhsa;
-  iree_hal_amdgpu_topology_t topology;
+  static iree_allocator_t host_allocator;
+  static iree_hal_amdgpu_libhsa_t libhsa;
+  static iree_hal_amdgpu_topology_t topology;
 
-  void SetUp() override {
+  static void SetUpTestSuite() {
     IREE_TRACE_SCOPE();
+    host_allocator = iree_allocator_system();
     iree_status_t status = iree_hal_amdgpu_libhsa_initialize(
         IREE_HAL_AMDGPU_LIBHSA_FLAG_NONE, iree_string_view_list_empty(),
         host_allocator, &libhsa);
@@ -36,12 +37,15 @@ struct VMemTest : public ::testing::Test {
     }
   }
 
-  void TearDown() override {
+  static void TearDownTestSuite() {
     IREE_TRACE_SCOPE();
     iree_hal_amdgpu_topology_deinitialize(&topology);
     iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
   }
 };
+iree_allocator_t VMemTest::host_allocator;
+iree_hal_amdgpu_libhsa_t VMemTest::libhsa;
+iree_hal_amdgpu_topology_t VMemTest::topology;
 
 //===----------------------------------------------------------------------===//
 // Virtual Memory Utilities

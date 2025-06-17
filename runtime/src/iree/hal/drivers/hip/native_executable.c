@@ -174,17 +174,6 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
                               i);
     }
 
-    uint32_t block_shared_memory_size =
-        iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
-    if (block_shared_memory_size > limits->max_block_shared_memory_size) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "exports[%" PRIhsz
-                              "] requires %uB of shared memory and "
-                              "exceeds the device maximum of %uB per block",
-                              i, block_shared_memory_size,
-                              limits->max_block_shared_memory_size);
-    }
-
     uint32_t constant_count =
         iree_hal_hip_ExportDef_constant_count_get(export_def);
     if (constant_count > IREE_HAL_HIP_MAX_DISPATCH_CONSTANT_COUNT) {
@@ -207,6 +196,30 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
 
     IREE_RETURN_IF_ERROR(iree_hal_debug_verify_export_def(
         iree_hal_hip_ExportDef_debug_info_get(export_def)));
+  }
+
+  return iree_ok_status();
+}
+
+// Verifies a function against the device limits so that we can avoid doing so
+// during runtime.
+static iree_status_t iree_hal_hip_function_attributes_verify(
+    iree_host_size_t id, const iree_hal_hip_dynamic_symbols_t* symbols,
+    hipFunction_t function, const iree_hal_hip_limits_t* limits) {
+  int block_shared_memory_size;
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
+      symbols,
+      hipFuncGetAttribute(
+          &block_shared_memory_size,
+          (hipFuncAttribute)HIP_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, function),
+      "hipFuncGetAttribute"));
+  if (block_shared_memory_size > limits->max_block_shared_memory_size) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "exports[%" PRIhsz
+                            "] requires %uB of shared memory and "
+                            "exceeds the device maximum of %uB per block",
+                            id, block_shared_memory_size,
+                            limits->max_block_shared_memory_size);
   }
 
   return iree_ok_status();
@@ -397,16 +410,8 @@ iree_status_t iree_hal_hip_native_executable_create(
           break;
         }
 
-        uint32_t block_shared_memory_size =
-            iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
-        status = IREE_HIP_CALL_TO_STATUS(
-            symbols,
-            hipFuncSetAttribute(
-                function,
-                (hipFuncAttribute)
-                    HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-                block_shared_memory_size),
-            "hipFuncSetAttribute");
+        status = iree_hal_hip_function_attributes_verify(i, symbols, function,
+                                                         &limits);
         if (!iree_status_is_ok(status)) break;
 
         // Package required parameters for kernel launches for each entry
@@ -419,8 +424,6 @@ iree_status_t iree_hal_hip_native_executable_create(
         kernel_info->block_dims[0] = block_dims->x;
         kernel_info->block_dims[1] = block_dims->y;
         kernel_info->block_dims[2] = block_dims->z;
-        kernel_info->block_shared_memory_size =
-            iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
         kernel_info->constant_count =
             iree_hal_hip_ExportDef_constant_count_get(export_def);
         iree_hal_hip_BindingBits_vec_t binding_flags_vec =

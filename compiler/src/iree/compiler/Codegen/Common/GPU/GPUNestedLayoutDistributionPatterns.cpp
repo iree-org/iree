@@ -1607,9 +1607,9 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
   for (auto [unDistributedDim, upperBound] : llvm::enumerate(upperBounds)) {
     SmallVector<int64_t> undistributedShape =
         layout.getPackedShapeForUndistributedDim(unDistributedDim);
-    SmallVector<int64_t> distrShape{undistributedShape[batchIdx],
-                                    undistributedShape[outerIdx],
-                                    undistributedShape[elementIdx]};
+    std::array<int64_t, 3> distrShape{undistributedShape[batchIdx],
+                                      undistributedShape[outerIdx],
+                                      undistributedShape[elementIdx]};
     int64_t elementPerThread = ShapedType::getNumElements(distrShape);
     auto allValid =
         rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread);
@@ -1620,11 +1620,13 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
     // A special condition if the pre-distribution bounds match
     // the mask dimension length, then the distributed bounds
     // should exhibit the same property.
-    if (auto constUpperBound = dyn_cast_or_null<arith::ConstantIndexOp>(
-            upperBound.getDefiningOp())) {
+
+    APInt constUpperBound;
+    if (matchPattern(upperBound.getDefiningOp(),
+                     m_ConstantInt(&constUpperBound))) {
       int64_t undistributedDimLen =
           ShapedType::getNumElements(undistributedShape);
-      if (constUpperBound.value() == undistributedDimLen) {
+      if (constUpperBound.getZExtValue() == undistributedDimLen) {
         bounds.push_back(allValid);
         continue;
       }

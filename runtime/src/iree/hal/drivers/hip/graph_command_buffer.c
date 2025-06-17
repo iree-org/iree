@@ -815,7 +815,6 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
       .gridDim.z = workgroup_count[2],
       .func = kernel_params->function,
       .kernelParams = params_ptr,
-      .sharedMemBytes = kernel_params->block_shared_memory_size,
   };
 
   if (command_buffer->graph_node_count >=

@@ -92,15 +92,30 @@ def IREECodegen_Dialect : Dialect {
     /// the module once and can reuse it across all invocations.
     std::mutex libraryMutex;
   }];
+  // We use linalg.iterator_type to avoid clashing definitions for the
+  // enum attribute that wraps mlir::utils::IteratorType, so we need to be
+  // able to parse it.
+  let dependentDialects = ["::mlir::linalg::LinalgDialect"];
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
   let hasOperationAttrVerify = 1;
 }
+
+//===----------------------------------------------------------------------===//
+// Type definitions
+//===----------------------------------------------------------------------===//
 
 def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
 
 class RankedTensorOrMemRefType<list<Type> allowedTypes, list<int> ranks>
     : AnyTypeOf<[TensorRankOf<allowedTypes, ranks>,
         MemRefRankOf<allowedTypes, ranks>]>;
+
+class RankedTensorOrVectorOf<list<Type> allowedTypes> :
+  ShapedContainerType<allowedTypes,
+      Or<[IsVectorOfNonZeroRankTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
+  "ranked tensor or vector", "::mlir::ShapedType">;
+
+def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_DIALECT

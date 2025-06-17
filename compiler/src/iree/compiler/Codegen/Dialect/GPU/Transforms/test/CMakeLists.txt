@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "combine_barrier_regions.mlir"
     "concretize_mma_shapes.mlir"
-    "distribute_mma_to_lanes.mlir"
+    "distribute_inner_tiled_to_lanes.mlir"
   TOOLS
     FileCheck
     iree-opt

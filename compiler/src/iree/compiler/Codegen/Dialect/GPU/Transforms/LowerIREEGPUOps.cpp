@@ -27,7 +27,7 @@ void LowerIREEGPUOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   populateIREEGPULowerValueBarrierPatterns(patterns);
-  populateIREEGPULowerMultiMmaPatterns(patterns);
+  populateIREEGPULowerInnerTiledPatterns(patterns);
   populateIREEGPULowerGlobalLoadDMAPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

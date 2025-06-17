@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include <numeric>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -516,6 +517,8 @@ MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
 
 int64_t MMAAttr::getExpectedNumInputs() const { return 2; }
 
+int64_t MMAAttr::getExpectedNumOutputs() const { return 1; }
+
 LogicalResult MMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
 }
@@ -569,6 +572,13 @@ Attribute MMAAttr::getDistributionMappingKind() const {
   return IREE::GPU::LaneIdAttr::get(getContext(), 0);
 }
 
+OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                                 Operation *) const {
+  if (!getDistributionMappingKind())
+    return OpFoldResult();
+  return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
+}
+
 // Get virtual intrinsics that is composed/based on queried op.
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
@@ -619,22 +629,28 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
 
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
-FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
-                                            Type resultType, Value lhs,
-                                            Value rhs, Value acc) const {
-  auto [aType, bType, cType] = getABCVectorTypes();
-  if (aType != lhs.getType() || bType != rhs.getType() ||
-      cType != acc.getType()) {
+LogicalResult
+MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
+                                   ValueRange inputs, ValueRange outputs,
+                                   SmallVectorImpl<Value> &results) const {
+  if (inputs.size() != 2) {
     return failure();
   }
-  // Fail if the result type does not match with the expected return type of
-  // the intrinsic. We expect the caller to handle type conversions externally.
-  if (cType != resultType) {
+  if (outputs.size() != 1) {
     return failure();
   }
-  if (Value value = createMmaOp(builder, loc, getIntrinsic(), resultType, lhs,
-                                rhs, acc, getColMajor())) {
-    return value;
+  SmallVector<VectorType> threadTypes;
+  getDistributedTileTypes(threadTypes);
+  if (!llvm::equal(threadTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
+  if (Value value =
+          createMmaOp(builder, loc, getIntrinsic(), outputs[0].getType(),
+                      inputs[0], inputs[1], outputs[0], getColMajor())) {
+    results.push_back(value);
+    return success();
   }
   return failure();
 }
@@ -755,6 +771,8 @@ sliceSwizzledShape(const TileSwizzle &swizzle,
 
 int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
 
+int64_t DataTiledMMAAttr::getExpectedNumOutputs() const { return 1; }
+
 LogicalResult
 DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
@@ -793,6 +811,18 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
 Attribute DataTiledMMAAttr::getDistributionMappingKind() const {
   return gpu::GPUThreadMappingAttr::get(getContext(),
                                         gpu::MappingId::LinearDim0);
+}
+
+OpFoldResult
+DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                             Operation *opToDistribute) const {
+  if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
+    if (auto wgSizes = getWorkgroupSize(func)) {
+      return getAsIndexOpFoldResult(getContext(),
+                                    ShapedType::getNumElements(*wgSizes));
+    }
+  }
+  return OpFoldResult();
 }
 
 LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
@@ -944,20 +974,20 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
   return distributedValues;
 }
 
-FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
-                                                     Location loc,
-                                                     Type resultType, Value lhs,
-                                                     Value rhs,
-                                                     Value acc) const {
+LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results) const {
   // Validation. Similar to MMAAttr::buildMmaOperation.
-  auto [aType, bType, cType] = getABCVectorTypes();
-  if (aType != lhs.getType() || bType != rhs.getType() ||
-      cType != acc.getType()) {
+  if (inputs.size() != 2) {
     return failure();
   }
-  // Fail if the result type does not match with the expected return type of
-  // the intrinsic. We expect the caller to handle type conversions externally.
-  if (cType != resultType) {
+  if (outputs.size() != 1) {
+    return failure();
+  }
+  SmallVector<VectorType> regTypes;
+  getDistributedTileTypes(regTypes);
+  if (!llvm::equal(regTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
   }
 
@@ -966,20 +996,20 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   LDBG("DataTiledMMAAttr::buildMmaOperation");
   LDBG("    lhsSwizzle: " << lhsSwizzle);
   SmallVector<Value> intrinsicsLhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, lhs, lhsSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
 
   TileSwizzle rhsSwizzle = getSwizzle(*this, MMAFragment::Rhs);
   LDBG("DataTiledMMAAttr::buildMmaOperation");
   LDBG("    rhsSwizzle: " << rhsSwizzle);
   SmallVector<Value> intrinsicsRhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, rhs, rhsSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
 
   TileSwizzle accSwizzle = getSwizzle(*this, MMAFragment::Acc);
   LDBG("DataTiledMMAAttr::buildMmaOperation");
   LDBG("    accSwizzle: " << accSwizzle);
 
   SmallVector<Value> intrinsicsAcc =
-      distributeMmaFragmentToIntrinsics(builder, loc, acc, accSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
 
   MMAIntrinsic intrinsic = getIntrinsic();
   VectorType intrinCType =
@@ -1012,15 +1042,20 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   int dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);
   SmallVector<int64_t> indices(dstRank, 0);
+  Value acc = outputs[0];
   for (Value intrAcc : intrinsicsAcc) {
     auto expandedAcc = builder.create<vector::ShapeCastOp>(
-        loc, VectorType::get(accInternalShape, cType.getElementType()),
+        loc,
+        VectorType::get(
+            accInternalShape,
+            cast<VectorType>(outputs[0].getType()).getElementType()),
         intrAcc);
     acc = builder.create<vector::InsertStridedSliceOp>(loc, expandedAcc, acc,
                                                        indices, strides);
     incrementIndices(indices, accCrossIntrinsicShape);
   }
-  return acc;
+  results.push_back(acc);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1079,6 +1114,8 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
 
 int64_t VirtualMMAAttr::getExpectedNumInputs() const { return 2; }
 
+int64_t VirtualMMAAttr::getExpectedNumOutputs() const { return 1; }
+
 LogicalResult
 VirtualMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
@@ -1117,6 +1154,11 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
 
 Attribute VirtualMMAAttr::getDistributionMappingKind() const {
   return IREE::GPU::LaneIdAttr::get(getContext(), 0);
+}
+
+OpFoldResult VirtualMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                                        Operation *) const {
+  return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
 LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
@@ -1158,20 +1200,22 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
 
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
-FailureOr<Value> VirtualMMAAttr::buildMmaOperation(OpBuilder &builder,
-                                                   Location loc,
-                                                   Type resultType, Value lhs,
-                                                   Value rhs, Value acc) const {
-  auto [aType, bType, cType] = getABCVectorTypes();
-  if (aType != lhs.getType() || bType != rhs.getType() ||
-      cType != acc.getType()) {
+LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results) const {
+  if (inputs.size() != 2) {
     return failure();
   }
-  // Fail if the result type does not match with the expected return type of
-  // the intrinsic. We expect the caller to handle type conversions externally.
-  if (cType != resultType) {
+  if (outputs.size() != 1) {
     return failure();
   }
+  SmallVector<VectorType> threadTypes;
+  getDistributedTileTypes(threadTypes);
+  if (!llvm::equal(threadTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
@@ -1190,21 +1234,23 @@ FailureOr<Value> VirtualMMAAttr::buildMmaOperation(OpBuilder &builder,
       return failure();
     }
     int64_t vectorWidth = aType.getShape()[0] / unrollKFactor;
+    Value acc = outputs[0];
     for (int i = 0; i < unrollKFactor; i++) {
       int64_t offset = vectorWidth * i;
       Value sliced_lhs = builder.create<vector::ExtractStridedSliceOp>(
-          loc, lhs, ArrayRef<int64_t>{offset}, ArrayRef<int64_t>{vectorWidth},
-          ArrayRef<int64_t>{1});
+          loc, inputs[0], ArrayRef<int64_t>{offset},
+          ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       Value sliced_rhs = builder.create<vector::ExtractStridedSliceOp>(
-          loc, rhs, ArrayRef<int64_t>{offset}, ArrayRef<int64_t>{vectorWidth},
-          ArrayRef<int64_t>{1});
+          loc, inputs[1], ArrayRef<int64_t>{offset},
+          ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       acc = builder
-                .create<amdgpu::MFMAOp>(loc, resultType, m, n, nativeKSize,
-                                        getBlockSize(), sliced_lhs, sliced_rhs,
-                                        acc)
+                .create<amdgpu::MFMAOp>(loc, outputs[0].getType(), m, n,
+                                        nativeKSize, getBlockSize(), sliced_lhs,
+                                        sliced_rhs, acc)
                 .getResult();
     }
-    return acc;
+    results.push_back(acc);
+    return success();
   }
   }
   return failure();
