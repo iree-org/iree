@@ -70,10 +70,14 @@ typedef struct iree_hal_amdgpu_host_block_pools_t {
 // This is currently limited by the `uint16_t packet_offset` in
 // iree_hal_amdgpu_device_cmd_header_t.
 //
-// TODO(benvanik): limit further to fly under Tracy event limits.
-#define IREE_HAL_AMDGPU_COMMAND_BUFFER_MAX_BLOCK_AQL_PACKET_COUNT              \
-  (1u << sizeof(((iree_hal_amdgpu_device_cmd_header_t*)NULL)->packet_offset) * \
-             8)
+// TODO(benvanik): currently we also limit this by tracy's outstanding GPU event
+// limit. If we made our own timeline (which we really need to for concurrency)
+// then we could eliminate this artificial limit.
+#define IREE_HAL_AMDGPU_COMMAND_BUFFER_MAX_BLOCK_AQL_PACKET_COUNT            \
+  IREE_AMDGPU_MIN(IREE_HAL_AMDGPU_DEVICE_QUERY_RINGBUFFER_CAPACITY,          \
+                  (1u << sizeof(((iree_hal_amdgpu_device_cmd_header_t*)NULL) \
+                                    ->packet_offset) *                       \
+                             8))
 
 // Recording options for a command buffer.
 // Referenced data structures such as block pools must remain live for the
