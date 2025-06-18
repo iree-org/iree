@@ -186,7 +186,7 @@ struct BubbleExpandThroughExtract final
     const SmallVector<ReassociationIndices, 4> reassoc =
         expandOp.getReassociationIndices();
     int64_t droppedDimCount = 0;
-    for (uint64_t i = 0; i < extractSrcRank; i++) {
+    for (uint64_t i = 0; i < extractSrcRank; ++i) {
       if (droppedDims.test(i)) {
         ++droppedDimCount;
         continue;
@@ -208,7 +208,7 @@ struct BubbleExpandThroughExtract final
     newReassociation.reserve(extractSrcRank);
     int64_t count = 0;
     uint64_t expandedIdx = 0;
-    for (uint64_t i = 0; i < extractSrcRank; i++) {
+    for (uint64_t i = 0; i < extractSrcRank; ++i) {
       if (droppedDims.test(i)) {
         newReassociation.push_back(ReassociationIndices{count++});
       } else {
@@ -228,13 +228,15 @@ struct BubbleExpandThroughExtract final
     auto zeroAttr = rewriter.getIndexAttr(0);
     auto oneAttr = rewriter.getIndexAttr(1);
 
+    // Find the new offsets/sizes/strides for the `extract_slice `& new expanded
+    // shape for the `expand_shape`.
     SmallVector<int64_t> newExpandShape;
     SmallVector<OpFoldResult> newOffsets;
     SmallVector<OpFoldResult> newSizes;
     SmallVector<OpFoldResult> newStrides;
     droppedDimCount = 0;
     for (const auto &[inDim, outDims] : llvm::enumerate(newReassociation)) {
-      droppedDimCount += droppedDims.test(inDim) ? 1 : 0;
+      droppedDimCount += droppedDims.test(inDim);
       if (outDims.size() == 1) {
         newExpandShape.push_back(extractSrcShape[inDim]);
         newOffsets.push_back(oldOffsets[inDim]);
@@ -254,7 +256,7 @@ struct BubbleExpandThroughExtract final
 
     auto newExpandType =
         RankedTensorType::get(newExpandShape, expandedType.getElementType());
-    // The builder can't fail to compute the output_shape because none of
+    // The builder can't fail to infer the output_shape because none of
     // the dynamic dimensions are expanded.
     auto newExpand = rewriter.create<tensor::ExpandShapeOp>(
         expandOp.getLoc(), newExpandType, extractOp.getSource(),
