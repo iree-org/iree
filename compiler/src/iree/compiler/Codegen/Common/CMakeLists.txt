@@ -150,6 +150,7 @@ iree_cc_library(
     "RematerializeParallelOps.cpp"
     "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
+    "ReshapePatterns.cpp"
     "ResolveSwizzleHints.cpp"
     "SpecializeExports.cpp"
     "SplitFullPartialTransferPass.cpp"
