@@ -156,15 +156,10 @@ static void sortMMAIntrinsics(GPUMatmulShapeType problem,
       return lhsMNAligned > rhsMNAligned;
     }
 
-    // If alignment situation is the same, prefer the intrinsic with larger size
-    auto collapseVector = [](const SmallVector<int64_t, 2> &sizes) {
-      return std::accumulate(sizes.begin(), sizes.end(), 1,
-                             std::multiplies<int64_t>());
-    };
     auto intrinsicArea = [&](const GPUMatmulShapeType &intrinsic) {
-      return (collapseVector(intrinsic.mSizes) +
-              collapseVector(intrinsic.nSizes)) *
-             collapseVector(intrinsic.kSizes);
+      return (ShapedType::getNumElements(intrinsic.mSizes) +
+              ShapedType::getNumElements(intrinsic.nSizes)) *
+             ShapedType::getNumElements(intrinsic.kSizes);
     };
     auto lhsArea = intrinsicArea(lhs);
     auto rhsArea = intrinsicArea(rhs);
@@ -173,7 +168,8 @@ static void sortMMAIntrinsics(GPUMatmulShapeType problem,
     }
 
     // Finally if everything else is the same, prefer large K size.
-    return collapseVector(lhs.kSizes) > collapseVector(rhs.kSizes);
+    return ShapedType::getNumElements(lhs.kSizes) >
+           ShapedType::getNumElements(rhs.kSizes);
   });
 }
 
