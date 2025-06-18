@@ -131,28 +131,21 @@ void addSPIRVVectorLoweringPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createSPIRVFinalVectorLoweringPass());
 }
 
-/// TODO(#20912): Enable the injection of assume_alignment ops after the
-/// hoisting bug is fixed.
 static void addBufferizePasses(OpPassManager &funcPassManager,
-                               BufferizationOptions::AllocationFn fn,
-                               bool injectAssumeAlignmentOp = true) {
+                               BufferizationOptions::AllocationFn fn) {
   BufferizationOptions::AllocationFn allocationFn = fn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn,
-                                      injectAssumeAlignmentOp);
+  addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
 }
 
-/// TODO(#20912): Enable the injection of assume_alignment ops after the
-/// hoisting bug is fixed.
 static void
 addSPIRVBufferizePasses(OpPassManager &funcPassManager,
-                        BufferizationOptions::AllocationFn allocationFn,
-                        bool injectAssumeAlignmentOp = true) {
+                        BufferizationOptions::AllocationFn allocationFn) {
   // Resolve dim ops first so that we don't have compute Linalg ops lingering on
   // becuase of dim op usage. This avoids bufferizing those compute ops just for
   // their shape dimensions.
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  addBufferizePasses(funcPassManager, allocationFn, injectAssumeAlignmentOp);
+  addBufferizePasses(funcPassManager, allocationFn);
   // Distribute immediately after bufferization to avoid losing attribute
   // annotations in subsequent transformations. This is a bit fragile right now
   // but we expect upstream for loops to eventually recognize distribution as a
@@ -394,8 +387,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
       funcPassManager, /*useFuseTensorPadWithConsumerPass=*/false,
       /*useWARForCooperativeMatrixCodegen=*/true);
 
-  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn,
-                     /*injectAssumeAlignmentOp=*/false);
+  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
 
   // Tile to GPU workgroups and promote.
   funcPassManager.addPass(
@@ -508,8 +500,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Bufferize.
-  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn,
-                     /*injectAssumeAlignmentOp=*/false);
+  addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
 
   // Distribute scf.forall to GPU threads.
   funcPassManager.addPass(createGPUDistributePass());
