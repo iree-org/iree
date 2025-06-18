@@ -381,14 +381,13 @@ LogicalResult DispatchRegionOp::verify() {
   }
 
   // Verify terminator.
-  SmallVector<Flow::ReturnOp> returnOps;
-  for (Block &block : getBody()) {
-    if (auto returnOp =
-            dyn_cast_or_null<Flow::ReturnOp>(block.getTerminator())) {
-      returnOps.push_back(returnOp);
+  for (auto returnOp : getBody().getOps<Flow::ReturnOp>()) {
+    if (returnOp.getNumOperands() != getNumResults()) {
+      return returnOp->emitOpError()
+             << "number of results (" << getNumResults()
+             << ") does not match number of returned values ("
+             << returnOp.getNumOperands() << ")";
     }
-  }
-  for (auto returnOp : returnOps) {
     for (const auto [resultType, returnType] :
          llvm::zip_equal(getResultTypes(), returnOp->getOperandTypes()))
       if (resultType != returnType) {
