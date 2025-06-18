@@ -3093,4 +3093,109 @@ LogicalResult CustomOp::getResultTilePosition(
   return success();
 }
 
+//===---------------------------------------------------------------------===//
+// tensor::ConcatOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+struct ConcatOpTilingExternalModel
+    : public TilingInterface::ExternalModel<ConcatOpTilingExternalModel,
+                                            tensor::ConcatOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *op) const {
+    auto concatOp = cast<tensor::ConcatOp>(op);
+    SmallVector<utils::IteratorType> iteratorTypes(
+        concatOp.getResultType().getRank(), utils::IteratorType::parallel);
+    iteratorTypes[concatOp.getDim()] = utils::IteratorType::reduction;
+    return iteratorTypes;
+  }
+  SmallVector<Range> getIterationDomain(Operation *op,
+                                        OpBuilder &builder) const;
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &builder,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const;
+
+  FailureOr<TilingResult>
+  generateResultTileValue(Operation *op, OpBuilder &builder,
+                          unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+                          ArrayRef<OpFoldResult> sizes) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  LogicalResult
+  getResultTilePosition(Operation *op, OpBuilder &builder,
+                        unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+                        ArrayRef<OpFoldResult> sizes,
+                        SmallVector<OpFoldResult> &resultOffsets,
+                        SmallVector<OpFoldResult> &resultSizes) const {
+    resultOffsets.assign(offsets.begin(), offsets.end());
+    resultSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+};
+} // namespace
+
+SmallVector<Range>
+ConcatOpTilingExternalModel::getIterationDomain(Operation *op,
+                                                OpBuilder &builder) const {
+  auto concatOp = cast<tensor::ConcatOp>(op);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+
+  ReifiedRankedShapedTypeDims reifiedDims;
+  LogicalResult result = concatOp.reifyResultShapes(builder, reifiedDims);
+  (void)result;
+  assert(succeeded(result));
+
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, concatOp.getResultType().getRank())) {
+    ranges.push_back(Range{zero, reifiedDims[0][dim], one});
+    continue;
+  }
+
+  return ranges;
+}
+
+FailureOr<TilingResult> ConcatOpTilingExternalModel::getTiledImplementation(
+    Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) const {
+  auto concatOp = cast<tensor::ConcatOp>(op);
+  Location loc = concatOp.getLoc();
+  uint64_t dim = concatOp.getDim();
+  RankedTensorType resultType = concatOp.getResultType();
+
+  // Don't support tiling along the concated dimension.
+  std::optional<int64_t> concatDimSize = getConstantIntValue(sizes[dim]);
+  if (!concatDimSize || concatDimSize.value() != resultType.getDimSize(dim)) {
+    return failure();
+  }
+
+  // Collect slices of each operand.
+  SmallVector<OpFoldResult> strides(resultType.getRank(),
+                                    builder.getI64IntegerAttr(1));
+  SmallVector<OpFoldResult> operandSizes(sizes);
+  operandSizes[dim] = getDim(builder, loc, concatOp.getOperand(0), dim);
+  SmallVector<Operation *> slices =
+      llvm::map_to_vector(concatOp.getOperands(), [&](Value operand) {
+        return getSlice(builder, loc, operand, offsets, operandSizes, strides);
+      });
+  SmallVector<Value> sliceValues = llvm::map_to_vector(
+      slices, [](Operation *slice) -> Value { return slice->getResult(0); });
+
+  // Create tiled `tensor.concat`.
+  SmallVector<int64_t> resultStaticShape;
+  SmallVector<Value> resultDynamicShape;
+  dispatchIndexOpFoldResults(sizes, resultDynamicShape, resultStaticShape);
+  auto newResultType = resultType.clone(resultStaticShape);
+  Operation *tiledConcatOp =
+      mlir::clone(builder, concatOp.getOperation(), TypeRange{newResultType},
+                  ValueRange(sliceValues));
+  return TilingResult{
+      {tiledConcatOp}, SmallVector<Value>(tiledConcatOp->getResults()), slices};
+}
+
+void registerConcatOpTilingInterfaceExternalModel(MLIRContext *ctx) {
+  tensor::ConcatOp::attachInterface<ConcatOpTilingExternalModel>(*ctx);
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
