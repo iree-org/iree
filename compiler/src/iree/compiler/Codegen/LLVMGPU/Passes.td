@@ -89,6 +89,7 @@ def LLVMGPUPackSharedMemoryAllocPass :
 def LLVMGPUPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
   let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
+  let dependentDialects = ["amdgpu::AMDGPUDialect"];
 }
 
 def LLVMGPUSelectLoweringStrategyPass :
