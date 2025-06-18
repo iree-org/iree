@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -13,8 +15,12 @@
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_FOLDRESHAPEINTOINTERFACETENSORPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -864,6 +870,18 @@ struct FoldExpandShapeIntoLoadFromBuffer
     moveOpAfterLastOperand(rewriter, domInfo, loadOp);
     rewriter.replaceOp(expandOp, loadOp);
     return success();
+  }
+};
+
+struct FoldReshapeIntoInterfaceTensorPass final
+    : impl::FoldReshapeIntoInterfaceTensorPassBase<
+          FoldReshapeIntoInterfaceTensorPass> {
+  void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+    populateReshapeToInterfaceTensorPatterns(patterns);
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

@@ -49,6 +49,7 @@ iree_lit_test_suite(
     "flatten_memref_subspan.mlir"
     "fold_affine_min_in_distributed_loops.mlir"
     "fold_affine_min_of_block_id.mlir"
+    "fold_reshape_into_interface_tensor.mlir"
     "fold_tensor_extract_op.mlir"
     "forall_to_for.mlir"
     "forop_canonicalization.mlir"
