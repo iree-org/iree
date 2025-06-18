@@ -147,7 +147,7 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
   }
 }
 
-static SmallVector<GPUMatmulShapeType>
+static SmallVector<GPUIntrinsicType>
 getIntrinsics(linalg::LinalgOp linalgOp,
               ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   IREE::GPU::TargetAttr target;
@@ -166,7 +166,7 @@ getIntrinsics(linalg::LinalgOp linalgOp,
   return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
+    return GPUIntrinsicType{mSize, nSize, kSize, aType, bType, cType, mma};
   });
 }
 
@@ -174,7 +174,7 @@ static void
 padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
           ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics =
+  SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
@@ -346,7 +346,7 @@ static void padContractionLikeOp(
   }
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics =
+  SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
