@@ -415,7 +415,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
     bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
-  for (auto intrinsic : intrinsics) {
+  for (const GPUIntrinsicType &intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
@@ -541,7 +541,7 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
          pvMatmul.kSizes.size() == 1 && qkMatmul.mSizes.size() == 1 &&
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
-  for (auto intrinsic : intrinsics) {
+  for (const GPUIntrinsicType &intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
