@@ -42,7 +42,7 @@ util.func public @test_outer_dim_concat(%arg0: tensor<32x?x64xf16>, %arg1: tenso
 
 // -----
 
-// Do not modify concat in `flow.dispatch.region`
+// Do not modify concat in `flow.dispatch.region`.
 util.func public @test_concat_in_dispatch(%arg0: tensor<32x8x64xf16>, %arg1: tensor<32x8x64xf16>) -> tensor<32x8x128xf16> {
   %dispatch = flow.dispatch.region -> (tensor<32x8x128xf16>) {
     %concat = tensor.concat dim(2) %arg0, %arg1 : (tensor<32x8x64xf16>, tensor<32x8x64xf16>) -> tensor<32x8x128xf16>
