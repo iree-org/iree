@@ -123,6 +123,60 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+/// Sort the MMA intrinsics by following precedence rules:
+///   1) k-alignment. We prefer intrinsics that can evenly divide the K
+///   dimension of the problem.
+///   2) M/N-alignment. We prefer intrinsics that can evenly divide the M and N
+///   dimensions of the problem.
+///   3) Intrinsic with larger gemm size.
+///   4) Intrinsic with larger K size.
+static void sortMMAIntrinsics(GPUMatmulShapeType problem,
+                              SmallVector<GPUIntrinsicType> &intrinsics) {
+  llvm::sort(intrinsics, [&](const GPUMatmulShapeType &lhs,
+                             const GPUMatmulShapeType &rhs) {
+    // Prefer K-aligned intrinsics.
+    int64_t lhsKAligned =
+        problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
+    int64_t rhsKAligned =
+        problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
+    if (lhsKAligned != rhsKAligned) {
+      return lhsKAligned > rhsKAligned;
+    }
+
+    // If K alignment is the same, prefer the intrinsic that aligns M and N.
+    int64_t lhsMNAligned = (problem.mSizes.back() % lhs.mSizes.back() == 0 &&
+                            problem.nSizes.back() % lhs.nSizes.back() == 0)
+                               ? 1
+                               : 0;
+    int64_t rhsMNAligned = (problem.mSizes.back() % rhs.mSizes.back() == 0 &&
+                            problem.nSizes.back() % rhs.nSizes.back() == 0)
+                               ? 1
+                               : 0;
+    if (lhsMNAligned != rhsMNAligned) {
+      return lhsMNAligned > rhsMNAligned;
+    }
+
+    // If alignment situation is the same, prefer the intrinsic with larger size
+    auto collapseVector = [](const SmallVector<int64_t, 2> &sizes) {
+      return std::accumulate(sizes.begin(), sizes.end(), 1,
+                             std::multiplies<int64_t>());
+    };
+    auto intrinsicArea = [&](const GPUMatmulShapeType &intrinsic) {
+      return (collapseVector(intrinsic.mSizes) +
+              collapseVector(intrinsic.nSizes)) *
+             collapseVector(intrinsic.kSizes);
+    };
+    auto lhsArea = intrinsicArea(lhs);
+    auto rhsArea = intrinsicArea(rhs);
+    if (lhsArea != rhsArea) {
+      return lhsArea > rhsArea;
+    }
+
+    // Finally if everything else is the same, prefer large K size.
+    return collapseVector(lhs.kSizes) > collapseVector(rhs.kSizes);
+  });
+}
+
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
@@ -144,6 +198,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   }
   if (intrinsics.empty())
     return std::nullopt;
+  sortMMAIntrinsics(problem, intrinsics);
 
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
