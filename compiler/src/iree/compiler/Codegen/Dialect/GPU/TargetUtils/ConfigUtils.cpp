@@ -130,7 +130,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
     bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUIntrinsicType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a distribution kind cannot be distributed.
     if (!mma.getDistributionMappingKind())
@@ -140,7 +140,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   }
   if (intrinsics.empty())
     return std::nullopt;
@@ -347,8 +347,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind =
-      target.getWgp().getMma()[schedule->index];
+  IREE::GPU::MmaInterfaceAttr mmaKind = schedule->mmaKind;
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
@@ -363,10 +362,12 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   if (mustBeAligned) {
-    bool directLoadArray[] = {true, true};
-    ArrayRef<bool> directLoadOperands =
-        useDirectLoad ? directLoadArray : ArrayRef<bool>{};
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, directLoadOperands);
+    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
+    ArrayRef<Attribute> promotionTypes =
+        useDirectLoad ? ArrayRef<Attribute>(promotionArray)
+                      : ArrayRef<Attribute>{};
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, promotionTypes);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.

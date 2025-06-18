@@ -86,6 +86,13 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
 /// attribute.
 StringRef getTilingLevelName(GPU::TilingLevel level);
 
+//===----------------------------------------------------------------------===//
+// Implementations for operand promotion
+//===----------------------------------------------------------------------===//
+
+Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
+                                Attribute attr);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off

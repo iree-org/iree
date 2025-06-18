@@ -1500,6 +1500,15 @@ bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
 }
 
 //===----------------------------------------------------------------------===//
+// PromoteWithCacheSwizzleAttr
+//===----------------------------------------------------------------------===//
+
+Value PromoteWithCacheSwizzleAttr::promoteOperand(
+    mlir::OpBuilder &builder, mlir::OpOperand &operand) const {
+  return cacheSwizzlePromotionImpl(builder, operand, getCopyConfig());
+}
+
+//===----------------------------------------------------------------------===//
 // LaneIdAttr
 //===----------------------------------------------------------------------===//
 
