@@ -3121,6 +3121,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fold-reshape-into-interface-tensor" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-fold-reshape-into-interface-tensor
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-tensor-extract-op" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fold-tensor-extract-op
@@ -5975,6 +5984,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fold-reshape-into-interface-tensor" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-fold-reshape-into-interface-tensor
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-tensor-extract-op" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fold-tensor-extract-op
@@ -6842,6 +6860,8 @@ on subspan ops to the consumer load/store ops, in preparation for lowering
 to backends that require linearized access.</p>
 <h3 id="-iree-codegen-fold-affinemin-in-distributed-loops"><code>-iree-codegen-fold-affinemin-in-distributed-loops</code><a class="headerlink" href="#-iree-codegen-fold-affinemin-in-distributed-loops" title="Permanent link">link</a></h3>
 <p><em>Fold <code>affine.min</code> ops in distributed loops</em></p>
+<h3 id="-iree-codegen-fold-reshape-into-interface-tensor"><code>-iree-codegen-fold-reshape-into-interface-tensor</code><a class="headerlink" href="#-iree-codegen-fold-reshape-into-interface-tensor" title="Permanent link">link</a></h3>
+<p><em>Folds reshape operations into the interface bindings.</em></p>
 <h3 id="-iree-codegen-fold-tensor-extract-op"><code>-iree-codegen-fold-tensor-extract-op</code><a class="headerlink" href="#-iree-codegen-fold-tensor-extract-op" title="Permanent link">link</a></h3>
 <p><em>Fold <code>tensor.extract</code> operations prior to lowering to LLVM</em></p>
 <p>After running the upstream TensorConstantBufferize pass, remove
