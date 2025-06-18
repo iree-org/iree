@@ -7,6 +7,7 @@
 #include "iree/compiler/ExternalInterfaces/LinalgExtExternalModels.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
@@ -129,6 +130,9 @@ void registerLinalgExtExternalModels(DialectRegistry &registry) {
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
         >(ctx);
     linalg::SoftmaxOp::attachInterface<SoftmaxFusionOpInterfaceAdapter>(*ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    IREE::LinalgExt::registerConcatOpTilingInterfaceExternalModel(ctx);
   });
 }
 
