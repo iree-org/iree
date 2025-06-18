@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -113,6 +114,7 @@ public:
     emitBarrier(loc, rewriter);
     emitCompute(mapping[0], rewriter, indVar);
     emitBarrier(loc, rewriter);
+    emitSchedBarrier(loc, rewriter);
     emitWrite(mapping[1], rewriter, iPlusOne);
     updateYield(mapping[0], rewriter);
     return;
@@ -328,6 +330,12 @@ private:
   /// Creates a gpu.barrier op with |rewriter|.
   void emitBarrier(Location loc, RewriterBase &rewriter) {
     rewriter.create<gpu::BarrierOp>(loc);
+  }
+
+  void emitSchedBarrier(Location loc, RewriterBase &rewriter) {
+    rewriter.create<amdgpu::SchedBarrierOp>(
+        loc, amdgpu::sched_barrier_opt_enumAttr::get(
+                 rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
   }
 
   /// Creates all compute stage ops for a loop iteration with |rewriter| and
