@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -237,6 +238,39 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasFolder = 1;
+  let hasVerifier = 1;
+}
+
+// TODO: to_layout, to_simt, to_simd, layouted_expand are very similar ops and
+// should eventually be one op really.
+def IREEVectorExt_LayoutedExpandOp : IREEVectorExt_PureOp<"layouted_expand",
+    [ViewLikeOpInterface, Pure]> {
+  let summary = [{}];
+  let description = [{}];
+  let arguments = (ins
+    AnyShaped:$input,
+    Variadic<Index>:$offsets,
+    // TODO: Generalize to VectorLayoutInterface.
+    NestedLayoutAttr:$layout
+  );
+  let results = (outs
+    AnyShaped:$output
+  );
+
+  let extraClassDeclaration = [{
+    Value getViewSource() {
+      return getInput();
+    }
+
+    static ShapedType computeLayoutedExpandedType(
+      ShapedType ty, NestedLayoutAttr layout);
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$input, "ValueRange":$indices, "NestedLayoutAttr":$layout)>
+  ];
+
+  let assemblyFormat = "$input  `[` $offsets `]` `to` `layout` `(` $layout `)` attr-dict `:` type($input) `->` type($output)";
   let hasVerifier = 1;
 }
 

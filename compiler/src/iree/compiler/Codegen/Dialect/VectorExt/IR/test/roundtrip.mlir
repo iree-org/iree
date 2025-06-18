@@ -179,3 +179,23 @@ func.func @transfer_gather(%indices: vector<128xindex>,
 
 // CHECK-LABEL: func.func @transfer_gather
 // CHECK: iree_vector_ext.transfer_gather
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 4],
+  outer_tile = [4, 1],
+  thread_tile = [4, 2],
+  element_tile = [1, 4],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [1, 4]
+>
+
+func.func @layouted_pack(%mem: memref<64x64xf16>) -> memref<2x2x1x1x2x4x4x1x4x2x1x4xf16> {
+  %packed = iree_vector_ext.layouted_pack %mem layout(#nested) : memref<64x64xf16> -> memref<2x2x1x1x2x4x4x1x4x2x1x4xf16>
+  func.return %packed : memref<2x2x1x1x2x4x4x1x4x2x1x4xf16>
+}
+// CHECK-LABEL: func.func @to_simd_op
+// CHECK:      iree_vector_ext.layouted_pack

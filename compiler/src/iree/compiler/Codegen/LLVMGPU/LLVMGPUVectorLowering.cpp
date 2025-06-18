@@ -128,7 +128,10 @@ struct LLVMGPUVectorLoweringPass final
                                           vectorToSCFOptions);
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
     amdgpu::populateAmdgpuTransferReadToLoadPatterns(vectorToLoopsPatterns);
-    vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
+        vectorToLoopsPatterns, PatternBenefit(2));
+    vector::populateVectorTransferLoweringPatterns(
+        vectorToLoopsPatterns, std::nullopt, PatternBenefit(2));
     if (failed(
             applyPatternsGreedily(funcOp, std::move(vectorToLoopsPatterns)))) {
       return signalPassFailure();
