@@ -110,7 +110,7 @@ def TestReshapeFusionPass :
 
 def VectorizeIREELinalgExtOpsPass :
     InterfacePass<"iree-linalg-ext-vectorize-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Decompose and lower linalg_ext ops into vector operations.";
+  let summary = "Convert linalg_ext ops into their vector form.";
   let dependentDialects = [
     "::mlir::vector::VectorDialect",
     "::mlir::arith::ArithDialect"

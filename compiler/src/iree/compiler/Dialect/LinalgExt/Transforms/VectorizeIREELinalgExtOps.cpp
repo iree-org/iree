@@ -23,11 +23,11 @@ struct VectorizeStaticMapScatterOpPattern final
   using OpRewritePattern<IREE::LinalgExt::MapScatterOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
-    ShapedType inputType = mapScatterOp.getInputType();
-    if (isa<VectorType>(inputType)) {
+    if (mapScatterOp.isVectorized()) {
       return rewriter.notifyMatchFailure(mapScatterOp,
                                          "map_scatter is already vectorized");
     }
+    ShapedType inputType = mapScatterOp.getInputType();
     if (!inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(mapScatterOp,
                                          "map_scatter has non-static shape");
