@@ -174,7 +174,7 @@ public:
     target.storeToConfigAttrs(context, configItems);
     configItems.emplace_back(
         b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
-        IREE::CPU::CPUEncodingLayoutAttr::get(context, {}));
+        IREE::CPU::CPUEncodingResolverAttr::get(context, {}));
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;

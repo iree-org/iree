@@ -15,9 +15,9 @@ include "mlir/IR/AttrTypeBase.td"
 // iree_cpu.encoding_layout_attr
 //===----------------------------------------------------------------------===//
 
-def IREECPU_CPUEncodingLayoutAttr :
-    AttrDef<IREECPU_Dialect, "CPUEncodingLayout"> {
-  let mnemonic = "cpu_encoding_layout";
+def IREECPU_CPUEncodingResolverAttr :
+    AttrDef<IREECPU_Dialect, "CPUEncodingResolver"> {
+  let mnemonic = "cpu_encoding_resolver";
   let summary = [{The encoding layout attribute for CPU backends.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding

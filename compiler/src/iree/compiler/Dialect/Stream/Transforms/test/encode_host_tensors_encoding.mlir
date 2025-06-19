@@ -179,7 +179,7 @@ util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) 
 
 // -----
 
-#encoding_layout_0 = #iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
+#encoding_layout_0 = #iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
 #encoding_layout_1 = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [2, 16], outerDimsPerm = [0, 1]}}>
 #encoding_layout_2 = #iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout_0, #encoding_layout_1, #encoding_layout_2]>
