@@ -122,6 +122,9 @@ $ ../iree-build/tools/iree-compile \
 
 ### iree-run-module
 
+> [!TIP]
+> `iree-benchmark-module` and `iree-run-module` share many flags.
+
 The `iree-run-module` program takes an already translated IREE module as input
 and executes an exported function using the provided inputs.
 
@@ -141,7 +144,7 @@ $ ../iree-build/tools/iree-run-module \
 Input scalars are passed as `value` and input buffers are passed as
 `[shape]xtype=[value]`.
 
-* Input buffers may also be read from raw binary files or Numpy npy files.
+* Input buffers may also be [read from raw binary files or Numpy npy files](#read-inputs-from-a-file).
 
 MLIR type | Description | Input example
 -- | -- | --
@@ -256,6 +259,19 @@ should be in the format `[shape]xtype=[value]`. For example:
 ``` text
 1x5xf32=1,-2,-3,4,-5
 1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1
+```
+
+Read from a numpy file:
+
+``` text
+--input=@input.npy
+```
+
+Read from a binary file with passing the shape and dtype because raw binary
+files have no metadata:
+
+``` text
+--input=[shape]xdtype=@input.bin
 ```
 
 #### `--iree-flow-trace-dispatch-tensors`
