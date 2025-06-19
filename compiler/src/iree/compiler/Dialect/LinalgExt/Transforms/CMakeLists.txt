@@ -32,6 +32,7 @@ iree_cc_library(
     "ConvertToLoops.cpp"
     "DecomposeAttention.cpp"
     "DecomposeIm2col.cpp"
+    "DecomposeMapScatter.cpp"
     "DecomposeWinogradPass.cpp"
     "FoldUnitExtentDims.cpp"
     "PadContractionToBlockSize.cpp"
@@ -42,6 +43,7 @@ iree_cc_library(
     "TestReshapeFusion.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
+    "VectorizeIREELinalgExtOps.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

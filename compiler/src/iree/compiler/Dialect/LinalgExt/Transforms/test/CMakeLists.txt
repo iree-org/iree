@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "convert_to_loops.mlir"
     "convert_to_online_attention.mlir"
     "decompose_im2col.mlir"
+    "decompose_map_scatter.mlir"
     "decompose_winograd.mlir"
     "distribution.mlir"
     "fold_unit_dims.mlir"
@@ -26,6 +27,7 @@ iree_lit_test_suite(
     "reshape_fusion.mlir"
     "split_reduction.mlir"
     "tiling.mlir"
+    "vectorize_iree_linalg_ext_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
