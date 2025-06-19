@@ -1086,8 +1086,8 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
 // Note that this needs to run before SCF -> CF.
 static void
 addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
-  funcPassManager.addPass(createExtractAddressComputationGPUPass)
-      .addPass(memref::createExpandOpsPass)
+  funcPassManager
+      .addPass(createExtractAddressComputationGPUPass)
       // Lower any remaining vector.transfer_read and vector.transfer_write ops,
       // since some of the following patterns have trouble dealing with their
       // full complexity.
@@ -1178,7 +1178,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createConvertComplexToStandardPass)
       // Math dialect ops rewrites, approximations, casts.
       .addPass(createMathTransformPass)
-      .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
