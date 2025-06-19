@@ -122,8 +122,9 @@ $ ../iree-build/tools/iree-compile \
 
 ### iree-run-module
 
-> [!TIP]
-> `iree-benchmark-module` and `iree-run-module` share many flags.
+!!! tip
+
+    `iree-benchmark-module` and `iree-run-module` share many flags.
 
 The `iree-run-module` program takes an already translated IREE module as input
 and executes an exported function using the provided inputs.
