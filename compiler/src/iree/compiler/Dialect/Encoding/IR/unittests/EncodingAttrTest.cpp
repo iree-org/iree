@@ -38,7 +38,7 @@ TEST_F(EncodingAttrsTest, EncodingAttr) {
   EXPECT_FALSE(attr.isIdentityLayout());
 
   attr = cast<SerializableAttr>(attr.cloneWithLayouts(
-      PadEncodingLayoutAttr::getIdentityAttr(ctx, /*rank=*/2)));
+      PaddingAttr::getIdentityAttr(ctx, /*rank=*/2)));
   EXPECT_TRUE(attr.isIdentityLayout());
 }
 
@@ -49,18 +49,18 @@ TEST_F(EncodingAttrsTest, MatulKAttr) {
   EXPECT_FALSE(attr.isIdentityLayout());
 
   attr = cast<SerializableAttr>(attr.cloneWithLayouts(
-      PadEncodingLayoutAttr::getIdentityAttr(ctx, /*rank=*/2)));
+      PaddingAttr::getIdentityAttr(ctx, /*rank=*/2)));
   EXPECT_TRUE(attr.isIdentityLayout());
 }
 
-TEST_F(EncodingAttrsTest, PadEncodingLayoutAttr) {
+TEST_F(EncodingAttrsTest, PaddingAttr) {
   MLIRContext *ctx = getContext();
   auto zeroPaddingAttr =
-      PadEncodingLayoutAttr::getIdentityAttr(ctx, /*rank=*/2);
+      PaddingAttr::getIdentityAttr(ctx, /*rank=*/2);
   EXPECT_TRUE(cast<SerializableAttr>(zeroPaddingAttr).isIdentityLayout());
 
   SmallVector<int64_t> paddings = {4, 2};
-  auto nonZeroPaddingAttr = PadEncodingLayoutAttr::get(ctx, paddings);
+  auto nonZeroPaddingAttr = PaddingAttr::get(ctx, paddings);
   EXPECT_FALSE(cast<SerializableAttr>(nonZeroPaddingAttr).isIdentityLayout());
 }
 
