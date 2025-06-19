@@ -122,11 +122,11 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic_using_layo
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_layout = #iree_encoding.padding<[0, 0]>
 #no_pad_encoding = #iree_encoding.layout<[#no_pad_layout]>
-#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_layout_a = #iree_encoding.padding<[0, 64]>
 #pad_encoding_a = #iree_encoding.layout<[#pad_layout_a]>
-#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_layout_b = #iree_encoding.padding<[64, 0]>
 #pad_encoding_b = #iree_encoding.layout<[#pad_layout_b]>
 util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
   %0 = stream.tensor.sizeof tensor<2048x4096xf16, #no_pad_encoding>{} : index
@@ -148,11 +148,11 @@ util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_layout = #iree_encoding.padding<[0, 0]>
 #no_pad_encoding = #iree_encoding.layout<[#no_pad_layout]>
-#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_layout_a = #iree_encoding.padding<[0, 64]>
 #pad_encoding_a = #iree_encoding.layout<[#pad_layout_a]>
-#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_layout_b = #iree_encoding.padding<[64, 0]>
 #pad_encoding_b = #iree_encoding.layout<[#pad_layout_b]>
 util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) -> index, index, index, index {
   %0 = stream.tensor.sizeof tensor<2048x?xf16, #no_pad_encoding>{%arg0} : index

@@ -77,7 +77,7 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
 
 //------------------------------------------------------------------------------
 // iree_gpu.gpu_pad_encoding specialization tests.
-// These get serialized to iree_encoding.pad_encoding_layout attributes.
+// These get serialized to iree_encoding.padding attributes.
 //------------------------------------------------------------------------------
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
@@ -95,9 +95,9 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
                                             max_workgroup_memory_bytes = 65536,
                                             max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
-#encodingA = #iree_encoding.pad_encoding_layout<[0, ?]>
-#encodingB = #iree_encoding.pad_encoding_layout<[0, 64]>
-#encodingC = #iree_encoding.pad_encoding_layout<[64, 64]>
+#encodingA = #iree_encoding.padding<[0, ?]>
+#encodingB = #iree_encoding.padding<[0, 64]>
+#encodingC = #iree_encoding.padding<[64, 64]>
 
 util.global private @device_a = #device_target_local_0_
 util.func public @with_pad_encoding_using_pad_attr(%arg0: index, %arg1: index) {
@@ -107,18 +107,18 @@ util.func public @with_pad_encoding_using_pad_attr(%arg0: index, %arg1: index) {
   %3 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x2048xf16, #encodingC>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG: #[[$NO_PAD:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 0]>]
-// CHECK-DAG: #[[$PAD_DIM1_64:.+]] =  #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]
+// CHECK-DAG: #[[$NO_PAD:.+]] = #iree_encoding.layout<[#iree_encoding.padding<[0, 0]>]
+// CHECK-DAG: #[[$PAD_DIM1_64:.+]] =  #iree_encoding.layout<[#iree_encoding.padding<[0, 64]>]
 
 // CHECK-LABEL: util.func public @with_pad_encoding_using_pad_attr(
 // CHECK: stream.tensor.empty {{.*}} : tensor<?x2048xf16, #[[$PAD_DIM1_64]]>
 // CHECK: stream.tensor.empty {{.*}} : tensor<?x16xf16, #[[$NO_PAD]]>
-// CHECK: stream.tensor.empty {{.*}} : tensor<?x2048xf16, #iree_encoding.pad_encoding_layout<[0, 64]>>
-// CHECK: stream.tensor.empty {{.*}} : tensor<?x2048xf16, #iree_encoding.pad_encoding_layout<[64, 64]>>
+// CHECK: stream.tensor.empty {{.*}} : tensor<?x2048xf16, #iree_encoding.padding<[0, 64]>>
+// CHECK: stream.tensor.empty {{.*}} : tensor<?x2048xf16, #iree_encoding.padding<[64, 64]>>
 
 // -----
 
-// Currently unsupported pad_encoding_layouts.
+// Currently unsupported paddings.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
   iree.encoding.resolver = #iree_gpu.gpu_pad_layout<>,
@@ -135,8 +135,8 @@ util.func public @with_pad_encoding_using_pad_attr(%arg0: index, %arg1: index) {
                                             max_workgroup_memory_bytes = 65536,
                                             max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
-#encodingA = #iree_encoding.pad_encoding_layout<[0, ?]>
-#encodingD = #iree_encoding.pad_encoding_layout<[64, ?]>
+#encodingA = #iree_encoding.padding<[0, ?]>
+#encodingD = #iree_encoding.padding<[64, ?]>
 
 // expected-error @+1 {{failed to add layouts to Stream::TensorPhaseOp with encodings}}
 module {
@@ -163,7 +163,7 @@ util.func public @create_pad_identity_encoding(%arg0: index, %arg1: index) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK: #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK: #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.padding<[0, 0]>]>
 // CHECK-LABEL: @create_pad_identity_encoding
 // CHECK: stream.tensor.empty {{.*}} :  tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
@@ -459,7 +459,7 @@ util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.padding<[0, 0]>]>
 // CHECK-LABEL: util.func public @drop_encoding
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
@@ -476,7 +476,7 @@ util.func public @ignore_encoding_by_identity_resolver(%arg0: index, %arg1: inde
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.pad_encoding_layout<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.padding<[0, 0]>]>
 // CHECK-LABEL: util.func public @ignore_encoding_by_identity_resolver
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 

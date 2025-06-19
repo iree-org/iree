@@ -449,14 +449,14 @@ struct GPUPadLayoutResolverAttr final
 
     int64_t rank = type.getRank();
     auto noPaddingAttr =
-        IREE::Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
+        IREE::Encoding::PaddingAttr::getIdentityAttr(ctx, rank);
     if (!gpuPadLayoutAttr.getCacheLineBytes() ||
         !gpuPadLayoutAttr.getCacheSets()) {
       return noPaddingAttr;
     }
 
     auto paddingEncodingAttr =
-        dyn_cast_or_null<IREE::Encoding::PadEncodingLayoutAttr>(
+        dyn_cast_or_null<IREE::Encoding::PaddingAttr>(
             type.getEncoding());
     if (!paddingEncodingAttr) {
       return nullptr;
@@ -525,7 +525,7 @@ struct GPUPadLayoutResolverAttr final
     int64_t numPadElements = (padBytes * 8) / elementBits;
     SmallVector<int64_t> padValues(rank, 0);
     padValues.back() = numPadElements;
-    auto padLayout = IREE::Encoding::PadEncodingLayoutAttr::get(ctx, padValues);
+    auto padLayout = IREE::Encoding::PaddingAttr::get(ctx, padValues);
     return padLayout;
   }
 };
