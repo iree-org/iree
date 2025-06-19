@@ -176,7 +176,7 @@ func.func @load_from_padded_and_mmt() {
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {
     abi = "hip",
-    iree.encoding.resolver = #iree_gpu.gpu_pad_layout<>,
+    iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>,
     iree.gpu.target = #iree_gpu.target<arch = "gfx1100",
                                        features = "",
                                        wgp = <compute =  fp32,

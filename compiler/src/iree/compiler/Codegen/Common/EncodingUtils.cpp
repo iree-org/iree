@@ -128,11 +128,11 @@ LogicalResult MaterializeEncodingTypeConverter::getOffsetsSizesStrides(
   if (!boundType || !boundType.getEncoding()) {
     return failure();
   }
-  // TODO(jornt): The isa<IREE::GPU::GPUPadLayoutAttr> check is
+  // TODO(jornt): The isa<IREE::GPU::GPUPaddingResolverAttr> check is
   // needed because PaddingAttr is a serializable attribute, but it
-  // relies on its own type conversion for now. Once GPUPadLayoutAttr
+  // relies on its own type conversion for now. Once GPUPaddingResolverAttr
   // implements `getOffsetsSizesStrides`, this can be removed.
-  if (!isa<IREE::GPU::GPUPadLayoutAttr>(getLayoutAttr())) {
+  if (!isa<IREE::GPU::GPUPaddingResolverAttr>(getLayoutAttr())) {
     return getLayoutAttr().getOffsetsSizesStrides(
         builder, loc, type, dynamicDims, offsets, sizes, strides, newOffsets,
         newSizes, newStrides);
