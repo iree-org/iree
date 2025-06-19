@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -201,9 +202,24 @@ analyseInterfaceStoreTensorOp(IREE::TensorExt::DispatchTensorStoreOp storeOp,
   return success();
 }
 
+static LogicalResult analyseLoadFromBufferOp(IREE::Codegen::LoadFromBufferOp op,
+                                             BufferizationPlan &plan) {
+  plan.insert(op.getTensor());
+  return success();
+}
+
+static LogicalResult analyseStoreToBufferOp(IREE::Codegen::StoreToBufferOp op,
+                                            BufferizationPlan &plan) {
+  plan.storeSet(op.getTensor());
+  return success();
+}
+
 static LogicalResult
 analyseInterfaceBindingSubspanOp(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                                  BufferizationPlan &plan) {
+  if (isa<MemRefType>(subspanOp.getResult().getType())) {
+    return success();
+  }
   plan.insert(subspanOp.getResult());
   return success();
 }
@@ -515,6 +531,14 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<IREE::TensorExt::DispatchTensorStoreOp>(
             [&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
               return analyseInterfaceStoreTensorOp(storeOp, plan);
+            })
+        .Case<IREE::Codegen::LoadFromBufferOp>(
+            [&](IREE::Codegen::LoadFromBufferOp loadOp) {
+              return analyseLoadFromBufferOp(loadOp, plan);
+            })
+        .Case<IREE::Codegen::StoreToBufferOp>(
+            [&](IREE::Codegen::StoreToBufferOp storeOp) {
+              return analyseStoreToBufferOp(storeOp, plan);
             })
         .Case<IREE::HAL::InterfaceBindingSubspanOp>(
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
