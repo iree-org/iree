@@ -4937,6 +4937,10 @@ supported input MLIR assembly.</p>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
 </code></pre></div>
 <h3 id="iree-run-module">iree-run-module<a class="headerlink" href="#iree-run-module" title="Permanent link">link</a></h3>
+<blockquote>
+<p>[!TIP]
+<code>iree-benchmark-module</code> and <code>iree-run-module</code> share many flags.</p>
+</blockquote>
 <p>The <code>iree-run-module</code> program takes an already translated IREE module as input
 and executes an exported function using the provided inputs.</p>
 <p>This program can be used in sequence with <code>iree-compile</code> to translate a
@@ -4952,7 +4956,7 @@ above on IREE's local-task CPU device:</p>
 <p>Input scalars are passed as <code>value</code> and input buffers are passed as
 <code>[shape]xtype=[value]</code>.</p>
 <ul>
-<li>Input buffers may also be read from raw binary files or Numpy npy files.</li>
+<li>Input buffers may also be <a href="#read-inputs-from-a-file">read from raw binary files or Numpy npy files</a>.</li>
 </ul>
 <table>
 <thead>
@@ -5533,6 +5537,13 @@ scalar or a buffer. Scalars should be in the format <code>type=value</code> and 
 should be in the format <code>[shape]xtype=[value]</code>. For example:</p>
 <div class="highlight"><pre><span></span><code>1x5xf32=1,-2,-3,4,-5
 1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1
+</code></pre></div>
+<p>Read from a numpy file:</p>
+<div class="highlight"><pre><span></span><code>--input=@input.npy
+</code></pre></div>
+<p>Read from a binary file with passing the shape and dtype because raw binary
+files have no metadata:</p>
+<div class="highlight"><pre><span></span><code>--input=[shape]xdtype=@input.bin
 </code></pre></div>
 <h4 id="-iree-flow-trace-dispatch-tensors"><code>--iree-flow-trace-dispatch-tensors</code><a class="headerlink" href="#-iree-flow-trace-dispatch-tensors" title="Permanent link">link</a></h4>
 <p>This flag will enable tracing inputs and outputs for each dispatch function. It
