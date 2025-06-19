@@ -575,8 +575,8 @@ SpecializationResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
 
 Attribute SpecializationResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  return SpecializedEncodingAttr::get(ctx, getSeed(),
-                                      TypeAttr::get(type.dropEncoding()));
+  return SpecializedAttr::get(ctx, getSeed(),
+                              TypeAttr::get(type.dropEncoding()));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

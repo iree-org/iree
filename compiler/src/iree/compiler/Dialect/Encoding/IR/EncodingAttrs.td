@@ -390,13 +390,13 @@ def SpecializationResolverAttr :
   let assemblyFormat = "`<` $seed `>`";
 
   let summary = [{
-    A layout resolver that always generates specialized_encoding<> with the seed.
+    A layout resolver that always generates iree_encoding.specialized<> with the seed.
   }];
 
   let description = [{
     This attribute implements very basic interface methods of LayoutResolverAttr
-    that returns the SpecializedEncodingAttr with the same seed as serialized
-    layout in encoding specialization.
+    that returns the SpecializedAttr with the same seed as serialized layout in
+    encoding specialization.
 
     Different seed values indicate different layouts.
 
@@ -407,11 +407,11 @@ def SpecializationResolverAttr :
   let parameters = (ins "int32_t":$seed);
 }
 
-def SpecializedEncodingAttr :
-    IREEEncoding_Attr<"SpecializedEncoding", [
+def SpecializedAttr :
+    IREEEncoding_Attr<"Specialized", [
       IREEEncoding_SerializableAttr
     ]> {
-  let mnemonic = "specialized_encoding";
+  let mnemonic = "specialized";
   let assemblyFormat = "`<` $seed (`,` $type^)? `>`";
 
   let summary = [{An attribute that indicates the encoding is specialized.}];
