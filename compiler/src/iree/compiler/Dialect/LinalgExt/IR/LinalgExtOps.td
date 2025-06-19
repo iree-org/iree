@@ -684,6 +684,39 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     This region defines the sorting rule, e.g., "greater than" for argmax or
     "less than" for argmin. It allows for generalization beyond simple argmax-style
     behavior.
+
+    Example (argmax over dim 1):
+
+    %input = memref<2x10xf32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : memref<2x10xf32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+
+  Example with index_base = 5 (i.e., indices start counting from 5):
+
+    %input = memref<2x10xf32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    %base = arith.constant 5 : index
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : memref<2x10xf32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>)
+      index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+
+  The `index_base` is optional. When specified, it is added to the selected index
+  in the result, which is useful when reducing over a tiled or sliced subregion.
   }];
 
   let arguments = (ins
