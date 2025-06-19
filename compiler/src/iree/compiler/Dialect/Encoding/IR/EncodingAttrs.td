@@ -344,14 +344,14 @@ def UnsupportedResolverAttr :
 // Encoding specialization attributes, which are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-def TestingEncodingAttr :
-    IREEEncoding_Attr<"TestingEncoding", [
+def TestingAttr :
+    IREEEncoding_Attr<"Testing", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>
     ]> {
-  let mnemonic = "testing_encoding";
+  let mnemonic = "testing";
   let summary = [{An encoding attribute for testing purposes.}];
 
   let description = [{

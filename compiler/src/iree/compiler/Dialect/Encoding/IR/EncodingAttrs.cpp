@@ -533,7 +533,7 @@ Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
 // Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
+Attribute TestingAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess())) {
     return {};
   }
@@ -549,7 +549,7 @@ Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
   return get(p.getContext(), layouts);
 }
 
-void TestingEncodingAttr::print(AsmPrinter &p) const {
+void TestingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
   if (auto layouts = getLayouts()) {
@@ -558,14 +558,11 @@ void TestingEncodingAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-bool TestingEncodingAttr::isSerialized() const {
-  return getLayouts() ? true : false;
-}
+bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
-Attribute
-TestingEncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return TestingEncodingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
 Attribute
