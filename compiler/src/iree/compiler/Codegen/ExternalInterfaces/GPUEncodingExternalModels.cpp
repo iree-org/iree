@@ -420,7 +420,7 @@ struct GPULayoutResolverAttr final
 
 struct GPUPadEncodingLayoutMaterializerAttr final
     : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
-          GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutAttr> {
+          GPUPadEncodingLayoutMaterializerAttr, GPUPaddingResolverAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
@@ -430,7 +430,7 @@ struct GPUPadEncodingLayoutMaterializerAttr final
 
 struct GPUPadLayoutResolverAttr final
     : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          GPUPadLayoutResolverAttr, GPUPadLayoutAttr> {
+          GPUPadLayoutResolverAttr, GPUPaddingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -438,14 +438,14 @@ struct GPUPadLayoutResolverAttr final
     std::optional<IREE::GPU::L1CacheInfo> cache =
         IREE::GPU::getL1CacheInfo(gpuTarget);
     if (!cache) {
-      return GPUPadLayoutAttr::get(ctx, std::nullopt, std::nullopt);
+      return GPUPaddingResolverAttr::get(ctx, std::nullopt, std::nullopt);
     }
-    return GPUPadLayoutAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
+    return GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    auto gpuPadLayoutAttr = cast<GPUPadLayoutAttr>(attr);
+    auto gpuPadLayoutAttr = cast<GPUPaddingResolverAttr>(attr);
 
     int64_t rank = type.getRank();
     auto noPaddingAttr =
@@ -539,7 +539,7 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
         GPUEncodingPackedLayoutMaterializerAttr,
         GPUEncodingLayoutMaterializerAttr, GPULayoutResolverAttr,
         GPUSerializableAttr>(*ctx);
-    IREE::GPU::GPUPadLayoutAttr::attachInterface<
+    IREE::GPU::GPUPaddingResolverAttr::attachInterface<
         GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(*ctx);
   });
 }

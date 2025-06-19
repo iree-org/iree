@@ -51,14 +51,14 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     RewritePatternSet patterns(ctx);
     DictionaryAttr targetConfig =
         targetAttr ? targetAttr.getConfiguration() : nullptr;
-    // Check if the encoding resolver is a GPUPadLayoutAttr. For padding
+    // Check if the encoding resolver is a GPUPaddingResolverAttr. For padding
     // encoding materialization, we use a separate pass, so skip materialization
     // here.
-    // TODO(#20160): Support GPUPadLayoutAttr materialization through this
+    // TODO(#20160): Support GPUPaddingResolverAttr materialization through this
     // pass, and remove the ad-hoc materialization pass for padding.
-    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPadLayoutAttr>(
+    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
                             IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG("Found GPUPadLayoutAttr encoding resolver. Materialization will "
+      LDBG("Found GPUPaddingResolverAttr encoding resolver. Materialization will "
            "be handled later.");
       return success();
     }

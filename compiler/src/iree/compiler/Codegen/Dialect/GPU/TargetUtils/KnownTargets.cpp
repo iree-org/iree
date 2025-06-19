@@ -850,7 +850,7 @@ Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target,
   }
 
   if (resolver == kPadEncodingLayoutResolverName) {
-    return IREE::GPU::GPUPadLayoutAttr::get(target.getContext(),
+    return IREE::GPU::GPUPaddingResolverAttr::get(target.getContext(),
                                             /*cache_line_bytes=*/std::nullopt,
                                             /*cache_sets=*/std::nullopt);
   }
