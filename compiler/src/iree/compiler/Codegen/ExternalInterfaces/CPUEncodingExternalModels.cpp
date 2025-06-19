@@ -695,8 +695,8 @@ struct CPUEncodingResolverMaterializerAttr final
 };
 
 struct CPULayoutResolverAttr final
-    : IREE::Encoding::LayoutResolverAttr::ExternalModel<CPULayoutResolverAttr,
-                                                        CPUEncodingResolverAttr> {
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          CPULayoutResolverAttr, CPUEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -705,7 +705,7 @@ struct CPULayoutResolverAttr final
     storeNamedAttrIfPresent(configItems, config, "target_triple");
     storeNamedAttrIfPresent(configItems, config, "ukernels");
     return CPUEncodingResolverAttr::get(ctx,
-                                      DictionaryAttr::get(ctx, configItems));
+                                        DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
@@ -839,7 +839,7 @@ struct VMVXLayoutResolverAttr final
     SmallVector<NamedAttribute> configItems;
     storeNamedAttrIfPresent(configItems, config, "ukernels");
     return VMVXEncodingResolverAttr::get(ctx,
-                                       DictionaryAttr::get(ctx, configItems));
+                                         DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
@@ -850,8 +850,8 @@ struct VMVXLayoutResolverAttr final
 };
 
 struct VMVXSerializableAttr final
-    : IREE::Encoding::SerializableAttr::ExternalModel<VMVXSerializableAttr,
-                                                      VMVXEncodingResolverAttr> {
+    : IREE::Encoding::SerializableAttr::ExternalModel<
+          VMVXSerializableAttr, VMVXEncodingResolverAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

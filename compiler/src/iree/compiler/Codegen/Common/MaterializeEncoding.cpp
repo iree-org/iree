@@ -58,16 +58,16 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // pass, and remove the ad-hoc materialization pass for padding.
     if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
                             IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG("Found GPUPaddingResolverAttr encoding resolver. Materialization will "
-           "be handled later.");
+      LDBG("Found GPUPaddingResolverAttr encoding resolver. Materialization "
+           "will be handled later.");
       return success();
     }
 
     auto getTestTargetOrNopLayout =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
-        LDBG("Select GPUEncodingResolverAttr attribute as the layout attribute. "
-             "(testCLGPUTarget)");
+        LDBG("Select GPUEncodingResolverAttr attribute as the layout "
+             "attribute. (testCLGPUTarget)");
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingResolverAttr::get(
                 ctx,
