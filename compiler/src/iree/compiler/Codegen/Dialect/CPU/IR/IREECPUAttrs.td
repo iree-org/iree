@@ -34,9 +34,9 @@ def IREECPU_CPUEncodingResolverAttr :
   );
 }
 
-def IREECPU_VMVXEncodingLayoutAttr :
-    AttrDef<IREECPU_Dialect, "VMVXEncodingLayout"> {
-  let mnemonic = "vmvx_encoding_layout";
+def IREECPU_VMVXEncodingResolverAttr :
+    AttrDef<IREECPU_Dialect, "VMVXEncodingResolver"> {
+  let mnemonic = "vmvx_encoding_resolver";
   let summary = [{The encoding layout attribute for VMVX backend.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding

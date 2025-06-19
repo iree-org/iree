@@ -51,7 +51,7 @@ getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
       b.getStringAttr(enableMicrokernels ? "all" : "none"));
   configItems.emplace_back(
       b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
-      IREE::CPU::VMVXEncodingLayoutAttr::get(context, {}));
+      IREE::CPU::VMVXEncodingResolverAttr::get(context, {}));
   return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
       b.getStringAttr(backend), b.getStringAttr(format),
       b.getDictionaryAttr(configItems));

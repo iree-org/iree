@@ -551,7 +551,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
     if (layoutAttr.getLayouts().size() != 1) {
       return rewriter.notifyMatchFailure(op, "only single layout is handled");
     }
-    auto encodingLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingLayoutAttr>(
+    auto encodingLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingResolverAttr>(
         layoutAttr.getLayouts().getValue()[0]);
     if (!encodingLayoutAttr || !encodingLayoutAttr.getConfiguration()) {
       return rewriter.notifyMatchFailure(
