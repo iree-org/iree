@@ -215,8 +215,8 @@ util.func public @tensorEncodeDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %a
 // CHECK-LABEL: @tensorEncodeChangeEncoding
 // CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
-#encoding = #iree_encoding.specialization_resolver<123>
-#encoding1 = #iree_encoding.specialization_resolver<456>
+#encoding = #iree_encoding.specialized<123>
+#encoding1 = #iree_encoding.specialized<456>
 util.func public @tensorEncodeChangeEncoding(%arg0 : tensor<?x4xf32, #encoding>, %arg1 : index) -> tensor<?x4xf32, #encoding1> {
   // CHECK:      %[[RES:.+]] = flow.tensor.encode %[[ARG0]]
   // CHECK-SAME:   : tensor<?x4xf32, #iree_encoding.specialization_resolver<123>>{%[[ARG1]]}
