@@ -1893,9 +1893,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extargmax-linalgextargmaxop" class="md-nav__link">
+  <a href="#iree_linalg_extarg_compare-linalgextargcompareop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_linalg_ext.argmax (LinalgExt::ArgmaxOp)
+      iree_linalg_ext.arg_compare (LinalgExt::ArgCompareOp)
     </span>
   </a>
   
@@ -4915,9 +4915,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extargmax-linalgextargmaxop" class="md-nav__link">
+  <a href="#iree_linalg_extarg_compare-linalgextargcompareop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_linalg_ext.argmax (LinalgExt::ArgmaxOp)
+      iree_linalg_ext.arg_compare (LinalgExt::ArgCompareOp)
     </span>
   </a>
   
@@ -5201,7 +5201,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 </ul>
 </li>
 <li><a href="#non-structured-ops">Non-structured ops</a><ul>
-<li><a href="#iree_linalg_extargmax-linalgextargmaxop">iree_linalg_ext.argmax (LinalgExt::ArgmaxOp)</a></li>
+<li><a href="#iree_linalg_extarg_compare-linalgextargcompareop">iree_linalg_ext.arg_compare (LinalgExt::ArgCompareOp)</a></li>
 <li><a href="#iree_linalg_extattention-linalgextattentionop">iree_linalg_ext.attention (LinalgExt::AttentionOp)</a></li>
 <li><a href="#iree_linalg_extfft-linalgextfftop">iree_linalg_ext.fft (LinalgExt::FftOp)</a></li>
 <li><a href="#iree_linalg_extgather-linalgextgatherop">iree_linalg_ext.gather (LinalgExt::GatherOp)</a></li>
@@ -5522,16 +5522,54 @@ also supports permuting the tiled loops.</p>
 </tbody>
 </table>
 <h3 id="non-structured-ops">Non-structured ops<a class="headerlink" href="#non-structured-ops" title="Permanent link">link</a></h3>
-<h4 id="iree_linalg_extargmax-linalgextargmaxop"><code>iree_linalg_ext.argmax</code> (LinalgExt::ArgmaxOp)<a class="headerlink" href="#iree_linalg_extargmax-linalgextargmaxop" title="Permanent link">link</a></h4>
-<p><em>Argmax reduction op.</em></p>
+<h4 id="iree_linalg_extarg_compare-linalgextargcompareop"><code>iree_linalg_ext.arg_compare</code> (LinalgExt::ArgCompareOp)<a class="headerlink" href="#iree_linalg_extarg_compare-linalgextargcompareop" title="Permanent link">link</a></h4>
+<p><em>Performs an arg-reduction using a user-defined comparator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.argmax` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.arg_compare` attr-dict
               `dimension` `(` $dimension `)`
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               `outs` `(` $outputs `:` type($outputs) `)`
-              (`:` type($results)^)?
+              (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+              $region (`-&gt;` type($results)^)?
 </code></pre></div>
-<p>An argmax op that reduces along a given dimension, returning the max value and its index.</p>
+<p>The <code>arg_compare</code> op performs a reduction over a given dimension of a tensor,
+returning both the selected value and its corresponding index. The selection
+logic is defined by a user-specified comparator region.</p>
+<p>The comparator region receives two candidate values and returns a single <code>i1</code>
+result indicating whether the first argument should be preferred over the second.</p>
+<p>This region defines the sorting rule, e.g., "greater than" for argmax or
+"less than" for argmin. It allows for generalization beyond simple argmax-style
+behavior.</p>
+<p>Example (argmax over dim 1):
+<div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
+%out_val = memref&lt;2xf32&gt;
+%out_idx = memref&lt;2xi32&gt;
+iree_linalg_ext.arg_compare
+  dimension(1)
+  ins(%input : memref&lt;2x10xf32&gt;)
+  outs(%out_val, %out_idx : memref&lt;2xf32&gt;, memref&lt;2xi32&gt;) {
+^bb0(%a: f32, %b: f32):
+  %cmp = arith.cmpf ogt, %a, %b : f32
+  iree_linalg_ext.yield %cmp : i1
+}
+</code></pre></div></p>
+<p>Example with index_base = 5 (i.e., indices start counting from 5):
+<div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
+%out_val = memref&lt;2xf32&gt;
+%out_idx = memref&lt;2xi32&gt;
+%base = arith.constant 5 : index
+iree_linalg_ext.arg_compare
+  dimension(1)
+  ins(%input : memref&lt;2x10xf32&gt;)
+  outs(%out_val, %out_idx : memref&lt;2xf32&gt;, memref&lt;2xi32&gt;)
+  index_base(%base : index) {
+^bb0(%a: f32, %b: f32):
+  %cmp = arith.cmpf ogt, %a, %b : f32
+  iree_linalg_ext.yield %cmp : i1
+}
+</code></pre></div></p>
+<p>The <code>index_base</code> is optional. When specified, it is added to the selected index
+in the result, which is useful when reducing over a tiled or sliced subregion.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
@@ -5556,6 +5594,10 @@ also supports permuting the tiled loops.</p>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
 <td>variadic of shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>index_base</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>
