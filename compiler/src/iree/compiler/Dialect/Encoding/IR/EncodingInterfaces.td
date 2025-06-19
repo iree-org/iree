@@ -18,27 +18,25 @@ def IREEEncoding_LayoutResolverAttr :
   AttrInterface<"LayoutResolverAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
-    Interface used to query layout information needed to materialize encoding
+    Interface used to query layout information needed to serialize encoding
     attributes.
 
-    Any backend can implement the interface to interpret an encoding layout
-    based on their needs.
-
-    TBD. The current expectation of the interface is to propagate layout
-    information from backends to the host compilation or other targets.
+    Any backend can implement encoding resolvers that implement the interface
+    to interpret an encoding layout based on their needs.
   }];
 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the attribute with simplified configuration/layouts. Attribute
-        is immutable in MLIR concept. Different attributes can implement
-        attribute interface methods differently, and they can carry target
-        configuration (e.g., cpu features) for further lowering. However, some
-        configuration/parameters can be dropped as long as they are no longer
-        needed in the progressively lowering. This method provides a mechanism
-        for such attribute to drop the outdated parameters and makes IR dump less
-        verbose.
+        Returns a new encoding resolver with simplified configuration/layouts.
+        Attribute is immutable in MLIR concept. Different attributes can
+        implement attribute interface methods differently, and they can carry
+        target configuration (e.g., cpu features) for further lowering. However,
+        some configuration/parameters can be dropped as long as they are no
+        longer needed in the progressively lowering. This method provides a
+        mechanism for encoding resolver to carry needed information for encoding
+        specialization. It is intended to see an encoding resolver without any
+        parameter because it makes IR dump less verbose.
       }],
       /*retTy=*/"::mlir::Attribute",
       /*methodName=*/"cloneWithSimplifiedConfig",
@@ -53,14 +51,13 @@ def IREEEncoding_LayoutResolverAttr :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the an attribute implementing the  which is either common format
-        or wrapped by an attribute that implements the
-        `SerializableAttr` interface.
+        Returns the attribute implementing the which is either common format or
+        wrapped by an attribute that implements the `SerializableAttr`
+        interface. Returns nullptr if it fails to get the layout.
         If it is in common format (e.g., a regular tensor type), we can easily
         calculate the storage size. Otherwise, we will need a hook from
         external, and the hook can come from an attribute that implements the
-        interface.
-        Returns nullptr if it fails to get the layout.
+        `SerializableAttr` interface.
       }],
       /*retTy=*/"::mlir::Attribute",
       /*methodName=*/"getLayout",
@@ -80,15 +77,19 @@ def IREEEncoding_SerializableAttr :
   AttrInterface<"SerializableAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
-    Interface for encoding attributes that can be attached on a tensor type. An
-    encoding has two states, serialized and unserialized. An encoding can be set
-    with high level encoded information, e.g., operation type, element types of
-    operands, etc. During the lowering, the virtual encodings are progressively
-    lowered to physical encodings/operations. At some point, an encoding could
-    in the middle state, where the final serialized data is encoded in the
-    attribute. I.e., the high level information is replaced with serialized
-    information, and they are no longer needed. The interface methods are
-    intended to help the lowering.
+    An interface that describes encoding properties and should have enough
+    information for later transformation if the encoding is serialized.
+
+    An encoding has two states, verbose encoding and serialized encoding. An
+    encoding can be set with high level encoded information, e.g., operation
+    type, element types of operands, etc.
+
+    During the lowering, the virtual encodings are progressively lowered to
+    physical operations and types. At some point, an encoding could be in a
+    middle state, where the final serialized data is encoded in the attribute.
+    I.e., the high level information is replaced with serialized information,
+    and they are no longer needed. The interface methods are intended to help
+    the lowering.
 
     There are few core methods:
 
@@ -101,9 +102,6 @@ def IREEEncoding_SerializableAttr :
 
     The attributes implementing this interface may be target-specific or general
     enough to be shared across backends, depending on the layouts used.
-
-    TBD: The serialization does not need to tie to layouts. It is the only use
-         case today, and could be relaxed in the future.
   }];
 
   let methods = [
