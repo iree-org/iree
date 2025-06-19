@@ -37,7 +37,7 @@ struct EncodingOpAsmInterface : public OpAsmDialectInterface {
   // provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (llvm::isa<EncodingAttr, MatmulKAttr, LayoutAttr, TestingEncodingAttr,
-                  UnknownEncodingAttr>(attr)) {
+                  UnknownAttr>(attr)) {
       os << "encoding";
       return AliasResult::OverridableAlias;
     }

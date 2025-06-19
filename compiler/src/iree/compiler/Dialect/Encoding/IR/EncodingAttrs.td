@@ -368,8 +368,8 @@ def TestingEncodingAttr :
   let genVerifyDecl = 0;
 }
 
-def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
-  let mnemonic = "unknown_encoding";
+def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
+  let mnemonic = "unknown";
   let summary = [{A pure encoding attribute for testing purpose.}];
 
   let description = [{

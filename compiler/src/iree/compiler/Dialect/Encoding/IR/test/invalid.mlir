@@ -103,7 +103,7 @@ func.func @illegal_set_encoding_op_with_source_encoding(%arg0 : tensor<?x?xf32, 
 
 // -----
 
-func.func @illegal_set_encoding_op_with_unknown_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, "gemm_lhs"> {
+func.func @illegal_set_encoding_op_with_unknown(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, "gemm_lhs"> {
   // expected-error @+1 {{result of set_encoding op expected to have a valid tensor encoding}}
   %0 = iree_encoding.set_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32, "gemm_lhs">
   return %0 : tensor<?x?xf32, "gemm_lhs">
@@ -146,7 +146,7 @@ func.func @illegal_unset_encoding_op_with_result_encoding(%arg0 : tensor<?x?xf32
 
 // -----
 
-func.func @illegal_unset_encoding_op_with_unknown_encoding(%arg0 : tensor<?x?xf32, "gemm_lhs">) -> tensor<?x?xf32> {
+func.func @illegal_unset_encoding_op_with_unknown(%arg0 : tensor<?x?xf32, "gemm_lhs">) -> tensor<?x?xf32> {
   // expected-error @+1 {{source of unset_encoding op expected to have a valid tensor encoding}}
   %0 = iree_encoding.unset_encoding %arg0: tensor<?x?xf32, "gemm_lhs"> -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -181,7 +181,7 @@ func.func @illegal_layout_encoding_without_any_layout(%arg0: tensor<?x?xf32, #en
 // -----
 
 // expected-error @+1 {{expected all the layout attributes to implement SerializableAttr}}
-#encoding = #iree_encoding.layout<[#iree_encoding.unknown_encoding]>
+#encoding = #iree_encoding.layout<[#iree_encoding.unknown]>
 func.func @illegal_layout_encoding_with_invalid_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }

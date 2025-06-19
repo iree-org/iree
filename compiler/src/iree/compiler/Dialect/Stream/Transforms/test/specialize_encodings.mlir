@@ -242,7 +242,7 @@ util.func public @tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index, %ar
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding0 = #iree_encoding.testing_encoding<>
-#encoding1 = #iree_encoding.unknown_encoding
+#encoding1 = #iree_encoding.unknown
 util.global private @device_a = #device_target_local_0_
 util.func public @tensor_encode_op_change_encoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) {
   %c0 = arith.constant 0 : index
@@ -253,7 +253,7 @@ util.func public @tensor_encode_op_change_encoding(%arg0: !stream.resource<*>, %
   util.return
 }
 // CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123, tensor<?x?xf32>>]>
-// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.unknown_encoding
+// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.unknown
 // CHECK:       #[[TARGET:.+]] = #hal.device.target
 // CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
 // CHECK-LABEL: util.func public @tensor_encode_op_change_encoding
@@ -295,14 +295,14 @@ util.func public @tensor_constant_op_with_serialized_encoding(%arg0: index) {
 
 // -----
 
-#encoding = #iree_encoding.unknown_encoding
+#encoding = #iree_encoding.unknown
 util.global private @device_a : !hal.device
-util.func public @tensor_constant_op_with_unknown_encoding(%arg0: index) {
+util.func public @tensor_constant_op_with_unknown(%arg0: index) {
   %0 = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<?x5x64xf32, #encoding>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>
   util.return
 }
-// CHECK:       #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown_encoding
-// CHECK-LABEL: util.func public @tensor_constant_op_with_unknown_encoding(
+// CHECK:       #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown
+// CHECK-LABEL: util.func public @tensor_constant_op_with_unknown(
 // CHECK:         stream.tensor.constant
 // CHECK-SAME:      tensor<?x5x64xf32, #[[$UNKNOWN_ENCODING]]>
 
@@ -329,16 +329,16 @@ module {
 
 // -----
 
-#unknown_encoding = #iree_encoding.unknown_encoding
+#unknown = #iree_encoding.unknown
 util.global private @device_a : !hal.device
-util.func public @tensor_clone_op_with_unknown_encodings(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
+util.func public @tensor_clone_op_with_unknowns(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
   %0 = stream.tensor.clone on(#hal.device.affinity<@device_a>)
-    %arg0 : tensor<?x4xf32, #unknown_encoding>{%arg1} in !stream.resource<*>{%arg2}
-    -> tensor<?x4xf32, #unknown_encoding>{%arg1} in !stream.resource<*>{%arg2}
+    %arg0 : tensor<?x4xf32, #unknown>{%arg1} in !stream.resource<*>{%arg2}
+    -> tensor<?x4xf32, #unknown>{%arg1} in !stream.resource<*>{%arg2}
   util.return
 }
-// CHECK-DAG:   #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown_encoding
-// CHECK-LABEL: util.func public @tensor_clone_op_with_unknown_encodings(
+// CHECK-DAG:   #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown
+// CHECK-LABEL: util.func public @tensor_clone_op_with_unknowns(
 // CHECK:         stream.tensor.clone
 // CHECK-SAME:      tensor<?x4xf32, #[[$UNKNOWN_ENCODING]]>
 // CHECK-SAME:      tensor<?x4xf32, #[[$UNKNOWN_ENCODING]]>
@@ -384,18 +384,18 @@ module {
 
 // -----
 
-#unknown_encoding = #iree_encoding.unknown_encoding
+#unknown = #iree_encoding.unknown
 #serialized_encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123>]>
 util.global private @device_a : !hal.device
 util.func public @tensor_slice_op_with_unknown_or_serialized_encodings(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %1 = stream.tensor.slice on(#hal.device.affinity<@device_a>)
-    %arg0[%c0, %c1 for %arg3, %c1] : tensor<?x4xf32, #unknown_encoding>{%arg1} in !stream.resource<*>{%arg2}
+    %arg0[%c0, %c1 for %arg3, %c1] : tensor<?x4xf32, #unknown>{%arg1} in !stream.resource<*>{%arg2}
     -> tensor<?x1xf32, #serialized_encoding>{%arg3} in !stream.resource<*>{%arg4}
   util.return
 }
-// CHECK:       #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown_encoding
+// CHECK:       #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown
 // CHECK:       #[[$SERIALIZED_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123>]>
 // CHECK-LABEL: util.func public @tensor_slice_op_with_unknown_or_serialized_encodings(
 // CHECK:         stream.tensor.slice
@@ -427,18 +427,18 @@ module {
 
 // -----
 
-#unknown_encoding = #iree_encoding.unknown_encoding
+#unknown = #iree_encoding.unknown
 #serialized_encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123>]>
 util.global private @device_a : !hal.device
 util.func public @tensor_update_op_with_unknown_or_serialized_encodings(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = stream.tensor.update on(#hal.device.affinity<@device_a>)
-    %arg0, %arg2[%c0, %c0] : tensor<2x2xf32, #unknown_encoding> in !stream.resource<*>{%arg1}
+    %arg0, %arg2[%c0, %c0] : tensor<2x2xf32, #unknown> in !stream.resource<*>{%arg1}
     -> tensor<?x4xf32, #serialized_encoding>{%arg3} in %arg2 as !stream.resource<*>{%arg4}
   util.return
 }
-// CHECK:       #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown_encoding
+// CHECK:       #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown
 // CHECK:       #[[$SERIALIZED_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123>]>
 // CHECK-LABEL: util.func public @tensor_update_op_with_unknown_or_serialized_encodings(
 // CHECK:         stream.tensor.update
@@ -942,7 +942,7 @@ util.func public @multi_device_gemm(%arg0: !stream.resource<external>, %arg1: !s
 // nothing if the encoding is not recognized. It updates the subspan binding, if
 // the encoding is already serialized.
 
-#unknown_encoding = #iree_encoding.unknown_encoding
+#unknown = #iree_encoding.unknown
 #serialized_encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123>]>
 util.global private @device_a : !hal.device
 stream.executable private @executable {
@@ -958,10 +958,10 @@ stream.executable private @executable {
 }
 util.func public @tensor_dispatch_with_unknown_and_serialized_encodings(%arg0: !stream.resource<external>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
   %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
-  %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch(%0, %arg3) : (tensor<4x?xf32, #unknown_encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #serialized_encoding>{%arg2} in !stream.resource<*>{%arg1}
+  %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch(%0, %arg3) : (tensor<4x?xf32, #unknown>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #serialized_encoding>{%arg2} in !stream.resource<*>{%arg1}
   util.return %1 : !stream.resource<*>
 }
-// CHECK-DAG:   #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown_encoding
+// CHECK-DAG:   #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown
 // CHECK-DAG:   #[[$SERIALIZED_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123>]>
 // CHECK:       stream.executable
 // CHECK:         func.func
@@ -980,7 +980,7 @@ util.func public @tensor_dispatch_with_unknown_and_serialized_encodings(%arg0: !
 // Test that the unserialized encoding is serialized, and the unknown encoding
 // is the same.
 
-#unknown_encoding = #iree_encoding.unknown_encoding
+#unknown = #iree_encoding.unknown
 #encoding = #iree_encoding.testing_encoding<>
 #executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_a]> : !hal.device
@@ -998,10 +998,10 @@ stream.executable private @executable {
 }
 util.func public @tensor_dispatch_with_unknown_and_unserialized_encodings(%arg0: !stream.resource<external>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
   %0 = stream.async.transfer %arg0 : !stream.resource<external>{%arg2} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<*>{%arg2}
-  %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch(%0, %arg3) : (tensor<4x?xf32, #unknown_encoding>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}
+  %1 = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable::@dispatch(%0, %arg3) : (tensor<4x?xf32, #unknown>{%arg2} in !stream.resource<*>{%arg1}, index) -> tensor<4x?xf32, #encoding>{%arg2} in !stream.resource<*>{%arg1}
   util.return %1 : !stream.resource<*>
 }
-// CHECK-DAG:   #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown_encoding
+// CHECK-DAG:   #[[$UNKNOWN_ENCODING:.+]] = #iree_encoding.unknown
 // CHECK-DAG:   #[[$SERIALIZED_ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized<123, tensor<4x?xf32>>]>
 // CHECK:       stream.executable
 // CHECK:         func.func
@@ -1039,7 +1039,7 @@ util.func public @dispatch_hal_executable(%arg0: !stream.resource<*>, %arg1: ind
 
 // It does not fail because the executable does not match the requirements.
 
-#encoding = #iree_encoding.unknown_encoding
+#encoding = #iree_encoding.unknown
 util.global private @device : !hal.device
 hal.executable.source public @executable {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<constants = 0, bindings = [
