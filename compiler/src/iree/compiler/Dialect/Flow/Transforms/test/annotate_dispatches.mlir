@@ -760,3 +760,63 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch0_reduction_4x4096_f32
+  flow.executable.export public @dispatch0
+  builtin.module {
+    // CHECK: func.func @dispatch0_reduction_4x4096_f32
+    func.func @dispatch0(
+                 %arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x4096xf32>>,
+                 %arg1: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>) {
+      %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [4, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x4096xf32>> -> tensor<4x4096xf32>
+      %c2_i64 = arith.constant 2 : i64
+      %cst = arith.constant 1.000000e+02 : f32
+      %empty = tensor.empty() : tensor<4xf32>
+      %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4xf32>) -> tensor<4xf32>
+      %reduction = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%0 : tensor<4x4096xf32>) outs(%fill : tensor<4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %20 = math.fpowi %in, %c2_i64 : f32, i64
+        %21 = arith.addf %20, %out : f32
+        linalg.yield %21 : f32
+      } -> tensor<4xf32>
+      iree_tensor_ext.dispatch.tensor.store %reduction, %arg1, offsets = [0], sizes = [4], strides = [1] : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch0_reduction_4x4096_f32
+  flow.executable.export public @dispatch0
+  builtin.module {
+    // CHECK: func.func @dispatch0_reduction_4x4096_f32
+    func.func @dispatch0(
+             %arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x4096xf32>>,
+             %arg1: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x4096xf32>>) {
+      %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [4, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x4096xf32>> -> tensor<4x4096xf32>
+      %c2_i64 = arith.constant 2 : i64
+      %cst = arith.constant 1.000000e+02 : f32
+      %empty = tensor.empty() : tensor<4xf32>
+      %empty0 = tensor.empty() : tensor<4x4096xf32>
+      %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4xf32>) -> tensor<4xf32>
+      %reduction = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%0 : tensor<4x4096xf32>) outs(%fill : tensor<4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %20 = math.fpowi %in, %c2_i64 : f32, i64
+        %21 = arith.addf %20, %out : f32
+        linalg.yield %21 : f32
+      } -> tensor<4xf32>
+      %elem = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0, %reduction : tensor<4x4096xf32>, tensor<4xf32>) outs(%empty0 : tensor<4x4096xf32>) {
+      ^bb0(%in: f32, %in0 : f32, %out: f32):
+        %21 = arith.addf %in, %in0 : f32
+        linalg.yield %21 : f32
+      } -> tensor<4x4096xf32>
+      iree_tensor_ext.dispatch.tensor.store %elem, %arg1, offsets = [0, 0], sizes = [4, 4096], strides = [1, 1] : tensor<4x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x4096xf32>>
+      return
+    }
+  }
+}
