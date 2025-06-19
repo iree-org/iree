@@ -59,8 +59,8 @@ iree_compiler_cc_library(
     name = "GPUTransforms",
     srcs = [
         "CombineBarrierRegions.cpp",
-        "ConcretizeMmaShapes.cpp",
         "DistributeInnerTiledToLanes.cpp",
+        "ExpandUndistributedInnerTiles.cpp",
         "LowerIREEGPUOps.cpp",
         "Passes.cpp",
         "Transforms.cpp",
