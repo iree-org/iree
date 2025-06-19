@@ -668,30 +668,77 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
-def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
+def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
 ]> {
-  let summary = "Argmax reduction op.";
+  let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
-    An argmax op that reduces along a given dimension, returning the max value and its index.
+    The `arg_compare` op performs a reduction over a given dimension of a tensor,
+    returning both the selected value and its corresponding index. The selection
+    logic is defined by a user-specified comparator region.
+
+    The comparator region receives two candidate values and returns a single `i1`
+    result indicating whether the first argument should be preferred over the second.
+
+    This region defines the sorting rule, e.g., "greater than" for argmax or
+    "less than" for argmin. It allows for generalization beyond simple argmax-style
+    behavior.
+
+    Example (argmax over dim 1):
+    ```mlir
+    %input = memref<2x10xf32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : memref<2x10xf32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    Example with index_base = 5 (i.e., indices start counting from 5):
+    ```mlir
+    %input = memref<2x10xf32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    %base = arith.constant 5 : index
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : memref<2x10xf32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>)
+      index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    The `index_base` is optional. When specified, it is added to the selected index
+    in the result, which is useful when reducing over a tiled or sliced subregion.
   }];
 
   let arguments = (ins
     Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
+    Optional<Index>:$index_base,
     I64Attr:$dimension
   );
 
   let results = (outs
     Variadic<AnyRankedTensor>:$results
   );
-
-let assemblyFormat = [{
+  let regions = (region SizedRegion<1>:$region);
+  let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
-    (`:` type($results)^)?
+    (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+    $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{

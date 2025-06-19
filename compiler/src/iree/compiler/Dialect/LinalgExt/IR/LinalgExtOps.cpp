@@ -913,19 +913,21 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 // ArgmaxOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult ArgmaxOp::verify() {
+LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  if (getNumDpsInputs() != 1) {
+  unsigned numInputVals = llvm::size(getInputs());
+  if (numInputVals != 1) {
     return op->emitOpError(
-               "expected exactly one input operand (values), but got ")
-           << getNumDpsInputs();
+               "expected exactly one tensor input operand, but got ")
+           << numInputVals;
   }
 
-  if (getNumDpsInits() != 2) {
+  unsigned numOutputs = getNumDpsInits();
+  if (numOutputs != 2) {
     return op->emitOpError(
                "expected two output operands (value and index), but got ")
-           << getNumDpsInits();
+           << numOutputs;
   }
 
   uint64_t dim = getDimension();
@@ -954,7 +956,7 @@ LogicalResult ArgmaxOp::verify() {
   }
 
   SmallVector<int64_t> expectedShape;
-  for (int64_t i = 0; i < getInputRank(); ++i) {
+  for (int64_t i = 0; i < rank; ++i) {
     if (i != dim)
       expectedShape.push_back(inputType.getDimSize(i));
   }
@@ -966,12 +968,43 @@ LogicalResult ArgmaxOp::verify() {
            << llvm::interleaved_array(outputValueType.getShape());
   }
 
+  Region &region = getRegion();
+  Block &block = region.front();
+  unsigned numArgs = block.getNumArguments();
+  if (numArgs != 2) {
+    return op->emitOpError("region block should have 2 arguments, but got ")
+           << numArgs;
+  }
+  Type inputElemType = inputType.getElementType();
+  Type arg0Type = block.getArgument(0).getType();
+  Type arg1Type = block.getArgument(1).getType();
+
+  if (arg0Type != inputElemType || arg1Type != inputElemType) {
+    return op->emitOpError(
+               "comparator region arguments must match input element type. ")
+           << "Expected: " << inputElemType << ", but got: " << arg0Type
+           << " and " << arg1Type;
+  }
+
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
+  unsigned numOperands = yieldOp->getNumOperands();
+  if (numOperands != 1) {
+    return op->emitOpError(
+               "expected linalg_ext.yield to return 1 operand, but got ")
+           << numOperands;
+  }
+
+  Type yieldType = yieldOp.getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return op->emitOpError(
+               "region block must end with a linalg_ext.yield i1, but got: ")
+           << yieldType;
+  }
   return success();
 }
 
-LogicalResult
-ArgmaxOp::reifyResultShapes(OpBuilder &b,
-                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult ArgCompareOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -2400,7 +2433,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
-DEFINE_OP_GET_EFFECTS(ArgmaxOp)
+DEFINE_OP_GET_EFFECTS(ArgCompareOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
