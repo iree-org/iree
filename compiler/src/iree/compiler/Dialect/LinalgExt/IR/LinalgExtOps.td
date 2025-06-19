@@ -348,7 +348,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     the mask value is true, the input value will be written.
   }];
   let arguments = (ins
-      AnyRankedTensorOrMemRefType:$input,
+      AnyShaped:$input,
       AnyRankedTensorOrMemRefType:$output
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -372,6 +372,11 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     }
     int64_t getOutputRank() {
       return getOutputType().getRank();
+    }
+
+    // Return true if the map_scatter op has vector semantics.
+    bool isVectorized() {
+      return isa<VectorType>(getInputType());
     }
 
     // Helper to apply transformations to the source index block arguments of

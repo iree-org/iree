@@ -108,4 +108,13 @@ def TestReshapeFusionPass :
   let summary = "Test reshape fusion patterns";
 }
 
+def VectorizeIREELinalgExtOpsPass :
+    InterfacePass<"iree-linalg-ext-vectorize-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Convert linalg_ext ops into their vector form.";
+  let dependentDialects = [
+    "::mlir::vector::VectorDialect",
+    "::mlir::arith::ArithDialect"
+  ];
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_PASSES
