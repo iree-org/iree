@@ -182,12 +182,12 @@ func.func @set_encoding_ops_with_iteration_sizes(%arg0: tensor<?x?xf32>) {
 
 // -----
 
-#encoding = #iree_encoding.unspecialized_encoding<123>
-func.func @unspecialized_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+#encoding = #iree_encoding.specialization_resolver<123>
+func.func @specialization_resolver(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
-//      CHECK: func.func @unspecialized_encoding(
-// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.unspecialized_encoding<123>>
+//      CHECK: func.func @specialization_resolver(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.specialization_resolver<123>>
 // CHECK         return %[[ARG0]]
 
 // -----
@@ -223,11 +223,11 @@ func.func @testing_encoding_without_layouts(%arg0: tensor<?x?xf32, #encoding>) -
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<[#iree_encoding.unspecialized_encoding<123>]>
+#encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialization_resolver<123>]>
 func.func @testing_encoding_with_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.unspecialized_encoding<123>]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialization_resolver<123>]>
 //      CHECK: func.func @testing_encoding_with_layouts(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK         return %[[ARG0]]
