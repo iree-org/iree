@@ -31,7 +31,7 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
 // -----
 
 //------------------------------------------------------------------------------
-// #iree_gpu.gpu_encoding_layout specialization tests.
+// #iree_gpu.gpu_encoding_resolver specialization tests.
 // These get serialized to the layout attributes.
 //------------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {
     abi = "hip",
-    iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>,
+    iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>,
     iree.gpu.target = #iree_gpu.target<arch = "gfx942",
                                        features = "",
                                        wgp = <compute = fp32,
@@ -67,7 +67,7 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
   util.return %size0 : index
 }
 // CHECK:       #[[$ENCODING:.+]] = #iree_encoding.layout
-// CHECK-SAME:    #iree_gpu.gpu_encoding_layout
+// CHECK-SAME:    #iree_gpu.gpu_encoding_resolver
 // CHECK-SAME:    encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
 // CHECK-LABEL: util.func public @gpu_with_encoding_layout
 // CHECK:         %[[RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING]]>

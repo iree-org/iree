@@ -843,10 +843,10 @@ TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
 Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target,
                                          StringRef resolver) {
   if (resolver == kDataTilingEncodingLayoutResolverName) {
-    // Return a GPUEncodingLayoutAttr with an empty configuration. The addtional
+    // Return a GPUEncodingResolverAttr with an empty configuration. The addtional
     // attributes will be attached by the `cloneWithSimplifiedConfig` interface
     // method when the resolver needs to be configured.
-    return IREE::GPU::GPUEncodingLayoutAttr::get(target.getContext(), {});
+    return IREE::GPU::GPUEncodingResolverAttr::get(target.getContext(), {});
   }
 
   if (resolver == kPadEncodingLayoutResolverName) {

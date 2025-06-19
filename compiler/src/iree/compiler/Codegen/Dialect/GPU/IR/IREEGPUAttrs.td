@@ -351,12 +351,12 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
-// iree_gpu.gpu_encoding_layout
+// iree_gpu.gpu_encoding_resolver
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_GPUEncodingLayoutAttr :
-    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout"> {
-  let mnemonic = "gpu_encoding_layout";
+def IREEGPU_GPUEncodingResolverAttr :
+    AttrDef<IREEGPU_Dialect, "GPUEncodingResolver"> {
+  let mnemonic = "gpu_encoding_resolver";
   let summary = [{The encoding layout attribute for GPU backend.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding
