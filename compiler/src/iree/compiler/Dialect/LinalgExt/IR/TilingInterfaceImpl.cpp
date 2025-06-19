@@ -1341,6 +1341,75 @@ LogicalResult TopkOp::getResultTilePosition(
 }
 
 //===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> ArgCompareOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  int64_t rank = getInputRank();
+  SmallVector<Range> ranges;
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    OpFoldResult ub = getDim(builder, loc, getInputValue(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
+                                                         Location loc,
+                                                         ValueRange ivs) {
+  uint64_t kDim = getDimension();
+
+  SmallVector<Value> outerIndices;
+  for (size_t i = 0; i < ivs.size(); ++i) {
+    if ((int64_t)i == kDim)
+      continue;
+    outerIndices.push_back(ivs[i]);
+  }
+
+  Value bestValueSoFar =
+      b.create<memref::LoadOp>(loc, outputValue(), outerIndices);
+  Value bestIndexSoFar =
+      b.create<memref::LoadOp>(loc, outputIndex(), outerIndices);
+
+  Value candidateValue = b.create<memref::LoadOp>(loc, getInputValue(), ivs);
+
+  auto &srcBlock = getRegion().front();
+  IRMapping bvm;
+  bvm.map(srcBlock.getArgument(0), candidateValue);
+  bvm.map(srcBlock.getArgument(1), bestValueSoFar);
+
+  for (auto &op : srcBlock.without_terminator()) {
+    b.clone(op, bvm);
+  }
+
+  Value cmpResult = bvm.lookup(srcBlock.getTerminator()->getOperand(0));
+
+  Value selectedValue =
+      b.create<arith::SelectOp>(loc, cmpResult, candidateValue, bestValueSoFar);
+
+  Value indexOffset = ivs[kDim];
+  if (getIndexBase()) {
+    indexOffset = b.create<arith::AddIOp>(loc, getIndexBase(), indexOffset);
+  }
+
+  Value castedIndex = indexOffset;
+  if (castedIndex.getType() != bestIndexSoFar.getType()) {
+    castedIndex = b.create<arith::IndexCastOp>(loc, bestIndexSoFar.getType(),
+                                               castedIndex);
+  }
+
+  Value selectedIndex =
+      b.create<arith::SelectOp>(loc, cmpResult, castedIndex, bestIndexSoFar);
+  b.create<memref::StoreOp>(loc, selectedValue, outputValue(), outerIndices);
+  b.create<memref::StoreOp>(loc, selectedIndex, outputIndex(), outerIndices);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
