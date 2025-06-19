@@ -311,14 +311,14 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
 
 struct GPUEncodingPackedLayoutMaterializerAttr
     : public PackedLayoutMaterializerAttrExternalModelBase<
-          GPUEncodingPackedLayoutMaterializerAttr, GPUEncodingLayoutAttr> {
+          GPUEncodingPackedLayoutMaterializerAttr, GPUEncodingResolverAttr> {
   DictionaryAttr getConfiguration(Attribute attr) const {
-    return cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
+    return cast<GPUEncodingResolverAttr>(attr).getConfiguration();
   }
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
-    auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<GPUEncodingResolverAttr>(attr);
     DictionaryAttr config = layoutAttr.getConfiguration();
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
@@ -361,13 +361,13 @@ struct GPUEncodingPackedLayoutMaterializerAttr
   }
 };
 
-struct GPUEncodingLayoutMaterializerAttr
+struct GPUEncodingResolverMaterializerAttr
     : public EncodingLayoutMaterializerAttrExternalModelBase<
-          GPUEncodingLayoutMaterializerAttr, GPUEncodingLayoutAttr> {
+          GPUEncodingResolverMaterializerAttr, GPUEncodingResolverAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
-    auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<GPUEncodingResolverAttr>(attr);
     auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
@@ -384,7 +384,7 @@ struct GPUEncodingLayoutMaterializerAttr
 
 struct GPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<GPUSerializableAttr,
-                                                      GPUEncodingLayoutAttr> {
+                                                      GPUEncodingResolverAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -396,25 +396,25 @@ struct GPUSerializableAttr final
 
 struct GPULayoutResolverAttr final
     : IREE::Encoding::LayoutResolverAttr::ExternalModel<GPULayoutResolverAttr,
-                                                        GPUEncodingLayoutAttr> {
+                                                        GPUEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     SmallVector<NamedAttribute> configItems;
     DictionaryAttr existingConfig =
-        cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
+        cast<GPUEncodingResolverAttr>(attr).getConfiguration();
     if (existingConfig) {
       configItems.append(existingConfig.getValue().begin(),
                          existingConfig.getValue().end());
     }
     storeNamedAttrIfPresent(configItems, config, kGPUTargetAttrName);
-    return GPUEncodingLayoutAttr::get(ctx,
+    return GPUEncodingResolverAttr::get(ctx,
                                       DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return GPUEncodingLayoutAttr::get(ctx, getPackedLayoutImpl(attr, type));
+    return GPUEncodingResolverAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 };
 
@@ -535,9 +535,9 @@ struct GPUPadLayoutResolverAttr final
 void registerGPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::GPU::IREEGPUDialect *dialect) {
-    IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
+    IREE::GPU::GPUEncodingResolverAttr::attachInterface<
         GPUEncodingPackedLayoutMaterializerAttr,
-        GPUEncodingLayoutMaterializerAttr, GPULayoutResolverAttr,
+        GPUEncodingResolverMaterializerAttr, GPULayoutResolverAttr,
         GPUSerializableAttr>(*ctx);
     IREE::GPU::GPUPaddingResolverAttr::attachInterface<
         GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(*ctx);

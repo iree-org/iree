@@ -66,10 +66,10 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     auto getTestTargetOrNopLayout =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
-        LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
+        LDBG("Select GPUEncodingResolverAttr attribute as the layout attribute. "
              "(testCLGPUTarget)");
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
-            IREE::GPU::GPUEncodingLayoutAttr::get(
+            IREE::GPU::GPUEncodingResolverAttr::get(
                 ctx,
                 DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
                                                         getCLGPUTarget(ctx)))));
