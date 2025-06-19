@@ -554,6 +554,20 @@ void MMAAttr::getDistributedTileTypes(
                  getThreadVectorType(context, intrinsic, MMAFragment::Acc)});
 }
 
+std::optional<SmallVector<int64_t, 2>>
+MMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                          int64_t dim) const {
+  assert(operandIndex <= 2 && "invalid operand index");
+  assert(dim < 2 && "pre-expansion inner tiles all have two elements");
+  MMASingleSubgroupLayout layout =
+      getSingleSubgroupLayout(*this, static_cast<MMAFragment>(operandIndex));
+  if (layout.outer[dim] > 1) {
+    return SmallVector<int64_t, 2>{layout.outer[dim],
+                                   layout.element[dim] * layout.thread[dim]};
+  }
+  return std::nullopt;
+}
+
 int64_t MMAAttr::getBlockSize() const {
   return IREE::GPU::getBlockSize(getIntrinsic());
 }
@@ -1397,6 +1411,20 @@ int64_t ScaledMMAAttr::getBlockSize() const {
   return 0;
 }
 
+MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
+                                                int64_t operandIndex,
+                                                bool isAccColMajor) {
+  MMASingleSubgroupLayout baseLayout =
+      getSingleSubgroupLayout(intrinsic, operandIndex);
+  if (operandIndex == 4 && isAccColMajor) {
+    std::swap(baseLayout.outer[0], baseLayout.outer[1]);
+    std::swap(baseLayout.thread[0], baseLayout.thread[1]);
+    std::swap(baseLayout.tstrides[0], baseLayout.tstrides[1]);
+    std::swap(baseLayout.element[0], baseLayout.element[1]);
+  }
+  return baseLayout;
+}
+
 int64_t ScaledMMAAttr::getSubgroupSize() const {
   switch (getIntrinsic()) {
   case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
@@ -1481,6 +1509,19 @@ void ScaledMMAAttr::getDistributedTileTypes(
   }
 }
 
+std::optional<SmallVector<int64_t, 2>>
+ScaledMMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                int64_t dim) const {
+  assert(operandIndex <= 4 && "invalid operand index");
+  MMASingleSubgroupLayout layout =
+      getSingleSubgroupLayout(getIntrinsic(), operandIndex, getColMajor());
+  if (layout.outer[dim] > 1) {
+    return SmallVector<int64_t, 2>{layout.outer[dim],
+                                   layout.element[dim] * layout.thread[dim]};
+  }
+  return std::nullopt;
+}
+
 Attribute ScaledMMAAttr::getDistributionMappingKind() const {
   return IREE::GPU::LaneIdAttr::get(getContext(), 0);
 }
@@ -1498,13 +1539,8 @@ LogicalResult ScaledMMAAttr::populateOperandOffsetsSizesStrides(
   assert(operandIndex <= 4 && "Scaled MFMA has 5 operands");
 
   MMASingleSubgroupLayout subgroupLayout =
-      getSingleSubgroupLayout(getIntrinsic(), operandIndex);
-  if (operandIndex == 4 && getColMajor()) {
-    std::swap(subgroupLayout.outer[0], subgroupLayout.outer[1]);
-    std::swap(subgroupLayout.thread[0], subgroupLayout.thread[1]);
-    std::swap(subgroupLayout.tstrides[0], subgroupLayout.tstrides[1]);
-    std::swap(subgroupLayout.element[0], subgroupLayout.element[1]);
-  }
+      getSingleSubgroupLayout(getIntrinsic(), operandIndex, getColMajor());
+
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(

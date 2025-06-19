@@ -15,23 +15,6 @@ def CombineBarrierRegionsPass :
   let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
 }
 
-def ConcretizeMmaShapesPass :
-    InterfacePass<"iree-gpu-concretize-mma-shapes", "mlir::FunctionOpInterface"> {
-  let summary = "Expands the inner dimensions of iree_gpu.multi_mma ops to match the thread layout";
-  let dependentDialects = [
-    "::mlir::tensor::TensorDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-  ];
-  let options = [
-    Option<"concretizeInputs", "concretize-inputs",
-      "bool", /*default=*/"true",
-      "Expand the inner dimensions for the lhs and rhs operands of the multi_mma ops.">,
-    Option<"concretizeResult", "concretize-result",
-      "bool", /*default=*/"true",
-      "Expand the inner dimensions for the acc operand of the multi_mma ops.">,
-  ];
-}
-
 def DistributeInnerTiledToLanesPass :
     InterfacePass<"iree-gpu-distribute-inner-tiled-to-lanes", "mlir::FunctionOpInterface"> {
   let summary = "Distributes iree_codegen.inner_tiled ops to lanes";
@@ -41,6 +24,23 @@ def DistributeInnerTiledToLanesPass :
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
     "::mlir::tensor::TensorDialect",
+  ];
+}
+
+def ExpandUndistributedInnerTilesPass :
+    InterfacePass<"iree-gpu-expand-undistributed-inner-tiles", "mlir::FunctionOpInterface"> {
+  let summary = "Expands the inner dimensions of iree_codegen.inner_tiled ops to match the thread layout";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+  let options = [
+    Option<"expandInputs", "expand-inputs",
+      "bool", /*default=*/"true",
+      "Expand the inner dimensions for the input operands of the inner_tiled ops.">,
+    Option<"expandOutputs", "expand-outputs",
+      "bool", /*default=*/"true",
+      "Expand the inner dimensions for the output operands and results of the inner_tiled ops.">,
   ];
 }
 
