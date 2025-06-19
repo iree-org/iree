@@ -6,7 +6,7 @@
 ]>
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [1, 1000, ?]>
 func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 }{
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>>
@@ -44,7 +44,7 @@ func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f() attributes 
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [7, 7, 7]>
 func.func @set_encoding_7x7x7_matmul_LHS() attributes {
-   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<7x7xf32>>
@@ -74,7 +74,7 @@ func.func @set_encoding_7x7x7_matmul_LHS() attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 80, 32, ?]>
 func.func @set_encoding_128x80x32_batch_matmul_LHS() attributes {
-   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x80x32xf32>>
@@ -105,7 +105,7 @@ func.func @set_encoding_128x80x32_batch_matmul_LHS() attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 32, 320, ?]>
 func.func @set_encoding_128x32x320_batch_matmul_RHS() attributes {
-   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
@@ -138,7 +138,7 @@ func.func @set_encoding_128x32x320_batch_matmul_RHS() attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 80, 320, ?]>
 func.func @unset_encoding_128x80x320_batch_matmul_RESULT() attributes {
-   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
@@ -176,7 +176,7 @@ func.func @unset_encoding_128x80x320_batch_matmul_RESULT() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
-   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -217,7 +217,7 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
 
 // -----
 
-#executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+#executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
@@ -264,7 +264,7 @@ func.func @matvec_f32_x86_64_generic() attributes {hal.executable.target = #exec
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f32f32f32_x86_64() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -336,7 +336,7 @@ func.func @matmul_lowering_f32f32f32_x86_64() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f32f32f32_x86_64_avx2() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -407,7 +407,7 @@ func.func @matmul_lowering_f32f32f32_x86_64_avx2() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f32f32f32_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -478,7 +478,7 @@ func.func @matmul_lowering_f32f32f32_x86_64_avx512f() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f16f16f32_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -549,7 +549,7 @@ func.func @matmul_lowering_f16f16f32_x86_64_avx512f() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f16f16f16_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -620,7 +620,7 @@ func.func @matmul_lowering_f16f16f16_x86_64_avx512f() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_bf16bf16f32_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -691,7 +691,7 @@ func.func @matmul_lowering_bf16bf16f32_x86_64_avx512f() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -762,7 +762,7 @@ func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512f() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_bf16bf16f32_x86_64_avx512bf16() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f,+avx512bf16", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f,+avx512bf16", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -835,7 +835,7 @@ func.func @matmul_lowering_bf16bf16f32_x86_64_avx512bf16() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512bf16() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f,+avx512bf16", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f,+avx512bf16", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -908,7 +908,7 @@ func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512bf16() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f32f16f16_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f,+avx512bf16", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f,+avx512bf16", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -982,7 +982,7 @@ func.func @matmul_lowering_f32f16f16_x86_64_avx512f() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i8i8i32_x86_64_avx2() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -1055,7 +1055,7 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx2() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i8i8i32_x86_64_avx512bw() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512bw", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512bw", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -1128,7 +1128,7 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512bw() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -1196,7 +1196,7 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, 1, 11008, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, 1, 11008, 128]>
 func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: tensor<32x1x128xi8>, %arg1: tensor<32x128x11008xi8>) -> tensor<32x1x11008xi32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0_i32 = arith.constant 0 : i32
   %4 = iree_encoding.set_encoding %arg0 : tensor<32x1x128xi8> -> tensor<32x1x128xi8, #encoding_lhs>
@@ -1259,7 +1259,7 @@ func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: tensor<32x1x128xi8>, %ar
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i16i16i32_x86_64_avx2() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -1332,7 +1332,7 @@ func.func @matmul_lowering_i16i16i32_x86_64_avx2() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -1400,7 +1400,7 @@ func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [11008, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [11008, 128]>
 func.func @vecmat(%arg0: tensor<128xi8>, %arg1: tensor<128x11008xi8>) -> tensor<11008xi32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0_i32 = arith.constant 0 : i32
   %4 = iree_encoding.set_encoding %arg0 : tensor<128xi8> -> tensor<128xi8, #encoding_lhs>
@@ -1461,7 +1461,7 @@ func.func @vecmat(%arg0: tensor<128xi8>, %arg1: tensor<128x11008xi8>) -> tensor<
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [11008, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [11008, 128]>
 func.func @matvec(%arg0: tensor<11008x128xi8>, %arg1: tensor<128xi8>) -> tensor<11008xi32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0_i32 = arith.constant 0 : i32
   %4 = iree_encoding.set_encoding %arg0 : tensor<11008x128xi8> -> tensor<11008x128xi8, #encoding_lhs>
@@ -1522,7 +1522,7 @@ func.func @matvec(%arg0: tensor<11008x128xi8>, %arg1: tensor<128xi8>) -> tensor<
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [15, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [15, 128]>
 func.func @matvec_with_narrow_M(%arg0: tensor<15x128xi8>, %arg1: tensor<128xi8>) -> tensor<15xi32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0_i32 = arith.constant 0 : i32
   %4 = iree_encoding.set_encoding %arg0 : tensor<15x128xi8> -> tensor<15x128xi8, #encoding_lhs>
@@ -1584,7 +1584,7 @@ func.func @matvec_with_narrow_M(%arg0: tensor<15x128xi8>, %arg1: tensor<128xi8>)
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 11008, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 11008, 128]>
 func.func @batch_vecmat(%arg0: tensor<32x128xi8>, %arg1: tensor<32x128x11008xi8>) -> tensor<32x11008xi32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0_i32 = arith.constant 0 : i32
   %4 = iree_encoding.set_encoding %arg0 : tensor<32x128xi8> -> tensor<32x128xi8, #encoding_lhs>
@@ -1642,7 +1642,7 @@ func.func @batch_vecmat(%arg0: tensor<32x128xi8>, %arg1: tensor<32x128x11008xi8>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [11008, 1, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [11008, 1, 128]>
 func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<32x11008x128xi8>
   %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<32x128xi8>
@@ -1668,7 +1668,7 @@ func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2:
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 512, 256]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 512, 256]>
 func.func @matmul_transpose_a_f32f32f32(%arg0: tensor<256x128xf32>, %arg1: tensor<256x512xf32>, %arg2: tensor<128x512xf32>) -> tensor<128x512xf32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c256 = arith.constant 256 : index
   %c128 = arith.constant 128 : index
@@ -1707,7 +1707,7 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: tensor<256x128xf32>, %arg1: tenso
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 512, 256]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 512, 256]>
 func.func @matmul_transpose_b_f32f32f32(%arg0: tensor<128x256xf32>, %arg1: tensor<512x256xf32>, %arg2: tensor<128x512xf32>) -> tensor<128x512xf32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -1745,7 +1745,7 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: tensor<128x256xf32>, %arg1: tenso
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, 128, 512, 256]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, 128, 512, 256]>
 func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg1: tensor<2x256x512xf32>, %arg2: tensor<2x128x512xf32>) -> tensor<2x128x512xf32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c2 = arith.constant 2 : index
   %c256 = arith.constant 256 : index
@@ -1784,7 +1784,7 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, 128, 512, 256]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, 128, 512, 256]>
 func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg1: tensor<2x512x256xf32>, %arg2: tensor<2x128x512xf32>) -> tensor<2x128x512xf32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c2 = arith.constant 2 : index
   %c128 = arith.constant 128 : index
@@ -1823,7 +1823,7 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 4096, 128]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 4096, 128]>
 func.func @generic_batch_vecmat_transposed_i16u4i32(%arg0: tensor<32x128xi16>, %arg1: tensor<4096x32x128xi4>, %arg2: tensor<4096x32xi32>) -> tensor<4096x32xi32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0_i32 = arith.constant 0 : i32
   %c0_i4 = arith.constant 0 : i4
@@ -1880,7 +1880,7 @@ func.func @generic_batch_vecmat_transposed_i16u4i32(%arg0: tensor<32x128xi16>, %
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 #encoding_bcast = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 func.func @dequantization() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -1935,7 +1935,7 @@ func.func @dequantization() attributes {
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 #encoding_bcast = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,  affine_map<(d0, d1, d2) -> (d1, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 func.func @broadcast_batch() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -1974,7 +1974,7 @@ func.func @broadcast_batch() attributes {
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 #encoding_bcast = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 func.func @broadcast_M() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -2013,7 +2013,7 @@ func.func @broadcast_M() attributes {
 #encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 #encoding_bcast = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2) -> (d0, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 func.func @broadcast_N() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -2052,7 +2052,7 @@ func.func @broadcast_N() attributes {
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 #encoding_bcast = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iteration_sizes = [2, 128, 64, ?]>
 func.func @broadcast_K() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -2092,8 +2092,8 @@ func.func @broadcast_K() attributes {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
-#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 1], outerDimsPerm = [0, 1]}}>]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 1], outerDimsPerm = [0, 1]}}>]>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -2122,8 +2122,8 @@ func.func @set_encoding_LHS_with_layout() attributes {
 
 // -----
 
-#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [16, 1], outerDimsPerm = [1, 0]}}>]>
-#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [16, 1], outerDimsPerm = [1, 0]}}>]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -2155,8 +2155,8 @@ func.func @set_encoding_RHS_with_layout() attributes {
 
 // -----
 
-#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 16], outerDimsPerm = [0, 1]}}>]>
-#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_layout<>}>
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [1, 16], outerDimsPerm = [0, 1]}}>]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

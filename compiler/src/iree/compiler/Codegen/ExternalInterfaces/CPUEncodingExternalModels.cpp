@@ -321,7 +321,7 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
 }
 
 //===----------------------------------------------------------------------===//
-// Interface methods implementaion for iree_cpu.cpu_encoding_layout.
+// Interface methods implementaion for iree_cpu.cpu_encoding_resolver.
 //===----------------------------------------------------------------------===//
 
 // Enumerate tile sizes to choose from on riscv32.
@@ -626,15 +626,15 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
 
 struct CPUEncodingPackedLayoutMaterializerAttr
     : public PackedLayoutMaterializerAttrExternalModelBase<
-          CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
+          CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingResolverAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
-    return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
+    return cast<CPUEncodingResolverAttr>(attr).getConfiguration();
   }
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
-    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -674,14 +674,14 @@ struct CPUEncodingPackedLayoutMaterializerAttr
   }
 };
 
-struct CPUEncodingLayoutMaterializerAttr final
+struct CPUEncodingResolverMaterializerAttr final
     : public EncodingLayoutMaterializerAttrExternalModelBase<
-          CPUEncodingLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
+          CPUEncodingResolverMaterializerAttr, CPUEncodingResolverAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
-    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
     auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
@@ -696,7 +696,7 @@ struct CPUEncodingLayoutMaterializerAttr final
 
 struct CPULayoutResolverAttr final
     : IREE::Encoding::LayoutResolverAttr::ExternalModel<CPULayoutResolverAttr,
-                                                        CPUEncodingLayoutAttr> {
+                                                        CPUEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -704,19 +704,19 @@ struct CPULayoutResolverAttr final
     storeNamedAttrIfPresent(configItems, config, "cpu_features");
     storeNamedAttrIfPresent(configItems, config, "target_triple");
     storeNamedAttrIfPresent(configItems, config, "ukernels");
-    return CPUEncodingLayoutAttr::get(ctx,
+    return CPUEncodingResolverAttr::get(ctx,
                                       DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return CPUEncodingLayoutAttr::get(ctx, getPackedLayoutImpl(attr, type));
+    return CPUEncodingResolverAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 };
 
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
-                                                      CPUEncodingLayoutAttr> {
+                                                      CPUEncodingResolverAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -865,9 +865,9 @@ struct VMVXSerializableAttr final
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
-        IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
+        IREE::CPU::CPUEncodingResolverAttr::attachInterface<
             CPUEncodingPackedLayoutMaterializerAttr,
-            CPUEncodingLayoutMaterializerAttr, CPULayoutResolverAttr,
+            CPUEncodingResolverMaterializerAttr, CPULayoutResolverAttr,
             CPUSerializableAttr>(*ctx);
         IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
             VMVXEncodingPackedLayoutMaterializerAttr,
