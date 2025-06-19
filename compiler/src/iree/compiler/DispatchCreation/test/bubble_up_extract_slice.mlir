@@ -219,3 +219,93 @@ func.func @bubble_up_expand_of_extract_of_expand(%arg0: tensor<131072xi64>, %arg
 //  CHECK-SAME:       ins(%[[SLICE0]], %[[EXPAND2]] :
 //  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   return %[[GENERIC]]
+
+// -----
+
+util.func public @no_bubble_expand_sliced_dim(%arg0 : tensor<1024xf16>) -> (tensor<32x10xf16>) {
+  %extracted_slice = tensor.extract_slice %arg0[0] [320] [1] : tensor<1024xf16> to tensor<320xf16>
+  %expanded = tensor.expand_shape %extracted_slice[[0, 1]] output_shape [32, 10] : tensor<320xf16> into tensor<32x10xf16>
+  util.return %expanded : tensor<32x10xf16>
+}
+// CHECK-LABEL: util.func public @no_bubble_expand_sliced_dim
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG0]]
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[EXTRACT]]
+
+// -----
+
+util.func public @no_bubble_slice_dynamic(%arg0 : tensor<?xf16>, %val : index) -> (tensor<32x?xf16>) {
+  %extracted_slice = tensor.extract_slice %arg0[0] [%val] [1] : tensor<?xf16> to tensor<?xf16>
+  %cst32 = arith.constant 32 : index
+  %div = arith.divsi %val, %cst32 : index
+  %expanded_239 = tensor.expand_shape %extracted_slice[[0, 1]] output_shape [32, %div] : tensor<?xf16> into tensor<32x?xf16>
+  util.return %expanded_239 : tensor<32x?xf16>
+}
+// CHECK-LABEL: util.func public @no_bubble_slice_dynamic
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG0]]
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[EXTRACT]]
+
+// -----
+
+util.func public @bubble_slice_dynamic(%arg0 : tensor<?x10x128xf16>, %val : index) -> (tensor<?x5x2x16xf16>) {
+  %extracted_slice = tensor.extract_slice %arg0[0, 0, 0] [%val, 10, 16] [1, 1, 1] : tensor<?x10x128xf16> to tensor<?x10x16xf16>
+  %expanded = tensor.expand_shape %extracted_slice[[0], [1, 2], [3]] output_shape [%val, 5, 2, 16] : tensor<?x10x16xf16> into tensor<?x5x2x16xf16>
+  util.return %expanded : tensor<?x5x2x16xf16>
+}
+// CHECK-LABEL: util.func public @bubble_slice_dynamic
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[CST0:.+]] = arith.constant 0
+//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[CST0]]
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     output_shape [%[[DIM]], 5, 2, 128]
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[EXPAND]]
+//  CHECK-SAME:     [0, 0, 0, 0] [%[[ARG1]], 5, 2, 16] [1, 1, 1, 1]
+
+// -----
+
+util.func public @bubble_expand_rank_reducing_inner(%arg0 : tensor<1024x10xf16>) -> (tensor<32x32xf16>) {
+  %extracted_slice = tensor.extract_slice %arg0[0, 0] [1024, 1] [1, 1] : tensor<1024x10xf16> to tensor<1024xf16>
+  %expanded = tensor.expand_shape %extracted_slice[[0, 1]] output_shape [32, 32] : tensor<1024xf16> into tensor<32x32xf16>
+  util.return %expanded : tensor<32x32xf16>
+}
+// CHECK-LABEL: util.func public @bubble_expand_rank_reducing_inner
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<1024x10xf16> into tensor<32x32x10xf16>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[EXPAND]]
+//  CHECK-SAME:     tensor<32x32x10xf16> to tensor<32x32xf16>
+
+// -----
+
+util.func public @bubble_expand_rank_reducing_outer(%arg0 : tensor<10x1024xf16>) -> (tensor<32x32xf16>) {
+  %extracted_slice = tensor.extract_slice %arg0[0, 0] [1, 1024] [1, 1] : tensor<10x1024xf16> to tensor<1024xf16>
+  %expanded = tensor.expand_shape %extracted_slice[[0, 1]] output_shape [32, 32] : tensor<1024xf16> into tensor<32x32xf16>
+  util.return %expanded : tensor<32x32xf16>
+}
+// CHECK-LABEL: util.func public @bubble_expand_rank_reducing_outer
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<10x1024xf16> into tensor<10x32x32xf16>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[EXPAND]]
+//  CHECK-SAME:     tensor<10x32x32xf16> to tensor<32x32xf16>
+
+// -----
+
+util.func public @bubble_dynamic_rank_reducing(%arg0: tensor<?x32x2x8x32x128xf8E4M3FNUZ>, %arg1: index) -> tensor<?x8x32x2x64xf8E4M3FNUZ> {
+  %extracted_slice = tensor.extract_slice %arg0[0, 31, 0, 0, 0, 0] [%arg1, 1, 1, 8, 32, 128] [1, 1, 1, 1, 1, 1] : tensor<?x32x2x8x32x128xf8E4M3FNUZ> to tensor<?x8x32x128xf8E4M3FNUZ>
+  %expanded = tensor.expand_shape %extracted_slice [[0], [1], [2], [3, 4]] output_shape [%arg1, 8, 32, 2, 64] : tensor<?x8x32x128xf8E4M3FNUZ> into tensor<?x8x32x2x64xf8E4M3FNUZ>
+  util.return %expanded : tensor<?x8x32x2x64xf8E4M3FNUZ>
+}
+// CHECK-LABEL: util.func public @bubble_dynamic_rank_reducing
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[CST0:.+]] = arith.constant 0
+//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[CST0]]
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     output_shape [%[[DIM]], 32, 2, 8, 32, 2, 64]
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[EXPAND]]
+//  CHECK-SAME:     [0, 31, 0, 0, 0, 0, 0]
+//  CHECK-SAME:     [%[[ARG1]], 1, 1, 8, 32, 2, 64]
+//  CHECK-SAME:     [1, 1, 1, 1, 1, 1, 1]
