@@ -295,6 +295,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
       prefix = "horizontal_multi_contract";
     } else if (succeeded(linalg::inferConvolutionDims(op))) {
       prefix = "conv";
+    } else if (op.getNumReductionLoops()) {
+      prefix = "reduction";
     }
   }
 
