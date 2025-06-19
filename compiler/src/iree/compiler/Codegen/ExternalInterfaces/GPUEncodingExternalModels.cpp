@@ -395,8 +395,8 @@ struct GPUSerializableAttr final
 };
 
 struct GPULayoutResolverAttr final
-    : IREE::Encoding::LayoutResolverAttr::ExternalModel<GPULayoutResolverAttr,
-                                                        GPUEncodingResolverAttr> {
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          GPULayoutResolverAttr, GPUEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -409,7 +409,7 @@ struct GPULayoutResolverAttr final
     }
     storeNamedAttrIfPresent(configItems, config, kGPUTargetAttrName);
     return GPUEncodingResolverAttr::get(ctx,
-                                      DictionaryAttr::get(ctx, configItems));
+                                        DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
@@ -440,7 +440,8 @@ struct GPUPadLayoutResolverAttr final
     if (!cache) {
       return GPUPaddingResolverAttr::get(ctx, std::nullopt, std::nullopt);
     }
-    return GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
+    return GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
+                                       cache->cacheSets);
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
@@ -456,8 +457,7 @@ struct GPUPadLayoutResolverAttr final
     }
 
     auto paddingEncodingAttr =
-        dyn_cast_or_null<IREE::Encoding::PaddingAttr>(
-            type.getEncoding());
+        dyn_cast_or_null<IREE::Encoding::PaddingAttr>(type.getEncoding());
     if (!paddingEncodingAttr) {
       return nullptr;
     }

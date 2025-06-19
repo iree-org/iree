@@ -40,8 +40,7 @@ namespace {
 
 // Returns the pad encoding layout, or nullptr if this is not the only layout or
 // if there's no encoding at all.
-static PaddingAttr getPadLayout(Attribute layoutAttr,
-                                          RankedTensorType type) {
+static PaddingAttr getPadLayout(Attribute layoutAttr, RankedTensorType type) {
   if (!type.getEncoding()) {
     return nullptr;
   }
