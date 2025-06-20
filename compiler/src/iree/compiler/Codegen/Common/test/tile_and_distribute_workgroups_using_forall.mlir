@@ -989,3 +989,22 @@ func.func @only_producer_fusion_multiple_result(%arg0: tensor<77x4096xf16>, %arg
 //       CHECK:     linalg.generic
 //       CHECK:     linalg.generic
 //       CHECK:   return %[[RESULT]]#1, %[[RESULT]]#0
+
+// -----
+
+// Verify that the scf.forall is generated when there is other distribution
+// present, even though the tile sizes are full, and only one worker is needed
+// for distribution of the copy.
+func.func @dispatch_with_pre_distributed_ops(%0 : tensor<64x64xf32>, %1 : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %2 = linalg.copy {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+      ins(%0 : tensor<64x64xf32>)
+      outs(%1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %alloc = memref.alloc() : memref<64xf32>
+  %cst = arith.constant 0.0 : f32
+  scf.forall (%arg0) in (64) {
+    memref.store %cst, %alloc[%arg0] : memref<64xf32>
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  return %2 : tensor<64x64xf32>
+}
+//   CHECK-LABEL: func @dispatch_with_pre_distributed_ops
+// CHECK-COUNT-2:   scf.forall
