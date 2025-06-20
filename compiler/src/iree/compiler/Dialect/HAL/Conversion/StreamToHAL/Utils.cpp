@@ -199,17 +199,15 @@ IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region) {
 }
 
 LogicalResult
-deriveRequiredResourceBufferBits(Location loc,
-                                 IREE::Stream::ResourceType resourceType,
+deriveRequiredResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
                                  IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                  IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  switch (resourceType.getLifetime()) {
+  switch (lifetime) {
   default:
-    return mlir::emitError(loc)
-           << "unsupported resource lifetime: "
-           << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
+    return mlir::emitError(loc) << "unsupported resource lifetime: "
+                                << IREE::Stream::stringifyLifetime(lifetime);
   case IREE::Stream::Lifetime::Constant:
     // Device local; copies required to get into external resources.
     memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
@@ -252,17 +250,16 @@ deriveRequiredResourceBufferBits(Location loc,
 }
 
 LogicalResult
-deriveAllowedResourceBufferBits(Location loc,
-                                IREE::Stream::ResourceType resourceType,
+deriveAllowedResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                 IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
+  if (failed(deriveRequiredResourceBufferBits(loc, lifetime, memoryTypes,
                                               bufferUsage))) {
     return failure();
   }
-  switch (resourceType.getLifetime()) {
+  switch (lifetime) {
   default:
     break;
   case IREE::Stream::Lifetime::External:
