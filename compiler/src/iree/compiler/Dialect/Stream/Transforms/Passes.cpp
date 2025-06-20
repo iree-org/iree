@@ -134,6 +134,8 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Bring all initializers together so that we can schedule them.
   passManager.addPass(IREE::Util::createCombineInitializersPass());
 
+  passManager.addPass(IREE::Util::createOptimizeGlobalDuplicatesPass());
+
   //----------------------------------------------------------------------------
   // Stream affinity/assignment
   //----------------------------------------------------------------------------
