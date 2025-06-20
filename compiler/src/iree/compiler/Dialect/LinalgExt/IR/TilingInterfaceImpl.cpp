@@ -1341,6 +1341,86 @@ LogicalResult TopkOp::getResultTilePosition(
 }
 
 //===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> ArgCompareOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  int64_t rank = getInputRank();
+  SmallVector<Range> ranges;
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    OpFoldResult ub = getDim(builder, loc, getInputValue(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
+                                                         Location loc,
+                                                         ValueRange ivs) {
+  uint64_t reductionDim = getDimension();
+  SmallVector<Value> parallelIndices;
+  for (size_t i = 0, rank = ivs.size(); i < rank; ++i) {
+    if (i == reductionDim)
+      continue;
+    parallelIndices.push_back(ivs[i]);
+  }
+
+  Value candidateValue = b.create<memref::LoadOp>(loc, getInputValue(), ivs);
+  Value indexValue = ivs[reductionDim];
+  if (getIndexBase()) {
+    indexValue = b.create<arith::AddIOp>(loc, getIndexBase(), indexValue);
+  }
+  Value castedIndex = indexValue;
+  Type indexType = getOutputIndexType().getElementType();
+  if (castedIndex.getType() != indexType) {
+    castedIndex = b.create<arith::IndexCastOp>(loc, indexType, castedIndex);
+  }
+
+  Value isFirst =
+      b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, ivs[reductionDim],
+                              b.create<arith::ConstantIndexOp>(loc, 0));
+  auto ifOp = b.create<scf::IfOp>(loc, isFirst, /*withElseRegion=*/true);
+  {
+    OpBuilder thenBuilder = ifOp.getThenBodyBuilder();
+    thenBuilder.create<memref::StoreOp>(loc, candidateValue, outputValue(),
+                                        parallelIndices);
+    thenBuilder.create<memref::StoreOp>(loc, castedIndex, outputIndex(),
+                                        parallelIndices);
+  }
+
+  {
+    OpBuilder elseBuilder = ifOp.getElseBodyBuilder();
+
+    Value bestValueSoFar =
+        elseBuilder.create<memref::LoadOp>(loc, outputValue(), parallelIndices);
+    Value bestIndexSoFar =
+        elseBuilder.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
+
+    auto &srcBlock = getRegion().front();
+    IRMapping regionMap;
+    regionMap.map(srcBlock.getArgument(0), candidateValue);
+    regionMap.map(srcBlock.getArgument(1), bestValueSoFar);
+    for (Operation &op : srcBlock.without_terminator()) {
+      elseBuilder.clone(op, regionMap);
+    }
+    Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
+    Value selectedValue = elseBuilder.create<arith::SelectOp>(
+        loc, cmpResult, candidateValue, bestValueSoFar);
+    Value selectedIndex = elseBuilder.create<arith::SelectOp>(
+        loc, cmpResult, castedIndex, bestIndexSoFar);
+    elseBuilder.create<memref::StoreOp>(loc, selectedValue, outputValue(),
+                                        parallelIndices);
+    elseBuilder.create<memref::StoreOp>(loc, selectedIndex, outputIndex(),
+                                        parallelIndices);
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
