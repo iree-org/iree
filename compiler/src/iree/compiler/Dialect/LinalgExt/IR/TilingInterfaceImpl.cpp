@@ -1362,8 +1362,7 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
                                                          ValueRange ivs) {
   uint64_t reductionDim = getDimension();
   SmallVector<Value> parallelIndices;
-  size_t rank = ivs.size();
-  for (size_t i = 0; i < rank; ++i) {
+  for (size_t i = 0, rank = ivs.size(); i < rank; ++i) {
     if (i == reductionDim)
       continue;
     parallelIndices.push_back(ivs[i]);
@@ -1408,10 +1407,8 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
       elseBuilder.clone(op, regionMap);
     }
     Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
-
     Value selectedValue = elseBuilder.create<arith::SelectOp>(
         loc, cmpResult, candidateValue, bestValueSoFar);
-
     Value selectedIndex = elseBuilder.create<arith::SelectOp>(
         loc, cmpResult, castedIndex, bestIndexSoFar);
     elseBuilder.create<memref::StoreOp>(loc, selectedValue, outputValue(),
