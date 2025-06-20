@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "slp-vectorize.mlir"
     "vector_ext_fold_unit_extent_dims.mlir"
     "vectorize_vector_ext_ops.mlir"
   TOOLS

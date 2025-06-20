@@ -28,6 +28,7 @@ iree_cc_library(
     "Transforms.h"
   SRCS
     "Passes.cpp"
+    "SLPVectorizer.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
     "VectorizeIREEVectorExtOps.cpp"
   DEPS
