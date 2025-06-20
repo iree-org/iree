@@ -730,16 +730,12 @@ iree_hal_amdgpu_device_cmd_dispatch_update(
   if (cmd->header.flags & IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_IMPLICIT_ARGS) {
     const iree_hal_amdgpu_device_kernel_args_t* dispatch_args =
         cmd->config.kernel_args;
+    uint8_t* implicit_args_ptr =
+        (uint8_t*)packet->kernarg_address +
+        dispatch_args->binding_count * sizeof(void*) +
+        iree_amdgpu_align(dispatch_args->constant_count * sizeof(uint32_t), 8);
     iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args =
-        (iree_amdgpu_kernel_implicit_args_t*)((uint8_t*)
-                                                  packet->kernarg_address +
-                                              dispatch_args->binding_count *
-                                                  sizeof(void*) +
-                                              iree_amdgpu_align(
-                                                  dispatch_args
-                                                          ->constant_count *
-                                                      sizeof(uint32_t),
-                                                  8));
+        (iree_amdgpu_kernel_implicit_args_t*)implicit_args_ptr;
     implicit_args->block_count[0] = workgroups_ptr[0];
     implicit_args->block_count[1] = workgroups_ptr[1];
     implicit_args->block_count[2] = workgroups_ptr[2];

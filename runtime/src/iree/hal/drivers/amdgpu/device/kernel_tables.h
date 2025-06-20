@@ -50,7 +50,7 @@ IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_block_x16,
 // not allow for divergent threads _and_ the assumption that we have a mix of
 // commands that causes each thread to diverge, but that's a guess. We may find
 // that since 90+% of packets are dispatches we're mostly running the same code
-// paths per command and can benefit from TLP.
+// paths per command and can benefit from thread-level parallelism.
 #define IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_X 32
 #define IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_Y 1
 #define IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_Z 1
