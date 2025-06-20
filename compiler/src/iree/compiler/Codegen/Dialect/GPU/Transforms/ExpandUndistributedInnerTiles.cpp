@@ -21,8 +21,7 @@ namespace {
 struct ExpandUndistributedInnerTilesPass final
     : impl::ExpandUndistributedInnerTilesPassBase<
           ExpandUndistributedInnerTilesPass> {
-  using ExpandUndistributedInnerTilesPassBase::
-      ExpandUndistributedInnerTilesPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 
