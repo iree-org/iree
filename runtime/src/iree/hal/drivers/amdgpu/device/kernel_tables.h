@@ -45,14 +45,41 @@ IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_buffer_copy_block_x16,
 // Command buffers (command_buffer.h)
 //===----------------------------------------------------------------------===//
 
+// TODO(benvanik): evaluate the optimal size for issue workgroup size.
+// Lower sizes (ideally 1) are the most reliable on current hardware that does
+// not allow for divergent threads _and_ the assumption that we have a mix of
+// commands that causes each thread to diverge, but that's a guess. We may find
+// that since 90+% of packets are dispatches we're mostly running the same code
+// paths per command and can benefit from thread-level parallelism.
+#define IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_X 32
+#define IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_Y 1
+#define IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_Z 1
+
+#define IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_X 1
+#define IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Y 1
+#define IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Z 1
+
 // NOTE: these workgroup sizes are guesses and need to be changed.
-#if 0
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_block_issue, 1, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(
-    iree_hal_amdgpu_device_cmd_dispatch_indirect_update, 1, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_branch, 1, 1, 1)
-IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_return, 1, 1, 1)
-#endif
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_block_issue,
+                              IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_CMD_ISSUE_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_dispatch_update,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_branch,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_cond_branch,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Z)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(iree_hal_amdgpu_device_cmd_return,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_X,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Y,
+                              IREE_HAL_AMDGPU_CMD_CONTROL_WORKGROUP_SIZE_Z)
 
 //===----------------------------------------------------------------------===//
 // Scheduling (scheduler.h)
