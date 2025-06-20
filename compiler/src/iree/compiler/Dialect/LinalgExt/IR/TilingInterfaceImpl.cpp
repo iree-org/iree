@@ -1362,7 +1362,8 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
                                                          ValueRange ivs) {
   uint64_t reductionDim = getDimension();
   SmallVector<Value> parallelIndices;
-  for (size_t i = 0; i < ivs.size(); ++i) {
+  size_t rank = ivs.size();
+  for (size_t i = 0; i < rank; ++i) {
     if (i == reductionDim)
       continue;
     parallelIndices.push_back(ivs[i]);
@@ -1374,7 +1375,7 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
     indexValue = b.create<arith::AddIOp>(loc, getIndexBase(), indexValue);
   }
   Value castedIndex = indexValue;
-  auto indexType = getOutputIndexType().getElementType();
+  Type indexType = getOutputIndexType().getElementType();
   if (castedIndex.getType() != indexType) {
     castedIndex = b.create<arith::IndexCastOp>(loc, indexType, castedIndex);
   }
@@ -1400,13 +1401,13 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
         elseBuilder.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
 
     auto &srcBlock = getRegion().front();
-    IRMapping bvm;
-    bvm.map(srcBlock.getArgument(0), candidateValue);
-    bvm.map(srcBlock.getArgument(1), bestValueSoFar);
-    for (auto &op : srcBlock.without_terminator()) {
-      elseBuilder.clone(op, bvm);
+    IRMapping regionMap;
+    regionMap.map(srcBlock.getArgument(0), candidateValue);
+    regionMap.map(srcBlock.getArgument(1), bestValueSoFar);
+    for (Operation &op : srcBlock.without_terminator()) {
+      elseBuilder.clone(op, regionMap);
     }
-    Value cmpResult = bvm.lookup(srcBlock.getTerminator()->getOperand(0));
+    Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
 
     Value selectedValue = elseBuilder.create<arith::SelectOp>(
         loc, cmpResult, candidateValue, bestValueSoFar);
