@@ -17,17 +17,17 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
   size_t numDims = sizes.size();
   basis.reserve(numDims);
 
-  SmallVector<std::tuple<int64_t, size_t, int64_t>> terms =
+  SmallVector<std::tuple<int64_t, int64_t, size_t>> terms =
       llvm::map_to_vector(llvm::enumerate(strides, sizes), [&](auto tuple) {
         auto [dim, stride, size] = tuple;
-        return std::make_tuple(stride, dim, size);
+        return std::make_tuple(stride, size, dim);
       });
   llvm::sort(terms);
 
   int64_t previousSizes = 1;
   SmallVector<std::optional<size_t>> basisEntryToDim;
   basisEntryToDim.reserve(numDims);
-  for (auto [stride, dim, size] : terms) {
+  for (auto [stride, size, dim] : terms) {
     if (stride == 0) {
       stride = 1;
       size = 1;
