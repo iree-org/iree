@@ -20,8 +20,8 @@ extern "C" {
 //
 // Some implementations - such as for IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION -
 // will try to import the backing storage directly into a usable staging buffer
-// using |device_allocator| and available with |queue_affinity|. Otherwise the
-// file is allowed to be use with any device or queue.
+// using |device_allocator| and available |queue_affinity|. Otherwise the
+// file is allowed to be used with any device or queue as it is host-only.
 IREE_API_EXPORT iree_status_t iree_hal_file_from_handle(
     iree_hal_allocator_t* device_allocator,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_access_t access,
