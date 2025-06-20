@@ -135,23 +135,21 @@ static void sortMMAIntrinsics(GPUMatmulShapeType problem,
   llvm::sort(intrinsics, [&](const GPUMatmulShapeType &lhs,
                              const GPUMatmulShapeType &rhs) {
     // Prefer K-aligned intrinsics.
-    int64_t lhsKAligned =
-        problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
-    int64_t rhsKAligned =
-        problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
+    int lhsKAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
+    int rhsKAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
     if (lhsKAligned != rhsKAligned) {
       return lhsKAligned > rhsKAligned;
     }
 
     // If K alignment is the same, prefer the intrinsic that aligns M and N.
-    int64_t lhsMNAligned = (problem.mSizes.back() % lhs.mSizes.back() == 0 &&
-                            problem.nSizes.back() % lhs.nSizes.back() == 0)
-                               ? 1
-                               : 0;
-    int64_t rhsMNAligned = (problem.mSizes.back() % rhs.mSizes.back() == 0 &&
-                            problem.nSizes.back() % rhs.nSizes.back() == 0)
-                               ? 1
-                               : 0;
+    int lhsMNAligned = (problem.mSizes.back() % lhs.mSizes.back() == 0 &&
+                        problem.nSizes.back() % lhs.nSizes.back() == 0)
+                           ? 1
+                           : 0;
+    int rhsMNAligned = (problem.mSizes.back() % rhs.mSizes.back() == 0 &&
+                        problem.nSizes.back() % rhs.nSizes.back() == 0)
+                           ? 1
+                           : 0;
     if (lhsMNAligned != rhsMNAligned) {
       return lhsMNAligned > rhsMNAligned;
     }
@@ -161,8 +159,8 @@ static void sortMMAIntrinsics(GPUMatmulShapeType problem,
               ShapedType::getNumElements(intrinsic.nSizes)) *
              ShapedType::getNumElements(intrinsic.kSizes);
     };
-    auto lhsArea = intrinsicArea(lhs);
-    auto rhsArea = intrinsicArea(rhs);
+    int64_t lhsArea = intrinsicArea(lhs);
+    int64_t rhsArea = intrinsicArea(rhs);
     if (lhsArea != rhsArea) {
       return lhsArea > rhsArea;
     }
