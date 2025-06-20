@@ -7,7 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 
+#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
@@ -15,7 +18,6 @@
 #include <queue>
 
 namespace mlir::iree_compiler {
-
 /// Tile and fuse producers of extract slice operations from the worklist into
 /// the given loops, adding any new fusion opportunities back to the worklist,
 /// proceeding recursively until fixed point is reached.
@@ -95,10 +97,9 @@ void collectTiledAndFusedOps(Operation *rootOp,
 // opportunities, as well as the new surrounding `scf.forall` (because consumer
 // fusion replaces the loop).
 FailureOr<std::queue<Operation *>>
-fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
-                        MutableArrayRef<LoopLikeOpInterface> loops,
-                        bool useWARForConsumerFusionSSAViolation);
-
+fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
+              MutableArrayRef<LoopLikeOpInterface> loops,
+              bool useWARForConsumerFusionSSAViolation);
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_

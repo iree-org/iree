@@ -106,30 +106,28 @@ void collectTiledAndFusedOps(Operation *rootOp,
 }
 
 FailureOr<std::queue<Operation *>>
-fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
-                        MutableArrayRef<LoopLikeOpInterface> loops,
-                        bool useWARForConsumerFusionSSAViolation) {
-  auto addCandidateSlices =
-      [](Operation *fusedOp,
-         std::queue<tensor::ParallelInsertSliceOp> &candidates) {
-        for (auto *userOp : fusedOp->getResults().getUsers()) {
-          if (auto sliceOp =
-                  llvm::dyn_cast<tensor::ParallelInsertSliceOp>(userOp)) {
-            candidates.push(sliceOp);
-          }
-        }
-      };
+fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
+              MutableArrayRef<LoopLikeOpInterface> loops,
+              bool useWARForConsumerFusionSSAViolation) {
+  auto addCandidateSlices = [](Operation *fusedOp,
+                               std::queue<Operation *> &candidates) {
+    for (auto *userOp : fusedOp->getResults().getUsers()) {
+      if (llvm::isa<tensor::InsertSliceOp, tensor::ParallelInsertSliceOp>(
+              userOp)) {
+        candidates.push(userOp);
+      }
+    }
+  };
 
   // Collect the candidate slices which can be potential consumers that can be
   // fused.
-  std::queue<tensor::ParallelInsertSliceOp> candidates;
+  std::queue<Operation *> candidates;
   addCandidateSlices(tiledOp, candidates);
 
   std::queue<Operation *> newFusionOpportunities;
   while (!candidates.empty()) {
-
     // Traverse the slices in BFS fashion.
-    tensor::ParallelInsertSliceOp candidateSliceOp = candidates.front();
+    Operation *candidateSliceOp = candidates.front();
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
@@ -185,5 +183,4 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
   }
   return newFusionOpportunities;
 }
-
 } // namespace mlir::iree_compiler
