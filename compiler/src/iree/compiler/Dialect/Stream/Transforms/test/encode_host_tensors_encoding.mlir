@@ -20,7 +20,7 @@ util.func public @tensorSizeOfAlignedPackedI1() -> index {
 
 // -----
 
-#encoding_layout = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 16], outerDimsPerm = [0, 1]}}>
+#encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_lhs_encoding_dynamic_using_layouts(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
@@ -39,7 +39,7 @@ util.func public @sizeof_lhs_encoding_dynamic_using_layouts(%arg0: index, %arg1:
 
 // -----
 
-#encoding_layout = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 16], outerDimsPerm = [0, 1]}}>
+#encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_lhs_encoding_partially_dynamic_using_layouts(%arg0: index) -> index {
   %0 = stream.tensor.sizeof tensor<10x?xf32, #encoding>{%arg0} : index
@@ -58,7 +58,7 @@ util.func public @sizeof_lhs_encoding_partially_dynamic_using_layouts(%arg0: ind
 // In GEMM, the RHS has the `(M, N, K) -> (K, N)` layout. The  tile sizes
 // (i.e., [8, 16]) are for [dim_1, dim_0] in the encoding_info, where dim_1 is
 // N-dimension and dim_0 is K-dimension.
-#encoding_layout = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [8, 16], outerDimsPerm = [1, 0]}}>
+#encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [8, 16], outerDimsPerm = [1, 0]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_rhs_encoding_dynamic_using_layouts(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
@@ -78,7 +78,7 @@ util.func public @sizeof_rhs_encoding_dynamic_using_layouts(%arg0: index, %arg1:
 
 // -----
 
-#encoding_layout = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
+#encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_result_encoding_dynamic_using_layouts(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
@@ -99,7 +99,7 @@ util.func public @sizeof_result_encoding_dynamic_using_layouts(%arg0: index, %ar
 
 // The M-dimension inner tile is not present because it broadcasts across the
 // M-dimension. We do not need to pack the M-dimension in this case.
-#encoding_layout = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [1], innerTileSizes = [16], outerDimsPerm = [0, 1]}}>
+#encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [1], innerTileSizes = [16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic_using_layouts(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index
@@ -122,11 +122,11 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic_using_layo
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_layout = #iree_encoding.padding<[0, 0]>
 #no_pad_encoding = #iree_encoding.layout<[#no_pad_layout]>
-#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_layout_a = #iree_encoding.padding<[0, 64]>
 #pad_encoding_a = #iree_encoding.layout<[#pad_layout_a]>
-#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_layout_b = #iree_encoding.padding<[64, 0]>
 #pad_encoding_b = #iree_encoding.layout<[#pad_layout_b]>
 util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
   %0 = stream.tensor.sizeof tensor<2048x4096xf16, #no_pad_encoding>{} : index
@@ -148,11 +148,11 @@ util.func public @sizeof_lhs_pad_encoding_static() -> index, index, index {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#no_pad_layout = #iree_encoding.pad_encoding_layout<[0, 0]>
+#no_pad_layout = #iree_encoding.padding<[0, 0]>
 #no_pad_encoding = #iree_encoding.layout<[#no_pad_layout]>
-#pad_layout_a = #iree_encoding.pad_encoding_layout<[0, 64]>
+#pad_layout_a = #iree_encoding.padding<[0, 64]>
 #pad_encoding_a = #iree_encoding.layout<[#pad_layout_a]>
-#pad_layout_b = #iree_encoding.pad_encoding_layout<[64, 0]>
+#pad_layout_b = #iree_encoding.padding<[64, 0]>
 #pad_encoding_b = #iree_encoding.layout<[#pad_layout_b]>
 util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) -> index, index, index, index {
   %0 = stream.tensor.sizeof tensor<2048x?xf16, #no_pad_encoding>{%arg0} : index
@@ -179,9 +179,9 @@ util.func public @sizeof_rhs_pad_encoding_dynamic(%arg0 : index, %arg1 : index) 
 
 // -----
 
-#encoding_layout_0 = #iree_cpu.cpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
-#encoding_layout_1 = #iree_cpu.vmvx_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [2, 16], outerDimsPerm = [0, 1]}}>
-#encoding_layout_2 = #iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>
+#encoding_layout_0 = #iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 8], outerDimsPerm = [0, 1]}}>
+#encoding_layout_1 = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [2, 16], outerDimsPerm = [0, 1]}}>
+#encoding_layout_2 = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout_0, #encoding_layout_1, #encoding_layout_2]>
 util.func public @sizeof_multi_encoding_layouts(%arg0: index, %arg1: index) -> index {
   %0 = stream.tensor.sizeof tensor<?x?xf32, #encoding>{%arg0, %arg1} : index

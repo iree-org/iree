@@ -57,7 +57,8 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
   }
 
   // Only VMVX with ukernel config supports dynamic inner tile sizes.
-  auto vmvxLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingLayoutAttr>(layoutAttr);
+  auto vmvxLayoutAttr =
+      dyn_cast<IREE::CPU::VMVXEncodingResolverAttr>(layoutAttr);
   if (!vmvxLayoutAttr || !hasUkernel(vmvxLayoutAttr.getConfiguration())) {
     return failure();
   }
