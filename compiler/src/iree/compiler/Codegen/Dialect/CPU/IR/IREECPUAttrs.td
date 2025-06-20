@@ -12,7 +12,7 @@ include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 
 //===----------------------------------------------------------------------===//
-// iree_cpu.encoding_layout_attr
+// Encoding Resolvers.
 //===----------------------------------------------------------------------===//
 
 def IREECPU_CPUEncodingResolverAttr :
