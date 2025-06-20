@@ -62,9 +62,8 @@ func.func @fold_collapse_into_stores_dynamic(%arg0 : tensor<2x?x32xf32>) {
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic(
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
-//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
+//       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%[[CONST]]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
@@ -134,9 +133,8 @@ func.func @fold_collapse_into_stores_dynamic_partial_size(%arg0 : tensor<2x?x32x
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_size(
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
-//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
+//       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%[[CONST]]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
@@ -158,9 +156,8 @@ func.func @fold_collapse_into_stores_dynamic_partial_with_offset(%arg0 : tensor<
   return
 }
 // CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_with_offset(
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
-//       CHECK:   %[[SHAPE:.+]] = arith.divsi %[[CONST]], %[[C2]]
+//       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%[[CONST]]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x40xf32>>{%[[SHAPE]]}
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
@@ -171,7 +168,7 @@ func.func @fold_collapse_into_stores_dynamic_partial_with_offset(%arg0 : tensor<
 
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<2x?x32xf32>) {
+func.func @fold_collapse_into_stores_dynamic_same(%arg0 : tensor<2x?x32xf32>) {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
@@ -181,15 +178,63 @@ func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<
       : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   return
 }
-// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_unsupported(
-//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
-//  CHECK-NEXT:   iree_tensor_ext.dispatch.tensor.store %[[COLLAPSE]]
+// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_same(
+//       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
+//       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%[[CONST]]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [8, 0, 0], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_into_stores_slice_1d(%arg0 : tensor<3x?x16xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<3x?x16xf32> into tensor<?x16xf32>
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [8, 0], sizes = [%0, 16], strides = [1, 1]
+      : tensor<?x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @fold_collapse_into_stores_slice_1d(
+//       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
+//       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 3)>()[%[[CONST]]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x?x32xf32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [8, 0, 0], sizes = [3, %[[SHAPE]], 16], strides = [1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x?x32xf32>>{%[[SHAPE]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_into_stores_slice_3d(%arg0 : tensor<4x8x4x128xf32>) {
+  %c0 = arith.constant 0 : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x4608xf32>>
+  %2 = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<4x8x4x128xf32> into tensor<4x4096xf32>
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [4, 4096], strides = [1, 1]
+      : tensor<4x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x4608xf32>>
+  return
+}
+// CHECK-LABEL: func @fold_collapse_into_stores_slice_3d(
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x9x4x128xf32>>
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [4, 8, 4, 128], strides = [1, 1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x9x4x128xf32>>
 
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<2x?x32xf32>) {
+func.func @fold_collapse_into_stores_dynamic_diff(%arg0 : tensor<2x?x32xf32>) {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
@@ -200,6 +245,75 @@ func.func @fold_collapse_into_stores_dynamic_partial_unsupported(%arg0 : tensor<
       : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
   return
 }
-// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_partial_unsupported(
-//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
-//  CHECK-NEXT:   iree_tensor_ext.dispatch.tensor.store %[[COLLAPSE]]
+// CHECK-LABEL: func @fold_collapse_into_stores_dynamic_diff
+//       CHECK:   %[[CONST:.+]] = hal.interface.constant.load
+//       CHECK:   %[[SHAPE:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%[[CONST]]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [0, 0, 0], sizes = [2, %[[SHAPE]], 32], strides = [1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x?x32xf32>>{%[[SHAPE]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @unsupported_multiple_dynamic_dims_in_group(%arg0 : tensor<?x?x32xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  %3 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<?x?x32xf32> into tensor<?x32xf32>
+  iree_tensor_ext.dispatch.tensor.store %3, %2, offsets = [0, 0], sizes = [%1, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @unsupported_multiple_dynamic_dims_in_group
+//       CHECK:   tensor.collapse_shape
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @unsupported_dynamic_store_into_static_subspan(%arg0 : tensor<2x?x32xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x32xf32>>
+  %2 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<2x?x32xf32> into tensor<?x32xf32>
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 32], strides = [1, 1]
+      : tensor<?x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x32xf32>>
+  return
+}
+// CHECK-LABEL: func @unsupported_dynamic_store_into_static_subspan
+//       CHECK:   tensor.collapse_shape
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_expand_and_collapse(%arg0 : tensor<1x?x1x8xi32>) {
+  %c128 = arith.constant 128 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c128) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x8xi32>>{%0}
+  %2 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%0, 8], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x8xi32>>{%0} -> tensor<?x8xi32>
+  %3 = tensor.expand_shape %2 [[0, 1], [2, 3]] output_shape [1, %0, 1, 8] : tensor<?x8xi32> into tensor<1x?x1x8xi32>
+  %4 = linalg.copy ins(%arg0 : tensor<1x?x1x8xi32>)
+        outs(%3 : tensor<1x?x1x8xi32>) -> tensor<1x?x1x8xi32>
+  %5 = tensor.collapse_shape %4 [[0, 1], [2, 3]] : tensor<1x?x1x8xi32> into tensor<?x8xi32>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [%0, 8], strides = [1, 1] : tensor<?x8xi32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x8xi32>>{%0}
+  return
+}
+// CHECK-LABEL: func @fold_expand_and_collapse
+//       CHECK:   %[[SHAPE:.+]] = hal.interface.constant.load
+//       CHECK:   %[[SUBSPAN1:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x?x1x8xi32>>{%[[SHAPE]]}
+//       CHECK:   %[[SUBSPAN2:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x?x1x8xi32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load %[[SUBSPAN1]]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [1, %[[SHAPE]], 1, 8], strides = [1, 1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x?x1x8xi32>>{%[[SHAPE]]}
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN2]]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [1, %[[SHAPE]], 1, 8], strides = [1, 1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x?x1x8xi32>>{%[[SHAPE]]}
