@@ -165,6 +165,18 @@ def MaterializeCopyOnWritePass :
   ];
 }
 
+def ElideTransferOpsPass :
+    Pass<"iree-stream-elide-transfer-ops", "mlir::ModuleOp"> {
+  let summary = "Elides transfer ops when they the topology allows (no transfer required)";
+  let description = [{
+    Elides all transfer ops that are between device links that do not
+    require tansfers and do not change the lifetime of the resource.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def MaterializeEncodingsPass :
     Pass<"iree-stream-materialize-encodings", "mlir::ModuleOp"> {
   let summary = "Materialize stream.tensor.encode ops to dispatches and executables.";
