@@ -432,10 +432,12 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // Step 1.5. Expand result shapes of MultiMmaOps before tiling, and
   // propagate reshapes to the function boundary.
   {
-    IREE::GPU::ConcretizeMmaShapesPassOptions options;
-    options.concretizeInputs = false;
-    options.concretizeResult = true;
-    funcPassManager.addPass(IREE::GPU::createConcretizeMmaShapesPass());
+    IREE::GPU::ExpandUndistributedInnerTilesPassOptions options;
+    options.expandInputs = false;
+    options.expandOutputs = true;
+    // Note: options not passed in was previous behavior from PR #18179.
+    funcPassManager.addPass(
+        IREE::GPU::createExpandUndistributedInnerTilesPass());
   }
   funcPassManager.addPass(createPropagateReshapesByExpansionPass());
 
@@ -456,10 +458,12 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // Step 3.5. Expand the inner dimensions of MultiMma ops in preparation for
   // distribution to lanes.
   {
-    IREE::GPU::ConcretizeMmaShapesPassOptions options;
-    options.concretizeInputs = true;
-    options.concretizeResult = false;
-    funcPassManager.addPass(IREE::GPU::createConcretizeMmaShapesPass());
+    IREE::GPU::ExpandUndistributedInnerTilesPassOptions options;
+    options.expandInputs = true;
+    options.expandOutputs = false;
+    // Note: options not passed in was previous behavior from PR #18179.
+    funcPassManager.addPass(
+        IREE::GPU::createExpandUndistributedInnerTilesPass());
   }
 
   funcPassManager.addPass(createPropagateReshapesByExpansionPass());

@@ -48,8 +48,8 @@ iree_cc_library(
     "Transforms.h"
   SRCS
     "CombineBarrierRegions.cpp"
-    "ConcretizeMmaShapes.cpp"
     "DistributeInnerTiledToLanes.cpp"
+    "ExpandUndistributedInnerTiles.cpp"
     "LowerIREEGPUOps.cpp"
     "Passes.cpp"
     "Transforms.cpp"
