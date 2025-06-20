@@ -25,47 +25,6 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
-///  This function checks whether the `genericOp` has any external captures,
-///  i.e., whether it uses any values that are defined outside of its body.
-///  %10 = linalg.generic {indexing_maps = [#map, #map],
-///          iterator_types = ["parallel", "parallel"]}
-///         ins(%5 : tensor<4096x64xi64>) outs(%9 : tensor<4096x64xf16>) {
-///          ^bb0(%in: i64, %out: f16):
-///            %14 = linalg.index 0 : index
-///            %15 = arith.index_cast %in : i64 to index
-///            %extracted = tensor.extract %4[%14, %15] : tensor<4096x64xf16>
-///            linalg.yield %extracted : f16
-///           } -> tensor<4096x64xf16>
-///  Here %4 is an external capture used via tensor.extract inside
-///  linalg.generic hence the above `genericOp` has an external capture.
-static bool hasExternalCapture(linalg::GenericOp genericOp) {
-  Block &body = genericOp.getRegion().front();
-  for (Operation &op : body.getOperations()) {
-    for (Value operand : op.getOperands()) {
-      if (auto bArg = dyn_cast<BlockArgument>(operand)) {
-        // Check whether the operand lies in the same block.
-        if (bArg.getOwner() == &body) {
-          continue;
-        }
-        return true;
-      }
-      Operation *defOp = operand.getDefiningOp();
-      // Scalar constant is allowed.
-      if (defOp && defOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
-        Type type = operand.getType();
-        if (type.isIntOrFloat() || type.isIndex()) {
-          continue;
-        }
-      }
-      // If defining op is not inside the block, it’s an external value.
-      if (!defOp || defOp->getBlock() != &body) {
-        return true;
-      }
-    }
-  }
-  return false; // All operands are locally defined or block arguments.
-}
-
 /// Rematerialize all parallel elementwise operations into its users within a
 /// `flow.dispatch.region`.
 struct RematerializeParallelOpsPattern
