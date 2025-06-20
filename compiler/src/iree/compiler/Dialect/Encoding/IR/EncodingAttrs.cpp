@@ -501,15 +501,15 @@ PadEncodingLayoutAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.identity_encoding
+// iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
 
 Attribute
-IdentityEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+IdentityResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
   return *this;
 }
 
-Attribute IdentityEncodingAttr::getLayout(RankedTensorType type) const {
+Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
   SmallVector<int64_t> zeros(type.getRank(), 0);
   return Encoding::PadEncodingLayoutAttr::get(
@@ -517,15 +517,15 @@ Attribute IdentityEncodingAttr::getLayout(RankedTensorType type) const {
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.unsupported_encoding
+// iree_encoding.unsupported_resolver
 //===---------------------------------------------------------------------===//
 
 Attribute
-UnsupportedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+UnsupportedResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
   return *this;
 }
 
-Attribute UnsupportedEncodingAttr::getLayout(RankedTensorType) const {
+Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
   return nullptr;
 }
 
@@ -533,7 +533,7 @@ Attribute UnsupportedEncodingAttr::getLayout(RankedTensorType) const {
 // Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
+Attribute TestingAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess())) {
     return {};
   }
@@ -549,7 +549,7 @@ Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
   return get(p.getContext(), layouts);
 }
 
-void TestingEncodingAttr::print(AsmPrinter &p) const {
+void TestingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
   if (auto layouts = getLayouts()) {
@@ -558,25 +558,22 @@ void TestingEncodingAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-bool TestingEncodingAttr::isSerialized() const {
-  return getLayouts() ? true : false;
-}
+bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
-Attribute
-TestingEncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return TestingEncodingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
 Attribute
-UnspecializedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+SpecializationResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
   return *this;
 }
 
-Attribute UnspecializedEncodingAttr::getLayout(RankedTensorType type) const {
+Attribute SpecializationResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  return SpecializedEncodingAttr::get(ctx, getSeed(),
-                                      TypeAttr::get(type.dropEncoding()));
+  return SpecializedAttr::get(ctx, getSeed(),
+                              TypeAttr::get(type.dropEncoding()));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

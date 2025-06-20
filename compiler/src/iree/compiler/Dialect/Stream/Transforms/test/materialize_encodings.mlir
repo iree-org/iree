@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-stream-materialize-encodings --split-input-file %s | FileCheck %s
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 // CHECK-LABEL: @fold_tensor_encode_op
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 util.func public @fold_tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
@@ -14,8 +14,8 @@ util.func public @fold_tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index
 
 // -----
 
-// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups()
 // CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice
@@ -46,8 +46,8 @@ util.func public @encode_static_shape(%resource: !stream.resource<*>, %total_siz
 
 // -----
 
-// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
 // CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
@@ -84,8 +84,8 @@ util.func public @mixed_static_dynamic_encoding(%resource: !stream.resource<*>, 
 
 // -----
 
-// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
@@ -126,8 +126,8 @@ util.func public @encode_result_resource(%resource: !stream.resource<*>, %total_
 
 // -----
 
-// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
@@ -168,10 +168,10 @@ util.func public @decode_source_resource(%resource: !stream.resource<*>, %total_
 
 // -----
 
-// CHECK-DAG:  #[[ENCODING0:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
-// CHECK-DAG:  #[[ENCODING1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
-#encoding0 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
-#encoding1 = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<456>]>
+// CHECK-DAG:  #[[ENCODING0:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK-DAG:  #[[ENCODING1:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
+#encoding0 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
@@ -216,8 +216,8 @@ util.func public @update_encoding(%resource: !stream.resource<*>, %total_size: i
 // This tests that only a single executable is created and it is reused by both
 // dispatch ops.
 
-// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups()
 // CHECK-NOT:  stream.executable

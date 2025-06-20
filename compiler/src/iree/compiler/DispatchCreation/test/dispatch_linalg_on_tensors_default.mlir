@@ -32,7 +32,7 @@ util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : ten
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
     %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #encoding> {
   %0 = tensor.empty() : tensor<384x512xf32>
