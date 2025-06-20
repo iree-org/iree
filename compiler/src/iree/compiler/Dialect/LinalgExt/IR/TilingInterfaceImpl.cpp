@@ -1360,51 +1360,64 @@ SmallVector<Range> ArgCompareOp::getIterationDomain(OpBuilder &builder) {
 LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
                                                          Location loc,
                                                          ValueRange ivs) {
-  uint64_t kDim = getDimension();
-
-  SmallVector<Value> outerIndices;
+  uint64_t reductionDim = getDimension();
+  SmallVector<Value> parallelIndices;
   for (size_t i = 0; i < ivs.size(); ++i) {
-    if ((int64_t)i == kDim)
+    if (i == reductionDim)
       continue;
-    outerIndices.push_back(ivs[i]);
+    parallelIndices.push_back(ivs[i]);
   }
-
-  Value bestValueSoFar =
-      b.create<memref::LoadOp>(loc, outputValue(), outerIndices);
-  Value bestIndexSoFar =
-      b.create<memref::LoadOp>(loc, outputIndex(), outerIndices);
 
   Value candidateValue = b.create<memref::LoadOp>(loc, getInputValue(), ivs);
-
-  auto &srcBlock = getRegion().front();
-  IRMapping bvm;
-  bvm.map(srcBlock.getArgument(0), candidateValue);
-  bvm.map(srcBlock.getArgument(1), bestValueSoFar);
-
-  for (auto &op : srcBlock.without_terminator()) {
-    b.clone(op, bvm);
-  }
-
-  Value cmpResult = bvm.lookup(srcBlock.getTerminator()->getOperand(0));
-
-  Value selectedValue =
-      b.create<arith::SelectOp>(loc, cmpResult, candidateValue, bestValueSoFar);
-
-  Value indexOffset = ivs[kDim];
+  Value indexValue = ivs[reductionDim];
   if (getIndexBase()) {
-    indexOffset = b.create<arith::AddIOp>(loc, getIndexBase(), indexOffset);
+    indexValue = b.create<arith::AddIOp>(loc, getIndexBase(), indexValue);
+  }
+  Value castedIndex = indexValue;
+  auto indexType = getOutputIndexType().getElementType();
+  if (castedIndex.getType() != indexType) {
+    castedIndex = b.create<arith::IndexCastOp>(loc, indexType, castedIndex);
   }
 
-  Value castedIndex = indexOffset;
-  if (castedIndex.getType() != bestIndexSoFar.getType()) {
-    castedIndex = b.create<arith::IndexCastOp>(loc, bestIndexSoFar.getType(),
-                                               castedIndex);
+  Value isFirst =
+      b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, ivs[reductionDim],
+                              b.create<arith::ConstantIndexOp>(loc, 0));
+  auto ifOp = b.create<scf::IfOp>(loc, isFirst, /*withElseRegion=*/true);
+  {
+    OpBuilder thenBuilder = ifOp.getThenBodyBuilder();
+    thenBuilder.create<memref::StoreOp>(loc, candidateValue, outputValue(),
+                                        parallelIndices);
+    thenBuilder.create<memref::StoreOp>(loc, castedIndex, outputIndex(),
+                                        parallelIndices);
   }
 
-  Value selectedIndex =
-      b.create<arith::SelectOp>(loc, cmpResult, castedIndex, bestIndexSoFar);
-  b.create<memref::StoreOp>(loc, selectedValue, outputValue(), outerIndices);
-  b.create<memref::StoreOp>(loc, selectedIndex, outputIndex(), outerIndices);
+  {
+    OpBuilder elseBuilder = ifOp.getElseBodyBuilder();
+
+    Value bestValueSoFar =
+        elseBuilder.create<memref::LoadOp>(loc, outputValue(), parallelIndices);
+    Value bestIndexSoFar =
+        elseBuilder.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
+
+    auto &srcBlock = getRegion().front();
+    IRMapping bvm;
+    bvm.map(srcBlock.getArgument(0), candidateValue);
+    bvm.map(srcBlock.getArgument(1), bestValueSoFar);
+    for (auto &op : srcBlock.without_terminator()) {
+      elseBuilder.clone(op, bvm);
+    }
+    Value cmpResult = bvm.lookup(srcBlock.getTerminator()->getOperand(0));
+
+    Value selectedValue = elseBuilder.create<arith::SelectOp>(
+        loc, cmpResult, candidateValue, bestValueSoFar);
+
+    Value selectedIndex = elseBuilder.create<arith::SelectOp>(
+        loc, cmpResult, castedIndex, bestIndexSoFar);
+    elseBuilder.create<memref::StoreOp>(loc, selectedValue, outputValue(),
+                                        parallelIndices);
+    elseBuilder.create<memref::StoreOp>(loc, selectedIndex, outputIndex(),
+                                        parallelIndices);
+  }
 
   return success();
 }
