@@ -537,7 +537,8 @@ typedef struct IREE_AMDGPU_ALIGNAS(8) iree_amdgpu_kernel_implicit_args_t {
   uint16_t group_size[3];  // + 12/14/16
 
   // Grid dispatch work group size of the partial work group, if it exists.
-  // Any dimension that does not exist must be 0.
+  // Any dimension that does not exist must be 0. Only used in OpenCL and can
+  // be 0.
   //
   // Represented in metadata as:
   //   hidden_remainder_x
@@ -549,6 +550,11 @@ typedef struct IREE_AMDGPU_ALIGNAS(8) iree_amdgpu_kernel_implicit_args_t {
   uint64_t reserved1;  // + 32
 
   // OpenCL grid dispatch global offset.
+  // Always 0 in HIP but still required as the device library functions for
+  // grid locations is shared with OpenCL and unconditionally factors it in.
+  //
+  // Hardcoded to 0 in HIP:
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/hipamd/src/hip_module.cpp#L348
   //
   // Represented in metadata as:
   //   hidden_global_offset_x
@@ -559,52 +565,189 @@ typedef struct IREE_AMDGPU_ALIGNAS(8) iree_amdgpu_kernel_implicit_args_t {
   // Grid dispatch dimensionality. This is the same value as the AQL
   // dispatch packet dimensionality. Must be a value between 1 and 3.
   //
+  // Hardcoded to 3 in HIP:
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/hipamd/src/hip_module.cpp#L349
+  //
   // Represented in metadata as:
   //   hidden_grid_dims
   uint16_t grid_dims;  // + 64
 
+  // Fixed-size buffer for `-mprintf-kind=buffered` support.
+  // By default LLVM uses `hostcall` but that's a mess and we avoid it.
+  // `__printf_alloc` in the device library is used to grab this pointer, the
+  // header DWORDs are manipulated, and the contents are written to the buffer.
+  //
+  // struct {
+  //   atomic_uint32_t offset;
+  //   uint32_t size;
+  //   uint8_t data[size];
+  // } printf_buffer_t;
+  //
+  // One of many disappointing parts of this scheme is that constant string
+  // values are interned, MD5 hashed, and stored *externally* in the amdhsa data
+  // blob. In order to print with any constant format string this data blob
+  // needs to be parsed, retained, and referenced every time a printf packet is
+  // processed. It would have been significantly better to embed the table in
+  // the ELF as a global constant instead as then we could reference it on both
+  // host and device and not need to parse the amdhsa blob.
+  //
+  // The contents of the data buffer are best defined by the janky parser code:
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/rocclr/device/rocm/rocprintf.cpp#L454
+  // Each printf consists of a control DWORD followed by 8-byte aligned
+  // contents. Effectively:
+  // struct {
+  //   uint32_t is_stderr : 1;       // else stdout
+  //   uint32_t constant : 1;        // constant format string code path
+  //   uint32_t size_in_bytes : 30;  // (including this header)
+  //   uint64_t data[size_in_bytes / 8];
+  // } printf_packet_t;
+  //
+  // To construct the full format data buffer if constant == 1:
+  //  data[0] contains the lower 64-bits of the MD5 hash of the string followed
+  //  by size_in_bytes-12 arguments. The data buffer needs to be expanded into
+  //  an 8-byte aligned NUL-terminated string with the corresponding hash
+  //  followed by the arguments verbatim. Once reconstituted the subsequent
+  //  logic is the same.
+  //
+  // The data buffer is an 8-byte aligned NUL-terminated string followed by
+  // the argument data. E.g. `hi! %s` would be encoded as `hi! %s` 0x00 0x??
+  // (with the last byte being padding to an 8-byte boundary). The reference
+  // code for formatting the string lives in the CLR:
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/rocclr/device/devhcprintf.cpp#L168
+  // Note that the documentation is incorrect about there being a version prefix
+  // and it expects the first uint64_t to contain the format string bytes.
+  //
+  // Note that in another disappointing display of rube-goldbergian development
+  // this implementation for some reason uses uint64_t for its data elements
+  // but never aligns it - meaning that consumer code must use unaligned loads
+  // in order to read the data. The CLR just copies it out each time. One could
+  // think that was for streaming (release the buffer contents early back to
+  // dispatches) but since they fully halt the world and synchronize after every
+  // dispatch containing a print none of that matters and it's just poor
+  // engineering.
+  //
+  // The compiler emits strings in the delimited form of
+  // `"0:0:<format_string_hash>,<actual_format_string>"`. Note that the first
+  // two values should always be 0 and are delimited by `:` while the MD5 hash
+  // is delimited from the format string itself by `,`. There's some special
+  // handling in the CLR for `:` being in the format string because whoever
+  // wrote it did a find from the end instead of a prefix consume - there's
+  // special handling of \72 (`:`) and other weird things that I'm not sure is
+  // needed. Example from LLVM: `"0:0:8addc4c0362218ac,Hello World!:\n"`.
+  //
+  // The hash is the lower 64 bits of the MD5 hash in hex but we don't care as
+  // it's just a semi-unique value we use to lookup the string formats. On load
+  // we sort and do a binary search instead of creating an std::map for every
+  // single print invocation like the CLR does. Just... wow.
+  //
+  // Handling the contents is also overtly complicated and poorly documented:
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/rocclr/device/devhcprintf.cpp#L168
+  //
+  // See:
+  // https://github.com/ROCm/llvm-project/commit/631c965483e03355cdc1dba578e787b259c4d79d
+  // https://github.com/ROCm/llvm-project/blob/997363823fcc5ccc7b0cc572aad05ba08714bf5f/amd/device-libs/ockl/src/cprintf.cl#L17
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/rocclr/device/rocm/rocprintf.cpp#L393
+  //
+  // Note that having a printf in a kernel causes the kernel to dispatch
+  // synchronously :facepalm:. We can't do the same and would need to emit
+  // flush packets (or something) into the control queue. What a mess.
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/rocclr/device/rocm/rocvirtual.cpp#L3644
+  // https://github.com/ROCm/clr/blob/a2550e0a9ecaa8f371cb14d08904c51874c37cbe/rocclr/device/rocm/rocprintf.cpp#L428-L429
+  //
   // Represented in metadata as:
   //   hidden_printf_buffer
-  void* printf_buffer;
+  void* printf_buffer;  // + 72
 
+  // Used for ASAN, printf, and more modern device memory allocations.
+  // It's bizarre and only "documented" in code and I really hope we don't have
+  // to touch it. Note that due to some LLVM bug sometimes this will be included
+  // in the offset table for a kernel even if it is not used (the
+  // `amdgpu-no-hostcall-ptr` attribute is set). At this point I'm quite sure no
+  // one has ever actually inspected the files produced by the LLVM backend.
+  //
   // Represented in metadata as:
   //   hidden_hostcall_buffer
-  void* hostcall_buffer;
+  void* hostcall_buffer;  // + 80
 
+  // Multi-grid support was deprecated in ROCM 5.x and should never appear in
+  // any program we generate ourselves or care about running.
+  //
   // Represented in metadata as:
   //   hidden_multigrid_sync_arg
-  uint64_t multigrid_sync_arg;
+  uint64_t deprecated_multigrid_sync_arg;
 
+  // Device memory heap pointer for device malloc/free.
+  // We don't support kernels using this as it requires too much goo for little
+  // payoff. The kernels we run shouldn't be malloc/freeing internally. If they
+  // do we will need to implement the heap API via hostcalls and other silly
+  // things that add a tremendous amount of complexity.
+  //
+  // See:
+  // https://github.com/ROCm/llvm-project/blob/97753eeaa4c79c2db2dcd9f37b7989596a8d4f15/amd/device-libs/ockl/src/dm.cl#L192
+  //
   // Represented in metadata as:
   //   hidden_heap_v1
-  uint64_t heap_v1;
+  uint64_t unused_heap_v1;
 
+  // AQL queue handles are only used by OpenCL device-side enqueue and we do not
+  // support that. We could, probably, by passing in our execution queue but
+  // since HIP has never supported it the use case doesn't exist. If we wanted
+  // to support device-enqueue we'd do it in a structured fashion instead of
+  // letting kernels splat right into the AQL queue.
+  //
+  // See:
+  // https://github.com/ROCm/llvm-project/blob/97753eeaa4c79c2db2dcd9f37b7989596a8d4f15/amd/device-libs/opencl/src/devenq/enqueue.cl#L310
+  //
   // Represented in metadata as:
   //   hidden_default_queue
-  uint64_t default_queue;
+  uint64_t unused_default_queue;
 
+  // Completion actions were (I believe) an attempt at dynamic parallelism and
+  // HIP has never supported them. Device-side enqueue in OpenCL uses this but
+  // we don't support those kernels.
+  //
+  // See:
+  // https://github.com/ROCm/llvm-project/blob/97753eeaa4c79c2db2dcd9f37b7989596a8d4f15/amd/device-libs/opencl/src/devenq/enqueue.cl#L311
+  //
   // Represented in metadata as:
   //   hidden_completion_action
-  uint64_t completion_action;
+  uint64_t unused_completion_action;
 
+  // The value of the sharedMemBytes parameter to the dispatch indicating how
+  // much dynamic shared memory was reserved for the kernel. This may be larger
+  // than the requested amount. The total group_segment_size for a dispatch is
+  // the static LDS requirement of the kernel plus this value.
+  //
   // Represented in metadata as:
   //   hidden_dynamic_lds_size
   uint32_t dynamic_lds_size;
 
   uint8_t reserved[68];
 
+  // Only used by GFX8, which we don't support.
+  //
   // Represented in metadata as:
   //   hidden_private_base
   uint32_t deprecated_private_base;
 
+  // Only used by GFX8, which we don't support.
+  //
   // Represented in metadata as:
   //   hidden_shared_base
   uint32_t deprecated_shared_base;
 
+  // AQL queue the dispatch is running on.
+  // Only used by pre-GFX9 devices, which we don't support.
+  //
   // Represented in metadata as:
   //   hidden_queue_ptr;
-  iree_hsa_queue_t* queue_ptr;
+  iree_hsa_queue_t* deprecated_queue_ptr;
 } iree_amdgpu_kernel_implicit_args_t;
+
+#define IREE_AMDGPU_KERNEL_IMPLICIT_ARGS_SIZE               \
+  (IREE_AMDGPU_OFFSETOF(iree_amdgpu_kernel_implicit_args_t, \
+                        dynamic_lds_size) +                 \
+   sizeof(((iree_amdgpu_kernel_implicit_args_t*)NULL)->dynamic_lds_size))
 
 //===----------------------------------------------------------------------===//
 // OpenCL/HIP Dispatch ABI

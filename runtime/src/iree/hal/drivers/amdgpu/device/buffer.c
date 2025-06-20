@@ -63,3 +63,26 @@ void* iree_hal_amdgpu_device_workgroup_count_buffer_ref_resolve(
              ? (uint8_t*)buffer_ref.value.ptr + buffer_ref.offset
              : NULL;
 }
+
+void* iree_hal_amdgpu_device_uint64_buffer_ref_resolve(
+    iree_hal_amdgpu_device_uint64_buffer_ref_t buffer_ref,
+    IREE_AMDGPU_ALIGNAS(64)
+        const iree_hal_amdgpu_device_buffer_ref_t* IREE_AMDGPU_RESTRICT
+            binding_table) {
+  if (buffer_ref.type == IREE_HAL_AMDGPU_DEVICE_BUFFER_TYPE_SLOT) {
+    const iree_hal_amdgpu_device_buffer_ref_t binding =
+        binding_table[buffer_ref.value.slot];
+    const uint64_t offset = buffer_ref.offset + binding.offset;
+    buffer_ref = (iree_hal_amdgpu_device_uint64_buffer_ref_t){
+        .type = binding.type,
+        .offset = offset,
+        .value.bits = binding.value.bits,
+    };
+  }
+  if (buffer_ref.type == IREE_HAL_AMDGPU_DEVICE_BUFFER_TYPE_HANDLE) {
+    buffer_ref.value.ptr = buffer_ref.value.handle->ptr;
+  }
+  return buffer_ref.value.ptr
+             ? (uint8_t*)buffer_ref.value.ptr + buffer_ref.offset
+             : NULL;
+}
