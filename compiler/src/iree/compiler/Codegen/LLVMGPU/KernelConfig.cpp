@@ -1588,10 +1588,11 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
           // Try to distribute the resources over the dimensions greedily.
           int64_t dimSize = bounds[dim];
           if (ShapedType::isDynamic(dimSize)) {
-            // We do not distribute over dynamic dimensions yet. It's possible
-            // to do it since we have masking, it's just not clear what
-            // heuristic to use.
-            basis.counts[rCurrDim] = 1;
+            // Distribute all remaining resources on the dynamic dimension.
+            // There isn't much we can do here other than this.
+            int64_t used = available;
+            available /= used;
+            basis.counts[rCurrDim] = used;
             continue;
           }
           int64_t used = std::gcd(available, dimSize);
@@ -1669,65 +1670,104 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
       SmallVector<int64_t>(opInfo.getDomainRank())};
 
-  int64_t qkRemainingThreads = targetSubgroupSize;
+  {
+    int64_t qkRemainingThreads = targetSubgroupSize;
+
+    // Distribute both basis on K2 equally.
+    int64_t qkCurrDim = 0;
+    qkRemainingThreads = distributeDimensionsToBasisGreedily(
+        qkRemainingThreads, llvm::to_vector(llvm::reverse(opInfo.getK2Dims())),
+        qkThreadBasis, qkCurrDim);
+
+    pvThreadBasis = qkThreadBasis;
+    int64_t pvRemainingThreads = qkRemainingThreads;
+    int64_t pvCurrDim = qkCurrDim;
+
+    // If the target doesn't support subgroup shuffle, we should still be
+    // distributing on threads. It's the backends problem to not use shuffles,
+    // and instead use shared memory for reduction.
+
+    // Distribute K1 on QK basis and N on nothing.
+    qkRemainingThreads = distributeDimensionsToBasisGreedily(
+        qkRemainingThreads, opInfo.getK1Dims(), qkThreadBasis, qkCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getNDims(), qkThreadBasis,
+                                        qkCurrDim);
+    // Distribute N on PV basis and K1 on nothing.
+    pvRemainingThreads = distributeDimensionsToBasisGreedily(
+        pvRemainingThreads, opInfo.getNDims(), pvThreadBasis, pvCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getK1Dims(), pvThreadBasis,
+                                        pvCurrDim);
+
+    // We already tiled B/M on workgroups, so it doesn't really matter how we
+    // distribute them here.
+    qkRemainingThreads = distributeDimensionsToBasisGreedily(
+        qkRemainingThreads, opInfo.getBatchDims(), qkThreadBasis, qkCurrDim);
+    qkRemainingThreads = distributeDimensionsToBasisGreedily(
+        qkRemainingThreads, opInfo.getMDims(), qkThreadBasis, qkCurrDim);
+
+    pvRemainingThreads = distributeDimensionsToBasisGreedily(
+        pvRemainingThreads, opInfo.getBatchDims(), pvThreadBasis, pvCurrDim);
+    pvRemainingThreads = distributeDimensionsToBasisGreedily(
+        pvRemainingThreads, opInfo.getMDims(), pvThreadBasis, pvCurrDim);
+  }
 
   // Distribute both basis on K2 equally.
-  int64_t qkCurrDim = 0;
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getK2Dims(), qkThreadBasis, qkCurrDim);
-
-  pvThreadBasis = qkThreadBasis;
-  int64_t pvRemainingThreads = qkRemainingThreads;
-  int64_t pvCurrDim = qkCurrDim;
-
-  // If the target doesn't support subgroup shuffle, we should still be
-  // distributing on threads. It's the backends problem to not use shuffles, and
-  // instead use shared memory for reduction.
-
-  // Distribute K1 on QK basis and N on nothing.
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getK1Dims(), qkThreadBasis, qkCurrDim);
-  distributeDimensionsToBasisGreedily(1, opInfo.getNDims(), qkThreadBasis,
-                                      qkCurrDim);
-  // Distribute N on PV basis and K1 on nothing.
-  pvRemainingThreads = distributeDimensionsToBasisGreedily(
-      pvRemainingThreads, opInfo.getNDims(), pvThreadBasis, pvCurrDim);
-  distributeDimensionsToBasisGreedily(1, opInfo.getK1Dims(), pvThreadBasis,
-                                      pvCurrDim);
-
-  // We already tiled B/M on workgroups, so it doesn't really matter how we
-  // distribute them here.
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getBatchDims(), qkThreadBasis, qkCurrDim);
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getMDims(), qkThreadBasis, qkCurrDim);
-
-  pvRemainingThreads = distributeDimensionsToBasisGreedily(
-      pvRemainingThreads, opInfo.getBatchDims(), pvThreadBasis, pvCurrDim);
-  pvRemainingThreads = distributeDimensionsToBasisGreedily(
-      pvRemainingThreads, opInfo.getMDims(), pvThreadBasis, pvCurrDim);
-
-  // Do not distribute on subgroups for now. We want to distribute the reduction
-  // dimension on subgroups, but until the masked reduction work lands, we do
-  // nothing.
-  IREE::GPU::Basis subgroupBasis = {
+  IREE::GPU::Basis qkSubgroupBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
-      llvm::to_vector(llvm::seq<int64_t>(opInfo.getDomainRank()))};
+      SmallVector<int64_t>(opInfo.getDomainRank())};
+  IREE::GPU::Basis pvSubgroupBasis = {
+      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
+      SmallVector<int64_t>(opInfo.getDomainRank())};
+
+  // Use 4 subgroups for now.
+  // TODO: We should set this based on occupancy we can get.
+  int64_t numSubgroups = 4;
+  {
+    int64_t qkRemainingSubgroups = numSubgroups;
+    int64_t qkCurrDim = 0;
+    qkRemainingSubgroups = distributeDimensionsToBasisGreedily(
+        qkRemainingSubgroups,
+        llvm::to_vector(llvm::reverse(opInfo.getK2Dims())), qkSubgroupBasis,
+        qkCurrDim);
+
+    pvSubgroupBasis = qkSubgroupBasis;
+    int64_t pvCurrDim = qkCurrDim;
+
+    // Don't use subgroups on any other dimension. Distribute B, M, K1, N to
+    // nothing.
+    // TODO: Explore if this is useful.
+    distributeDimensionsToBasisGreedily(1, opInfo.getBatchDims(),
+                                        qkSubgroupBasis, qkCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getMDims(), qkSubgroupBasis,
+                                        qkCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getK1Dims(), qkSubgroupBasis,
+                                        qkCurrDim);
+
+    distributeDimensionsToBasisGreedily(1, opInfo.getBatchDims(),
+                                        pvSubgroupBasis, pvCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getMDims(), pvSubgroupBasis,
+                                        pvCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getNDims(), pvSubgroupBasis,
+                                        pvCurrDim);
+
+    // Change numSubgroups to reflect total number of subgroups actually used.
+    numSubgroups /= qkRemainingSubgroups;
+  }
 
   LDBG("QK Basis");
   LDBG("Thread Basis");
   LDBG(llvm::interleaved(qkThreadBasis.counts));
   LDBG(llvm::interleaved(qkThreadBasis.mapping));
   LDBG("Subgroup Basis");
-  LDBG(llvm::interleaved(subgroupBasis.counts));
-  LDBG(llvm::interleaved(subgroupBasis.mapping));
+  LDBG(llvm::interleaved(qkSubgroupBasis.counts));
+  LDBG(llvm::interleaved(qkSubgroupBasis.mapping));
   LDBG("PV Basis");
   LDBG("Thread Basis");
   LDBG(llvm::interleaved(pvThreadBasis.counts));
   LDBG(llvm::interleaved(pvThreadBasis.mapping));
   LDBG("Subgroup Basis");
-  LDBG(llvm::interleaved(subgroupBasis.counts));
-  LDBG(llvm::interleaved(subgroupBasis.mapping));
+  LDBG(llvm::interleaved(pvSubgroupBasis.counts));
+  LDBG(llvm::interleaved(pvSubgroupBasis.mapping));
 
   // Tile N parallel dimensions if they are to big to workgroups.
   for (int64_t dim : opInfo.getNDims()) {
@@ -1742,18 +1782,16 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Tile remaining reduction dimensions to serial loops.
   SmallVector<int64_t> reductionTileSizes(opInfo.getDomainRank(), 0);
   for (int64_t dim : opInfo.getK2Dims()) {
-    if (ShapedType::isDynamic(dim)) {
-      reductionTileSizes[dim] = 1;
-    }
     if (bounds[dim] != 1) {
       int64_t threadCount = qkThreadBasis.counts[qkThreadBasis.mapping[dim]];
-      int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
+      int64_t subgroupCount =
+          qkSubgroupBasis.counts[qkSubgroupBasis.mapping[dim]];
       reductionTileSizes[dim] = threadCount * subgroupCount;
     }
   }
 
   int64_t flatWorkgroupSize =
-      targetSubgroupSize * ShapedType::getNumElements(subgroupBasis.counts);
+      targetSubgroupSize * ShapedType::getNumElements(numSubgroups);
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   MLIRContext *context = op.getContext();
@@ -1774,7 +1812,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute> qkConfig = {
       NamedAttribute("thread", b.getI64ArrayAttr(qkThreadTileSizes))};
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
-                      projectBasis(subgroupBasis, opInfo.getNDims()));
+                      projectBasis(qkSubgroupBasis, opInfo.getNDims()));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Thread,
                       projectBasis(qkThreadBasis, opInfo.getNDims()));
 
@@ -1789,7 +1827,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute> pvConfig = {
       NamedAttribute("thread", b.getI64ArrayAttr(pvThreadTileSizes))};
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
-                      projectBasis(subgroupBasis, opInfo.getK1Dims()));
+                      projectBasis(pvSubgroupBasis, opInfo.getK1Dims()));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Thread,
                       projectBasis(pvThreadBasis, opInfo.getK1Dims()));
 
