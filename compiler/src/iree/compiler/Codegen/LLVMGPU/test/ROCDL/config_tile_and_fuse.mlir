@@ -157,6 +157,43 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 
 // -----
 
+// This tests the mfma lowering intrinsic K alignment. Since gemmK = 360, and will
+// be aligned to 8 but not 16, we expect the 32x32x8xf16 intrinsic to be used.
+func.func @mfma_matmul_k_aligned_intrinsic(%lhs: tensor<1024x360xf16>, %rhs: tensor<360x1024xf16>) -> tensor<1024x1024xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %5 = tensor.empty() : tensor<1024x1024xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  %7 = linalg.matmul ins(%lhs, %rhs : tensor<1024x360xf16>, tensor<360x1024xf16>) outs(%6 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  return %7 : tensor<1024x1024xf32>
+}
+
+// CHECK-LABEL: func.func @mfma_matmul_k_aligned_intrinsic
+// CHECK:         pipeline = LLVMGPUTileAndFuse
+// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+
+// LATE: LLVMGPUVectorDistribute
+
+// -----
+
+// This tests the mfma lowering intrinsic M alignment. Since gemmM = 176, and will
+// be aligned to 16 but not 32, we expect the 16x16x32xi8 intrinsic to be used.
+func.func @mfma_matmul_m_aligned_intrinsic(%lhs: tensor<176x1024xi8>, %rhs: tensor<1024x1024xi8>) -> tensor<176x1024xi32> {
+  %cst = arith.constant 0 : i32
+  %5 = tensor.empty() : tensor<176x1024xi32>
+  %6 = linalg.fill ins(%cst : i32) outs(%5 : tensor<176x1024xi32>) -> tensor<176x1024xi32>
+  %7 = linalg.matmul ins(%lhs, %rhs : tensor<176x1024xi8>, tensor<1024x1024xi8>) outs(%6 : tensor<176x1024xi32>) -> tensor<176x1024xi32>
+  return %7 : tensor<176x1024xi32>
+}
+
+// CHECK-LABEL: func.func @mfma_matmul_m_aligned_intrinsic
+// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>
+
+// LATE: LLVMGPUVectorDistribute
+
+// -----
+
 module {
   func.func @conv_nhwc(%3: tensor<2x258x514x768xf16>, %4: tensor<3x3x768x256xf16>) -> tensor<2x256x512x256xf32> {
     %c0 = arith.constant 0 : index
