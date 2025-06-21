@@ -739,9 +739,13 @@ py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
       "Cannot export device buffer");
   static_assert(sizeof(dl_tensor.data) >=
                 sizeof(external_buffer.handle.device_allocation.ptr));
+  // Set the data pointer to the offset, and the byte_offset to 0.
+  // This SHOULD not be required, but some backends (torch GPU for example),
+  // ignore the byte_offset entirely.
   dl_tensor.data =
-      reinterpret_cast<void*>(external_buffer.handle.device_allocation.ptr);
-  dl_tensor.byte_offset = offset;
+      reinterpret_cast<uint8_t*>(external_buffer.handle.device_allocation.ptr) +
+      offset;
+  dl_tensor.byte_offset = 0;
 
   // Create and return capsule.
   PyObject* capsule = PyCapsule_New(static_cast<DLManagedTensor*>(tensor.get()),
