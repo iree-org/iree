@@ -268,6 +268,187 @@ struct BubbleExpandThroughExtract final
   }
 };
 
+struct BubbleExpandThroughConcat final
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto concatOp = expandOp.getSrc().getDefiningOp<tensor::ConcatOp>();
+    if (!concatOp) {
+      return failure();
+    }
+
+    // Get concat dimension and input/result types.
+    int64_t concatDim = concatOp.getDim();
+    auto reassoc = expandOp.getReassociationIndices();
+    auto expandedType = expandOp.getResultType();
+    auto expandedShape = expandedType.getShape();
+    auto srcShape = concatOp.getResultType().getShape();
+
+    // Find the "new" concat dim and if it is part of an expansion dim
+    int64_t srcRank = srcShape.size();
+    int64_t newConcatDim = -1, expandedDimCount = 0;
+    int64_t count = 0;
+    for (int64_t i = 0; i < srcRank; ++i) {
+      int64_t n = reassoc[i].size();
+      if (i == concatDim) {
+        newConcatDim = count;
+        expandedDimCount = n;
+        break;
+      }
+      count += n;
+    }
+    if (newConcatDim == -1)
+      return failure();
+
+    // If concat dim is expanded, check divisibility for all but outermost.
+    if (expandedDimCount > 1) {
+      int64_t origDim = srcShape[concatDim];
+      // Loop over all but the outermost expanded dims.
+      for (int64_t j = 1; j < expandedDimCount; ++j) {
+        int64_t expDim = expandedShape[newConcatDim + j];
+        // Example:
+        //   %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<100x100xf32>,
+        //   tensor<?x100xf32>) -> tensor<?x100xf32> %1 = tensor.expand_shape %0
+        //   [[0, 1], [2]] output_shape [?, 10, 100] : tensor<?x100xf32> into
+        //   tensor<?x10x100xf32>
+        // The propagation here legal because we know ? is divisible by 10
+        // because (? + 100) % 10 == 0.
+        if (ShapedType::isDynamic(origDim)) {
+          // Check all static input shapes for divisibility.
+          bool allStaticInputsDivisible = true;
+          for (Value input : concatOp.getInputs()) {
+            auto inputType = dyn_cast<RankedTensorType>(input.getType());
+            if (!inputType) {
+              return rewriter.notifyMatchFailure(
+                  expandOp, "Input to concat is not a RankedTensorType");
+            }
+            int64_t inputDim = inputType.getShape()[concatDim];
+            if (!ShapedType::isDynamic(inputDim) && inputDim % expDim != 0) {
+              allStaticInputsDivisible = false;
+              break;
+            }
+          }
+          // If any input is not divisible, we cannot propagate.
+          if (!allStaticInputsDivisible)
+            return rewriter.notifyMatchFailure(
+                expandOp,
+                "Not all static input dims are divisible by expanded dim");
+        } else if (ShapedType::isDynamic(expDim)) {
+          // If expanded dim is dynamic and not outermost, we cannot propagate.
+          return rewriter.notifyMatchFailure(
+              expandOp, "Expanded dim is dynamic and not outermost");
+        } else {
+          // Both static, check divisibility.
+          if (origDim % expDim != 0)
+            return rewriter.notifyMatchFailure(
+                expandOp, "Original dim is not divisible by expanded dim");
+        }
+      }
+    } // else we can always propagate the expand_shape through the concat.
+
+    // Create new expand_shape ops for each input.
+    SmallVector<Value> newInputs;
+    for (Value input : concatOp.getInputs()) {
+      auto type = input.getType();
+      auto inputType = dyn_cast<RankedTensorType>(type);
+      if (!inputType)
+        return failure();
+      ArrayRef<int64_t> inputShape = inputType.getShape();
+      SmallVector<OpFoldResult> expandShapeOutputDims;
+      SmallVector<int64_t> expandShapeOutputDimsInt;
+      // i = input shape index, k = expanded shape index, j = reassoc index
+      for (int64_t i = 0, k = 0; i < inputShape.size(); i++) {
+        // If the input is not expanded, just copy the shape.
+        if (reassoc[i].size() == 1) {
+          expandShapeOutputDims.push_back(rewriter.getIndexAttr(inputShape[i]));
+          expandShapeOutputDimsInt.push_back(inputShape[i]);
+          k++;
+          continue;
+        }
+        // Only the concat dim can differ from the original expanded dim
+        // The concat dim must be at j = 0.
+        // Iterate from j = 1 to size, and multiply each. after looping, divide
+        // by inputShape[i].
+        int64_t nonConcatDimProduct = 1;
+        bool concatInThisLoop = false;
+        for (int64_t j = 0; j < reassoc[i].size(); j++, k++) {
+          // if k is the concatDim we need to calculate it after getting the
+          // product of the other dimensions
+          if (k == newConcatDim) {
+            concatInThisLoop = true;
+            // We can skip the rest of the logic for this idx
+            continue;
+          }
+          if (!concatInThisLoop) {
+            // No concat in this loop, so we can use the expanded shape
+            // directly.
+            if (ShapedType::isDynamic(expandedShape[k])) {
+              auto dimVal =
+                  rewriter.create<tensor::DimOp>(expandOp.getLoc(), input, i);
+              expandShapeOutputDims.push_back(dimVal.getResult());
+              expandShapeOutputDimsInt.push_back(ShapedType::kDynamic);
+            } else {
+              expandShapeOutputDims.push_back(
+                  rewriter.getIndexAttr(expandedShape[k]));
+              expandShapeOutputDimsInt.push_back(expandedShape[k]);
+            }
+          } else if (concatInThisLoop &&
+                     !ShapedType::isDynamic(expandedShape[k])) {
+            nonConcatDimProduct *= expandedShape[k];
+          } else {
+            // We shouldn't reach this.
+            return rewriter.notifyMatchFailure(
+                expandOp,
+                "Expanded shape has dynamic dimension in concat reassoc"
+                "dimensions that is not the concat (ie outer) dimension");
+          }
+        }
+        // If we skipped the concat dim, we calculate it now.
+        if (k - reassoc[i].size() == newConcatDim) {
+          assert(concatInThisLoop && "concat should have been convered");
+          // Calculate the concat dim based on the product of the other
+          // dimensions.
+          if (ShapedType::isDynamic(inputShape[i])) {
+            // if input shape is dynamic, the concat dim is dynamic.
+            auto dimVal =
+                rewriter.create<tensor::DimOp>(expandOp.getLoc(), input, i);
+            expandShapeOutputDims.push_back(dimVal.getResult());
+            expandShapeOutputDimsInt.push_back(ShapedType::kDynamic);
+          } else {
+            // If input shape is static, we can calculate the concat dim.
+            expandShapeOutputDims.push_back(
+                rewriter.getIndexAttr(inputShape[i] / nonConcatDimProduct));
+            expandShapeOutputDimsInt.push_back(inputShape[i] /
+                                               nonConcatDimProduct);
+          }
+          for (int64_t j = 1; j < reassoc[i].size(); j++) {
+            // For the non-concat dimensions, we can just use the expanded
+            // shape.
+            int64_t idx = k - reassoc[i].size() + j;
+            expandShapeOutputDims.push_back(
+                rewriter.getIndexAttr(expandedShape[idx]));
+            expandShapeOutputDimsInt.push_back(expandedShape[idx]);
+          }
+        }
+      }
+      auto newType = RankedTensorType::get(expandShapeOutputDimsInt,
+                                           inputType.getElementType());
+      Value newExpand;
+      newExpand = rewriter.create<tensor::ExpandShapeOp>(
+          expandOp.getLoc(), newType, input, reassoc, expandShapeOutputDims);
+      newInputs.push_back(newExpand);
+    }
+    // Create new concat op on expanded inputs.
+    auto dimAttr = rewriter.getI64IntegerAttr(newConcatDim);
+    auto newConcat = rewriter.create<tensor::ConcatOp>(
+        concatOp.getLoc(), expandedType, dimAttr, newInputs);
+    rewriter.replaceOp(expandOp, newConcat.getResult());
+    return success();
+  }
+};
+
 static bool
 isExpandingUnitDims(ArrayRef<ReassociationIndices> reassociationIndices,
                     ArrayRef<int64_t> expandedShape) {
@@ -392,6 +573,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
+  bubbleExpandShapePatterns.insert<BubbleExpandThroughConcat>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(

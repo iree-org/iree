@@ -223,3 +223,36 @@ util.func @dont_propagate_edge_unit_reshapes(%arg0: tensor<?x1xi32>) -> tensor<?
 //       CHECK:   %[[VAL:.+]] = linalg.generic
 //  CHECK-SAME:      iterator_types = ["parallel"]
 //       CHECK:   util.return %[[VAL]] : tensor<?xi32>
+
+// -----
+
+//  Check basic expand_shape propagation through a concat op
+util.func public @test_expand_shape_propagation_through_concat(%arg0 : tensor<100x50x32xf32>, %arg1 : tensor<100x100x32xf32>) -> tensor<10x10x150x16x2xf32>{
+  %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<100x50x32xf32>, tensor<100x100x32xf32>) -> tensor<100x150x32xf32>
+  %1 = tensor.expand_shape %0 [[0, 1], [2], [3, 4]] output_shape [10, 10, 150, 16, 2] : tensor<100x150x32xf32> into tensor<10x10x150x16x2xf32>
+  util.return %1 : tensor<10x10x150x16x2xf32>
+}
+
+// CHECK-LABEL: func public @test_expand_shape_propagation_through_concat
+// CHECK: tensor.expand_shape {{.*}}: tensor<100x50x32xf32> into tensor<10x10x50x16x2xf32>
+// CHECK: tensor.expand_shape {{.*}}: tensor<100x100x32xf32> into tensor<10x10x100x16x2xf32>
+// CHECK: tensor.concat dim(2) {{.*}}: (tensor<10x10x50x16x2xf32>, tensor<10x10x100x16x2xf32>) -> tensor<10x10x150x16x2xf32>
+
+// -----
+
+// Check that expand_shape can be propagated through a concat op with mixed static and dynamic dimensions
+// Covers multiple expansions,
+util.func public @test_expand_prop_through_concat_mixed_dynamic_static_args(%arg0: tensor<4x100x100xf32>, %arg1: tensor<4x?x100xf32>) -> tensor<1x4x?x2x5x10x100xf32> {
+  %c0 = arith.constant 1 : index
+  %concat = tensor.concat dim(1) %arg0, %arg1 : (tensor<4x100x100xf32>, tensor<4x?x100xf32>) -> tensor<4x?x100xf32>
+  %dim = tensor.dim %arg1, %c0 : tensor<4x?x100xf32>
+  %0 = affine.apply affine_map<()[s0] -> (s0 + 100)>()[%dim]
+  %expanded = tensor.expand_shape %concat [[0, 1], [2,3, 4,5], [6]] output_shape [1, 4, %0, 2, 5, 10, 100] : tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
+  util.return %expanded : tensor<1x4x?x2x5x10x100xf32>
+}
+
+
+// CHECK-LABEL: func public @test_expand_prop_through_concat_mixed_dynamic_static_args
+// CHECK: tensor.expand_shape {{.*}}: tensor<4x100x100xf32> into tensor<1x4x1x2x5x10x100xf32>
+// CHECK: tensor.expand_shape {{.*}}: tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
+// CHECK: tensor.concat dim(2) {{.*}}: (tensor<1x4x1x2x5x10x100xf32>, tensor<1x4x?x2x5x10x100xf32>) -> tensor<1x4x?x2x5x10x100xf32>
