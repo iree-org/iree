@@ -7,10 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_UTILS_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_UTILS_H_
 
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -55,25 +53,6 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
 
 // Scans all of the stream.cmd.* ops in the region to derive a command category.
 IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region);
-
-// Maps a resource type to the corresponding HAL memory types and buffer usage.
-// This will fail if the resource type is not directly mappable to HAL bits.
-// The bits set here are those that must be set for the buffer to be used as the
-// buffer within the program with its defined resource lifetime.
-LogicalResult
-deriveRequiredResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
-                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
-                                 IREE::HAL::BufferUsageBitfield &bufferUsage);
-
-// Maps a resource type to the corresponding HAL memory types and buffer usage.
-// This will fail if the resource type is not directly mappable to HAL bits.
-// The bits set here represent the superset of required and allowed bits and
-// are useful for providing buffers back to users via the ABI that may need to
-// be used for more than just what the internal program requires.
-LogicalResult
-deriveAllowedResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
-                                IREE::HAL::MemoryTypeBitfield &memoryTypes,
-                                IREE::HAL::BufferUsageBitfield &bufferUsage);
 
 class BindingTable {
 public:
