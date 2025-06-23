@@ -610,7 +610,7 @@ struct DistributeTransferGather final
           StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
     }
 
-    auto indexed =
+    SmallVector<bool> indexed =
         llvm::to_vector(gatherOp.getIndexed().getAsValueRange<BoolAttr>());
 
     for (auto [idx, offsets] :
@@ -631,7 +631,8 @@ struct DistributeTransferGather final
       SmallVector<Value> slicedIndexVecs;
       for (auto [indexVecIdx, disIndexVec, layout] :
            llvm::enumerate(disIndexVecs, indexVecLayouts)) {
-        auto offsets = llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
+        SmallVector<int64_t> offsets =
+            llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
         ++allIndexVecOffsets[indexVecIdx];
         VectorValue slicedIndexVec = getSlicedIndexVec(
             rewriter, gatherOp.getLoc(), offsets, layout, disIndexVec);
