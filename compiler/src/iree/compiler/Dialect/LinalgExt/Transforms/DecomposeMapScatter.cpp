@@ -27,19 +27,13 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 /// collapsible strides, then the decomposition will fail.
 static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
                                          RewriterBase &rewriter) {
-  auto inputType = dyn_cast<VectorType>(mapScatterOp.getInputType());
-  if (!inputType) {
-    return success();
-  }
-  auto outputType = dyn_cast<MemRefType>(mapScatterOp.getOutputType());
-  if (!outputType) {
-    return success();
-  }
+  auto inputType = cast<VectorType>(mapScatterOp.getInputType());
   if (!inputType.hasStaticShape()) {
     return rewriter.notifyMatchFailure(mapScatterOp,
                                        "expected static input shape");
   }
   SmallVector<ReassociationIndices> reassociations;
+  auto outputType = cast<MemRefType>(mapScatterOp.getOutputType());
   reassociations.push_back(
       llvm::to_vector(llvm::seq<int64_t>(outputType.getRank())));
   if (!memref::CollapseShapeOp::isGuaranteedCollapsible(outputType,
@@ -160,8 +154,17 @@ struct DecomposeMapScatterPass final
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
 
+    // Decomposition is only supported for map_scatter ops that are both
+    // vectorized and bufferized. Bufferization is a requirement because
+    // vector.scatter only takes memref destinations.
+    // TODO(#21135): Allow tensor outputs when vector.scatter supports tensor
+    // destinations.
     SmallVector<MapScatterOp> candidates;
-    funcOp->walk([&](MapScatterOp op) { candidates.push_back(op); });
+    funcOp->walk([&](MapScatterOp op) {
+      if (isa<VectorType>(op.getInputType()) && op.hasPureBufferSemantics()) {
+        candidates.push_back(op);
+      }
+    });
     IRRewriter rewriter(context);
     for (auto mapScatterOp : candidates) {
       if (failed(decomposeMapScatter(mapScatterOp, rewriter))) {
