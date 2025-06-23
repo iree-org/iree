@@ -109,3 +109,22 @@ func.func @fission_unit_trip(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<f
   return
 }
 // CHECK-ALL-COUNT-2: scf.for
+
+// -----
+
+// CHECK-ALL-LABEL: @negative_side_effect_in_loop
+func.func @negative_side_effect_in_loop(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: i1, %arg3: vector<1x1x1x8xbf16>, %arg4: memref<1x1x1x8xbf16, #gpu.address_space<private>>) {
+  // The loop contains side-effecting ops other than the transfer_read/write, so fission shouldn't apply.
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %ub = affine.min affine_map<(d0) -> (1, d0)>(%arg1)
+  scf.for %arg5 = %c0 to %ub step %c1 {
+    %read = vector.transfer_read %arg0[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
+    memref.store %cst, %arg0[%c0, %c0, %c0, %c0] : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+    vector.transfer_write %read, %arg4[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x8xbf16>, memref<1x1x1x8xbf16, #gpu.address_space<private>>
+  }
+  return
+}
+// CHECK-ALL: scf.for
+// CHECK-ALL-NOT: scf.for

@@ -15,7 +15,6 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-fission-transfer-ops-in-control-flow"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -214,6 +213,14 @@ static bool isLegal(vector::TransferReadOp readOp,
   }
   if (hasGlobalMemoryAddressSpace(
           cast<MemRefType>(writeOp.getBase().getType()))) {
+    return false;
+  }
+
+  // Only the read/write ops may have side effects, we assume we can
+  // re-order/erase the other ops freely.
+  if (!llvm::all_of(forOp.getOps(), [&](Operation &op) -> bool {
+        return (&op == readOp || &op == writeOp || mlir::isPure(&op));
+      })) {
     return false;
   }
   return true;
