@@ -359,18 +359,11 @@ struct BubbleExpandThroughConcat final
       SmallVector<OpFoldResult> expandShapeOutputDims;
       SmallVector<int64_t> expandShapeOutputDimsInt;
       // i = input shape index, k = expanded shape index, j = reassoc index
+      // Only the concat dim can differ from the original expanded dim
+      // The concat dim must be at j = 0.
+      // Iterate from j = 0 to size, and multiply each non-concat dim.
+      // after looping, divide by inputShape[i].
       for (int64_t i = 0, k = 0; i < inputShape.size(); i++) {
-        // If the input is not expanded, just copy the shape.
-        if (reassoc[i].size() == 1) {
-          expandShapeOutputDims.push_back(rewriter.getIndexAttr(inputShape[i]));
-          expandShapeOutputDimsInt.push_back(inputShape[i]);
-          k++;
-          continue;
-        }
-        // Only the concat dim can differ from the original expanded dim
-        // The concat dim must be at j = 0.
-        // Iterate from j = 1 to size, and multiply each. after looping, divide
-        // by inputShape[i].
         int64_t nonConcatDimProduct = 1;
         bool concatInThisLoop = false;
         for (int64_t j = 0; j < reassoc[i].size(); j++, k++) {
