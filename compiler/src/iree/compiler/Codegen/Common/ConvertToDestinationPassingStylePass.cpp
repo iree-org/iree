@@ -206,9 +206,8 @@ modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
 
   Value resultBuffer;
   OpBuilder::InsertionGuard g(b);
-  auto dispatchTensorStoreOp =
-      dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(storeOp);
-  if (dispatchTensorStoreOp) {
+  if (auto dispatchTensorStoreOp =
+          dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(storeOp)) {
     b.setInsertionPointToStart(storeOp->getBlock());
     if (auto sourceDefiningOp =
             dispatchTensorStoreOp.getTarget().getDefiningOp()) {
