@@ -170,22 +170,23 @@ static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp,
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
-                                              loops);
+        mlir::scf::tileAndFuseConsumerOfSlices(
+            rewriter, candidateSliceOp.getOperation(), loops);
     if (failed(fusedResult)) {
       LDBG("failed to fuse consumer of slice: " << candidateSliceOp);
       continue;
     }
 
     // Replace the original consumer operation with the tiled implementation.
-    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+    rewriter.replaceOp(fusedResult->origConsumerOperands.front()->getOwner(),
                        fusedResult->tiledOps.front());
 
     // The result of the fused conumers might themselved be slices of
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
-    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
-                       candidates);
+    addCandidateSlices(
+        fusedResult->tiledAndFusedConsumerOperands.front()->getOwner(),
+        candidates);
   }
 }
 
