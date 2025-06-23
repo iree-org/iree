@@ -42,6 +42,71 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_tile = [1, 1],
   outer_tile = [1, 1],
   thread_tile = [1, 1],
+  element_tile = [16, 32],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @transfer_read_mask(%arr: memref<16x32xf16>, %a: vector<16x32xf16>, %b: vector<16x32xf16>, %cond: i1) -> vector<16x32xf16> {
+    %c0 = arith.constant 0 : index
+    %c12 = arith.constant 12 : index
+    %mask = vector.create_mask %c12 : vector<16xi1>
+    // expected-remark @above {{element_tile = [16]}}
+    %cst_0 = arith.constant 0.0 : f16
+    %root = vector.transfer_read %arr[%c0, %c0], %cst_0, %mask {permutation_map = affine_map<(d0, d1) -> (d1, 0)>, in_bounds = [true, true]} : memref<16x32xf16>, vector<16x32xf16>
+    // expected-remark @above {{element_tile = [16, 32]}}
+    %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x32xf16>
+    func.return %rootl : vector<16x32xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1],
+  batch_tile = [1, 1, 1],
+  outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 1],
+  element_tile = [16, 8, 4],
+
+  subgroup_strides = [0, 0, 0],
+  thread_strides   = [0, 0, 0]
+>
+
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @transfer_write_mask(%arr: memref<32x32x32x32xf16>, %d: vector<16x8x4xf16>) {
+    %c0 = arith.constant 0 : index
+    %c12 = arith.constant 12 : index
+    %mask = vector.create_mask %c12, %c12, %c12 : vector<8x16x4xi1>
+    // expected-remark @above {{element_tile = [8, 16, 4]}}
+    %dl = iree_vector_ext.to_layout %d to layout(#layout) : vector<16x8x4xf16>
+    vector.transfer_write %dl, %arr[%c0, %c0, %c0, %c0], %mask {permutation_map = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, in_bounds = [true, true, true]} : vector<16x8x4xf16>, memref<32x32x32x32xf16>
+    return
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
   element_tile = [16, 16],
 
   subgroup_strides = [0, 0],
@@ -751,6 +816,63 @@ builtin.module attributes { transform.with_named_sequence } {
     }
 
     func.return %out : vector<f16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout_1d = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4],
+  batch_tile = [4],
+  outer_tile = [1],
+  thread_tile = [1],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides = [0]
+>
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @paged_transfer_gather(%indices: vector<16xindex>,
+    %source: memref<4096x512x8xf16>) -> vector<16x8xf16> {
+
+    %cst0 = arith.constant 0.0 : f16
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant dense<1> : vector<16xindex>
+    // expected-remark @above {{element_tile = [1]}}
+    %c7 = arith.constant 7 : index
+    %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
+    %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
+    // expected-remark @above {{element_tile = [1, 8]}}
+    %indices1 = arith.addi %indices, %c1 : vector<16xindex>
+    // expected-remark @above {{element_tile = [1]}}
+    %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+    // expected-remark @above {{element_tile = [1, 8]}}
+    [None, %indices1: vector<16xindex>, None], %cst0, %mask { indexed_maps = [
+                                               affine_map<(d0, d1, d2) -> (d1)>],
+      permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
+      in_bounds = [true, true] }
+    : memref<4096x512x8xf16>, vector<16x8xf16>
+    %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
+
+    return %l_out : vector<16x8xf16>
   }
 
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
