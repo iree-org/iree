@@ -568,6 +568,21 @@ func.func @map_scatter_wrong_num_yielded_values(
 
 // -----
 
+func.func @map_scatter_0D(
+    %input: vector<f32>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected input type to have non-zero rank}}
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0():
+      %mask = arith.constant true
+      %zero = arith.constant 0 : index
+      iree_linalg_ext.yield %zero, %mask : index, i1
+  } : vector<f32> into memref<4xf32>
+  return
+}
+
+// -----
+
 func.func @arg_compare_invalid_too_many_inputs(
     %input_val: tensor<2x10xf32>,
     %input_extra: tensor<2x10xf32>,
