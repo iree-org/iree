@@ -314,11 +314,7 @@ struct BubbleExpandThroughConcat final
 
       for (Value input : concatOp.getInputs()) {
         // Check all static input shapes for divisibility.
-        auto inputType = dyn_cast<RankedTensorType>(input.getType());
-        if (!inputType) {
-          return rewriter.notifyMatchFailure(
-              expandOp, "Input to concat is not a RankedTensorType");
-        }
+        auto inputType = cast<RankedTensorType>(input.getType());
         int64_t inputDim = inputType.getShape()[concatDim];
         // if the input dim is dynamic, we rely on checking the divisibility of
         // the other inputs. Example:
