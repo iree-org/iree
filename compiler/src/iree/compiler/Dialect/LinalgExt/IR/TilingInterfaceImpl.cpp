@@ -537,8 +537,7 @@ LogicalResult MapScatterOp::generateScalarImplementation(OpBuilder &b,
     // The last yielded Value is the mask, so use it as the if condition instead
     // of the store indices.
     Value ifCond = yieldedValues.back();
-    ArrayRef<Value> storeIndices =
-        yieldedValues.take_front(yieldedValues.size() - 1);
+    ArrayRef<Value> storeIndices = yieldedValues.drop_back();
     auto thenBuilder = [&](OpBuilder &ifBuilder, Location ifLoc) {
       SmallVector<OpFoldResult> ivsOfr(ivs);
       Value input = ifBuilder.create<memref::LoadOp>(ifLoc, getInput(), ivs);
