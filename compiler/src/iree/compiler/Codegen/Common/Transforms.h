@@ -121,6 +121,9 @@ void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 /// Populate patterns to fold relayout operations into map_scatter ops.
 void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns);
 
+/// Populate patterns to fuse tilable consumers of forall ops into it.
+void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
