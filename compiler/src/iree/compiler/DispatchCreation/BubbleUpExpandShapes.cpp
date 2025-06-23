@@ -303,16 +303,18 @@ struct BubbleExpandThroughConcat final
     if (newConcatDim == -1)
       return failure();
 
+    SmallVector<int64_t> expandShapeProducts;
     // Loop over all but the outermost expanded dims.
-    for (int64_t j = 1; j < expandedDimCount; ++j) {
-      int64_t expDim = expandedShape[newConcatDim + j];
-      if (ShapedType::isDynamic(expDim)) {
-        // If expanded dim is dynamic and not outermost, we cannot propagate.
-        return rewriter.notifyMatchFailure(
-            expandOp, "Expanded dim is dynamic and not outermost");
-      }
+    for (Value input : concatOp.getInputs()) {
+      int64_t expandShapeProduct = 1;
+      for (int64_t j = 1; j < expandedDimCount; ++j) {
+        int64_t expDim = expandedShape[newConcatDim + j];
+        if (ShapedType::isDynamic(expDim)) {
+          // If expanded dim is dynamic and not outermost, we cannot propagate.
+          return rewriter.notifyMatchFailure(
+              expandOp, "Expanded dim is dynamic and not outermost");
+        }
 
-      for (Value input : concatOp.getInputs()) {
         // Check all static input shapes for divisibility.
         auto inputType = cast<RankedTensorType>(input.getType());
         int64_t inputDim = inputType.getShape()[concatDim];
@@ -332,92 +334,36 @@ struct BubbleExpandThroughConcat final
           return rewriter.notifyMatchFailure(
               expandOp,
               "Not all static input dims are divisible by expanded dim");
+        } else {
+          expandShapeProduct *= expDim;
         }
       }
+      expandShapeProducts.push_back(expandShapeProduct);
     } // else we can always propagate the expand_shape through the concat.
 
     // Create new expand_shape ops for each input.
     SmallVector<Value> newInputs;
-    for (Value input : concatOp.getInputs()) {
+    for (auto [input, product] :
+         llvm::zip(concatOp.getInputs(), expandShapeProducts)) {
       auto type = input.getType();
-      auto inputType = dyn_cast<RankedTensorType>(type);
-      if (!inputType)
-        return failure();
+      auto inputType = cast<RankedTensorType>(type);
       ArrayRef<int64_t> inputShape = inputType.getShape();
-      SmallVector<OpFoldResult> expandShapeOutputDims;
-      SmallVector<int64_t> expandShapeOutputDimsInt;
-      // i = input shape index, k = expanded shape index, j = reassoc index
-      // Only the concat dim can differ from the original expanded dim
-      // The concat dim must be at j = 0.
-      // Iterate from j = 0 to size, and multiply each non-concat dim.
-      // after looping, divide by inputShape[i].
-      for (int64_t i = 0, k = 0; i < inputShape.size(); i++) {
-        int64_t nonConcatDimProduct = 1;
-        bool concatInThisLoop = false;
-        for (int64_t j = 0; j < reassoc[i].size(); j++, k++) {
-          // if k is the concatDim we need to calculate it after getting the
-          // product of the other dimensions
-          if (k == newConcatDim) {
-            concatInThisLoop = true;
-            // We can skip the rest of the logic for this idx
-            continue;
-          }
-          if (!concatInThisLoop) {
-            // No concat in this loop, so we can use the expanded shape
-            // directly.
-            if (ShapedType::isDynamic(expandedShape[k])) {
-              auto dimVal =
-                  rewriter.create<tensor::DimOp>(expandOp.getLoc(), input, i);
-              expandShapeOutputDims.push_back(dimVal.getResult());
-              expandShapeOutputDimsInt.push_back(ShapedType::kDynamic);
-            } else {
-              expandShapeOutputDims.push_back(
-                  rewriter.getIndexAttr(expandedShape[k]));
-              expandShapeOutputDimsInt.push_back(expandedShape[k]);
-            }
-          } else if (concatInThisLoop &&
-                     !ShapedType::isDynamic(expandedShape[k])) {
-            nonConcatDimProduct *= expandedShape[k];
-          } else {
-            // We shouldn't reach this.
-            return rewriter.notifyMatchFailure(
-                expandOp,
-                "Expanded shape has dynamic dimension in concat reassoc"
-                "dimensions that is not the concat (ie outer) dimension");
-          }
-        }
-        // If we skipped the concat dim, we calculate it now.
-        if (k - reassoc[i].size() == newConcatDim) {
-          assert(concatInThisLoop && "concat should have been convered");
-          // Calculate the concat dim based on the product of the other
-          // dimensions.
-          if (ShapedType::isDynamic(inputShape[i])) {
-            // if input shape is dynamic, the concat dim is dynamic.
-            auto dimVal =
-                rewriter.create<tensor::DimOp>(expandOp.getLoc(), input, i);
-            expandShapeOutputDims.push_back(dimVal.getResult());
-            expandShapeOutputDimsInt.push_back(ShapedType::kDynamic);
-          } else {
-            // If input shape is static, we can calculate the concat dim.
-            expandShapeOutputDims.push_back(
-                rewriter.getIndexAttr(inputShape[i] / nonConcatDimProduct));
-            expandShapeOutputDimsInt.push_back(inputShape[i] /
-                                               nonConcatDimProduct);
-          }
-          // Add the other expanded dims that we skipped above.
-          for (int64_t j = 1; j < reassoc[i].size(); j++) {
-            int64_t idx = k - reassoc[i].size() + j;
-            expandShapeOutputDims.push_back(
-                rewriter.getIndexAttr(expandedShape[idx]));
-            expandShapeOutputDimsInt.push_back(expandedShape[idx]);
-          }
-        }
+      auto mixedOutputShape = expandOp.getMixedOutputShape();
+      std::pair<SmallVector<int64_t>, SmallVector<Value>> shapeDecomp =
+          decomposeMixedValues(mixedOutputShape);
+
+      // Update newConcatDim to be theinputShape[concatDim] / product.
+      if (!ShapedType::isDynamic(inputShape[concatDim])) {
+        shapeDecomp.first[newConcatDim] = inputShape[concatDim] / product;
       }
-      auto newType = RankedTensorType::get(expandShapeOutputDimsInt,
-                                           inputType.getElementType());
+      SmallVector<OpFoldResult> newOutputShape =
+          getMixedValues(shapeDecomp.first, shapeDecomp.second, getContext());
+
+      auto newType =
+          RankedTensorType::get(shapeDecomp.first, inputType.getElementType());
       Value newExpand;
       newExpand = rewriter.create<tensor::ExpandShapeOp>(
-          expandOp.getLoc(), newType, input, reassoc, expandShapeOutputDims);
+          expandOp.getLoc(), newType, input, reassoc, newOutputShape);
       newInputs.push_back(newExpand);
     }
     // Create new concat op on expanded inputs.
