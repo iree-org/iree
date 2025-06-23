@@ -158,9 +158,9 @@ static NestedLayoutAttr createNestedLayout(
 static FailureOr<std::tuple<IREE::VectorExt::VectorLayoutInterface,
                             IREE::VectorExt::VectorLayoutInterface,
                             IREE::VectorExt::VectorLayoutInterface>>
-getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
-                     VectorContractOpInfo &opInfo,
-                     linalg::LinalgOp contractOp) {
+getContractionLayoutImpl(IREE::GPU::MMAScheduleAttr schedule,
+                         VectorContractOpInfo &opInfo,
+                         linalg::LinalgOp contractOp) {
   LLVM_DEBUG({
     llvm::dbgs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::dbgs() << "For schedule: " << schedule << "\n";
@@ -379,6 +379,25 @@ getContractionLayout(IREE::GPU::MMAScheduleAttr schedule,
   return result;
 }
 
+/// Template specializations
+::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
+                               VectorExt::VectorLayoutInterface,
+                               VectorExt::VectorLayoutInterface>>
+getContractionLayout(IREE::GPU::MMAScheduleAttr scheduleAttr,
+                     VectorContractOpInfo &opInfo,
+                     linalg::LinalgOp contractOp) {
+  return getContractionLayoutImpl(scheduleAttr, opInfo, contractOp);
+}
+
+::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
+                               VectorExt::VectorLayoutInterface,
+                               VectorExt::VectorLayoutInterface>>
+getContractionLayout(IREE::GPU::MMAScheduleAttr scheduleAttr,
+                     VectorContractOpInfo &opInfo,
+                     vector::ContractionOp contractOp) {
+  return getContractionLayoutImpl(scheduleAttr, opInfo, contractOp);
+}
+
 static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
                                           SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
@@ -397,7 +416,7 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
           contract.getIndexingMapsArray());
   assert(succeeded(opInfo) && "contraction should have been inferred");
 
-  auto layouts = getContractionLayout(schedule, opInfo.value(), contract);
+  auto layouts = getContractionLayoutImpl(schedule, opInfo.value(), contract);
   if (failed(layouts)) {
     return contract->emitError("cannot get concrete layout for contraction");
   }
@@ -484,7 +503,7 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   assert(succeeded(opInfo) &&
          "unit filter dim convolution should have been infered");
 
-  auto layouts = getContractionLayout(schedule, opInfo.value(), conv);
+  auto layouts = getContractionLayoutImpl(schedule, opInfo.value(), conv);
   if (failed(layouts)) {
     return conv->emitError("cannot get concrete layout for convolution");
   }

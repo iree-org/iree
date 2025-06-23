@@ -122,6 +122,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertToLLVM.h",
+        "InternalAPI.h",
         "KernelConfig.h",
         "Passes.h",
         "ROCDLKernelConfig.h",
