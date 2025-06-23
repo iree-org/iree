@@ -410,18 +410,21 @@ static MapScatterOp
 insertIdentityMapScatter(RewriterBase &rewriter,
                          tensor::ParallelInsertSliceOp parallelinsertsliceop, scf::ForallOp forallOp) {
   llvm::dbgs()<<"Entered insertIdentityMapScatter\n";
-  // Get the source location
+  
+  // Get the source location, the place in the MLIR source where the operation appears
   Location loc = parallelinsertsliceop->getLoc();
+  llvm::dbgs()<<loc<<"\n";
 
-  // To insert new ops before the parallel-slice-op such that the result of the new
-  // op will be used by the parallel_insert_slice_op
+  // insert the new op before the terminator of the forall op
   OpBuilder::InsertionGuard g(rewriter);
-  // rewriter.setInsertionPoint(parallelinsertsliceop);
   rewriter.setInsertionPoint(forallOp.getTerminator());
+  // rewriter.setInsertionPoint(parallelinsertsliceop);
 
-  // create an empty tensor to store the result of the map_scatter
+  // get the tensor slice that the thread wants to insert.
    Value source = parallelinsertsliceop.getSource();
    Type bf16Type = rewriter.getBF16Type();
+  
+   // create an empty tensor to store the result of the map_scatter
   auto mapScatterDest =
       rewriter
           .create<tensor::EmptyOp>(
@@ -429,9 +432,12 @@ insertIdentityMapScatter(RewriterBase &rewriter,
           .getResult();
   auto mapScatterOp = MapScatterOp::createIdentityMapScatter(
       rewriter, loc, source, mapScatterDest);
+
+  // input to the parallel_insert_slice op is the output of the map_scatter 
   rewriter.modifyOpInPlace(parallelinsertsliceop, [&]() {
     parallelinsertsliceop.getSourceMutable().assign(mapScatterOp.getResult(0));
   });
+  llvm::dbgs()<<mapScatterOp->getLoc()<<"\n";
   LDBG("Created identity map_scatter:\n" << mapScatterOp);
   llvm::dbgs()<<"Returning from insertIdentityMapScatter\n";
   return mapScatterOp;
