@@ -39,7 +39,7 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*description=*/"Apply the given AffineMap to the layout.",
       /*retTy=*/"VectorLayoutInterface",
       /*methodName=*/"apply",
-      /*args=*/(ins "AffineMap":$map)
+      /*args=*/(ins "::mlir::AffineMap":$map)
     >,
     InterfaceMethod<
       /*description=*/"Get the expected undistributed shape for the given vector type.",
