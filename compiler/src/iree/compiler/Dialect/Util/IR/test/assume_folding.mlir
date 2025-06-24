@@ -71,3 +71,47 @@ util.func public @dedup_duplicate_operands(%arg0: index) -> index, index {
   // CHECK: util.return %[[ASSUME]], %[[ASSUME]]
   util.return %0#0, %0#1 : index, index
 }
+
+// -----
+
+// CHECK-LABEL: @fold_assume_of_div_mul
+util.func public @fold_assume_of_div_mul(%arg0: index) -> index  {
+  // CHECK-SAME: %[[ARG0:.+]]: index
+  %0 = util.assume.int %arg0<udiv=4> : index
+  // CHECK: %[[ASSUME:.*]] = util.assume.int %[[ARG0]]
+  %c4 = arith.constant 4 : index
+  %1 = arith.divui %0, %c4 : index
+  %2 = arith.muli %1, %c4 : index
+  // CHECK: util.return %[[ASSUME]]
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @fold_assume_of_div_mul_multiple
+util.func public @fold_assume_of_div_mul_multiple(%arg0: index) -> index  {
+  // CHECK-SAME: %[[ARG0:.+]]: index
+  %0 = util.assume.int %arg0<udiv=8> : index
+  // CHECK: %[[ASSUME:.*]] = util.assume.int %[[ARG0]]
+  %c4 = arith.constant 4 : index
+  %1 = arith.divui %0, %c4 : index
+  %2 = arith.muli %1, %c4 : index
+  // CHECK: util.return %[[ASSUME]]
+  util.return %2 : index
+}
+
+// -----
+
+// CHECK-LABEL: @nofold_assume_of_div_mul_indivisible
+util.func public @nofold_assume_of_div_mul_indivisible(%arg0: index) -> index  {
+  // CHECK-SAME: %[[ARG0:.+]]: index
+  %0 = util.assume.int %arg0<udiv=7> : index
+  // CHECK: %[[ASSUME:.*]] = util.assume.int %[[ARG0]]
+  %c4 = arith.constant 4 : index
+  %1 = arith.divui %0, %c4 : index
+  // CHECK: %[[DIV:.*]] = arith.divui %[[ASSUME]]
+  %2 = arith.muli %1, %c4 : index
+  // CHECK: %[[MUL:.*]] = arith.muli %[[DIV]]
+  // CHECK: util.return %[[MUL]]
+  util.return %2 : index
+}

@@ -44,8 +44,8 @@ getIntAssumptionFixedValue(ArrayAttr assumptions) {
   return std::nullopt;
 }
 
-LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
-                                        PatternRewriter &rewriter) {
+static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
+                                             PatternRewriter &rewriter) {
   bool needsRewrite = false;
   ArrayAttr assumptions = op.getAssumptions();
 
@@ -170,6 +170,65 @@ LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
 
   rewriter.eraseOp(op);
   return success();
+}
+
+namespace {
+
+/// Folds sequences of cancelling multiplications and divisions based on
+/// assumes, i.e.
+///
+/// %0 = util.assume.int ... <[..., udiv = Y]>
+/// %1 = arith.divui %0, X
+/// %2 = arith.muli %1, X
+///
+/// Where X | Y.
+struct FoldDivMulOfAssume : public OpRewritePattern<arith::MulIOp> {
+  using OpRewritePattern<arith::MulIOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(arith::MulIOp mulOp,
+                                PatternRewriter &rewriter) const override {
+    APInt mulConstantInt;
+    if (!matchPattern(mulOp.getRhs(), m_ConstantInt(&mulConstantInt))) {
+      return rewriter.notifyMatchFailure(mulOp, "non-constant mul rhs");
+    }
+
+    auto divOp = mulOp.getLhs().getDefiningOp<arith::DivUIOp>();
+    if (!divOp) {
+      return rewriter.notifyMatchFailure(mulOp, "non-div lhs producer");
+    }
+
+    APInt divConstantInt;
+    if (!matchPattern(divOp.getRhs(), m_ConstantInt(&divConstantInt))) {
+      return rewriter.notifyMatchFailure(mulOp, "non-constant div rhs");
+    }
+
+    if (mulConstantInt != divConstantInt) {
+      return rewriter.notifyMatchFailure(mulOp,
+                                         "div and mul factors do not match");
+    }
+
+    auto assumeOp = divOp.getLhs().getDefiningOp<AssumeIntOp>();
+    if (!assumeOp) {
+      return rewriter.notifyMatchFailure(mulOp, "non-assume div lhs producer");
+    }
+
+    std::optional<int64_t> maybeUdiv = assumeOp.getUnionedUnsignedDivisor(
+        cast<OpResult>(divOp.getLhs()).getResultNumber());
+    if (!maybeUdiv || maybeUdiv.value() % divConstantInt.getZExtValue() != 0) {
+      return rewriter.notifyMatchFailure(
+          mulOp, "assume divisibility does not equal cancelling mul-div");
+    }
+
+    rewriter.replaceOp(mulOp, divOp.getLhs());
+    return success();
+  }
+};
+
+} // namespace
+
+void AssumeIntOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  results.add<FoldDivMulOfAssume>(context);
+  results.add(canonicalizeAssumeIntOp);
 }
 
 //===----------------------------------------------------------------------===//
