@@ -69,5 +69,5 @@ util.func public @expand_affine(%arg0: index) -> index {
 
 // CHECK-LABEL: util.func public @expand_affine
 //  CHECK-SAME:   %[[ARG0:.+]]: index
-//       CHECK:   %[[MUL:.+]] = arith.muli %[[ARG0]], %c4
+//       CHECK:   %[[MUL:.+]] = arith.muli %[[ARG0]], %c4 overflow<nsw>
 //       CHECK:   util.return %[[MUL]]
