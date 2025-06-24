@@ -228,13 +228,14 @@ struct MeshAllReduceToFlow
     ImplicitLocOpBuilder builder(op->getLoc(), rewriter);
     builder.setInsertionPointAfter(op.getOperation());
     Value channel = buildCachedChannelLoading(op, builder);
-    Value target = builder.create<tensor::EmptyOp>(
-        op.getResult().getType().getShape(),
-        op.getResult().getType().getElementType());
+    RankedTensorType resultType =
+        cast<RankedTensorType>(op.getOperand().getType());
+    Value target = builder.create<tensor::EmptyOp>(resultType.getShape(),
+                                                   resultType.getElementType());
     auto flowAllReduce = builder.create<IREE::Flow::CollectiveAllReduceOp>(
         convertReductionKind(op.getReductionAttr()),
-        getCollectiveElementTypeAttr(op.getResult().getType()), target,
-        op.getOperand(), channel);
+        getCollectiveElementTypeAttr(resultType), target, op.getOperand(),
+        channel);
     rewriter.replaceAllUsesWith(op.getResult(), flowAllReduce.getResult());
     rewriter.eraseOp(op.getOperation());
     return success();
