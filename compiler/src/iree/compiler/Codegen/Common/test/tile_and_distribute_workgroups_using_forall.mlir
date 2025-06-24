@@ -826,7 +826,7 @@ func.func @pad_fusion(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x
 
 // -----
 
-// Test 1 of 2 that are testing a work-around for SSA violation issue with consumer fusion upstream.
+// Test 1 of 2 that are testing fusion while considering multiple slices.
 
 func.func @horizontal_fusion_consumer_fusion1(%arg0 : tensor<2x4096x640xf16>,
     %arg1 : tensor<10x64x640xf16>, %arg2 : tensor<10x64x640xf16>, %arg3 : tensor<10x64x640xf16>)
@@ -893,7 +893,7 @@ func.func @horizontal_fusion_consumer_fusion1(%arg0 : tensor<2x4096x640xf16>,
 
 // -----
 
-// Test 2 of 2 that are testing a work-around for SSA violation issue with consumer fusion upstream.
+// Test 2 of 2 that are testing fusion while considering multiple slices.
 
 func.func @horizontal_fusion_consumer_fusion2(%arg0 : tensor<2x4096x640xi8>,
     %arg1 : tensor<2x640x640xi8>, %arg2 : tensor<2x640x640xi8>) -> tensor<2x4096x640xf16> {
@@ -989,3 +989,87 @@ func.func @only_producer_fusion_multiple_result(%arg0: tensor<77x4096xf16>, %arg
 //       CHECK:     linalg.generic
 //       CHECK:     linalg.generic
 //       CHECK:   return %[[RESULT]]#1, %[[RESULT]]#0
+
+// -----
+
+func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
+     %arg2: tensor<256x32xf32>, %arg3: tensor<32xf32>)
+     -> (tensor<3x?x32x32xf32>, tensor<3x?x32x32xf32>) {
+  %c32 = arith.constant 32 : index
+  %c2_i64 = arith.constant 2 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 3.200000e+01 : f32
+  %cst_1 = arith.constant 9.000000e+00 : f32
+  %0 = arith.divsi %arg0, %c32 : index
+  %1 = affine.apply affine_map<()[s0] -> (s0 floordiv 32)>()[%arg0]
+  %2 = tensor.empty(%1) : tensor<3x?x32x32xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<3x?x32xi64>) outs(%2 : tensor<3x?x32x32xf32>) {
+    ^bb0(%in: i64, %out: f32):
+      %8 = arith.index_cast %in : i64 to index
+      %9 = linalg.index 3 : index
+      %extracted = tensor.extract %arg2[%8, %9] : tensor<256x32xf32>
+      linalg.yield %extracted : f32
+    } -> tensor<3x?x32x32xf32>
+  %4 = tensor.empty(%0) : tensor<3x?x32xf32>
+  %5 = linalg.fill ins(%cst : f32)outs(%4 : tensor<3x?x32xf32>) -> tensor<3x?x32xf32>
+  %6 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%3 : tensor<3x?x32x32xf32>) outs(%5 : tensor<3x?x32xf32>)
+      attrs = {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 4], thread = [1, 1, 1, 0], workgroup = [1, 1, 64, 0]}>} {
+  ^bb0(%in: f32, %out: f32):
+    %8 = math.fpowi %in, %c2_i64 : f32, i64
+    %9 = arith.addf %8, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<3x?x32xf32>
+  %7 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg3, %3, %6 : tensor<32xf32>, tensor<3x?x32x32xf32>, tensor<3x?x32xf32>)
+      outs(%2 : tensor<3x?x32x32xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %8 = arith.divf %in_3, %cst_0 : f32
+    %9 = arith.addf %8, %cst_1 : f32
+    %10 = math.rsqrt %9 : f32
+    %11 = arith.mulf %in_2, %10 : f32
+    %12 = arith.mulf %in, %11 : f32
+    linalg.yield %12 : f32
+  } -> tensor<3x?x32x32xf32>
+  return %3, %7 : tensor<3x?x32x32xf32>, tensor<3x?x32x32xf32>
+}
+// CHECK-LABEL: func @multi_slice_fusion_broadcast
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<3x?x32xi64>
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<32xf32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty
+//       CHECK:    %[[RESULT:.+]]:2 = scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]])
+//  CHECK-SAME:        shared_outs(%[[INIT0:[a-zA-Z0-9]+]] = %[[EMPTY]], %[[INIT1:[a-zA-Z0-9]+]] = %[[EMPTY]])
+//   CHECK-DAG:      %[[INIT0_SLICE:.+]] = tensor.extract_slice %[[INIT0]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32]
+//   CHECK-DAG:      %[[ARG1_SLICE:.+]] = tensor.extract_slice %[[ARG1]][%[[IV0]], %[[IV1]], 0] [1, 1, 32]
+//       CHECK:      %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:          ins(%[[ARG1_SLICE]] :
+//  CHECK-SAME:          outs(%[[INIT0_SLICE]] :
+//       CHECK:      %[[CAST0:.+]] = tensor.cast %[[GENERIC0]]
+//       CHECK:      %[[EMPTYTILE:.+]] = tensor.empty() : tensor<1x1x32xf32>
+//       CHECK:      %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:          outs(%[[EMPTYTILE]] :
+//       CHECK:      %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:          ins(%[[GENERIC0]] :
+//  CHECK-SAME:          outs(%[[FILL]] :
+//       CHECK:      %[[INIT1_SLICE:.+]] = tensor.extract_slice %[[INIT1]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1]
+//       CHECK:      %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:          ins(%[[ARG3]], %[[GENERIC0]], %[[GENERIC1]] :
+//  CHECK-SAME:          outs(%[[INIT1_SLICE]] :
+//       CHECK:      %[[CAST1:.+]] = tensor.cast %[[GENERIC2]]
+//   CHECK-DAG:      tensor.parallel_insert_slice %[[CAST0]] into %[[INIT0]][%[[IV0]], %[[IV1]], %[[C0]], 0] [1, 1, %[[C32]], 32]
+//   CHECK-DAG:      tensor.parallel_insert_slice %[[CAST1]] into %[[INIT1]][%[[IV0]], %[[IV1]], %[[C0]], 0] [1, 1, %[[C32]], 32]
+//       CHECK:    return %[[RESULT]]#0, %[[RESULT]]#1
