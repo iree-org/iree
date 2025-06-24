@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::IREE::ROCM {
