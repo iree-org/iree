@@ -29,6 +29,8 @@ def ROCM_Dialect : Dialect {
 
     /// Helper for checking whether the requested builtin is present.
     bool hasBuiltin(StringRef name);
+    /// Helper for getting a builtin.
+    std::optional<StringRef> getBuiltin(StringRef name);
 
     /// Returns the loaded builtin module for the `path`. If the module has
     /// already been loaded in the past, returns the memoized module without

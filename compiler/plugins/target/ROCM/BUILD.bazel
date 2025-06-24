@@ -28,6 +28,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/plugins/target/ROCM/Dialect/ROCM/IR:ROCMDialect",
+        "//compiler/plugins/target/ROCM/Dialect/ROCM/Transforms",
         "//compiler/plugins/target/ROCM/builtins/ukernel:iree_uk_amdgpu_bitcode",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",

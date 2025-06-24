@@ -7,6 +7,7 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.cpp.inc"
+#include "compiler/plugins/target/ROCM/builtins/specialization/iree_specialization_patterns_amdgpu.h"
 #include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
 
 namespace mlir::iree_compiler::IREE::ROCM {
@@ -15,14 +16,29 @@ void ROCMDialect::initialize() {
   registerAttributes();
 
   // Initialize the mapping from builtin filenames to data.
-  const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
-  for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e; ++i) {
-    builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+  {
+    const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
+    for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
+         ++i) {
+      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+    }
+  }
+
+  {
+    const iree_file_toc_t *toc = iree_specialization_patterns_amdgpu_create();
+    for (size_t i = 0, e = iree_specialization_patterns_amdgpu_size(); i != e;
+         ++i) {
+      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+    }
   }
 }
 
 bool ROCMDialect::hasBuiltin(llvm::StringRef name) {
   return builtins.getFile(name).has_value();
+}
+
+std::optional<StringRef> ROCMDialect::getBuiltin(llvm::StringRef name) {
+  return builtins.getFile(name);
 }
 
 } // namespace mlir::iree_compiler::IREE::ROCM

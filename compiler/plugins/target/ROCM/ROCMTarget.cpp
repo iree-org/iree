@@ -9,6 +9,7 @@
 #include <cstdint>
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
+#include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -83,6 +84,8 @@ struct ROCMOptions {
   std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
+
+  bool specializeDispatches = false;
 
   /// List of LLVM opt pass pluggins to be loaded during GPU code
   /// generation. The pluggins are paths to dynamic libraries that
@@ -161,6 +164,12 @@ struct ROCMOptions {
                      cl::desc("Enable slp vectorization in llvm opt."));
     binder.opt<bool>("iree-hip-llvm-global-isel", globalISel, cl::cat(category),
                      cl::desc("Enable global instruction selection in llvm."));
+
+    binder.opt<bool>(
+        "iree-hip-specialize-dispatches", specializeDispatches,
+        cl::cat(category),
+        cl::desc(
+            "Enable runtime specialization of dynamically shaped dispatches."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -354,6 +363,21 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
+    if (options.specializeDispatches) {
+      if (auto attr = getGPUTargetAttr(targetAttr)) {
+        ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+        if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
+          if (StringAttr sku = chip.getSku()) {
+            options.targets.push_back(sku.str());
+          }
+        }
+        options.targets.push_back(attr.getArch().str());
+        OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+        FunctionLikeNest(modulePassManager).addPass([&]() {
+          return ROCM::createApplyBuiltinPDLPatternsPass(options);
+        });
+      }
+    }
     buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
@@ -1018,6 +1042,7 @@ namespace {
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
+  static void registerPasses() { IREE::ROCM::registerROCMTargetPasses(); }
   void onRegisterDialects(DialectRegistry &registry) {
     registry.insert<IREE::ROCM::ROCMDialect>();
   }
