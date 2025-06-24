@@ -214,7 +214,7 @@ util.func public @quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<
 // -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @do_not_collapse_ops_with_encoding(%arg0: tensor<2x320x128x128xf32, #encoding>) -> tensor<2x320x128x128xf32, #encoding> {
   %0 = flow.dispatch.region -> (tensor<2x320x128x128xf32, #encoding>) {
     %empty = tensor.empty() : tensor<2x320x128x128xf32, #encoding>

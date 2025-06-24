@@ -186,10 +186,10 @@ util.func public @tensorCloneDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x4xf32>
 
 // -----
 
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: @tensorEncodeStatic
 // CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @tensorEncodeStatic(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32, #encoding> {
   // CHECK: %[[RES:.+]] = flow.tensor.encode %[[ARG0]] : tensor<4x4xf32> -> tensor<4x4xf32, #[[$ENCODING]]>
   %0 = flow.tensor.encode %arg0 : tensor<4x4xf32> -> tensor<4x4xf32, #encoding>
@@ -198,12 +198,12 @@ util.func public @tensorEncodeStatic(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32,
 
 // -----
 
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: @tensorEncodeDynamic
 // CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG2:.[a-zA-Z0-9]+]]
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @tensorEncodeDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2: index) -> tensor<5x?xf32, #encoding> {
   // CHECK: %[[RES:.+]] = flow.tensor.encode %[[ARG0]] : tensor<?x4xf32>{%[[ARG1]]} -> tensor<5x?xf32, #[[$ENCODING]]>{%[[ARG2]]}
   %0 = flow.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} -> tensor<5x?xf32, #encoding>{%arg2}
@@ -215,12 +215,12 @@ util.func public @tensorEncodeDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %a
 // CHECK-LABEL: @tensorEncodeChangeEncoding
 // CHECK-SAME:    %[[ARG0:.[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:.[a-zA-Z0-9]+]]
-#encoding = #iree_encoding.unspecialized_encoding<123>
-#encoding1 = #iree_encoding.unspecialized_encoding<456>
+#encoding = #iree_encoding.specialized<123>
+#encoding1 = #iree_encoding.specialized<456>
 util.func public @tensorEncodeChangeEncoding(%arg0 : tensor<?x4xf32, #encoding>, %arg1 : index) -> tensor<?x4xf32, #encoding1> {
   // CHECK:      %[[RES:.+]] = flow.tensor.encode %[[ARG0]]
-  // CHECK-SAME:   : tensor<?x4xf32, #iree_encoding.unspecialized_encoding<123>>{%[[ARG1]]}
-  // CHECK-SAME:   -> tensor<?x4xf32, #iree_encoding.unspecialized_encoding<456>>{%[[ARG1]]}
+  // CHECK-SAME:   : tensor<?x4xf32, #iree_encoding.specialized<123>>{%[[ARG1]]}
+  // CHECK-SAME:   -> tensor<?x4xf32, #iree_encoding.specialized<456>>{%[[ARG1]]}
   %0 = flow.tensor.encode %arg0 : tensor<?x4xf32, #encoding>{%arg1} -> tensor<?x4xf32, #encoding1>{%arg1}
   util.return %0 : tensor<?x4xf32, #encoding1>
 }

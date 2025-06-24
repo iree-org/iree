@@ -298,17 +298,17 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.identity_encoding
+// iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
 
-def IdentityEncodingAttr :
-    IREEEncoding_Attr<"IdentityEncoding", [
+def IdentityResolverAttr :
+    IREEEncoding_Attr<"IdentityResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "identity_encoding";
+  let mnemonic = "identity_resolver";
   let summary = [{A layout resolver that behaves like an identity function.}];
   let description = [{
     A layout resolver that behaves like an identity function. I.e., it resolves
@@ -319,17 +319,17 @@ def IdentityEncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.unsupported_encoding
+// iree_encoding.unsupported_resolver
 //===---------------------------------------------------------------------===//
 
-def UnsupportedEncodingAttr :
-    IREEEncoding_Attr<"UnsupportedEncoding", [
+def UnsupportedResolverAttr :
+    IREEEncoding_Attr<"UnsupportedResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "unsupported_encoding";
+  let mnemonic = "unsupported_resolver";
   let summary = [{A layout resolver attribute that always fails to get layout.}];
   let description = [{
     An layout resolver that never resolves the layout. I.e., it always fails on
@@ -344,14 +344,14 @@ def UnsupportedEncodingAttr :
 // Encoding specialization attributes, which are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-def TestingEncodingAttr :
-    IREEEncoding_Attr<"TestingEncoding", [
+def TestingAttr :
+    IREEEncoding_Attr<"Testing", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>
     ]> {
-  let mnemonic = "testing_encoding";
+  let mnemonic = "testing";
   let summary = [{An encoding attribute for testing purposes.}];
 
   let description = [{
@@ -368,8 +368,8 @@ def TestingEncodingAttr :
   let genVerifyDecl = 0;
 }
 
-def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
-  let mnemonic = "unknown_encoding";
+def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
+  let mnemonic = "unknown";
   let summary = [{A pure encoding attribute for testing purpose.}];
 
   let description = [{
@@ -379,23 +379,26 @@ def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
   let genVerifyDecl = 0;
 }
 
-def UnspecializedEncodingAttr :
-    IREEEncoding_Attr<"UnspecializedEncoding", [
+def SpecializationResolverAttr :
+    IREEEncoding_Attr<"SpecializationResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "unspecialized_encoding";
+  let mnemonic = "specialization_resolver";
   let assemblyFormat = "`<` $seed `>`";
 
-  let summary = [{An attribute that indicates the encoding is not yet specialized.}];
+  let summary = [{
+    A layout resolver that always generates iree_encoding.specialized<> with the seed.
+  }];
 
   let description = [{
-    This attribute indicates this is an unspecialized encoding. It implements
-    very basic interface methods of LayoutResolverAttr that
-    returns the SpecializedEncodingAttr with the same seed as serialized layout
-    in encoding specialization. Different seed values indicate different layouts.
+    This attribute implements very basic interface methods of LayoutResolverAttr
+    that returns the SpecializedAttr with the same seed as serialized layout in
+    encoding specialization.
+
+    Different seed values indicate different layouts.
 
     It is mainly for testing purpose as some transformations do not depend on
     actual dialects that implement the attribute interface.
@@ -404,21 +407,21 @@ def UnspecializedEncodingAttr :
   let parameters = (ins "int32_t":$seed);
 }
 
-def SpecializedEncodingAttr :
-    IREEEncoding_Attr<"SpecializedEncoding", [
+def SpecializedAttr :
+    IREEEncoding_Attr<"Specialized", [
       IREEEncoding_SerializableAttr
     ]> {
-  let mnemonic = "specialized_encoding";
+  let mnemonic = "specialized";
   let assemblyFormat = "`<` $seed (`,` $type^)? `>`";
 
   let summary = [{An attribute that indicates the encoding is specialized.}];
 
   let description = [{
-    This attribute is similar to UnspecializedEncodingAttr, but with an optional
-    type. The attribute denotes the layout of the type.
+    This attribute indicates this is a specialized encoding. Different seed
+    values indicate different layouts, which can be used to emulate different
+    encoding attributes.
 
-    Different seed values indicate different layouts, which can be used to
-    emulate different encoding attributes.
+    It is intended to be used by SpecializationResolver for testing purpose.
   }];
 
   let parameters = (ins
