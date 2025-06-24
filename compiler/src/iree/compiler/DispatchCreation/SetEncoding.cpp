@@ -236,8 +236,8 @@ public:
       Attribute encoding;
       switch (encodingOption) {
       case EncodingOptions::Generic: {
-        encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
-                                     iterationSizes);
+        encoding =
+            EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps, {});
         break;
       }
       case EncodingOptions::MatmulK: {
