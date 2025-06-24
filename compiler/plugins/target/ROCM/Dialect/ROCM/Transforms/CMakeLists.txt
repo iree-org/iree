@@ -32,10 +32,14 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRIR
+    MLIRLinalgDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
+    MLIRTransformUtils
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::Util::IR
     iree::compiler::plugins::target::ROCM::Dialect::ROCM::IR::ROCMDialect
     iree::compiler::plugins::target::ROCM::builtins::specialization::iree_specialization_patterns_amdgpu
   PUBLIC

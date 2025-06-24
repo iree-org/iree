@@ -46,12 +46,16 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/plugins/target/ROCM/Dialect/ROCM/IR:ROCMDialect",
         "//compiler/plugins/target/ROCM/builtins/specialization:iree_specialization_patterns_amdgpu",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
     ],
 )
 
