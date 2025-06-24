@@ -65,10 +65,10 @@ util.func private @tensorClone(%arg0: !stream.resource<*>, %arg1: index, %arg2: 
 
 // -----
 
-#unserialized_encoding = #iree_encoding.testing_encoding<>
-#serialized_encoding = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
-// CHECK-DAG:   #[[$ENC_0:.+]] = #iree_encoding.testing_encoding<>
-// CHECK-DAG:   #[[$ENC_1:.+]] = #iree_encoding.testing_encoding<[#iree_encoding.specialized_encoding<123>]>
+#unserialized_encoding = #iree_encoding.testing<>
+#serialized_encoding = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK-DAG:   #[[$ENC_0:.+]] = #iree_encoding.testing<>
+// CHECK-DAG:   #[[$ENC_1:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
 // CHECK-LABEL: @tensorCloneWithEncoding(
 util.func private @tensorCloneWithEncoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> !stream.resource<*> {
   // CHECK: = stream.tensor.clone %arg0 : tensor<?x4xf32, #[[$ENC_0]]>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #[[$ENC_1]]>{%arg1} in !stream.resource<*>{%arg2}
@@ -78,8 +78,8 @@ util.func private @tensorCloneWithEncoding(%arg0: !stream.resource<*>, %arg1: in
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
-// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
+// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: @tensorEncode
 util.func private @tensorEncode(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> !stream.resource<*> {
   // CHECK: = stream.tensor.encode %arg0 : tensor<?x4xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x4xf32, #[[$ENC]]>{%arg3} in !stream.resource<*>{%arg4}

@@ -18,7 +18,7 @@ util.func public @matmul(%arg0: tensor<100x200xf32>, %arg1: tensor<200x300xf32>,
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @matmul_with_encoding(%arg0: tensor<100x200xf32, #encoding>, %arg1: tensor<200x300xf32>, %arg2: tensor<100x300xf32>) -> tensor<100x300xf32> {
   %0 = linalg.matmul
     ins(%arg0, %arg1 : tensor<100x200xf32, #encoding>, tensor<200x300xf32>)

@@ -79,7 +79,7 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
     %arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x1024xf32>>,
     %arg1: index, %arg2: index, %arg3: index, %arg4: index,
@@ -99,7 +99,7 @@ util.func public @dispatch_dispatch_0_generic_512x1024_f32(
   iree_tensor_ext.dispatch.tensor.store %11, %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
   util.return
 }
-// CHECK:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK:  #[[ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK:  util.func public @dispatch_dispatch_0_generic_512x1024_f32
 // CHECK:    %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load
 // CHECK:    %[[PAD:.+]] = tensor.pad %[[LOAD]] low

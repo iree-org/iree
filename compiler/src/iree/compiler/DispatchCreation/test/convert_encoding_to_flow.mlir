@@ -1,11 +1,11 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-convert-encoding-to-flow,canonicalize))" -split-input-file | FileCheck %s
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @set_encoding_static(%arg0: tensor<123x456xf32>) -> tensor<123x456xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<123x456xf32> -> tensor<123x456xf32, #encoding>
   util.return %0 : tensor<123x456xf32, #encoding>
 }
-// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL:  @set_encoding_static(
 // CHECK-SAME:     %[[SRC:[a-zA-Z0-9]+]]
 // CHECK:          %[[RES:.+]] = flow.tensor.encode %[[SRC]]
@@ -13,12 +13,12 @@ util.func public @set_encoding_static(%arg0: tensor<123x456xf32>) -> tensor<123x
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @set_encoding_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   util.return %0 : tensor<?x?xf32, #encoding>
 }
-// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL:  @set_encoding_dynamic(
 // CHECK-SAME:     %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-DAG:      %[[C0:.+]] = arith.constant 0 : index
@@ -30,7 +30,7 @@ util.func public @set_encoding_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @set_encoding_in_flow_region(%arg0: tensor<123x456xf32>) -> tensor<123x456xf32, #encoding> {
   %0 = flow.dispatch.region -> (tensor<123x456xf32, #encoding>) {
     %1 = iree_encoding.set_encoding %arg0 : tensor<123x456xf32> -> tensor<123x456xf32, #encoding>
@@ -43,12 +43,12 @@ util.func public @set_encoding_in_flow_region(%arg0: tensor<123x456xf32>) -> ten
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @unset_encoding_static(%arg0: tensor<123x456xf32, #encoding>) -> tensor<123x456xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<123x456xf32, #encoding> -> tensor<123x456xf32>
   util.return %0 : tensor<123x456xf32>
 }
-// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL:  @unset_encoding_static(
 // CHECK-SAME:     %[[SRC:[a-zA-Z0-9]+]]
 // CHECK:          %[[RES:.+]] = flow.tensor.encode %[[SRC]]
@@ -56,12 +56,12 @@ util.func public @unset_encoding_static(%arg0: tensor<123x456xf32, #encoding>) -
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @unset_encoding_dynamic(%arg0: tensor<?x?xf32, #encoding>, %d0: index, %d1: index) -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   util.return %0 : tensor<?x?xf32>
 }
-// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing_encoding<>
+// CHECK-DAG:    #[[$ENC:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL:  @unset_encoding_dynamic(
 // CHECK-SAME:     %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-SAME:     %[[D0:[a-zA-Z0-9]+]]
@@ -71,7 +71,7 @@ util.func public @unset_encoding_dynamic(%arg0: tensor<?x?xf32, #encoding>, %d0:
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @unset_encoding_in_flow_region(%arg0: tensor<123x456xf32, #encoding>) -> tensor<123x456xf32> {
   %0 = flow.dispatch.region -> (tensor<123x456xf32>) {
     %1 = iree_encoding.unset_encoding %arg0 : tensor<123x456xf32, #encoding> -> tensor<123x456xf32>
