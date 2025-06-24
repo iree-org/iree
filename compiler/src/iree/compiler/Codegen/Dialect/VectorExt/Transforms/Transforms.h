@@ -21,9 +21,12 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
 
 LogicalResult
 vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
-                                         IREE::LinalgExt::GatherOp gatherOp);
+                                         IREE::LinalgExt::GatherOp gatherOp,
+                                         ArrayRef<int64_t> vectorSizes = {});
 
 void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
+
+void populateVectorMaskLoweringPatterns(RewritePatternSet &patterns);
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 
