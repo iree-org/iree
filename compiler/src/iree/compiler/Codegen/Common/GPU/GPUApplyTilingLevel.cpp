@@ -132,8 +132,15 @@ static LogicalResult applyTileAndFuseToEachRoot(
 
     if (tilingLevel == IREE::GPU::TilingLevel::PartialReduction) {
       tilingOptions.setReductionTilingStrategy(
-          scf::SCFTilingOptions::ReductionTilingStrategy::
-              PartialReductionOuterReduction);
+          ReductionTilingStrategy::PartialReductionOuterReduction);
+      SmallVector<unsigned> reductionDims;
+      for (auto [index, iteratorType] :
+           llvm::enumerate(tilingInterfaceOp.getLoopIteratorTypes())) {
+        if (iteratorType == utils::IteratorType::reduction) {
+          reductionDims.push_back(index);
+        }
+      }
+      tilingOptions.setReductionDims(reductionDims);
     }
 
     scf::SCFTileAndFuseOptions tileAndFuseOptions;
