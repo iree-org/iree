@@ -28,7 +28,9 @@ class LinalgExtOp;
 
 namespace detail {
 LogicalResult verifyLinalgExtOpInterface(Operation *op);
-}
+} // namespace detail
+
+void registerConcatOpTilingInterfaceExternalModel(MLIRContext *ctx);
 
 /// Include the generated interface declarations.
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h.inc" // IWYU pragma: export

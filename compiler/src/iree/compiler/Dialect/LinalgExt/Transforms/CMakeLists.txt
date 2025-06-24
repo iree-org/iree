@@ -42,6 +42,7 @@ iree_cc_library(
     "TestReshapeFusion.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
+    "VectorizeIREELinalgExtOps.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -72,6 +73,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRVectorDialect
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR

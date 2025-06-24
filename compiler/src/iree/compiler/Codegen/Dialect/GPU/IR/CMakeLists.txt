@@ -41,6 +41,7 @@ iree_cc_library(
     "IREEGPUDialect.cpp"
     "IREEGPUInterfaces.cpp"
     "IREEGPUOps.cpp"
+    "PromotionImpls.cpp"
   DEPS
     ::IREEGPUAttrs
     ::IREEGPUDialectGen
@@ -69,6 +70,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
     iree::compiler::bindings::c::headers
   PUBLIC

@@ -30,8 +30,12 @@ namespace mlir::iree_compiler::IREE::Flow {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 static constexpr int64_t kMaxCost = INT64_MAX;
+static constexpr int64_t kReductionCost = 2;
 
-namespace {
+static int64_t saturatingMul(int64_t lhs, int64_t rhs) {
+  assert(lhs > 0 && rhs > 0);
+  return (lhs > kMaxCost / rhs) ? kMaxCost : lhs * rhs;
+}
 
 // This op estimates the cost of a list of perfectly nested loop ranges simply
 // as the product of ranges. Note that this does not take into account the cost
@@ -48,11 +52,7 @@ static int64_t costOfDomain(ArrayRef<int64_t> domain) {
       multiplier = 1024;
     }
 
-    // Preform saturating multiplication
-    if (product > kMaxCost / multiplier) {
-      return kMaxCost;
-    }
-    product *= multiplier;
+    product = saturatingMul(product, multiplier);
   }
   return product;
 }
@@ -62,6 +62,12 @@ static int64_t estimateLinalgOpCost(linalg::LinalgOp op) {
   // For linalg ops we know the iteration domain, so return the number
   // of iterations of the iteration domain (or INT64_MAX for dynamic.)
   int64_t cost = costOfDomain(op.getStaticLoopRanges());
+
+  // Operations with reduction iterators are generally more costly and are
+  // likely to be the most important operation in the dispatch.
+  if (op.getNumReductionLoops()) {
+    cost = saturatingMul(cost, kReductionCost);
+  }
   LLVM_DEBUG(llvm::dbgs() << "// " << op->getName() << " cost: " << cost
                           << "\n");
   return cost;
@@ -295,6 +301,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
       prefix = "horizontal_multi_contract";
     } else if (succeeded(linalg::inferConvolutionDims(op))) {
       prefix = "conv";
+    } else if (op.getNumReductionLoops()) {
+      prefix = "reduction";
     }
   }
 
@@ -482,8 +490,6 @@ static std::string summarizeDispatchRegion(Region &region) {
   LLVM_DEBUG(llvm::dbgs() << "// best op summary: '" << bestSummary << "'\n");
   return bestSummary;
 }
-
-} // namespace
 
 struct AnnotateDispatchesPass
     : public IREE::Flow::impl::AnnotateDispatchesPassBase<

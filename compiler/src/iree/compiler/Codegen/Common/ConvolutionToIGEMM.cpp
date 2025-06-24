@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"

@@ -167,6 +167,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRSupport
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
   PUBLIC
 )
 

@@ -202,7 +202,6 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // to handle subview ops.
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createEmulateNarrowTypePass)
-      .addPass(memref::createExpandOpsPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
 
