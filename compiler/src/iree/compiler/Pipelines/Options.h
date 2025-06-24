@@ -122,7 +122,7 @@ struct GlobalOptimizationOptions {
   bool outerDimConcat = false;
 
   // Enables data tiling.
-  bool dataTiling = true;
+  bool dataTiling = false;
 
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;
