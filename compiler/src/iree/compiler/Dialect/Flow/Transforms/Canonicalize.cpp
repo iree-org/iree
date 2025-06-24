@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
@@ -83,6 +84,23 @@ struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
   }
 };
 
+/// Convert an "affine.apply" operation into a sequence of arith ops.
+class AffineApplyLowering : public OpRewritePattern<affine::AffineApplyOp> {
+public:
+  using OpRewritePattern<affine::AffineApplyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(affine::AffineApplyOp op,
+                                PatternRewriter &rewriter) const override {
+    auto maybeExpandedMap =
+        affine::expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(),
+                                llvm::to_vector<8>(op.getOperands()));
+    if (!maybeExpandedMap)
+      return failure();
+    rewriter.replaceOp(op, *maybeExpandedMap);
+    return success();
+  }
+};
+
 /// Canonicalize operations in nested regions.
 struct CanonicalizePass : public impl::CanonicalizePassBase<CanonicalizePass> {
   using IREE::Flow::impl::CanonicalizePassBase<
@@ -104,6 +122,7 @@ struct CanonicalizePass : public impl::CanonicalizePassBase<CanonicalizePass> {
     // compilation phase.
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(owningPatterns);
     owningPatterns.add<FoldFullInsertSlice>(context);
+    owningPatterns.add<AffineApplyLowering>(context);
 
     patterns =
         std::make_shared<FrozenRewritePatternSet>(std::move(owningPatterns));
