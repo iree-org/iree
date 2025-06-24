@@ -35,8 +35,8 @@ util.func public @multiDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 // -----
 
-// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK-LABEL: util.func public @encodedDispatch
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]

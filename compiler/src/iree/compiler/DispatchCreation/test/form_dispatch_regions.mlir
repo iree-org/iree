@@ -137,7 +137,7 @@ util.func public @transpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #encoding> {
   %cst = arith.constant 0.0 : f32
@@ -188,7 +188,7 @@ util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
     %arg1 : index, %arg2 : index) -> tensor<?x?xf32, #encoding> {
   %cst = arith.constant 0.0 : f32
@@ -211,14 +211,14 @@ util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
 // -----
 
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
     -> tensor<?x?xf32, #encoding> {
   %encode = iree_encoding.set_encoding %arg0
       : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   util.return %encode : tensor<?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing_encoding
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing
 //      CHECK: util.func public @set_encoding_op
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
 //  CHECK-NOT:   flow.dispatch.region
@@ -227,7 +227,7 @@ util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1: tensor<?xf32>,
@@ -251,7 +251,7 @@ util.func public @unset_encoding_elementwise_fusion(
     } -> tensor<?x?xf32>
   util.return %2 : tensor<?x?xf32>
 }
-//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
@@ -264,7 +264,7 @@ util.func public @unset_encoding_elementwise_fusion(
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @unset_encoding_elementwise_fusion(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1: tensor<?xf32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
@@ -286,7 +286,7 @@ util.func public @unset_encoding_elementwise_fusion(
     } -> tensor<?x?xf32>
   util.return %2 : tensor<?x?xf32>
 }
-//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
+//       CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
@@ -339,7 +339,7 @@ util.func public @unpack_elementwise_fusion(
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @unset_encoding_slice(%arg0: tensor<1x50x384xf32, #encoding>) -> tensor<384xf32> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<1x50x384xf32, #encoding> -> tensor<1x50x384xf32>
   %extracted_slice = tensor.extract_slice %0[0, 0, 0] [1, 1, 384] [1, 1, 1] : tensor<1x50x384xf32> to tensor<384xf32>
