@@ -160,7 +160,10 @@ def LLVMCPUTileRootAndFuseProducerConsumerPass
               "only-fuse-producer-input-operands", "bool",
               /*default=*/"false",
               "Specifies if we only want to fuse producer's input operands. "
-              "This is helpful to tile&fuse in case of reduction dimensions.">];
+              "This is helpful to tile&fuse in case of reduction dimensions.">,
+       Option<"tileUsingForall", "tile-using-forall", "bool",
+              /*default=*/"false",
+              "Tile parallel dimensions using `scf.forall` instead of `scf.for`. Reduction dimension defaults to `scf.for`.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :

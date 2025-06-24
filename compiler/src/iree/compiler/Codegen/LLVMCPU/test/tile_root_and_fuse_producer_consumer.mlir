@@ -1,5 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=0}), canonicalize)"  --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=2 only-fuse-producer-input-operands=true}), canonicalize)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=0}), cse)"  --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=0 tile-using-forall=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-FORALL
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=2 only-fuse-producer-input-operands=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [1, 0, 0, 16, 16, 0], [0, 0, 1, 0, 0, 1], [0, 0, 0, 0, 0, 0]]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -30,6 +31,14 @@ func.func @mmt4d_bias_relu(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?x?x16x1xf
 // CHECK:           %[[RES0:.+]] =  tensor.insert_slice %[[MMT4D]]
 // CHECK:           %[[RES1:.+]] =  tensor.insert_slice %[[ELEM]]
 // CHECK:           scf.yield %[[RES0]], %[[RES1]]
+
+// CHECK-FORALL-LABEL: func.func @mmt4d_bias_relu(
+// CHECK-FORALL:         scf.forall
+// CHECK-FORALL:           linalg.fill
+// CHECK-FORALL-NEXT:      %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-FORALL:           %[[ELEM:.+]] = linalg.generic
+// CHECK-FORALL:           scf.forall.in_parallel
+// CHECK-FORALL:             tensor.parallel_insert_slice %[[ELEM]]
 
 // -----
 
@@ -73,6 +82,16 @@ func.func @quantized_matmul(%arg0: tensor<2x4x128x16x1xi8>, %arg1: tensor<2x4x16
 // CHECK:    %[[RES0:.+]] =  tensor.insert_slice %[[MMT4D]]
 // CHECK:    %[[RES1:.+]] =  tensor.insert_slice %[[UNPACK]]
 // CHECK:    scf.yield %[[RES0]], %[[RES1]]
+
+// CHECK-FORALL-LABEL: func.func @quantized_matmul(
+// CHECK-FORALL:         scf.forall
+// CHECK-FORALL:           linalg.generic
+// CHECK-FORALL:           linalg.generic
+// CHECK-FORALL:           linalg.fill
+// CHECK-FORALL:           %[[MMT4D:.+]] = linalg.batch_mmt4d
+// CHECK-FORALL:           %[[UNPACK:.+]] = linalg.unpack
+// CHECK-FORALL:           scf.forall.in_parallel
+// CHECK-FORALL:             tensor.parallel_insert_slice %[[UNPACK]]
 
 // -----
 
@@ -119,3 +138,63 @@ func.func @silently_bail_no_root_op(%arg0: tensor<1x2x1x2xi8>, %arg1: tensor<1x2
 }
 // CHECK-REDUCTION-LABEL: func.func @silently_bail_no_root_op(
 // CHECK-REDUCTION-NOT:     scf.for
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -> tensor<12x197x197xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant -3.40282347E+38 : f32
+  %8 = tensor.empty() : tensor<12x197x197xf32>
+  %9 = tensor.empty() : tensor<12x197xf32>
+  %10 = linalg.fill ins(%cst_0 : f32) outs(%9 : tensor<12x197xf32>) -> tensor<12x197xf32>
+  %max = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%7 : tensor<12x197x197xf32>) outs(%10 : tensor<12x197xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %15 = arith.maxnumf %in, %out : f32
+    linalg.yield %15 : f32
+  } -> tensor<12x197xf32>
+  %12 = linalg.fill ins(%cst : f32) outs(%9 : tensor<12x197xf32>) -> tensor<12x197xf32>
+  %exp_sum = linalg.generic {
+    indexing_maps = [#map, #map1, #map1],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%7, %max : tensor<12x197x197xf32>, tensor<12x197xf32>)
+    outs(%12 : tensor<12x197xf32>) attrs =  {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4, 8, 0]]>} {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %15 = arith.subf %in, %in_1 : f32
+    %16 = math.exp %15 : f32
+    %17 = arith.addf %16, %out : f32
+    linalg.yield %17 : f32
+  } -> tensor<12x197xf32>
+  %softmax:2 = linalg.generic {
+    indexing_maps = [#map, #map1, #map1, #map, #map],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%7, %max, %exp_sum : tensor<12x197x197xf32>, tensor<12x197xf32>, tensor<12x197xf32>)
+    outs(%8, %8 : tensor<12x197x197xf32>, tensor<12x197x197xf32>) {
+  ^bb0(%in: f32, %in_1: f32, %in_2: f32, %out: f32, %out_3: f32):
+    %15 = arith.subf %in, %in_1 : f32
+    %16 = math.exp %15 : f32
+    %17 = arith.divf %16, %in_2 : f32
+    linalg.yield %16, %17 : f32, f32
+  } -> (tensor<12x197x197xf32>, tensor<12x197x197xf32>)
+  return %softmax#1 : tensor<12x197x197xf32>
+}
+// CHECK-FORALL-LABEL: func @multi_use_producer_no_yield_replacement(
+//       CHECK-FORALL:   %[[RESULT:.+]] = scf.forall
+//       CHECK-FORALL:     %[[MAX:.+]] = linalg.generic
+//       CHECK-FORALL:       arith.maxnumf
+//       CHECK-FORALL:     %[[EXPSUM:.+]] = linalg.generic
+//  CHECK-FORALL-SAME:       ins(%{{.*}}, %[[MAX]]
+//       CHECK-FORALL:       arith.subf
+//       CHECK-FORALL:       math.exp
+//       CHECK-FORALL:       arith.addf
+//       CHECK-FORALL:     %[[EXPDIV:.+]] = linalg.generic
+//  CHECK-FORALL-SAME:       ins(%{{.*}}, %[[MAX]], %[[EXPSUM]]
+//       CHECK-FORALL:       arith.subf
+//       CHECK-FORALL:       math.exp
+//       CHECK-FORALL:       arith.divf
+//       CHECK-FORALL:   return %[[RESULT]]
