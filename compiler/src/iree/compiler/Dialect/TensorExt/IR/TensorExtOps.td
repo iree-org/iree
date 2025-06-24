@@ -307,6 +307,31 @@ def IREETensorExt_DispatchWorkgroupCountFromSliceOp :
   }];
 }
 
+def IREETensorExt_DispatchWorkgroupCountSplitKModifier :
+    IREETensorExt_PureOp<"dispatch.workgroup_count_splitk_modifier"> {
+  let summary = [{
+    Modifies the workgroup count calculation to account for split-k computation.
+  }];
+  let description = [{
+    A split-k dispatch contains two parts: a `scf.forall` and linalg compute ops
+    within the scf op. `workgroup_x`, `workgroup_y`, and `workgroup_z` represent the
+    workgroups needed to execute the inner compute ops. This is combined with
+    `workload` to determine the total number of workgroups required to run
+    the computation after accounting for the `scf.forall`.
+  }];
+  let arguments = (ins
+    Index:$workgroup_x,
+    Index:$workgroup_y,
+    Index:$workgroup_z,
+    Variadic<Index>:$workload
+  );
+  let results = (outs Index:$result_x, Index:$result_y, Index:$result_z);
+
+  let assemblyFormat = [{
+    attr-dict `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `,` ($workload^)?
+  }];
+}
+
 def IREETensorExt_DispatchWorkloadOrdinalOp :
     IREETensorExt_PureOp<"dispatch.workload.ordinal", [
       DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface>,
