@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -485,11 +486,31 @@ static OpFoldResult getMinimumConstantOffsetMap(OpBuilder &b, Location loc,
   if (!value)
     return offset;
 
-  auto apply = value.getDefiningOp<affine::AffineApplyOp>();
-  if (!apply)
-    return offset;
+  affine::AffineApplyOp apply;
+  if (auto realApply = value.getDefiningOp<affine::AffineApplyOp>()) {
+    apply = realApply;
+  } else if (auto linearize =
+                 value.getDefiningOp<affine::AffineLinearizeIndexOp>()) {
+    SmallVector<OpFoldResult> multiIndex =
+        getAsOpFoldResult(linearize.getMultiIndex());
+    OpFoldResult linearized =
+        affine::linearizeIndex(b, loc, multiIndex, linearize.getMixedBasis());
+    // A linearization of constants should already have been a constant, but we
+    // might as well be defensive here.
+    if (LLVM_UNLIKELY(isa<Attribute>(linearized))) {
+      return linearized;
+    }
+    if (auto asApply =
+            cast<Value>(linearized).getDefiningOp<affine::AffineApplyOp>()) {
+      apply = asApply;
+    }
+  }
 
+  if (!apply) {
+    return offset;
+  }
   AffineMap map = apply.getMap();
+
   // Simplify the map to move `+ c` terms to the right most (first) expression
   // in the tree.
   map = simplifyAffineMap(map);
