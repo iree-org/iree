@@ -308,8 +308,8 @@ struct TopkSplitReductionPass final
 
     TopkSplitReductionControlFn splitReductionFn =
         [&](int64_t splitReductionDepth) -> int64_t {
-      SmallVector<int64_t, 4> reductionRatios(splitRatios.begin(),
-                                              splitRatios.end());
+      SmallVector<int64_t> reductionRatios(splitRatios.begin(),
+                                           splitRatios.end());
       if (splitReductionDepth >= reductionRatios.size()) {
         return -1;
       } else {
@@ -556,7 +556,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     insertSplitDimension = reductionDim + 1;
   }
 
-  SmallVector<int64_t, 4> loopRanges = genericOp.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = genericOp.getStaticLoopRanges();
   int64_t reductionDimSize = loopRanges[reductionDim];
   if (ShapedType::isDynamic(reductionDimSize) ||
       reductionDimSize % ratio != 0) {

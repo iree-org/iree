@@ -56,7 +56,7 @@ public:
     }
     if (inputMap.isProjectedPermutation())
       return failure();
-    SmallVector<int64_t, 4> staticShape = op.getStaticLoopRanges();
+    SmallVector<int64_t> staticShape = op.getStaticLoopRanges();
 
     llvm::SmallDenseMap<unsigned, int64_t> strides;
     SmallVector<AffineExpr> replacementExprs;
