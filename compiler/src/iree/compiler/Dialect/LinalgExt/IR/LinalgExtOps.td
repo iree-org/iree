@@ -675,7 +675,12 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+  ["generateScalarImplementation",
+   "getIterationDomain"]
+  >
 ]> {
   let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
