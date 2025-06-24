@@ -193,6 +193,16 @@ macro(iree_llvm_set_bundled_cmake_options)
   if(IREE_TARGET_BACKEND_LLVM_CPU)
     message(STATUS "  - llvm-cpu")
     list(APPEND LLVM_TARGETS_TO_BUILD "${IREE_DEFAULT_CPU_LLVM_TARGETS}")
+    # Misconfiguration of LLVM sometimes results in empty LLVM_TARGETS_TO_BUILD.
+    # This has led to hard-to-diagnose issues, so better catch that here.
+    # Note that the placement of that check matters:
+    # - Here we are inside the if IREE_TARGET_BACKEND_LLVM_CPU, so we know that
+    #   we should have at least one LLVM CPU target enabled.
+    # - Here we are before some other if branches below for other backends that
+    #   append more targets to the list, making it it unconditionally nonempty.
+    if (NOT LLVM_TARGETS_TO_BUILD)
+      message(SEND_ERROR "LLVM_TARGETS_TO_BUILD should not be empty.")
+    endif()
     set(IREE_CLANG_TARGET clang)
     set(IREE_LLD_TARGET lld)
   endif()
@@ -228,12 +238,6 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   list(REMOVE_DUPLICATES LLVM_ENABLE_PROJECTS)
   list(REMOVE_DUPLICATES LLVM_TARGETS_TO_BUILD)
-
-  # Misconfiguration of LLVM sometimes results in empty LLVM_TARGETS_TO_BUILD.
-  # This has led to hard-to-diagnose issues, so better catch that here.
-  if (NOT LLVM_TARGETS_TO_BUILD)
-    message(SEND_ERROR "LLVM_TARGETS_TO_BUILD should not be empty.")
-  endif()
 
   message(VERBOSE "Building LLVM Targets: ${LLVM_TARGETS_TO_BUILD}")
   message(VERBOSE "Building LLVM Projects: ${LLVM_ENABLE_PROJECTS}")
