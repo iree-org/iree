@@ -551,7 +551,7 @@ static bool isNonMatvecContraction(Operation *op) {
   if (!linalgOp) {
     return false;
   }
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
   if (failed(contractionDims)) {
