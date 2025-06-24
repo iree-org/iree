@@ -320,7 +320,8 @@ struct FuseTilableForallConsumers final
     }
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice, {sliceOwner});
+        scf::tileAndFuseConsumerOfSlices(rewriter, producerSlice.getOperation(),
+                                         {sliceOwner});
     if (failed(fuseConsumerResults)) {
       return failure();
     }

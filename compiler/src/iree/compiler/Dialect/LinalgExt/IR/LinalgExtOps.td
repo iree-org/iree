@@ -103,8 +103,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile"]>]> {
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
     Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
@@ -326,8 +326,8 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile",
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles",
          "generateScalarImplementation"]>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
   let summary = [{Scatter with a mapping from source indices to result indices.}];
