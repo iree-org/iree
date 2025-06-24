@@ -1075,3 +1075,26 @@ func.func @if_conversion_clone_offsets() {
 //       CHECK:     %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load
 //       CHECK:     %[[PADDED:.+]] = tensor.pad %[[VAL]]
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[PADDED]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @early_bufferization_ops() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<4xi32, #hal.descriptor_type<storage_buffer>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<4xi32, #hal.descriptor_type<storage_buffer>>
+  %2 = iree_codegen.load_from_buffer %0 : memref<4xi32, #hal.descriptor_type<storage_buffer>> -> tensor<4xi32>
+  %3 = tensor.empty() : tensor<4xi32>
+  %4 = linalg.copy ins(%2 : tensor<4xi32>) outs(%3 : tensor<4xi32>) -> tensor<4xi32>
+  iree_codegen.store_to_buffer %4, %1 : tensor<4xi32> into memref<4xi32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+// CHECK-LABEL: func.func @early_bufferization_ops
+// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan{{.+}} binding(0)
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan{{.+}} binding(1)
+// CHECK-DAG:     %[[IN:.+]] = iree_codegen.load_from_buffer %[[IN_BINDING]]
+// CHECK-DAG:     %[[OUT:.+]] = iree_codegen.load_from_buffer %[[OUT_BINDING]]
+// CHECK:         linalg.copy ins(%[[IN]]{{.*}} outs(%[[OUT]]
