@@ -1368,55 +1368,38 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
     parallelIndices.push_back(ivs[i]);
   }
 
+  Value bestValueSoFar =
+      b.create<memref::LoadOp>(loc, outputValue(), parallelIndices);
+  Value bestIndexSoFar =
+      b.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
+
   Value candidateValue = b.create<memref::LoadOp>(loc, getInputValue(), ivs);
-  Value indexValue = ivs[reductionDim];
+
+  auto &srcBlock = getRegion().front();
+  IRMapping regionMap;
+  regionMap.map(srcBlock.getArgument(0), candidateValue);
+  regionMap.map(srcBlock.getArgument(1), bestValueSoFar);
+  for (Operation &op : srcBlock.without_terminator()) {
+    b.clone(op, regionMap);
+  }
+
+  Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
+  Value selectedValue =
+      b.create<arith::SelectOp>(loc, cmpResult, candidateValue, bestValueSoFar);
+  Value indexOffset = ivs[reductionDim];
   if (getIndexBase()) {
-    indexValue = b.create<arith::AddIOp>(loc, getIndexBase(), indexValue);
+    indexOffset = b.create<arith::AddIOp>(loc, getIndexBase(), indexOffset);
   }
-  Value castedIndex = indexValue;
-  Type indexType = getOutputIndexType().getElementType();
-  if (castedIndex.getType() != indexType) {
-    castedIndex = b.create<arith::IndexCastOp>(loc, indexType, castedIndex);
-  }
-
-  Value isFirst =
-      b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, ivs[reductionDim],
-                              b.create<arith::ConstantIndexOp>(loc, 0));
-  auto ifOp = b.create<scf::IfOp>(loc, isFirst, /*withElseRegion=*/true);
-  {
-    OpBuilder thenBuilder = ifOp.getThenBodyBuilder();
-    thenBuilder.create<memref::StoreOp>(loc, candidateValue, outputValue(),
-                                        parallelIndices);
-    thenBuilder.create<memref::StoreOp>(loc, castedIndex, outputIndex(),
-                                        parallelIndices);
+  Value castedIndex = indexOffset;
+  if (castedIndex.getType() != bestIndexSoFar.getType()) {
+    castedIndex = b.create<arith::IndexCastOp>(loc, bestIndexSoFar.getType(),
+                                               castedIndex);
   }
 
-  {
-    OpBuilder elseBuilder = ifOp.getElseBodyBuilder();
-
-    Value bestValueSoFar =
-        elseBuilder.create<memref::LoadOp>(loc, outputValue(), parallelIndices);
-    Value bestIndexSoFar =
-        elseBuilder.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
-
-    auto &srcBlock = getRegion().front();
-    IRMapping regionMap;
-    regionMap.map(srcBlock.getArgument(0), candidateValue);
-    regionMap.map(srcBlock.getArgument(1), bestValueSoFar);
-    for (Operation &op : srcBlock.without_terminator()) {
-      elseBuilder.clone(op, regionMap);
-    }
-    Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
-    Value selectedValue = elseBuilder.create<arith::SelectOp>(
-        loc, cmpResult, candidateValue, bestValueSoFar);
-    Value selectedIndex = elseBuilder.create<arith::SelectOp>(
-        loc, cmpResult, castedIndex, bestIndexSoFar);
-    elseBuilder.create<memref::StoreOp>(loc, selectedValue, outputValue(),
-                                        parallelIndices);
-    elseBuilder.create<memref::StoreOp>(loc, selectedIndex, outputIndex(),
-                                        parallelIndices);
-  }
-
+  Value selectedIndex =
+      b.create<arith::SelectOp>(loc, cmpResult, castedIndex, bestIndexSoFar);
+  b.create<memref::StoreOp>(loc, selectedValue, outputValue(), parallelIndices);
+  b.create<memref::StoreOp>(loc, selectedIndex, outputIndex(), parallelIndices);
   return success();
 }
 
