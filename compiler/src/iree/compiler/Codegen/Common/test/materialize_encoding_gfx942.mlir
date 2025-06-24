@@ -652,7 +652,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8() {
     >
   >,
   ukernels = "none",
-  iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+  iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 }>
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -726,7 +726,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
     >
   >,
   ukernels = "none",
-  iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+  iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 }>
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -800,7 +800,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
     >
   >,
   ukernels = "none",
-  iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+  iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 }>
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -874,7 +874,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1() attribu
     >
   >,
   ukernels = "none",
-  iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+  iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 }>
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -948,7 +948,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_8192() at
     >
   >,
   ukernels = "none",
-  iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+  iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 }>
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -1022,7 +1022,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096() at
     >
   >,
   ukernels = "none",
-  iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+  iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 }>
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -1203,8 +1203,8 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x16_BF16() {
 // Test suite for encodings with resolved layouts.
 //----------------------------------------------------------------------------//
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>}>
-#encoding = #iree_encoding.layout<[#iree_gpu.gpu_encoding_layout<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>}>
+#encoding = #iree_encoding.layout<[#iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>

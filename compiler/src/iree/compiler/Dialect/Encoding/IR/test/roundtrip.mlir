@@ -245,20 +245,20 @@ func.func @matmul_k_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf3
 
 // -----
 
-#encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+#encoding = #iree_encoding.layout<[#iree_encoding.padding<[0, 64]>]>
 func.func @layout_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, 64]>]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.padding<[0, 64]>]>
 //      CHECK: func.func @layout_encoding(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK         return %[[ARG0]]
 
 // -----
 
-#encoding = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, ?, 64]>]>
+#encoding = #iree_encoding.layout<[#iree_encoding.padding<[0, ?, 64]>]>
 func.func @dynamic_layout_encoding(%arg0: tensor<?x?x?xf32, #encoding>) -> tensor<?x?x?xf32, #encoding> {
   return %arg0 : tensor<?x?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.pad_encoding_layout<[0, ?, 64]>]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.padding<[0, ?, 64]>]>
 //      CHECK: func.func @dynamic_layout_encoding(%[[ARG0:.+]]: tensor<?x?x?xf32, #[[ENCODING]]>)

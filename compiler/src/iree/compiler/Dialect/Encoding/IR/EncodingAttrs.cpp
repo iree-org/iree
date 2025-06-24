@@ -376,7 +376,7 @@ Attribute MatmulKAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.pad_encoding_layout
+// iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
 /// Custom printer/parser methods to handle dynamic shapes.
@@ -423,35 +423,32 @@ static int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
-                                                 ArrayRef<int64_t> padding) {
+PaddingAttr PaddingAttr::get(MLIRContext *ctx, ArrayRef<int64_t> padding) {
   return get(ctx, DenseI64ArrayAttr::get(ctx, padding));
 }
 
-PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
-                                                             int rank) {
+PaddingAttr PaddingAttr::getIdentityAttr(MLIRContext *ctx, int rank) {
   SmallVector<int64_t> zeros(rank, 0);
   return get(ctx, zeros);
 }
 
-Attribute
-PadEncodingLayoutAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+Attribute PaddingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
-bool PadEncodingLayoutAttr::isSerialized() const {
+bool PaddingAttr::isSerialized() const {
   return !ShapedType::isDynamicShape(getPadding().asArrayRef());
 }
 
-bool PadEncodingLayoutAttr::isIdentityLayout() const {
+bool PaddingAttr::isIdentityLayout() const {
   ArrayRef<int64_t> padding = getPadding().asArrayRef();
   return llvm::all_of(padding, [](int64_t val) { return val == 0; });
 }
 
-Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
-    Location loc, OpBuilder &builder, RankedTensorType type,
-    ValueRange dynamicDims) const {
+Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
+                                               RankedTensorType type,
+                                               ValueRange dynamicDims) const {
   ArrayRef<int64_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
   LLVM_DEBUG(if (llvm::any_of(padding, [](int64_t x) { return x != 0; })) {
@@ -487,9 +484,8 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
-LogicalResult
-PadEncodingLayoutAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                              DenseI64ArrayAttr padding) {
+LogicalResult PaddingAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                  DenseI64ArrayAttr padding) {
   // You can only verify that the value is non-negative or dynamic.
   if (!llvm::all_of(padding.asArrayRef(), [](int64_t val) {
         return val == ShapedType::kDynamic || val >= 0;
@@ -512,8 +508,7 @@ IdentityResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
 Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
   SmallVector<int64_t> zeros(type.getRank(), 0);
-  return Encoding::PadEncodingLayoutAttr::get(
-      ctx, DenseI64ArrayAttr::get(ctx, zeros));
+  return Encoding::PaddingAttr::get(ctx, DenseI64ArrayAttr::get(ctx, zeros));
 }
 
 //===---------------------------------------------------------------------===//

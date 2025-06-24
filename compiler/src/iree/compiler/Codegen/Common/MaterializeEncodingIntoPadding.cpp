@@ -40,8 +40,7 @@ namespace {
 
 // Returns the pad encoding layout, or nullptr if this is not the only layout or
 // if there's no encoding at all.
-static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
-                                          RankedTensorType type) {
+static PaddingAttr getPadLayout(Attribute layoutAttr, RankedTensorType type) {
   if (!type.getEncoding()) {
     return nullptr;
   }
@@ -52,7 +51,7 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
     if (layouts.size() != 1) {
       return nullptr;
     }
-    return dyn_cast<PadEncodingLayoutAttr>(*layouts.begin());
+    return dyn_cast<PaddingAttr>(*layouts.begin());
   }
   Attribute resolvedEncoding =
       cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr).getLayout(type);
@@ -61,14 +60,14 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
     llvm::dbgs() << "layoutAttr: " << layoutAttr << "\n";
     llvm::dbgs() << "Resolved into: " << resolvedEncoding << "\n";
   });
-  return dyn_cast<PadEncodingLayoutAttr>(resolvedEncoding);
+  return dyn_cast<PaddingAttr>(resolvedEncoding);
 }
 
 // Returns a padded tensor type (without encoding) for tensor types with the pad
 // encoding layout, or the same type for all other tensors.
 static RankedTensorType getPaddedType(Attribute layoutAttr,
                                       RankedTensorType type) {
-  PadEncodingLayoutAttr layout = getPadLayout(layoutAttr, type);
+  PaddingAttr layout = getPadLayout(layoutAttr, type);
   if (layout.isIdentityLayout()) {
     return type.dropEncoding();
   }
@@ -90,7 +89,7 @@ struct MaterializePadEncodingTypeConverter final
       IREE::Encoding::LayoutMaterializerAttr layoutAttr)
       : MaterializeEncodingTypeConverter(layoutAttr) {
     addConversion([](RankedTensorType type) -> std::optional<RankedTensorType> {
-      // The type converter is designed for `pad_encoding_layout` encoding
+      // The type converter is designed for `padding` encoding
       // attribute. By the definition, the final converted type is the same
       // tensor type without encodings.
       return type.dropEncoding();
@@ -101,7 +100,7 @@ struct MaterializePadEncodingTypeConverter final
       if (!type || !type.getEncoding()) {
         return dispatchTensorType;
       }
-      // The incoming bindings have the padded type, if `pad_encoding_layout` is
+      // The incoming bindings have the padded type, if `padding` is
       // present.
       if (getPadLayout(getLayoutAttr(), type)) {
         type = getPaddedType(getLayoutAttr(), type);
@@ -112,7 +111,7 @@ struct MaterializePadEncodingTypeConverter final
   }
 
   bool hasNonZeroPadding(RankedTensorType type) const {
-    PadEncodingLayoutAttr layout = getPadLayout(getLayoutAttr(), type);
+    PaddingAttr layout = getPadLayout(getLayoutAttr(), type);
     return layout && !layout.isIdentityLayout();
   }
 };

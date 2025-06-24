@@ -577,9 +577,9 @@ def MaterializeEncodingIntoNopPass :
 
 def MaterializeEncodingIntoPaddingPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
+  let summary = "Materialize `#iree_encoding.padding` attributes.";
   let description = [{
-    Handles padding introduced by `pad_encoding_layout` encoding layouts, which
+    Handles padding introduced by `padding` encoding layouts, which
     requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
     padding regions.
     Materializes any other encoding layouts into nop.
