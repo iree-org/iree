@@ -1341,6 +1341,69 @@ LogicalResult TopkOp::getResultTilePosition(
 }
 
 //===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> ArgCompareOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  int64_t rank = getInputRank();
+  SmallVector<Range> ranges;
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    OpFoldResult ub = getDim(builder, loc, getInputValue(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
+                                                         Location loc,
+                                                         ValueRange ivs) {
+  uint64_t reductionDim = getDimension();
+  SmallVector<Value> parallelIndices;
+  for (size_t i = 0, rank = ivs.size(); i < rank; ++i) {
+    if (i == reductionDim)
+      continue;
+    parallelIndices.push_back(ivs[i]);
+  }
+
+  Value bestValueSoFar =
+      b.create<memref::LoadOp>(loc, outputValue(), parallelIndices);
+  Value bestIndexSoFar =
+      b.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
+
+  Value candidateValue = b.create<memref::LoadOp>(loc, getInputValue(), ivs);
+
+  auto &srcBlock = getRegion().front();
+  IRMapping regionMap;
+  regionMap.map(srcBlock.getArgument(0), candidateValue);
+  regionMap.map(srcBlock.getArgument(1), bestValueSoFar);
+  for (Operation &op : srcBlock.without_terminator()) {
+    b.clone(op, regionMap);
+  }
+
+  Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
+  Value selectedValue =
+      b.create<arith::SelectOp>(loc, cmpResult, candidateValue, bestValueSoFar);
+  Value indexOffset = ivs[reductionDim];
+  if (getIndexBase()) {
+    indexOffset = b.create<arith::AddIOp>(loc, getIndexBase(), indexOffset);
+  }
+  Value castedIndex = indexOffset;
+  if (castedIndex.getType() != bestIndexSoFar.getType()) {
+    castedIndex = b.create<arith::IndexCastOp>(loc, bestIndexSoFar.getType(),
+                                               castedIndex);
+  }
+
+  Value selectedIndex =
+      b.create<arith::SelectOp>(loc, cmpResult, castedIndex, bestIndexSoFar);
+  b.create<memref::StoreOp>(loc, selectedValue, outputValue(), parallelIndices);
+  b.create<memref::StoreOp>(loc, selectedIndex, outputIndex(), parallelIndices);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
