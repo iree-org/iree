@@ -2060,18 +2060,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#gpuencodinglayoutattr" class="md-nav__link">
+  <a href="#gpuencodingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
-      GPUEncodingLayoutAttr
+      GPUEncodingResolverAttr
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#gpupadlayoutattr" class="md-nav__link">
+  <a href="#gpupaddingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
-      GPUPadLayoutAttr
+      GPUPaddingResolverAttr
     </span>
   </a>
   
@@ -5196,18 +5196,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#gpuencodinglayoutattr" class="md-nav__link">
+  <a href="#gpuencodingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
-      GPUEncodingLayoutAttr
+      GPUEncodingResolverAttr
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#gpupadlayoutattr" class="md-nav__link">
+  <a href="#gpupaddingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
-      GPUPadLayoutAttr
+      GPUPaddingResolverAttr
     </span>
   </a>
   
@@ -5682,8 +5682,8 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
 <li><a href="#derivedthreadconfigattr">DerivedThreadConfigAttr</a></li>
 <li><a href="#dotproductopsattr">DotProductOpsAttr</a></li>
-<li><a href="#gpuencodinglayoutattr">GPUEncodingLayoutAttr</a></li>
-<li><a href="#gpupadlayoutattr">GPUPadLayoutAttr</a></li>
+<li><a href="#gpuencodingresolverattr">GPUEncodingResolverAttr</a></li>
+<li><a href="#gpupaddingresolverattr">GPUPaddingResolverAttr</a></li>
 <li><a href="#gpupipelineoptionsattr">GPUPipelineOptionsAttr</a></li>
 <li><a href="#laneidattr">LaneIdAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
@@ -6127,10 +6127,10 @@ tiling configs.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="gpuencodinglayoutattr">GPUEncodingLayoutAttr<a class="headerlink" href="#gpuencodinglayoutattr" title="Permanent link">link</a></h3>
+<h3 id="gpuencodingresolverattr">GPUEncodingResolverAttr<a class="headerlink" href="#gpuencodingresolverattr" title="Permanent link">link</a></h3>
 <p><em>The encoding layout attribute for GPU backend.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_encoding_layout&lt;
+<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_encoding_resolver&lt;
   DictionaryAttr   # configuration
 &gt;
 </code></pre></div>
@@ -6157,10 +6157,10 @@ implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="gpupadlayoutattr">GPUPadLayoutAttr<a class="headerlink" href="#gpupadlayoutattr" title="Permanent link">link</a></h3>
+<h3 id="gpupaddingresolverattr">GPUPaddingResolverAttr<a class="headerlink" href="#gpupaddingresolverattr" title="Permanent link">link</a></h3>
 <p><em>The padded encoding layout attribute for GPU targets.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_pad_layout&lt;
+<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_padding_resolver&lt;
   std::optional&lt;uint32_t&gt;,   # cache_line_bytes
   std::optional&lt;uint32_t&gt;   # cache_sets
 &gt;

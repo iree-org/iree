@@ -6933,8 +6933,8 @@ operations.</p>
 <h3 id="-iree-codegen-materialize-encoding-into-nop"><code>-iree-codegen-materialize-encoding-into-nop</code><a class="headerlink" href="#-iree-codegen-materialize-encoding-into-nop" title="Permanent link">link</a></h3>
 <p><em>Drop the encodings from tensor types with encodings.</em></p>
 <h3 id="-iree-codegen-materialize-encoding-into-padding"><code>-iree-codegen-materialize-encoding-into-padding</code><a class="headerlink" href="#-iree-codegen-materialize-encoding-into-padding" title="Permanent link">link</a></h3>
-<p><em>Materialize <code>#iree_encoding.pad_encoding_layout</code> attributes.</em></p>
-<p>Handles padding introduced by <code>pad_encoding_layout</code> encoding layouts, which
+<p><em>Materialize <code>#iree_encoding.padding</code> attributes.</em></p>
+<p>Handles padding introduced by <code>padding</code> encoding layouts, which
 requires <code>iree_tensor_ext.dispatch.tensor.load</code>/<code>.store</code> to be adjusted to account for
 padding regions.
 Materializes any other encoding layouts into nop.</p>
