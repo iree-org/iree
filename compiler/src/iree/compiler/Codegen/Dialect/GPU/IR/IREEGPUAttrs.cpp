@@ -1537,7 +1537,7 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   SmallVector<VectorType> subgroupTypes;
   getUndistributedTileTypes(subgroupTypes);
 
-  // Note to data tiling people: the scales argument is given as a vector of 4
+  // Note: the scales argument is given as a vector of 4
   // scales + a constant selector to say which byte in the vector is to be used.
   // This'll allow better value reuse, hence why we extend to 4-vectors
   // instead of clamping to scalars here.

@@ -1347,7 +1347,7 @@ static bool isParallelIterator(Attribute attr) {
 }
 
 /// Pick an unrolling order that reuses the LHS register, assuming that the LHS
-/// register is the frist argument.
+/// register is the first argument.
 static std::optional<SmallVector<int64_t>>
 gpuMatmulLikeUnrollOrder(Operation *op) {
   IREE::Codegen::InnerTiledOp tiledOp =
