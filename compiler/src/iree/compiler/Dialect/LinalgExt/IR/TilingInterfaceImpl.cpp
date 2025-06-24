@@ -2501,7 +2501,7 @@ static AffineMap getPartialResultMap(AffineMap map, AttentionOpDetail &opInfo) {
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::generateInitialTensorForPartialReduction(
     OpBuilder &b, Location loc, ArrayRef<OpFoldResult> sizes,
-    ArrayRef<int> reductionDim) {
+    const llvm::SetVector<unsigned> &reductionDims) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2555,8 +2555,11 @@ OnlineAttentionOp::generateInitialTensorForPartialReduction(
 }
 
 FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
-    OpBuilder &b, Location loc, ValueRange init, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, ArrayRef<int> reductionDims) {
+    OpBuilder &b, Location loc, ReductionTilingStrategy strategy,
+    ValueRange init, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2707,10 +2710,9 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
   return genericOp.getResult(0);
 }
 
-FailureOr<MergeResult>
-OnlineAttentionOp::mergeReductions(OpBuilder &b, Location loc,
-                                   ValueRange partialReduce,
-                                   ArrayRef<int> reductionDim) {
+FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
+    OpBuilder &b, Location loc, ValueRange partialReduce,
+    const llvm::SetVector<unsigned> &reductionDims) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2752,9 +2754,12 @@ OnlineAttentionOp::mergeReductions(OpBuilder &b, Location loc,
 }
 
 LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
-    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
-    SmallVector<OpFoldResult> &resultSizes, ArrayRef<int> reductionDims) {
+    OpBuilder &b, unsigned resultNumber, ReductionTilingStrategy tilingStrategy,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs,
+    SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
