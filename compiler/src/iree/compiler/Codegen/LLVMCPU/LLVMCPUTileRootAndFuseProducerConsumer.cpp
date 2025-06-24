@@ -49,8 +49,20 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
+    // If an op result is used after `rootOp`, yield a replacement---unless the
+    // op using the result will also later be fused.
+    // For example:
+    //     A
+    //    / \
+    //   |  [B]
+    //    \  /
+    //     C
+    // Assuming we're doing producer-consumer fusion from B, as C uses A, and B
+    // does not properly dominate C, we will yield replacements for A. That is,
+    // unless C will later be fused through consumer fusion.
     if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-          return dominanceInfo.properlyDominates(rootOp, user);
+          return dominanceInfo.properlyDominates(rootOp, user) &&
+                 !tiledAndFusedOps.contains(user);
         })) {
       yieldReplacementsFor.insert(op);
     }
@@ -113,6 +125,7 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
     return std::nullopt;
   };
   tileAndFuseOptions.setFusionControlFn(controlFn);
+  rewriter.setInsertionPoint(rootOp);
 
   FailureOr<scf::SCFTileAndFuseResult> tiledResults =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, rootOp,
@@ -126,19 +139,20 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
     rewriter.replaceAllUsesWith(origValue, replacement);
   }
 
-  FailureOr<Operation *> tiledOp = tiledResults->tiledAndFusedOps.front();
+  FailureOr<Operation *> rootTiledOp = tiledResults->tiledAndFusedOps.front();
 
-  if (failed(tiledOp)) {
+  if (failed(rootTiledOp)) {
     return failure();
   }
   SmallVector<LoopLikeOpInterface> tilingLoops = tiledResults->loops;
 
   if (!onlyFuseProducerInputOperands) {
-    FailureOr<std::queue<Operation *>> newFusionOpportunities = fuseConsumers(
-        rewriter, *tiledOp, tilingLoops, useWARForConsumerFusionSSAViolation);
+    FailureOr<std::queue<Operation *>> newFusionOpportunities =
+        fuseConsumersIntoLoops(rewriter, *rootTiledOp, tilingLoops,
+                               useWARForConsumerFusionSSAViolation);
 
     if (failed(newFusionOpportunities)) {
-      tiledOp.value()->emitOpError("failed to fuse consumers");
+      rootTiledOp.value()->emitOpError("failed to fuse consumers");
       return failure();
     }
 
