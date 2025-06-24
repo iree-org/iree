@@ -142,9 +142,9 @@ fuseConsumersIntoLoops(RewriterBase &rewriter, Operation *tiledOp,
         //       }
         //   }
         assert((candidates.empty() ||
-               candidates.front()->getName() == userOp->getName()) &&
-                   "expected all slice users to be of type tensor.insert_slice "
-                   "or of tensor.parallel_insert_slice.");
+                candidates.front()->getName() == userOp->getName()) &&
+               "expected all slice users to be of type tensor.insert_slice "
+               "or of tensor.parallel_insert_slice.");
         candidates.push(userOp);
       }
     }

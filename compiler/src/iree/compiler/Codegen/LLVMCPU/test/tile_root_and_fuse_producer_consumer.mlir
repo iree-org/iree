@@ -183,7 +183,6 @@ func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -
   } -> (tensor<12x197x197xf32>, tensor<12x197x197xf32>)
   return %softmax#1 : tensor<12x197x197xf32>
 }
-
 // CHECK-FORALL-LABEL: func @multi_use_producer_no_yield_replacement(
 //       CHECK-FORALL:   %[[RESULT:.+]] = scf.forall
 //       CHECK-FORALL:     %[[MAX:.+]] = linalg.generic
