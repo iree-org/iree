@@ -194,7 +194,7 @@ void HoistEncodingOpsPass::runOnOperation() {
     }
     // Avoid hoisting set encodings that are using the padding encodings.
     Attribute encoding = setEncodingOp.getResultType().getEncoding();
-    if (isa_and_nonnull<IREE::Encoding::PadEncodingLayoutAttr>(encoding)) {
+    if (isa_and_nonnull<IREE::Encoding::PaddingAttr>(encoding)) {
       return;
     }
     Operation *src = setEncodingOp.getSource().getDefiningOp();

@@ -377,8 +377,8 @@ static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
   // value.
   SmallVector<int64_t> paddingValue(operandType.getRank(), 0);
   paddingValue.back() = ShapedType::kDynamic;
-  auto encoding = IREE::Encoding::PadEncodingLayoutAttr::get(
-      rewriter.getContext(), paddingValue);
+  auto encoding =
+      IREE::Encoding::PaddingAttr::get(rewriter.getContext(), paddingValue);
 
   // Compute the result types of the new dispatch.
   auto newResultType = operandType.cloneWithEncoding(encoding);

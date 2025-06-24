@@ -11,10 +11,10 @@
 // RUN:   --iree-hip-target=gfx90a --iree-hip-encoding-layout-resolver=none %s | FileCheck %s --check-prefix=NONE
 
 // PAD:      #hal.executable.target<"rocm"
-// PAD-SAME:   iree.encoding.resolver = #iree_gpu.gpu_pad_layout<>
+// PAD-SAME:   iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>
 
 // DATA-TILING:      #hal.executable.target<"rocm"
-// DATA-TILING-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+// DATA-TILING-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 
 // NONE:      #hal.executable.target<"rocm"
 // NONE-NOT:    iree.encoding.resolver

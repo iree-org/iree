@@ -258,7 +258,7 @@ util.func public @hoist_encoding_only() -> tensor<640x320xf32> {
 
 // Avoid hoisting `set_encoding` operations that have pad encodings
 
-#encoding = #iree_encoding.pad_encoding_layout<[0, ?]>
+#encoding = #iree_encoding.padding<[0, ?]>
 util.func public @dont_hoist_pad_encoding() -> tensor<640x320xf32, #encoding> {
   %cst = arith.constant dense<1.0> : tensor<640x320xf32>
   %0 = flow.dispatch.region -> (tensor<640x320xf32, #encoding>) {
