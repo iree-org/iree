@@ -1863,11 +1863,35 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   return result;
 }
 
+std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
+    SmallVector<OpFoldResult> shape, bool isDestShape) {
+  VectorizationTileSizes result;
+  for (OpFoldResult dim : shape) {
+    LLVM_DEBUG(llvm::dbgs() << "Dim #" << dim << ": ");
+    FailureOr<int64_t> maybeDimBound =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, dim,
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(maybeDimBound)) {
+      LLVM_DEBUG(llvm::dbgs() << "failed\n");
+      return std::nullopt;
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
+    result.vectorSizes.push_back(maybeDimBound.value());
+    if (isDestShape) {
+      result.destShape.push_back(maybeDimBound.value());
+    }
+  }
+  return result;
+}
+
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   if (!val.getDefiningOp())
     return std::nullopt;
 
   std::optional<VectorizationTileSizes> result;
+  LLVM_DEBUG(llvm::dbgs() << "Inferring sizes for:\n" << val << "\n");
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
@@ -1875,25 +1899,15 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
-        result = VectorizationTileSizes();
-        LLVM_DEBUG(llvm::dbgs() << "Inferring sizes for:\n" << op << "\n");
-        int64_t destRank = op.getResult().getType().getRank();
-        for (int dim = 0; dim < destRank; ++dim) {
-          LLVM_DEBUG(llvm::dbgs() << "Dim #" << dim << ": ");
-          FailureOr<int64_t> maybeDimBound =
-              ValueBoundsConstraintSet::computeConstantBound(
-                  presburger::BoundType::UB, {op, dim},
-                  /*stopCondition=*/nullptr, /*closedUB=*/true);
-          if (failed(maybeDimBound)) {
-            LLVM_DEBUG(llvm::dbgs() << "failed\n");
-            result = std::nullopt;
-            return;
-          }
-          LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
-          result->destShape.push_back(maybeDimBound.value());
-        }
+        result =
+            inferSizesFromMixedSizes(op.getMixedSizes(), /*isDestShape=*/true);
+      })
+      .Case<tensor::EmptyOp>([&](tensor::EmptyOp op) {
+        result =
+            inferSizesFromMixedSizes(op.getMixedSizes(), /*isDestShape=*/true);
       })
       .Default([&](Operation *) {});
+
   return result;
 }
 
