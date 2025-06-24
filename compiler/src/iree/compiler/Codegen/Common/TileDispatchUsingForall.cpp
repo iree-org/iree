@@ -418,8 +418,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     std::swap(tileAndFuseResult->loops, tilingLoops);
     Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoForall(rewriter, rootTiledOp, tilingLoops,
-                                useWARForConsumerFusionSSAViolation);
+        fuseConsumersIntoLoops(rewriter, rootTiledOp, tilingLoops,
+                               useWARForConsumerFusionSSAViolation);
     if (failed(newFusionOpportunities)) {
       rootTiledOp->emitOpError("failed to fuse consumers");
       return signalPassFailure();
