@@ -209,7 +209,7 @@ util.func private @ElideUnneededTensorClones(%arg0: !stream.resource<*>, %arg1: 
 
 // -----
 
-#encoding = #iree_encoding.pad_encoding_layout<[0, 0]>
+#encoding = #iree_encoding.padding<[0, 0]>
 // CHECK-LABEL: @FoldTensorEncodeOpWithIdentitySource(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 util.func private @FoldTensorEncodeOpWithIdentitySource(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
@@ -220,7 +220,7 @@ util.func private @FoldTensorEncodeOpWithIdentitySource(%arg0: !stream.resource<
 
 // -----
 
-#encoding = #iree_encoding.pad_encoding_layout<[0, 0]>
+#encoding = #iree_encoding.padding<[0, 0]>
 // CHECK-LABEL: @FoldTensorEncodeOpWithIdentityResult(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 util.func private @FoldTensorEncodeOpWithIdentityResult(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {

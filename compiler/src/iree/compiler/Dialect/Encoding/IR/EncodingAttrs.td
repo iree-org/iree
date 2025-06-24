@@ -246,10 +246,10 @@ def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.pad_encoding_layout
+// iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
-def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
+def PaddingAttr : IREEEncoding_Attr<"Padding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "cloneWithLayouts",
@@ -257,7 +257,7 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
         "isSerialized"
         ]>
     ]> {
-  let mnemonic = "pad_encoding_layout";
+  let mnemonic = "padding";
   let assemblyFormat = "`<` custom<Padding>($padding) `>`";
 
   let summary = [{An attribute that encodes padding values of tensor dimensions.}];
@@ -290,8 +290,8 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
   ];
 
   let extraClassDeclaration = [{
-    /// Returns a PadEncodingLayoutAttr attribute that pads zero elements.
-    static PadEncodingLayoutAttr getIdentityAttr(MLIRContext *ctx, int rank);
+    /// Returns a PaddingAttr attribute that pads zero elements.
+    static PaddingAttr getIdentityAttr(MLIRContext *ctx, int rank);
   }];
 
   let genVerifyDecl = 1;

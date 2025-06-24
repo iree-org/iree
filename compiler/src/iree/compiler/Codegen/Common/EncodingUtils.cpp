@@ -23,7 +23,7 @@
 namespace mlir::iree_compiler {
 
 using IREE::Codegen::MaterializeEncodingInfo;
-using IREE::Encoding::PadEncodingLayoutAttr;
+using IREE::Encoding::PaddingAttr;
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     IREE::Encoding::LayoutMaterializerAttr layoutAttr)
@@ -33,11 +33,11 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
   addConversion([=](RankedTensorType type) {
-    // TODO(jornt): The isa<IREE::Encoding::PadEncodingLayoutAttr> check is
-    // needed because PadEncodingLayoutAttr is a serializable attribute, but it
-    // relies on its own type conversion for now. Once PadEncodingLayoutAttr
+    // TODO(jornt): The isa<IREE::Encoding::PaddingAttr> check is
+    // needed because PaddingAttr is a serializable attribute, but it
+    // relies on its own type conversion for now. Once PaddingAttr
     // implements `convertType`, this can be removed.
-    if (!isa<IREE::Encoding::PadEncodingLayoutAttr>(getLayoutAttr())) {
+    if (!isa<IREE::Encoding::PaddingAttr>(getLayoutAttr())) {
       return cast<RankedTensorType>(getLayoutAttr().convertType(type));
     }
     return type.dropEncoding();
@@ -48,11 +48,11 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     if (!boundType || !boundType.getEncoding()) {
       return dispatchTensorType;
     }
-    // TODO(jornt): The isa<IREE::Encoding::PadEncodingLayoutAttr> check is
-    // needed because PadEncodingLayoutAttr is a serializable attribute, but it
-    // relies on its own type conversion for now. Once PadEncodingLayoutAttr
+    // TODO(jornt): The isa<IREE::Encoding::PaddingAttr> check is
+    // needed because PaddingAttr is a serializable attribute, but it
+    // relies on its own type conversion for now. Once PaddingAttr
     // implements `convertType`, this can be removed.
-    if (!isa<IREE::Encoding::PadEncodingLayoutAttr>(getLayoutAttr())) {
+    if (!isa<IREE::Encoding::PaddingAttr>(getLayoutAttr())) {
       return cast<IREE::TensorExt::DispatchTensorType>(
           getLayoutAttr().convertType(dispatchTensorType));
     }
@@ -128,11 +128,11 @@ LogicalResult MaterializeEncodingTypeConverter::getOffsetsSizesStrides(
   if (!boundType || !boundType.getEncoding()) {
     return failure();
   }
-  // TODO(jornt): The isa<IREE::GPU::GPUPadLayoutAttr> check is
-  // needed because PadEncodingLayoutAttr is a serializable attribute, but it
-  // relies on its own type conversion for now. Once GPUPadLayoutAttr
+  // TODO(jornt): The isa<IREE::GPU::GPUPaddingResolverAttr> check is
+  // needed because PaddingAttr is a serializable attribute, but it
+  // relies on its own type conversion for now. Once GPUPaddingResolverAttr
   // implements `getOffsetsSizesStrides`, this can be removed.
-  if (!isa<IREE::GPU::GPUPadLayoutAttr>(getLayoutAttr())) {
+  if (!isa<IREE::GPU::GPUPaddingResolverAttr>(getLayoutAttr())) {
     return getLayoutAttr().getOffsetsSizesStrides(
         builder, loc, type, dynamicDims, offsets, sizes, strides, newOffsets,
         newSizes, newStrides);

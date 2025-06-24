@@ -12,12 +12,12 @@ include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 
 //===----------------------------------------------------------------------===//
-// iree_cpu.encoding_layout_attr
+// Encoding Resolvers.
 //===----------------------------------------------------------------------===//
 
-def IREECPU_CPUEncodingLayoutAttr :
-    AttrDef<IREECPU_Dialect, "CPUEncodingLayout"> {
-  let mnemonic = "cpu_encoding_layout";
+def IREECPU_CPUEncodingResolverAttr :
+    AttrDef<IREECPU_Dialect, "CPUEncodingResolver"> {
+  let mnemonic = "cpu_encoding_resolver";
   let summary = [{The encoding layout attribute for CPU backends.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding
@@ -34,9 +34,9 @@ def IREECPU_CPUEncodingLayoutAttr :
   );
 }
 
-def IREECPU_VMVXEncodingLayoutAttr :
-    AttrDef<IREECPU_Dialect, "VMVXEncodingLayout"> {
-  let mnemonic = "vmvx_encoding_layout";
+def IREECPU_VMVXEncodingResolverAttr :
+    AttrDef<IREECPU_Dialect, "VMVXEncodingResolver"> {
+  let mnemonic = "vmvx_encoding_resolver";
   let summary = [{The encoding layout attribute for VMVX backend.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding
