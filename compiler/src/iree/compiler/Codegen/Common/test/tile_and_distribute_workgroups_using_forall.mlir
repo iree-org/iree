@@ -641,26 +641,26 @@ func.func @diamond_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf3
 func.func @v_shaped_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %2 = tensor.empty() : tensor<12xf32>
-  %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
+  %A = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
   } ins(%0 : tensor<12xf32>) outs(%2 : tensor<12xf32>) attrs =  {
       lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = math.sqrt %in : f32
     linalg.yield %6 : f32
   } -> tensor<12xf32>
-  %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
+  %B = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
   } ins(%1 : tensor<12xf32>) outs(%2 : tensor<12xf32>) {
   ^bb0(%in: f32, %out: f32):
     %7 = math.sqrt %in : f32
     linalg.yield %7 : f32
   } -> tensor<12xf32>
-  %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
-  } ins(%3, %4 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  %C = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%A, %B : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %8 = arith.addf %in, %in_0 : f32
     linalg.yield %8 : f32
   } -> tensor<12xf32>
-  return %5 : tensor<12xf32>
+  return %C : tensor<12xf32>
 }
 
 // CHECK-LABEL: func @v_shaped_graph(

@@ -5,8 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+
+#include <cassert>
 
 #define DEBUG_TYPE "iree-codegen-common-tile-and-fuse-utils"
 
@@ -106,30 +111,54 @@ void collectTiledAndFusedOps(Operation *rootOp,
 }
 
 FailureOr<std::queue<Operation *>>
-fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
-                        MutableArrayRef<LoopLikeOpInterface> loops,
-                        bool useWARForConsumerFusionSSAViolation) {
-  auto addCandidateSlices =
-      [](Operation *fusedOp,
-         std::queue<tensor::ParallelInsertSliceOp> &candidates) {
-        for (auto *userOp : fusedOp->getResults().getUsers()) {
-          if (auto sliceOp =
-                  llvm::dyn_cast<tensor::ParallelInsertSliceOp>(userOp)) {
-            candidates.push(sliceOp);
-          }
-        }
-      };
+fuseConsumersIntoLoops(RewriterBase &rewriter, Operation *tiledOp,
+                       MutableArrayRef<LoopLikeOpInterface> loops,
+                       bool useWARForConsumerFusionSSAViolation) {
+  auto addCandidateSlices = [](Operation *fusedOp,
+                               std::queue<Operation *> &candidates) {
+    for (auto *userOp : fusedOp->getResults().getUsers()) {
+      if (llvm::isa<tensor::InsertSliceOp, tensor::ParallelInsertSliceOp>(
+              userOp)) {
+        // Users of tiledOp should either be all of type `tensor.insert_slice`
+        // or all of`tensor.parallel_insert_slice`.
+        //
+        // Pattern 1 - tileing with scf.for:
+        //   %out = scf.for ... {
+        //     %0 = scf.for ... {
+        //       %t0 = op
+        //       %t1 = op  %t0                 // <- `tiledOp`
+        //       %1 = tensor.insert_slice %t1
+        //       yield %1
+        //     }
+        //     yield %0
+        //   }
+        //
+        // Pattern 2 - tiling with scf.forall:
+        //   % out = scf.forall ... {
+        //       %t0 = op
+        //       %t1 = op  %t0                 // <- `tiledOp`
+        //       scf.forall.in_parallel {
+        //         tensor.parallel_insert_slice %tile
+        //       }
+        //   }
+        assert((candidates.empty() ||
+                candidates.front()->getName() == userOp->getName()) &&
+               "expected all slice users to be of type tensor.insert_slice "
+               "or of tensor.parallel_insert_slice.");
+        candidates.push(userOp);
+      }
+    }
+  };
 
   // Collect the candidate slices which can be potential consumers that can be
   // fused.
-  std::queue<tensor::ParallelInsertSliceOp> candidates;
+  std::queue<Operation *> candidates;
   addCandidateSlices(tiledOp, candidates);
 
   std::queue<Operation *> newFusionOpportunities;
   while (!candidates.empty()) {
-
     // Traverse the slices in BFS fashion.
-    tensor::ParallelInsertSliceOp candidateSliceOp = candidates.front();
+    Operation *candidateSliceOp = candidates.front();
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
@@ -141,8 +170,8 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
       continue;
     }
 
-    // Implement the WAR for consumer fusion SSA violation (as described below
-    // in the comments for `warForConsumerFusionSSAViolation`)
+    // Implement the WAR for consumer fusion SSA violation (as described in the
+    // comments for `warForConsumerFusionSSAViolation`)
     if (useWARForConsumerFusionSSAViolation) {
       for (auto [tiledOpResult, loopResult] :
            llvm::zip(tiledOp->getResults(), loops.back()->getResults())) {
@@ -185,5 +214,4 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
   }
   return newFusionOpportunities;
 }
-
 } // namespace mlir::iree_compiler
