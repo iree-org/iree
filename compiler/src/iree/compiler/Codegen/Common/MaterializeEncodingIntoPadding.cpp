@@ -118,9 +118,7 @@ struct MaterializePadEncodingTypeConverter final
 };
 
 /// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
-/// materializing the encoding. We extract a smaller tensor for the padded
-/// source. This way we do not create partial loads prematurely, which would be
-/// difficult to undo later on.
+/// materializing the encoding.
 struct MaterializeFlowDispatchTensorLoadOp final
     : OpConversionPattern<IREE::TensorExt::DispatchTensorLoadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -155,28 +153,17 @@ struct MaterializeFlowDispatchTensorLoadOp final
                                          rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
                                          rewriter.getIndexAttr(1));
-    SmallVector<int64_t> newStaticDims;
-    SmallVector<Value> newDynamicDims;
-    dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-
-    Location loc = loadOp.getLoc();
-    Value newLoad = rewriter.create<IREE::TensorExt::DispatchTensorLoadOp>(
-        loc, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
-        newStrides);
-    auto extractType = RankedTensorType::get(boundTensorType.getShape(),
-                                             boundTensorType.getElementType());
     SmallVector<OpFoldResult> extractSizes = getMixedValues(
         boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        loadOp, extractType, newLoad, newOffsets, extractSizes, newStrides);
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
+        loadOp, adaptor.getSource(), loadOp.getSourceDims(), newOffsets,
+        extractSizes, newStrides);
     return success();
   }
 };
 
 /// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
-/// materializing the encoding. We create a larger empty tensor for the
-/// destination and insert the value into it. This way we do not create partial
-/// stores prematurely, which would be difficult to undo later on.
+/// materializing the encoding.
 struct MaterializeFlowDispatchTensorStoreOp final
     : OpConversionPattern<IREE::TensorExt::DispatchTensorStoreOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -206,28 +193,15 @@ struct MaterializeFlowDispatchTensorStoreOp final
     RankedTensorType paddedType = newTargetType.asRankedTensorType();
 
     Location loc = storeOp.getLoc();
-    SmallVector<Value> dynamicResultSizes{adaptor.getOperands()};
-    Value empty =
-        rewriter.create<tensor::EmptyOp>(loc, paddedType, dynamicResultSizes);
-
     SmallVector<OpFoldResult> offsets(paddedType.getRank(),
                                       rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> strides(paddedType.getRank(),
                                       rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
         tensor::getMixedSizes(rewriter, loc, adaptor.getValue());
-    Value insertOp = rewriter.create<tensor::InsertSliceOp>(
-        loc, adaptor.getValue(), empty, offsets, sizes, strides);
-
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        paddedType.getShape(), storeOp.getTargetDims(), rewriter);
-    SmallVector<int64_t> newStaticDims;
-    SmallVector<Value> newDynamicDims;
-    dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
-        storeOp, insertOp, adaptor.getTarget(), newDynamicDims, offsets,
-        newMixedSizes, strides);
+        storeOp, adaptor.getValue(), adaptor.getTarget(),
+        adaptor.getTargetDims(), offsets, sizes, strides);
     return success();
   }
 };
