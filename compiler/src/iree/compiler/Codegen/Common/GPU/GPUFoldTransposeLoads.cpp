@@ -47,44 +47,6 @@ protected:
   int64_t subgroupSize;
 };
 
-struct CombineTransferReadWriteToDMAPattern
-    : SubgroupTransformPatternBase<vector::TransferWriteOp> {
-  CombineTransferReadWriteToDMAPattern(MLIRContext *context,
-                                       ArrayRef<int64_t> workgroupSize,
-                                       int64_t subgroupSize)
-      : SubgroupTransformPatternBase<vector::TransferWriteOp>(
-            context, workgroupSize, subgroupSize) {}
-  LogicalResult matchAndRewrite(vector::TransferWriteOp op,
-                                PatternRewriter &rewriter) const override {
-    auto transferReadOp = op.getBase().getDefiningOp<vector::TransferReadOp>();
-    if (!transferReadOp || transferReadOp.getMask() ||
-        transferReadOp.hasOutOfBoundsDim()) {
-      return failure();
-    }
-
-    if (op.getVectorType() != transferReadOp.getVectorType()) {
-      return rewriter.notifyMatchFailure(
-          op, "Transfer read and write ops have different vector types.");
-    }
-
-    auto sourceType = cast<MemRefType>(transferReadOp.getBase().getType());
-    auto targetType = cast<MemRefType>(op.getResult().getType());
-    if (!hasGlobalMemoryAddressSpace(sourceType) ||
-        !hasSharedMemoryAddressSpace(targetType)) {
-      return rewriter.notifyMatchFailure(
-          op, "Transfer read and write ops have incompatible address spaces.");
-    }
-
-    if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
-      return rewriter.notifyMatchFailure(
-          op,
-          "Transfer write target is not static or not contiguous row major.");
-    }
-
-    return failure();
-  }
-};
-
 struct CombineVectorTransposeWithTransferReadOpPattern
     : SubgroupTransformPatternBase<vector::TransposeOp> {
   CombineVectorTransposeWithTransferReadOpPattern(
@@ -104,7 +66,29 @@ namespace {
 struct GPUFoldTransposeLoadsPass final
     : impl::GPUFoldTransposeLoadsPassBase<GPUFoldTransposeLoadsPass> {
 
-  void runOnOperation() override {}
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    auto funcOp = getOperation();
+
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        mlir::iree_compiler::getWorkgroupSize(funcOp);
+    if (!workgroupSize) {
+      funcOp.emitOpError(
+          "unimplemented: Distribution with dynamic workgroup size.");
+      return signalPassFailure();
+    }
+    auto subgroupSize = mlir::iree_compiler::getSubgroupSize(funcOp);
+    if (!subgroupSize) {
+      funcOp.emitOpError(
+          "unimplemented: Distribution with dynamic subgroup size.");
+      return signalPassFailure();
+    }
+
+    RewritePatternSet patterns(context);
+    patterns.add<CombineVectorTransposeWithTransferReadOpPattern>(
+        context, *workgroupSize, *subgroupSize);
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
+  }
 };
 
 } // namespace
