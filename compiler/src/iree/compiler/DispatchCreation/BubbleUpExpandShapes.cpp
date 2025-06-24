@@ -285,28 +285,42 @@ struct BubbleExpandThroughConcat final
         expandOp.getReassociationIndices();
     RankedTensorType expandedType = expandOp.getResultType();
     ArrayRef<int64_t> expandedShape = expandedType.getShape();
-    ArrayRef<int64_t> srcShape = concatOp.getResultType().getShape();
 
     // Find the "new" concat dim and if it is part of an expansion dim
-    int64_t srcRank = srcShape.size();
-    int64_t newConcatDim = -1, expandedDimCount = 0;
-    int64_t count = 0;
-    for (int64_t i = 0; i < srcRank; ++i) {
-      int64_t n = reassoc[i].size();
-      if (i == concatDim) {
-        newConcatDim = count;
-        expandedDimCount = n;
-        break;
-      }
-      count += n;
+    int64_t newConcatDim = 0;
+    for (int64_t i = 0; i < concatDim; ++i) {
+      newConcatDim += reassoc[i].size();
     }
-    if (newConcatDim == -1)
-      return failure();
+    int64_t expandedDimCount = reassoc[concatDim].size();
 
     SmallVector<int64_t> expandShapeProducts;
+    int64_t countExpandedDynamicDims = 0;
     // Loop over all but the outermost expanded dims.
     for (Value input : concatOp.getInputs()) {
       int64_t expandShapeProduct = 1;
+      auto inputType = cast<RankedTensorType>(input.getType());
+      int64_t inputDim = inputType.getShape()[concatDim];
+      // if the input dim is dynamic, we rely on checking the divisibility of
+      // the other inputs. Example:
+      //   %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<100x100xf32>,
+      //   tensor<?x100xf32>) -> tensor<?x100xf32> %1 = tensor.expand_shape %0
+      //   [[0, 1], [2]] output_shape [?, 10, 100] : tensor<?x100xf32> into
+      //   tensor<?x10x100xf32>
+      // The propagation here legal because we know ? is divisible by 10
+      // because (? + 100) % 10 == 0.
+      if (ShapedType::isDynamic(inputDim) && expandedDimCount > 1) {
+        countExpandedDynamicDims++;
+        // (A+ B + 10) % 10 == 0 does not imply A % 10 == 0 and
+        // B % 10 == 0, so we cannot propagate.
+        if (countExpandedDynamicDims > 1) {
+          return rewriter.notifyMatchFailure(
+              expandOp, "More than one dynamic expanded dim");
+        }
+        // Allows us to zip in the next loop.
+        expandShapeProducts.push_back(expandShapeProduct);
+        continue;
+      }
+      // Check all static input shapes for divisibility.
       for (int64_t j = 1; j < expandedDimCount; ++j) {
         int64_t expDim = expandedShape[newConcatDim + j];
         if (ShapedType::isDynamic(expDim)) {
@@ -314,33 +328,20 @@ struct BubbleExpandThroughConcat final
           return rewriter.notifyMatchFailure(
               expandOp, "Expanded dim is dynamic and not outermost");
         }
-
-        // Check all static input shapes for divisibility.
-        auto inputType = cast<RankedTensorType>(input.getType());
-        int64_t inputDim = inputType.getShape()[concatDim];
-        // if the input dim is dynamic, we rely on checking the divisibility of
-        // the other inputs. Example:
-        //   %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<100x100xf32>,
-        //   tensor<?x100xf32>) -> tensor<?x100xf32> %1 = tensor.expand_shape %0
-        //   [[0, 1], [2]] output_shape [?, 10, 100] : tensor<?x100xf32> into
-        //   tensor<?x10x100xf32>
-        // The propagation here legal because we know ? is divisible by 10
-        // because (? + 100) % 10 == 0.
-        if (ShapedType::isDynamic(inputDim)) {
-          continue;
-        }
-        // If any input is not divisible, we cannot propagate.
-        if (inputDim % expDim != 0) {
-          return rewriter.notifyMatchFailure(
-              expandOp,
-              "Not all static input dims are divisible by expanded dim");
-        } else {
-          expandShapeProduct *= expDim;
-        }
+        // Calculate the product of static dims.
+        expandShapeProduct *= expDim;
+      }
+      if (!(inputDim % expandShapeProduct == 0)) {
+        // ie concat(tensor<6xf32>, tensor<6xf32>) -> expand to
+        // tensor<3x2x2xf32> cannot be done because 6 % (2 * 2) != 0.
+        return rewriter.notifyMatchFailure(
+            expandOp,
+            "Input dim is not divisible by the product of inner expanded dims");
       }
       expandShapeProducts.push_back(expandShapeProduct);
     } // else we can always propagate the expand_shape through the concat.
 
+    auto mixedOutputShape = expandOp.getMixedOutputShape();
     // Create new expand_shape ops for each input.
     SmallVector<Value> newInputs;
     for (auto [input, product] :
@@ -348,7 +349,6 @@ struct BubbleExpandThroughConcat final
       auto type = input.getType();
       auto inputType = cast<RankedTensorType>(type);
       ArrayRef<int64_t> inputShape = inputType.getShape();
-      auto mixedOutputShape = expandOp.getMixedOutputShape();
       std::pair<SmallVector<int64_t>, SmallVector<Value>> shapeDecomp =
           decomposeMixedValues(mixedOutputShape);
 
