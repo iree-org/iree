@@ -129,6 +129,11 @@ macro(iree_llvm_set_bundled_cmake_options)
   set(IREE_DEFAULT_CPU_LLVM_TARGETS "X86;ARM;AArch64;RISCV"
       CACHE STRING "Initialization value for default LLVM CPU targets.")
 
+  # Catch an incorrect usage pattern that has been used in the past.
+  if("host" IN_LIST IREE_DEFAULT_CPU_LLVM_TARGETS)
+    message(SEND_ERROR "IREE_DEFAULT_CPU_LLVM_TARGETS may not contain 'host'.")
+  endif()
+
   # These defaults are moderately important to us, but the user *can*
   # override them (enabling some of these brings in deps that will conflict,
   # so ymmv).
@@ -223,6 +228,13 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   list(REMOVE_DUPLICATES LLVM_ENABLE_PROJECTS)
   list(REMOVE_DUPLICATES LLVM_TARGETS_TO_BUILD)
+
+  # Misconfiguration of LLVM sometimes results in empty LLVM_TARGETS_TO_BUILD.
+  # This has led to hard-to-diagnose issues, so better catch that here.
+  if (NOT LLVM_TARGETS_TO_BUILD)
+    message(SEND_ERROR "LLVM_TARGETS_TO_BUILD should not be empty.")
+  endif()
+
   message(VERBOSE "Building LLVM Targets: ${LLVM_TARGETS_TO_BUILD}")
   message(VERBOSE "Building LLVM Projects: ${LLVM_ENABLE_PROJECTS}")
 endmacro()
