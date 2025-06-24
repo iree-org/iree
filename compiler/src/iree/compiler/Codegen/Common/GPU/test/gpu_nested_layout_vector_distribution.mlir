@@ -1248,3 +1248,101 @@ builtin.module attributes { transform.with_named_sequence } {
 // Accumulator addition
 // CHECK:      %[[BROADCASTED:.+]] = vector.broadcast %[[SCALAR]] : f32 to vector<1xf32>
 // CHECK:      arith.addf %{{.*}}, %[[BROADCASTED]]
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @paged_transfer_gather(%indices: vector<16xindex>,
+  %source: memref<4096x512x8xf16>) -> vector<16x8xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+  [None, %indices: vector<16xindex>, None], %cst0 { indexed_maps = [
+                                             affine_map<(d0, d1, d2) -> (d1)>],
+    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
+    in_bounds = [true, true] }
+  : memref<4096x512x8xf16>, vector<16x8xf16>
+
+  %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
+
+  return %l_out : vector<16x8xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: @paged_transfer_gather
+// CHECK-SAME: %[[INDICES:.+]]: vector<16xindex>, %[[SOURCE:.+]]: memref<4096x512x8xf16>
+// CHECK: %[[DIS_INDICES:.+]] = iree_vector_ext.to_simt %[[INDICES]] : vector<16xindex> -> vector<4x1x1xindex>
+// CHECK: %[[GATHER0:.+]] = vector.extract %[[DIS_INDICES]][0, 0, 0]
+// CHECK: vector.transfer_read %[[SOURCE]][%c0, %[[GATHER0]], %c0]
+// CHECK: %[[GATHER1:.+]] = vector.extract %[[DIS_INDICES]][1, 0, 0]
+// CHECK: vector.transfer_read %[[SOURCE]][%c0, %[[GATHER1]], %c0]
+// CHECK: %[[GATHER2:.+]] = vector.extract %[[DIS_INDICES]][2, 0, 0]
+// CHECK: vector.transfer_read %[[SOURCE]][%c0, %[[GATHER2]], %c0]
+// CHECK: %[[GATHER3:.+]] = vector.extract %[[DIS_INDICES]][3, 0, 0]
+// CHECK: vector.transfer_read %[[SOURCE]][%c0, %[[GATHER3]], %c0]
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @paged_transfer_gather_multi_index(%indices: vector<16xindex>,
+  %indices2: vector<8x16xindex>,
+  %source: memref<4096x512x8xf16>) -> vector<16x8xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+  [None, %indices: vector<16xindex>, %indices2: vector<8x16xindex>], %cst0
+                                           { indexed_maps = [
+                                             affine_map<(d0, d1, d2) -> (d1)>,
+                                             affine_map<(d0, d1, d2) -> (d2, d1)>],
+    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
+    in_bounds = [true, true] }
+  : memref<4096x512x8xf16>, vector<16x8xf16>
+
+  %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
+
+  return %l_out : vector<16x8xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: @paged_transfer_gather_multi_index
+// CHECK-COUNT-4: vector_ext.transfer_gather

@@ -365,3 +365,64 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c8, %c0 : index
 // CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
 // CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<8x8xi1>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [4, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [1, 8],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 0]
+>
+
+func.func @paged_transfer_gather_mask(%indices: vector<16xindex>,
+  %source: memref<4096x512x8xf16>) -> vector<16x8xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %c7 = arith.constant 7 : index
+  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
+  %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
+  [None, %indices: vector<16xindex>, None], %cst0, %mask { indexed_maps = [
+                                             affine_map<(d0, d1, d2) -> (d1)>],
+    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
+    in_bounds = [true, true] }
+  : memref<4096x512x8xf16>, vector<16x8xf16>
+
+  %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
+
+  return %l_out : vector<16x8xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: @paged_transfer_gather_mask
+// CHECK: %[[MASK:.+]] = vector.create_mask
+// CHECK: %[[MASK0:.+]] = vector.extract %[[MASK]][0] : vector<8xi1> from vector<4x8xi1>
+// CHECK: %[[SMASK0:.+]] = vector.shape_cast %[[MASK0]] : vector<8xi1> to vector<1x8xi1>
+// CHECK: vector.transfer_read
+// CHECK-SAME: %[[SMASK0]]
+// CHECK: %[[MASK1:.+]] = vector.extract %[[MASK]][1] : vector<8xi1> from vector<4x8xi1>
+// CHECK: %[[SMASK1:.+]] = vector.shape_cast %[[MASK1]] : vector<8xi1> to vector<1x8xi1>
+// CHECK: vector.transfer_read
+// CHECK-SAME: %[[SMASK1]]
+// CHECK: %[[MASK2:.+]] = vector.extract %[[MASK]][2] : vector<8xi1> from vector<4x8xi1>
+// CHECK: %[[SMASK2:.+]] = vector.shape_cast %[[MASK2]] : vector<8xi1> to vector<1x8xi1>
+// CHECK: vector.transfer_read
+// CHECK-SAME: %[[SMASK2]]
+// CHECK: %[[MASK3:.+]] = vector.extract %[[MASK]][3] : vector<8xi1> from vector<4x8xi1>
+// CHECK: %[[SMASK3:.+]] = vector.shape_cast %[[MASK3]] : vector<8xi1> to vector<1x8xi1>
+// CHECK: vector.transfer_read
+// CHECK-SAME: %[[SMASK3]]
