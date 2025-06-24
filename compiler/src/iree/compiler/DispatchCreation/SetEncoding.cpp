@@ -217,7 +217,7 @@ public:
     // combination of `iteration_sizes` and `user_indexing_maps`, we can later
     // derive information such as the iteration size of the M/N dimensions of a
     // matmul-like operation for example.
-    FailureOr<SmallVector<int64_t, 4>> maybeIterationSizes =
+    FailureOr<SmallVector<int64_t>> maybeIterationSizes =
         linalgOp.getStaticLoopRanges();
     if (failed(maybeIterationSizes)) {
       return failure();
@@ -496,7 +496,7 @@ SmallVector<unsigned> getOperandsToPad(Operation *op) {
   int64_t parallelDimSize = 1;
   llvm::SmallSetVector<int32_t, 4> reductionDimsSet;
   reductionDimsSet.insert_range(reductionDims);
-  SmallVector<int64_t, 4> loopRanges = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
   for (auto [idx, dimSize] : llvm::enumerate(loopRanges)) {
     if (reductionDimsSet.contains(idx)) {
       // Bail if the reduction dimension is dynamic.

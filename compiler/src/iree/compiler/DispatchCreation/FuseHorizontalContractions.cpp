@@ -179,8 +179,8 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
     return false;
   }
 
-  SmallVector<int64_t, 4> aStaticDims = aLinalgOp.getStaticLoopRanges();
-  SmallVector<int64_t, 4> bStaticDims = bLinalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> aStaticDims = aLinalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bStaticDims = bLinalgOp.getStaticLoopRanges();
   if (bPermutationVector) {
     applyPermutationToVector(bStaticDims, bPermutationVector.value());
   }

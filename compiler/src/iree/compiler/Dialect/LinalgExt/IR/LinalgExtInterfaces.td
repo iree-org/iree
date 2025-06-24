@@ -12,7 +12,32 @@ include "mlir/Interfaces/DestinationStyleOpInterface.td"
 
 // The interface is a subset of LinalgStructuredInterface.
 def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
-  let methods = [];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the `opOperand` shape or an empty vector for scalars or vectors
+        not wrapped within a tensor or a memref.
+      }],
+      /*retTy=*/"ArrayRef<int64_t>",
+      /*methodName=*/"getShape",
+      /*args=*/(ins "OpOperand*":$opOperand),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(opOperand->getOwner() == this->getOperation());
+        Type t = opOperand->get().getType();
+        // A VectorType is an elemental type, do not consider its rank for the operand.
+        if (isa<VectorType>(t))
+          return {};
+        if (auto shapedType = ::llvm::dyn_cast<ShapedType>(t)) {
+          // Failsafe.
+          assert((isa<MemRefType>(t) || isa<RankedTensorType>(t)) &&
+                 "expected a ranked tensor or memref in LinalgInterface::getRank");
+          return shapedType.getShape();
+        }
+        return {};
+      }]
+    >
+  ];
 
   let extraClassDeclaration = [{
     /// Returns the value that expresses the shape of the output in terms of
