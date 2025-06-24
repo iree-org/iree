@@ -215,14 +215,6 @@ static bool isLegal(vector::TransferReadOp readOp,
           cast<MemRefType>(writeOp.getBase().getType()))) {
     return false;
   }
-
-  // Only the read/write ops may have side effects, we assume we can
-  // re-order/erase the other ops freely.
-  if (!llvm::all_of(forOp.getOps(), [&](Operation &op) -> bool {
-        return (&op == readOp || &op == writeOp || mlir::isPure(&op));
-      })) {
-    return false;
-  }
   return true;
 }
 
@@ -252,6 +244,13 @@ static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
         continue;
       }
 
+      // Only the read/write ops may have side effects, since we assume we can
+      // re-order/erase the other ops freely.
+      if (!llvm::all_of(forOp.getOps(), [&](Operation &op) -> bool {
+            return (&op == readOp || &op == writeOp || mlir::isPure(&op));
+          })) {
+        return failure();
+      }
       FissionTarget fissionTarget = {forOp, readOp, writeOp};
       return fissionTarget;
     }
