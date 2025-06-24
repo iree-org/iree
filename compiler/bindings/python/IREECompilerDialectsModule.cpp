@@ -22,7 +22,6 @@ static const char *kGpuModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
 
 namespace py = nanobind;
-using namespace mlir;
 using namespace nanobind::literals;
 using namespace mlir::python::nanobind_adaptors;
 
@@ -65,13 +64,13 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
 
 static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
   mlir::Attribute Attr = unwrap(attr);
-  auto arrayAttr = dyn_cast_or_null<mlir::ArrayAttr>(Attr);
+  auto arrayAttr = mlir::dyn_cast_or_null<mlir::ArrayAttr>(Attr);
   if (!arrayAttr)
     return {};
   std::vector<int64_t> values;
   values.reserve(arrayAttr.size());
   for (mlir::Attribute val : arrayAttr)
-    values.push_back(cast<mlir::IntegerAttr>(val).getInt());
+    values.push_back(mlir::cast<mlir::IntegerAttr>(val).getInt());
   return values;
 }
 
@@ -489,7 +488,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "n_dims",
           [](const ireeCodegenAttentionOpDetail &self) { return self.n; })
       .def_prop_ro("domain_rank", [](const ireeCodegenAttentionOpDetail &self) {
-        return self.rank;
+        return self.domainRank;
       });
 
   iree_codegen_module.def(

@@ -85,7 +85,7 @@ struct ireeCodegenAttentionOpDetail {
   MlirAttribute k1;
   MlirAttribute k2;
   MlirAttribute n;
-  int64_t rank;
+  int64_t domainRank;
 };
 
 MLIR_CAPI_EXPORTED ireeCodegenAttentionOpDetail

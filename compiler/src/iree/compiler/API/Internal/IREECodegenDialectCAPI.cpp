@@ -257,7 +257,7 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
   result.k1 = wrap(builder.getI64ArrayAttr(opInfo.getK1Dims()));
   result.k2 = wrap(builder.getI64ArrayAttr(opInfo.getK2Dims()));
   result.n = wrap(builder.getI64ArrayAttr(opInfo.getNDims()));
-  result.rank = opInfo.getDomainRank();
+  result.domainRank = opInfo.getDomainRank();
 
   return result;
 }
