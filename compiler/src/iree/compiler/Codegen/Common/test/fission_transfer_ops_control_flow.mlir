@@ -109,3 +109,48 @@ func.func @fission_unit_trip(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<f
   return
 }
 // CHECK-ALL-COUNT-2: scf.for
+
+// -----
+
+// CHECK-ALL-LABEL: @negative_multiple_transfer_pairs
+func.func @negative_multiple_transfer_pairs(%arg0: memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg4: memref<?x1x1x2xbf16, #gpu.address_space<private>>) {
+  // Multiple read/write pairs is currently unsupported.
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %ub = affine.min affine_map<(d0) -> (1, d0)>(%arg1)
+  scf.for %idx = %c0 to %ub step %c1 {
+    %src0 = memref.subview %arg0[%idx, 0, 0, 0] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+    %dst0 = memref.subview %arg4[%idx, 0, 0, 0] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #gpu.address_space<private>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
+    %val0 = vector.transfer_read %src0[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x1xbf16>
+    vector.transfer_write %val0, %dst0[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x1xbf16>, memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
+
+    %src1 = memref.subview %arg0[%idx, 0, 0, 1] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+    %dst1 = memref.subview %arg4[%idx, 0, 0, 1] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #gpu.address_space<private>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
+    %val1 = vector.transfer_read %src1[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x1xbf16>
+    vector.transfer_write %val1, %dst1[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x1xbf16>, memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
+  }
+  return
+}
+// CHECK-ALL: scf.for
+// CHECK-ALL-NOT: scf.for
+
+
+// -----
+
+// CHECK-ALL-LABEL: @negative_side_effect_in_loop
+func.func @negative_side_effect_in_loop(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg4: memref<1x1x1x8xbf16, #gpu.address_space<private>>) {
+  // The loop contains side-effecting ops other than the transfer_read/write, so fission shouldn't apply.
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %ub = affine.min affine_map<(d0) -> (1, d0)>(%arg1)
+  scf.for %arg5 = %c0 to %ub step %c1 {
+    %read = vector.transfer_read %arg0[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x8xbf16>
+    memref.store %cst, %arg0[%c0, %c0, %c0, %c0] : memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+    vector.transfer_write %read, %arg4[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x8xbf16>, memref<1x1x1x8xbf16, #gpu.address_space<private>>
+  }
+  return
+}
+// CHECK-ALL: scf.for
+// CHECK-ALL-NOT: scf.for
