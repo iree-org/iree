@@ -80,12 +80,14 @@ iree_cc_library(
     "bitmap.h"
     "block_pool.h"
     "device_library.h"
+    "info.h"
     "kfd.h"
     "vmem.h"
   SRCS
     "bitmap.c"
     "block_pool.c"
     "device_library.c"
+    "info.c"
     "kfd.c"
     "vmem.c"
   DEPS
