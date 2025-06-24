@@ -14,7 +14,7 @@
 // PAD-SAME:   iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>
 
 // DATA-TILING:      #hal.executable.target<"rocm"
-// DATA-TILING-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_layout<>
+// DATA-TILING-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 
 // NONE:      #hal.executable.target<"rocm"
 // NONE-NOT:    iree.encoding.resolver
