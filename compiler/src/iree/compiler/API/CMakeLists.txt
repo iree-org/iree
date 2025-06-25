@@ -25,14 +25,14 @@ iree_cc_library(
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
     MLIRCAPITransforms
-    iree::compiler::API::Internal::CompilerDriver
-    iree::compiler::API::Internal::IREECodegenDialectCAPI
-    iree::compiler::API::Internal::IREECompileToolEntryPoint
-    iree::compiler::API::Internal::IREEGPUDialectCAPI
-    iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
-    iree::compiler::API::Internal::IREEOptToolEntryPoint
-    iree::compiler::API::Internal::IREEReduceToolEntryPoint
-    iree::compiler::API::Internal::LLDToolEntryPoint
+    iree::compiler::API::internal::CompilerDriver
+    iree::compiler::API::internal::IREECodegenDialectCAPI
+    iree::compiler::API::internal::IREECompileToolEntryPoint
+    iree::compiler::API::internal::IREEGPUDialectCAPI
+    iree::compiler::API::internal::IREEMLIRLSPServerToolEntryPoint
+    iree::compiler::API::internal::IREEOptToolEntryPoint
+    iree::compiler::API::internal::IREEReduceToolEntryPoint
+    iree::compiler::API::internal::LLDToolEntryPoint
   PUBLIC
 )
 
@@ -78,14 +78,14 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
-  iree_compiler_API_Internal_CompilerDriver.objects
-  iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
-  iree_compiler_API_Internal_IREECodegenDialectCAPI.objects
-  iree_compiler_API_Internal_IREEGPUDialectCAPI.objects
-  iree_compiler_API_Internal_IREEMLIRLSPServerToolEntryPoint.objects
-  iree_compiler_API_Internal_IREEOptToolEntryPoint.objects
-  iree_compiler_API_Internal_IREEReduceToolEntryPoint.objects
-  iree_compiler_API_Internal_LLDToolEntryPoint.objects
+  iree_compiler_API_internal_CompilerDriver.objects
+  iree_compiler_API_internal_IREECompileToolEntryPoint.objects
+  iree_compiler_API_internal_IREECodegenDialectCAPI.objects
+  iree_compiler_API_internal_IREEGPUDialectCAPI.objects
+  iree_compiler_API_internal_IREEMLIRLSPServerToolEntryPoint.objects
+  iree_compiler_API_internal_IREEOptToolEntryPoint.objects
+  iree_compiler_API_internal_IREEReduceToolEntryPoint.objects
+  iree_compiler_API_internal_LLDToolEntryPoint.objects
 )
 
 if(DEFINED IREE_COMPILER_API_ADDL_EXPORT_OBJECTS)
