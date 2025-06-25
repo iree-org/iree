@@ -91,6 +91,11 @@ def LLVMGPUPrefetchSharedMemoryPass :
   let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
 }
 
+def LLVMGPUOptimizeAndPrefetchSharedMemoryPass :
+    InterfacePass<"iree-llvmgpu-optimize-and-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
+  let summary = "Optimize and prefetch shared memory";
+}
+
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";

@@ -552,12 +552,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-  if (pipelineOptions.prefetchSharedMemory) {
-    funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
-    funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
-    funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-    funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
-  }
 
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -965,9 +959,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-  if (options.prefetchSharedMemory) {
-    funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
-  }
   if (clLLVMGPUEnableSharedMemoryReuse) {
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createGPUReuseSharedMemoryAllocsPass());
@@ -1124,6 +1115,11 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
                                     bool forROCDL) {
+  if (forROCDL) {
+    FunctionLikeNest(modulePassManager)
+        .addPass(createLLVMGPUOptimizeAndPrefetchSharedMemoryPass);
+  }
+
   modulePassManager.addPass(
       createConvertHALDescriptorTypeToGPUAddressSpacePass());
   modulePassManager.addPass(createCanonicalizerPass());
