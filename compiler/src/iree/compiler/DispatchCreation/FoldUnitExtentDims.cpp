@@ -259,8 +259,10 @@ void FoldUnitExtentDimsPass::runOnOperation() {
 
   RewritePatternSet foldUnitDimsPatterns(context);
   populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
-  if (failed(
-          applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns)))) {
+  GreedyRewriteConfig rewriterConfig;
+  rewriterConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
+  if (failed(applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns),
+                                   rewriterConfig))) {
     return signalPassFailure();
   }
 }
@@ -269,8 +271,10 @@ void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet foldUnitDimsPatterns(context);
   populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
-  if (failed(applyPatternsGreedily(getOperation(),
-                                   std::move(foldUnitDimsPatterns)))) {
+  GreedyRewriteConfig rewriterConfig;
+  rewriterConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
+  if (failed(applyPatternsGreedily(
+          getOperation(), std::move(foldUnitDimsPatterns), rewriterConfig))) {
     return signalPassFailure();
   }
 }
