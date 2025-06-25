@@ -167,7 +167,7 @@ iree_cc_library(
     "iree_compile_lib.cc"
   DEPS
     LLVMSupport
-    iree::compiler::API::Internal::CompilerDriver
+    iree::compiler::API::internal::CompilerDriver
     iree::compiler::Pipelines
     iree::compiler::bindings::c::headers
   PUBLIC
