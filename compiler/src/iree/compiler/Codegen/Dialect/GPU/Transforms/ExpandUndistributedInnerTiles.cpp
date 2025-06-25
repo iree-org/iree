@@ -24,6 +24,7 @@ struct ExpandUndistributedInnerTilesPass final
   using Base::Base;
   void runOnOperation() override;
 };
+} // namespace
 
 static LogicalResult materializeOperandExpandedShape(
     OpBuilder &builder, Codegen::InnerTiledOp tiledOp, int64_t operandIndex,
@@ -98,6 +99,7 @@ static LogicalResult materializeOperandExpandedShape(
   return success();
 }
 
+namespace {
 struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -216,7 +218,6 @@ private:
   bool expandInputs = true;
   bool expandOutputs = true;
 };
-
 } // namespace
 
 void ExpandUndistributedInnerTilesPass::runOnOperation() {
