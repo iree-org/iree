@@ -2818,13 +2818,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-gpu-concretize-mma-shapes" class="md-nav__link">
+  <a href="#-iree-gpu-distribute-inner-tiled-to-lanes" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-gpu-concretize-mma-shapes
+      -iree-gpu-distribute-inner-tiled-to-lanes
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-gpu-concretize-mma-shapes">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-gpu-expand-undistributed-inner-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-gpu-expand-undistributed-inner-tiles
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-gpu-expand-undistributed-inner-tiles">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2838,15 +2847,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-gpu-distribute-inner-tiled-to-lanes" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-gpu-distribute-inner-tiled-to-lanes
-    </span>
-  </a>
   
 </li>
       
@@ -4616,13 +4616,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-gpu-concretize-mma-shapes" class="md-nav__link">
+  <a href="#-iree-gpu-distribute-inner-tiled-to-lanes" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-gpu-concretize-mma-shapes
+      -iree-gpu-distribute-inner-tiled-to-lanes
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-gpu-concretize-mma-shapes">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-gpu-expand-undistributed-inner-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-gpu-expand-undistributed-inner-tiles
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-gpu-expand-undistributed-inner-tiles">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4636,15 +4645,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-gpu-distribute-inner-tiled-to-lanes" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-gpu-distribute-inner-tiled-to-lanes
-    </span>
-  </a>
   
 </li>
       
@@ -4704,14 +4704,14 @@
 
 <h3 id="-iree-gpu-combine-barrier-regions"><code>-iree-gpu-combine-barrier-regions</code><a class="headerlink" href="#-iree-gpu-combine-barrier-regions" title="Permanent link">link</a></h3>
 <p><em>Combines <code>iree_gpu.barrier_region</code> ops</em></p>
-<h3 id="-iree-gpu-concretize-mma-shapes"><code>-iree-gpu-concretize-mma-shapes</code><a class="headerlink" href="#-iree-gpu-concretize-mma-shapes" title="Permanent link">link</a></h3>
-<p><em>Expands the inner dimensions of iree_gpu.multi_mma ops to match the thread layout</em></p>
-<h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-concretize-inputs : Expand the inner dimensions for the lhs and rhs operands of the multi_mma ops.
--concretize-result : Expand the inner dimensions for the acc operand of the multi_mma ops.
-</code></pre></div>
 <h3 id="-iree-gpu-distribute-inner-tiled-to-lanes"><code>-iree-gpu-distribute-inner-tiled-to-lanes</code><a class="headerlink" href="#-iree-gpu-distribute-inner-tiled-to-lanes" title="Permanent link">link</a></h3>
 <p><em>Distributes iree_codegen.inner_tiled ops to lanes</em></p>
+<h3 id="-iree-gpu-expand-undistributed-inner-tiles"><code>-iree-gpu-expand-undistributed-inner-tiles</code><a class="headerlink" href="#-iree-gpu-expand-undistributed-inner-tiles" title="Permanent link">link</a></h3>
+<p><em>Expands the inner dimensions of iree_codegen.inner_tiled ops to match the thread layout</em></p>
+<h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-expand-inputs  : Expand the inner dimensions for the input operands of the inner_tiled ops.
+-expand-outputs : Expand the inner dimensions for the output operands and results of the inner_tiled ops.
+</code></pre></div>
 <h3 id="-iree-gpu-lower-ops"><code>-iree-gpu-lower-ops</code><a class="headerlink" href="#-iree-gpu-lower-ops" title="Permanent link">link</a></h3>
 <p><em>Post bufferization lowerings of iree_gpu ops before late lowerings</em></p>
 <h3 id="-iree-gpu-unroll-to-intrinsics"><code>-iree-gpu-unroll-to-intrinsics</code><a class="headerlink" href="#-iree-gpu-unroll-to-intrinsics" title="Permanent link">link</a></h3>
