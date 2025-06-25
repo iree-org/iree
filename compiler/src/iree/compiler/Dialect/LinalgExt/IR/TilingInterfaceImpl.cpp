@@ -1410,6 +1410,10 @@ ArgCompareOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.push_back(outputIdxSlice->getResult(0));
   slices.push_back(outputIdxSlice);
 
+  if (getIndexBase()) {
+    tiledOperands.push_back(getIndexBase());
+  }
+
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
     resultTypes.push_back(outputValSlice->getResult(0).getType());

@@ -682,6 +682,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
    "getLoopIteratorTypes",
    "getResultTilePosition",
    "getTiledImplementation",
+   "generateResultTileValue",
    "getIterationDomain"]
   >
 ]> {
