@@ -31,8 +31,8 @@ iree_cc_library(
     iree::compiler::API::internal::IREEGPUDialectCAPI
     iree::compiler::API::internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::internal::IREEOptToolEntryPoint
-    iree::compiler::API::internal::IREEReduceToolEntryPoint
     iree::compiler::API::internal::LLDToolEntryPoint
+    iree::compiler::API::internal::IREEReduceToolEntryPoint
   PUBLIC
 )
 
@@ -84,8 +84,8 @@ set(_EXPORT_OBJECT_LIBS
   iree_compiler_API_internal_IREEGPUDialectCAPI.objects
   iree_compiler_API_internal_IREEMLIRLSPServerToolEntryPoint.objects
   iree_compiler_API_internal_IREEOptToolEntryPoint.objects
-  iree_compiler_API_internal_IREEReduceToolEntryPoint.objects
   iree_compiler_API_internal_LLDToolEntryPoint.objects
+  iree_compiler_API_internal_IREEReduceToolEntryPoint.objects
 )
 
 if(DEFINED IREE_COMPILER_API_ADDL_EXPORT_OBJECTS)
