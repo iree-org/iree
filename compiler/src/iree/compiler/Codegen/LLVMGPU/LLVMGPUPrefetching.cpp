@@ -55,19 +55,6 @@ struct LLVMGPUOptimizeAndPrefetchSharedMemoryPass final
           LLVMGPUOptimizeAndPrefetchSharedMemoryPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    IREE::Codegen::TranslationInfoAttr translationInfo =
-        getTranslationInfo(funcOp);
-    if (!translationInfo)
-      return;
-
-    IREE::GPU::GPUPipelineOptions pipelineOptions =
-        IREE::GPU::getPipelineOptions(funcOp, translationInfo);
-
-    // Prfetch only when the option is enabled.
-    if (!pipelineOptions.prefetchSharedMemory) {
-      return;
-    }
-
     std::optional<OpPassManager> maybePipeline =
         getFunctionOpInterfacePassManager(funcOp);
     if (!maybePipeline) {
