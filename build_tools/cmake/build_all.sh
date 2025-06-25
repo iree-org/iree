@@ -34,7 +34,6 @@ IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-ON}"
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
 
 # Create install directory now--we need to get its real path later.
 mkdir -p "${INSTALL_DIR}"
@@ -79,8 +78,4 @@ if (( IREE_BUILD_TEST_DEPS == 1 )); then
   echo "Building test deps"
   echo "------------------"
   "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-fi
-
-if (( IREE_USE_CCACHE == 1 )); then
-  ccache --show-stats
 fi

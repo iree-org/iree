@@ -168,12 +168,9 @@ iree_cc_library(
     LLDToolEntryPoint
   SRCS
     "LLDToolEntryPoint.cpp"
-  COPTS
-    ${_lld_copts}
   DEPS
     LLVMSupport
     LLVMTargetParser
     iree::compiler::bindings::c::headers
-    ${_lld_deps}
   PUBLIC
 )
