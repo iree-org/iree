@@ -10,6 +10,8 @@ If available a list of CMake targets and their corresponding object file will be
 used to try to infer the objects based on the filenames of the .profraw files as
 `cmake_target[.optional-extra-discriminators].profraw`. Objects can also be
 explicitly specified for any profiles not matching a target.
+The `--targets=` file is a ; delimited dictionary of target=path items.
+e.g. `cmake_target_a=/bin/a;cmake_target_b=/bin/b`
 
 The paths for llvm-profdata and llvm-cov can be explicitly specified as flags
 and otherwise must be available on PATH.
@@ -89,9 +91,9 @@ def main(args):
         objects.append([object for object in args.objects.split(";")])
 
     # Read target map, if specified.
-    # This may not be need if no objects are specified.
-    # The file is either a ; delimited dictionary of target=path
-    # items. e.g. cmake_target_a=/bin/a;cmake_target_b=/bin/b
+    # This may not be needed if objects are also specified and is allowed to
+    # fail. The file is a ; delimited dictionary of target=path items.
+    # e.g. cmake_target_a=/bin/a;cmake_target_b=/bin/b
     target_map = {}
     if args.targets:
         with open(args.targets, "r") as targets_file:
