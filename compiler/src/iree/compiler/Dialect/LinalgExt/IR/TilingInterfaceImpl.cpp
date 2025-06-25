@@ -1380,9 +1380,6 @@ ArgCompareOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
   Operation *inputSlice =
       getSlice(builder, loc, getInputValue(), offsets, sizes, strides);
-  if (!inputSlice) {
-    return emitOpError("failed to slice input");
-  }
   tiledOperands.push_back(inputSlice->getResult(0));
   slices.push_back(inputSlice);
 
@@ -1396,17 +1393,11 @@ ArgCompareOp::getTiledImplementation(OpBuilder &builder,
                                           builder.getIndexAttr(1));
   Operation *outputValSlice = getSlice(
       builder, loc, outputValue(), outputOffsets, outputSizes, outputStrides);
-  if (!outputValSlice) {
-    return emitOpError("failed to slice output value");
-  }
   tiledOperands.push_back(outputValSlice->getResult(0));
   slices.push_back(outputValSlice);
 
   Operation *outputIdxSlice = getSlice(
       builder, loc, outputIndex(), outputOffsets, outputSizes, outputStrides);
-  if (!outputIdxSlice) {
-    return emitOpError("failed to slice output index");
-  }
   tiledOperands.push_back(outputIdxSlice->getResult(0));
   slices.push_back(outputIdxSlice);
 
@@ -1445,8 +1436,6 @@ LogicalResult ArgCompareOp::getResultTilePosition(
     resultSizes.push_back(sizes[i]);
   }
 
-  assert(resultSizes.size() == static_cast<size_t>(inputRank - 1) &&
-         "Argmax output rank should be one less than input rank");
   return success();
 }
 
