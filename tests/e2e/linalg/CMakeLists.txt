@@ -17,6 +17,7 @@ iree_check_single_backend_test_suite(
     "conv2d.mlir"
     "fp_to_subbyte.mlir"
     "narrow_n_matmuls.mlir"
+    "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
     "subbyte_to_fp.mlir"
@@ -29,22 +30,6 @@ iree_check_single_backend_test_suite(
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
     "nowasm"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task_noriscv
-  SRCS
-    "pack.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-target-cpu=generic"
-  LABELS
-    "nowasm"
-    "noriscv"
 )
 
 iree_check_single_backend_test_suite(
