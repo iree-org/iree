@@ -247,7 +247,8 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
                                         /*domainRank=*/-1};
   }
 
-  const auto &opInfo = *maybeDetail;
+  const mlir::iree_compiler::IREE::LinalgExt::AttentionOpDetail &opInfo =
+      *maybeDetail;
 
   mlir::Builder builder(QMap.getContext());
 
