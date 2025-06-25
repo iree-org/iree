@@ -153,6 +153,33 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        If the `dim`th _logical_ dimension of `operand` requires expansion before
+        distribution via a forall, return the shape that dimension should be expanded
+        to.
+
+        The reshape will only be applied when the inner tile is (a permuted form of)
+        the logical shape returned by `getUndistributedTileTypes`.
+
+        If no reshape is required, std::nullopt is returned.
+
+        Context: Some intrinsics require pre-distribution reshapes of the inner tile
+        so that distribution to threads works correctly. The motivating example is when
+        the data has the form [outer per-lane] x [distributed accross lanes] x [inner per-lane].
+        For instance, the i-th value in the M dimension of the matrix could be
+        located at vector index `[i / 8, i % 4]` of thread `32 * ((i / 8) % 2)`,
+        which means the length 32 M dimension has to be retiled to 4x8 so that the
+        length-8 dimension can be distributed to threads.
+      }],
+      /*retTy=*/"std::optional<::mlir::SmallVector<int64_t, 2>>",
+      /*methodName=*/"getUndistributedTileDimExpansion",
+      /*args=*/(ins "int64_t":$operandIndex, "int64_t":$logicalDim),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Given (distributed, if applicable) arguments whose types correspond
         to `getDistributedTileShapes()`, construct, if possible, the operations
         that implement this kind and place the results (which will be used to
