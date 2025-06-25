@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECTS_IREE_CODEGEN_H
 #define IREE_COMPILER_DIALECTS_IREE_CODEGEN_H
 
+#include "mlir-c/AffineMap.h"
 #include "mlir-c/IR.h"
 #include "mlir-c/Support.h"
 
@@ -77,6 +78,19 @@ MLIR_CAPI_EXPORTED void ireeCodegenGetTunerRootOps(MlirModule module,
 MLIR_CAPI_EXPORTED void ireeCodegenQueryMMAIntrinsics(MlirOperation op,
                                                       size_t *numIntrinsics,
                                                       uint32_t *mmaIntrinsics);
+
+struct ireeCodegenAttentionOpDetail {
+  MlirAttribute batch;
+  MlirAttribute m;
+  MlirAttribute k1;
+  MlirAttribute k2;
+  MlirAttribute n;
+  int64_t domainRank;
+};
+
+MLIR_CAPI_EXPORTED ireeCodegenAttentionOpDetail
+ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
+                                MlirAffineMap vMap, MlirAffineMap oMap);
 
 #ifdef __cplusplus
 }
