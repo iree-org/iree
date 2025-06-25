@@ -288,9 +288,9 @@ def IREEGPU_VirtualMMAAttr :
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
-    "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -326,6 +326,55 @@ def IREEGPU_VirtualMMAAttr :
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_ScaledMMAAttr :
+    AttrDef<IREEGPU_Dialect, "ScaledMMA", [
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "getExpectedNumOutputs",
+    "verifyIndexingMaps",
+    "getUndistributedTileTypes",
+    "getDistributedTileTypes",
+    "populateOperandOffsetsSizesStrides",
+    "getDistributionMappingKind",
+    "getDistributionWorkerCount",
+    "buildUnderlyingOperations",
+  ]>
+]> {
+  let mnemonic = "scaled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This attribute represents MMAs that operate on low-precision floating point
+    types (like fp4 or fp8) and apply _block scales_ to their inputs,
+    where each |blockSize| elements share a scale (which is currently
+    always a f32 exponent / f8E8M0).
+
+    The intrinsic is a ScaledMMAIntrinsic, and the element types are given
+    on the attribute, not in the intrinsic enum, since these scaled
+    operations allow arbitrary combinations of fp4/fp6/fp8 inputs.
+
+    This intrinsic takes its four parameters as (lhs, lhs_scale, rhs, rhs_scale).
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+    "::mlir::Type":$lhs_elem_type,
+    "::mlir::Type":$rhs_elem_type,
+    "::mlir::Type":$acc_elem_type,
+    DefaultValuedParameter<"bool", "false", "if this is a column-major scaled MFMA">:$col_major
+  );
+
+  let extraClassDeclaration = [{
+    // Return the number of elements per shared scale.
+    int64_t getBlockSize() const;
+
+    // Return the required subgroup size for this intrinsic.
+    int64_t getSubgroupSize() const;
+  }];
 }
 
 //===----------------------------------------------------------------------===//

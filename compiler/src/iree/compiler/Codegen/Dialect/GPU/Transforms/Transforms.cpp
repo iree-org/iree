@@ -1346,34 +1346,35 @@ static bool isParallelIterator(Attribute attr) {
          utils::IteratorType::parallel;
 }
 
-/// Pick an unrolling order that reuses the LHS register.
+/// Pick an unrolling order that reuses the LHS register, assuming that the LHS
+/// register is the first argument.
 static std::optional<SmallVector<int64_t>>
-gpuMultiMmaUnrollOrder(Operation *op) {
-  IREE::Codegen::InnerTiledOp mmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
-  // TODO: review for generalizability to other inner tiled ops.
-  if (!mmaOp || !isa<GPU::MmaInterfaceAttr>(mmaOp.getKind())) {
+gpuMatmulLikeUnrollOrder(Operation *op) {
+  IREE::Codegen::InnerTiledOp tiledOp =
+      dyn_cast<IREE::Codegen::InnerTiledOp>(op);
+  if (!tiledOp) {
     return std::nullopt;
   }
   SmallVector<int64_t> order;
   // First make reduction the outer dimensions.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+  for (auto [index, iter] : llvm::enumerate(tiledOp.getIteratorTypes())) {
     if (isReductionIterator(iter)) {
       order.push_back(index);
     }
   }
 
   llvm::SmallDenseSet<int64_t> dimsInLhs;
-  for (AffineExpr expr : mmaOp.getIndexingMapsArray()[0].getResults()) {
+  for (AffineExpr expr : tiledOp.getIndexingMapsArray()[0].getResults()) {
     dimsInLhs.insert(cast<AffineDimExpr>(expr).getPosition());
   }
   // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+  for (auto [index, iter] : llvm::enumerate(tiledOp.getIteratorTypes())) {
     if (isParallelIterator(iter) && dimsInLhs.count(index)) {
       order.push_back(index);
     }
   }
   // Then the remaining parallel loops.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+  for (auto [index, iter] : llvm::enumerate(tiledOp.getIteratorTypes())) {
     if (isParallelIterator(iter) && !dimsInLhs.count(index)) {
       order.push_back(index);
     }
@@ -1395,7 +1396,7 @@ void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns) {
   populateIREEGPUVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
                     .setNativeShapeFn(getInnerTiledUnitShape)
-                    .setUnrollTraversalOrderFn(gpuMultiMmaUnrollOrder));
+                    .setUnrollTraversalOrderFn(gpuMatmulLikeUnrollOrder));
 }
 
 //===---------------------------------------------------------------------===//
