@@ -11,14 +11,18 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
+#include "mlir/CAPI/AffineMap.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Support/LogicalResult.h"
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
@@ -219,4 +223,42 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
   for (size_t i = 0, e = tunerRootOps.size(); i < e; ++i) {
     rootOps[i] = wrap(tunerRootOps[i]);
   }
+}
+
+ireeCodegenAttentionOpDetail
+ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
+                                MlirAffineMap vMap, MlirAffineMap oMap) {
+  mlir::AffineMap QMap = unwrap(qMap);
+  mlir::AffineMap KMap = unwrap(kMap);
+  mlir::AffineMap VMap = unwrap(vMap);
+  mlir::AffineMap OMap = unwrap(oMap);
+
+  llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::AttentionOpDetail>
+      maybeDetail =
+          mlir::iree_compiler::IREE::LinalgExt::AttentionOpDetail::get(
+              QMap, KMap, VMap, OMap);
+
+  if (failed(maybeDetail)) {
+    return ireeCodegenAttentionOpDetail{/*batch=*/wrap(mlir::Attribute()),
+                                        /*m=*/wrap(mlir::Attribute()),
+                                        /*k1=*/wrap(mlir::Attribute()),
+                                        /*k2=*/wrap(mlir::Attribute()),
+                                        /*n=*/wrap(mlir::Attribute()),
+                                        /*domainRank=*/-1};
+  }
+
+  const mlir::iree_compiler::IREE::LinalgExt::AttentionOpDetail &opInfo =
+      *maybeDetail;
+
+  mlir::Builder builder(QMap.getContext());
+
+  ireeCodegenAttentionOpDetail result;
+  result.batch = wrap(builder.getI64ArrayAttr(opInfo.getBatchDims()));
+  result.m = wrap(builder.getI64ArrayAttr(opInfo.getMDims()));
+  result.k1 = wrap(builder.getI64ArrayAttr(opInfo.getK1Dims()));
+  result.k2 = wrap(builder.getI64ArrayAttr(opInfo.getK2Dims()));
+  result.n = wrap(builder.getI64ArrayAttr(opInfo.getNDims()));
+  result.domainRank = opInfo.getDomainRank();
+
+  return result;
 }

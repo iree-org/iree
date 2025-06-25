@@ -13,6 +13,8 @@
 #include "mlir-c/IR.h"
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
+#include "mlir/CAPI/IR.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 static const char *kCodegenModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
@@ -58,6 +60,18 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
   ireeCodegenGetTunerRootOps(module, &numOps, ops.data());
 
   return ops;
+}
+
+static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
+  mlir::Attribute Attr = unwrap(attr);
+  auto arrayAttr = mlir::dyn_cast_or_null<mlir::ArrayAttr>(Attr);
+  if (!arrayAttr)
+    return {};
+  std::vector<int64_t> values;
+  values.reserve(arrayAttr.size());
+  for (mlir::Attribute val : arrayAttr)
+    values.push_back(mlir::cast<mlir::IntegerAttr>(val).getInt());
+  return values;
 }
 
 NB_MODULE(_ireeCompilerDialects, m) {
@@ -452,4 +466,39 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           "Get the operations marked with the tuner root op "
                           "attribute from a module.",
                           py::arg("module"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetAttentionOpDetail
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeCodegenAttentionOpDetail>(iree_codegen_module,
+                                           "AttentionOpDetail")
+      .def_prop_ro(
+          "batch_dims",
+          [](const ireeCodegenAttentionOpDetail &self) { return self.batch; })
+      .def_prop_ro(
+          "m_dims",
+          [](const ireeCodegenAttentionOpDetail &self) { return self.m; })
+      .def_prop_ro(
+          "k1_dims",
+          [](const ireeCodegenAttentionOpDetail &self) { return self.k1; })
+      .def_prop_ro(
+          "k2_dims",
+          [](const ireeCodegenAttentionOpDetail &self) { return self.k2; })
+      .def_prop_ro(
+          "n_dims",
+          [](const ireeCodegenAttentionOpDetail &self) { return self.n; })
+      .def_prop_ro("domain_rank", [](const ireeCodegenAttentionOpDetail &self) {
+        return self.domainRank;
+      });
+
+  iree_codegen_module.def(
+      "get_attention_op_detail",
+      [](MlirAffineMap q, MlirAffineMap k, MlirAffineMap v, MlirAffineMap o) {
+        ireeCodegenAttentionOpDetail result =
+            ireeCodegenGetAttentionOpDetail(q, k, v, o);
+        return result;
+      },
+      "Infers the structure of an attention operation from affine indexing "
+      "maps.",
+      py::arg("q"), py::arg("k"), py::arg("v"), py::arg("o"));
 }
