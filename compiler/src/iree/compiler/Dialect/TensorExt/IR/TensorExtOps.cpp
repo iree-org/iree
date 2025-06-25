@@ -321,6 +321,18 @@ bool DispatchTensorStoreOp::isStoreToWholeTarget() {
 }
 
 //===----------------------------------------------------------------------===//
+// dispatch.workgroup_count_splitk_modifier
+//===----------------------------------------------------------------------===//
+
+void DispatchWorkgroupCountSplitKModifierOp::build(OpBuilder &b,
+                                                   OperationState &state,
+                                                   ValueRange workgroups,
+                                                   ValueRange workload) {
+  assert(workgroups.size() == 3);
+  return build(b, state, workgroups[0], workgroups[1], workgroups[2], workload);
+}
+
+//===----------------------------------------------------------------------===//
 // iree_tensor_ext.dispatch.workload.ordinal
 //===----------------------------------------------------------------------===//
 

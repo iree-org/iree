@@ -307,7 +307,7 @@ def IREETensorExt_DispatchWorkgroupCountFromSliceOp :
   }];
 }
 
-def IREETensorExt_DispatchWorkgroupCountSplitKModifier :
+def IREETensorExt_DispatchWorkgroupCountSplitKModifierOp :
     IREETensorExt_PureOp<"dispatch.workgroup_count_splitk_modifier"> {
   let summary = [{
     Modifies the workgroup count calculation to account for split-k computation.
@@ -330,6 +330,13 @@ def IREETensorExt_DispatchWorkgroupCountSplitKModifier :
   let assemblyFormat = [{
     attr-dict `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `,` ($workload^)?
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$workgroups,
+      "ValueRange":$workload
+    )>,
+  ];
 }
 
 def IREETensorExt_DispatchWorkloadOrdinalOp :
