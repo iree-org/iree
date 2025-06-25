@@ -137,6 +137,8 @@ function(iree_cc_test)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
 
+  set(_ENVIRONMENT_VARS)
+
   # Case for cross-compiling towards Android.
   if(ANDROID)
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
@@ -155,13 +157,9 @@ function(iree_cc_test)
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
     # with the expectation of the run_android_test.{sh|bat|ps1} script.
-    set(
-      _ENVIRONMENT_VARS
-        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
-        TEST_EXECUTABLE=$<TARGET_FILE:${_NAME}>
-        TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
-    )
-    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
+    list(APPEND _ENVIRONMENT_VARS TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR})
+    list(APPEND _ENVIRONMENT_VARS TEST_EXECUTABLE=$<TARGET_FILE:${_NAME}>)
+    list(APPEND _ENVIRONMENT_VARS TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir)
   elseif((IREE_ARCH STREQUAL "riscv_64" OR
           IREE_ARCH STREQUAL "riscv_32") AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -187,6 +185,17 @@ function(iree_cc_test)
 
     iree_configure_test(${_NAME_PATH})
   endif(ANDROID)
+
+  # TODO(benvanik): add an iree_runtime_cc_test that wraps this and adds the
+  # runtime-specific options. Today all tests use iree_cc_test, but since this
+  # is harmless for non-instrumented tests it's safe to apply to a bit more than
+  # we intend.
+  if(IREE_ENABLE_RUNTIME_COVERAGE)
+    list(APPEND _ENVIRONMENT_VARS LLVM_PROFILE_FILE=${IREE_BINARY_DIR}/coverage/runtime/${_NAME}.profraw)
+    set_property(GLOBAL APPEND PROPERTY IREE_RUNTIME_COVERAGE_TARGETS "${_NAME}=$<TARGET_FILE:${_NAME}>")
+  endif()
+
+  set_property(TEST ${_NAME_PATH} APPEND PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
 
   if (NOT DEFINED _RULE_TIMEOUT)
     set(_RULE_TIMEOUT 60)

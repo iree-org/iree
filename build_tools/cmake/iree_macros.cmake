@@ -17,7 +17,6 @@ else()
   set(IREE_HOST_EXECUTABLE_SUFFIX "")
 endif()
 
-
 #-------------------------------------------------------------------------------
 # IREE_ARCH: identifies the target CPU architecture. May be empty when this is
 # ill-defined, such as multi-architecture builds.
@@ -593,7 +592,6 @@ function(iree_symlink_tool)
   set(_FROM_TOOL_TARGET ${_RULE_FROM_TOOL_TARGET})
   set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
   get_filename_component(_TO_TOOL_DIR "${_TO_TOOL_PATH}" DIRECTORY)
-
 
   add_custom_command(
     TARGET "${_TARGET}"
