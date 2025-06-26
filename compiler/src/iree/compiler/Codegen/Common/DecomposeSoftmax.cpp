@@ -45,8 +45,9 @@ struct FuseElementWiseGenericOps : public OpRewritePattern<linalg::GenericOp> {
     for (OpOperand &opOperand : genericOp->getOpOperands()) {
       if (!linalg::areElementwiseOpsFusable(&opOperand))
         continue;
-      // If the producer is a generic op, don't fuse if it has external
-      // capture.
+      // Don't fuse if it has external capture. For e.g., the gather like
+      // payload operation like 'tensor.extract' would be cloned in
+      // every consumer op, which is not what we want.
       auto producer = opOperand.get().getDefiningOp<linalg::GenericOp>();
       if (producer && hasExternalCapture(producer)) {
         continue;
