@@ -86,14 +86,14 @@ def LLVMGPUPackSharedMemoryAllocPass :
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
 }
 
-def LLVMGPUPrefetchSharedMemoryPass :
+def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
-  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
-}
-
-def LLVMGPUOptimizeAndPrefetchSharedMemoryPass :
-    InterfacePass<"iree-llvmgpu-optimize-and-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
-  let summary = "Optimize and prefetch shared memory";
+      let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"
+          "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation."
+          "1) It might work for older NVIDIA GPUs but we may prefer multi-buffer if shared memory is large"
+          "enough. Newer CUDA architectures use asynchronous loads, rendering this pass unnecessary."
+          "2) For SPIR-V, it is unclear there are Vulkan targets can issue load instructions asynchronously."
+          "This pass is also not applicable to SPIR-V targets that go through cooperative matrix.";
 }
 
 def LLVMGPUSelectLoweringStrategyPass :
