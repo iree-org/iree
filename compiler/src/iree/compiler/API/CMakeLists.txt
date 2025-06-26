@@ -67,25 +67,25 @@ iree_cc_library(
 ################################################################################
 
 set(_EXPORT_OBJECT_LIBS
-  obj.IREEDialectsCAPI
-  obj.MLIRCAPIDebug
-  obj.MLIRCAPIIR
-  obj.MLIRCAPIInterfaces
-  obj.MLIRCAPIGPU
-  obj.MLIRCAPILLVM
-  obj.MLIRCAPILinalg
-  obj.MLIRCAPIPDL
-  obj.MLIRCAPITransforms
-  obj.MLIRCAPITransformDialect
-  obj.MLIRCAPITransformDialectTransforms
-  iree_compiler_API_internal_CompilerDriver.objects
-  iree_compiler_API_internal_IREECompileToolEntryPoint.objects
-  iree_compiler_API_internal_IREECodegenDialectCAPI.objects
-  iree_compiler_API_internal_IREEGPUDialectCAPI.objects
-  iree_compiler_API_internal_IREEMLIRLSPServerToolEntryPoint.objects
-  iree_compiler_API_internal_IREEOptToolEntryPoint.objects
-  iree_compiler_API_internal_LLDToolEntryPoint.objects 
-  iree_compiler_API_internal_IREEReduceToolEntryPoint.objects 
+  "obj.IREEDialectsCAPI"
+  "obj.MLIRCAPIDebug"
+  "obj.MLIRCAPIIR"
+  "obj.MLIRCAPIInterfaces"
+  "obj.MLIRCAPIGPU"
+  "obj.MLIRCAPILLVM"
+  "obj.MLIRCAPILinalg"
+  "obj.MLIRCAPIPDL"
+  "obj.MLIRCAPITransforms"
+  "obj.MLIRCAPITransformDialect"
+  "obj.MLIRCAPITransformDialectTransforms"
+  "iree_compiler_API_internal_CompilerDriver.objects"
+  "iree_compiler_API_internal_IREECompileToolEntryPoint.objects"
+  "iree_compiler_API_internal_IREECodegenDialectCAPI.objects"
+  "iree_compiler_API_internal_IREEGPUDialectCAPI.objects"
+  "iree_compiler_API_internal_IREEMLIRLSPServerToolEntryPoint.objects"
+  "iree_compiler_API_internal_IREEOptToolEntryPoint.objects"
+  "iree_compiler_API_internal_LLDToolEntryPoint.objects"
+  "iree_compiler_API_internal_IREEReduceToolEntryPoint.objects"
 )
 
 if(DEFINED IREE_COMPILER_API_ADDL_EXPORT_OBJECTS)
