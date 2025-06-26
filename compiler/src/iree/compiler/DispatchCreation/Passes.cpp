@@ -241,7 +241,12 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         options.cseConstants = false;
         return IREE::Flow::createCanonicalizePass(options);
       })
-      .addPass(createCSEPass);
+      .addPass(createCSEPass)
+      .addPass([&] {
+        return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
+            CloneProducersIntoDispatchRegionsPassOptions{
+                options.enableAggressiveFusion});
+      });
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be
