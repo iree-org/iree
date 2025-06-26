@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches{split-size=128}, cse))" --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches{split-size=128}, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-materialize-default-workgroup-count-region, canonicalize))" --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=WORKGROUP
 
 util.func public @split_reduction_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
@@ -23,6 +24,12 @@ util.func public @split_reduction_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?xf3
 //  CHECK-SAME:      ins(%[[DISPATCH]] :
 //       CHECK:    util.return %[[REDUCE]]
 
+// Check that count region contains splitk modifier.
+// WORKGROUP-LABEL:   util.func public @split_reduction_dynamic
+//       WORKGROUP:     count(
+//       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_splitk_modifier
+
 // -----
 
 util.func public @split_reduction_static(%arg0: tensor<64x4096xf32>) -> tensor<64xf32> {
@@ -46,3 +53,9 @@ util.func public @split_reduction_static(%arg0: tensor<64x4096xf32>) -> tensor<6
 //       CHECK:    %[[REDUCE:.+]] = linalg
 //  CHECK-SAME:      ins(%[[DISPATCH]] :
 //       CHECK:    util.return %[[REDUCE]]
+
+// Check that count region contains splitk modifier.
+// WORKGROUP-LABEL:   util.func public @split_reduction_static
+//       WORKGROUP:     count(
+//       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_splitk_modifier
