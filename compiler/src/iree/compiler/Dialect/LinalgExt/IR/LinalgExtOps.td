@@ -679,6 +679,10 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   ["generateScalarImplementation",
+   "getLoopIteratorTypes",
+   "getResultTilePosition",
+   "getTiledImplementation",
+   "generateResultTileValue",
    "getIterationDomain"]
   >
 ]> {
