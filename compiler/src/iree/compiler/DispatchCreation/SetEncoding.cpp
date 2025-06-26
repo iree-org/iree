@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -310,22 +311,11 @@ struct FoldFillWithSetEncoding final
 // Set padding encodings
 //===---------------------------------------------------------------------===//
 
-struct PaddedValue {
-  Value paddedValue;
-  SmallVector<Value> dynamicDims;
-};
-
-// For a given `operand`, if its producer is a `flow.dispatch.region`,
-// generate a new value for `operand` that has the padding encoding.
-// The producer `flow.dispatch.region` need not be the immediate defining op
-// of `operand`. This method tracks through operations like
-// `tensor.expand_shape/tensor.collapse_shape` to get to the producer dispatch.
-// Once the producer dispatch is found, its result is modified to be of the same
-// type as `operand` but with the padding encodings. To keep things consistent,
-// the operations that are encountered before getting to the original producing
-// `flow.dispatch.region` are replicated into the producer dispatch.
-static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
-                                                     Value operand) {
+// Utility to return the producer dispatch region op result and the chain of
+// operations being looked past during the traversal to find the producer
+// dispatch.
+static std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+getProducerDispatchValueAndOpChain(Value operand) {
   auto operandType = dyn_cast<RankedTensorType>(operand.getType());
   if (!operandType || operandType.getRank() == 0) {
     return std::nullopt;
@@ -370,6 +360,38 @@ static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
   if (!llvm::hasSingleElement(producerValue.getUses())) {
     return std::nullopt;
   }
+  return std::make_pair(producerValue, opChain);
+}
+
+struct PaddedValue {
+  Value paddedValue;
+  SmallVector<Value> dynamicDims;
+};
+
+// For a given `operand`, if its producer is a `flow.dispatch.region`,
+// generate a new value for `operand` that has the padding encoding.
+// The producer `flow.dispatch.region` need not be the immediate defining op
+// of `operand`. This method tracks through operations like
+// `tensor.expand_shape/tensor.collapse_shape` to get to the producer dispatch.
+// Once the producer dispatch is found, its result is modified to be of the same
+// type as `operand` but with the padding encodings. To keep things consistent,
+// the operations that are encountered before getting to the original producing
+// `flow.dispatch.region` are replicated into the producer dispatch.
+static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
+                                                     Value operand) {
+  auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+  std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+      maybeProducerDispatchAndOpChain =
+          getProducerDispatchValueAndOpChain(operand);
+  if (!maybeProducerDispatchAndOpChain) {
+    return std::nullopt;
+  }
+  OpResult producerValue;
+  SmallVector<Operation *> opChain;
+  std::tie(producerValue, opChain) =
+      std::move(maybeProducerDispatchAndOpChain.value());
+  auto producerDispatch =
+      cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
 
   Location loc = producerDispatch.getLoc();
   unsigned resultNumber = producerValue.getResultNumber();
@@ -522,7 +544,31 @@ SmallVector<unsigned> getOperandsToPad(Operation *op) {
     return {};
   }
 
-  return {0, 1};
+  // Do not pad if the producer dispatch region contains an attention operation
+  // as that results in complicated multi-dimensional load/store access patterns
+  // which aren't well supported with padding.
+  // TODO(#21149): Try to generalize this by either providing better support in
+  // codegen or catching these load/store access patterns cases in a more
+  // general way.
+  SmallVector<unsigned> operandsNum = {0, 1};
+  for (unsigned operandNum : operandsNum) {
+    OpOperand &operand = op->getOpOperand(operandNum);
+    std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+        dispatchAndOpChain = getProducerDispatchValueAndOpChain(operand.get());
+    if (dispatchAndOpChain.has_value()) {
+      auto producerDispatch = cast<IREE::Flow::DispatchRegionOp>(
+          dispatchAndOpChain->first.getOwner());
+      WalkResult res =
+          producerDispatch->walk([&](IREE::LinalgExt::AttentionOp op) {
+            return WalkResult::interrupt();
+          });
+      if (res.wasInterrupted()) {
+        return {};
+      }
+    }
+  }
+
+  return operandsNum;
 }
 
 // Main driver method to add encodings to pad. Typically these are
