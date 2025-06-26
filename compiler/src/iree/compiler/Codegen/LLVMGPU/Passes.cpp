@@ -1168,8 +1168,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
 
-  // Run checks on shared memory usage.
   funcPassManager
+      // Run checks on shared memory usage.
       .addPass([&] {
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
@@ -1178,6 +1178,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
+      // Hoist allocations back into the entry block, as lowering to CF may have
+      // split the block at a point before the allocation.
+      .addPass(createHoistStaticallyBoundAllocationsPass)
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
       // Math dialect ops rewrites, approximations, casts.
