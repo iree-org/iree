@@ -133,7 +133,7 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
   // Also exclude the case of matvec, which has only one non-unit parallel dim.
   // They should go down different pipelines.
   int nonUnitParallelDimCount = 0;
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");

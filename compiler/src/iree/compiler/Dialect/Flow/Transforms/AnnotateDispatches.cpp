@@ -196,7 +196,7 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
     return false;
 
   // One of the input should have all the parallel dimensions with size one.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
   SmallVector<utils::IteratorType> iterators = linalgOp.getIteratorTypesArray();
 

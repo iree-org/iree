@@ -55,7 +55,7 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 
   // Check if the first parallel dimension has bound 1, indicating we found a
   // vector shape.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   if (bounds[dims->m.front()] != 1)
     return false;
 
@@ -74,7 +74,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   int64_t numParallelDims = op.getNumParallelLoops();
 
   if (reductionDims.empty())

@@ -180,7 +180,7 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     return;
 
   // Check that conv has met conditions to go down mfma.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(linalgOp);
   assert(succeeded(convolutionDims) && "Could not infer contraction dims");
@@ -359,7 +359,7 @@ static void padContractionLikeOp(
   int64_t kDim = contractionDims->k.back();
 
   // If none of the shape is dynamic, we'd fallback to using pad to intrinsics.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   int64_t mSize = bounds[mDim];
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];

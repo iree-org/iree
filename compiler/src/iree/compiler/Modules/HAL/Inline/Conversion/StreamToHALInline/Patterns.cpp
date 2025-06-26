@@ -137,8 +137,8 @@ struct ResourceReleaseOpPattern
   matchAndRewrite(IREE::Stream::ResourceReleaseOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Allocation tracking not supported in the inline HAL.
-    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, 0,
-                                                      rewriter.getI1Type());
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, rewriter.getI1Type(),
+                                                      0);
     return success();
   }
 };
@@ -150,8 +150,8 @@ struct ResourceIsTerminalOpPattern
   matchAndRewrite(IREE::Stream::ResourceIsTerminalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Allocation tracking not supported in the inline HAL.
-    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, 0,
-                                                      rewriter.getI1Type());
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, rewriter.getI1Type(),
+                                                      0);
     return success();
   }
 };
