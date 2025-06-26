@@ -162,8 +162,8 @@ fuseConsumersIntoLoops(RewriterBase &rewriter, Operation *tiledOp,
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlices(
-            rewriter, candidateSliceOp.getOperation(), loops);
+        mlir::scf::tileAndFuseConsumerOfSlices(rewriter, candidateSliceOp,
+                                               loops);
     if (failed(fusedResult)) {
       LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
                               << candidateSliceOp << "\n");
