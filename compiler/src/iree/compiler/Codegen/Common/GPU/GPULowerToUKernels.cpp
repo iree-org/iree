@@ -157,7 +157,7 @@ struct LowerInnerTiledMmaToUKernelPattern
       return rewriter.create<arith::IndexCastOp>(loc, I32Type, val);
     };
     auto constI32 = [&](int val) {
-      return rewriter.create<arith::ConstantIntOp>(loc, val, I32Type);
+      return rewriter.create<arith::ConstantIntOp>(loc, I32Type, val);
     };
     int64_t sharedMemoryBytes = ukernelAttr.getSharedMemoryBytes();
     auto sharedMemory = createSharedMemory(rewriter, loc, sharedMemoryBytes);

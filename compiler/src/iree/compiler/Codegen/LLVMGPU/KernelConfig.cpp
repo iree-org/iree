@@ -352,7 +352,7 @@ getVectorDistributeReductionConfig(
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
@@ -724,7 +724,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
 
@@ -836,7 +836,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(op);
   if (failed(convolutionDims)) {
@@ -1040,7 +1040,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   if (failed(contractionDims)) {
@@ -1881,7 +1881,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   // They should go down different pipelines.
   // Currently dynamic dimensions are tiled with size=1 in codegen.
   int staticNonUnitParallelDimCount = 0;
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
@@ -2424,7 +2424,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   int64_t numParallelDims = op.getNumParallelLoops();
 
   if (reductionDims.empty())
@@ -2714,7 +2714,7 @@ static LogicalResult setArgmaxUkernelConfig(
     return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   int64_t numParallelDims = op.getNumParallelLoops();
   int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {

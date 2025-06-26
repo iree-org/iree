@@ -284,7 +284,7 @@ static void specializeExportedFunction(
       builder.setInsertionPointToStart(newCondition);
 
       Value exportCondition =
-          builder.create<arith::ConstantIntOp>(loc, 1, builder.getI1Type());
+          builder.create<arith::ConstantIntOp>(loc, builder.getI1Type(), 1);
 
       for (auto [range, assumedSize] :
            llvm::zip(specializationRange, workloadMapping)) {

@@ -764,7 +764,7 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
   // We will need exp(-2 * PI * j / m * I), compute "-2 * PI / m" for imag part
   // first.
   Value coeff = b.create<arith::ConstantFloatOp>(
-      loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
+      loc, f32Type, llvm::APFloat(static_cast<float>(-2 * acos(-1))));
   coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
   b.create<linalg::GenericOp>(

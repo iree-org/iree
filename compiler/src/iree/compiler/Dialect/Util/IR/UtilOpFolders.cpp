@@ -144,7 +144,7 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
             rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *fixedValue);
       } else {
         constantValue = rewriter.create<arith::ConstantIntOp>(
-            op.getLoc(), *fixedValue, result.getType());
+            op.getLoc(), result.getType(), *fixedValue);
       }
       rewriter.replaceAllUsesWith(result, constantValue);
       madeChange = true;

@@ -142,7 +142,7 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
   // Create a zero-filled accumulator.
   Value initAcc =
       rewriter.create<tensor::EmptyOp>(staticSizes, accETy, dynSizes);
-  Value zeroInt = rewriter.create<arith::ConstantIntOp>(0, accETy).getResult();
+  Value zeroInt = rewriter.create<arith::ConstantIntOp>(accETy, 0).getResult();
   Value zeroAcc =
       rewriter.create<linalg::FillOp>(zeroInt, initAcc).getResult(0);
 
