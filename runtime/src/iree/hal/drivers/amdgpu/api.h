@@ -65,12 +65,10 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // aggressively scheduling queue entries out-of-order.
   uint64_t exclusive_execution : 1;
 
-  // Uses HSA_WAIT_STATE_ACTIVE for up to duration before switching to
+  // Uses HSA_WAIT_STATE_ACTIVE for up to the given duration before switching to
   // HSA_WAIT_STATE_BLOCKED. Above zero this will increase CPU usage in cases
   // where the waits are long and decrease latency in cases where the waits are
-  // short.
-  //
-  // TODO(benvanik): add as a value to device wait semaphores instead.
+  // short. When IREE_DURATION_INFINITE waits will use HSA_WAIT_STATE_ACTIVE.
   iree_duration_t wait_active_for_ns;
 } iree_hal_amdgpu_logical_device_options_t;
 

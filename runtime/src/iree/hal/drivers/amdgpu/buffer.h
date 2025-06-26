@@ -60,10 +60,9 @@ void iree_hal_amdgpu_transient_buffer_deinitialize(
 
 // Resets |buffer| to the given parameters as if it had just been allocated.
 void iree_hal_amdgpu_transient_buffer_reset(
-    iree_hal_amdgpu_transient_buffer_t* buffer,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length);
+    iree_hal_amdgpu_transient_buffer_t* buffer, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length);
 
 //===----------------------------------------------------------------------===//
 // Buffer Resolution
