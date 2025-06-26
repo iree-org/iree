@@ -143,9 +143,7 @@ void GenericVectorizationPass::runOnOperation() {
       std::optional<SizesAndScalableFlags> vectorSizesAndScalableDims =
           getVectorSizes(op, useConfiguredVectorSizes);
       if (vectorSizesAndScalableDims) {
-        auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
-        vectorSizes.append(sizes.begin(), sizes.end());
-        scalableVecDims.append(scalableDims.begin(), scalableDims.end());
+        std::tie(vectorSizes, scalableVecDims) = *vectorSizesAndScalableDims;
       }
     }
 
