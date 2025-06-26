@@ -117,6 +117,7 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   # like this, but MSVC is weird and given the structure of the projects, this
   # isn't so bad.
   get_target_property(_imported ${_object_lib} IMPORTED)
+  message(STATUS "Verifying object target: '${_object_lib}'")
   if(MSVC AND NOT ${_imported})
     target_compile_definitions(${_object_lib} PRIVATE
       # See compiler/bindings/c/iree/compiler/api_support.h.
