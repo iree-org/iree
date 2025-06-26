@@ -25,9 +25,7 @@ static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
     return false;
   }
 
-  auto isScalarOrVector = [](Type t) {
-    return t.isIntOrIndexOrFloat() || isa<VectorType>(t);
-  };
+  auto isIntOrIndex = [](Type t) { return t.isIntOrIndex(); };
   auto isOutsideDispatch = [&](Value v) {
     return v.getParentRegion()->getParentOp() != dispatch;
   };
@@ -35,8 +33,8 @@ static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
   // Check that all operands are defined outside the dispatch and all operand
   // and result types are scalars or vectors.
   return llvm::all_of(op->getOperands(), isOutsideDispatch) &&
-         llvm::all_of(op->getOperandTypes(), isScalarOrVector) &&
-         llvm::all_of(op->getResultTypes(), isScalarOrVector);
+         llvm::all_of(op->getOperandTypes(), isIntOrIndex) &&
+         llvm::all_of(op->getResultTypes(), isIntOrIndex);
 }
 
 namespace {
@@ -49,7 +47,8 @@ struct HoistUniformScalarComputePass
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
-    funcOp.walk([&](IREE::Flow::DispatchRegionOp dispatch) {
+    WalkResult walkResult = funcOp.walk([&](IREE::Flow::DispatchRegionOp
+                                                dispatch) {
       for (Block &body : dispatch.getBody()) {
         SmallVector<Operation *> ops = llvm::map_to_vector(
             body.getOperations(), [](Operation &op) { return &op; });
@@ -65,8 +64,7 @@ struct HoistUniformScalarComputePass
           dispatch.getBody(), dispatch.getBody(), [&](OpOperand *operand) {
             Value v = operand->get();
             auto constant = v.getDefiningOp<arith::ConstantOp>();
-            if (!constant || (!v.getType().isIntOrIndexOrFloat() &&
-                              !isa<VectorType>(v.getType()))) {
+            if (!constant || !v.getType().isIntOrIndex()) {
               return;
             }
             constantsToClone.insert(constant);
@@ -81,8 +79,12 @@ struct HoistUniformScalarComputePass
           }
         }
       }
-      return WalkResult::interrupt();
+      return WalkResult::advance();
     });
+    if (walkResult.wasInterrupted()) {
+      funcOp->emitError("Failed to clone constant into dispatch region.");
+      return signalPassFailure();
+    }
   }
 };
 
