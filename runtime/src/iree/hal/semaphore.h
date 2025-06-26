@@ -72,7 +72,7 @@ typedef uint32_t iree_hal_semaphore_flags_t;
 static inline uint64_t iree_hal_status_as_semaphore_failure(
     iree_status_t status) {
   return IREE_HAL_SEMAPHORE_FAILURE_VALUE_STATUS_BIT |
-         (((uint64_t)(uintptr_t)status) >> 1);
+         ((uint64_t)(uintptr_t)status);
 }
 
 // Returns OK if the |value| does not indicate an error.

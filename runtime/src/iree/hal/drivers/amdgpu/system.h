@@ -9,33 +9,9 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/drivers/amdgpu/util/device_library.h"
+#include "iree/hal/drivers/amdgpu/util/info.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
-
-//===----------------------------------------------------------------------===//
-// iree_hal_amdgpu_system_info_t
-//===----------------------------------------------------------------------===//
-
-// Cached information about the system.
-typedef struct iree_hal_amdgpu_system_info_t {
-  // Timestamp value increase rate in hz.
-  // HSA_SYSTEM_INFO_TIMESTAMP_FREQUENCY
-  uint64_t timestamp_frequency;
-  // Whether all agents have access to system allocated memory by default.
-  // This is true on APUs and discrete GPUs with XNACK enabled.
-  // HSA_AMD_SYSTEM_INFO_SVM_ACCESSIBLE_BY_DEFAULT
-  uint32_t svm_accessible_by_default : 1;
-  // Whether the dmabuf APIs are supported by the driver.
-  // HSA_AMD_SYSTEM_INFO_DMABUF_SUPPORTED
-  uint32_t dmabuf_supported : 1;
-} iree_hal_amdgpu_system_info_t;
-
-// Queries system information and verifies that the minimum required
-// capabilities and versions are available. If this fails it's unlikely that the
-// HAL will work and it should be called early on startup.
-iree_status_t iree_hal_amdgpu_system_info_query(
-    const iree_hal_amdgpu_libhsa_t* libhsa,
-    iree_hal_amdgpu_system_info_t* out_info);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_system_t
@@ -48,13 +24,6 @@ typedef struct iree_hal_amdgpu_system_options_t {
   // Force queues to run one entry at a time instead of overlapping or
   // aggressively scheduling queue entries out-of-order.
   uint64_t exclusive_execution : 1;
-  // Uses HSA_WAIT_STATE_ACTIVE for up to duration before switching to
-  // HSA_WAIT_STATE_BLOCKED. Above zero this will increase CPU usage in cases
-  // where the waits are long and decrease latency in cases where the waits are
-  // short.
-  //
-  // TODO(benvanik): add as a value to device wait semaphores instead.
-  iree_duration_t wait_active_for_ns;
 } iree_hal_amdgpu_system_options_t;
 
 // A set of queried HSA regions and memory pools for a particular CPU agent.

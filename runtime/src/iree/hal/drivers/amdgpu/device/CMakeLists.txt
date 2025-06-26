@@ -13,6 +13,7 @@ set(_BITCODE_SRCS
   "buffer.c"
   "command_buffer.c"
   "host_client.c"
+  "semaphore.c"
   "tracing.c"
 )
 
@@ -23,6 +24,7 @@ set(_BITCODE_HDRS
   "kernel_tables.h"
   "kernels.h"
   "host_client.h"
+  "semaphore.h"
   "tracing.h"
   "support/common.h"
   "support/kernel_args.h"
