@@ -234,12 +234,13 @@ yet).
 
 ### :octicons-git-merge-16: Obtaining commit access
 
-Access to affiliated repositories is divided into tiers:
+Access to repositories is divided into tiers following the
+[GitHub organization permissions model](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization):
 
-| Tier | Description | Team link |
+| Tier | Description | Team links |
 | ---- | ----------- | --------- |
-Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)
-Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | [iree-write](https://github.com/orgs/iree-org/teams/iree-write)
+Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | <ul><li>[iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)<br>(access to most repositories)</li></ul>
+Write | **Established contributors can request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | <ul><li>[iree-write](https://github.com/orgs/iree-org/teams/iree-write)<br>(access to most repositories)</li><li>[iree-turbine-write](https://github.com/orgs/iree-org/teams/iree-turbine-write)<br>(access to <a href="https://github.com/iree-org/iree-turbine">iree-turbine</a>)</li></ul>
 Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case
 
 All access tiers first require joining the
@@ -261,7 +262,20 @@ Reason for requesting access:
 If approved, an invitation will be sent to your GitHub account. You can also
 view the [invitation link](https://github.com/orgs/iree-org/invitation)
 directly. Then, once you are a member of the organization, you can request to
-join any of the teams on <https://github.com/orgs/iree-org/teams>.
+join any of the teams on <https://github.com/orgs/iree-org/teams> (note that
+some teams are nested under iree-triage, so click the caret to expand the list).
+
+Write access is reserved for "established contributors" who have a track record
+of multiple high quality pull requests or reviews and have demonstrated
+familiarity with the contributing guidelines.
+
+!!! question "Questions about access"
+
+    For questions about access policies, feel free to reach out on the
+    [`#github` channel](https://discord.com/channels/689900678990135345/1166024193599615006)
+    on IREE's Discord server, the <iree-github-requests@lists.lfaidata.foundation>
+    email list, or another of our
+    [communication channels](../../index.md#communication-channels) to discuss.
 
 ### :octicons-git-branch-16: Branch naming
 
