@@ -382,7 +382,9 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
                             iree_time_t deadline_ns) {
   struct pollfd poll_fds;
   poll_fds.fd = iree_wait_primitive_get_read_fd(handle);
-  if (poll_fds.fd == -1) return false;
+  if (poll_fds.fd == -1) {
+    return iree_ok_status();  // no-op wait
+  }
   poll_fds.events = POLLIN;
   poll_fds.revents = 0;
 
