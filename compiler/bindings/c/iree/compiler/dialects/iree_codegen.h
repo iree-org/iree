@@ -92,6 +92,9 @@ MLIR_CAPI_EXPORTED ireeCodegenAttentionOpDetail
 ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
                                 MlirAffineMap vMap, MlirAffineMap oMap);
 
+MLIR_CAPI_EXPORTED bool
+ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op);
+
 #ifdef __cplusplus
 }
 #endif

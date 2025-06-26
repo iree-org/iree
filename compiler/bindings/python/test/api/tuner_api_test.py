@@ -113,3 +113,40 @@ def attention_op_detail():
     assert [attr.value for attr in result.k1_dims] == []
     assert [attr.value for attr in result.k2_dims] == [2]
     assert [attr.value for attr in result.n_dims] == [3]
+
+
+@run
+def test_isa_attention_op():
+    module_str = """
+        module {
+               func.func @attention_20x4096x64x4096x64(
+                    %q : tensor<20x4096x64xf16>,
+                    %k : tensor<20x4096x64xf16>,
+                    %v : tensor<20x4096x64xf16>,
+                    %scale : f16,
+                    %output : tensor<20x4096x64xf16>
+                ) -> tensor<20x4096x64xf16> {
+                    %result = iree_linalg_ext.attention { root_op,
+                        indexing_maps = [
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+                        ]
+                    } ins(%q, %k, %v, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
+                        outs(%output : tensor<20x4096x64xf16>) {
+                    ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                    } -> tensor<20x4096x64xf16>
+                    return %result : tensor<20x4096x64xf16>
+                }
+        }
+    """
+    input_module = ir.Module.parse(module_str)
+    assert input_module is not None, "Failed to parse input MLIR module"
+    print(input_module)
+    root_op_list = iree_codegen.get_tuner_root_ops(input_module)
+    assert len(root_op_list) == 1
+    assert root_op_list[0].name == "iree_linalg_ext.attention"
+    assert iree_codegen.isa_attention_op(root_op_list[0])

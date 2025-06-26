@@ -501,4 +501,12 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "Infers the structure of an attention operation from affine indexing "
       "maps.",
       py::arg("q"), py::arg("k"), py::arg("v"), py::arg("o"));
+
+  iree_codegen_module.def(
+      "isa_attention_op",
+      [](MlirOperation op) -> bool {
+        return ireeCodegenMlirOperationIsACodegenAttentionOp(op);
+      },
+      "Checks if the given operation is an IREE LinalgExt attention op.",
+      py::arg("op"));
 }

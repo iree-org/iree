@@ -19,6 +19,7 @@ VER_0 {
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
     ireeCodegenQueryMMAIntrinsics;
+    ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
     ireeCodegenTranslationInfoAttrGetTypeID;
