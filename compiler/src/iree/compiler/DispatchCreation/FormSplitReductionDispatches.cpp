@@ -27,6 +27,7 @@ namespace {
 struct FormSplitReductionDispatchesPass final
     : public impl::FormSplitReductionDispatchesPassBase<
           FormSplitReductionDispatchesPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -40,28 +41,35 @@ static void getReductionDims(TilingInterface op, SmallVector<unsigned> &dims) {
 }
 
 static LogicalResult tileOpAndWrapInDispatch(RewriterBase &rewriter,
-                                             TilingInterface op) {
+                                             TilingInterface op,
+                                             OpFoldResult splitSize) {
   IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
-  // Tile the operation.
   scf::SCFTilingOptions options;
   options.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
   options.setReductionTilingStrategy(
       ReductionTilingStrategy::PartialReductionOuterParallel);
-  // TODO: fix this
+
+  // Set tile sizes.
   SmallVector<OpFoldResult> tileSizes;
+  auto zeroAttr = rewriter.getIndexAttr(0);
   for (utils::IteratorType iteratorType : op.getLoopIteratorTypes()) {
     if (iteratorType == utils::IteratorType::parallel) {
-      tileSizes.push_back(rewriter.getIndexAttr(0));
+      tileSizes.push_back(zeroAttr);
     } else {
-      tileSizes.push_back(rewriter.getIndexAttr(128));
+      tileSizes.push_back(splitSize);
     }
   }
   options.setTileSizes(tileSizes);
   SmallVector<unsigned> reductionDims;
   getReductionDims(op, reductionDims);
+  if (reductionDims.size() != 1) {
+    return op.emitError("op must only have one reduction dim");
+  }
   options.setReductionDims(reductionDims);
+
+  // Tile the operation.
   FailureOr<scf::SCFTilingResult> result =
       scf::tileUsingSCF(rewriter, op, options);
   if (failed(result)) {
@@ -69,8 +77,12 @@ static LogicalResult tileOpAndWrapInDispatch(RewriterBase &rewriter,
   }
   rewriter.replaceOp(op, result->replacements);
 
+  // Didn't tile.
+  if (result->loops.size() == 0) {
+    return success();
+  }
   if (result->loops.size() != 1) {
-    return op.emitOpError("expected single tiled loop");
+    return failure();
   }
 
   // Wrap loop in `flow.dispatch.region`.
@@ -98,12 +110,11 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
   });
 
   for (TilingInterface op : reductionOps) {
-    if (failed(tileOpAndWrapInDispatch(rewriter, op))) {
+    if (failed(tileOpAndWrapInDispatch(
+            rewriter, op, rewriter.getIndexAttr(splitSize.getValue())))) {
       return signalPassFailure();
     }
   }
-
-  (void)context;
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation

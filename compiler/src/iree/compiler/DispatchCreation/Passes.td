@@ -265,6 +265,10 @@ def FormScalarDispatchesPass :
 def FormSplitReductionDispatchesPass :
     InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
   let summary = "Partially tile reduction operations and place into dispatches";
+  let options = [
+    Option<"splitSize", "split-size", "int",
+           /*default=*/"0", "Tile size for split reduction">
+  ];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
     "IREE::TensorExt::IREETensorExtDialect",
