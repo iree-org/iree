@@ -161,6 +161,9 @@ void iree_hal_amdgpu_transient_buffer_initialize(
       &iree_hal_amdgpu_transient_buffer_vtable, &out_buffer->base);
   out_buffer->handle = handle;
   out_buffer->release_callback = release_callback;
+
+  // NOTE: transient buffers start with 0 references as they are pooled.
+  iree_atomic_ref_count_init_value(&out_buffer->base.resource.ref_count, 0);
 }
 
 void iree_hal_amdgpu_transient_buffer_deinitialize(
@@ -199,16 +202,18 @@ static void iree_hal_amdgpu_transient_buffer_recycle(
 }
 
 void iree_hal_amdgpu_transient_buffer_reset(
-    iree_hal_amdgpu_transient_buffer_t* buffer,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length) {
-  buffer->base.memory_type = memory_type;
-  buffer->base.allowed_access = allowed_access;
-  buffer->base.allowed_usage = allowed_usage;
+    iree_hal_amdgpu_transient_buffer_t* buffer, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length) {
+  buffer->base.memory_type = params.type;
+  buffer->base.allowed_access = params.access;
+  buffer->base.allowed_usage = params.usage;
   buffer->base.allocation_size = allocation_size;
   buffer->base.byte_offset = byte_offset;
   buffer->base.byte_length = byte_length;
+  buffer->base.placement.queue_affinity = params.queue_affinity
+                                              ? params.queue_affinity
+                                              : IREE_HAL_QUEUE_AFFINITY_ANY;
 }
 
 // Returns the device pointer from the allocation handle if it is currently
@@ -283,7 +288,7 @@ static iree_status_t iree_hal_amdgpu_transient_buffer_flush_range(
 static const iree_hal_buffer_vtable_t iree_hal_amdgpu_transient_buffer_vtable =
     {
         .recycle = iree_hal_amdgpu_transient_buffer_recycle,
-        .destroy = NULL,  // never used
+        .destroy = iree_hal_amdgpu_transient_buffer_recycle,
         .map_range = iree_hal_amdgpu_transient_buffer_map_range,
         .unmap_range = iree_hal_amdgpu_transient_buffer_unmap_range,
         .invalidate_range = iree_hal_amdgpu_transient_buffer_invalidate_range,
