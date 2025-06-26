@@ -99,32 +99,40 @@ set(_EXPORT_OBJECT_SRCS)
 set(_EXPORT_OBJECT_DEPS)
 foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   if(TARGET ${_object_lib})
+    message(STATUS "Verifying object target: '${_object_lib}'")
+
     get_target_property(_imported ${_object_lib} IMPORTED)
+
     if(MSVC AND NOT ${_imported})
       target_compile_definitions(${_object_lib} PRIVATE
+        # See compiler/bindings/c/iree/compiler/api_support.h.
+        # IREE embedded CAPI uses its own macros to enable
+        # declaration specs.
         IREE_EMBED_ENABLE_WINDOWS_DLL_DECLSPEC
         IREE_EMBED_BUILDING_LIBRARY
+
+        # See mlir-c/Support.h for the annotation selection.
         MLIR_CAPI_ENABLE_WINDOWS_DLL_DECLSPEC
         MLIR_CAPI_BUILDING_LIBRARY
       )
     endif()
+
+    list(APPEND _EXPORT_OBJECT_SRCS "$<TARGET_OBJECTS:${_object_lib}>")
+    # Ugh. CMake. GENEX_EVAL is not recursive: it evaluates one level of generator
+    # expressions. There is a way to hold it just right so that GENEX_EVAL is
+    # used at the call site, but it is really tricky and people can't be expected
+    # to get it right. In fact, at the time of this writing, some misc usage
+    # in LLVM causes a second level of generator expressions in some base
+    # libraries. For good measure, we do GENEX_EVAL four times. If you get errors
+    # that show like generator expressions are showing up in link lines, this is
+    # the culprit. Look at the export_objects_debug.txt to confirm. Then, add
+    # another level of fix upstream if you like pain.
+    list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
   else()
-    message(WARNING "Skipping non-target entry: ${_object_lib}")
+    message(WARNING "Skipping non-target entry: '${_object_lib}'")
   endif()
 endforeach()
 
-  list(APPEND _EXPORT_OBJECT_SRCS "$<TARGET_OBJECTS:${_object_lib}>")
-  # Ugh. CMake. GENEX_EVAL is not recursive: it evaluates one level of generator
-  # expressions. There is a way to hold it just right so that GENEX_EVAL is
-  # used at the call site, but it is really tricky and people can't be expected
-  # to get it right. In fact, at the time of this writing, some misc usage
-  # in LLVM causes a second level of generator expressions in some base
-  # libraries. For good measure, we do GENEX_EVAL four times. If you get errors
-  # that show like generator expressions are showing up in link lines, this is
-  # the culprit. Look at the export_objects_debug.txt to confirm. Then, add
-  # another level of fix upstream if you like pain.
-  list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
-endforeach()
 
 # UNCOMMENT TO DEBUG WHAT IS GOING ON.
 # file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
