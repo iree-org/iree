@@ -532,7 +532,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
 
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumer(
-      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
+      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel()),
+      /*tileUsingForall=*/true));
   // The below two passes are nop if the "mmt4d" is explicitly excluded in the
   // ukernels attribute.
   funcPassManager.addPass(createCPUPrepareUkernelsPass());
@@ -540,9 +541,11 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
       static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
+  funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   {
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
