@@ -5213,25 +5213,26 @@ learn how to customize this behavior.</p>
 someone else to merge it for them (e.g. because they don't have write access
 yet).</p>
 <h3 id="obtaining-commit-access"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.73 5.73 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218M4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5m8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M5 3.25a.75.75 0 1 0 0 .005z"/></svg></span> Obtaining commit access<a class="headerlink" href="#obtaining-commit-access" title="Permanent link">link</a></h3>
-<p>Access to affiliated repositories is divided into tiers:</p>
+<p>Access to repositories is divided into tiers following the
+<a href="https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization">GitHub organization permissions model</a>:</p>
 <table>
 <thead>
 <tr>
 <th>Tier</th>
 <th>Description</th>
-<th>Team link</th>
+<th>Team links</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Triage</td>
 <td><strong>New project members should typically start here</strong><br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can be <a href="https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users">assigned issues</a><br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can apply labels to issues / PRs<br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can run workflows <a href="https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks">without approval</a></td>
-<td><a href="https://github.com/orgs/iree-org/teams/iree-triage">iree-triage</a></td>
+<td><ul><li><a href="https://github.com/orgs/iree-org/teams/iree-triage">iree-triage</a><br>(access to most repositories)</li></ul></td>
 </tr>
 <tr>
 <td>Write</td>
-<td><strong>Established project contributors should request this access</strong><br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request">merge approved pull requests</a><br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can create branches<br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can <a href="https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs">re-run workflows</a></td>
-<td><a href="https://github.com/orgs/iree-org/teams/iree-write">iree-write</a></td>
+<td><strong>Established contributors can request this access</strong><br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request">merge approved pull requests</a><br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can create branches<br><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z"/></svg></span> Can <a href="https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs">re-run workflows</a></td>
+<td><ul><li><a href="https://github.com/orgs/iree-org/teams/iree-write">iree-write</a><br>(access to most repositories)</li><li><a href="https://github.com/orgs/iree-org/teams/iree-turbine-write">iree-turbine-write</a><br>(access to <a href="https://github.com/iree-org/iree-turbine">iree-turbine</a>)</li></ul></td>
 </tr>
 <tr>
 <td>Maintain/Admin</td>
@@ -5255,7 +5256,19 @@ Reason for requesting access:
 <p>If approved, an invitation will be sent to your GitHub account. You can also
 view the <a href="https://github.com/orgs/iree-org/invitation">invitation link</a>
 directly. Then, once you are a member of the organization, you can request to
-join any of the teams on <a href="https://github.com/orgs/iree-org/teams">https://github.com/orgs/iree-org/teams</a>.</p>
+join any of the teams on <a href="https://github.com/orgs/iree-org/teams">https://github.com/orgs/iree-org/teams</a> (note that
+some teams are nested under iree-triage, so click the caret to expand the list).</p>
+<p>Write access is reserved for "established contributors" who have a track record
+of multiple high quality pull requests or reviews and have demonstrated
+familiarity with the contributing guidelines.</p>
+<div class="admonition question">
+<p class="admonition-title">Questions about access</p>
+<p>For questions about access policies, feel free to reach out on the
+<a href="https://discord.com/channels/689900678990135345/1166024193599615006"><code>#github</code> channel</a>
+on IREE's Discord server, the <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#105;&#114;&#101;&#101;&#45;&#103;&#105;&#116;&#104;&#117;&#98;&#45;&#114;&#101;&#113;&#117;&#101;&#115;&#116;&#115;&#64;&#108;&#105;&#115;&#116;&#115;&#46;&#108;&#102;&#97;&#105;&#100;&#97;&#116;&#97;&#46;&#102;&#111;&#117;&#110;&#100;&#97;&#116;&#105;&#111;&#110;">&#105;&#114;&#101;&#101;&#45;&#103;&#105;&#116;&#104;&#117;&#98;&#45;&#114;&#101;&#113;&#117;&#101;&#115;&#116;&#115;&#64;&#108;&#105;&#115;&#116;&#115;&#46;&#108;&#102;&#97;&#105;&#100;&#97;&#116;&#97;&#46;&#102;&#111;&#117;&#110;&#100;&#97;&#116;&#105;&#111;&#110;</a>
+email list, or another of our
+<a href="../../../#communication-channels">communication channels</a> to discuss.</p>
+</div>
 <h3 id="branch-naming"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.5 2.5 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25m-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0m8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5M4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5"/></svg></span> Branch naming<a class="headerlink" href="#branch-naming" title="Permanent link">link</a></h3>
 <p>Most work should be done on
 <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks">repository forks</a>.
