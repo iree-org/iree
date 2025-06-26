@@ -1357,6 +1357,95 @@ SmallVector<Range> ArgCompareOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
+SmallVector<utils::IteratorType> ArgCompareOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult>
+ArgCompareOp::getTiledImplementation(OpBuilder &builder,
+                                     ArrayRef<OpFoldResult> offsets,
+                                     ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         "Unexpected offsets size");
+  assert(sizes.size() == static_cast<size_t>(rank) && "Unexpected sizes size");
+
+  SmallVector<Operation *> slices;
+  SmallVector<Value> tiledOperands;
+
+  SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+  Operation *inputSlice =
+      getSlice(builder, loc, getInputValue(), offsets, sizes, strides);
+  tiledOperands.push_back(inputSlice->getResult(0));
+  slices.push_back(inputSlice);
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return emitOpError("failed to compute output tile position");
+  }
+
+  SmallVector<OpFoldResult> outputStrides(outputOffsets.size(),
+                                          builder.getIndexAttr(1));
+  Operation *outputValSlice = getSlice(
+      builder, loc, outputValue(), outputOffsets, outputSizes, outputStrides);
+  tiledOperands.push_back(outputValSlice->getResult(0));
+  slices.push_back(outputValSlice);
+
+  Operation *outputIdxSlice = getSlice(
+      builder, loc, outputIndex(), outputOffsets, outputSizes, outputStrides);
+  tiledOperands.push_back(outputIdxSlice->getResult(0));
+  slices.push_back(outputIdxSlice);
+
+  if (getIndexBase()) {
+    tiledOperands.push_back(getIndexBase());
+  }
+
+  SmallVector<Type> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValSlice->getResult(0).getType());
+    resultTypes.push_back(outputIdxSlice->getResult(0).getType());
+  }
+
+  Operation *tiledArgmaxOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{
+      {tiledArgmaxOp}, SmallVector<Value>(tiledArgmaxOp->getResults()), slices};
+}
+
+LogicalResult ArgCompareOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  int64_t dim = getDimension();
+  int64_t inputRank = getInputRank();
+
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i == dim) {
+      continue;
+    }
+    resultOffsets.push_back(offsets[i]);
+    resultSizes.push_back(sizes[i]);
+  }
+
+  return success();
+}
+
+FailureOr<TilingResult>
+ArgCompareOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                      ArrayRef<OpFoldResult> offsets,
+                                      ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
 LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
                                                          Location loc,
                                                          ValueRange ivs) {
