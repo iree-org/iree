@@ -342,7 +342,9 @@ void buildDispatchCreationPassPipeline(
       /// `iree_tensor_ext.dispatch.workload.ordinal`
       ///   to map the captured operand to the position in the workload list.
       .addPass(
-          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass);
+          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass)
+      .addPass(createCSEPass)
+      .addPass(IREE::Flow::createCanonicalizePass);
 }
 
 namespace {
