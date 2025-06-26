@@ -53,7 +53,9 @@ jobs:
         run: |
           choco install sccache
           choco install cmake
-          choco install ninja
+          # ninja pinned due to a bug in the 1.13.0 release:
+          # https://github.com/ninja-build/ninja/issues/2616
+          choco install ninja --version 1.12.1
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
