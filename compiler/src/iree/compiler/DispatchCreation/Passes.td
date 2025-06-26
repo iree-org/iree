@@ -271,7 +271,6 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
     "IREE::Encoding::IREEEncodingDialect",
   ];
 }
-
 def HoistEncodingOpsPass :
     InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
   let summary = "Hoists tensor encoding ops out of flow dispatch regions.";

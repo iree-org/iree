@@ -231,19 +231,23 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
                 options.enableAggressiveFusion});
       })
       // Collapse dimensions of linalg Ops.
-      .addPass(DispatchCreation::createCollapseDimensionsPass);
+      .addPass(DispatchCreation::createCollapseDimensionsPass)
+      // Hoist scalar compute introduced from collapsing dimensions to
+      // increase CSE and deduplication opportunities.
+      //.addPass(DispatchCreation::createHoistUniformScalarComputePass);
+      // Run canonicalizer first to make propagation easier.
+      .addPass([&]() {
+        IREE::Flow::CanonicalizePassOptions options;
+        options.cseConstants = false;
+        return IREE::Flow::createCanonicalizePass(options);
+      })
+      .addPass(createCSEPass);
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be
   // separated from compiler fusion decisions.
   if (clEnableDataTiling) {
     FunctionLikeNest(passManager)
-        // Run canonicalizer first to make propagation easier.
-        .addPass([&]() {
-          IREE::Flow::CanonicalizePassOptions options;
-          options.cseConstants = false;
-          return IREE::Flow::createCanonicalizePass(options);
-        })
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
@@ -339,7 +343,9 @@ void buildDispatchCreationPassPipeline(
       /// `iree_tensor_ext.dispatch.workload.ordinal`
       ///   to map the captured operand to the position in the workload list.
       .addPass(
-          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass);
+          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass)
+      .addPass(createCSEPass)
+      .addPass(IREE::Flow::createCanonicalizePass);
 }
 
 namespace {
