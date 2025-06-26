@@ -125,7 +125,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
     SmallVector<tensor::ExpandShapeOp> maybeExpands(numOperands, nullptr);
     SmallVector<Value> newOperands(tiledOp.getOperands());
     SmallVector<Attribute> newPermutations;
-    if (*permutationsAttr) {
+    if (permutationsAttr) {
       newPermutations = llvm::to_vector(*permutationsAttr);
     }
 
