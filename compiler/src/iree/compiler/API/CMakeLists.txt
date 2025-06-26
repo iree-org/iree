@@ -98,39 +98,20 @@ message(STATUS "Final _EXPORT_OBJECT_LIBS: ${_EXPORT_OBJECT_LIBS}")
 set(_EXPORT_OBJECT_SRCS)
 set(_EXPORT_OBJECT_DEPS)
 foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
-  # On MSVC, source level __declspec(dllexport) remain the most precise
-  # way to control DLL API availability. All of the MLIR and IREE CAPI
-  # are annotated this way, which approximates the same behavior we get if
-  # building the overall project with visibility=hidden on POSIX.
-  # Emission of these annotations is guarded by two macros in each
-  # codebase: one to enable DECLSPEC emission at all and another
-  # to indicate that we are building a library and the symbols should be
-  # exported (vs imported). Note that with CMake controlling linking,
-  # it is not necessary to emit dllimport annotations, since CMake will
-  # link against the import library, which is sufficient for functions.
-  # The alternative is to export everything by setting (on the SharedImpl):
-  #   WINDOWS_EXPORT_ALL_SYMBOLS ON
-  # This, however, produces on the order of 6-10k exported symbols, whereas
-  # the focused API is 1/10 of that.
-  #
-  # It isn't super polite to be poking at other people's library definitions
-  # like this, but MSVC is weird and given the structure of the projects, this
-  # isn't so bad.
-  get_target_property(_imported ${_object_lib} IMPORTED)
-  message(STATUS "Verifying object target: '${_object_lib}'")
-  if(MSVC AND NOT ${_imported})
-    target_compile_definitions(${_object_lib} PRIVATE
-      # See compiler/bindings/c/iree/compiler/api_support.h.
-      # IREE embedded CAPI uses its own macros to enable
-      # declaration specs.
-      IREE_EMBED_ENABLE_WINDOWS_DLL_DECLSPEC
-      IREE_EMBED_BUILDING_LIBRARY
-
-      # See mlir-c/Support.h for the annotation selection.
-      MLIR_CAPI_ENABLE_WINDOWS_DLL_DECLSPEC
-      MLIR_CAPI_BUILDING_LIBRARY
-    )
+  if(TARGET ${_object_lib})
+    get_target_property(_imported ${_object_lib} IMPORTED)
+    if(MSVC AND NOT ${_imported})
+      target_compile_definitions(${_object_lib} PRIVATE
+        IREE_EMBED_ENABLE_WINDOWS_DLL_DECLSPEC
+        IREE_EMBED_BUILDING_LIBRARY
+        MLIR_CAPI_ENABLE_WINDOWS_DLL_DECLSPEC
+        MLIR_CAPI_BUILDING_LIBRARY
+      )
+    endif()
+  else()
+    message(WARNING "Skipping non-target entry: ${_object_lib}")
   endif()
+endforeach()
 
   list(APPEND _EXPORT_OBJECT_SRCS "$<TARGET_OBJECTS:${_object_lib}>")
   # Ugh. CMake. GENEX_EVAL is not recursive: it evaluates one level of generator
