@@ -133,6 +133,8 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   endif()
 endforeach()
 
+message(STATUS "Final _EXPORT_OBJECT_DEPS: ${_EXPORT_OBJECT_DEPS}")
+
 
 # UNCOMMENT TO DEBUG WHAT IS GOING ON.
 # file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
