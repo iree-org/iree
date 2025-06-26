@@ -788,6 +788,244 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @arg_compare_tile_tensor(
+    %input: tensor<?x?xf32>,
+    %outv: tensor<?xf32>,
+    %outi: tensor<?xi32>
+) -> (tensor<?xf32>, tensor<?xi32>) {
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<?x?xf32>)
+    outs(%outv, %outi : tensor<?xf32>, tensor<?xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xf32>, tensor<?xi32>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xi32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK:       func.func @arg_compare_tile_tensor
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK:         %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C10]] iter_args(%[[V0:.+]] = %[[ARG1]], %[[V1:.+]] = %[[ARG2]])
+// CHECK:           %[[MIN:.+]] = affine.min #[[MAP0]](%[[IV]])[%[[D0]]]
+// CHECK:           %[[SLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[IV]], 0] [%[[MIN]], %[[D1]]] [1, 1]
+// CHECK:           %[[SLICE1:.+]] = tensor.extract_slice %[[V0]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[SLICE2:.+]] = tensor.extract_slice %[[V1]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[CMP:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:      ins(%[[SLICE0]]
+// CHECK-SAME:      outs(%[[SLICE1]], %[[SLICE2]]
+// CHECK:           %[[INS0:.+]] = tensor.insert_slice %[[CMP]]#0 into %[[V0]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[INS1:.+]] = tensor.insert_slice %[[CMP]]#1 into %[[V1]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           scf.yield %[[INS0]], %[[INS1]]
+// CHECK:         return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @arg_compare_tile_memref(
+    %input: memref<?x?xf32>,
+    %outv: memref<?xf32>,
+    %outi: memref<?xi32>
+) {
+  iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : memref<?x?xf32>)
+    outs(%outv, %outi : memref<?xf32>, memref<?xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK:       func.func @arg_compare_tile_memref
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+// CHECK:         %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
+// CHECK:         scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
+// CHECK:           %[[MIN:.+]] = affine.min #[[MAP0]](%[[IV]])[%[[D0]]]
+// CHECK:           %[[SV0:.+]] = memref.subview %[[ARG0]][%[[IV]], 0] [%[[MIN]], %[[D1]]] [1, 1]
+// CHECK:           %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[SV2:.+]] = memref.subview %[[ARG2]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           iree_linalg_ext.arg_compare
+// CHECK-SAME:        dimension(1)
+// CHECK-SAME:        ins(%[[SV0]]
+// CHECK-SAME:        outs(%[[SV1]], %[[SV2]]
+// CHECK:           return
+
+// -----
+
+func.func @arg_compare_1d(%input: tensor<128xf32>) -> tensor<i32> {
+  %outv = tensor.empty() : tensor<f32>
+  %outi = tensor.empty() : tensor<i32>
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%input : tensor<128xf32>)
+    outs(%outv, %outi : tensor<f32>, tensor<i32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<f32>, tensor<i32>
+  return %result#1 : tensor<i32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.tile_using_for %0 tile_sizes [0]
+         : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+//      CHECK: func.func @arg_compare_1d(
+// CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xf32>
+//      CHECK:   %[[ACCV:.+]] = tensor.empty() : tensor<f32>
+//      CHECK:   %[[ACCI:.+]] = tensor.empty() : tensor<i32>
+//      CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:       ins(%[[OPERAND]] :
+// CHECK-SAME:       outs(%[[ACCV]], %[[ACCI]] :
+//      CHECK:   return %[[RESULT]]#1
+
+// -----
+
+func.func @arg_compare_2d_dim0(%input: tensor<16x32xf32>) -> tensor<32xi32> {
+  %outv = tensor.empty() : tensor<32xf32>
+  %outi = tensor.empty() : tensor<32xi32>
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%input : tensor<16x32xf32>)
+    outs(%outv, %outi : tensor<32xf32>, tensor<32xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<32xf32>, tensor<32xi32>
+  return %result#1 : tensor<32xi32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    // Only tile the non-reduction dimension: columns.
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0) -> (-d0 + 32, 20)>
+//      CHECK:  func.func @arg_compare_2d_dim0(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
+//  CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+//  CHECK-DAG:    %[[C20:.+]] = arith.constant 20 : index
+//  CHECK-DAG:    %[[ACCV:.+]] = tensor.empty() : tensor<32xf32>
+//  CHECK-DAG:    %[[ACCI:.+]] = tensor.empty() : tensor<32xi32>
+//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
+// CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[ACCV]], %[[ARG3:.+]] = %[[ACCI]])
+//      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])
+//      CHECK:      %[[UPDATE_SLICE_IN:.+]] = tensor.extract_slice %[[ARG0]][0, %[[I]]] [16, %[[SIZE]]] [1, 1]
+//      CHECK:      %[[UPDATE_SLICE_OUTV:.+]] = tensor.extract_slice %[[ARG2]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:      %[[UPDATE_SLICE_OUTI:.+]] = tensor.extract_slice %[[ARG3]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:      %[[ARGCMP_TILE:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:       dimension(0)
+// CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
+// CHECK-SAME:       outs(%[[UPDATE_SLICE_OUTV]], %[[UPDATE_SLICE_OUTI]]
+//      CHECK:       %[[ACCV_YIELD:.+]] = tensor.insert_slice %[[ARGCMP_TILE]]#0 into %[[ARG2]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:       %[[ACCI_YIELD:.+]] = tensor.insert_slice %[[ARGCMP_TILE]]#1 into %[[ARG3]][%[[I]]] [%[[SIZE]]] [1]
+//      CHECK:       scf.yield %[[ACCV_YIELD]], %[[ACCI_YIELD]] : tensor<32xf32>, tensor<32xi32>
+//      CHECK:   return %[[RESULT]]#1
+
+// -----
+
+func.func @arg_compare_with_base(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>,
+    %base : index
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>)
+    index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op
+         : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [1, 0]
+         : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func.func @arg_compare_with_base(
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x6xf32>
+// CHECK-SAME:    %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
+// CHECK-SAME:    %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xindex>
+// CHECK-SAME:    %[[BASE:[a-zA-Z0-9_]+]]: index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK:        %[[RESULT:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK-SAME:      iter_args(%[[VARG:.+]] = %[[OUTV]], %[[IARG:.+]] = %[[OUTI]])
+// CHECK:          %[[SLICE_IN:.+]] = tensor.extract_slice %[[INPUT]][%[[IV]], 0] [1, 6] [1, 1]
+// CHECK:          %[[SLICE_OUTV:.+]] = tensor.extract_slice %[[VARG]][%[[IV]]] [1] [1]
+// CHECK:          %[[SLICE_OUTI:.+]] = tensor.extract_slice %[[IARG]][%[[IV]]] [1] [1]
+// CHECK:          %[[ARGCMP:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:         dimension(1)
+// CHECK-SAME:         ins(%[[SLICE_IN]]
+// CHECK-SAME:         outs(%[[SLICE_OUTV]], %[[SLICE_OUTI]]
+// CHECK-SAME:         index_base(%[[BASE]]
+// CHECK:          %[[INS_OUTV:.+]] = tensor.insert_slice %[[ARGCMP]]#0 into %[[VARG]][%[[IV]]] [1] [1]
+// CHECK:          %[[INS_OUTI:.+]] = tensor.insert_slice %[[ARGCMP]]#1 into %[[IARG]][%[[IV]]] [1] [1]
+// CHECK:          scf.yield %[[INS_OUTV]], %[[INS_OUTI]]
+// CHECK:        return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
 func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
