@@ -478,6 +478,9 @@ struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
 FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
                                    int64_t startDim, int64_t numDims,
                                    Value operand, ShapedType ty) {
+  if (numDims == 0) {
+    return failure();
+  }
   // Find list of dims to drop and the target shape.
   ArrayRef<int64_t> shape = ty.getShape();
   SmallVector<bool> unitDims(shape.size(), false);
