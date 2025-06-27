@@ -154,6 +154,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
                                                executableOp, exportOp);
 }
 
+
 struct OutlineDispatchRegionsPass
     : public IREE::Flow::impl::OutlineDispatchRegionsPassBase<
           OutlineDispatchRegionsPass> {
@@ -164,6 +165,7 @@ struct OutlineDispatchRegionsPass
     for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Generate a nice name if possible. All ops we outline in the same scope
       // will have the same root name.
+
       std::string namePrefix;
       if (isa<IREE::Util::InitializerOp>(funcOp)) {
         namePrefix =
