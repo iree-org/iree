@@ -402,7 +402,8 @@ LogicalResult isAtBoundary(Operation *op) {
 }
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
-                                   const GPUPipelineOptions &pipelineOptions) {
+                                   const GPUPipelineOptions &pipelineOptions,
+                                   bool forROCDL) {
   if (pipelineOptions.useIgemmConvolution) {
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
@@ -556,11 +557,11 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-  if (pipelineOptions.prefetchSharedMemory) {
+  if (forROCDL && pipelineOptions.prefetchSharedMemory) {
     funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-    funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
+    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
   }
 
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
@@ -864,8 +865,8 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 }
 
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
-                                        const GPUPipelineOptions &options) {
-
+                                        const GPUPipelineOptions &options,
+                                        bool forROCDL) {
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
 
@@ -969,8 +970,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-  if (options.prefetchSharedMemory) {
-    funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
+  if (forROCDL && options.prefetchSharedMemory) {
+    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
   }
   if (clLLVMGPUEnableSharedMemoryReuse) {
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());

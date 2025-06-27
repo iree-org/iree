@@ -14,28 +14,30 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_LLVMGPUPREFETCHSHAREDMEMORYPASS
+#define GEN_PASS_DEF_ROCDLPREFETCHSHAREDMEMORYPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
 
-struct LLVMGPUPrefetchSharedMemoryPass final
-    : impl::LLVMGPUPrefetchSharedMemoryPassBase<
-          LLVMGPUPrefetchSharedMemoryPass> {
+static void prefetchSharedMemory(FunctionOpInterface funcOp) {
+  IRRewriter rewriter(funcOp.getContext());
+  SmallVector<scf::ForOp> loops;
+  funcOp.walk([&loops](scf::ForOp forOp) { loops.push_back(forOp); });
+
+  for (scf::ForOp forOp : loops) {
+    FailureOr<scf::ForOp> newLoop = prefetchSharedMemoryCopy(rewriter, forOp);
+    // The only possible failure is the analysis failure, which does not cause
+    // the pass to fail. Therefore we discard any failures at this point.
+    (void)newLoop;
+    break; // TODO: Fix nested loop handling.
+  }
+}
+
+struct ROCDLPrefetchSharedMemoryPass final
+    : impl::ROCDLPrefetchSharedMemoryPassBase<ROCDLPrefetchSharedMemoryPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    IRRewriter rewriter(funcOp.getContext());
-
-    SmallVector<scf::ForOp> loops;
-    funcOp.walk([&loops](scf::ForOp forOp) { loops.push_back(forOp); });
-
-    for (scf::ForOp forOp : loops) {
-      FailureOr<scf::ForOp> newLoop = prefetchSharedMemoryCopy(rewriter, forOp);
-      // The only possible failure is the analysis failure, which does not cause
-      // the pass to fail. Therefore we discard any failures at this point.
-      (void)newLoop;
-      break; // TODO: Fix nested loop handling.
-    }
+    prefetchSharedMemory(funcOp);
   }
 };
 
