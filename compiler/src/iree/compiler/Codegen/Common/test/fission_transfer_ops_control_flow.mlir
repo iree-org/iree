@@ -34,6 +34,23 @@ func.func @fission_global_read_to_private_write(%arg0: memref<1x?x?x8xbf16, #amd
 
 // -----
 
+func.func @fission_memref_vector_dim_no_match(%arg0: memref<1x1x1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: memref<1x1x1x8xbf16, #gpu.address_space<private>>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  scf.for %arg5 = %c0 to %arg1 step %c1 {
+    %read = vector.transfer_read %arg0[%c0, %c0, %c0, %c0], %cst : memref<1x1x1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+    vector.transfer_write %read, %arg2[%c0, %c0, %c0, %c0] : vector<8xbf16>, memref<1x1x1x8xbf16, #gpu.address_space<private>>
+  }
+  return
+}
+// MULTI-all-count-2: scf.for
+
+// SINGLE: scf.for
+// SINGLE-NOT: scf.for
+
+// -----
+
 // CHECK-ALL-LABEL: @fission_global_read_to_workgroup_write
 // CHECK-ALL-SAME: %[[ARG0:.*]]: index
 // CHECK-ALL-SAME: %[[ARG1:.*]]: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>

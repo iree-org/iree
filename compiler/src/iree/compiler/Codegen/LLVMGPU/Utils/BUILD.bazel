@@ -19,7 +19,7 @@ iree_compiler_cc_library(
     srcs = [
         "LLVMGPUSelectUKernels.cpp",
         "LLVMGPUUtils.cpp",
-        "PrefetchSharedMemoryCopy.cpp",
+        "ROCDLPrefetchSharedMemoryCopy.cpp",
     ],
     hdrs = [
         "LLVMGPUSelectUKernels.h",

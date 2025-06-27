@@ -119,7 +119,8 @@ static void setupReadLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
 
   auto readLoopIndex = createMemrefAccessIndex(rewriter, readLoop);
   SmallVector<Value> readLoopIndices = {readLoopIndex};
-  auto readOpIndicesSize = readOp.getIndices().size();
+  // Use alloca size to determine the number of zero indices needed.
+  auto readOpIndicesSize = alloca.getType().getShape().size() - 1;
   auto constantZero =
       rewriter.create<arith::ConstantIndexOp>(readOp.getLoc(), 0);
   auto zeroIndices = SmallVector<Value>(readOpIndicesSize, constantZero);
@@ -142,7 +143,8 @@ static void setupWriteLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
 
   auto writeLoopIndex = createMemrefAccessIndex(rewriter, writeLoop);
   SmallVector<Value> writeLoopIndices = {writeLoopIndex};
-  auto zeroIndicesSize = writeOp.getIndices().size();
+  // Use alloca size to determine the number of zero indices needed.
+  auto zeroIndicesSize = alloca.getType().getShape().size() - 1;
   auto constantZero =
       rewriter.create<arith::ConstantIndexOp>(readOp.getLoc(), 0);
   SmallVector<Value> zeroIndices(zeroIndicesSize, constantZero);
@@ -231,7 +233,7 @@ struct FissionTarget {
 static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
   // Fission Loop always has a transfer_write as the last operation.
   auto lastOp = forOp.getBody()->getTerminator()->getPrevNode();
-  if (!isa<vector::TransferWriteOp>(lastOp)) {
+  if (!isa_and_present<vector::TransferWriteOp>(lastOp)) {
     return failure();
   }
 

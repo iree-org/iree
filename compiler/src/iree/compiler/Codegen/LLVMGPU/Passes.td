@@ -86,9 +86,10 @@ def LLVMGPUPackSharedMemoryAllocPass :
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
 }
 
-def LLVMGPUPrefetchSharedMemoryPass :
+def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
-  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
+      let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"
+          "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.";
 }
 
 def LLVMGPUSelectLoweringStrategyPass :

@@ -19,7 +19,7 @@ iree_cc_library(
   SRCS
     "LLVMGPUSelectUKernels.cpp"
     "LLVMGPUUtils.cpp"
-    "PrefetchSharedMemoryCopy.cpp"
+    "ROCDLPrefetchSharedMemoryCopy.cpp"
   DEPS
     LLVMExecutionEngine
     LLVMIRReader
