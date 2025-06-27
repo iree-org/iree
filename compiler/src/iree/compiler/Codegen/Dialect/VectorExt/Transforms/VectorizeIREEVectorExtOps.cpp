@@ -525,9 +525,6 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   ShapedType gatherTy = gatherOp.getOutputType();
   ShapedType sourceTy = gatherOp.getSourceType();
 
-  SmallVector<OpFoldResult> gatherDims =
-      tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());
-
   if (vectorSizes.empty()) {
     vectorSizes = gatherTy.getShape();
   }
@@ -544,6 +541,8 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
       gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero));
   // Mask the index_vec read.
   VectorType indicesMaskType = indicesVecTy.clone(rewriter.getI1Type());
+  SmallVector<OpFoldResult> gatherDims =
+      tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());
   Value indicesMask = rewriter.create<vector::CreateMaskOp>(
       loc, indicesMaskType,
       ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
@@ -585,6 +584,12 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   return success();
 }
 
+/// Lowers vector.mask %mask { iree_vector_ext.transfer_gather }
+///  into
+/// iree_vector_ext.transfer_gather %mask
+///
+/// Ideally, the mask should have just been put on transfer_gather directly,
+/// but this is done this way to match upstream vector.transfer_read masking.
 struct MaskedTransferGatherOpPattern : public OpRewritePattern<vector::MaskOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
@@ -598,9 +603,10 @@ public:
     // TODO: The 'vector.mask' passthru is a vector and 'vector.transfer_read'
     // expects a scalar. We could only lower one to the other for cases where
     // the passthru is a broadcast of a scalar.
-    if (maskOp.hasPassthru())
+    if (maskOp.hasPassthru()) {
       return rewriter.notifyMatchFailure(
-          maskOp, "Can't lower passthru to vector.transfer_read");
+          maskOp, "can't lower passthru to transfer_gather");
+    }
     // Replace the `vector.mask` operation.
     rewriter.replaceOpWithNewOp<TransferGatherOp>(
         maskOp, gatherOp.getVectorType(), gatherOp.getBase(),
