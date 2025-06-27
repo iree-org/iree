@@ -230,7 +230,7 @@ struct MaterializeUserConfigsPass final
       IREE::Codegen::TranslationInfoAttr translationInfo =
           getTranslationInfo(funcOp);
       if (translationInfo) {
-        return;
+        continue;
       }
 
       /// First, apply all user configs.
@@ -256,13 +256,13 @@ struct MaterializeUserConfigsPass final
           translationInfo.getDispatchLoweringPassPipeline() !=
               IREE::Codegen::DispatchLoweringPassPipeline::
                   TransformDialectCodegen) {
-        return;
+        continue;
       }
 
       std::optional<SymbolRefAttr> strategyName =
           translationInfo.getCodegenSpec();
       if (!strategyName || *strategyName == SymbolRefAttr()) {
-        return;
+        continue;
       }
 
       /// If we have a symbol, verify the existence of the symbol within the
