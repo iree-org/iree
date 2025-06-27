@@ -36,6 +36,8 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRArithDialect
+    MLIRBufferizationDialect
+    MLIRBufferizationTransforms
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
