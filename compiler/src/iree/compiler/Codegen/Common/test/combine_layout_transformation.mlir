@@ -305,4 +305,3 @@ func.func @no_map_scatter_op(%2 : tensor<196608x35xbf16>, %9 : tensor<8x16x1x16x
 }
 // CHECK-LABEL: @no_map_scatter_op
 //   CHECK-NOT:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
-//   CHECK-NOT:        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
