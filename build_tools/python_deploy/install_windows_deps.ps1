@@ -24,7 +24,7 @@ $PYTHON_VERSIONS_NO_DOT = @(
 
 # These can be discovered at https://www.python.org/downloads/windows/
 $PYTHON_INSTALLER_URLS = @(
-  "https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe" #,
+  "https://www.python.org/ftp/python/3.13.1/python-3.13.1-amd64.exe" #,
   "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" #,
   "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" #,
   # "https://www.python.org/ftp/python/3.10.5/python-3.10.5-amd64.exe",
@@ -45,7 +45,7 @@ for($i=0 ; $i -lt $PYTHON_VERSIONS.Length; $i++) {
   $PYTHON_INSTALLER_URL = $PYTHON_INSTALLER_URLS[$i]
   Write-Host "-- Installing Python ${PYTHON_VERSION} from ${PYTHON_INSTALLER_URL}"
 
-  if ($PYTHON_VERSION -ne "3.13" -and "${INSTALLED_VERSIONS_OUTPUT}" -like "*${PYTHON_VERSION}*") {
+  if ("${INSTALLED_VERSIONS_OUTPUT}" -like "*${PYTHON_VERSION}*") {
     Write-Host "::  Python version already installed. Not reinstalling."
   } else {
     $DOWNLOAD_ROOT = "$env:TEMP/iree_python_install"
