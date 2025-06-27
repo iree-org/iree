@@ -47,40 +47,40 @@ struct HoistUniformScalarComputePass
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
-    WalkResult walkResult = funcOp.walk([&](IREE::Flow::DispatchRegionOp
-                                                dispatch) {
-      for (Block &body : dispatch.getBody()) {
-        SmallVector<Operation *> ops = llvm::map_to_vector(
-            body.getOperations(), [](Operation &op) { return &op; });
-        for (Operation *op : ops) {
-          if (isUniformScalarForDispatch(op, dispatch)) {
-            op->moveBefore(dispatch);
-          }
-        }
-      }
-
-      llvm::SetVector<Operation *> constantsToClone;
-      mlir::visitUsedValuesDefinedAbove(
-          dispatch.getBody(), dispatch.getBody(), [&](OpOperand *operand) {
-            Value v = operand->get();
-            auto constant = v.getDefiningOp<arith::ConstantOp>();
-            if (!constant || !v.getType().isIntOrIndex()) {
-              return;
+    WalkResult walkResult =
+        funcOp.walk([&](IREE::Flow::DispatchRegionOp dispatch) {
+          for (Block &body : dispatch.getBody()) {
+            SmallVector<Operation *> ops = llvm::map_to_vector(
+                body.getOperations(), [](Operation &op) { return &op; });
+            for (Operation *op : ops) {
+              if (isUniformScalarForDispatch(op, dispatch)) {
+                op->moveBefore(dispatch);
+              }
             }
-            constantsToClone.insert(constant);
-          });
-      for (Operation *constant : constantsToClone) {
-        if (constant->hasOneUse()) {
-          constant->moveBefore(&dispatch.getBody().front().front());
-        } else {
-          if (failed(IREE::Flow::clonePrecedingOpIntoDispatchRegion(
-                  rewriter, constant, dispatch))) {
-            return WalkResult::interrupt();
           }
-        }
-      }
-      return WalkResult::advance();
-    });
+
+          llvm::SetVector<Operation *> constantsToClone;
+          mlir::visitUsedValuesDefinedAbove(
+              dispatch.getBody(), dispatch.getBody(), [&](OpOperand *operand) {
+                Value v = operand->get();
+                auto constant = v.getDefiningOp<arith::ConstantOp>();
+                if (!constant || !v.getType().isIntOrIndex()) {
+                  return;
+                }
+                constantsToClone.insert(constant);
+              });
+          for (Operation *constant : constantsToClone) {
+            if (constant->hasOneUse()) {
+              constant->moveBefore(&dispatch.getBody().front().front());
+            } else {
+              if (failed(IREE::Flow::clonePrecedingOpIntoDispatchRegion(
+                      rewriter, constant, dispatch))) {
+                return WalkResult::interrupt();
+              }
+            }
+          }
+          return WalkResult::advance();
+        });
     if (walkResult.wasInterrupted()) {
       funcOp->emitError("Failed to clone constant into dispatch region.");
       return signalPassFailure();
