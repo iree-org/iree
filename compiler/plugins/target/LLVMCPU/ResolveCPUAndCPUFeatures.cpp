@@ -6,6 +6,7 @@
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/Host.h"
@@ -99,7 +100,8 @@ void tweakCPUFeatures(const llvm::Triple &triple, std::string &cpu,
 }
 
 std::string getImplicitGenericFallbackMessage(std::string_view triple_str) {
-  llvm::Triple triple(triple_str);
+  llvm::StringRef triple_str_ref(triple_str);
+  llvm::Triple triple(triple_str_ref);
   std::string msg = R"MSG(
 Defaulting to targeting a generic CPU for the target architecture will result in poor performance. Please specify a target CPU and/or a target CPU feature set. If it is intended to target a generic CPU, specify "generic" as the CPU.
 
@@ -153,7 +155,8 @@ Examples:
 }
 
 std::string getUnknownCPUMessage(std::string_view triple_str) {
-  llvm::Triple triple(triple_str);
+  llvm::StringRef triple_str_ref(triple_str);
+  llvm::Triple triple(triple_str_ref);
   std::string msg = llvm::formatv("Unknown CPU for target architecture {}.\n",
                                   triple.getArchName());
   if (triple.isX86()) {
@@ -192,7 +195,8 @@ resolveCPUAndCPUFeatures(std::string_view triple_str, std::string &cpu,
     return a == ResolveCPUAndCPUFeaturesStatus::OK ? b : a;
   };
 
-  llvm::Triple triple(triple_str);
+  llvm::StringRef triple_str_ref(triple_str);
+  llvm::Triple triple(triple_str_ref);
   // No early-return on error status. The caller may treat these errors as
   // non-fatal and will carry on with whichever `cpu` and `cpuFeatures` we
   // produce.
