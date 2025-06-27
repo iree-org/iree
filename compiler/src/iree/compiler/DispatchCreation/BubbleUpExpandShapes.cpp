@@ -316,7 +316,8 @@ struct BubbleExpandThroughConcat final
           return rewriter.notifyMatchFailure(
               expandOp, "More than one dynamic expanded dim");
         }
-        // Allows us to zip in the next loop.
+        // Note that we don't have to multiply by the dynamic dim here becuase
+        // it must be outermost Allows us to zip in the next loop.
         expandShapeProducts.push_back(expandShapeProduct);
         continue;
       }
@@ -342,6 +343,7 @@ struct BubbleExpandThroughConcat final
     } // else we can always propagate the expand_shape through the concat.
 
     auto mixedOutputShape = expandOp.getMixedOutputShape();
+    SmallVector<int64_t, 4> staticOutputShape = llvm::to_vector(expandedShape);
     // Create new expand_shape ops for each input.
     SmallVector<Value> newInputs;
     for (auto [input, product] :
@@ -349,21 +351,35 @@ struct BubbleExpandThroughConcat final
       auto type = input.getType();
       auto inputType = cast<RankedTensorType>(type);
       ArrayRef<int64_t> inputShape = inputType.getShape();
-      std::pair<SmallVector<int64_t>, SmallVector<Value>> shapeDecomp =
-          decomposeMixedValues(mixedOutputShape);
 
-      // Update newConcatDim to be theinputShape[concatDim] / product.
-      if (!ShapedType::isDynamic(inputShape[concatDim])) {
-        shapeDecomp.first[newConcatDim] = inputShape[concatDim] / product;
+      AffineExpr concatDimExpr, productExpr;
+      OpFoldResult productOpFold = rewriter.getIndexAttr(product);
+      OpFoldResult dimOfr;
+      if (ShapedType::isDynamic(inputShape[concatDim])) {
+        // Get the runtime value for the dynamic dimension.
+        dimOfr =
+            rewriter.create<tensor::DimOp>(expandOp.getLoc(), input, concatDim)
+                .getResult();
+      } else {
+        // Use the static value as an Attribute.
+        dimOfr = rewriter.getIndexAttr(inputShape[concatDim]);
       }
-      SmallVector<OpFoldResult> newOutputShape =
-          getMixedValues(shapeDecomp.first, shapeDecomp.second, getContext());
-
+      bindSymbols(rewriter.getContext(), concatDimExpr, productExpr);
+      OpFoldResult concatDimValue = affine::makeComposedFoldedAffineApply(
+          rewriter, expandOp.getLoc(), concatDimExpr.ceilDiv(productExpr),
+          {dimOfr, productOpFold});
+      mixedOutputShape[newConcatDim] =
+          concatDimValue; // getValueOrCreateConstantIndexOp(rewriter,
+                          // concatOp.getLoc(), concatDimValue);
+      staticOutputShape[newConcatDim] =
+          ShapedType::isDynamic(inputShape[concatDim])
+              ? ShapedType::kDynamic
+              : inputShape[concatDim] / product;
       auto newType =
-          RankedTensorType::get(shapeDecomp.first, inputType.getElementType());
+          RankedTensorType::get(staticOutputShape, inputType.getElementType());
       Value newExpand;
       newExpand = rewriter.create<tensor::ExpandShapeOp>(
-          expandOp.getLoc(), newType, input, reassoc, newOutputShape);
+          expandOp.getLoc(), newType, input, reassoc, mixedOutputShape);
       newInputs.push_back(newExpand);
     }
     // Create new concat op on expanded inputs.
