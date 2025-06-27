@@ -127,7 +127,15 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
     # that show like generator expressions are showing up in link lines, this is
     # the culprit. Look at the export_objects_debug.txt to confirm. Then, add
     # another level of fix upstream if you like pain.
-    # list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
+    get_target_property(_link_libs ${_object_lib} LINK_LIBRARIES)
+
+    if(_link_libs)
+      list(APPEND _EXPORT_OBJECT_DEPS
+        "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>"
+      )
+    else()
+      message(STATUS "Skipping LINK_LIBRARIES for '${_object_lib}' (none found)")
+    endif()
   else()
     message(WARNING "Skipping non-target entry: '${_object_lib}'")
   endif()
