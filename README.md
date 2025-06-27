@@ -1,4 +1,4 @@
-# IREE: Intermediate Representation Execution Environment
+# IREE: Intermediate Representation Execution Environment (SanLogic-Copy)
 
 <p><img src="docs/website/docs/assets/images/IREE_Logo_Icon_Color.svg" width="48px"></p>
 
