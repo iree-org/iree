@@ -1864,7 +1864,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
 }
 
 std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
-    SmallVector<OpFoldResult> shape, bool isDestShape) {
+    SmallVector<OpFoldResult> shape) {
   VectorizationTileSizes result;
   for (OpFoldResult dim : shape) {
     LLVM_DEBUG(llvm::dbgs() << "Dim #" << dim << ": ");
@@ -1879,9 +1879,7 @@ std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
 
     LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
     result.vectorSizes.push_back(maybeDimBound.value());
-    if (isDestShape) {
-      result.destShape.push_back(maybeDimBound.value());
-    }
+    result.destShape.push_back(maybeDimBound.value());
   }
   return result;
 }
@@ -1896,13 +1894,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
+      .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
-        result =
-            inferSizesFromMixedSizes(op.getMixedSizes(), /*isDestShape=*/true);
-      })
-      .Case<tensor::EmptyOp>([&](tensor::EmptyOp op) {
         result =
             inferSizesFromMixedSizes(op.getMixedSizes(), /*isDestShape=*/true);
       })

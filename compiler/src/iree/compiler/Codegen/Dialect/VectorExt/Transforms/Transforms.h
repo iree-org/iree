@@ -19,6 +19,18 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     ArrayRef<int64_t> vectorSizes = {}, ArrayRef<bool> scalableVecDims = {},
     bool vectorizeNDExtract = false);
 
+/// Vectorizes iree_linalg_ext.gather to iree_vector_ext.transfer_gather.
+/// Currently, this pattern only works when the index_depth and batch rank of
+/// the gather is 1.
+///
+/// %gather = iree_linalg_ext.gather dimension_map=[0] ins(%source, %indices)
+///                                                    outs(%output)
+///
+///  vectorizes to:
+///
+/// %indices_vec = vector.transfer_read %indices
+/// %gather_vec = iree_vector_ext.gather %source[...][%indices_vec...]
+/// %gather = vector.transfer_write %gather_vec, %output
 LogicalResult
 vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
                                          IREE::LinalgExt::GatherOp gatherOp,
