@@ -157,20 +157,20 @@ static LogicalResult outlineDispatchWorkgroupsOp(
                                                executableOp, exportOp);
 }
 
-void chkDenseResource(IREE::Util::FuncOp Op) {
-  Op.walk([&](arith::ConstantOp constOp) {
-    if (auto denseResAttr =
-            mlir::dyn_cast<DenseResourceElementsAttr>(constOp.getValue())) {
-      auto tensorType = cast<RankedTensorType>(denseResAttr.getType());
-      auto shape = tensorType.getShape();
-      if (shape.size() == 1) {
-        EXSLERATEV2::globalExtractedTensors.biases.push_back(denseResAttr);
-      } else {
-        EXSLERATEV2::globalExtractedTensors.weights.push_back(denseResAttr);
-      }
-    }
-  });
-}
+// void chkDenseResource(IREE::Util::FuncOp Op) {
+//   Op.walk([&](arith::ConstantOp constOp) {
+//     if (auto denseResAttr =
+//             mlir::dyn_cast<DenseResourceElementsAttr>(constOp.getValue())) {
+//       auto tensorType = cast<RankedTensorType>(denseResAttr.getType());
+//       auto shape = tensorType.getShape();
+//       if (shape.size() == 1) {
+//         EXSLERATEV2::globalExtractedTensors.biases.push_back(denseResAttr);
+//       } else {
+//         EXSLERATEV2::globalExtractedTensors.weights.push_back(denseResAttr);
+//       }
+//     }
+//   });
+// }
 
 
 struct OutlineDispatchRegionsPass
@@ -185,9 +185,9 @@ struct OutlineDispatchRegionsPass
       // will have the same root name.
       //
 
-      if (auto func = dyn_cast<IREE::Util::FuncOp>(funcOp.getOperation())) {
-        chkDenseResource(func); 
-      }
+      // if (auto func = dyn_cast<IREE::Util::FuncOp>(funcOp.getOperation())) {
+      //   chkDenseResource(func); 
+      // }
 
 
       std::string namePrefix;
