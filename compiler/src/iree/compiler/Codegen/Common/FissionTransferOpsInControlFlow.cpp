@@ -233,7 +233,7 @@ struct FissionTarget {
 static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
   // Fission Loop always has a transfer_write as the last operation.
   auto lastOp = forOp.getBody()->getTerminator()->getPrevNode();
-  if (lastOp == nullptr || !isa<vector::TransferWriteOp>(lastOp)) {
+  if (!isa_and_present<vector::TransferWriteOp>(lastOp)) {
     return failure();
   }
 
