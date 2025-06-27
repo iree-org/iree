@@ -147,7 +147,7 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
     ImplicitLocOpBuilder b(linalgModelOp.getLoc(), rewriter);
     auto regionBuilder = linalgModelOp.getRegionBuilder();
     llvm::ArrayRef<mlir::NamedAttribute> attrs = {};
-    regionBuilder(b, *bodyBlock, attrs);
+    regionBuilder(b, *bodyBlock, attrs, /*emitError=*/{});
   }
 
   return haveEquivalentBodies(linalgOp, linalgModelOp, rewriter);
