@@ -700,6 +700,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::ArgCompareOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::ArgCompareOp>>(*ctx);
     IREE::LinalgExt::FftOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
     IREE::LinalgExt::PackOp::attachInterface<
