@@ -270,125 +270,125 @@ struct VerifyDevicesPass
     //   });
     // }
 
-    bool anyconvolution = false;
-    int layerCount = 0; 
+    // bool anyconvolution = false;
+    // int layerCount = 0; 
 
-    for (auto &op : moduleOp.getOps()) {
-      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
-        continue; 
-      }
+    // for (auto &op : moduleOp.getOps()) {
+    //   if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
+    //     continue; 
+    //   }
 
-      op.walk([&](Operation *childop) {
-        if (isa<linalg::Conv1DNcwFcwOp, linalg::Conv2DNchwFchwOp,
-                linalg::Conv2DNhwcFhwcOp, linalg::Conv3DNcdhwFcdhwOp>(
-                childop)) {
-          anyconvolution = true;
-          EXSLERATEV2::LayerParams layerParam;
-          bool hasweight = false, hasbias = false;
+    //   op.walk([&](Operation *childop) {
+    //     if (isa<linalg::Conv1DNcwFcwOp, linalg::Conv2DNchwFchwOp,
+    //             linalg::Conv2DNhwcFhwcOp, linalg::Conv3DNcdhwFcdhwOp>(
+    //             childop)) {
+    //       anyconvolution = true;
+    //       EXSLERATEV2::LayerParams layerParam;
+    //       bool hasweight = false, hasbias = false;
 
-          // Extract weights 
-          if (childop->getNumOperands() >= 2) {
-            auto weightOperand = childop->getOperand(1);
-            if (auto definingOp = weightOperand.getDefiningOp()) {
-              if (auto constOp = dyn_cast<arith::ConstantOp>(definingOp)) {
-                if (auto denseattr = dyn_cast<DenseResourceElementsAttr>(
-                        constOp.getValue())) {
-                  layerParam.convWeight = denseattr;
-                  hasweight = true;
-                  llvm::errs()
-                      << "Extracted convolution weight - Size: "
-                      << denseattr.getType().getNumElements() << " elements\n";
-                }
-              }
-            }
-          }
+    //       // Extract weights 
+    //       if (childop->getNumOperands() >= 2) {
+    //         auto weightOperand = childop->getOperand(1);
+    //         if (auto definingOp = weightOperand.getDefiningOp()) {
+    //           if (auto constOp = dyn_cast<arith::ConstantOp>(definingOp)) {
+    //             if (auto denseattr = dyn_cast<DenseResourceElementsAttr>(
+    //                     constOp.getValue())) {
+    //               layerParam.convWeight = denseattr;
+    //               hasweight = true;
+    //               llvm::errs()
+    //                   << "Extracted convolution weight - Size: "
+    //                   << denseattr.getType().getNumElements() << " elements\n";
+    //             }
+    //           }
+    //         }
+    //       }
 
-          // FIXED: Enhanced bias extraction - multiple patterns
-          if (childop->getNumOperands() >= 3) {
-            bool biasFound = false;
+    //       // FIXED: Enhanced bias extraction - multiple patterns
+    //       if (childop->getNumOperands() >= 3) {
+    //         bool biasFound = false;
 
-            // Pattern 1: Your existing logic - last operand with broadcast
-            auto lastOperand =
-                childop->getOperand(childop->getNumOperands() - 1);
-            if (auto broadcastOp = dyn_cast<linalg::BroadcastOp>(
-                    lastOperand.getDefiningOp())) {
-              auto biasOperand = broadcastOp.getInput();
-              if (auto definingOp = biasOperand.getDefiningOp()) {
-                if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
-                  if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
-                          constop.getValue())) {
-                    layerParam.convBias = denseAttr;
-                    hasbias = true;
-                    biasFound = true;
-                    llvm::errs()
-                        << "Extracted convolution bias (broadcast) - Size: "
-                        << denseAttr.getType().getNumElements()
-                        << " elements\n";
-                  }
-                }
-              }
-            }
+    //         // Pattern 1: Your existing logic - last operand with broadcast
+    //         auto lastOperand =
+    //             childop->getOperand(childop->getNumOperands() - 1);
+    //         if (auto broadcastOp = dyn_cast<linalg::BroadcastOp>(
+    //                 lastOperand.getDefiningOp())) {
+    //           auto biasOperand = broadcastOp.getInput();
+    //           if (auto definingOp = biasOperand.getDefiningOp()) {
+    //             if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
+    //               if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
+    //                       constop.getValue())) {
+    //                 layerParam.convBias = denseAttr;
+    //                 hasbias = true;
+    //                 biasFound = true;
+    //                 llvm::errs()
+    //                     << "Extracted convolution bias (broadcast) - Size: "
+    //                     << denseAttr.getType().getNumElements()
+    //                     << " elements\n";
+    //               }
+    //             }
+    //           }
+    //         }
 
-            // Pattern 2: Direct constant in last operand (fallback)
-            if (!biasFound) {
-              if (auto definingOp = lastOperand.getDefiningOp()) {
-                if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
-                  if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
-                          constop.getValue())) {
-                    layerParam.convBias = denseAttr;
-                    hasbias = true;
-                    biasFound = true;
-                    llvm::errs()
-                        << "Extracted convolution bias (direct) - Size: "
-                        << denseAttr.getType().getNumElements()
-                        << " elements\n";
-                  }
-                }
-              }
-            }
+    //         // Pattern 2: Direct constant in last operand (fallback)
+    //         if (!biasFound) {
+    //           if (auto definingOp = lastOperand.getDefiningOp()) {
+    //             if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
+    //               if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
+    //                       constop.getValue())) {
+    //                 layerParam.convBias = denseAttr;
+    //                 hasbias = true;
+    //                 biasFound = true;
+    //                 llvm::errs()
+    //                     << "Extracted convolution bias (direct) - Size: "
+    //                     << denseAttr.getType().getNumElements()
+    //                     << " elements\n";
+    //               }
+    //             }
+    //           }
+    //         }
 
-            // Pattern 3: Check third operand as potential bias
-            if (!biasFound && childop->getNumOperands() >= 3) {
-              auto thirdOperand = childop->getOperand(2);
-              if (auto definingOp = thirdOperand.getDefiningOp()) {
-                if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
-                  if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
-                          constop.getValue())) {
-                    // Simple validation: bias should be smaller than weights
-                    if (hasweight &&
-                        denseAttr.getType().getNumElements() <
-                            layerParam.convWeight.getType().getNumElements()) {
-                      layerParam.convBias = denseAttr;
-                      hasbias = true;
-                      llvm::errs()
-                          << "Extracted convolution bias (3rd operand) - Size: "
-                          << denseAttr.getType().getNumElements()
-                          << " elements\n";
-                    }
-                  }
-                }
-              }
-            }
-          }
+    //         // Pattern 3: Check third operand as potential bias
+    //         if (!biasFound && childop->getNumOperands() >= 3) {
+    //           auto thirdOperand = childop->getOperand(2);
+    //           if (auto definingOp = thirdOperand.getDefiningOp()) {
+    //             if (auto constop = dyn_cast<arith::ConstantOp>(definingOp)) {
+    //               if (auto denseAttr = dyn_cast<DenseResourceElementsAttr>(
+    //                       constop.getValue())) {
+    //                 // Simple validation: bias should be smaller than weights
+    //                 if (hasweight &&
+    //                     denseAttr.getType().getNumElements() <
+    //                         layerParam.convWeight.getType().getNumElements()) {
+    //                   layerParam.convBias = denseAttr;
+    //                   hasbias = true;
+    //                   llvm::errs()
+    //                       << "Extracted convolution bias (3rd operand) - Size: "
+    //                       << denseAttr.getType().getNumElements()
+    //                       << " elements\n";
+    //                 }
+    //               }
+    //             }
+    //           }
+    //         }
+    //       }
 
-          // Store layer if we have weights
-          if (hasweight) {
-            EXSLERATEV2::globalParamas.layers.push_back(layerParam);
-            if (!hasbias) {
-              llvm::errs() << "Note: Convolution layer " << layerCount
-                           << " has no bias\n";
-            }
-            layerCount++;
-          } else {
-            llvm::errs()
-                << "Warning: Convolution found but no weights extracted\n";
-          }
+    //       // Store layer if we have weights
+    //       if (hasweight) {
+    //         EXSLERATEV2::globalParamas.layers.push_back(layerParam);
+    //         if (!hasbias) {
+    //           llvm::errs() << "Note: Convolution layer " << layerCount
+    //                        << " has no bias\n";
+    //         }
+    //         layerCount++;
+    //       } else {
+    //         llvm::errs()
+    //             << "Warning: Convolution found but no weights extracted\n";
+    //       }
 
-          return WalkResult::advance();
-        }
-        return WalkResult::advance();
-      });
-    }
+    //       return WalkResult::advance();
+    //     }
+    //     return WalkResult::advance();
+    //   });
+    // }
 
     // Enhanced reporting
     // if (anyconvolution) {
