@@ -14,6 +14,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
   SRCS
+    "arg_compare.mlir"
     "attention.mlir"
     "gather.mlir"
     "map_scatter.mlir"
@@ -53,6 +54,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_local-task
   SRCS
+    "arg_compare.mlir"
     "gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
@@ -71,6 +73,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda
   SRCS
+    "arg_compare.mlir"
     "gather.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -94,6 +97,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_rocm_hip
   SRCS
+    "arg_compare.mlir"
     "gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
@@ -111,6 +115,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_metal-spirv_vulkan
   SRCS
+    "arg_compare.mlir"
     "gather.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -127,6 +132,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
+    "arg_compare.mlir"
     "gather.mlir"
     "scan.mlir"
     "scatter.mlir"
