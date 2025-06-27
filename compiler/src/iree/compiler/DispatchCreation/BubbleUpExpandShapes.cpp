@@ -354,16 +354,8 @@ struct BubbleExpandThroughConcat final
 
       AffineExpr concatDimExpr, productExpr;
       OpFoldResult productOpFold = rewriter.getIndexAttr(product);
-      OpFoldResult dimOfr;
-      if (ShapedType::isDynamic(inputShape[concatDim])) {
-        // Get the runtime value for the dynamic dimension.
-        dimOfr =
-            rewriter.create<tensor::DimOp>(expandOp.getLoc(), input, concatDim)
-                .getResult();
-      } else {
-        // Use the static value as an Attribute.
-        dimOfr = rewriter.getIndexAttr(inputShape[concatDim]);
-      }
+      OpFoldResult dimOfr =
+          tensor::getMixedSizes(rewriter, expandOp.getLoc(), input)[concatDim];
       bindSymbols(rewriter.getContext(), concatDimExpr, productExpr);
       OpFoldResult concatDimValue = affine::makeComposedFoldedAffineApply(
           rewriter, expandOp.getLoc(), concatDimExpr.ceilDiv(productExpr),
