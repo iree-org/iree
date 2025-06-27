@@ -24,8 +24,8 @@ util.func public @tensor_pad(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[D0]]]
-//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]], %[[D1]]]
+//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[ARG3]]]
+//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[D1]], %[[ARG2]]]
 //       CHECK:   %[[INIT:.+]] = tensor.empty(%[[RD0]], %[[RD1]])
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[VAL]] :
