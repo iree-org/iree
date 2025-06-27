@@ -273,6 +273,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  funcPassManager.addPass(createGPUFoldTransposeLoadsPass());
+
   // Run subset hoisting to convert iter_args to vectors.
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -1003,6 +1006,11 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
+
+  // fold (vector.transpose (vector.transfer_read $src) into:
+  // (amdgpu.transpose_load $src)
+  funcPassManager.addPass(createGPUFoldTransposeLoadsPass());
+
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
