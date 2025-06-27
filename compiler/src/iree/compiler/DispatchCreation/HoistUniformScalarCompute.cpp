@@ -9,6 +9,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -21,7 +22,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
   assert(op->getParentOp() == dispatch &&
          "hoist target is not direct child of dispatch");
-  if (!mlir::isPure(op)) {
+  if (!mlir::isPure(op) || op->hasTrait<OpTrait::IsTerminator>()) {
     return false;
   }
 
