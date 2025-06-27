@@ -341,5 +341,6 @@ util.func public @test_expand_prop_through_concat_mixed_dynamic_static_args(%arg
 }
 // CHECK-LABEL: func public @test_expand_prop_through_concat_mixed_dynamic_static_args
 //       CHECK: tensor.expand_shape {{.*}}: tensor<4x100x100xf32> into tensor<1x4x1x2x5x10x100xf32>
-//       CHECK: tensor.expand_shape {{.*}}: tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
+//       CHECK: %[[AFF:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 100)>()[%dim]
+//       CHECK: tensor.expand_shape {{.*}}output_shape [1, 4, %[[AFF]], 2, 5, 10, 100] : tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
 //       CHECK: tensor.concat dim(2) {{.*}}: (tensor<1x4x1x2x5x10x100xf32>, tensor<1x4x?x2x5x10x100xf32>) -> tensor<1x4x?x2x5x10x100xf32>
