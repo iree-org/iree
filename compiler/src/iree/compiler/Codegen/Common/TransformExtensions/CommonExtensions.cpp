@@ -1217,16 +1217,16 @@ applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
     rewriter.setInsertionPoint(target);
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, target, loops);
+        scf::tileAndFuseConsumerOfSlices(rewriter, target, loops);
 
     if (failed(fuseConsumerResults))
       return failure();
 
     // Report back the relevant handles to the transform op.
     originalConsumerOps.push_back(
-        fuseConsumerResults->origConsumerOperand->getOwner());
+        fuseConsumerResults->origConsumerOperands.front()->getOwner());
     fusedConsumerOps.push_back(
-        fuseConsumerResults->tiledAndFusedConsumerOperand->getOwner());
+        fuseConsumerResults->tiledAndFusedConsumerOperands.front()->getOwner());
   }
 
   transformResults.set(transformOp->getOpResult(0), originalConsumerOps);

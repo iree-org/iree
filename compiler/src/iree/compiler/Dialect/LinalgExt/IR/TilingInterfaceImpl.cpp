@@ -178,9 +178,10 @@ LogicalResult ScatterOp::getResultTilePosition(
 
 /// Method to return the position of the result tile computed by the tiled
 /// operation.
-LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
+LogicalResult ScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
     SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
     SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
   // Fusion with producers is not possible in general if `unique_indices` is not
@@ -190,9 +191,12 @@ LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
   }
   // TODO: Support fusion along the index operand. For the index operand, the
   // offset + size must be the full size for the inner most dim.
-  if (getInputs().getBeginOperandIndex() != operandNumber) {
+  if (operandNumbers.size() != 1 ||
+      getInputs().getBeginOperandIndex() != operandNumbers.front()) {
     return failure();
   }
+  ArrayRef<OpFoldResult> offsets(allOffsets[0]);
+  ArrayRef<OpFoldResult> sizes(allSizes[0]);
 
   // The iteration domain is defined in terms of the |input|, so simply
   // use the given offsets/sizes.
@@ -203,12 +207,14 @@ LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
 
 /// Method to generate the tiled implementation of an operation from the tile
 /// of the operand.
-FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes) {
   SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
-  if (failed(getIterationDomainTileFromOperandTile(
-          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+  if (failed(getIterationDomainTileFromOperandTiles(
+          b, operandNumbers, allOffsets, allSizes, mappedOffsets,
+          mappedSizes))) {
     return failure();
   }
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
@@ -479,14 +485,19 @@ LogicalResult MapScatterOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult MapScatterOp::getIterationDomainTileFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
+LogicalResult MapScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
     SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
     SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
-  if (operandNumber != getInputMutable().getOperandNumber()) {
+  if (operandNumbers.size() != 1 ||
+      operandNumbers.front() != getInputMutable().getOperandNumber()) {
     return failure();
   }
+  ArrayRef<OpFoldResult> offsets(allOffsets[0]);
+  ArrayRef<OpFoldResult> sizes(allSizes[0]);
+
   // The iteration domain is defined in terms of the `input`, so simply
   // use the given offsets/sizes.
   iterDomainOffsets.assign(offsets.begin(), offsets.end());
@@ -494,12 +505,14 @@ LogicalResult MapScatterOp::getIterationDomainTileFromOperandTile(
   return success();
 }
 
-FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes) {
   SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
-  if (failed(getIterationDomainTileFromOperandTile(
-          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+  if (failed(getIterationDomainTileFromOperandTiles(
+          b, operandNumbers, allOffsets, allSizes, mappedOffsets,
+          mappedSizes))) {
     return failure();
   }
   return getTiledImplementation(b, mappedOffsets, mappedSizes);

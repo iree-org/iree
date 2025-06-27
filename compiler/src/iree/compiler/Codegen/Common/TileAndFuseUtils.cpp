@@ -162,8 +162,8 @@ fuseConsumersIntoLoops(RewriterBase &rewriter, Operation *tiledOp,
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
-                                              loops);
+        mlir::scf::tileAndFuseConsumerOfSlices(rewriter, candidateSliceOp,
+                                               loops);
     if (failed(fusedResult)) {
       LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
                               << candidateSliceOp << "\n");
@@ -190,14 +190,15 @@ fuseConsumersIntoLoops(RewriterBase &rewriter, Operation *tiledOp,
     }
 
     // Replace the original consumer operation with the tiled implementation.
-    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+    rewriter.replaceOp(fusedResult->origConsumerOperands.front()->getOwner(),
                        fusedResult->tiledOps.front());
 
     // The result of the fused consumers might themselves be slices of
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
-    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
-                       candidates);
+    addCandidateSlices(
+        fusedResult->tiledAndFusedConsumerOperands.front()->getOwner(),
+        candidates);
 
     // Add the list of new producer fusion opportunities.
     for (auto tiledOp : fusedResult.value().tiledOps) {
