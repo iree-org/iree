@@ -4,11 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <queue>
+
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -207,8 +210,36 @@ void HoistEncodingOpsPass::runOnOperation() {
   });
   IRRewriter rewriter(ctx);
   for (auto setEncodingOp : candidates) {
+    SetVector<Operation *> opsWithinDispatch;
+    std::queue<Operation *> worklist;
+    worklist.push(setEncodingOp);
+    while (!worklist.empty()) {
+      Operation *op = worklist.front();
+      worklist.pop();
+      opsWithinDispatch.insert(op);
+      for (auto input : op->getOperands()) {
+        if (auto inputOp = input.getDefiningOp()) {
+          if (isa_and_nonnull<linalg::LinalgDialect,
+                              IREE::LinalgExt::IREELinalgExtDialect>(
+                  inputOp->getDialect())) {
+            continue;
+          }
+          if (inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
+              !opsWithinDispatch.contains(inputOp)) {
+            worklist.push(inputOp);
+          }
+        }
+      }
+    }
     // TODO: Hoist the entire slice of IR up to the root if there is a ConstExpr
     // root op.
+    for (auto srcOp : llvm::reverse(opsWithinDispatch)) {
+      if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, srcOp))) {
+        srcOp->emitOpError("failed to hoist the op out of dispatch");
+        return signalPassFailure();
+      }
+    }
+#if 0
     Operation *src = setEncodingOp.getSource().getDefiningOp();
     if (src && src->hasTrait<OpTrait::ConstantLike>() &&
         src->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
@@ -220,6 +251,7 @@ void HoistEncodingOpsPass::runOnOperation() {
       setEncodingOp.emitOpError("failed to hoist the op out of dispatch");
       return signalPassFailure();
     }
+#endif
   }
 
   RewritePatternSet cleanPatterns(ctx);
