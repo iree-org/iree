@@ -125,7 +125,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
     SmallVector<tensor::ExpandShapeOp> maybeExpands(numOperands, nullptr);
     SmallVector<Value> newOperands(tiledOp.getOperands());
     SmallVector<Attribute> newPermutations;
-    if (permutationsAttr) {
+    if (permutationsAttr.has_value() && *permutationsAttr) {
       newPermutations = llvm::to_vector(*permutationsAttr);
     }
 
@@ -134,7 +134,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
     for (int64_t opIndex : llvm::seq(firstOperand, lastOperand)) {
       Value operand = newOperands[opIndex];
       std::optional<ArrayRef<int64_t>> permutation;
-      if (permutationsAttr) {
+      if (permutationsAttr.has_value() && *permutationsAttr) {
         permutation =
             cast<DenseI64ArrayAttr>((*permutationsAttr)[opIndex]).asArrayRef();
       }
