@@ -500,7 +500,7 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);
   }
 
-  // Insert identity map_scatter op for each region arg on finding a 
+  // Insert identity map_scatter op for each region arg on finding a
   // parallel_insert_slice op within a scf.forall op with workgroup mapping.
   funcOp->walk([&](scf::ForallOp forallOp) {
     bool hasWorkgroupMapping =
