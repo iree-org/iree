@@ -109,9 +109,6 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> updateStrides(updateRank, oneAttr);
   Operation *updateSlice =
       getSlice(builder, loc, getUpdates(), offsets, sizes, updateStrides);
-  if (!updateSlice) {
-    return emitOpError("failed to get updates slice");
-  }
   Value tiledUpdate = updateSlice->getResult(0);
   slices.push_back(updateSlice);
 
@@ -127,9 +124,6 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
                                      indicesSizes, indicesStrides);
-  if (!indicesSlice) {
-    return emitOpError("failed to get indices slices");
-  }
   Value tiledIndices = indicesSlice->getResult(0);
   slices.push_back(indicesSlice);
 
@@ -144,9 +138,6 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   Operation *originalSlice =
       getSlice(builder, loc, getOriginal(), originalOffsets, originalSizes,
                originalStrides);
-  if (!originalSlice) {
-    return emitOpError("failed to get original tensor slice");
-  }
   Value tiledOriginal = originalSlice->getResult(0);
   slices.push_back(originalSlice);
 
@@ -314,9 +305,6 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> resultStrides(resultRank, oneAttr);
   Operation *resultSlice =
       getSlice(builder, loc, getOutput(), offsets, sizes, resultStrides);
-  if (!resultSlice) {
-    return emitOpError("failed to get result slice");
-  }
   Value tiledResult = resultSlice->getResult(0);
 
   // Slice of indices.
@@ -331,9 +319,6 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
                                      indicesSizes, indicesStrides);
-  if (!indicesSlice) {
-    return emitOpError("failed to get indices slices");
-  }
   Value tiledIndices = indicesSlice->getResult(0);
 
   // Slice of the source.
@@ -353,9 +338,6 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> sourceStrides(sourceRank, oneAttr);
   Operation *sourceSlice = getSlice(builder, loc, getSource(), sourceOffsets,
                                     sourceSizes, sourceStrides);
-  if (!sourceSlice) {
-    return emitOpError("failed to get source tensor slice");
-  }
   Value tiledSource = sourceSlice->getResult(0);
 
   slices.push_back(sourceSlice);
@@ -461,9 +443,6 @@ MapScatterOp::getTiledImplementation(OpBuilder &builder,
                                          builder.getI64IntegerAttr(1));
   Operation *inputSlice =
       getSlice(builder, loc, getInput(), offsets, sizes, inputStrides);
-  if (!inputSlice) {
-    return emitOpError("failed to get input slice");
-  }
 
   // Clone the operation with the slice of the input, and then compose the
   // tiling offsets with the index transformation of the map_scatter op,
@@ -617,9 +596,6 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   for (auto [idx, output] : llvm::enumerate(getOutputs())) {
     Operation *slice =
         getSlice(builder, getLoc(), output, offsets, sizes, strides);
-    if (!slice) {
-      return emitOpError("failed to get slice of operand ") << idx;
-    }
     tiledOperands[idx] = slice->getResult(0);
     slices.push_back(slice);
   }
@@ -910,9 +886,6 @@ FftOp::getTiledImplementation(OpBuilder &builder,
   for (auto [index, out] : llvm::enumerate(getOutputs())) {
     Operation *slice =
         getSlice(builder, getLoc(), out, offsets, sizes, strides);
-    if (!slice) {
-      return emitOpError("failed to get slice of output ") << index;
-    }
     tiledOperands.push_back(slice->getResult(0));
     slices.push_back(slice);
     if (hasPureTensorSemantics()) {
@@ -1055,9 +1028,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *inputSlice =
         getSlice(builder, getLoc(), getInput(), offsets, sizes, strides);
-    if (!inputSlice) {
-      return emitOpError("failed to get input slice");
-    }
     tiledOperands.emplace_back(inputSlice->getResult(0));
     slices.push_back(inputSlice);
   }
@@ -1066,9 +1036,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *output0Slice =
         getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides);
-    if (!output0Slice) {
-      return emitOpError("failed to get slice of output 0");
-    }
     tiledOperands.emplace_back(output0Slice->getResult(0));
     slices.push_back(output0Slice);
   }
@@ -1082,9 +1049,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
     SmallVector<OpFoldResult> accumStrides(rank - 1, oneAttr);
     Operation *output1Slice = getSlice(builder, getLoc(), getOutputs()[1],
                                        accumOffsets, accumSizes, accumStrides);
-    if (!output1Slice) {
-      return emitOpError("failed to get output1 slice");
-    }
     tiledOperands.emplace_back(output1Slice->getResult(0));
     slices.push_back(output1Slice);
   } else {
@@ -1272,9 +1236,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *valuesSlice =
         getSlice(builder, loc, getValues(), offsets, sizes, strides);
-    if (!valuesSlice) {
-      return emitOpError("failed to get values slice");
-    }
     tiledOperands.emplace_back(valuesSlice->getResult(0));
     slices.push_back(valuesSlice);
   }
@@ -1282,9 +1243,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   if (getIndices()) {
     Operation *indicesSlice =
         getSlice(builder, loc, *getIndices(), offsets, sizes, strides);
-    if (!indicesSlice) {
-      return emitOpError("failed to get slices of indices");
-    }
     tiledOperands.emplace_back(indicesSlice->getResult(0));
     slices.push_back(indicesSlice);
   }
@@ -1298,9 +1256,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *output0Slice =
         getSlice(builder, loc, getOutputs()[0], offsets, outputSizes, strides);
-    if (!output0Slice) {
-      return emitOpError("failed to get output 0 slice");
-    }
     tiledOperands.emplace_back(output0Slice->getResult(0));
     slices.push_back(output0Slice);
   }
@@ -1309,9 +1264,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *output1Slice =
         getSlice(builder, loc, getOutputs()[1], offsets, outputSizes, strides);
-    if (!output1Slice) {
-      return emitOpError("failed to get output1 slice");
-    }
     tiledOperands.emplace_back(output1Slice->getResult(0));
     slices.push_back(output1Slice);
   }
@@ -1772,16 +1724,10 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   // Input
   Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
                                    inputSizes, inputStrides);
-  if (!inputSlice) {
-    return emitOpError("failed to get slice of input");
-  }
 
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
   Operation *outputSlice =
       getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
-  if (!outputSlice) {
-    return emitOpError("failed to get outputSlice");
-  }
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1920,9 +1866,6 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
                                      inputSizes, inputStrides);
-    if (!inputSlice) {
-      return emitOpError("failed to get input slice");
-    }
     tiledOperands.emplace_back(inputSlice->getResult(0));
     slices.push_back(inputSlice);
   }
@@ -1931,9 +1874,6 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
                                       outputSizes, outputStrides);
-    if (!outputSlice) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSlice->getResult(0));
     slices.push_back(outputSlice);
   }
@@ -2036,9 +1976,6 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   {
     Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
                                      inputSizes, inputStrides);
-    if (!inputSlice) {
-      return emitOpError("failed to get input slice");
-    }
     tiledOperands.emplace_back(inputSlice->getResult(0));
     slices.push_back(inputSlice);
   }
@@ -2047,9 +1984,6 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   {
     Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
                                       outputSizes, outputStrides);
-    if (!outputSlice) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSlice->getResult(0));
     slices.push_back(outputSlice);
   }
@@ -2371,9 +2305,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Query
   {
     Operation *querySliceOp = getSlice(builder, loc, getQuery(), querySlice);
-    if (!querySliceOp) {
-      return emitOpError("failed to get query slice");
-    }
     tiledOperands.emplace_back(querySliceOp->getResult(0));
     slices.push_back(querySliceOp);
   }
@@ -2381,9 +2312,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Key
   {
     Operation *keySliceOp = getSlice(builder, loc, getKey(), keySlice);
-    if (!keySliceOp) {
-      return emitOpError("failed to get key slice");
-    }
     tiledOperands.emplace_back(keySliceOp->getResult(0));
     slices.push_back(keySliceOp);
   }
@@ -2391,9 +2319,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Value
   {
     Operation *valueSliceOp = getSlice(builder, loc, getValue(), valueSlice);
-    if (!valueSliceOp) {
-      return emitOpError("failed to get value slice");
-    }
     tiledOperands.emplace_back(valueSliceOp->getResult(0));
     slices.push_back(valueSliceOp);
   }
@@ -2414,9 +2339,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
-    if (!outputSliceOp) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
@@ -2530,9 +2452,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Query
   {
     Operation *querySliceOp = getSlice(builder, loc, getQuery(), querySlice);
-    if (!querySliceOp) {
-      return emitOpError("failed to get query slice");
-    }
     tiledOperands.emplace_back(querySliceOp->getResult(0));
     slices.push_back(querySliceOp);
   }
@@ -2540,9 +2459,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Key
   {
     Operation *keySliceOp = getSlice(builder, loc, getKey(), keySlice);
-    if (!keySliceOp) {
-      return emitOpError("failed to get key slice");
-    }
     tiledOperands.emplace_back(keySliceOp->getResult(0));
     slices.push_back(keySliceOp);
   }
@@ -2550,9 +2466,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Value
   {
     Operation *valueSliceOp = getSlice(builder, loc, getValue(), valueSlice);
-    if (!valueSliceOp) {
-      return emitOpError("failed to get value slice");
-    }
     tiledOperands.emplace_back(valueSliceOp->getResult(0));
     slices.push_back(valueSliceOp);
   }
@@ -2572,9 +2485,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
-    if (!outputSliceOp) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
@@ -2582,9 +2492,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Max
   {
     Operation *maxSliceOp = getSlice(builder, loc, getMax(), maxSlice);
-    if (!maxSliceOp) {
-      return emitOpError("failed to get max slice");
-    }
     tiledOperands.emplace_back(maxSliceOp->getResult(0));
     slices.push_back(maxSliceOp);
   }
@@ -2592,9 +2499,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Sum
   {
     Operation *sumSliceOp = getSlice(builder, loc, getSum(), sumSlice);
-    if (!sumSliceOp) {
-      return emitOpError("failed to get sum slice");
-    }
     tiledOperands.emplace_back(sumSliceOp->getResult(0));
     slices.push_back(sumSliceOp);
   }
