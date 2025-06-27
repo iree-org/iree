@@ -47,12 +47,20 @@ struct HoistUniformScalarComputePass
     mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
+    Dialect *arithDialect = context->getLoadedDialect<arith::ArithDialect>();
 
     WalkResult walkResult =
         funcOp.walk([&](IREE::Flow::DispatchRegionOp dispatch) {
           for (Block &body : dispatch.getBody()) {
-            SmallVector<Operation *> ops = llvm::map_to_vector(
-                body.getOperations(), [](Operation &op) { return &op; });
+            SmallVector<Operation *> ops;
+            // Restrict to arith ops to avoid unexpected hoisting of
+            // flow/stream/hal.dispatch.workgroups.count/id ops.
+            // TODO: Add an op trait to tie count/id ops to region ops.
+            for (Operation &op : body.getOperations()) {
+              if (op.getDialect() == arithDialect) {
+                ops.push_back(&op);
+              }
+            }
             for (Operation *op : ops) {
               if (isUniformScalarForDispatch(op, dispatch)) {
                 op->moveBefore(dispatch);
