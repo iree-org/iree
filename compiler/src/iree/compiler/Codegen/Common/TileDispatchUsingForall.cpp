@@ -36,11 +36,18 @@ struct TileAndDistributeToWorkgroupsUsingForallOpPass final
     : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
   explicit TileAndDistributeToWorkgroupsUsingForallOpPass(
-      bool transposeWorkgroup) {
+      bool transposeWorkgroup)
+      : getRootOpFn(nullptr) {
     this->transposeWorkgroup = transposeWorkgroup;
   }
+  explicit TileAndDistributeToWorkgroupsUsingForallOpPass(GetTilingRootOpFn fn)
+      : getRootOpFn(fn) {}
+
   using Base::Base;
   void runOnOperation() override;
+
+private:
+  GetTilingRootOpFn getRootOpFn;
 };
 
 } // namespace
@@ -56,22 +63,8 @@ struct TilingInfo {
   SmallVector<int64_t> interchange;
 };
 
-static FailureOr<TilingInfo>
-getTiledAndDistributionInfo(RewriterBase &rewriter,
-                            ArrayRef<Operation *> computeOps) {
-  // TODO: It is expected that at most one compute op has a workgroup tiling
-  // level. Currently, it selects the last compute op that has workgroup tiling
-  // level.
-  Operation *tilableOp = nullptr;
-  for (Operation *op : llvm::reverse(computeOps)) {
-    if (getLoweringConfig(op)) {
-      if (!getLoweringConfig(op).hasWorkgroupTilingLevel()) {
-        continue;
-      }
-      tilableOp = op;
-      break;
-    }
-  }
+static FailureOr<TilingInfo> getTiledAndDistributionInfo(RewriterBase &rewriter,
+                                                         Operation *tilableOp) {
   if (!tilableOp) {
     // There is no lowering config. Return `null`.
     return TilingInfo{nullptr, {}, {}};
@@ -316,10 +309,22 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   auto funcOp = getOperation();
   auto *context = &getContext();
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  if (!getRootOpFn) {
+    getRootOpFn = [](ArrayRef<Operation *> computeOps) -> Operation * {
+      for (Operation *op : llvm::reverse(computeOps)) {
+        if (!getLoweringConfig(op) ||
+            !getLoweringConfig(op).hasWorkgroupTilingLevel()) {
+          continue;
+        }
+        return op;
+      }
+      return nullptr;
+    };
+  }
 
   IRRewriter rewriter(context);
   FailureOr<TilingInfo> tilingInfo =
-      getTiledAndDistributionInfo(rewriter, computeOps);
+      getTiledAndDistributionInfo(rewriter, getRootOpFn(computeOps));
   if (failed(tilingInfo)) {
     return signalPassFailure();
   }
@@ -480,9 +485,17 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   return;
 }
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup) {
   return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
       transposeWorkgroup);
+}
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsUsingForallOpPassWithRootOpControl(
+    GetTilingRootOpFn getRootOpFn) {
+  return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
+      getRootOpFn);
 }
 } // namespace mlir::iree_compiler

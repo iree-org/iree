@@ -196,15 +196,15 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  Operation *rootOp = getCPURootOperation(computeOps);
 
-  if (failed(rootOp) || !rootOp.value()) {
+  if (!rootOp) {
     LDBG("unable to find the root operation");
     return;
   }
 
   IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-      getLoweringConfig(rootOp.value());
+      getLoweringConfig(rootOp);
 
   if (!loweringConfig) {
     LDBG("unable to find the attached lowering config");
@@ -217,7 +217,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   }
 
   if (failed(tileRootAndFuseProducerConsumer(
-          rewriter, cast<TilingInterface>(rootOp.value()), tilingLevel,
+          rewriter, cast<TilingInterface>(rootOp), tilingLevel,
           onlyFuseProducerInputOperands, tileUsingForall))) {
     funcOp.emitError() << "tiling of level " << tilingLevel.getValue()
                        << " failed\n";

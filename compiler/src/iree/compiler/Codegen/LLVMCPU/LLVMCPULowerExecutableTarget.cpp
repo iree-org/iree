@@ -67,13 +67,13 @@ public:
 static FailureOr<TilingConfig>
 getTilingConfigForPipeline(FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp) || !rootOp.value()) {
+  Operation *rootOp = getCPURootOperation(computeOps);
+  if (!rootOp) {
     return failure();
   }
   auto rootLoweringConfig =
       iree_compiler::getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
-          rootOp.value());
+          rootOp);
   if (!rootLoweringConfig) {
     return failure();
   }

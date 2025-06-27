@@ -3186,12 +3186,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
   }
 
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp))
-    return failure();
-  Operation *rootOperation = rootOp.value();
-
   // Handle the case with no known root operation.
+  Operation *rootOperation = getCPURootOperation(computeOps);
   if (!rootOperation) {
     return lowerUsingDefaultPipeline(entryPointFn);
   }

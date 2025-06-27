@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -116,7 +117,8 @@ static llvm::cl::opt<bool> clForceArmStreaming(
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   if (clTileDispatchUsingForall) {
     funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
+        createTileAndDistributeToWorkgroupsUsingForallOpPassWithRootOpControl(
+            getCPURootOperation));
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
     funcPassManager.addPass(createCSEPass());

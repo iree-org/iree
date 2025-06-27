@@ -19,7 +19,7 @@
 
 namespace mlir::iree_compiler {
 
-FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
+Operation *getCPURootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
   for (auto op : llvm::reverse(computeOps)) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {

@@ -105,6 +105,12 @@ createTileAndDistributeToWorkgroupsPass(
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);
 
+// Pass to tile and distribute using scf.forall with rootOp control function.
+using GetTilingRootOpFn = std::function<Operation *(ArrayRef<Operation *>)>;
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsUsingForallOpPassWithRootOpControl(
+    GetTilingRootOpFn getRootOpFn);
+
 //----------------------------------------------------------------------------//
 // CodeGen Common Patterns
 //----------------------------------------------------------------------------//
