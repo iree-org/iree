@@ -100,6 +100,35 @@ FailureOr<std::queue<Operation *>>
 fuseConsumersIntoLoops(RewriterBase &rewriter, Operation *tiledOp,
                        MutableArrayRef<LoopLikeOpInterface> loops,
                        bool useWARForConsumerFusionSSAViolation);
+
+//===---------------------------------------------------------------------===//
+// Distribution Utilities.
+//===---------------------------------------------------------------------===//
+
+struct TilingInfo {
+  Operation *tilableOp;
+  SmallVector<OpFoldResult> tileSizes;
+  SmallVector<int64_t> interchange;
+};
+
+/// Find the lowering config from `tileableOp` to use for getting the tile
+/// sizes.
+FailureOr<TilingInfo> getTiledAndDistributionInfo(RewriterBase &rewriter,
+                                                  Operation *tilableOp);
+
+/// Helper function to return the mapping attribute to use given the tile sizes.
+SmallVector<Attribute> getDistributionMapping(MLIRContext *context,
+                                              ArrayRef<OpFoldResult> tileSizes);
+
+/// Checks whether we have static dimension for all the loop bounds and steps.
+/// This is a requirement if the reordering strategy is set to `transpose`.
+bool areAllStaticLoopBounds(scf::ForallOp forallOp);
+
+/// Find dimensions of the loop that are unit-trip count and drop them from the
+/// distributed dimensions.
+FailureOr<scf::ForallOp> dropUnitDistributedDims(RewriterBase &rewriter,
+                                                 scf::ForallOp forallOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
