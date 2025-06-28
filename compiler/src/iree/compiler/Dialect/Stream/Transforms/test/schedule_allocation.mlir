@@ -895,3 +895,49 @@ util.func public @multiAffinityTrip(%input_timepoint: !stream.timepoint, %input_
   // CHECK: util.return %[[TIMEPOINT_B]]
   util.return %timepoint_b, %output_handle : !stream.timepoint, i64
 }
+
+// -----
+
+// A multi-affinity test with a larger number of devices. This IR used to crash.
+
+// CHECK-LABEL: multiAffinityLotsOfDevices
+util.func public @multiAffinityLotsOfDevices(%wait_timepoint: !stream.timepoint) {
+  // Constant from 'device_a' is used on a multiple devices.
+  //      CHECK: stream.resource.constants on(#hal.device.optimal<[
+  // CHECK-SAME:   #hal.device.promise<@device_a>, #hal.device.promise<@device_b>,
+  // CHECK-SAME:   #hal.device.promise<@device_c>, #hal.device.promise<@device_d>,
+  // CHECK-SAME:   #hal.device.promise<@device_e>, #hal.device.promise<@device_f>,
+  // CHECK-SAME:   #hal.device.promise<@device_g>, #hal.device.promise<@device_h>
+  // CHECK-SAME: ]>) :
+  // CHECK-NEXT:   !stream.resource<constant>{%c16} = dense<4>
+  %c16 = arith.constant 16 : index
+  %result_a, %result_timepoint_a = stream.async.execute on(#hal.device.promise<@device_a>) await(%wait_timepoint) => with() -> (!stream.resource<constant>{%c16}) {
+    %cst16 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
+    stream.yield %cst16 : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+
+  // Result from 'device_a' used on a large number of other devices.
+  %result_b, %result_timepoint_b = stream.async.execute on(#hal.device.promise<@device_b>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  %result_c, %result_timepoint_c = stream.async.execute on(#hal.device.promise<@device_c>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  %result_d, %result_timepoint_d = stream.async.execute on(#hal.device.promise<@device_d>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  %result_e, %result_timepoint_e = stream.async.execute on(#hal.device.promise<@device_e>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  %result_f, %result_timepoint_f = stream.async.execute on(#hal.device.promise<@device_f>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  %result_g, %result_timepoint_g = stream.async.execute on(#hal.device.promise<@device_g>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+  %result_h, %result_timepoint_h = stream.async.execute on(#hal.device.promise<@device_h>) await(%result_timepoint_a) => with(%result_a as %capture: !stream.resource<constant>{%c16}) -> (!stream.resource<constant>{%c16}) {
+    stream.yield %capture : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+
+  util.return
+}
