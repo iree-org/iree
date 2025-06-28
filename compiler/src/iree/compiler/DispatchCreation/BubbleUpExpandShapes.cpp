@@ -339,7 +339,9 @@ struct BubbleExpandThroughConcat final
       expandShapeProducts.push_back(expandShapeProduct);
     } // else we can always propagate the expand_shape through the concat.
 
-    auto mixedOutputShape = expandOp.getMixedOutputShape();
+    SmallVector<OpFoldResult> mixedOutputShape = expandOp.getMixedOutputShape();
+    SmallVector<int64_t> staticOutputShape =
+        llvm::to_vector(expandedType.getShape());
     // Create new expand_shape ops for each input.
     SmallVector<Value> newInputs;
     for (auto [input, product] :
@@ -351,17 +353,13 @@ struct BubbleExpandThroughConcat final
       bindSymbols(rewriter.getContext(), concatDimExpr);
       auto divMap = concatDimExpr.floorDiv(product);
       OpFoldResult dimOfr =
-          tensor::getMixedSizes(rewriter, expandOp.getLoc(), input)[concatDim];
+          tensor::getMixedSize(rewriter, expandOp.getLoc(), input, concatDim);
       OpFoldResult concatDimValue = affine::makeComposedFoldedAffineApply(
           rewriter, expandOp.getLoc(), divMap, ArrayRef<OpFoldResult>{dimOfr});
       mixedOutputShape[newConcatDim] = concatDimValue;
-      SmallVector<int64_t> staticOutputShape =
-          llvm::map_to_vector(mixedOutputShape, [](OpFoldResult ofr) {
-            if (auto staticShapeAttr = dyn_cast<Attribute>(ofr)) {
-              return cast<IntegerAttr>(staticShapeAttr).getInt();
-            }
-            return ShapedType::kDynamic;
-          });
+      staticOutputShape[newConcatDim] =
+          mlir::getConstantIntValue(concatDimValue)
+              .value_or(ShapedType::kDynamic);
       auto newType =
           RankedTensorType::get(staticOutputShape, inputType.getElementType());
       Value newExpand;
