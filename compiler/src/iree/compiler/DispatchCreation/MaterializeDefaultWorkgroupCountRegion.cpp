@@ -70,10 +70,16 @@ static void createDefaultWorkgroupCountRegion(
   Location loc = workgroupsOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
-  auto defaultCountOp =
+  Operation *defaultCountOp =
       rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
           loc, block->getArguments());
-  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp.getResults());
+  if (!workgroupsOp.getClosureBodyRegion().getOps<scf::ForallOp>().empty()) {
+    defaultCountOp =
+        rewriter
+            .create<IREE::TensorExt::DispatchWorkgroupCountSplitKModifierOp>(
+                loc, defaultCountOp->getResults(), block->getArguments());
+  }
+  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp->getResults());
 
   // Update the `workgroupsOp` region.
   rewriter.modifyOpInPlace(workgroupsOp, [&]() {
