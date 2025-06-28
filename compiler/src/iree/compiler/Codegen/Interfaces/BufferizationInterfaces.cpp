@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -675,6 +677,7 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 
   // Register IREE operations.
   registerIREEGPUBufferizationInterfaces(registry);
+  IREE::VectorExt::registerIREEVectorExtBufferizationInterfaces(registry);
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::TensorExt::IREETensorExtDialect *dialect) {
         // DispatchTensorLoadOp
