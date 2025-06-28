@@ -30,18 +30,12 @@ struct TileAndDistributeToWorkgroupsUsingForallOpPass final
     : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
   explicit TileAndDistributeToWorkgroupsUsingForallOpPass(
-      bool transposeWorkgroup)
-      : getRootOpFn(nullptr) {
+      bool transposeWorkgroup) {
     this->transposeWorkgroup = transposeWorkgroup;
   }
-  explicit TileAndDistributeToWorkgroupsUsingForallOpPass(GetTilingRootOpFn fn)
-      : getRootOpFn(fn) {}
 
   using Base::Base;
   void runOnOperation() override;
-
-private:
-  GetTilingRootOpFn getRootOpFn;
 };
 
 } // namespace
@@ -55,30 +49,26 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   // gets fused with it. For now to keep consistent with the legacy
   // tile-and-distribute it is still looking for the "last compute operation".
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  if (!getRootOpFn) {
-    getRootOpFn = [](ArrayRef<Operation *> computeOps) -> Operation * {
-      for (Operation *op : llvm::reverse(computeOps)) {
-        if (!getLoweringConfig(op) ||
-            !getLoweringConfig(op).hasWorkgroupTilingLevel()) {
-          continue;
-        }
-        return op;
-      }
-      return nullptr;
-    };
+  Operation *rootOp = nullptr;
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (!getLoweringConfig(op) ||
+        !getLoweringConfig(op).hasWorkgroupTilingLevel()) {
+      continue;
+    }
+    rootOp = op;
+    break;
+  }
+  if (!rootOp) {
+    return;
   }
 
   IRRewriter rewriter(context);
   FailureOr<TilingInfo> tilingInfo =
-      getTiledAndDistributionInfo(rewriter, getRootOpFn(computeOps));
+      getTiledAndDistributionInfo(rewriter, rootOp);
   if (failed(tilingInfo)) {
     return signalPassFailure();
   }
-  auto tilableOp = dyn_cast_or_null<TilingInterface>(tilingInfo->tilableOp);
-  if (!tilableOp) {
-    // Did not find a tileable op. So do nothing.
-    return;
-  }
+  auto tilableOp = cast<TilingInterface>(tilingInfo->tilableOp);
   mlir::DominanceInfo dominanceInfo(tilableOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
   collectTiledAndFusedOps(tilableOp, tiledAndFusedOps);
@@ -231,17 +221,9 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   return;
 }
-
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup) {
   return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
       transposeWorkgroup);
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTileAndDistributeToWorkgroupsUsingForallOpPassWithRootOpControl(
-    GetTilingRootOpFn getRootOpFn) {
-  return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
-      getRootOpFn);
 }
 } // namespace mlir::iree_compiler
