@@ -109,43 +109,32 @@ void CPUTileAndDistributeToWorkgroupsPass::runOnOperation() {
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.
   SmallVector<LoopLikeOpInterface> tilingLoops;
-  if (tilableOp->getNumResults() == 0) {
-    FailureOr<scf::SCFTilingResult> tilingResult =
-        scf::tileUsingSCF(rewriter, tilableOp, tilingOptions);
-    if (failed(tilingResult)) {
-      funcOp.emitOpError("tiling failed");
-      return signalPassFailure();
-    }
-    rewriter.eraseOp(tilableOp);
-    std::swap(tilingResult->loops, tilingLoops);
-  } else {
-    FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilableOp,
-                                                  tileAndFuseOptions);
-    if (failed(tileAndFuseResult)) {
-      funcOp.emitOpError("tile and fuse greedily failed");
-      return signalPassFailure();
-    }
-    for (auto [origValue, replacement] : tileAndFuseResult->replacements) {
-      rewriter.replaceAllUsesWith(origValue, replacement);
-    }
-    std::swap(tileAndFuseResult->loops, tilingLoops);
-    Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
-    FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoLoops(rewriter, rootTiledOp, tilingLoops,
-                               useWARForConsumerFusionSSAViolation);
-    if (failed(newFusionOpportunities)) {
-      rootTiledOp->emitOpError("failed to fuse consumers");
-      return signalPassFailure();
-    }
-
-    // Because we restrict to at most a single tilable consumer for yielding
-    // a replacement, no new fusion opportunities will yield a replacement,
-    // meaning there is no need to run consumer fusion again afterwards.
-    // TODO: run producer and consumer fusion in one worklist.
-    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
-                          tilingLoops);
+  FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+      scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilableOp,
+                                                tileAndFuseOptions);
+  if (failed(tileAndFuseResult)) {
+    funcOp.emitOpError("tile and fuse greedily failed");
+    return signalPassFailure();
   }
+  for (auto [origValue, replacement] : tileAndFuseResult->replacements) {
+    rewriter.replaceAllUsesWith(origValue, replacement);
+  }
+  std::swap(tileAndFuseResult->loops, tilingLoops);
+  Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
+  FailureOr<std::queue<Operation *>> newFusionOpportunities =
+      fuseConsumersIntoLoops(rewriter, rootTiledOp, tilingLoops,
+                             useWARForConsumerFusionSSAViolation);
+  if (failed(newFusionOpportunities)) {
+    rootTiledOp->emitOpError("failed to fuse consumers");
+    return signalPassFailure();
+  }
+
+  // Because we restrict to at most a single tilable consumer for yielding
+  // a replacement, no new fusion opportunities will yield a replacement,
+  // meaning there is no need to run consumer fusion again afterwards.
+  // TODO: run producer and consumer fusion in one worklist.
+  fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
+                        tilingLoops);
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {
       funcOp.emitOpError(

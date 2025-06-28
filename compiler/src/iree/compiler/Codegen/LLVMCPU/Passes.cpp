@@ -114,9 +114,15 @@ static llvm::cl::opt<bool> clForceArmStreaming(
     llvm::cl::init(false));
 
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
-static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
+static void addTileAndDistributePasses(OpPassManager &funcPassManager,
+                                       bool startWithRootOp) {
   if (clTileDispatchUsingForall) {
-    funcPassManager.addPass(createCPUTileAndDistributeToWorkgroupsPass());
+    if (startWithRootOp) {
+      funcPassManager.addPass(createCPUTileAndDistributeToWorkgroupsPass());
+    } else {
+      funcPassManager.addPass(
+          createTileAndDistributeToWorkgroupsUsingForallOpPass());
+    }
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
     funcPassManager.addPass(createCSEPass());
@@ -348,7 +354,7 @@ void buildLLVMCPUVectorLoweringPipeline(
 void addCPUBufferOpsTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/false);
 
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
@@ -385,7 +391,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
 void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/false);
 
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
@@ -465,7 +471,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/false);
 
   // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -529,7 +535,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/true);
 
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumer(
       static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel()),
@@ -580,7 +586,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/false);
 
   // The below two passes are nop if pack/unpack is not specified in ukernels
   // attribute. By default, they are disabled.
@@ -623,7 +629,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/false);
 
   {
     LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
@@ -679,7 +685,7 @@ void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                FailureOr<TilingConfig> &tilingConfig) {
   if (succeeded(tilingConfig) &&
       tilingConfig.value().getNumTilingLevels() > 1) {
-    addTileAndDistributePasses(funcPassManager);
+    addTileAndDistributePasses(funcPassManager, /*startWithRootOp=*/false);
     funcPassManager.addPass(createLLVMCPUTileAndFusePass(
         tilingConfig.value().getVectorCommonParallelLevel()));
   }
