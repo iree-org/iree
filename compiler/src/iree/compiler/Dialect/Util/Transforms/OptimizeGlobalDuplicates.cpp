@@ -12,23 +12,31 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -45,73 +53,14 @@ static llvm::cl::opt<bool>
                                       llvm::cl::desc("Disables this pass"),
                                       llvm::cl::init(false));
 
-using MapTy =
-    llvm::SmallDenseMap<StringRef, std::pair<SymbolRefAttr, StringRef>>;
-
-void processStoreOp(IREE::Util::GlobalLoadOp loadOp,
-                    IREE::Stream::TensorDispatchOp dispatchOp,
-                    IREE::Util::GlobalStoreOp storeOp, MapTy &m,
-                    llvm::SmallDenseMap<StringRef, StringRef> &m1) {
-  StringRef loadRef = loadOp.getGlobal();
-  StringRef storeRef = storeOp.getGlobal();
-  for (auto ref : dispatchOp.getEntryPointRefs()) {
-    auto [it, inserted] = m.try_emplace(loadRef, std::make_pair(ref, storeRef));
-    if (!inserted && it->second.first == ref) {
-      m1.insert({storeRef, it->second.second});
-      storeOp.erase();
-    }
+bool areAttributesEquivalent(Operation &lhs, Operation &rhs) {
+  auto storeOpLhs = llvm::dyn_cast_or_null<IREE::Util::GlobalStoreOp>(lhs);
+  auto storeOpRhs = llvm::dyn_cast_or_null<IREE::Util::GlobalStoreOp>(rhs);
+  if (storeOpLhs && storeOpRhs) {
+    return true;
   }
+  return false;
 }
-
-void processDispatchOp(IREE::Util::GlobalLoadOp loadOp, Operation *dispatchUser,
-                       MapTy &m,
-                       llvm::SmallDenseMap<StringRef, StringRef> &m1) {
-  auto dispatchOp =
-      llvm::dyn_cast<IREE::Stream::TensorDispatchOp>(dispatchUser);
-  if (!dispatchOp)
-    return;
-
-  for (auto *u1 : dispatchOp->getUsers()) {
-    for (auto *u2 : u1->getUsers()) {
-      if (auto storeOp = llvm::dyn_cast<IREE::Util::GlobalStoreOp>(u2)) {
-        processStoreOp(loadOp, dispatchOp, storeOp, m, m1);
-      }
-    }
-  }
-}
-
-void processLoadOp(IREE::Util::GlobalLoadOp loadOp, MapTy &m,
-                   llvm::SmallDenseMap<StringRef, StringRef> &m1) {
-  if (!llvm::isa<IREE::Stream::ResourceType>(loadOp.getType()))
-    return;
-
-  llvm::outs() << loadOp << '\n';
-  for (auto *loadUser : loadOp->getUsers()) {
-    llvm::outs() << *loadUser << '\n';
-    for (auto *asyncUser : loadUser->getUsers()) {
-      llvm::outs() << *asyncUser << '\n';
-      processDispatchOp(loadOp, asyncUser, m, m1);
-    }
-  }
-}
-
-void processInitializerOp(IREE::Util::InitializerOp initializerOp, MapTy &m,
-                          llvm::SmallDenseMap<StringRef, StringRef> &m1) {
-  for (auto loadOp : initializerOp.getOps<IREE::Util::GlobalLoadOp>()) {
-    processLoadOp(loadOp, m, m1);
-  }
-}
-
-void rewriteGlobalLoads(IREE::Util::FuncOp funcOp,
-                        llvm::SmallDenseMap<StringRef, StringRef> &m1) {
-  funcOp.walk([&m1](IREE::Util::GlobalLoadOp loadOp) {
-    StringRef s1 = loadOp.getGlobal();
-    if (auto it = m1.find(s1); it != m1.end()) {
-      loadOp.setGlobal(it->second);
-    }
-  });
-}
-
 class OptimizeGlobalDuplicatesPass
     : public impl::OptimizeGlobalDuplicatesPassBase<
           OptimizeGlobalDuplicatesPass> {
@@ -124,16 +73,89 @@ public:
     if (clDisableOptimizeGlobalDuplicates)
       return;
 
+    // llvm::outs() << "Running OptimizeGlobalDuplicatesPass\n";
     auto moduleOp = getOperation();
-    MapTy m;
-    llvm::SmallDenseMap<StringRef, StringRef> m1;
 
-    for (auto initializerOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
-      processInitializerOp(initializerOp, m, m1);
+    SmallVector<IREE::Util::InitializerOp> initOps;
+    llvm::SmallDenseMap<IREE::Util::InitializerOp, IREE::Util::GlobalStoreOp>
+        map;
+    for (auto callableOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
+      bool allImmutableLoads = true;
+      for (auto loadOp : callableOp.getInitializerRegion()
+                             .getOps<IREE::Util::GlobalLoadOp>()) {
+        if (!loadOp.isGlobalImmutable()) {
+          allImmutableLoads = false;
+          break;
+        }
+      }
+
+      auto bg = callableOp.getInitializerRegion()
+                    .getOps<IREE::Util::GlobalStoreOp>()
+                    .begin();
+      auto en = callableOp.getInitializerRegion()
+                    .getOps<IREE::Util::GlobalStoreOp>()
+                    .end();
+
+      auto tmp = bg;
+      if (allImmutableLoads && ++bg == en) {
+        initOps.push_back(callableOp);
+        map[callableOp] = *tmp;
+      }
     }
 
-    for (auto funcOp : moduleOp.getOps<IREE::Util::FuncOp>()) {
-      rewriteGlobalLoads(funcOp, m1);
+    BitVector initOpBitVector(initOps.size());
+    OperationEquivalenceCache cache(moduleOp.getContext());
+    auto mapping = cache.acquireMapping();
+    llvm::EquivalenceClasses<IREE::Util::InitializerOp> ec;
+    for (int i = 0; i < initOps.size(); ++i) {
+      if (initOpBitVector[i]) {
+        continue; // Already processed.
+      }
+      for (int j = i + 1; j < initOps.size(); ++j) {
+        if (initOpBitVector[j]) {
+          continue; // Already processed.
+        }
+        if (isStructurallyEquivalentTo(
+                cache, initOps[i].getInitializerRegion(),
+                initOps[j].getInitializerRegion(), *mapping,
+                [](Operation &lhs, Operation &rhs) {
+                  return areAttributesEquivalent(lhs, rhs);
+                })) {
+          // llvm::outs() << "Found structurally equivalent initializers: "
+          //  << initOps[i] << " and " << initOps[j] << "\n";
+          initOpBitVector.set(i);
+          initOpBitVector.set(j);
+          ec.unionSets(initOps[i], initOps[j]);
+        }
+      }
+    }
+
+    GlobalTable globalTable(moduleOp);
+    globalTable.rebuild();
+    SmallVector<SmallVector<IREE::Util::InitializerOp>> fusableSets;
+    for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
+      // llvm::outs() << "Equivalence class: \n";
+      if (!(*it)->isLeader()) {
+        continue; // Ignore non-leader sets.
+      }
+      if (++ec.member_begin(**it) == ec.member_end()) {
+        continue; // size 1
+      }
+      SmallVector<IREE::Util::InitializerOp> members;
+      for (auto mi = ec.member_begin(**it); mi != ec.member_end(); ++mi) {
+        members.push_back(*mi);
+      }
+
+      mlir::OpBuilder builder(moduleOp.getContext());
+      builder.setInsertionPoint(map[members.front()]);
+      for (int i = 1; i < members.size(); ++i) {
+        builder.create<IREE::Util::GlobalStoreOp>(
+            map[members.front()].getLoc(),
+            map[members.front()].getStoredGlobalValue(),
+            map[members[i]].getGlobal());
+
+        map[members[i]].erase();
+      }
     }
   }
 };

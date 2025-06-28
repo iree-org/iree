@@ -195,6 +195,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
     registry.insert<IREE::Flow::FlowDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  passManager.addPass(IREE::Util::createOptimizeGlobalDuplicatesPass());
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);

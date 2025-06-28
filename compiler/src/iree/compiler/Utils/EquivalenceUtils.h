@@ -8,6 +8,7 @@
 #define IREE_COMPILER_UTILS_EQUIVALENCEUTILS_H_
 
 #include "llvm/ADT/SetVector.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir {
@@ -21,13 +22,17 @@ namespace mlir::iree_compiler {
 //
 // Structural equivalence ensures that operations in both regions
 // |lhs| and |rhs| have the same attributes and same use-def structure.
-bool isStructurallyEquivalentTo(Region &lhs, Region &rhs);
+bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
+                                std::function<bool(Operation &, Operation &)>
+                                    areAttributesEquivalent = nullptr);
 
 // Recursively compares two operations for structural equivalence.
 //
 // Structural equivalence ensures that operations in the regions of both the
 // |lhs| and |rhs| have the same attributes and same use-def structure.
-bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs);
+bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
+                                std::function<bool(Operation &, Operation &)>
+                                    areAttributesEquivalent = nullptr);
 
 // Manages a cache of operation metadata used for efficient structural
 // equivalence checks.
@@ -76,9 +81,13 @@ private:
 // Uses |cache| to memoize operation information to improve repeated queries.
 // Callers must not mutate any IR that may be in the cache between queries.
 bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
-                                Region &rhs, IRMapping &mapping);
+                                Region &rhs, IRMapping &mapping,
+                                std::function<bool(Operation &, Operation &)>
+                                    areAttributesEquivalent = nullptr);
 bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                Operation &lhs, Operation &rhs);
+                                Operation &lhs, Operation &rhs,
+                                std::function<bool(Operation &, Operation &)>
+                                    areAttributesEquivalent = nullptr);
 
 } // namespace mlir::iree_compiler
 
