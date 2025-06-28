@@ -1231,6 +1231,7 @@ DeviceOptimalAttr::joinOR(IREE::Stream::AffinityAttr other) const {
         if (it == affinitySet.end()) {
           // New device entry.
           affinitySet.insert({otherDeviceAttr, affinityAttr});
+          return true;
         }
         // OR in with existing entry.
         auto joinedAttr = it->second.joinOR(other);
