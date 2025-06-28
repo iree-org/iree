@@ -116,9 +116,7 @@ static llvm::cl::opt<bool> clForceArmStreaming(
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   if (clTileDispatchUsingForall) {
-    funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPassWithRootOpControl(
-            getCPURootOperation));
+    funcPassManager.addPass(createCPUTileAndDistributeToWorkgroupsPass());
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
     funcPassManager.addPass(createCSEPass());
