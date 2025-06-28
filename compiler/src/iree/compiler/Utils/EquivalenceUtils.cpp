@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
+#include <functional>
 
 #include "llvm/ADT/PostOrderIterator.h"
 #include "mlir/IR/Block.h"
@@ -106,31 +107,42 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   return true;
 }
 
-static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                       Operation &lhs, Operation &rhs,
-                                       IRMapping &parentMapping);
+static bool isStructurallyEquivalentTo(
+    OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
+    IRMapping &parentMapping,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent =
+        nullptr);
 
-bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
-                                Region &rhs) {
+bool isStructurallyEquivalentTo(
+    OperationEquivalenceCache &cache, Region &lhs, Region &rhs,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
   auto mapping = cache.acquireMapping();
-  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
+                                    areAttributesEquivalent);
 }
 
-bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
+bool isStructurallyEquivalentTo(
+    Region &lhs, Region &rhs,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
   OperationEquivalenceCache cache(lhs.getContext());
-  return isStructurallyEquivalentTo(cache, lhs, rhs);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, areAttributesEquivalent);
 }
 
-bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs) {
+bool isStructurallyEquivalentTo(
+    Operation &lhs, Operation &rhs,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
   OperationEquivalenceCache cache(lhs.getContext());
   auto mapping = cache.acquireMapping();
-  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
+                                    areAttributesEquivalent);
 }
 
-bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                Operation &lhs, Operation &rhs) {
+bool isStructurallyEquivalentTo(
+    OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
   auto mapping = cache.acquireMapping();
-  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
+                                    areAttributesEquivalent);
 }
 
 // Recursively compares two regions for structural equivalence.
@@ -153,8 +165,10 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
 //
 // TODO(#3996): upstream into mlir::OperationEquivalence if this works.
 // TODO(#3996): add symbol ref comparison (add to IRMapping).
-bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
-                                Region &rhs, IRMapping &mapping) {
+bool isStructurallyEquivalentTo(
+    OperationEquivalenceCache &cache, Region &lhs, Region &rhs,
+    IRMapping &mapping,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
   auto &lhsRegionEntry = cache.getRegion(&lhs);
   auto &rhsRegionEntry = cache.getRegion(&rhs);
   if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size())
@@ -185,7 +199,8 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
 
     for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsBlock->getOperations(),
                                                rhsBlock->getOperations())) {
-      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping))
+      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping,
+                                      areAttributesEquivalent))
         return false;
     }
   }
@@ -194,9 +209,10 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
   return true;
 }
 
-static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                       Operation &lhs, Operation &rhs,
-                                       IRMapping &parentMapping) {
+static bool isStructurallyEquivalentTo(
+    OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
+    IRMapping &parentMapping,
+    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
   // Check operation metadata for early-exit opportunities.
   if (lhs.getName() != rhs.getName() ||
       lhs.getNumOperands() != rhs.getNumOperands() ||
@@ -209,19 +225,24 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
   auto &lhsEntry = cache.getOp(&lhs);
   auto &rhsEntry = cache.getOp(&rhs);
 
-  // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
+  // TODO(#3996): symbol mapping; for now allow them to differ
+  // unconditionally.
   if (lhsEntry.attrs.getAttrs().size() != rhsEntry.attrs.getAttrs().size())
     return false;
   for (auto [lhsAttr, rhsAttr] :
        llvm::zip_equal(lhsEntry.attrs, rhsEntry.attrs)) {
     if (!cache.isSymbolAttrName(lhsAttr.getName())) {
+      if (areAttributesEquivalent && areAttributesEquivalent(lhs, rhs)) {
+        break;
+      }
       if (lhsAttr != rhsAttr)
         return false;
     }
   }
 
-  // If the op references blocks (such as a branch) then we expect to have them
-  // in the mapping already from the parent region to do the lhs->rhs mapping.
+  // If the op references blocks (such as a branch) then we expect to have
+  // them in the mapping already from the parent region to do the lhs->rhs
+  // mapping.
   for (auto [lhsSuccessor, rhsSuccessor] :
        llvm::zip_equal(lhs.getSuccessors(), rhs.getSuccessors())) {
     if (rhsSuccessor != parentMapping.lookup(lhsSuccessor))
@@ -229,9 +250,9 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
   }
 
   // Ensure result types match first and add to the block and value mapping.
-  // For many ops if the result types don't match it's a good (cheap) indicator
-  // that the operands won't match either so this still allows a somewhat-early
-  // exit prior to the full traversal.
+  // For many ops if the result types don't match it's a good (cheap)
+  // indicator that the operands won't match either so this still allows a
+  // somewhat-early exit prior to the full traversal.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getResults(), rhs.getResults())) {
     if (lhsValue.getType() != rhsValue.getType())
@@ -239,8 +260,8 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
     parentMapping.map(lhsValue, rhsValue);
   }
 
-  // Check operands using the lhs->rhs mapping; since this op is only consuming
-  // these values they should already be defined in the mapping.
+  // Check operands using the lhs->rhs mapping; since this op is only
+  // consuming these values they should already be defined in the mapping.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getOperands(), rhs.getOperands())) {
     if (lhsValue.getType() != rhsValue.getType())
@@ -257,13 +278,15 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
     if (lhs.hasTrait<OpTrait::IsIsolatedFromAbove>()) {
       auto scopedRegionMapping = cache.acquireMapping();
       if (!isStructurallyEquivalentTo(cache, lhsRegion, rhsRegion,
-                                      *scopedRegionMapping)) {
+                                      *scopedRegionMapping,
+                                      areAttributesEquivalent)) {
         return false;
       }
     } else {
       IRMapping clonedParentMapping = parentMapping;
       if (!isStructurallyEquivalentTo(cache, lhsRegion, rhsRegion,
-                                      clonedParentMapping)) {
+                                      clonedParentMapping,
+                                      areAttributesEquivalent)) {
         return false;
       }
     }
