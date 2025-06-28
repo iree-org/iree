@@ -356,3 +356,42 @@ util.func public @single_gather(%source : tensor<20x20x100xi32>, %indices : tens
 //       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GATHER]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// Check that we end up with a single copy of the workload when collapsing
+// dynamic dims.
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+util.func public @collapse_dynamic_matmul(%arg0: tensor<4x?x2048xbf16>, %arg1: tensor<1024x2048xbf16>) -> tensor<4x?x1024xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %c1 = arith.constant 1 : index
+    %1 = tensor.dim %arg0, %c1 : tensor<4x?x2048xbf16>
+    %2 = tensor.empty(%1) : tensor<4x?x1024xf32>
+    %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<4x?x1024xf32>) -> tensor<4x?x1024xf32>
+    %4 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<4x?x2048xbf16>, tensor<1024x2048xbf16>) outs(%3 : tensor<4x?x1024xf32>) {
+    ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+      %9 = arith.extf %in : bf16 to f32
+      %10 = arith.extf %in_0 : bf16 to f32
+      %11 = arith.mulf %9, %10 : f32
+      %12 = arith.addf %out, %11 : f32
+      linalg.yield %12 : f32
+    } -> tensor<4x?x1024xf32>
+    util.return %4 : tensor<4x?x1024xf32>
+  }
+
+// CHECK-LABEL: util.func public @collapse_dynamic_matmul
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<4x?x2048xbf16>
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:   %[[MUL4:.+]] = arith.muli %[[DIM]], %[[C4]]
+//       CHECK:   flow.tensor.reshape %[[ARG0]] : {{.*}} -> tensor<?x2048xbf16>{%[[MUL4]]}
+//       CHECK:   flow.dispatch.workgroups[%[[MUL4]]](%[[MUL4]]
+//  CHECK-NEXT:     (%[[ARG2:[A-Za-z0-9]+]]: index
+
+//       CHECK:   %[[W:.+]] = iree_tensor_ext.dispatch.workload.ordinal %[[ARG2]], 0
+//       CHECK:   tensor.empty(%[[W]])
