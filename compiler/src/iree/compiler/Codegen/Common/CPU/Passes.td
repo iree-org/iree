@@ -30,4 +30,24 @@ def CPUPrepareUkernelsPass :
                 "For example, batch_mmt4d ops are decomposed to mmt4d ops";
 }
 
+def CPUTileAndDistributeToWorkgroupsPass :
+    InterfacePass<"iree-codegen-cpu-tile-and-distribute-to-workgroups",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Tile and distribute operations to workgroups using scf.forall op.";
+  let description = [{
+    Tile and distribute operations to workgroups using scf.forall op. Different
+    from the shared TileAndDistributeToWorkgroupsUsingForallOpPass, the CPU
+    version starts the tiling with the root op.
+  }];
+
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "IREE::Codegen::IREECodegenDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect",
+  ];
+}
+
+
 #endif  // IREE_CODEGEN_COMMON_CPU_PASSES

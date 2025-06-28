@@ -1,12 +1,13 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
-#include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -17,58 +18,35 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "tile-and-distribute-to-workgroups-using-forall-op"
-
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_TILEANDDISTRIBUTETOWORKGROUPSUSINGFORALLOPPASS
-#include "iree/compiler/Codegen/Common/Passes.h.inc"
+#define GEN_PASS_DEF_CPUTILEANDDISTRIBUTETOWORKGROUPSPASS
+#include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
 
 namespace {
-
-struct TileAndDistributeToWorkgroupsUsingForallOpPass final
-    : public impl::TileAndDistributeToWorkgroupsUsingForallOpPassBase<
-          TileAndDistributeToWorkgroupsUsingForallOpPass> {
-  explicit TileAndDistributeToWorkgroupsUsingForallOpPass(
-      bool transposeWorkgroup) {
-    this->transposeWorkgroup = transposeWorkgroup;
-  }
-
+struct CPUTileAndDistributeToWorkgroupsPass final
+    : public impl::CPUTileAndDistributeToWorkgroupsPassBase<
+          CPUTileAndDistributeToWorkgroupsPass> {
   using Base::Base;
   void runOnOperation() override;
 };
-
 } // namespace
 
-void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
+void CPUTileAndDistributeToWorkgroupsPass::runOnOperation() {
   auto funcOp = getOperation();
   auto *context = &getContext();
-
-  // TODO: For now this is taking the "last op" in the dispatch, but
-  // ideally this should take the "root op" that gets tiled and everything
-  // gets fused with it. For now to keep consistent with the legacy
-  // tile-and-distribute it is still looking for the "last compute operation".
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  Operation *rootOp = nullptr;
-  for (Operation *op : llvm::reverse(computeOps)) {
-    if (!getLoweringConfig(op) ||
-        !getLoweringConfig(op).hasWorkgroupTilingLevel()) {
-      continue;
-    }
-    rootOp = op;
-    break;
-  }
-  if (!rootOp) {
-    return;
-  }
-
   IRRewriter rewriter(context);
   FailureOr<TilingInfo> tilingInfo =
-      getTiledAndDistributionInfo(rewriter, rootOp);
+      getTiledAndDistributionInfo(rewriter, getCPURootOperation(computeOps));
   if (failed(tilingInfo)) {
     return signalPassFailure();
   }
-  auto tilableOp = cast<TilingInterface>(tilingInfo->tilableOp);
+  auto tilableOp = dyn_cast_or_null<TilingInterface>(tilingInfo->tilableOp);
+  if (!tilableOp) {
+    // Did not find a tileable op. So do nothing.
+    return;
+  }
   mlir::DominanceInfo dominanceInfo(tilableOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
   collectTiledAndFusedOps(tilableOp, tiledAndFusedOps);
@@ -104,13 +82,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tensor::ExtractSliceOp::getCanonicalizationPatterns(cleanupPatterns, context);
   tensor::DimOp::getCanonicalizationPatterns(cleanupPatterns, context);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(cleanupPatterns);
-  // TODO(Max191): Replace populateSwapExtractWithExpandPattern with upstream
-  // MLIR version once it is available (llvm-project/pull/126898).
-  populateSwapExtractWithExpandPattern(cleanupPatterns);
   // When fusing pads we do not want to generate zeroSliceGuards when doing
-  // workgroup tiling. In `GPUApplyTilingLevelPass` we do have an option called
-  // `allowZeroSlices` that can control this but we do not want these
-  // generated if workgroup tiling is happening first.
+  // workgroup tiling.
   cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
       context, [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
   tileAndFuseOptions.cleanupPatterns =
@@ -136,43 +109,32 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.
   SmallVector<LoopLikeOpInterface> tilingLoops;
-  if (tilableOp->getNumResults() == 0) {
-    FailureOr<scf::SCFTilingResult> tilingResult =
-        scf::tileUsingSCF(rewriter, tilableOp, tilingOptions);
-    if (failed(tilingResult)) {
-      funcOp.emitOpError("tiling failed");
-      return signalPassFailure();
-    }
-    rewriter.eraseOp(tilableOp);
-    std::swap(tilingResult->loops, tilingLoops);
-  } else {
-    FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilableOp,
-                                                  tileAndFuseOptions);
-    if (failed(tileAndFuseResult)) {
-      funcOp.emitOpError("tile and fuse greedily failed");
-      return signalPassFailure();
-    }
-    for (auto [origValue, replacement] : tileAndFuseResult->replacements) {
-      rewriter.replaceAllUsesWith(origValue, replacement);
-    }
-    std::swap(tileAndFuseResult->loops, tilingLoops);
-    Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
-    FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoLoops(rewriter, rootTiledOp, tilingLoops,
-                               useWARForConsumerFusionSSAViolation);
-    if (failed(newFusionOpportunities)) {
-      rootTiledOp->emitOpError("failed to fuse consumers");
-      return signalPassFailure();
-    }
-
-    // Because we restrict to at most a single tilable consumer for yielding
-    // a replacement, no new fusion opportunities will yield a replacement,
-    // meaning there is no need to run consumer fusion again afterwards.
-    // TODO: run producer and consumer fusion in one worklist.
-    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
-                          tilingLoops);
+  FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+      scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilableOp,
+                                                tileAndFuseOptions);
+  if (failed(tileAndFuseResult)) {
+    funcOp.emitOpError("tile and fuse greedily failed");
+    return signalPassFailure();
   }
+  for (auto [origValue, replacement] : tileAndFuseResult->replacements) {
+    rewriter.replaceAllUsesWith(origValue, replacement);
+  }
+  std::swap(tileAndFuseResult->loops, tilingLoops);
+  Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
+  FailureOr<std::queue<Operation *>> newFusionOpportunities =
+      fuseConsumersIntoLoops(rewriter, rootTiledOp, tilingLoops,
+                             useWARForConsumerFusionSSAViolation);
+  if (failed(newFusionOpportunities)) {
+    rootTiledOp->emitOpError("failed to fuse consumers");
+    return signalPassFailure();
+  }
+
+  // Because we restrict to at most a single tilable consumer for yielding
+  // a replacement, no new fusion opportunities will yield a replacement,
+  // meaning there is no need to run consumer fusion again afterwards.
+  // TODO: run producer and consumer fusion in one worklist.
+  fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
+                        tilingLoops);
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {
       funcOp.emitOpError(
@@ -185,20 +147,6 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     if (failed(forallOp)) {
       tilingLoops[0]->emitOpError("failed to drop unit dimensions");
       return signalPassFailure();
-    }
-
-    // Reorder the workgroups if the strategy is set to `transpose`.
-    // This just transposes the first two dimensions of the workgroup i.e., the
-    // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
-    // Only reorders if the loop bounds are static.
-    if (transposeWorkgroup) {
-      SmallVector<Attribute> mappingAttrs(
-          forallOp->getMappingAttr().getValue());
-      int64_t mappingSize = mappingAttrs.size();
-      if (areAllStaticLoopBounds(*forallOp) && mappingSize >= 2) {
-        std::swap(mappingAttrs[mappingSize - 1], mappingAttrs[mappingSize - 2]);
-        forallOp->setMappingAttr(ArrayAttr::get(context, mappingAttrs));
-      }
     }
   }
 
@@ -221,9 +169,5 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   return;
 }
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup) {
-  return std::make_unique<TileAndDistributeToWorkgroupsUsingForallOpPass>(
-      transposeWorkgroup);
-}
+
 } // namespace mlir::iree_compiler

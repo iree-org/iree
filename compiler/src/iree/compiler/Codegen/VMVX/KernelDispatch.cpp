@@ -98,13 +98,8 @@ setConfigForKernel(mlir::FunctionOpInterface entryPointFn) {
     return lowerUsingVMVXDefaultPipeline(entryPointFn);
   }
 
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp)) {
-    return failure();
-  }
-
   // Handle the case with no known root operation.
-  Operation *rootOperation = rootOp.value();
+  Operation *rootOperation = getCPURootOperation(computeOps);
   if (!rootOperation) {
     return lowerUsingVMVXDefaultPipeline(entryPointFn);
   }

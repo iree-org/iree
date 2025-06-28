@@ -19,7 +19,8 @@ namespace mlir::iree_compiler {
 ///   3. An operation that implements TilingInterface.
 /// If there are multiple operations meeting the same priority, the one closer
 /// to the end of the function is the root op.
-FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
+/// Returns nullptr if any root op is not found.
+Operation *getCPURootOperation(ArrayRef<Operation *> computeOps);
 
 /// Creates a string attribute containing the name of the attribute that is
 /// used to enable decomposition.
