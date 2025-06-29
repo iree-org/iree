@@ -348,14 +348,26 @@ def Stream_AffinityTopologyAttr : AttrInterface<"AffinityTopologyAttrInterface">
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns whether transfers between source and target affinity can be elided.
+        Returns whether source has transparent access to target.
       }],
       /*retTy=*/"bool",
-      /*methodName=*/"requiresTransfer",
+      /*methodName=*/"hasTransparentAccess",
       /*args=*/(ins "IREE::Stream::AffinityAttr":$source, "IREE::Stream::AffinityAttr":$target),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return true; // By default, assume transfers are needed
+        return false; // By default, assume no transparent access
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether two devices are connected by a link with unified memory.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"hasUnifiedMemory",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$source, "IREE::Stream::AffinityAttr":$target),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false; // By default, assume no unified memory
       }]
     >
   ];

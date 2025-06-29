@@ -17,6 +17,7 @@ iree_cc_library(
     "HALDialect.h"
     "HALOps.h"
     "HALTypes.h"
+    "Utils.h"
   TEXTUAL_HDRS
     "HALAttrInterfaces.cpp.inc"
     "HALAttrInterfaces.h.inc"
@@ -35,6 +36,7 @@ iree_cc_library(
     "HALOpFolders.cpp"
     "HALOps.cpp"
     "HALTypes.cpp"
+    "Utils.cpp"
   DEPS
     ::HALAttrsGen
     ::HALInterfacesGen

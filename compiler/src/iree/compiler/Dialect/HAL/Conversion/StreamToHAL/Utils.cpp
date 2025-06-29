@@ -5,12 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
-
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/CommandLine.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 
 static llvm::cl::opt<bool> clExternalResourcesMappable(
     "iree-stream-external-resources-mappable",
@@ -199,17 +197,15 @@ IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region) {
 }
 
 LogicalResult
-deriveRequiredResourceBufferBits(Location loc,
-                                 IREE::Stream::ResourceType resourceType,
+deriveRequiredResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
                                  IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                  IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  switch (resourceType.getLifetime()) {
+  switch (lifetime) {
   default:
-    return mlir::emitError(loc)
-           << "unsupported resource lifetime: "
-           << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
+    return mlir::emitError(loc) << "unsupported resource lifetime: "
+                                << IREE::Stream::stringifyLifetime(lifetime);
   case IREE::Stream::Lifetime::Constant:
     // Device local; copies required to get into external resources.
     memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
@@ -252,17 +248,16 @@ deriveRequiredResourceBufferBits(Location loc,
 }
 
 LogicalResult
-deriveAllowedResourceBufferBits(Location loc,
-                                IREE::Stream::ResourceType resourceType,
+deriveAllowedResourceBufferBits(Location loc, IREE::Stream::Lifetime lifetime,
                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                 IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
+  if (failed(deriveRequiredResourceBufferBits(loc, lifetime, memoryTypes,
                                               bufferUsage))) {
     return failure();
   }
-  switch (resourceType.getLifetime()) {
+  switch (lifetime) {
   default:
     break;
   case IREE::Stream::Lifetime::External:
