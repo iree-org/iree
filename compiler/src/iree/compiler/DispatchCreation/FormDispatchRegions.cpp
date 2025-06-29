@@ -20,6 +20,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -887,6 +888,40 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 // Dispatch region formation
 //===----------------------------------------------------------------------===//
 
+/// Check that `consumer` can be moved into `regionOp` without SSA violations.
+bool checkConsumerFusionLegality(Operation *regionOp, Operation *consumer,
+                                 DominanceInfo &dominance) {
+  // Compute the backward slice from consumer with cutoff being the dispatch.
+  BackwardSliceOptions sliceOptions;
+  sliceOptions.filter = [&](Operation *op) {
+    if (isa<tensor::DimOp>(op)) {
+      return false;
+    }
+    // If op dominates the regionOp, dont include in the slice.
+    if (dominance.properlyDominates(op, regionOp)) {
+      return false;
+    }
+    return true;
+  };
+  for (Value operand : consumer->getOperands()) {
+    if (operand.getDefiningOp() == regionOp) {
+      // If the operand is the region op directly, there is no issue.
+      continue;
+    }
+    SetVector<Operation *> slice;
+    if (failed(getBackwardSlice(operand, &slice, sliceOptions))) {
+      return false;
+    }
+    if (slice.contains(regionOp)) {
+      // This indicates that there is an operation in between the region op
+      // and the consumer in the SSA use-def chain (from regionOp -> consumer)
+      // preventing the fusion.
+      return false;
+    }
+  }
+  return true;
+}
+
 /// Create IREE::Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
@@ -991,6 +1026,13 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
         if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
           return failure();
         }
+      }
+
+      // Check to see if it is still legal to fuse into consumer.
+      if (!checkConsumerFusionLegality(regionOp, consumer, dominanceInfo)) {
+        // Leave the consumer as is, it will get put into its own dispatch
+        // later.
+        continue;
       }
 
       if (failed(moveOperandDefs(rewriter, consumer, regionOp, dominanceInfo,
