@@ -36,6 +36,7 @@ iree_lit_test_suite(
     "fuse_multiuse_elementwise_producer.mlir"
     "fusion_preprocessing.mlir"
     "hoist_encoding_ops.mlir"
+    "hoist_uniform_scalar_compute.mlir"
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"

@@ -271,7 +271,6 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
     "IREE::Encoding::IREEEncodingDialect",
   ];
 }
-
 def HoistEncodingOpsPass :
     InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
   let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
@@ -284,6 +283,11 @@ def HoistEncodingOpsPass :
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
   ];
+}
+
+def HoistUniformScalarComputePass :
+    InterfacePass<"iree-dispatch-creation-hoist-uniform-scalar-compute", "mlir::FunctionOpInterface"> {
+  let summary = "Hoists scalar (computation) out of dispatch regions.";
 }
 
 def PropagateEncodingsPass :
