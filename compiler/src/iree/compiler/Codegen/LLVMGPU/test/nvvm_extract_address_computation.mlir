@@ -49,8 +49,8 @@
 // CHECK-DAG: %[[TID_Y_IDX:.*]] = llvm.mul %[[TID_Y_TRUNC]], %[[C64]] overflow<nsw> : i32
 //
 // Match the loop invariant math on the special registers.
-// CHECK: %[[GRP_IDX:.*]] = llvm.add %[[TID_Y_IDX]], %[[LANEID_TRUNC]]  : i32
-// CHECK: %[[GRP_IDX1:.*]] = llvm.add %[[GRP_IDX]], %{{.*}}  : i32
+// CHECK: %[[GRP_IDX:.*]] = llvm.add %[[TID_Y_IDX]], %{{.*}}  : i32
+// CHECK: %[[GRP_IDX1:.*]] = llvm.add %[[GRP_IDX]], %[[LANEID_TRUNC]]  : i32
 // CHECK: %[[GRP_IDX2:.*]] = llvm.and %[[GRP_IDX1]], %[[C6]]  : i32
 // CHECK: %[[GRP_IDX3:.*]] = llvm.shl %[[GRP_IDX2]], %[[C2]]  : i32
 // CHECK: %{{.*}} = llvm.xor %[[SRC:.*]], %[[GRP_IDX3]]  : i32
