@@ -39,18 +39,14 @@ void addCommonTargetExecutablePreprocessingPasses(
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
 /// CleanupBufferAllocView).
-/// TODO(#20912): Enable the injection of assume_alignment ops after the
-/// hoisting bug is fixed.
-void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
-                                    bool injectAssumeAlignmentOp = true);
+void addIREEPostBufferizationPasses(OpPassManager &funcPassManager);
 
 using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
-    bool injectAssumeAlignmentOp = true);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 /// Populate Encoding to Nop pass and canonicalizer pass to the pipeline.
 void addEncodingToNopPasses(FunctionLikeNest &passManager);
