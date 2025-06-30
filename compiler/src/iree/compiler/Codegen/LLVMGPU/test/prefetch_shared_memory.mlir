@@ -28,6 +28,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     // CHECK: gpu.barrier
+    // CHECK: amdgpu.sched_barrier allow = <none>
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]]
     scf.yield %3 : vector<1xf32>
@@ -72,6 +73,7 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     %4 = arith.addf %3, %arg3 : vector<1xf32>
     // CHECK: gpu.barrier
+    // CHECK: amdgpu.sched_barrier allow = <none>
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]], %[[COMPUTE2]]
     scf.yield %3, %4 : vector<1xf32>, vector<1xf32>
@@ -127,6 +129,7 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     // CHECK: gpu.barrier
+    // CHECK: amdgpu.sched_barrier allow = <none>
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]]
     scf.yield %3 : vector<1xf32>
@@ -212,6 +215,7 @@ func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
 // CHECK:   %[[COMPUTE_READ:.*]] = vector.transfer_read %[[WG_ALLOC]][%[[C0]]]
 // CHECK:   %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
 // CHECK:   gpu.barrier
+// CHECK:   amdgpu.sched_barrier allow = <none>
 // CHECK:   scf.if %[[COND]] {
 // CHECK:     %[[COMPUTE_RELOAD:.*]] = vector.transfer_read %[[PRIV_ALLOC2]][%[[C0]]]
 // CHECK:     vector.transfer_write %[[COMPUTE_RELOAD]], %[[WG_ALLOC]][%[[C0]]]
@@ -319,6 +323,7 @@ func.func @prefetch_scf_if_transientreadwrite(%arg0: memref<128xf32>, %cond : i1
 // CHECK:   %[[READ3:.*]] = vector.transfer_read %[[WG_ALLOC]]
 // CHECK:   %[[COMP:.*]] = arith.addf
 // CHECK:   gpu.barrier
+// CHECK:   amdgpu.sched_barrier allow = <none>
 // CHECK:   %[[PRIV_ALLOC3:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK:   scf.if
 // CHECK:   %[[READ5:.*]] = vector.transfer_read %[[PRIV_ALLOC3]]
