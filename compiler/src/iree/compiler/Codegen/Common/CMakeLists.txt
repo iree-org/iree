@@ -144,6 +144,7 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "PassUtils.cpp"
     "Passes.cpp"
+    "PropagateConstantOffsets.cpp"
     "PropagateDispatchSizeBounds.cpp"
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"

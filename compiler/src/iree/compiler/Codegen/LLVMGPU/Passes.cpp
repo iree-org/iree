@@ -1098,6 +1098,11 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       // full complexity.
       .addPass(createVectorTransferLoweringPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
+      // Propagate constants close to loads/stores to improve the ability for
+      // swizzling to CSE.
+      .addPass(createPropagateConstantOffsetsPass)
+      // Propagating constants introduces CSE opportunities.
+      .addPass(createCSEPass)
       // Resolve swizzling hints before lowering affine ops but after
       // lowering vector (transfer) ops.
       .addPass(createResolveSwizzleHintsPass)
@@ -1152,7 +1157,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Hoist any newly static allocations from PadDynamicAlloc.
       .addPass(createHoistStaticallyBoundAllocationsPass)
 
-      .addPass(createLowerAffinePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 
