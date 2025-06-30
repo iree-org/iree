@@ -47,7 +47,6 @@ struct HoistUniformScalarComputePass
     mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
-    Dialect *arithDialect = context->getLoadedDialect<arith::ArithDialect>();
 
     WalkResult walkResult =
         funcOp.walk([&](IREE::Flow::DispatchRegionOp dispatch) {
@@ -57,7 +56,7 @@ struct HoistUniformScalarComputePass
             // flow/stream/hal.dispatch.workgroups.count/id ops.
             // TODO: Add an op trait to tie count/id ops to region ops.
             for (Operation &op : body.getOperations()) {
-              if (op.getDialect() == arithDialect) {
+              if (isa<arith::ArithDialect>(op.getDialect())) {
                 ops.push_back(&op);
               }
             }
