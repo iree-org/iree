@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow{fission-multi-trip}),cse,canonicalize)" %s | FileCheck %s --check-prefixes=CHECK-ALL,MULTI
-// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow),cse)" %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
+// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow{fission-multi-trip}))" %s | FileCheck %s --check-prefixes=CHECK-ALL,MULTI
+// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow))" %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
 
 // CHECK-ALL-LABEL: @fission_global_read_to_private_write
 // CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -129,8 +129,11 @@ func.func @fission_unit_trip(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<f
 
 // -----
 
-// CHECK-ALL-LABEL: @negative_multiple_transfer_pairs
-func.func @negative_multiple_transfer_pairs(%arg0: memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg4: memref<?x1x1x2xbf16, #gpu.address_space<private>>) {
+// CHECK-ALL-LABEL: @multiple_transfer_pairs
+// CHECK-ALL-SAME: %[[ARG0:.*]]: memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %[[ARG1:.*]]: index
+// CHECK-ALL-SAME: %[[ARG2:.*]]: memref<?x1x1x2xbf16, #gpu.address_space<private>>
+func.func @multiple_transfer_pairs(%arg0: memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: memref<?x1x1x2xbf16, #gpu.address_space<private>>) {
   // Multiple read/write pairs is currently unsupported.
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -138,19 +141,35 @@ func.func @negative_multiple_transfer_pairs(%arg0: memref<?x1x1x2xbf16, #amdgpu.
   %ub = affine.min affine_map<(d0) -> (1, d0)>(%arg1)
   scf.for %idx = %c0 to %ub step %c1 {
     %src0 = memref.subview %arg0[%idx, 0, 0, 0] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-    %dst0 = memref.subview %arg4[%idx, 0, 0, 0] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #gpu.address_space<private>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
+    %dst0 = memref.subview %arg2[%idx, 0, 0, 0] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #gpu.address_space<private>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
     %val0 = vector.transfer_read %src0[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x1xbf16>
     vector.transfer_write %val0, %dst0[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x1xbf16>, memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
 
     %src1 = memref.subview %arg0[%idx, 0, 0, 1] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-    %dst1 = memref.subview %arg4[%idx, 0, 0, 1] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #gpu.address_space<private>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
+    %dst1 = memref.subview %arg2[%idx, 0, 0, 1] [1, 1, 1, 1] [1, 1, 1, 1] : memref<?x1x1x2xbf16, #gpu.address_space<private>> to memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
     %val1 = vector.transfer_read %src1[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>, vector<1x1x1x1xbf16>
     vector.transfer_write %val1, %dst1[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x1xbf16>, memref<1x1x1x1xbf16, strided<[2, 2, 2, 1], offset: ?>, #gpu.address_space<private>>
   }
   return
 }
-// CHECK-ALL: scf.for
-// CHECK-ALL-NOT: scf.for
+// CHECK-ALL: %[[ALLOCA0:.*]] = memref.alloca(%[[UB:.*]])
+// CHECK-ALL: %[[ALLOCA1:.*]] = memref.alloca(%[[UB]])
+// CHECK-ALL: scf.for %[[ITER:.*]] = %c0 to %[[UB]] step %c1 {
+// CHECK-ALL:   %[[SRC0:.+]] = memref.subview %[[ARG0]][%[[ITER]], 0, 0, 0]
+// CHECK-ALL:   %[[VAL0:.*]] = vector.transfer_read %[[SRC0]][%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
+// CHECK-ALL:   %[[SRC1:.+]] = memref.subview %[[ARG0]][%[[ITER]], 0, 0, 1]
+// CHECK-ALL:   %[[VAL1:.*]] = vector.transfer_read %[[SRC1]][%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
+// CHECK-ALL:   vector.transfer_write %[[VAL0]], %[[ALLOCA0]][%[[ITER]], %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
+// CHECK-ALL:   vector.transfer_write %[[VAL1]], %[[ALLOCA1]][%[[ITER]], %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
+// CHECK-ALL: }
+// CHECK-ALL: scf.for %[[ITER:.*]] = %c0 to %[[UB]] step %c1 {
+// CHECK-ALL:   %[[DST0:.+]] = memref.subview %[[ARG2]][%[[ITER]], 0, 0, 0]
+// CHECK-ALL:   %[[VAL0:.*]] = vector.transfer_read %[[ALLOCA0]][%[[ITER]], %c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
+// CHECK-ALL:   vector.transfer_write %[[VAL0]], %[[DST0]][%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
+// CHECK-ALL:   %[[DST1:.+]] = memref.subview %[[ARG2]][%[[ITER]], 0, 0, 1]
+// CHECK-ALL:   %[[VAL1:.*]] = vector.transfer_read %[[ALLOCA1]][%[[ITER]], %c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
+// CHECK-ALL:   vector.transfer_write %[[VAL1]], %[[DST1]][%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
+// CHECK-ALL: }
 
 
 // -----
