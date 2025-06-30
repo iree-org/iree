@@ -62,8 +62,9 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
   // because outputs should reflect the full parallel iteration space.
   int64_t staticNumTrips = 1;
   for (auto [size, type] : llvm::zip_equal(staticTileSizes, iteratorTypes)) {
-    // Skip reduction iterators.
+    // Skip tiling of reduction iterators.
     if (type == utils::IteratorType::reduction) {
+      size = 0;
       continue;
     }
     if (ShapedType::isDynamic(size)) {
