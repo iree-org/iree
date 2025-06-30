@@ -136,19 +136,6 @@ func.func @gemm_unit_N(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x1xf32>,
 
 // -----
 
-func.func @gemm_unit_M_unit_N(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf32>,
-    %arg2 : tensor<1x1xf32>) -> tensor<1x1xf32> {
-  %0 = linalg.matmul {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>}
-      ins(%arg0, %arg1 : tensor<1x1xf32>, tensor<1x1xf32>)
-      outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
-  return %0 : tensor<1x1xf32>
-}
-// CHECK-LABEL: func.func @gemm_unit_M_unit_N(
-//   CHECK-NOT:   scf.forall
-
-// -----
-
 func.func @generic_unit_dims(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>) -> tensor<1x?x1x1x?x?x1x?xf32> {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -388,25 +375,6 @@ func.func @set_size_to_tilesize_when_divisible(
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[GENERIC]]
 //  CHECK-SAME:           tensor<1x16x128xf16> into tensor<?x16x4096xf16>
-
-// -----
-
-// This just verifies that constant dim propagation works as expected after tiling.
-func.func @generate_no_distribution(%arg0 : tensor<16xf16>) -> tensor<16xf16> {
-   %empty = tensor.empty() : tensor<16xf16>
-   %0 = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-      ins(%arg0 : tensor<16xf16>) outs(%empty : tensor<16xf16>)
-      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16]]>} {
-    ^bb0(%b0: f16, %b1: f16):
-      %1 = arith.mulf %b0, %b0 : f16
-      linalg.yield %1 : f16
-  } -> tensor<16xf16>
-  return %0 : tensor<16xf16>
-}
-// CHECK-LABEL: func @generate_no_distribution(
-//   CHECK-NOT:   scf.forall
 
 // -----
 
@@ -1073,3 +1041,16 @@ func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
 //   CHECK-DAG:      tensor.parallel_insert_slice %[[CAST0]] into %[[INIT0]][%[[IV0]], %[[IV1]], %[[C0]], 0] [1, 1, %[[C32]], 32]
 //   CHECK-DAG:      tensor.parallel_insert_slice %[[CAST1]] into %[[INIT1]][%[[IV0]], %[[IV1]], %[[C0]], 0] [1, 1, %[[C32]], 32]
 //       CHECK:    return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+// Verify that the scf.forall is still generated when only one worker is needed
+// for distribution.
+func.func @single_trip_forall(%0 : tensor<64x64xf32>, %1 : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %2 = linalg.copy {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+      ins(%0 : tensor<64x64xf32>)
+      outs(%1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  return %2 : tensor<64x64xf32>
+}
+//   CHECK-LABEL: func @single_trip_forall
+//         CHECK:   scf.forall
