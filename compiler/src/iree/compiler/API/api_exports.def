@@ -18,6 +18,7 @@ EXPORTS
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
   ireeCodegenQueryMMAIntrinsics
+  ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID

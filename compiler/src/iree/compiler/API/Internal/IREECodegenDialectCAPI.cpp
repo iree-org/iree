@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
@@ -261,4 +262,9 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
   result.domainRank = opInfo.getDomainRank();
 
   return result;
+}
+
+bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
+  return llvm::isa<mlir::iree_compiler::IREE::LinalgExt::AttentionOp>(
+      unwrap(op));
 }
