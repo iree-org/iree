@@ -83,6 +83,7 @@ iree_lit_test_suite(
     "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
+    "propagate_constant_offsets.mlir"
     "propagate_dispatch_size_bounds.mlir"
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
