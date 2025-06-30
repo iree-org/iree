@@ -68,33 +68,33 @@ struct EncodingTypeExternalModel
 struct BuiltinTensorExternalModel
     : bufferization::TensorLikeType::ExternalModel<
           BuiltinTensorExternalModel, IREE::TensorExt::DispatchTensorType> {
-  llvm::FailureOr<bufferization::BufferLikeType> getBufferType(
-      mlir::Type type, const bufferization::BufferizationOptions &options,
+  FailureOr<bufferization::BufferLikeType> getBufferType(
+      Type type, const bufferization::BufferizationOptions &options,
       llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
     auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
     auto tensorType = cast<TensorType>(dispatchTensorType.asRankedTensorType());
     auto memSpace = options.defaultMemorySpaceFn(tensorType);
-    if (!memSpace.has_value())
+    if (!memSpace.has_value()) {
       return emitError() << "could not infer memory space";
-
+    }
     return cast<bufferization::BufferLikeType>(
         getMemRefType(tensorType, options, /*layout=*/{}, *memSpace));
   }
 
-  mlir::LogicalResult verifyCompatibleBufferType(
-      mlir::Type type, bufferization::BufferLikeType bufferType,
+  LogicalResult verifyCompatibleBufferType(
+      Type type, bufferization::BufferLikeType bufferType,
       llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
     auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
     assert(isa<BaseMemRefType>(bufferType) && "expected memref type");
     auto memrefType = cast<ShapedType>(bufferType);
-
-    if (dispatchTensorType.getShape() != memrefType.getShape())
+    if (dispatchTensorType.getShape() != memrefType.getShape()) {
       return emitError() << "shapes do not match";
-
-    if (dispatchTensorType.getBoundElementType() != memrefType.getElementType())
+    }
+    if (dispatchTensorType.getBoundElementType() !=
+        memrefType.getElementType()) {
       return emitError() << "element types do not match";
-
-    return mlir::success();
+    }
+    return success();
   }
 };
 
