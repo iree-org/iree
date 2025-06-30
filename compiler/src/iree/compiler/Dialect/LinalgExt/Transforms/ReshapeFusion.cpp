@@ -476,8 +476,11 @@ struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
 };
 
 FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
-                                   int64_t numDims, Value operand,
-                                   ShapedType ty) {
+                                   int64_t startDim, int64_t numDims,
+                                   Value operand, ShapedType ty) {
+  if (numDims == 0) {
+    return failure();
+  }
   // Find list of dims to drop and the target shape.
   ArrayRef<int64_t> shape = ty.getShape();
   SmallVector<bool> unitDims(shape.size(), false);
@@ -489,18 +492,19 @@ FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
   // Because gather/scatter like to define special behavior to allow eliding
   // the coordinate dimension, we have to make sure we don't generate a 0-D
   // tensor.
-  auto slice = MutableArrayRef(unitDims).take_front(numDims);
+  auto slice = MutableArrayRef(unitDims).slice(startDim, numDims);
   if (llvm::all_of(slice, [](bool x) { return x; })) {
     slice.back() = false;
   }
   SmallVector<int64_t> targetShape;
-  for (int i = 0; i < numDims; ++i) {
+  targetShape.append(shape.begin(), shape.begin() + startDim);
+  for (int i = startDim; i < numDims + startDim; ++i) {
     if (!unitDims[i]) {
       targetShape.push_back(shape[i]);
     }
   }
-  ArrayRef<int64_t> remaining = shape.drop_front(numDims);
-  targetShape.append(remaining.begin(), remaining.end());
+  targetShape.append(shape.begin() + startDim + numDims, shape.end());
+  assert(targetShape.size() <= shape.size());
   // No unit dims dropped.
   if (targetShape.size() == shape.size()) {
     return failure();
@@ -513,7 +517,7 @@ FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
   return rankReducingExtract.value();
 };
 
-struct DropGatherBatchUnitDims final : public OpRewritePattern<GatherOp> {
+struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
   using OpRewritePattern<GatherOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
@@ -522,24 +526,53 @@ struct DropGatherBatchUnitDims final : public OpRewritePattern<GatherOp> {
       return rewriter.notifyMatchFailure(
           gatherOp, "dropping unit dims not implemented for buffer semantics");
     }
-    if (gatherOp.getBatchRank() <= 1) {
-      return rewriter.notifyMatchFailure(
-          gatherOp, "dropping unit dims from batch rank 1 is not supported.");
+
+    bool changed = false;
+    // Drop batch dimensions.
+    Value reducedSource = gatherOp.getSource();
+    Value reducedIndices = gatherOp.getIndices();
+    Value reducedOutput = gatherOp.getOutput();
+    if (gatherOp.getBatchRank() > 1) {
+      // The only reaason we have to do these rank reductions seperate is
+      // because gather/scatter have special behavior for eliding the coordinate
+      // dimension.
+      // TODO: Do the rank reduction in one go after this behavior is changed.
+      FailureOr<Value> newIndices = rankReduceOperand(
+          rewriter, loc, /*startDim=*/0, /*numDims=*/gatherOp.getBatchRank(),
+          gatherOp.getIndices(), gatherOp.getIndicesType());
+      FailureOr<Value> newOutput = rankReduceOperand(
+          rewriter, loc, /*startDim=*/0, /*numDims=*/gatherOp.getBatchRank(),
+          gatherOp.getOutput(), gatherOp.getOutputType());
+      if (succeeded(newIndices) && succeeded(newOutput)) {
+        reducedIndices = newIndices.value();
+        reducedOutput = newOutput.value();
+        changed = true;
+      }
+    }
+    // Drop slice dimensions.
+    FailureOr<Value> newSource =
+        rankReduceOperand(rewriter, loc, /*startDim=*/gatherOp.getIndexDepth(),
+                          /*numDims=*/gatherOp.getOutputSliceRank(),
+                          gatherOp.getSource(), gatherOp.getSourceType());
+    ShapedType newOutputTy = cast<ShapedType>(reducedOutput.getType());
+    FailureOr<Value> newOutput = rankReduceOperand(
+        rewriter, loc,
+        /*startDim=*/newOutputTy.getRank() - gatherOp.getOutputSliceRank(),
+        /*numDims=*/gatherOp.getOutputSliceRank(), reducedOutput, newOutputTy);
+    if (succeeded(newSource) && succeeded(newOutput)) {
+      reducedSource = newSource.value();
+      reducedOutput = newOutput.value();
+      changed = true;
     }
 
-    FailureOr<Value> newIndices =
-        rankReduceOperand(rewriter, loc, gatherOp.getBatchRank(),
-                          gatherOp.getIndices(), gatherOp.getIndicesType());
-    FailureOr<Value> newOutput =
-        rankReduceOperand(rewriter, loc, gatherOp.getBatchRank(),
-                          gatherOp.getOutput(), gatherOp.getOutputType());
-    if (failed(newIndices) || failed(newOutput)) {
+    if (!changed) {
       return failure();
     }
+
     auto newGather = rewriter.create<GatherOp>(
-        gatherOp.getLoc(), TypeRange{newOutput->getType()},
-        ValueRange{gatherOp.getSource(), newIndices.value()},
-        ValueRange{newOutput.value()}, gatherOp.getDimensionMap());
+        gatherOp.getLoc(), TypeRange{reducedOutput.getType()},
+        ValueRange{reducedSource, reducedIndices}, ValueRange{reducedOutput},
+        gatherOp.getDimensionMap());
     Value dest = gatherOp.getOutput();
     int64_t rank = gatherOp.getOutputType().getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
@@ -853,7 +886,7 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
-  patterns.add<DropScatterUnitIndexDepth, DropGatherBatchUnitDims>(
+  patterns.add<DropScatterUnitIndexDepth, DropGatherUnitDims>(
       patterns.getContext());
 }
 
