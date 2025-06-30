@@ -33,6 +33,7 @@ struct GPUPackToIntrinsicsPass final
 
 LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
                               RewriterBase &rewriter) {
+  llvm::errs() << "[DEBUG] - packToIntrinsic(linalg::LinalgOp linalgOp, RewriterBase &rewriter)\n";
   auto loweringConfig =
       getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
   assert(loweringConfig && "Packing unconfigured op");
@@ -92,7 +93,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-
+  llvm::errs() << "[DEBUG] - GPUPackToIntrinsicsPass\n";
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> packingCandidates;
@@ -103,6 +104,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
       return;
     }
     if (!getMmaKind(loweringConfig)) {
+      llvm::errs() << "[DEBUG] - !getMmaKind(loweringConfig)\n";
       return;
     }
     packingCandidates.push_back(linalgOp);

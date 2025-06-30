@@ -329,8 +329,16 @@ def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
 
+def IREEGPU_ScaledMMAOpsArrayAttr : ArrayOfAttr<
+  IREEGPU_Dialect, "ScaledMMAOpsArray", "scaled_mma_ops", "ScaledMMAAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
 def IREEGPU_ScaledMMAAttr :
     AttrDef<IREEGPU_Dialect, "ScaledMMA", [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getSubgroupSize",
+  ]>,
   DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
@@ -374,8 +382,9 @@ def IREEGPU_ScaledMMAAttr :
     // Return the number of elements per shared scale.
     int64_t getBlockSize() const;
 
-    // Return the required subgroup size for this intrinsic.
-    int64_t getSubgroupSize() const;
+    // Return all supported element types for inputs
+    static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
+    static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
   }];
 }
 
@@ -477,6 +486,7 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "DotProductOpsAttr":$dot,
     // MMAs available on this target. Heuristic MMA selection runs is order.
     "MMAOpsArrayAttr":$mma,
+    "ScaledMMAOpsArrayAttr":$scaled_mma,
 
     // Limits
     // Supported subgroup size choices.

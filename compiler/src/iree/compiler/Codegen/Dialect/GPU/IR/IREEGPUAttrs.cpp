@@ -1436,6 +1436,21 @@ int64_t ScaledMMAAttr::getSubgroupSize() const {
   return 0;
 }
 
+SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
+  return {
+    Float8E8M0FNUType::get(ctx),
+    Float8E5M2Type::get(ctx),
+    Float8E5M2FNUZType::get(ctx),
+    Float8E4M3FNType::get(ctx),
+    Float8E4M3FNUZType::get(ctx),
+    Float4E2M1FNType::get(ctx)
+  };
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedOutputTypes(MLIRContext *ctx) {
+  return {Float32Type::get(ctx)};
+}
+
 LogicalResult
 ScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   if (failed(verifyMmaIndexingMaps({maps[0], maps[2], maps[4]}))) {

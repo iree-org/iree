@@ -20,6 +20,7 @@ static std::optional<SmallVector<int64_t>> getIntegerVector(ArrayAttr array) {
 constexpr StringLiteral kMmaKindName = "mma_kind";
 
 IREE::GPU::MmaInterfaceAttr getMmaKind(LoweringConfigAttr config) {
+  llvm::errs() << "[DEBUG] - config " << config << "\n";
   return config.getAttributes().getAs<IREE::GPU::MmaInterfaceAttr>(
       kMmaKindName);
 }
