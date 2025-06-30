@@ -28,6 +28,7 @@ extern void ireeCodegenGetExecutableVariantOps();
 extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenGetAttentionOpDetail();
 extern void ireeCodegenQueryMMAIntrinsics();
+extern void ireeCodegenMlirOperationIsACodegenAttentionOp();
 extern void ireeCodegenTranslationInfoAttrGet();
 extern void ireeCodegenTranslationInfoAttrGetParameters();
 extern void ireeCodegenTranslationInfoAttrGetTypeID();
@@ -932,6 +933,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenGetTunerRootOps;
   x += (uintptr_t)&ireeCodegenGetAttentionOpDetail;
   x += (uintptr_t)&ireeCodegenQueryMMAIntrinsics;
+  x += (uintptr_t)&ireeCodegenMlirOperationIsACodegenAttentionOp;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGet;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetParameters;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetTypeID;
