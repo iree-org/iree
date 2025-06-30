@@ -1403,7 +1403,7 @@ func.func @bufferize_cst_output_tensor() {
 
 //       CHECK-DAG: %[[CST1:.+]] = arith.constant -2147483648 : i32
 //       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-//       CHECK: %[[CAST5:.+]] = bufferization.to_buffer %[[CST5]] : tensor<5xi32> to memref<5xi32>
+//       CHECK: %[[CAST5:.+]] = bufferization.to_buffer %[[CST5]] : tensor<5xi32> to memref<5xi32, strided<[?], offset: ?>>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<5xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<i32, #hal.descriptor_type<storage_buffer>>
 //       CHECK: linalg.fill ins(%[[CST1]] : i32) outs(%[[OUTPUT]] : memref<i32{{.+}}>)
