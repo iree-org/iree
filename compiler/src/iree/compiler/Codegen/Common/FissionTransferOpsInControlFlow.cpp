@@ -167,27 +167,33 @@ static void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
 /// Populates a FissionTarget from a scf::ForOp by checking if it contains
 /// transfer read and write operations that can be legally fissioned.
 static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
-  FissionTarget fissionTarget = {forOp};
+  SmallVector<vector::TransferReadOp> readOps;
+  SmallVector<vector::TransferWriteOp> writeOps;
   for (Operation &op : forOp.getOps()) {
     if (auto readOp = dyn_cast<vector::TransferReadOp>(&op)) {
       if (!hasGlobalMemoryAddressSpace(
               cast<MemRefType>(readOp.getBase().getType()))) {
         return failure();
       }
-      fissionTarget.readOps.push_back(readOp);
+      readOps.push_back(readOp);
     } else if (auto writeOp = dyn_cast<vector::TransferWriteOp>(&op)) {
       if (hasGlobalMemoryAddressSpace(
               cast<MemRefType>(writeOp.getBase().getType()))) {
         return failure();
       }
-      fissionTarget.writeOps.push_back(writeOp);
+      writeOps.push_back(writeOp);
     } else if (!mlir::isPure(&op)) {
       // Only the read/write ops may have side effects, since we assume we can
       // re-order/erase the other ops freely.
       return failure();
     }
   }
-  return fissionTarget;
+
+  if (readOps.empty() || writeOps.empty() ||
+      readOps.size() != writeOps.size()) {
+    return failure();
+  }
+  return FissionTarget{forOp, readOps, writeOps};
 }
 
 struct FissionTransferOpsInControlFlowPass final
