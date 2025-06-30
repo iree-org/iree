@@ -277,7 +277,11 @@ vectorizeCopyToWorkgroupMemoryOps(mlir::FunctionOpInterface funcOp) {
 
   funcOp.walk([&](linalg::GenericOp op) {
     if (succeeded(filter.checkAndNotify(rewriter, op))) {
-      (void)linalg::vectorize(rewriter, op);
+      FailureOr<linalg::VectorizationResult> result =
+          linalg::vectorize(rewriter, op);
+      if (succeeded(result)) {
+        rewriter.replaceOp(op, result->replacements);
+      }
     }
   });
 }

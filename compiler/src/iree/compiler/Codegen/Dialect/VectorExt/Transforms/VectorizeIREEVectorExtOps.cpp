@@ -365,8 +365,13 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
 
   // If no extract op was found, call generic vectorization.
   if (!extractOp) {
-    return linalg::vectorize(rewriter, linalgOp, vectorSizes, scalableVecDims,
-                             vectorizeNDExtract);
+    FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
+        rewriter, linalgOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+    if (failed(result)) {
+      return failure();
+    }
+    rewriter.replaceOp(linalgOp, result->replacements);
+    return success();
   }
 
   Location loc = linalgOp->getLoc();

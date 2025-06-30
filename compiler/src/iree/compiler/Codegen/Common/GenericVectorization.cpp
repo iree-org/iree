@@ -171,8 +171,11 @@ void GenericVectorizationPass::runOnOperation() {
       (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(rewriter,
                                                                       gatherOp);
     } else {
-      (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                              vectorizeGatherAccesses);
+      FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
+          rewriter, op, vectorSizes, scalableVecDims, vectorizeGatherAccesses);
+      if (succeeded(result)) {
+        rewriter.replaceOp(op, result->replacements);
+      }
     }
   };
 
