@@ -128,3 +128,30 @@ func.func @no_tile_fill(%arg0: f32) -> tensor<64x256xf32> {
 //   CHECK-NOT:   scf.for
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //       CHECK:   return %[[FILL]]
+
+// -----
+
+func.func @dynamic_reduction_dim(%arg0: tensor<?x?xf32>, %arg1: tensor<1x?xf32>, %arg2: tensor<?x1xf32>) -> tensor<?x1xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+  ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<1x?xf32>)
+  outs(%arg2 : tensor<?x1xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<?x1xf32>
+  return %0 : tensor<?x1xf32>
+}
+
+// CHECK-LABEL: func.func @dynamic_reduction_dim
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %c0 : tensor<?x?xf32>
+//       CHECK:   scf.for %[[I:.+]] = %c0 to %[[DIM]] step %c1
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%{{.*}}: tensor<1x?xf32>, tensor<1x?xf32>)
+//  CHECK-SAME:       outs(%{{.*}}: tensor<1x1xf32>)
