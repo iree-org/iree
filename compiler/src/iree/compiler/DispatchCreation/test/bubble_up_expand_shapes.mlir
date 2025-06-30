@@ -6,7 +6,6 @@ util.func public @bubbble_expand_through_extract(%arg0 : tensor<2x4096x5120xf16>
   %expanded_239 = tensor.expand_shape %extracted_slice_237 [[0], [1, 2], [3]] output_shape [2, 64, 64, 2560] : tensor<2x4096x2560xf16> into tensor<2x64x64x2560xf16>
   util.return %expanded_239 : tensor<2x64x64x2560xf16>
 }
-
 // CHECK-LABEL:  @bubbble_expand_through_extract
 //       CHECK:    %[[EXPAND:.+]] = tensor.expand_shape
 //       CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice %[[EXPAND]]
@@ -18,7 +17,6 @@ util.func public @unsupported_bubbble_expand_through_extract(%arg0 : tensor<2x40
   %expanded_239 = tensor.expand_shape %extracted_slice_237 [[0], [1, 2], [3]] output_shape [2, 32, 64, 2560] : tensor<2x2048x2560xf16> into tensor<2x32x64x2560xf16>
   util.return %expanded_239 : tensor<2x32x64x2560xf16>
 }
-
 // CHECK-LABEL:  @unsupported_bubbble_expand_through_extract
 //       CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice
 //       CHECK:    %[[EXPAND:.+]] = tensor.expand_shape %[[EXTRACT]]
@@ -198,13 +196,12 @@ util.func public @test_no_infinite_loop_unit_dim_expansion(%arg0 : tensor<4xi64>
 
   util.return %11 : tensor<4xi64>
 }
-
 // CHECK-LABEL: test_no_infinite_loop_unit_dim_expansion
-// CHECK-NOT: tensor.expand_shape
-// CHECK: linalg.generic
-// CHECK: tensor.expand_shape
-// CHECK: linalg.generic
-// CHECK-NOT: tensor.expand_shape
+//   CHECK-NOT: tensor.expand_shape
+//       CHECK: linalg.generic
+//       CHECK: tensor.expand_shape
+//       CHECK: linalg.generic
+//   CHECK-NOT: tensor.expand_shape
 
 // -----
 
@@ -223,3 +220,127 @@ util.func @dont_propagate_edge_unit_reshapes(%arg0: tensor<?x1xi32>) -> tensor<?
 //       CHECK:   %[[VAL:.+]] = linalg.generic
 //  CHECK-SAME:      iterator_types = ["parallel"]
 //       CHECK:   util.return %[[VAL]] : tensor<?xi32>
+
+// -----
+
+// Basic check
+util.func public @test_basic_expand_bubble_through_concat(%arg0 : tensor<50xf32>, %arg1 : tensor<50xf32>) -> tensor<10x10xf32>{
+  %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<50xf32>, tensor<50xf32>) -> tensor<100xf32>
+  %1 = tensor.expand_shape %0 [[0, 1]] output_shape [10, 10] : tensor<100xf32> into tensor<10x10xf32>
+  util.return %1 : tensor<10x10xf32>
+}
+// CHECK-LABEL: func public @test_basic_expand_bubble_through_concat
+//       CHECK: tensor.expand_shape {{.*}}: tensor<50xf32> into tensor<5x10xf32>
+//       CHECK: tensor.expand_shape {{.*}}: tensor<50xf32> into tensor<5x10xf32>
+//       CHECK: tensor.concat dim(0) {{.*}}: (tensor<5x10xf32>, tensor<5x10xf32>) -> tensor<10x10xf32>
+
+// -----
+
+// Check product incompatibility
+util.func public @test_dont_bubble_inner_product_indivisible(%arg0 : tensor<6xf32>, %arg1 : tensor<6xf32>) -> tensor<3x2x2xf32>{
+  %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<6xf32>, tensor<6xf32>) -> tensor<12xf32>
+  %1 = tensor.expand_shape %0 [[0, 1, 2]] output_shape [3, 2, 2] : tensor<12xf32> into tensor<3x2x2xf32>
+  util.return %1 : tensor<3x2x2xf32>
+}
+// CHECK-LABEL: func public @test_dont_bubble_inner_product_indivisible
+//   CHECK-NOT: tensor.expand_shape
+//       CHECK: tensor.concat dim(0)
+//       CHECK: tensor.expand_shape
+
+// -----
+
+// Check pattern doesn't apply when operands are not statically divisible
+util.func public @test_dont_bubble_expand_statically_indivisible(%arg0 : tensor<51xf32>, %arg1 : tensor<49xf32>) -> tensor<10x10xf32>{
+  %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<51xf32>, tensor<49xf32>) -> tensor<100xf32>
+  %1 = tensor.expand_shape %0 [[0, 1]] output_shape [10, 10] : tensor<100xf32> into tensor<10x10xf32>
+  util.return %1 : tensor<10x10xf32>
+}
+// CHECK-LABEL: func public @test_dont_bubble_expand_statically_indivisible
+//   CHECK-NOT: tensor.expand_shape
+//       CHECK: tensor.concat dim(0) {{.*}}: (tensor<51xf32>, tensor<49xf32>) -> tensor<100xf32>
+//       CHECK: tensor.expand_shape %{{.*}} : tensor<100xf32> into tensor<10x10xf32>
+
+// -----
+
+// Check pattern doesn't apply when operands are not dynamically divisible
+util.func public @test_dont_bubble_expand_dynamically_indivisible(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>, %dim : index) -> tensor<?x10xf32>{
+  %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<?xf32>, tensor<?xf32>) -> tensor<?xf32>
+  %1 = tensor.expand_shape %0 [[0, 1]] output_shape [%dim, 10] : tensor<?xf32> into tensor<?x10xf32>
+  util.return %1 : tensor<?x10xf32>
+}
+// CHECK-LABEL: func public @test_dont_bubble_expand_dynamically_indivisible
+//   CHECK-NOT: tensor.expand_shape
+//       CHECK: tensor.concat dim(0) {{.*}}: (tensor<?xf32>, tensor<?xf32>) -> tensor<?xf32>
+//       CHECK: tensor.expand_shape %{{.*}} : tensor<?xf32> into tensor<?x10xf32>
+
+// -----
+
+// Check pattern doesn't apply when expanded shape has dynamic non outermost dimension
+util.func public @test_dont_bubble_expand_dynamic_non_outermost(%arg0 : tensor<10x?xf32>, %arg1 : tensor<10x10xf32>, %dim : index) -> tensor<10x5x?xf32>{
+  %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<10x?xf32>, tensor<10x10xf32>) -> tensor<10x?xf32>
+  %1 = tensor.expand_shape %0 [[0],[1, 2]] output_shape [10, 5, %dim] : tensor<10x?xf32> into tensor<10x5x?xf32>
+  util.return %1 : tensor<10x5x?xf32>
+}
+// CHECK-LABEL: func public @test_dont_bubble_expand_dynamic_non_outermost
+//   CHECK-NOT: tensor.expand_shape
+//       CHECK: tensor.concat dim(1) {{.*}}: (tensor<10x?xf32>, tensor<10x10xf32>) -> tensor<10x?xf32>
+//       CHECK: tensor.expand_shape %{{.*}} : tensor<10x?xf32> into tensor<10x5x?xf32>
+
+// -----
+
+util.func public @test_expand_shape_propagation_through_concat_three_inputs(%arg0 : tensor<100x50xf32>, %arg1 : tensor<100x100xf32>, %arg2 : tensor<100x5xf32>) -> tensor<10x10x155xf32>{
+  %0 = tensor.concat dim(1) %arg0, %arg1, %arg2 : (tensor<100x50xf32>, tensor<100x100xf32>, tensor<100x5xf32>) -> tensor<100x155xf32>
+  %1 = tensor.expand_shape %0 [[0, 1], [2]] output_shape [10, 10, 155] : tensor<100x155xf32> into tensor<10x10x155xf32>
+  util.return %1 : tensor<10x10x155xf32>
+}
+// CHECK-LABEL: func public @test_expand_shape_propagation_through_concat_three_inputs
+//       CHECK: tensor.expand_shape {{.*}}: tensor<100x50xf32> into tensor<10x10x50xf32>
+//       CHECK: tensor.expand_shape {{.*}}: tensor<100x100xf32> into tensor<10x10x100xf32>
+//       CHECK: tensor.expand_shape {{.*}}: tensor<100x5xf32> into tensor<10x10x5xf32>
+//       CHECK: tensor.concat dim(2) {{.*}}: (tensor<10x10x50xf32>, tensor<10x10x100xf32>, tensor<10x10x5xf32>) -> tensor<10x10x155xf32>
+//       CHECK: util.return %{{.*}} : tensor<10x10x155xf32>
+
+// -----
+
+// Check expand_shape propagation through concat with three inputs and two dynamic outermost expansion dims (concat dim)
+util.func public @test_dont_prop_expand_through_three_inputs_dynamic_outer(%arg0 : tensor<?x50xf32>, %arg1 : tensor<?x50xf32>, %arg2 : tensor<10x50xf32>, %d0 : index) -> tensor<?x10x50xf32> {
+  %0 = tensor.concat dim(0) %arg0, %arg1, %arg2 : (tensor<?x50xf32>, tensor<?x50xf32>, tensor<10x50xf32>) -> tensor<?x50xf32>
+  %expanded = tensor.expand_shape %0 [[0, 1], [2]] output_shape [%d0, 10, 50] : tensor<?x50xf32> into tensor<?x10x50xf32>
+  util.return %expanded : tensor<?x10x50xf32>
+}
+// CHECK-LABEL: func public @test_dont_prop_expand_through_three_inputs_dynamic_outer
+//   CHECK-NOT: tensor.expand_shape
+//       CHECK: tensor.concat dim(0) {{.*}}: (tensor<?x50xf32>, tensor<?x50xf32>, tensor<10x50xf32>) -> tensor<?x50xf32>
+//       CHECK: tensor.expand_shape %{{.*}} : tensor<?x50xf32> into tensor<?x10x50xf32>
+//       CHECK: util.return %{{.*}} : tensor<?x10x50xf32>
+
+// -----
+
+//  Check basic expand_shape propagation through a concat op
+util.func public @test_multi_dim_expand_shape_propagation_through_concat(%arg0 : tensor<100x50x32xf32>, %arg1 : tensor<100x100x32xf32>) -> tensor<10x10x150x16x2xf32>{
+  %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<100x50x32xf32>, tensor<100x100x32xf32>) -> tensor<100x150x32xf32>
+  %1 = tensor.expand_shape %0 [[0, 1], [2], [3, 4]] output_shape [10, 10, 150, 16, 2] : tensor<100x150x32xf32> into tensor<10x10x150x16x2xf32>
+  util.return %1 : tensor<10x10x150x16x2xf32>
+}
+// CHECK-LABEL: func public @test_multi_dim_expand_shape_propagation_through_concat
+//       CHECK: tensor.expand_shape {{.*}}: tensor<100x50x32xf32> into tensor<10x10x50x16x2xf32>
+//       CHECK: tensor.expand_shape {{.*}}: tensor<100x100x32xf32> into tensor<10x10x100x16x2xf32>
+//       CHECK: tensor.concat dim(2) {{.*}}: (tensor<10x10x50x16x2xf32>, tensor<10x10x100x16x2xf32>) -> tensor<10x10x150x16x2xf32>
+
+// -----
+
+// Check that expand_shape can be propagated through a concat op with mixed static and dynamic dimensions
+// Covers multiple expansions, including one before the concat dim
+util.func public @test_expand_prop_through_concat_mixed_dynamic_static_args(%arg0: tensor<4x100x100xf32>, %arg1: tensor<4x?x100xf32>) -> tensor<1x4x?x2x5x10x100xf32> {
+  %c0 = arith.constant 1 : index
+  %concat = tensor.concat dim(1) %arg0, %arg1 : (tensor<4x100x100xf32>, tensor<4x?x100xf32>) -> tensor<4x?x100xf32>
+  %dim = tensor.dim %arg1, %c0 : tensor<4x?x100xf32>
+  %0 = affine.apply affine_map<()[s0] -> (s0 + 100)>()[%dim]
+  %expanded = tensor.expand_shape %concat [[0, 1], [2,3, 4,5], [6]] output_shape [1, 4, %0, 2, 5, 10, 100] : tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
+  util.return %expanded : tensor<1x4x?x2x5x10x100xf32>
+}
+// CHECK-LABEL: func public @test_expand_prop_through_concat_mixed_dynamic_static_args
+//       CHECK: tensor.expand_shape {{.*}}: tensor<4x100x100xf32> into tensor<1x4x1x2x5x10x100xf32>
+//       CHECK: %[[AFF:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 100)>()[%dim]
+//       CHECK: tensor.expand_shape {{.*}}output_shape [1, 4, %[[AFF]], 2, 5, 10, 100] : tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
+//       CHECK: tensor.concat dim(2) {{.*}}: (tensor<1x4x1x2x5x10x100xf32>, tensor<1x4x?x2x5x10x100xf32>) -> tensor<1x4x?x2x5x10x100xf32>

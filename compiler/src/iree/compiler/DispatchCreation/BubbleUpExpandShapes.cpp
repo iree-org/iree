@@ -268,6 +268,113 @@ struct BubbleExpandThroughExtract final
   }
 };
 
+struct BubbleExpandThroughConcat final
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto concatOp = expandOp.getSrc().getDefiningOp<tensor::ConcatOp>();
+    if (!concatOp) {
+      return failure();
+    }
+
+    // Get concat dimension and input/result types.
+    int64_t concatDim = concatOp.getDim();
+    SmallVector<ReassociationIndices, 4> reassoc =
+        expandOp.getReassociationIndices();
+    RankedTensorType expandedType = expandOp.getResultType();
+    ArrayRef<int64_t> expandedShape = expandedType.getShape();
+
+    // Find the "new" concat dim and if it is part of an expansion dim
+    int64_t newConcatDim = 0;
+    for (int64_t i = 0; i < concatDim; ++i) {
+      newConcatDim += reassoc[i].size();
+    }
+    int64_t expandedDimCount = reassoc[concatDim].size();
+
+    SmallVector<int64_t> expandShapeProducts;
+    int64_t countExpandedDynamicDims = 0;
+    // Loop over all but the outermost expanded dims.
+    for (Value input : concatOp.getInputs()) {
+      int64_t expandShapeProduct = 1;
+      auto inputType = cast<RankedTensorType>(input.getType());
+      int64_t inputDim = inputType.getShape()[concatDim];
+      // if the input dim is dynamic, we rely on checking the divisibility of
+      // the other inputs. Example:
+      //   %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<100x100xf32>,
+      //   tensor<?x100xf32>) -> tensor<?x100xf32> %1 = tensor.expand_shape %0
+      //   [[0, 1], [2]] output_shape [?, 10, 100] : tensor<?x100xf32> into
+      //   tensor<?x10x100xf32>
+      // The propagation here legal because we know ? is divisible by 10
+      // because (? + 100) % 10 == 0.
+      if (ShapedType::isDynamic(inputDim) && expandedDimCount > 1) {
+        countExpandedDynamicDims++;
+        // (A+ B + 10) % 10 == 0 does not imply A % 10 == 0 and
+        // B % 10 == 0, so we cannot propagate.
+        if (countExpandedDynamicDims > 1) {
+          return rewriter.notifyMatchFailure(
+              expandOp, "More than one dynamic expanded dim");
+        }
+      }
+      // Check all static input shapes for divisibility.
+      for (int64_t j = 1; j < expandedDimCount; ++j) {
+        int64_t expDim = expandedShape[newConcatDim + j];
+        if (ShapedType::isDynamic(expDim)) {
+          // If expanded dim is dynamic and not outermost, we cannot propagate.
+          return rewriter.notifyMatchFailure(
+              expandOp, "Expanded dim is dynamic and not outermost");
+        }
+        // Calculate the product of static dims.
+        expandShapeProduct *= expDim;
+      }
+      if (!ShapedType::isDynamic(inputDim) &&
+          !(inputDim % expandShapeProduct == 0)) {
+        // ie concat(tensor<6xf32>, tensor<6xf32>) -> expand to
+        // tensor<3x2x2xf32> cannot be done because 6 % (2 * 2) != 0.
+        return rewriter.notifyMatchFailure(
+            expandOp,
+            "Input dim is not divisible by the product of inner expanded dims");
+      }
+      expandShapeProducts.push_back(expandShapeProduct);
+    } // else we can always propagate the expand_shape through the concat.
+
+    SmallVector<OpFoldResult> mixedOutputShape = expandOp.getMixedOutputShape();
+    SmallVector<int64_t> staticOutputShape =
+        llvm::to_vector(expandedType.getShape());
+    // Create new expand_shape ops for each input.
+    SmallVector<Value> newInputs;
+    for (auto [input, product] :
+         llvm::zip(concatOp.getInputs(), expandShapeProducts)) {
+      auto type = input.getType();
+      auto inputType = cast<RankedTensorType>(type);
+
+      AffineExpr concatDimExpr;
+      bindSymbols(rewriter.getContext(), concatDimExpr);
+      auto divMap = concatDimExpr.floorDiv(product);
+      OpFoldResult dimOfr =
+          tensor::getMixedSize(rewriter, expandOp.getLoc(), input, concatDim);
+      OpFoldResult concatDimValue = affine::makeComposedFoldedAffineApply(
+          rewriter, expandOp.getLoc(), divMap, ArrayRef<OpFoldResult>{dimOfr});
+      mixedOutputShape[newConcatDim] = concatDimValue;
+      staticOutputShape[newConcatDim] =
+          mlir::getConstantIntValue(concatDimValue)
+              .value_or(ShapedType::kDynamic);
+      auto newType =
+          RankedTensorType::get(staticOutputShape, inputType.getElementType());
+      Value newExpand;
+      newExpand = rewriter.create<tensor::ExpandShapeOp>(
+          expandOp.getLoc(), newType, input, reassoc, mixedOutputShape);
+      newInputs.push_back(newExpand);
+    }
+    // Create new concat op on expanded inputs.
+    auto newConcat = rewriter.create<tensor::ConcatOp>(concatOp.getLoc(),
+                                                       newConcatDim, newInputs);
+    rewriter.replaceOp(expandOp, newConcat.getResult());
+    return success();
+  }
+};
+
 static bool
 isExpandingUnitDims(ArrayRef<ReassociationIndices> reassociationIndices,
                     ArrayRef<int64_t> expandedShape) {
@@ -392,6 +499,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
+  bubbleExpandShapePatterns.insert<BubbleExpandThroughConcat>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(
