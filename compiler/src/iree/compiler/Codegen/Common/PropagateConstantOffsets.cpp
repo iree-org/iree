@@ -28,14 +28,19 @@ struct PropagateConstantOffsetsPass final
 
 /// Helper to extract constant RHS values from a defining arith op.
 template <typename OpTy>
-static std::optional<int64_t> getValueConstantRhs(Value v) {
+static std::optional<int64_t> getValueConstantRhs(Value v, bool nsw) {
   auto op = v.getDefiningOp<OpTy>();
   if (!op) {
     return std::nullopt;
   }
 
+  // Conditionally require nsw.
+  if (nsw && op.getOverflowFlags() != arith::IntegerOverflowFlags::nsw) {
+    return std::nullopt;
+  }
+
   // Folders move constant operands to the RHS so no need to check both sides.
-  llvm::APInt constant;
+  APInt constant;
   if (!matchPattern(op.getRhs(), m_ConstantInt(&constant))) {
     return std::nullopt;
   }
@@ -44,10 +49,10 @@ static std::optional<int64_t> getValueConstantRhs(Value v) {
 }
 
 /// Converts applies of the form:
-/// affine.apply affine_map<expr + C>
+///   %x = affine.apply affine_map<expr + C>
 /// to
-/// %apply = affine.apply affine_map<expr>
-/// arith.addi %apply, C
+///   %apply = affine.apply affine_map<expr>
+///   %x = arith.addi %apply, C overflow<nsw>
 struct ExtractConstantApplyOffset final
     : OpRewritePattern<affine::AffineApplyOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -59,14 +64,14 @@ struct ExtractConstantApplyOffset final
     // in the tree.
     map = simplifyAffineMap(map);
     AffineExpr resultExpr = map.getResult(0);
-    auto addExpr = llvm::dyn_cast<AffineBinaryOpExpr>(resultExpr);
+    auto addExpr = dyn_cast<AffineBinaryOpExpr>(resultExpr);
 
     // After simplification, the add should be the first expression if present.
     if (!addExpr || addExpr.getKind() != AffineExprKind::Add) {
       return rewriter.notifyMatchFailure(apply, "top level expr not an add");
     }
 
-    auto constantRhs = llvm::dyn_cast<AffineConstantExpr>(addExpr.getRHS());
+    auto constantRhs = dyn_cast<AffineConstantExpr>(addExpr.getRHS());
     if (!constantRhs) {
       return rewriter.notifyMatchFailure(apply, "non-const rhs");
     }
@@ -79,16 +84,17 @@ struct ExtractConstantApplyOffset final
         apply.getLoc(), newMap, apply.getOperands());
     Value offset =
         rewriter.create<arith::ConstantIndexOp>(apply.getLoc(), constantOffset);
-    rewriter.replaceOpWithNewOp<arith::AddIOp>(apply, newApply, offset);
+    rewriter.replaceOpWithNewOp<arith::AddIOp>(
+        apply, newApply, offset, arith::IntegerOverflowFlags::nsw);
     return success();
   }
 };
 
-/// Converts applies of the form:
-/// affine.apply affine_map<expr + C>
+/// Converts sequences of the form:
+///   %add = arith.addi %in, C overflow<nsw>
+///   %x = affine.apply affine_map<expr(d0)>(%add)
 /// to
-/// %apply = affine.apply affine_map<expr>
-/// arith.addi %apply, C
+///   %x = affine.apply affine_map<expr(d0 + C)>(%in)
 struct FoldApplySymbolOrDimSum final : OpRewritePattern<affine::AffineApplyOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(affine::AffineApplyOp apply,
@@ -107,7 +113,7 @@ struct FoldApplySymbolOrDimSum final : OpRewritePattern<affine::AffineApplyOp> {
       AffineExpr currExpr = getCurrExpr(i);
       OpOperand &operand = apply->getOpOperand(i);
       std::optional<int64_t> maybeOffset =
-          getValueConstantRhs<arith::AddIOp>(operand.get());
+          getValueConstantRhs<arith::AddIOp>(operand.get(), /*nsw=*/true);
       if (!maybeOffset) {
         replacements.push_back(currExpr);
         continue;
@@ -158,7 +164,7 @@ struct PropagateConstantAddsThroughLinearize final
     bool didReplace = false;
 
     auto matchConstantAndReplaceOperand = [&](OpOperand &operand) {
-      llvm::APInt constant;
+      APInt constant;
       Value replacement = nullptr;
       if (matchPattern(operand.get(), m_ConstantInt(&constant)) &&
           !constant.isZero()) {
@@ -167,7 +173,8 @@ struct PropagateConstantAddsThroughLinearize final
         runningOffset += constant.getSExtValue() * runningElementCount;
         replacement = getZero();
       } else if (std::optional<int64_t> offset =
-                     getValueConstantRhs<arith::AddIOp>(operand.get())) {
+                     getValueConstantRhs<arith::AddIOp>(operand.get(),
+                                                        /*nsw=*/true)) {
         runningOffset += offset.value() * runningElementCount;
         replacement = operand.get().getDefiningOp<arith::AddIOp>().getLhs();
       }
@@ -213,15 +220,22 @@ struct PropagateConstantAddsThroughLinearize final
     rewriter.setInsertionPointAfter(op);
     Value offset =
         rewriter.create<arith::ConstantIndexOp>(op.getLoc(), runningOffset);
-    auto addOp =
-        rewriter.create<arith::AddIOp>(op.getLoc(), op.getResult(), offset);
+    auto addOp = rewriter.create<arith::AddIOp>(
+        op.getLoc(), op.getResult(), offset, arith::IntegerOverflowFlags::nsw);
     rewriter.replaceAllUsesExcept(op, addOp, addOp);
     return success();
   }
 };
 
-/// Converts constant index operands into constants added after the linearize
-/// if the linearization basis is static.
+/// Converts operands multiplied by a constant product into the input to the
+/// mul if divisible by the basis element. For example,
+///
+///   %x4 = arith.muli %x, %c4 overflow<nsw> : index
+///   %linearize = affine.linearize_index [..., %x4, ...] (..., 16, ...)
+///
+/// into
+///
+///   %linearize = affine.linearize_index [..., %x, %c0, ...] (..., 4, 4, ...)
 struct FoldDivisibleConstantMulsIntoLinearize final
     : OpRewritePattern<affine::AffineLinearizeIndexOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -249,7 +263,7 @@ struct FoldDivisibleConstantMulsIntoLinearize final
              "unexpected dynamic basis element");
       Value operand = op.getMultiIndex()[indexCount - i - 1];
       std::optional<int64_t> coefficient =
-          getValueConstantRhs<arith::MulIOp>(operand);
+          getValueConstantRhs<arith::MulIOp>(operand, /*nsw=*/true);
       // If the basis size is indivisible by the coefficient, splitting up the
       // size by dividing by the coefficient isn't possible.
       if (coefficient && size % coefficient.value() == 0) {
@@ -268,7 +282,7 @@ struct FoldDivisibleConstantMulsIntoLinearize final
     if (indexCount != op.getStaticBasis().size()) {
       Value operand = op.getMultiIndex()[0];
       std::optional<int64_t> coefficient =
-          getValueConstantRhs<arith::MulIOp>(operand);
+          getValueConstantRhs<arith::MulIOp>(operand, /*nsw=*/true);
       // Since there is no outermost size, no need to verify divisibility.
       if (coefficient) {
         newMultiIndex.push_back(getZero());
@@ -300,10 +314,10 @@ struct FoldDivisibleConstantMulsIntoLinearize final
 void PropagateConstantOffsetsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.add<PropagateConstantAddsThroughLinearize>(context);
-  patterns.add<ExtractConstantApplyOffset>(context);
-  patterns.add<FoldApplySymbolOrDimSum>(context);
-  patterns.add<FoldDivisibleConstantMulsIntoLinearize>(context);
+  patterns
+      .add<PropagateConstantAddsThroughLinearize, ExtractConstantApplyOffset,
+           FoldApplySymbolOrDimSum, FoldDivisibleConstantMulsIntoLinearize>(
+          context);
   // Apply canonicalization to apply new composition opportunities.
   affine::AffineApplyOp::getCanonicalizationPatterns(patterns, context);
   // Add canonicalization to compose adds.
