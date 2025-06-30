@@ -3586,6 +3586,57 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_enable_runtime_coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      IREE_ENABLE_RUNTIME_COVERAGE
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IREE_ENABLE_RUNTIME_COVERAGE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iree-runtime-coverage-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-runtime-coverage-export
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree-runtime-coverage-clear-all" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-runtime-coverage-clear-all
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree-runtime-coverage-clear-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-runtime-coverage-clear-artifacts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vscode-coverage-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      VSCode Coverage Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5029,6 +5080,57 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_enable_runtime_coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      IREE_ENABLE_RUNTIME_COVERAGE
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IREE_ENABLE_RUNTIME_COVERAGE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iree-runtime-coverage-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-runtime-coverage-export
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree-runtime-coverage-clear-all" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-runtime-coverage-clear-all
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree-runtime-coverage-clear-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree-runtime-coverage-clear-artifacts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vscode-coverage-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      VSCode Coverage Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5219,6 +5321,38 @@ the current build type is Debug and the compiler supports it.</p>
 </ul>
 <p>Enable <a href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">undefiend behavior sanitizer</a>
 if the current build type is Debug and the compiler supports it.</p>
+<h3 id="iree_enable_runtime_coverage"><code>IREE_ENABLE_RUNTIME_COVERAGE</code><a class="headerlink" href="#iree_enable_runtime_coverage" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enable LLVM code coverage for the runtime code. All runtime libraries and
+binaries will be compiled with instrumentation and CMake targets will be exposed
+for performing common coverage tasks.</p>
+<h4 id="iree-runtime-coverage-export"><code>iree-runtime-coverage-export</code><a class="headerlink" href="#iree-runtime-coverage-export" title="Permanent link">link</a></h4>
+<p>Merges and export coverage data to <code>coverage/runtime.lcov.info</code>.
+All of <code>coverage/runtime/*.profraw</code> files will be merged as if they had been
+produced in the same run, written to <code>coverage/runtime.profdata</code>, and then
+exported into LCOV format.</p>
+<h4 id="iree-runtime-coverage-clear-all"><code>iree-runtime-coverage-clear-all</code><a class="headerlink" href="#iree-runtime-coverage-clear-all" title="Permanent link">link</a></h4>
+<p>Erases all <code>coverage/runtime*</code> files (<em>.profraw/</em>.profdata/*.info).
+Invoke this to completely clear all collected coverage data.</p>
+<h4 id="iree-runtime-coverage-clear-artifacts"><code>iree-runtime-coverage-clear-artifacts</code><a class="headerlink" href="#iree-runtime-coverage-clear-artifacts" title="Permanent link">link</a></h4>
+<p>Erases only merged <code>coverage/runtime.*</code> files (<em>.profdata/</em>.info).
+Invoke this after adding more *.profraw files to update the coverage.</p>
+<h4 id="vscode-coverage-integration">VSCode Coverage Integration<a class="headerlink" href="#vscode-coverage-integration" title="Permanent link">link</a></h4>
+<p>VSCode can be configured with these targets/artifacts to show coverage
+information by adding the following workspace configuration:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&quot;cmake.preRunCoverageTarget&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;iree-runtime-coverage-clear-all&quot;</span><span class="p">,</span>
+<span class="nt">&quot;cmake.postRunCoverageTarget&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;iree-runtime-coverage-export&quot;</span><span class="p">,</span>
+<span class="nt">&quot;cmake.coverageInfoFiles&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="s2">&quot;${command:cmake.buildDirectory}/coverage/runtime.lcov.info&quot;</span>
+<span class="p">],</span>
+</code></pre></div>
+<p>Coverage runs with the Test Explorer will clear, accumulate coverage for each
+test selected, and then export an LCOV file that will be rendered in the
+coverage panel/overlay.</p>
+<p>See the <a href="https://code.visualstudio.com/docs/debugtest/testing#_test-coverage">VSCode Testing Documentation</a>
+for more information.</p>
 <h2 id="cross-compilation">Cross-compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">link</a></h2>
 <p>When cross compiling (using a toolchain file like
 <a href="https://android.googlesource.com/platform/ndk/+/main/build/cmake/android.toolchain.cmake"><code>android.toolchain.cmake</code></a>),

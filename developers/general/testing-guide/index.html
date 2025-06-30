@@ -3241,6 +3241,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#code-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Code Coverage
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4858,6 +4867,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#code-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Code Coverage
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5191,6 +5209,13 @@ should generally derive the <code>CMakeLists.txt</code> file from the BUILD file
 <p>There are other more specific test targets, such as <code>iree_hal_cts_test_suite</code>,
 which are designed to test specific runtime support with template configuration
 and is not supported by Bazel rules.</p>
+<h3 id="code-coverage">Code Coverage<a class="headerlink" href="#code-coverage" title="Permanent link">link</a></h3>
+<p>Use the <a href="../../building/cmake-options/#iree_enable_runtime_coverage">IREE_ENABLE_RUNTIME_COVERAGE</a>
+CMake option to enable code coverage instrumentation and add synthetic targets
+for managing profiling state. Tests run with coverage enabled with automatically
+write profiles to the build directory and then the
+<code>iree-runtime-coverage-export</code> target can be built to export LCOV information
+for tooling/IDEs.</p>
 <h2 id="iree-core-end-to-end-e2e-tests">IREE core end-to-end (e2e) tests<a class="headerlink" href="#iree-core-end-to-end-e2e-tests" title="Permanent link">link</a></h2>
 <p>Here "end-to-end" means from the input accepted by the IREE core compiler
 (dialects like TOSA, StableHLO, Linalg) to execution using the IREE runtime
