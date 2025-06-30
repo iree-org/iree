@@ -889,6 +889,10 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   options.unknownTypeConverterFn = [](TensorType tensorType,
                                       Attribute memorySpace,
                                       const BufferizationOptions &options) {
+    if (tensorType.hasStaticShape()) {
+      return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
+                                                                  memorySpace);
+    }
     // Default case: Fully dynamic layout map for best compatibility.
     return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
                                                               memorySpace);
