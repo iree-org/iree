@@ -166,7 +166,7 @@ iree_status_t iree_hal_amdgpu_block_pool_acquire(
 void iree_hal_amdgpu_block_pool_release(
     iree_hal_amdgpu_block_pool_t* block_pool, iree_hal_amdgpu_block_t* block);
 
-// Releases a linked list of blocks back to the pool.
+// Releases a singly-linked list of blocks back to the pool.
 // All blocks must have been acquired from |block_pool|.
 void iree_hal_amdgpu_block_pool_release_list(
     iree_hal_amdgpu_block_pool_t* block_pool,
@@ -207,9 +207,13 @@ typedef struct iree_hal_amdgpu_block_arena_t {
   // Total bytes allocated from the arena; the utilization of the arena can be
   // checked with `used_allocation_size / total_allocation_size`.
   iree_device_size_t used_allocation_size;
-  // Linked list of allocated blocks maintained so that reset can release them.
-  // Newly allocated blocks are appended to the list such that block_tail is
-  // always the most recently allocated block.
+  // Doubly-linked list of allocated blocks maintained so that reset can release
+  // them. Newly allocated blocks are appended to the list such that block_tail
+  // is always the most recently allocated block.
+  //
+  // Note that we do not require the double-link, but do so such that
+  // iree_hal_amdgpu_block_arena_release_blocks returns a doubly-linked list to
+  // callers.
   iree_hal_amdgpu_block_t* block_head;
   iree_hal_amdgpu_block_t* block_tail;
   // The number of bytes remaining in the block pointed to by block_head.
@@ -229,8 +233,8 @@ void iree_hal_amdgpu_block_arena_deinitialize(
 // Resets the entire arena and returns allocated blocks to the parent pool.
 void iree_hal_amdgpu_block_arena_reset(iree_hal_amdgpu_block_arena_t* arena);
 
-// Releases ownership of the allocated blocks and returns them as a FIFO linked
-// list. The arena will be reset and ready to allocate new blocks.
+// Releases ownership of the allocated blocks and returns them as a FIFO
+// doubly-linked list. The arena will be reset and ready to allocate new blocks.
 iree_hal_amdgpu_block_t* iree_hal_amdgpu_block_arena_release_blocks(
     iree_hal_amdgpu_block_arena_t* arena);
 

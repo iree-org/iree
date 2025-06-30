@@ -364,6 +364,25 @@ TEST(BitmapTest, FindEmpty) {
             10);
 }
 
+TEST(BitmapTest, FindFull) {
+  uint64_t words[] = {
+      UINT64_MAX,
+      UINT64_MAX,
+  };
+  iree_hal_amdgpu_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_hal_amdgpu_bitmap_empty(bitmap));
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_set(bitmap, 0), 0);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_set(bitmap, 1), 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 0),
+            bitmap.bit_count);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 1),
+            bitmap.bit_count);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 0, 1),
+            bitmap.bit_count);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 1, 2),
+            bitmap.bit_count);
+}
+
 TEST(BitmapTest, Find0) {
   uint64_t words[] = {
       0ull | 0b1,
@@ -426,6 +445,14 @@ TEST(BitmapTest, Find67) {
   EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(
                 bitmap, bit_index, bitmap.bit_count - bit_index - 1),
             bit_index + 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 0),
+            bit_index + 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 1),
+            bit_index + 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 4),
+            bit_index + 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 60),
+            bitmap.bit_count);
 }
 
 TEST(BitmapTest, Find73) {
@@ -439,8 +466,36 @@ TEST(BitmapTest, Find73) {
   EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_set(bitmap, 0), bit_index);
   EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, bit_index),
             bitmap.bit_count);
-  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 0),
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 1),
             bitmap.bit_count);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, bit_index, 2),
+            bitmap.bit_count);
+}
+
+TEST(BitmapTest, FindUnset1001) {
+  uint64_t words[] = {
+      // 0001100100011001 (repeating)
+      0x191919191919ull,
+      0x191919191919ull,
+  };
+  iree_hal_amdgpu_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_hal_amdgpu_bitmap_empty(bitmap));
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_set(bitmap, 0), 0);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_set(bitmap, 1), 3);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 0), 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 1), 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 2), 2);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 3), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 4), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset(bitmap, 5), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 0, 2), 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 1, 2), 1);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 2, 2), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 0, 3), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 4, 3), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 5, 3), 5);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 6, 3), 13);
+  EXPECT_EQ(iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 7, 3), 13);
 }
 
 }  // namespace
