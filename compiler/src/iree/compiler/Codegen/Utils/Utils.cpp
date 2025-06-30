@@ -1897,8 +1897,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
-        result =
-            inferSizesFromMixedSizes(op.getMixedSizes(), /*isDestShape=*/true);
+        result = inferSizesFromMixedSizes(op.getMixedSizes());
       })
       .Default([&](Operation *) {});
 

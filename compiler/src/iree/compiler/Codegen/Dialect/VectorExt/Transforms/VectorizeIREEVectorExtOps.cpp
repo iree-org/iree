@@ -534,12 +534,10 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   auto indicesVecTy = VectorType::get(
       vectorSizes.take_front(gatherOp.getBatchRank()), rewriter.getIndexType());
 
-  // Read `indices` tensor via `vector.transfer_read`.
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   auto indicesVecRead = rewriter.create<vector::TransferReadOp>(
       loc, indicesVecTy.clone(indicesTy.getElementType()),
       gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero));
-  // Mask the index_vec read.
   VectorType indicesMaskType = indicesVecTy.clone(rewriter.getI1Type());
   SmallVector<OpFoldResult> gatherDims =
       tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());
@@ -547,11 +545,9 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
       loc, indicesMaskType,
       ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
   Value indicesVec = maskOperation(rewriter, indicesVecRead, indicesMask);
-  // int -> index cast.
   indicesVec =
       rewriter.create<arith::IndexCastOp>(loc, indicesVecTy, indicesVec);
 
-  // Create transfer_gather op
   SmallVector<Value> baseIndices(sourceTy.getRank(), zero);
   SmallVector<bool> indexed(sourceTy.getRank(), false);
   indexed[0] = true;
@@ -562,7 +558,6 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
       rewriter.getMultiDimIdentityMap(sourceTy.getRank()).getMajorSubMap(1)));
   Value padding = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getZeroAttr(gatherTy.getElementType()));
-
   auto transferGatherOp = rewriter.create<IREE::VectorExt::TransferGatherOp>(
       loc, gatherVectorTy, gatherOp.getSource(), baseIndices,
       ValueRange{indicesVec}, rewriter.getBoolArrayAttr(indexed), indexedMaps,
@@ -573,8 +568,6 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   Value gatherMask =
       rewriter.create<vector::CreateMaskOp>(loc, gatherMaskType, gatherDims);
   Value maskedGather = maskOperation(rewriter, transferGatherOp, gatherMask);
-
-  // Write back into tensor.
   SmallVector<Value> writeIndices(gatherTy.getRank(), zero);
   auto writeOp = rewriter.create<vector::TransferWriteOp>(
       loc, maskedGather, gatherOp.getOutput(), writeIndices);
@@ -600,14 +593,13 @@ public:
     if (!gatherOp) {
       return failure();
     }
-    // TODO: The 'vector.mask' passthru is a vector and 'vector.transfer_read'
+    // TODO: The 'vector.mask' passthru is a vector and 'transfer_gather'
     // expects a scalar. We could only lower one to the other for cases where
     // the passthru is a broadcast of a scalar.
     if (maskOp.hasPassthru()) {
       return rewriter.notifyMatchFailure(
           maskOp, "can't lower passthru to transfer_gather");
     }
-    // Replace the `vector.mask` operation.
     rewriter.replaceOpWithNewOp<TransferGatherOp>(
         maskOp, gatherOp.getVectorType(), gatherOp.getBase(),
         gatherOp.getIndices(), gatherOp.getIndexVecs(), gatherOp.getIndexed(),

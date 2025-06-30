@@ -657,8 +657,6 @@ void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 // MaskableOpInterface methods.
 
-/// Returns the mask type expected by this operation. Mostly used for
-/// verification purposes. It requires the operation to be vectorized."
 Type TransferGatherOp::getExpectedMaskType() {
   return vector::inferTransferOpMaskType(getVectorType(), getPermutationMap());
 }
