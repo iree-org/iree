@@ -33,7 +33,16 @@ def IREEGPU_MmaInterfaceAttr
       /*methodName=*/"getSubgroupSize",
       /*args=*/(ins)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the block size of elements sharing a scale in this kind of multi-MMA.
+      }],
+      /*retType=*/"int64_t",
+      /*methodName=*/"getBlockSize",
+      /*args=*/(ins)
+    >,
   ];
+
   // Methods included to preserve interfaces from beforet he InnerTileDescAttrInterface
   // refactoring.
   let extraSharedClassDeclaration = [{
@@ -50,6 +59,21 @@ def IREEGPU_MmaInterfaceAttr
       ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[2].getShape();
       ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
       return {accShape[0], accShape[1], lhsShape[1]};
+    }
+
+    /// Returns the shape of the scaled MMA operation:
+    /// ```
+    ///   C += A * B
+    /// ```
+    /// Where, up to some transpositions, `A` has shape `<M, K>`, `B` has shape
+    /// `<K, N>`, and `C` has shape `<M, N>`.
+    ::std::tuple<int64_t, int64_t, int64_t, int64_t>
+    getScaledMNKShape() const {
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
+      $_attr.getUndistributedTileTypes(preThreadTypes);
+      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
+      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
+      return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
     }
 
     /// Returns the element types of the operands to the MMA operation:

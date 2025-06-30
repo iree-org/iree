@@ -227,7 +227,7 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
                                         int64_t preferredSubgroupSize,
                                         bool canUpcastAcc, bool mustBeAligned) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
-         intrinsic.kSizes.size() == 1 &&
+         intrinsic.kSizes.size() <= 2 &&
          "expected intrinsic to have a single M, N, and K dimension.");
   if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
     return failure(); // Cannot use this intrinsic for mismatched types
@@ -277,16 +277,18 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
 
 static SmallVector<int64_t>
 getBestKTileSizes(const GPUMatmulShapeType &problem,
-                  const GPUMatmulShapeType &intrinsic,
+                  const GPUIntrinsicType &intrinsic,
                   const GPUMMAHeuristicSeeds &seeds) {
   // kTotalTileCounts is similar to m/nTotalTileCounts, representing the total
   // number of intrinsics along the K dimensions needed to fill the problem.
   // For the problem described above {M:[4, 16], N:[2, 32], K[3, 128]} with a
   // 16x16x16 intrinsic, then:
   //  - kTotalTileCounts would be 3 * (128/16) = 24
-  SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
-  kTotalTileCounts.back() =
-      llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
+  SmallVector<int64_t, 2> kTotalTileCounts;
+  for (auto [problemSize, intrinsicSize] :
+       zip_equal(problem.kSizes, intrinsic.kSizes)) {
+    kTotalTileCounts.push_back(llvm::divideCeil(problemSize, intrinsicSize));
+  }
   // Compute the ideal number of intrinsics along K per subgroup based on the
   // seed.
   int64_t bestKTileCountPerSubgroup =
@@ -316,7 +318,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                                             const GPUIntrinsicType &intrinsic,
                                             const GPUMMAHeuristicSeeds &seeds) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
-         intrinsic.kSizes.size() == 1 &&
+         intrinsic.kSizes.size() <= 2 &&
          "expected intrinsic to have a single M, N, and K dimension.");
   // mTotalTileCounts and nTotalTileCounts represent the total number of
   // intrinsics along the M or N dimensions needed to fill the problem size.
