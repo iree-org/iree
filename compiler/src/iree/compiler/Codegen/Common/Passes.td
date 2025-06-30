@@ -665,6 +665,15 @@ def MathTransformPass :
   ];
 }
 
+def PropagateConstantOffsetsPass :
+    InterfacePass<"iree-codegen-propagate-constant-offsets", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to push constant offsets towards loads/stores";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::arith::ArithDialect"
+  ];
+}
+
 def PropagateDispatchSizeBoundsPass :
     InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
   let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
