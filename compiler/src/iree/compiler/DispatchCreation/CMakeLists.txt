@@ -33,6 +33,7 @@ iree_cc_library(
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
     "HoistEncodingOps.cpp"
+    "HoistUniformScalarCompute.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
     "PropagateEncodings.cpp"

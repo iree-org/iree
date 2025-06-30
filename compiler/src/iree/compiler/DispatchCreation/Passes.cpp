@@ -231,7 +231,10 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
                 options.enableAggressiveFusion});
       })
       // Collapse dimensions of linalg Ops.
-      .addPass(DispatchCreation::createCollapseDimensionsPass);
+      .addPass(DispatchCreation::createCollapseDimensionsPass)
+      // Hoist scalar compute introduced from collapsing dimensions to
+      // increase CSE and deduplication opportunities.
+      .addPass(DispatchCreation::createHoistUniformScalarComputePass);
 
   // Experimental data tiling path. The intent of this path is to set encodings
   // after fusion decisions have already been made, so encodings can be
@@ -339,7 +342,9 @@ void buildDispatchCreationPassPipeline(
       /// `iree_tensor_ext.dispatch.workload.ordinal`
       ///   to map the captured operand to the position in the workload list.
       .addPass(
-          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass);
+          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass)
+      .addPass(createCSEPass)
+      .addPass(IREE::Flow::createCanonicalizePass);
 }
 
 namespace {
