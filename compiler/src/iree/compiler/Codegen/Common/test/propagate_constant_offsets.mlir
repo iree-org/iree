@@ -31,7 +31,7 @@ func.func @fold_add_into_map(%id0: index, %id1: index) -> index {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %a0 = arith.addi %id0, %c1 overflow<nsw> : index
-  %a1 = arith.addi %id1, %c2 overflow<nsw> : index
+  %a1 = arith.addi %id1, %c2 overflow<nsw, nuw> : index
   %0 = affine.apply affine_map<(d0)[s0] -> (s0 + d0)>(%a0)[%a1]
   return %0 : index
 }
@@ -52,7 +52,7 @@ func.func @propagate_constant_offsets_through_linearize(%id0: index, %id1: index
   %c2 = arith.constant 2 : index
   %c13 = arith.constant 13 : index
   %a0 = arith.addi %id0, %c1 overflow<nsw> : index
-  %a1 = arith.addi %id1, %c2 overflow<nsw> : index
+  %a1 = arith.addi %id1, %c2 overflow<nsw, nuw> : index
   %0 = affine.linearize_index [%a0, %c0, %a1, %c13] by (3, 5, 7, 11) : index
   return %0 : index
 }
@@ -94,7 +94,7 @@ func.func @propagate_constant_offsets_stop_dynamic(%id0: index, %id1: index, %s1
   %c2 = arith.constant 2 : index
   %c13 = arith.constant 13 : index
   %a0 = arith.addi %id0, %c1 overflow<nsw> : index
-  %a1 = arith.addi %id1, %c2 overflow<nsw> : index
+  %a1 = arith.addi %id1, %c2 overflow<nsw, nuw> : index
   %0 = affine.linearize_index disjoint [%a0, %c0, %a1, %c13] by (3, %s1, 7, 11) : index
   return %0 : index
 }
@@ -117,7 +117,7 @@ func.func @fold_mul_into_linearize(%id0: index, %id1: index) -> index {
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
   %a0 = arith.muli %id0, %c2 overflow<nsw> : index
-  %a1 = arith.muli %id1, %c4 overflow<nsw> : index
+  %a1 = arith.muli %id1, %c4 overflow<nsw, nuw> : index
   %0 = affine.linearize_index disjoint [%a0, %a1] by (16) : index
   return %0 : index
 }

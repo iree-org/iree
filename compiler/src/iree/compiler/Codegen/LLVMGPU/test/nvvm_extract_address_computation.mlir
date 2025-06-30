@@ -54,7 +54,7 @@
 // CHECK: %[[GRP_IDX2:.*]] = llvm.and %[[GRP_IDX1]], %[[C6]]  : i32
 // CHECK: %[[GRP_IDX3:.*]] = llvm.shl %[[GRP_IDX2]], %[[C2]]  : i32
 // CHECK: %{{.*}} = llvm.xor %[[SRC:.*]], %[[GRP_IDX3]]  : i32
-// CHECK: %[[ADJ_SRC:.*]] = llvm.add %[[SRC]], %[[C16]]  : i32
+// CHECK: %[[ADJ_SRC:.*]] = llvm.add %[[SRC]], %[[C16]] overflow<nsw> : i32
 // CHECK: %[[INV:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i32
 // CHECK: %[[INV_EXT:.*]] = llvm.zext %[[INV]] : i32 to i64
 //

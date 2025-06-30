@@ -35,7 +35,8 @@ static std::optional<int64_t> getValueConstantRhs(Value v, bool nsw) {
   }
 
   // Conditionally require nsw.
-  if (nsw && op.getOverflowFlags() != arith::IntegerOverflowFlags::nsw) {
+  if (nsw && !bitEnumContainsAll(op.getOverflowFlags(),
+                                 arith::IntegerOverflowFlags::nsw)) {
     return std::nullopt;
   }
 
