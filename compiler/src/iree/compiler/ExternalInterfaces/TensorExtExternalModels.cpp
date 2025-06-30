@@ -65,9 +65,9 @@ struct EncodingTypeExternalModel
   }
 };
 
-struct BuiltinTensorExternalModel
+struct TensorLikeTypeExternalModel
     : bufferization::TensorLikeType::ExternalModel<
-          BuiltinTensorExternalModel, IREE::TensorExt::DispatchTensorType> {
+          TensorLikeTypeExternalModel, IREE::TensorExt::DispatchTensorType> {
   FailureOr<bufferization::BufferLikeType> getBufferType(
       Type type, const bufferization::BufferizationOptions &options,
       llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
@@ -108,7 +108,7 @@ void registerTensorExtExternalModels(DialectRegistry &registry) {
         IREE::TensorExt::DispatchWorkloadOrdinalOp::attachInterface<
             WorkloadOrdinalOpInterface>(*ctx);
         IREE::TensorExt::DispatchTensorType::attachInterface<
-            EncodingTypeExternalModel, BuiltinTensorExternalModel>(*ctx);
+            EncodingTypeExternalModel, TensorLikeTypeExternalModel>(*ctx);
       });
 }
 
