@@ -2335,8 +2335,8 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
         calculate);
     if (!elementResult)
       return {};
-    auto resultType = lhs.getType().clone(
-        std::nullopt, IntegerType::get(lhs.getContext(), 32));
+    auto resultType =
+        lhs.getType().clone({}, IntegerType::get(lhs.getContext(), 32));
     return DenseElementsAttr::get(resultType, elementResult);
   } else if (auto lhs = llvm::dyn_cast_if_present<ElementsAttr>(rawLhs)) {
     auto rhs = llvm::dyn_cast_if_present<ElementsAttr>(rawRhs);
@@ -2353,8 +2353,8 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
       ++lhsIt;
       ++rhsIt;
     }
-    auto resultType = lhs.getShapedType().clone(
-        std::nullopt, IntegerType::get(lhs.getContext(), 32));
+    auto resultType =
+        lhs.getShapedType().clone({}, IntegerType::get(lhs.getContext(), 32));
     return DenseElementsAttr::get(resultType, resultAttrs);
   }
   return {};
