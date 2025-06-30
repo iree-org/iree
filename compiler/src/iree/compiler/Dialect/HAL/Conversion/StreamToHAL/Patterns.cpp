@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/IR/Utils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -103,8 +102,8 @@ struct ResourceAllocOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             allocOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
-            allocOp.getAffinity().value_or(nullptr),
-            resourceType.getLifetime());
+            IREE::Stream::AffinityAttr::lookupOrDefault(allocOp),
+            static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     // Lookup the appropriate allocator/queue for allocation based on the buffer
     // propreties.
@@ -138,8 +137,8 @@ struct ResourceAllocaOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             loc, rewriter.getI32Type(), rewriter.getI32Type(),
-            allocaOp.getAffinity().value_or(nullptr),
-            resourceType.getLifetime());
+            IREE::Stream::AffinityAttr::lookupOrDefault(allocaOp),
+            static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(allocaOp, resolveOp.getMemoryTypes(),
@@ -187,8 +186,8 @@ struct ResourceDeallocaOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             loc, rewriter.getI32Type(), rewriter.getI32Type(),
-            deallocaOp.getAffinity().value_or(nullptr),
-            resourceType.getLifetime());
+            IREE::Stream::AffinityAttr::lookupOrDefault(deallocaOp),
+            static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(deallocaOp, resolveOp.getMemoryTypes(),
@@ -458,8 +457,9 @@ buildStorageAssertions(Location loc, Value buffer, StringAttr message,
                        OpBuilder &builder) {
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveRequiredResourceBufferBits(loc, resourceType.getLifetime(),
-                                              memoryTypes, bufferUsage))) {
+  if (failed(deriveRequiredResourceBufferBits(
+          loc, static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()),
+          memoryTypes, bufferUsage))) {
     return failure();
   }
 

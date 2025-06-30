@@ -701,7 +701,7 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
 
   let arguments = (ins
     OptionalAttr<Stream_AffinityAttr>:$affinity,
-    Stream_LifetimeAttr:$resource_lifetime
+    HAL_LifetimeAttr:$lifetime
   );
   let results = (outs
     HAL_MemoryType:$memory_types,
@@ -710,12 +710,10 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
 
   let assemblyFormat = [{
     `for` `(` $affinity `)`
-    `lifetime` `(` $resource_lifetime `)`
+    `lifetime` `(` $lifetime `)`
     `:` type($memory_types) `,` type($buffer_usage)
     attr-dict-with-keyword
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 } // OpGroupAllocatorOps

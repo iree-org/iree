@@ -53,11 +53,7 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
 
-  // CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}Dispatch{{.+}}"> : i32
-  // CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-
   // CHECK: %[[NULL_FENCE:.+]] = util.null : !hal.fence
-
 
   // CHECK: %[[ARG0_BUFFER:.+]] = hal.buffer_view.buffer<%[[ARG0]] : !hal.buffer_view> : !hal.buffer
 
@@ -81,6 +77,8 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   %arg1_resource = stream.tensor.import %arg1 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
 
+  // CHECK: %[[MEMORY_TYPE:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
+  // CHECK-SAME: lifetime(external)
   // CHECK: %[[RESULT_BUFFER:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME: type(%[[MEMORY_TYPE]])
   // CHECK-SAME: usage(%[[BUFFER_USAGE]])

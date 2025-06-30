@@ -37,7 +37,8 @@ struct ParameterLoadOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             loc, rewriter.getI32Type(), rewriter.getI32Type(),
-            loadOp.getAffinity().value_or(nullptr), resourceType.getLifetime());
+            IREE::Stream::AffinityAttr::lookupOrDefault(loadOp),
+            static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(loadOp, resolveOp.getMemoryTypes(),

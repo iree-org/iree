@@ -54,6 +54,15 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
 // Scans all of the stream.cmd.* ops in the region to derive a command category.
 IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region);
 
+// Maps a resource type to the corresponding HAL memory types and buffer usage.
+// This will fail if the resource type is not directly mappable to HAL bits.
+// The bits set here are those that must be set for the buffer to be used as the
+// buffer within the program with its defined resource lifetime.
+LogicalResult
+deriveRequiredResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
+                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
+                                 IREE::HAL::BufferUsageBitfield &bufferUsage);
+
 class BindingTable {
 public:
   BindingTable() = default;
