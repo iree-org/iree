@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
 
@@ -108,7 +109,7 @@ struct BarrierRegionOpBufferizationInterface
                 SmallVector<Value> &invocationStack) const {
     auto barrierOp = cast<IREE::GPU::BarrierRegionOp>(op);
 
-    FailureOr<BaseMemRefType> memrefType = failure();
+    FailureOr<mlir::bufferization::BufferLikeType> memrefType = failure();
     if (auto opResult = dyn_cast<OpResult>(value)) {
       int64_t resultNum = opResult.getResultNumber();
       memrefType = bufferization::getBufferType(
@@ -121,7 +122,7 @@ struct BarrierRegionOpBufferizationInterface
     }
     if (failed(memrefType))
       return failure();
-    return memrefType;
+    return cast<BaseMemRefType>(*memrefType);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -146,10 +147,13 @@ struct BarrierRegionOpBufferizationInterface
         tensorizedOperands.push_back(replacement);
         continue;
       }
-      tensorizedOperands.push_back(rewriter
-                                       .create<bufferization::ToTensorOp>(
-                                           replacement.getLoc(), replacement)
-                                       .getResult());
+      tensorizedOperands.push_back(
+          rewriter
+              .create<bufferization::ToTensorOp>(
+                  replacement.getLoc(),
+                  memref::getTensorTypeFromMemRefType(replacement.getType()),
+                  replacement)
+              .getResult());
     }
 
     rewriter.setInsertionPoint(barrierOp);
@@ -205,7 +209,7 @@ struct ValueBarrierOpBufferizationInterface
         state, invocationStack);
     if (failed(srcMemrefType))
       return failure();
-    return srcMemrefType;
+    return cast<BaseMemRefType>(*srcMemrefType);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -341,8 +345,9 @@ struct BufferResourceCastOpBufferizationInterface
     if (failed(srcMemrefType))
       return failure();
 
-    if (!hasStorageBufferMemSpace(srcMemrefType.value())) {
-      return srcMemrefType;
+    auto baseMemrefType = cast<BaseMemRefType>(srcMemrefType.value());
+    if (!hasStorageBufferMemSpace(baseMemrefType)) {
+      return baseMemrefType;
     }
 
     auto rankedSrcType = cast<MemRefType>(srcMemrefType.value());
