@@ -300,9 +300,10 @@ enum iree_hal_amdgpu_device_cmd_flag_bits_t {
 
   // Sets HSA_FENCE_SCOPE_AGENT on the AQL packet release scope.
   // This flushes the I/K/L1 caches.
-  // This flushes the L1/L2 caches.
   IREE_HAL_AMDGPU_DEVICE_CMD_FLAG_FENCE_RELEASE_AGENT =
       IREE_HSA_FENCE_SCOPE_AGENT << 3,
+  // Sets HSA_FENCE_SCOPE_SYTEM on the AQL packet release scope.
+  // This flushes the L1/L2 caches.
   IREE_HAL_AMDGPU_DEVICE_CMD_FLAG_FENCE_RELEASE_SYSTEM =
       IREE_HSA_FENCE_SCOPE_SYSTEM << 3,
 };

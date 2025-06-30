@@ -25,7 +25,7 @@ struct BufferPoolTest : public ::testing::Test {
   static iree_allocator_t host_allocator;
   static iree_hal_amdgpu_libhsa_t libhsa;
   static iree_hal_amdgpu_topology_t topology;
-  static hsa_amd_memory_pool_t gpu_memory_pool;
+  static hsa_amd_memory_pool_t cpu_memory_pool;
 
   static void SetUpTestSuite() {
     IREE_TRACE_SCOPE();
@@ -44,9 +44,9 @@ struct BufferPoolTest : public ::testing::Test {
       GTEST_SKIP() << "no GPU devices available, skipping tests";
     }
 
-    hsa_agent_t gpu_agent = topology.gpu_agents[0];
+    hsa_agent_t cpu_agent = topology.cpu_agents[0];
     IREE_ASSERT_OK(iree_hal_amdgpu_find_fine_global_memory_pool(
-        &libhsa, gpu_agent, &gpu_memory_pool));
+        &libhsa, cpu_agent, &cpu_memory_pool));
   }
 
   static void TearDownTestSuite() {
@@ -58,7 +58,7 @@ struct BufferPoolTest : public ::testing::Test {
 iree_allocator_t BufferPoolTest::host_allocator;
 iree_hal_amdgpu_libhsa_t BufferPoolTest::libhsa;
 iree_hal_amdgpu_topology_t BufferPoolTest::topology;
-hsa_amd_memory_pool_t BufferPoolTest::gpu_memory_pool;
+hsa_amd_memory_pool_t BufferPoolTest::cpu_memory_pool;
 
 // Tests that a pool can be initialized/deinitialized successfully.
 // Note that pools do not allocate anything on initialization so this should
@@ -75,7 +75,7 @@ TEST_F(BufferPoolTest, Lifetime) {
   IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_initialize(
       &libhsa, &topology, placement,
       IREE_HAL_AMDGPU_BUFFER_POOL_DEFAULT_BLOCK_CAPACITY, host_allocator,
-      gpu_memory_pool, &buffer_pool));
+      cpu_memory_pool, &buffer_pool));
 
   // No-op since nothing has been allocated.
   iree_hal_amdgpu_buffer_pool_trim(&buffer_pool);
@@ -98,7 +98,7 @@ TEST_F(BufferPoolTest, LifetimePreallocate) {
   iree_hal_amdgpu_buffer_pool_t buffer_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_initialize(
       &libhsa, &topology, placement,
-      /*block_capacity=*/32, host_allocator, gpu_memory_pool, &buffer_pool));
+      /*block_capacity=*/32, host_allocator, cpu_memory_pool, &buffer_pool));
 
   // No-op since nothing has been allocated yet.
   iree_hal_amdgpu_buffer_pool_trim(&buffer_pool);
@@ -107,15 +107,17 @@ TEST_F(BufferPoolTest, LifetimePreallocate) {
   IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_preallocate(&buffer_pool, 0));
 
   // Preallocate one block.
-  IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_preallocate(&buffer_pool, 32));
+  IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_preallocate(
+      &buffer_pool, buffer_pool.block_capacity));
 
   // Trim the entire block (nothing is used).
   iree_hal_amdgpu_buffer_pool_trim(&buffer_pool);
 
   // Preallocate two blocks.
-  IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_preallocate(&buffer_pool, 33));
+  IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_preallocate(
+      &buffer_pool, buffer_pool.block_capacity + 1));
 
-  // Preallocate one more block (1 buffer ceildiv 32 capacity = 1 block).
+  // Preallocate one more block (1 buffer ceildiv capacity = 1 block).
   IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_preallocate(&buffer_pool, 1));
 
   // Deinitialize with remaining preallocated blocks to test cleanup.
@@ -134,7 +136,7 @@ TEST_F(BufferPoolTest, AcquireRelease) {
   iree_hal_amdgpu_buffer_pool_t buffer_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_initialize(
       &libhsa, &topology, placement,
-      /*block_capacity=*/32, host_allocator, gpu_memory_pool, &buffer_pool));
+      /*block_capacity=*/32, host_allocator, cpu_memory_pool, &buffer_pool));
 
   iree_hal_buffer_params_t buffer_params = {
       /*.usage=*/IREE_HAL_BUFFER_USAGE_DEFAULT |
@@ -212,7 +214,7 @@ TEST_F(BufferPoolTest, Growth) {
   iree_hal_amdgpu_buffer_pool_t buffer_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_buffer_pool_initialize(
       &libhsa, &topology, placement, /*block_capacity=*/32, host_allocator,
-      gpu_memory_pool, &buffer_pool));
+      cpu_memory_pool, &buffer_pool));
   // NOTE: the capacity may be larger than requested due to alignment.
   const iree_host_size_t block_capacity = buffer_pool.block_capacity;
 

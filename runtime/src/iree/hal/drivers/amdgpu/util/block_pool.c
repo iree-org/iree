@@ -77,9 +77,9 @@ iree_status_t iree_hal_amdgpu_block_pool_initialize(
 
   // Preallocate as many allocations as required to hold the requested initial
   // block count.
-  iree_status_t status = iree_ok_status();
-  iree_host_size_t initial_allocation_count = iree_host_size_ceil_div(
+  const iree_host_size_t initial_allocation_count = iree_host_size_ceil_div(
       options.initial_capacity, out_block_pool->blocks_per_allocation);
+  iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < initial_allocation_count; ++i) {
     status = iree_hal_amdgpu_block_pool_grow(out_block_pool);
     if (!iree_status_is_ok(status)) break;
@@ -184,8 +184,8 @@ void iree_hal_amdgpu_block_pool_trim(iree_hal_amdgpu_block_pool_t* block_pool) {
     if (free_block->allocation->used_count == 0) {
       // Allocation will be freed below - unlink.
       if (free_block == block_pool->free_blocks_head) {
+        IREE_ASSERT(!prev_free_block);
         block_pool->free_blocks_head = next_free_block;
-        if (prev_free_block) prev_free_block->next = next_free_block;
       } else {
         prev_free_block->next = next_free_block;
       }
@@ -207,8 +207,8 @@ void iree_hal_amdgpu_block_pool_trim(iree_hal_amdgpu_block_pool_t* block_pool) {
       IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
           IREE_LIBHSA(block_pool->libhsa), allocation->base_ptr));
       if (allocation == block_pool->allocations_head) {
+        IREE_ASSERT(!prev_allocation);
         block_pool->allocations_head = next_allocation;
-        if (prev_allocation) prev_allocation->next = next_allocation;
       } else {
         prev_allocation->next = next_allocation;
       }
@@ -306,6 +306,7 @@ void iree_hal_amdgpu_block_pool_release_list(
 
   IREE_TRACE_ZONE_END(z0);
 }
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_block_arena_t
 //===----------------------------------------------------------------------===//
@@ -356,11 +357,22 @@ iree_status_t iree_hal_amdgpu_block_arena_allocate(
   *out_ptr = NULL;
 
   iree_hal_amdgpu_block_pool_t* block_pool = arena->block_pool;
+  const iree_device_size_t block_size = block_pool->block_size;
 
   // Pad length allocated so that each pointer bump is always ending at an
   // aligned address and the next allocation will start aligned.
-  iree_device_size_t aligned_length =
+  const iree_device_size_t aligned_length =
       iree_device_align(byte_length, iree_hal_amdgpu_max_align_t);
+
+  // Check whether any block could ever satisfy the request given the size
+  // requested.
+  if (aligned_length > block_size) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocation request of %" PRIdsz
+                            " exceeds block capacity of %" PRIdsz
+                            " and cannot be satisfied",
+                            aligned_length, block_size);
+  }
 
   // Check to see if the current block (if any) has space - if not, get another.
   if (arena->block_head == NULL ||
@@ -372,18 +384,19 @@ iree_status_t iree_hal_amdgpu_block_arena_allocate(
     block->next = NULL;
     if (arena->block_tail) {
       arena->block_tail->next = block;
+      block->prev = arena->block_tail;
     } else {
       arena->block_head = block;
     }
     arena->block_tail = block;
-    arena->total_allocation_size += block_pool->block_size;
-    arena->block_bytes_remaining = block_pool->block_size;
+    arena->total_allocation_size += block_size;
+    arena->block_bytes_remaining = block_size;
     IREE_TRACE_ZONE_END(z0);
   }
 
   // Slice out the allocation from the current block.
-  IREE_AMDGPU_DEVICE_PTR void* ptr =
-      (uint8_t*)arena->block_tail->ptr - arena->block_bytes_remaining;
+  IREE_AMDGPU_DEVICE_PTR void* ptr = (uint8_t*)arena->block_tail->ptr +
+                                     block_size - arena->block_bytes_remaining;
   arena->block_bytes_remaining -= aligned_length;
   arena->used_allocation_size += aligned_length;
   *out_ptr = ptr;
@@ -407,7 +420,7 @@ iree_status_t iree_hal_amdgpu_block_allocator_initialize(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "min_page_size of %" PRIhsz
-        " bytes must fit within the pooled block size of %" PRIhsz " bytes",
+        " bytes must fit within the pooled block size of %" PRIdsz " bytes",
         min_page_size, block_pool->block_size);
   }
 
@@ -476,7 +489,7 @@ static iree_status_t iree_hal_amdgpu_block_allocator_allocate_with_lock(
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_block_pool_acquire(allocator->block_pool, &block));
 
-  // Reset the bitmap as the contents are undefined.
+  // Reset the bitmap as the contents are undefined upon acquisition.
   const iree_hal_amdgpu_bitmap_t bitmap = {
       .bit_count = allocator->page_count,
       .words = &block->user_data[0],
@@ -485,7 +498,7 @@ static iree_status_t iree_hal_amdgpu_block_allocator_allocate_with_lock(
 
   // Link the block into the list.
   // If it is full to start (page_count == pages per block) we move it to the
-  // end of the list so it's not scanned.
+  // end of the list so it's not scanned on subsequent requests.
   if (page_count == allocator->page_count) {
     block->next = NULL;
     block->prev = allocator->block_tail;
