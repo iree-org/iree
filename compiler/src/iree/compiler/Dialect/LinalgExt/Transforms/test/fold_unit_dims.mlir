@@ -39,5 +39,3 @@ util.func public @gather_batch_and_slice_dims(%source: tensor<4x4x1x4xf16>, %ind
 // CHECK: iree_linalg_ext.gather
 // CHECK-SAME: ins(%[[SOURCE_SLICE]], %[[INDICES_BATCH]]
 // CHECK-SAME: outs(%[[OUTPUT_SLICE]]
-
-// -----
