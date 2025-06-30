@@ -26,6 +26,26 @@ struct ResolveSwizzleHintsPass final
 };
 } // namespace
 
+static Value createOrFoldNewStaticAdd(RewriterBase &rewriter, Value v,
+                                      int64_t offset) {
+  // Early exit for the common offset = 0 case.
+  if (offset == 0) {
+    return v;
+  }
+
+  if (auto add = v.getDefiningOp<arith::AddIOp>()) {
+    llvm::APInt constant;
+    if (matchPattern(add.getRhs(), m_ConstantInt(&constant))) {
+      Value combined = rewriter.create<arith::ConstantIndexOp>(
+          add.getLoc(), offset + constant.getSExtValue());
+      return rewriter.create<arith::AddIOp>(add.getLoc(), add.getLhs(),
+                                            combined, add.getOverflowFlags());
+    }
+  }
+  Value offsetVal = rewriter.create<arith::ConstantIndexOp>(v.getLoc(), offset);
+  return rewriter.create<arith::AddIOp>(v.getLoc(), v, offsetVal);
+}
+
 /// Swizzles vector.load(iree_codegen.swizzle_hint, offset). The
 /// SwizzleInterfaceAttr exposes two methods:
 ///   1. getAccessElementCount -> int64_t
@@ -53,10 +73,6 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   VectorType swizzledLoadType =
       VectorType::get({accessWidth}, type.getElementType());
 
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  AffineMap sum = AffineMap::get(0, 2, s0 + s1);
-
   // ~ vector.undef, overwritten by unrolling.
   Value replacement = rewriter.create<arith::ConstantOp>(
       hintLoc, type, rewriter.getZeroAttr(type));
@@ -65,10 +81,7 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   // i = 0 -> C += k is the offset into the vector of a contiguous group of
   // swizzled elements.
   for (int64_t i = 0; i < loadWidth; i += accessWidth) {
-    auto vecOffset = rewriter.getIndexAttr(i);
-    auto newBaseOffset = affine::makeComposedFoldedAffineApply(
-        rewriter, hintLoc, sum, {memrefOffset, vecOffset});
-
+    Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
     Value newOffset = getValueOrCreateConstantIndexOp(
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
@@ -103,10 +116,6 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   int64_t storeWidth = type.getShape()[0];
   Value memrefOffset = store.getIndices()[0];
 
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  AffineMap sum = AffineMap::get(0, 2, s0 + s1);
-
   // Store type = vector<C>, k = accessWidth
   // i = 0 -> C += k is the offset into the vector of a contiguous group of
   // swizzled elements.
@@ -114,9 +123,7 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
     Value subVec = rewriter.create<vector::ExtractStridedSliceOp>(
         store.getLoc(), store.getValueToStore(), ArrayRef<int64_t>{i},
         ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
-    auto vecOffset = rewriter.getIndexAttr(i);
-    auto newBaseOffset = affine::makeComposedFoldedAffineApply(
-        rewriter, hintLoc, sum, {memrefOffset, vecOffset});
+    Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
 
     Value newOffset = getValueOrCreateConstantIndexOp(
         rewriter, hintLoc,
