@@ -15,6 +15,7 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-fission-transfer-ops-in-control-flow"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -24,49 +25,6 @@ namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_FISSIONTRANSFEROPSINCONTROLFLOWPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
-
-/// Replaces all occurrences of `oldVal` in the operands of `op` with `newVal`.
-static void replaceOperand(Operation *op, Value oldVal, Value newVal) {
-  for (auto &operand : op->getOpOperands()) {
-    if (operand.get() == oldVal) {
-      operand.set(newVal);
-    }
-  }
-}
-
-/// Collects a backward slice of operations within the same control flow scope
-/// (i.e., with the same parent) from the specified operation. This is useful
-/// for identifying dependencies within a block.
-static SetVector<Operation *>
-collectBackwardSliceInControlFlow(Operation *op, Operation *parentOp) {
-  BackwardSliceOptions options;
-  options.inclusive = false;
-  options.filter = [&](Operation *op) { return parentOp == op->getParentOp(); };
-  SetVector<Operation *> slice;
-  LogicalResult result = getBackwardSlice(op, &slice, options);
-  if (failed(result)) {
-    return {};
-  }
-  return slice;
-}
-
-/// Clones a slice of operations, remapping their operands.
-static void cloneSliceIntoLoop(IRRewriter &rewriter,
-                               SetVector<Operation *> &slice,
-                               IRMapping &mapping) {
-  for (Operation *op : slice) {
-    rewriter.clone(*op, mapping);
-  }
-}
-
-/// Creates a new loop with the same iteration parameters (bounds, step) as the
-/// given loop.
-static scf::ForOp createNewLoop(IRRewriter &rewriter, scf::ForOp forOp,
-                                Location loc) {
-  return rewriter.create<scf::ForOp>(loc, forOp.getLowerBound(),
-                                     forOp.getUpperBound(), forOp.getStep(),
-                                     forOp.getRegionIterArgs());
-}
 
 /// Creates an alloca operation for the intermediate results of the transfer.
 /// %alloca_size = (%upper_bound - %lower_bound) / %step
@@ -104,65 +62,67 @@ static Value createMemrefAccessIndex(IRRewriter &rewriter, scf::ForOp forOp) {
   return divUIOp.getResult();
 }
 
+namespace {
+struct FissionTarget {
+  scf::ForOp parent;
+  SmallVector<vector::TransferReadOp> readOps;
+  SmallVector<vector::TransferWriteOp> writeOps;
+};
+} // namespace
+
 /// Sets up the read loop for the transfer read operation.
-static void setupReadLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
-                          scf::ForOp forOp, memref::AllocaOp alloca) {
-  scf::ForOp readLoop = createNewLoop(rewriter, forOp, readOp.getLoc());
-  rewriter.setInsertionPointToStart(readLoop.getBody());
+static void setupReadLoop(IRRewriter &rewriter, const FissionTarget &target,
+                          ArrayRef<memref::AllocaOp> allocaOps) {
+  // Create a copy of the original loop, without the 'transfer_write's.
+  IRMapping mapping;
+  auto readLoop = cast<scf::ForOp>(rewriter.clone(*target.parent, mapping));
+  for (auto writeOp : target.writeOps) {
+    rewriter.eraseOp(mapping.lookup(writeOp));
+  }
 
-  IRMapping readMapping;
-  readMapping.map(forOp.getInductionVar(), readLoop.getInductionVar());
-  SetVector<Operation *> readSlice =
-      collectBackwardSliceInControlFlow(readOp, forOp);
-  cloneSliceIntoLoop(rewriter, readSlice, readMapping);
-  Operation *lastRead = rewriter.clone(*readOp, readMapping);
-
-  auto readLoopIndex = createMemrefAccessIndex(rewriter, readLoop);
-  SmallVector<Value> readLoopIndices = {readLoopIndex};
-  // Use alloca size to determine the number of zero indices needed.
-  auto readOpIndicesSize = alloca.getType().getShape().size() - 1;
+  rewriter.setInsertionPoint(readLoop.getBody()->getTerminator());
+  auto allocaIndex = createMemrefAccessIndex(rewriter, readLoop);
   auto constantZero =
-      rewriter.create<arith::ConstantIndexOp>(readOp.getLoc(), 0);
-  auto zeroIndices = SmallVector<Value>(readOpIndicesSize, constantZero);
-  readLoopIndices.insert(readLoopIndices.end(), zeroIndices.begin(),
-                         zeroIndices.end());
+      rewriter.create<arith::ConstantIndexOp>(readLoop.getLoc(), 0);
 
-  rewriter.create<vector::TransferWriteOp>(
-      readOp.getLoc(), lastRead->getResult(0), alloca, readLoopIndices);
+  // Store 'transfer_read' results into the corresponding 'alloca'.
+  for (size_t i = 0; i < allocaOps.size(); i++) {
+    memref::AllocaOp allocaOp = allocaOps[i];
+    auto readOp = cast<vector::TransferReadOp>(
+        mapping.lookup<Operation *>(target.readOps[i]));
+
+    SmallVector<Value> indices = {allocaIndex};
+    indices.append(allocaOp.getType().getShape().size() - 1, constantZero);
+    rewriter.create<vector::TransferWriteOp>(readOp.getLoc(), readOp, allocaOp,
+                                             indices);
+  }
 
   LDBG("Read loop: \n" << readLoop << "\n");
-  rewriter.setInsertionPointAfter(readLoop.getOperation());
+  rewriter.setInsertionPointAfter(readLoop);
 }
 
 /// Sets up the write loop for the transfer write operation.
-static void setupWriteLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
-                           vector::TransferWriteOp writeOp, scf::ForOp forOp,
-                           memref::AllocaOp alloca) {
-  scf::ForOp writeLoop = createNewLoop(rewriter, forOp, writeOp.getLoc());
+static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
+                           ArrayRef<memref::AllocaOp> allocaOps) {
+  // Create a copy of the original loop, where 'transfer_read's are replaced
+  // with reads from the corresponding 'alloca'.
+  IRMapping mapping;
+  auto writeLoop = cast<scf::ForOp>(rewriter.clone(*target.parent, mapping));
+
   rewriter.setInsertionPointToStart(writeLoop.getBody());
-
-  auto writeLoopIndex = createMemrefAccessIndex(rewriter, writeLoop);
-  SmallVector<Value> writeLoopIndices = {writeLoopIndex};
-  // Use alloca size to determine the number of zero indices needed.
-  auto zeroIndicesSize = alloca.getType().getShape().size() - 1;
+  auto allocaIndex = createMemrefAccessIndex(rewriter, writeLoop);
   auto constantZero =
-      rewriter.create<arith::ConstantIndexOp>(readOp.getLoc(), 0);
-  SmallVector<Value> zeroIndices(zeroIndicesSize, constantZero);
-  writeLoopIndices.insert(writeLoopIndices.end(), zeroIndices.begin(),
-                          zeroIndices.end());
+      rewriter.create<arith::ConstantIndexOp>(writeLoop.getLoc(), 0);
+  for (size_t i = 0; i < allocaOps.size(); i++) {
+    memref::AllocaOp allocaOp = allocaOps[i];
+    auto readOp = cast<vector::TransferReadOp>(
+        mapping.lookup<Operation *>(target.readOps[i]));
 
-  vector::TransferReadOp newReadOp = rewriter.create<vector::TransferReadOp>(
-      writeOp.getLoc(), writeOp.getVectorType(), alloca, writeLoopIndices);
-
-  IRMapping writeMapping;
-  writeMapping.map(forOp.getInductionVar(), writeLoop.getInductionVar());
-  SetVector<Operation *> writeSlice =
-      collectBackwardSliceInControlFlow(writeOp, forOp);
-  cloneSliceIntoLoop(rewriter, writeSlice, writeMapping);
-
-  rewriter.clone(*writeOp, writeMapping);
-  for (auto &op : writeLoop.getBody()->getOperations()) {
-    replaceOperand(&op, writeMapping.lookup(readOp.getResult()), newReadOp);
+    rewriter.setInsertionPointAfter(readOp);
+    SmallVector<Value> indices = {allocaIndex};
+    indices.append(allocaOp.getType().getShape().size() - 1, constantZero);
+    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+        readOp, readOp.getVectorType(), allocaOp, indices);
   }
 
   LDBG("Write loop: \n" << writeLoop << "\n");
@@ -188,76 +148,52 @@ static void setupWriteLoop(IRRewriter &rewriter, vector::TransferReadOp readOp,
 ///     vector.transfer_write %read ...
 ///   }
 static void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
-                                            vector::TransferReadOp readOp,
-                                            vector::TransferWriteOp writeOp,
-                                            scf::ForOp forOp) {
+                                            const FissionTarget &target) {
   LDBG("Splitting transfer ops from control flow: \n"
-       << "For Op: " << forOp << "\n");
+       << "For Op: " << target.parent << "\n");
 
-  rewriter.setInsertionPoint(forOp);
-  memref::AllocaOp alloca = createAlloca(rewriter, readOp, forOp);
+  rewriter.setInsertionPoint(target.parent);
+  SmallVector<memref::AllocaOp> allocaOps;
+  for (auto readOp : target.readOps) {
+    allocaOps.push_back(createAlloca(rewriter, readOp, target.parent));
+  }
 
-  setupReadLoop(rewriter, readOp, forOp, alloca);
-  setupWriteLoop(rewriter, readOp, writeOp, forOp, alloca);
+  setupReadLoop(rewriter, target, allocaOps);
+  setupWriteLoop(rewriter, target, allocaOps);
 
-  rewriter.eraseOp(forOp);
+  rewriter.eraseOp(target.parent);
 }
 
-/// Checks if the transfer read and write operations are legal for fissioning.
-static bool isLegal(vector::TransferReadOp readOp,
-                    vector::TransferWriteOp writeOp, scf::ForOp forOp) {
-  if (readOp->getParentOp() != forOp || writeOp->getParentOp() != forOp) {
-    return false;
-  }
-  if (!hasGlobalMemoryAddressSpace(
-          cast<MemRefType>(readOp.getBase().getType()))) {
-    return false;
-  }
-  if (hasGlobalMemoryAddressSpace(
-          cast<MemRefType>(writeOp.getBase().getType()))) {
-    return false;
-  }
-  return true;
-}
-
-namespace {
-struct FissionTarget {
-  scf::ForOp parent;
-  vector::TransferReadOp readOp;
-  vector::TransferWriteOp writeOp;
-};
-} // namespace
-
-/// Populates a FissionTarget from a scf::ForOp by checking if it contains a
-/// transfer read and write operation that can be legally fissioned.
+/// Populates a FissionTarget from a scf::ForOp by checking if it contains
+/// transfer read and write operations that can be legally fissioned.
 static FailureOr<FissionTarget> populateFissionTarget(scf::ForOp forOp) {
-  // Fission Loop always has a transfer_write as the last operation.
-  auto lastOp = forOp.getBody()->getTerminator()->getPrevNode();
-  if (!isa_and_present<vector::TransferWriteOp>(lastOp)) {
-    return failure();
-  }
-
-  vector::TransferWriteOp writeOp = cast<vector::TransferWriteOp>(lastOp);
-  SetVector<Operation *> writeSlice =
-      collectBackwardSliceInControlFlow(writeOp, forOp.getOperation());
-  for (Operation *op : writeSlice) {
-    if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-      if (!isLegal(readOp, writeOp, forOp)) {
-        continue;
-      }
-
-      // Only the read/write ops may have side effects, since we assume we can
-      // re-order/erase the other ops freely.
-      if (!llvm::all_of(forOp.getOps(), [&](Operation &op) -> bool {
-            return (&op == readOp || &op == writeOp || mlir::isPure(&op));
-          })) {
+  SmallVector<vector::TransferReadOp> readOps;
+  SmallVector<vector::TransferWriteOp> writeOps;
+  for (Operation &op : forOp.getOps()) {
+    if (auto readOp = dyn_cast<vector::TransferReadOp>(&op)) {
+      if (!hasGlobalMemoryAddressSpace(
+              cast<MemRefType>(readOp.getBase().getType()))) {
         return failure();
       }
-      FissionTarget fissionTarget = {forOp, readOp, writeOp};
-      return fissionTarget;
+      readOps.push_back(readOp);
+    } else if (auto writeOp = dyn_cast<vector::TransferWriteOp>(&op)) {
+      if (hasGlobalMemoryAddressSpace(
+              cast<MemRefType>(writeOp.getBase().getType()))) {
+        return failure();
+      }
+      writeOps.push_back(writeOp);
+    } else if (!mlir::isPure(&op)) {
+      // Only the read/write ops may have side effects, since we assume we can
+      // re-order/erase the other ops freely.
+      return failure();
     }
   }
-  return failure();
+
+  if (readOps.empty() || writeOps.empty() ||
+      readOps.size() != writeOps.size()) {
+    return failure();
+  }
+  return FissionTarget{forOp, readOps, writeOps};
 }
 
 struct FissionTransferOpsInControlFlowPass final
@@ -289,9 +225,11 @@ struct FissionTransferOpsInControlFlowPass final
     }
 
     for (const FissionTarget &target : fissionTargets) {
-      splitTransferOpsFromControlFlow(rewriter, target.readOp, target.writeOp,
-                                      target.parent);
+      splitTransferOpsFromControlFlow(rewriter, target);
     }
+
+    // Cleanup dead ops.
+    (void)applyPatternsGreedily(funcOp, {});
   }
 };
 
