@@ -280,11 +280,8 @@ createIREEComprehensiveBufferizePass(
                                                           memCpyFn.value());
 }
 
-void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
-                                    bool injectAssumeAlignmentOp) {
-  if (injectAssumeAlignmentOp) {
-    funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
-  }
+void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -298,13 +295,12 @@ void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
-    bool injectAssumeAlignmentOp) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
-  addIREEPostBufferizationPasses(funcPassManager, injectAssumeAlignmentOp);
+  addIREEPostBufferizationPasses(funcPassManager);
 }
 
 } // namespace mlir::iree_compiler
