@@ -40,6 +40,10 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "semaphore.c"
+    "semaphore.h"
+    "semaphore_pool.c"
+    "semaphore_pool.h"
     "system.c"
     "system.h"
   DEPS
@@ -78,6 +82,8 @@ iree_cc_library(
     "host_service.h"
     "logical_device.h"
     "physical_device.h"
+    "semaphore.h"
+    "semaphore_pool.h"
     "system.h"
   DEPS
     iree::base
@@ -121,6 +127,26 @@ iree_cc_test(
     ::amdgpu
     ::headers
     iree::base
+    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::topology
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+)
+
+iree_cc_test(
+  NAME
+    semaphore_pool_test
+  SRCS
+    "semaphore_pool_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
