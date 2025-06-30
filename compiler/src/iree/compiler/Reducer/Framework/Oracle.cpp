@@ -73,7 +73,7 @@ bool Oracle::isInteresting(WorkItem &workItem) {
 
   std::string errMsg;
   int exitCode = llvm::sys::ExecuteAndWait(testScript, testerArgs, std::nullopt,
-                                           std::nullopt, 0, 0, &errMsg);
+                                           {}, 0, 0, &errMsg);
 
   if (exitCode < 0) {
     llvm::report_fatal_error(llvm::Twine("Failed to run oracle: ") + errMsg);
