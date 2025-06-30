@@ -783,7 +783,15 @@ def TileAndDistributeToWorkgroupsPass :
 def TileAndDistributeToWorkgroupsUsingForallOpPass :
     InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups-using-forall-op",
                   "mlir::FunctionOpInterface"> {
-  let summary = "Tile and distribute operation to workgroups (using scf.forall op)";
+  let summary = "Tile and distribute operations to workgroups (using scf.forall op)";
+  let description = [{
+    Tile and distribute operations to workgroups using scf.forall op. The pass
+    itself holds GetTilingRootOpFn function to determine which operation is the
+    root op. I.e., the operation is used in start of tiling in the algorithm. If
+    the function is not provided, it selects the last compute op that has
+    workgroup tiling level.
+  }];
+
   let dependentDialects = [
     "affine::AffineDialect",
     "IREE::Codegen::IREECodegenDialect",
