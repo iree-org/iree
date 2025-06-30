@@ -84,6 +84,11 @@ macro(iree_llvm_configure_bundled)
   set(IREE_LLD_BINARY "$<TARGET_FILE:${IREE_LLD_TARGET}>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${LLVM_VERSION_MAJOR}/include/")
+
+  if(IREE_ENABLE_RUNTIME_COVERAGE)
+    set(IREE_LLVM_COV_BINARY "$<TARGET_FILE:${IREE_LLVM_COV_TARGET}>")
+    set(IREE_LLVM_PROFDATA_BINARY "$<TARGET_FILE:${IREE_LLVM_PROFDATA_TARGET}>")
+  endif()
 endmacro()
 
 macro(iree_llvm_configure_installed)
@@ -119,6 +124,11 @@ macro(iree_llvm_configure_installed)
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_LIBRARY_DIR}/clang/${LLVM_VERSION_MAJOR}/include")
   if(NOT EXISTS "${IREE_CLANG_BUILTIN_HEADERS_PATH}")
     message(WARNING "Could not find installed clang-resource-headers (tried ${IREE_CLANG_BUILTIN_HEADERS_PATH})")
+  endif()
+
+  if(IREE_ENABLE_RUNTIME_COVERAGE)
+    set(IREE_LLVM_COV_BINARY "$<TARGET_FILE:llvm-cov>")
+    set(IREE_LLVM_PROFDATA_BINARY "$<TARGET_FILE:llvm-profdata>")
   endif()
 endmacro()
 
@@ -182,6 +192,14 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   # Unconditionally enable mlir.
   list(APPEND LLVM_ENABLE_PROJECTS mlir)
+
+  # Coverage tools.
+  set(IREE_LLVM_COV_TARGET)
+  set(IREE_LLVM_PROFDATA_TARGET)
+  if(IREE_ENABLE_RUNTIME_COVERAGE)
+    set(IREE_LLVM_COV_TARGET llvm-cov)
+    set(IREE_LLVM_PROFDATA_TARGET llvm-profdata)
+  endif()
 
   # Configure LLVM based on enabled IREE target backends.
   message(STATUS "IREE compiler target backends:")

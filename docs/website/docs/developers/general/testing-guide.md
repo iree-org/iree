@@ -196,6 +196,15 @@ There are other more specific test targets, such as `iree_hal_cts_test_suite`,
 which are designed to test specific runtime support with template configuration
 and is not supported by Bazel rules.
 
+### Code Coverage
+
+Use the [IREE_ENABLE_RUNTIME_COVERAGE](../../building/cmake-options/#iree_enable_runtime_coverage)
+CMake option to enable code coverage instrumentation and add synthetic targets
+for managing profiling state. Tests run with coverage enabled with automatically
+write profiles to the build directory and then the
+`iree-runtime-coverage-export` target can be built to export LCOV information
+for tooling/IDEs.
+
 ## IREE core end-to-end (e2e) tests
 
 Here "end-to-end" means from the input accepted by the IREE core compiler
