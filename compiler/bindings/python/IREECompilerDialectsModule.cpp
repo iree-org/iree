@@ -503,10 +503,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("q"), py::arg("k"), py::arg("v"), py::arg("o"));
 
   iree_codegen_module.def(
-      "isa_attention_op",
-      [](MlirOperation op) -> bool {
-        return ireeCodegenMlirOperationIsACodegenAttentionOp(op);
-      },
+      "isa_attention_op", &ireeCodegenMlirOperationIsACodegenAttentionOp,
       "Checks if the given operation is an IREE LinalgExt attention op.",
       py::arg("op"));
 }
