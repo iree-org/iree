@@ -1334,6 +1334,18 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
 
 // -----
 
+
+// Avoid fusing consumer when the producer/consumer has the following structure
+//
+// ```mlir
+// %producer = "producer_op"
+// %root = "root_op"(%producer)
+// %0 = "non_fusable_op"(%producer)
+// %1 = "consumer_op"(%producer, %root_op, %0)
+// ```
+//
+// Moving the `"producer_op"`, `"root+_op"`, and  `"consumer_op"`  into a dispatch
+// and leaving `"non_fusable_op"` out would lead to SSA violation.
 util.func public @avoid_illegal_consumer_fusion(%arg0: tensor<75600x5120xf32>) -> tensor<75600x1x5120xbf16> {
   %cst0 = arith.constant 0.0 : bf16
   %0 = tensor.empty() : tensor<75600x5120xbf16>
