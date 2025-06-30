@@ -130,9 +130,6 @@ public:
       }
     }
 
-    GlobalTable globalTable(moduleOp);
-    globalTable.rebuild();
-    SmallVector<SmallVector<IREE::Util::InitializerOp>> fusableSets;
     for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
       // llvm::outs() << "Equivalence class: \n";
       if (!(*it)->isLeader()) {
