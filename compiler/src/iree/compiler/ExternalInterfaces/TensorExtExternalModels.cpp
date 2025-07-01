@@ -8,6 +8,9 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizationTypeInterfaces.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
@@ -62,6 +65,39 @@ struct EncodingTypeExternalModel
   }
 };
 
+struct TensorLikeTypeExternalModel
+    : bufferization::TensorLikeType::ExternalModel<
+          TensorLikeTypeExternalModel, IREE::TensorExt::DispatchTensorType> {
+  FailureOr<bufferization::BufferLikeType> getBufferType(
+      Type type, const bufferization::BufferizationOptions &options,
+      llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+    auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
+    auto tensorType = cast<TensorType>(dispatchTensorType.asRankedTensorType());
+    auto memSpace = options.defaultMemorySpaceFn(tensorType);
+    if (!memSpace.has_value()) {
+      return emitError() << "could not infer memory space";
+    }
+    return cast<bufferization::BufferLikeType>(
+        getMemRefType(tensorType, options, /*layout=*/{}, *memSpace));
+  }
+
+  LogicalResult verifyCompatibleBufferType(
+      Type type, bufferization::BufferLikeType bufferType,
+      llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+    auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
+    assert(isa<BaseMemRefType>(bufferType) && "expected memref type");
+    auto memrefType = cast<ShapedType>(bufferType);
+    if (dispatchTensorType.getShape() != memrefType.getShape()) {
+      return emitError() << "shapes do not match";
+    }
+    if (dispatchTensorType.getBoundElementType() !=
+        memrefType.getElementType()) {
+      return emitError() << "element types do not match";
+    }
+    return success();
+  }
+};
+
 } // namespace
 
 void registerTensorExtExternalModels(DialectRegistry &registry) {
@@ -72,7 +108,7 @@ void registerTensorExtExternalModels(DialectRegistry &registry) {
         IREE::TensorExt::DispatchWorkloadOrdinalOp::attachInterface<
             WorkloadOrdinalOpInterface>(*ctx);
         IREE::TensorExt::DispatchTensorType::attachInterface<
-            EncodingTypeExternalModel>(*ctx);
+            EncodingTypeExternalModel, TensorLikeTypeExternalModel>(*ctx);
       });
 }
 
