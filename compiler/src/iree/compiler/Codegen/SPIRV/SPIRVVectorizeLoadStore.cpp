@@ -338,8 +338,8 @@ public:
 
     // Creates a new function with the update signature.
     rewriter.modifyOpInPlace(funcOp, [&] {
-      funcOp.setType(rewriter.getFunctionType(
-          signatureConverter.getConvertedTypes(), std::nullopt));
+      funcOp.setType(
+          rewriter.getFunctionType(signatureConverter.getConvertedTypes(), {}));
     });
     return success();
   }
