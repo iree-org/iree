@@ -35,11 +35,13 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "VectorExtTransforms",
     srcs = [
+        "BufferizationInterfaces.cpp",
         "Passes.cpp",
         "VectorExtFoldUnitExtentDims.cpp",
         "VectorizeIREEVectorExtOps.cpp",
     ],
     hdrs = [
+        "BufferizationInterfaces.h",
         "Passes.h",
         "Passes.h.inc",
         "Transforms.h",
@@ -51,6 +53,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationInterfaces",
+        "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
