@@ -46,7 +46,7 @@ struct ElideCompatibleTransferPattern
     auto sourceType = cast<IREE::Stream::ResourceType>(source.getType());
     auto resultType = cast<IREE::Stream::ResourceType>(result.getType());
 
-    // Don't elide transfers that change lifetime (usage casts)
+    // Don't elide transfers that change lifetime (usage casts).
     if (sourceType.getLifetime() != resultType.getLifetime()) {
       return rewriter.notifyMatchFailure(
           transferOp, "not eliding lifetime-changing transfer");
@@ -97,7 +97,6 @@ struct ElideAsyncTransfersPass
         moduleOp->getAttrOfType<IREE::Stream::AffinityTopologyAttrInterface>(
             "stream.topology");
     if (!topologyAttr) {
-      // No topology present - skip this module (preserves all transfers)
       return;
     }
 
