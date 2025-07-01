@@ -994,7 +994,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       }
 
       if (failed(moveOperandDefs(rewriter, consumer, regionOp, dominanceInfo,
-                                 regionOp.getOperation()))) {
+                                 {}))) {
         continue;
       }
 

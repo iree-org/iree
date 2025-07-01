@@ -120,6 +120,10 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
   llvm::SetVector<Operation *> slice;
   for (auto op : operations) {
     for (auto operand : op->getOperands()) {
+      // If operand is the insertion point, there is nothing to move.
+      if (operand.getDefiningOp() == insertionPoint) {
+        continue;
+      }
       [[maybe_unused]] LogicalResult result =
           getBackwardSlice(operand, &slice, options);
       assert(result.succeeded());
@@ -131,10 +135,18 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
     llvm::SetVector<Value> capturedVals;
     mlir::getUsedValuesDefinedAbove(regions, capturedVals);
     for (auto value : capturedVals) {
+      // If operand is the insertion point, there is nothing to move.
+      if (value.getDefiningOp() == insertionPoint) {
+        continue;
+      }
       [[maybe_unused]] LogicalResult result =
           getBackwardSlice(value, &slice, options);
       assert(result.succeeded());
     }
+  }
+
+  if (slice.contains(insertionPoint)) {
+    return failure();
   }
 
   mlir::topologicalSort(slice);
