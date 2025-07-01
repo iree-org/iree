@@ -251,3 +251,43 @@ func.func @test_multiple_stores(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 16], [0, 1]],
 //  CHECK-SAME:               thread = [0, 4], thread_basis = {{\[}}[1, 64], [0, 1]],
 //  CHECK-SAME:               workgroup = [1, 0]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+// Test to not add lowering to gather like operation.
+func.func @test_gather_config(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096xi64>>, %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x64xf32>>, %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096xf32>>) {
+  %c2_i64 = arith.constant 2 : i64
+  %c0 = arith.constant 0 : index
+  %load1 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0], sizes = [4096], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096xi64>> -> tensor<4096xi64>
+  %load2 = iree_tensor_ext.dispatch.tensor.load %arg1, offsets = [0, 0], sizes = [4096, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x64xf32>> -> tensor<4096x64xf32>
+    %0 = tensor.empty() : tensor<4096x64xf32>
+    %1 = linalg.generic {indexing_maps = [#map1, #map], iterator_types = ["parallel", "parallel"]} ins(%load1 : tensor<4096xi64>) outs(%0 : tensor<4096x64xf32>) {
+    ^bb0(%in: i64, %out: f32):
+      %4 = linalg.index 0 : index
+      %5 = linalg.index 1 : index
+      %extracted = tensor.extract %load2[%4, %5] : tensor<4096x64xf32>
+      linalg.yield %extracted : f32
+    } -> tensor<4096x64xf32>
+    %2 = tensor.empty() : tensor<4096xf32>
+    %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%1 : tensor<4096x64xf32>) outs(%2 : tensor<4096xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %out : f32
+      linalg.yield %4 : f32
+    } -> tensor<4096xf32>
+  iree_tensor_ext.dispatch.tensor.store %3, %arg2, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096xf32>>
+  return
+}
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: func.func @test_gather_config
+// CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//      CHECK:   linalg.generic
+//  CHECK-NOT:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//      CHECK:    linalg.yield
+//      CHECK:   linalg.generic
+// CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:               partial_reduction = [0, 64],
+// CHECK-SAME:               subgroup_basis = {{\[}}[1, 1], [0, 1]],
+// CHECK-SAME:               thread = [0, 1], thread_basis = {{\[}}[1, 64], [0, 1]],
+// CHECK-SAME:               workgroup = [1, 0]

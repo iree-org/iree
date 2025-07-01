@@ -1941,4 +1941,32 @@ bool neverRunsSecondIteration(scf::ForOp op) {
   return isUbUnderStep.value_or(false) && isLbNonNegative.value_or(false);
 }
 
+bool hasExternalCapture(linalg::GenericOp genericOp) {
+  Block &body = genericOp.getRegion().front();
+  for (Operation &op : body.getOperations()) {
+    for (Value operand : op.getOperands()) {
+      if (auto bArg = dyn_cast<BlockArgument>(operand)) {
+        // Check whether the operand lies in the same block.
+        if (bArg.getOwner() == &body) {
+          continue;
+        }
+        return true;
+      }
+      Operation *defOp = operand.getDefiningOp();
+      // Scalar constant is allowed.
+      if (defOp && defOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
+        Type type = operand.getType();
+        if (type.isIntOrFloat() || type.isIndex()) {
+          continue;
+        }
+      }
+      // If defining op is not inside the block, it’s an external value.
+      if (!defOp || defOp->getBlock() != &body) {
+        return true;
+      }
+    }
+  }
+  return false; // All operands are locally defined or block arguments.
+}
+
 } // namespace mlir::iree_compiler
