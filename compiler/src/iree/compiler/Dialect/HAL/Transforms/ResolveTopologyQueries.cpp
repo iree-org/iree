@@ -140,71 +140,67 @@ static bool tryAddSharedUsageBits(IREE::HAL::DeviceTopologyAttr topology,
   return false;
 }
 
-struct ResolveMemoryPropertiesPattern
-    : public OpRewritePattern<AllocatorResolveMemoryPropertiesOp> {
-  DeviceAnalysis &deviceAnalysis;
+static LogicalResult
+resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
+                          DeviceAnalysis &deviceAnalysis) {
+  LLVM_DEBUG(llvm::dbgs() << "[resolve_topology_queries] Op: " << op << "\n");
 
-  ResolveMemoryPropertiesPattern(MLIRContext *context,
-                                 DeviceAnalysis &deviceAnalysis)
-      : OpRewritePattern(context), deviceAnalysis(deviceAnalysis) {}
+  OpBuilder builder(op);
+  auto loc = op.getLoc();
 
-  LogicalResult matchAndRewrite(AllocatorResolveMemoryPropertiesOp op,
-                                PatternRewriter &rewriter) const override {
-    LLVM_DEBUG(llvm::dbgs() << "[resolve_topology_queries] Op: " << op << "\n");
+  // Get the default memory types and buffer usage based on lifetime
+  auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+  auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+  if (failed(deriveAllowedResourceBufferBits(loc, op.getLifetime(),
+                                             memoryTypes, bufferUsage))) {
+    return failure();
+  }
 
-    // Get the default memory types and buffer usage based on lifetime
-    auto loc = op.getLoc();
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-    if (failed(deriveAllowedResourceBufferBits(loc, op.getLifetime(),
-                                               memoryTypes, bufferUsage))) {
-      return failure();
-    }
-
-    auto optimalAttr = dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(
-        op.getAffinity().value_or(nullptr));
-    if (!optimalAttr) {
-      // If we don't have an optimal attribute, we just set the default
-      // memory types and buffer usage.
-      auto memoryTypeOp =
-          rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
-      auto bufferUsageOp =
-          rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
-      rewriter.replaceOp(op, {memoryTypeOp, bufferUsageOp});
-      return success();
-    }
-
-    // Get the module to access the topology attribute.
-    auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
-    if (!moduleOp) {
-      return failure();
-    }
-
-    auto topologyAttr = moduleOp->getAttrOfType<IREE::HAL::DeviceTopologyAttr>(
-        "stream.topology");
-
-    LLVM_DEBUG(llvm::dbgs() << "  -> Topology attr: " << topologyAttr << "\n");
-
-    // Try to resolve shared usage bits if possible.
-    if (!tryAddSharedUsageBits(topologyAttr, optimalAttr, bufferUsage,
-                               memoryTypes, deviceAnalysis,
-                               op.getOperation())) {
-      LLVM_DEBUG(llvm::dbgs() << "  -> Failed to add shared usage bits\n");
-      return failure();
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "  -> Successfully resolved memory properties "
-                               "with shared usage bits\n");
-    // Create the resolved memory type and buffer usage ops.
+  auto optimalAttr = dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(
+      op.getAffinity().value_or(nullptr));
+  if (!optimalAttr) {
+    // If we don't have an optimal attribute, we just set the default
+    // memory types and buffer usage.
     auto memoryTypeOp =
-        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+        builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
     auto bufferUsageOp =
-        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
-    rewriter.replaceOp(op, {memoryTypeOp, bufferUsageOp});
-
+        builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+    op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
+    op.erase();
     return success();
   }
-};
+
+  // Get the module to access the topology attribute.
+  auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
+  if (!moduleOp) {
+    return failure();
+  }
+
+  auto topologyAttr = moduleOp->getAttrOfType<IREE::HAL::DeviceTopologyAttr>(
+      "stream.topology");
+
+  LLVM_DEBUG(llvm::dbgs() << "  -> Topology attr: " << topologyAttr << "\n");
+
+  // Try to resolve shared usage bits if possible.
+  if (!tryAddSharedUsageBits(topologyAttr, optimalAttr, bufferUsage,
+                             memoryTypes, deviceAnalysis,
+                             op.getOperation())) {
+    LLVM_DEBUG(llvm::dbgs() << "  -> Failed to add shared usage bits\n");
+    return failure();
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "  -> Successfully resolved memory properties "
+                             "with shared usage bits\n");
+  // Create the resolved memory type and buffer usage ops.
+  auto memoryTypeOp =
+      builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+  auto bufferUsageOp =
+      builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+  op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
+  op.erase();
+
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // --iree-hal-resolve-topology-queries
@@ -220,12 +216,12 @@ struct ResolveTopologyQueriesPass
       return signalPassFailure();
     }
 
-    MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-    patterns.add<ResolveMemoryPropertiesPattern>(context, deviceAnalysis);
-
-    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
-      return signalPassFailure();
+    for (auto funcOp : moduleOp.getOps<CallableOpInterface>()) {
+      if (auto *region = funcOp.getCallableRegion()) {
+        region->walk([&](IREE::HAL::AllocatorResolveMemoryPropertiesOp op) {
+          (void)resolveMemoryPropertiesOp(op, deviceAnalysis);
+        });
+      }
     }
   }
 };
