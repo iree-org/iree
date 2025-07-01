@@ -1,10 +1,8 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#include <utility>
 
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
@@ -15,8 +13,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-hal-resolve-topology-queries"
 
@@ -74,7 +70,7 @@ deriveAllowedResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
   return success();
 }
 
-// Check if all affinities of the optimal attribute refer to the same device ID.
+// Checks if all affinities of the optimal attribute refer to the same device ID.
 static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
                                  DeviceAnalysis &deviceAnalysis,
                                  Operation *fromOp) {
