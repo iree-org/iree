@@ -78,7 +78,12 @@ class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tensor::TensorDialect>();
+    // BufferizationDialect is needed for using type interfaces, like
+    // TensorLikeType. Because the builtin types, e.g., RankedTensorType, etc.,
+    // implement the type interface in
+    // bufferization::BufferizationDialect::initialize().
+    registry
+        .insert<bufferization::BufferizationDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
