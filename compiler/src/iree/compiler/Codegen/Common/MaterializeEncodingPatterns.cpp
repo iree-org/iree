@@ -628,14 +628,7 @@ struct MaterializeOperation : public OpConversionPattern<OpTy> {
     if (failed(convertedOp))
       return failure();
 
-    SmallVector<Value> replacements;
-    for (auto [type, res] : llvm::zip_equal(
-             op->getResultTypes(), convertedOp.value()->getResults())) {
-      Type targetType = this->getTypeConverter()->convertType(type);
-      replacements.push_back(
-          rewriter.createOrFold<tensor::CastOp>(op.getLoc(), targetType, res));
-    }
-    rewriter.replaceOp(op, replacements);
+    rewriter.replaceOp(op, convertedOp.value());
     return success();
   }
 };
@@ -692,11 +685,7 @@ struct SetEncodingOpLoweringConversion
     auto packedValue = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), *converter);
     if (failed(packedValue)) {
-      Type targetType =
-          getTypeConverter()->convertType(encodingOp.getResultType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(
-          encodingOp.getLoc(), targetType, adaptor.getSource());
-      rewriter.replaceOp(encodingOp, result);
+      rewriter.replaceOp(encodingOp, adaptor.getSource());
       return success();
     }
 
@@ -759,11 +748,7 @@ struct UnsetEncodingOpLoweringConversion
     MaterializeEncodingInfo encodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-      Type targetType =
-          getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(
-          unsetEncodingOp.getLoc(), targetType, adaptor.getSource());
-      rewriter.replaceOp(unsetEncodingOp, result);
+      rewriter.replaceOp(unsetEncodingOp, adaptor.getSource());
       return success();
     }
 
@@ -806,11 +791,7 @@ struct UnsetEncodingOpLoweringConversion
     auto unpackedValue = lowerUnsetEncodingToUnpackOp(rewriter, unsetEncodingOp,
                                                       unpackSrc, *converter);
     if (failed(unpackedValue)) {
-      Type targetType =
-          getTypeConverter()->convertType(unsetEncodingOp.getResultType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(loc, targetType,
-                                                           adaptor.getSource());
-      rewriter.replaceOp(unsetEncodingOp, result);
+      rewriter.replaceOp(unsetEncodingOp, adaptor.getSource());
       return success();
     }
     rewriter.replaceOp(unsetEncodingOp, unpackedValue.value());
