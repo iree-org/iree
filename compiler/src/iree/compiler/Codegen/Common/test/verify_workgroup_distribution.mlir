@@ -38,3 +38,17 @@ func.func @write_nested_in_other_forall(%i: i32, %out: memref<32xi32, #hal.descr
   }
   return
 }
+
+// -----
+
+// Allow scf.forall with split reduction mapping
+func.func @nested_split_reduction_and_workgroup_forall(%arg0 : i32,
+    %out : memref<?x?xi32, #hal.descriptor_type<storage_buffer>>) {
+  scf.forall (%iv0) in (1024) {
+    scf.forall (%iv1) in (32) {
+      memref.store %arg0, %out[%iv0, %iv1] : memref<?x?xi32, #hal.descriptor_type<storage_buffer>>
+    } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  return
+}
+// CHECK-LABEL: func @nested_split_reduction_and_workgroup_forall
