@@ -25,7 +25,6 @@ iree_lit_test_suite(
     "elide_async_transfers.mlir"
     "elide_timepoints_coverage.mlir"
     "elide_timepoints_immediate.mlir"
-    "elide_transfer_ops.mlir"
     "emplace_allocations.mlir"
     "encode_device_tensors.mlir"
     "encode_device_tensors_packing.mlir"
