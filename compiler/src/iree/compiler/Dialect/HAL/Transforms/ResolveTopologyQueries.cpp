@@ -13,6 +13,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-hal-resolve-topology-queries"
 
