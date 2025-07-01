@@ -1331,3 +1331,65 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
 //  CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
 //       CHECK:     flow.return %[[ATTENTION]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+
+// Avoid fusing consumer when the producer/consumer has the following structure
+//
+// ```mlir
+// %producer = "producer_op"
+// %root = "root_op"(%producer)
+// %0 = "non_fusable_op"(%producer)
+// %1 = "consumer_op"(%producer, %root_op, %0)
+// ```
+//
+// Moving the `"producer_op"`, `"root+_op"`, and  `"consumer_op"`  into a dispatch
+// and leaving `"non_fusable_op"` out would lead to SSA violation.
+util.func public @avoid_illegal_consumer_fusion(%arg0: tensor<75600x5120xf32>) -> tensor<75600x1x5120xbf16> {
+  %cst0 = arith.constant 0.0 : bf16
+  %0 = tensor.empty() : tensor<75600x5120xbf16>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<75600x5120xf32>) outs(%0 : tensor<75600x5120xbf16>) {
+  ^bb0(%in: f32, %out: bf16):
+    %13 = arith.truncf %in : f32 to bf16
+    linalg.yield %13 : bf16
+  } -> tensor<75600x5120xbf16>
+  %2 = tensor.empty() : tensor<75600xbf16>
+  %3 = linalg.fill ins(%cst0 : bf16) outs(%2 : tensor<75600xbf16>) -> tensor<75600xbf16>
+  %4 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%1 : tensor<75600x5120xbf16>) outs(%3 : tensor<75600xbf16>) {
+  ^bb0(%in: bf16, %out: bf16):
+    %8 = arith.addf %in, %out : bf16
+    linalg.yield %8 : bf16
+  } -> tensor<75600xbf16>
+  %expanded = tensor.expand_shape %1 [[0], [1, 2]] output_shape [75600, 1, 5120]
+      : tensor<75600x5120xbf16> into tensor<75600x1x5120xbf16>
+  %5 = tensor.empty() : tensor<75600x1x5120xbf16>
+  %6 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%expanded, %4 : tensor<75600x1x5120xbf16>, tensor<75600xbf16>)
+      outs(%5 : tensor<75600x1x5120xbf16>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
+    %9 = arith.subf %in, %in_0 : bf16
+    linalg.yield %9 : bf16
+  } -> tensor<75600x1x5120xbf16>
+  util.return %6 : tensor<75600x1x5120xbf16>
+}
+// CHECK-LABEL: @avoid_illegal_consumer_fusion(
+//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:     %[[GENERIC0:.+]] = linalg.generic
+//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC0]] :
+//       CHECK:     flow.return %[[GENERIC1]], %[[GENERIC0]]
+//       CHECK:   %[[EXPAND_SHAPE:.+]] = tensor.expand_shape %[[DISPATCH]]#1
+//       CHECK:   %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[EXPAND_SHAPE]], %[[DISPATCH]]#0 :
+//       CHECK:   util.return %[[GENERIC2]]
