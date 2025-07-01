@@ -71,7 +71,8 @@ deriveAllowedResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
   return success();
 }
 
-// Checks if all affinities of the optimal attribute refer to the same device ID.
+// Checks if all affinities of the optimal attribute refer to the same device
+// ID.
 static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
                                  DeviceAnalysis &deviceAnalysis,
                                  Operation *fromOp) {
@@ -148,8 +149,8 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
   // Get the default memory types and buffer usage based on lifetime
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveAllowedResourceBufferBits(loc, op.getLifetime(),
-                                             memoryTypes, bufferUsage))) {
+  if (failed(deriveAllowedResourceBufferBits(loc, op.getLifetime(), memoryTypes,
+                                             bufferUsage))) {
     return failure();
   }
 
@@ -173,15 +174,14 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
     return failure();
   }
 
-  auto topologyAttr = moduleOp->getAttrOfType<IREE::HAL::DeviceTopologyAttr>(
-      "stream.topology");
+  auto topologyAttr =
+      moduleOp->getAttrOfType<IREE::HAL::DeviceTopologyAttr>("stream.topology");
 
   LLVM_DEBUG(llvm::dbgs() << "  -> Topology attr: " << topologyAttr << "\n");
 
   // Try to resolve shared usage bits if possible.
   if (!tryAddSharedUsageBits(topologyAttr, optimalAttr, bufferUsage,
-                             memoryTypes, deviceAnalysis,
-                             op.getOperation())) {
+                             memoryTypes, deviceAnalysis, op.getOperation())) {
     LLVM_DEBUG(llvm::dbgs() << "  -> Failed to add shared usage bits\n");
     return failure();
   }
@@ -189,8 +189,7 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
   LLVM_DEBUG(llvm::dbgs() << "  -> Successfully resolved memory properties "
                              "with shared usage bits\n");
   // Create the resolved memory type and buffer usage ops.
-  auto memoryTypeOp =
-      builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+  auto memoryTypeOp = builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
   auto bufferUsageOp =
       builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
   op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
