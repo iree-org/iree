@@ -1004,6 +1004,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     AffineMap getScaleMap() {
       return getIndexingMapsArray()[3];
     }
+    std::optional<int64_t> getMaskOperandIndex() {
+      if (getMask()) {
+        return getMaskMutable().getAsOperandRange().getBeginOperandIndex();
+      }
+      return std::nullopt;
+    }
     std::optional<AffineMap> getMaskMap() {
       if (getMask()) {
         return cast<AffineMap>(getIndexingMapsArray()[4]);

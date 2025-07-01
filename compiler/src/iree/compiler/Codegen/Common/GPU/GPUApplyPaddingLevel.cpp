@@ -11,13 +11,18 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
@@ -59,10 +64,67 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
   return targets;
 }
 
+static TypedValue<ShapedType> setDefaultOnlineAttentionMask(
+    RewriterBase &rewriter,
+    IREE::LinalgExt::OnlineAttentionOp onlineAttentionOp) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(onlineAttentionOp);
+
+  Location loc = onlineAttentionOp->getLoc();
+  SmallVector<int64_t> maskStatic;
+  SmallVector<Value> maskDyn;
+  auto pushNext = [&](TypedValue<ShapedType> v, ShapedType t, int64_t idx) {
+    maskStatic.push_back(t.getDimSize(idx));
+    if (maskStatic.back() == ShapedType::kDynamic)
+      maskDyn.push_back(rewriter.create<tensor::DimOp>(loc, v, idx));
+  };
+
+  TypedValue<ShapedType> query = onlineAttentionOp.getQuery();
+  ShapedType queryTy = query.getType();
+  for (int i = 0, s = queryTy.getRank() - 1; i < s; ++i)
+    pushNext(query, queryTy, i);
+
+  TypedValue<ShapedType> key = onlineAttentionOp.getQuery();
+  ShapedType keyTy = key.getType();
+  pushNext(key, keyTy, keyTy.getRank() - 2);
+
+  Type maskType = getElementTypeOrSelf(queryTy);
+  Value emptyMask =
+      rewriter.create<tensor::EmptyOp>(loc, maskStatic, maskType, maskDyn);
+
+  Value zero = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getFloatAttr(getElementTypeOrSelf(maskType), 0.0));
+  Value mask =
+      rewriter.create<linalg::FillOp>(loc, zero, emptyMask).getResult(0);
+
+  rewriter.startOpModification(onlineAttentionOp);
+  onlineAttentionOp.getMaskMutable().assign(mask);
+  MLIRContext *ctx = onlineAttentionOp->getContext();
+  int64_t opRank = onlineAttentionOp.getQueryMap().getNumDims();
+  AffineMap mMap;
+  if (opRank == 4) {
+    AffineExpr m, n, k1, k2;
+    bindDims(ctx, m, n, k1, k2);
+    mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
+  } else if (opRank == 5) {
+    AffineExpr b, m, n, k1, k2;
+    bindDims(ctx, b, m, n, k1, k2);
+    mMap = AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {b, m, k2}, ctx);
+  } else {
+    llvm_unreachable("unsupported rank");
+  }
+  SmallVector<AffineMap> maps = onlineAttentionOp.getIndexingMapsArray();
+  int64_t maskIdx = onlineAttentionOp.getMaskOperandIndex().value();
+  maps.insert(maps.begin() + maskIdx, mMap);
+  onlineAttentionOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(maps));
+  rewriter.finalizeOpModification(onlineAttentionOp);
+
+  return cast<TypedValue<ShapedType>>(mask);
+}
+
 static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
                                        TilingInterface tilingInterfaceOp,
                                        IREE::GPU::TilingLevel tilingLevel) {
-
   // 1.a. Get padding values.
   SmallVector<Attribute> paddingValues;
   for (Value operand : tilingInterfaceOp.getOperation()->getOperands()) {
@@ -77,10 +139,11 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
           tilingInterfaceOp.getOperation())) {
     TypedValue<ShapedType> mask = onlineAttentionOp.getMask();
     if (!mask) {
-      tilingInterfaceOp.emitRemark(
-          "failed to pad op: requires a mask operand to pad to the "
-          "proper value. Consider materializing the mask operand explicitly.");
-      return failure();
+      mask = setDefaultOnlineAttentionMask(rewriter, onlineAttentionOp);
+      int64_t maskIdx = onlineAttentionOp.getMaskOperandIndex().value();
+      paddingValues.insert(
+          paddingValues.begin() + maskIdx,
+          rewriter.getZeroAttr(getElementTypeOrSelf(mask.getType())));
     }
     Type maskEltType = getElementTypeOrSelf(mask.getType());
     if (!llvm::isa<FloatType>(maskEltType)) {
@@ -88,11 +151,9 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
           "failed to pad op: -inf requires a float type");
       return failure();
     }
-    int64_t idx = onlineAttentionOp.getMaskMutable()
-                      .getAsOperandRange()
-                      .getBeginOperandIndex();
+    int64_t maskIdx = onlineAttentionOp.getMaskOperandIndex().value();
     const auto &fltSemantics = cast<FloatType>(maskEltType).getFloatSemantics();
-    paddingValues[idx] = rewriter.getFloatAttr(
+    paddingValues[maskIdx] = rewriter.getFloatAttr(
         maskEltType, APFloat::getInf(fltSemantics, /*Negative=*/true));
   }
 
