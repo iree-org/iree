@@ -120,6 +120,7 @@ void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 // hal.allocator.*
 //===----------------------------------------------------------------------===//
+
 namespace {
 
 /// Tries to fold either the device or queue affinity of a select when all
