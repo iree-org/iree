@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -28,7 +29,8 @@ struct VerifyWorkgroupDistributionPass final
     FunctionOpInterface funcOp = getOperation();
 
     WalkResult hasForall = funcOp.walk([&](scf::ForallOp forallOp) {
-      if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
+      if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr,
+                                 IREE::LinalgExt::SplitReductionMappingAttr>(
               forallOp)) {
         return WalkResult::interrupt();
       }
@@ -48,7 +50,8 @@ struct VerifyWorkgroupDistributionPass final
     WalkResult res = funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
       if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
         // Skip ops contained within forall ops with workgroup mappings.
-        if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
+        if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr,
+                                   IREE::LinalgExt::SplitReductionMappingAttr>(
                 forallOp)) {
           return WalkResult::skip();
         }
