@@ -1,5 +1,4 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=0}), cse)"  --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=0 tile-using-forall=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-FORALL
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=2 only-fuse-producer-input-operands=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [1, 0, 0, 16, 16, 0], [0, 0, 1, 0, 0, 1], [0, 0, 0, 0, 0, 0]]>
@@ -24,21 +23,12 @@ func.func @mmt4d_bias_relu(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?x?x16x1xf
   return %4 : tensor<?x?x16x16xf32>
 }
 // CHECK-LABEL: func.func @mmt4d_bias_relu(
-// CHECK:         scf.for
+// CHECK:         scf.forall
 // CHECK:           linalg.fill
 // CHECK-NEXT:      %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK:           %[[ELEM:.+]] = linalg.generic
-// CHECK:           %[[RES0:.+]] =  tensor.insert_slice %[[MMT4D]]
-// CHECK:           %[[RES1:.+]] =  tensor.insert_slice %[[ELEM]]
-// CHECK:           scf.yield %[[RES0]], %[[RES1]]
-
-// CHECK-FORALL-LABEL: func.func @mmt4d_bias_relu(
-// CHECK-FORALL:         scf.forall
-// CHECK-FORALL:           linalg.fill
-// CHECK-FORALL-NEXT:      %[[MMT4D:.+]] = linalg.mmt4d
-// CHECK-FORALL:           %[[ELEM:.+]] = linalg.generic
-// CHECK-FORALL:           scf.forall.in_parallel
-// CHECK-FORALL:             tensor.parallel_insert_slice %[[ELEM]]
+// CHECK:           scf.forall.in_parallel
+// CHECK:             tensor.parallel_insert_slice %[[ELEM]]
 
 // -----
 
@@ -72,26 +62,15 @@ func.func @quantized_matmul(%arg0: tensor<2x4x128x16x1xi8>, %arg1: tensor<2x4x16
   %unpack = linalg.unpack %6 outer_dims_perm = [0, 2, 1] inner_dims_pos = [2, 1] inner_tiles = [16, 16] into %7 : tensor<2x4x688x16x16xf32> -> tensor<2x11008x64xf32>
   return %unpack : tensor<2x11008x64xf32>
 }
-// CHECK: func.func @quantized_matmul(
-// CHECK:  scf.for
-// CHECK:    linalg.generic
-// CHECK:    linalg.generic
-// CHECK:    linalg.fill
-// CHECK:    %[[MMT4D:.+]] = linalg.batch_mmt4d
-// CHECK:    %[[UNPACK:.+]] = linalg.unpack
-// CHECK:    %[[RES0:.+]] =  tensor.insert_slice %[[MMT4D]]
-// CHECK:    %[[RES1:.+]] =  tensor.insert_slice %[[UNPACK]]
-// CHECK:    scf.yield %[[RES0]], %[[RES1]]
-
-// CHECK-FORALL-LABEL: func.func @quantized_matmul(
-// CHECK-FORALL:         scf.forall
-// CHECK-FORALL:           linalg.generic
-// CHECK-FORALL:           linalg.generic
-// CHECK-FORALL:           linalg.fill
-// CHECK-FORALL:           %[[MMT4D:.+]] = linalg.batch_mmt4d
-// CHECK-FORALL:           %[[UNPACK:.+]] = linalg.unpack
-// CHECK-FORALL:           scf.forall.in_parallel
-// CHECK-FORALL:             tensor.parallel_insert_slice %[[UNPACK]]
+// CHECK-LABEL: func.func @quantized_matmul(
+// CHECK:         scf.forall
+// CHECK:           linalg.generic
+// CHECK:           linalg.generic
+// CHECK:           linalg.fill
+// CHECK:           %[[MMT4D:.+]] = linalg.batch_mmt4d
+// CHECK:           %[[UNPACK:.+]] = linalg.unpack
+// CHECK:           scf.forall.in_parallel
+// CHECK:             tensor.parallel_insert_slice %[[UNPACK]]
 
 // -----
 
