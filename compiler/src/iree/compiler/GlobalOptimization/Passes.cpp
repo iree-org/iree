@@ -154,7 +154,7 @@ void buildGlobalOptimizationPassPipeline(
         return createGeneralizeLinalgNamedOpsPass(opt);
       });
 
-  mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
+  //   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   mainPassManager.addPass(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
