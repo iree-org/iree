@@ -114,8 +114,8 @@ util.func public @no_resolve_without_topology() -> (i32, i32) {
 
 // -----
 
-// CHECK-LABEL: @FoldAllocatorResolveMemoryPropertiesConstant
-util.func public @FoldAllocatorResolveMemoryPropertiesConstant() -> (i32, i32) {
+// CHECK-LABEL: @resolve_constant_lifetime
+util.func public @resolve_constant_lifetime() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
   // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable"> : i32
@@ -128,8 +128,8 @@ util.func public @FoldAllocatorResolveMemoryPropertiesConstant() -> (i32, i32) {
 
 // -----
 
-// CHECK-LABEL: @FoldAllocatorResolveMemoryPropertiesTransient
-util.func public @FoldAllocatorResolveMemoryPropertiesTransient() -> (i32, i32) {
+// CHECK-LABEL: @resolve_transient_lifetime
+util.func public @resolve_transient_lifetime() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
   // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage"> : i32
@@ -142,8 +142,8 @@ util.func public @FoldAllocatorResolveMemoryPropertiesTransient() -> (i32, i32) 
 
 // -----
 
-// CHECK-LABEL: @FoldAllocatorResolveMemoryPropertiesVariable
-util.func public @FoldAllocatorResolveMemoryPropertiesVariable() -> (i32, i32) {
+// CHECK-LABEL: @resolve_variable_lifetime
+util.func public @resolve_variable_lifetime() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
   // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage"> : i32
@@ -156,8 +156,8 @@ util.func public @FoldAllocatorResolveMemoryPropertiesVariable() -> (i32, i32) {
 
 // -----
 
-// CHECK-LABEL: @FoldAllocatorResolveMemoryPropertiesExternal
-util.func public @FoldAllocatorResolveMemoryPropertiesExternal() -> (i32, i32) {
+// CHECK-LABEL: @resolve_external_lifetime
+util.func public @resolve_external_lifetime() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
   // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage"> : i32
@@ -170,8 +170,8 @@ util.func public @FoldAllocatorResolveMemoryPropertiesExternal() -> (i32, i32) {
 
 // -----
 
-// CHECK-LABEL: @FoldAllocatorResolveMemoryPropertiesStaging
-util.func public @FoldAllocatorResolveMemoryPropertiesStaging() -> (i32, i32) {
+// CHECK-LABEL: @resolve_staging_lifetime
+util.func public @resolve_staging_lifetime() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"HostVisible|HostCoherent|HostLocal|DeviceVisible"> : i32
   // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|MappingScoped|MappingAccessRandom|Mapping"> : i32
@@ -184,14 +184,13 @@ util.func public @FoldAllocatorResolveMemoryPropertiesStaging() -> (i32, i32) {
 
 // -----
 
-// CHECK-LABEL: @NoFoldAllocatorResolveMemoryPropertiesOptimal
-util.func public @NoFoldAllocatorResolveMemoryPropertiesOptimal() -> (i32, i32) {
-  // CHECK: %[[MEMORY_TYPES:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
-  // CHECK-SAME: for(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-  // CHECK-SAME: lifetime(constant) : i32, i32
+// CHECK-LABEL: @resolve_no_attributes
+util.func public @resolve_no_attributes() -> (i32, i32) {
+  // CHECK-NOT: hal.allocator.resolve_memory_properties
+  // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<
+  // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<
   %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
-      for(#hal.device.optimal<[#hal.device.affinity<@device_a>, #hal.device.affinity<@device_b>]>)
-      lifetime(constant) : i32, i32
+      lifetime(transient) : i32, i32
   // CHECK: util.return %[[MEMORY_TYPES]], %[[BUFFER_USAGE]]
   util.return %memory_types, %buffer_usage : i32, i32
 }

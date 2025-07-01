@@ -709,7 +709,7 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
   );
 
   let assemblyFormat = [{
-    `for` `(` $affinity `)`
+    (`for` `(` $affinity^ `)`)?
     `lifetime` `(` $lifetime `)`
     `:` type($memory_types) `,` type($buffer_usage)
     attr-dict-with-keyword

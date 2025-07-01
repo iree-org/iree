@@ -102,7 +102,7 @@ struct ResourceAllocOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             allocOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
-            IREE::Stream::AffinityAttr::lookupOrDefault(allocOp),
+            allocOp.getAffinity().value_or(nullptr),
             static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     // Lookup the appropriate allocator/queue for allocation based on the buffer
@@ -137,7 +137,7 @@ struct ResourceAllocaOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             loc, rewriter.getI32Type(), rewriter.getI32Type(),
-            IREE::Stream::AffinityAttr::lookupOrDefault(allocaOp),
+            allocaOp.getAffinity().value_or(nullptr),
             static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     auto [device, queueAffinity] =
@@ -186,7 +186,7 @@ struct ResourceDeallocaOpPattern
     auto resolveOp =
         rewriter.create<IREE::HAL::AllocatorResolveMemoryPropertiesOp>(
             loc, rewriter.getI32Type(), rewriter.getI32Type(),
-            IREE::Stream::AffinityAttr::lookupOrDefault(deallocaOp),
+            deallocaOp.getAffinity().value_or(nullptr),
             static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     auto [device, queueAffinity] =
