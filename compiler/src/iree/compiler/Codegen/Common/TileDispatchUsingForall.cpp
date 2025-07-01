@@ -331,8 +331,6 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   mlir::DominanceInfo dominanceInfo(tilableOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
   collectTiledAndFusedOps(tilableOp, tiledAndFusedOps);
-  bool useWARForConsumerFusionSSAViolation =
-      warForConsumerFusionSSAViolation(tilableOp, tiledAndFusedOps);
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
@@ -413,13 +411,20 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       return signalPassFailure();
     }
     for (auto [origValue, replacement] : tileAndFuseResult->replacements) {
-      rewriter.replaceAllUsesWith(origValue, replacement);
+      Value replacementCopy = replacement;
+      rewriter.replaceUsesWithIf(origValue, replacement, [&](OpOperand &use) {
+        Operation *user = use.getOwner();
+        return !isa<tensor::DimOp>(user) &&
+               dominanceInfo.dominates(replacementCopy, user);
+      });
     }
     std::swap(tileAndFuseResult->loops, tilingLoops);
     Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoLoops(rewriter, rootTiledOp, tilingLoops,
-                               useWARForConsumerFusionSSAViolation);
+        fuseConsumersIntoForall(rewriter, rootTiledOp, tilingLoops,
+                                [&tiledAndFusedOps](Operation *op) {
+                                  return tiledAndFusedOps.contains(op);
+                                });
     if (failed(newFusionOpportunities)) {
       rootTiledOp->emitOpError("failed to fuse consumers");
       return signalPassFailure();
