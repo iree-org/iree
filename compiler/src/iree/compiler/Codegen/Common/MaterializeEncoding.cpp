@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/CSE.h"
@@ -234,7 +235,7 @@ struct MaterializeDeviceEncodingPass final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect,
+                    vector::VectorDialect, IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 

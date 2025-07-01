@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s --check-prefix=VSCALE
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -40,7 +41,7 @@ func.func @matvec_shaped_matmul_lowering_f32f32f32_aarch64(%arg0: !hal.buffer_vi
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f32f32f32_aarch64() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features="+sve", target_triple="aarch64-xyz-xyz", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -96,6 +97,36 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
 //  CHECK-SAME:       outs(%[[OUTS]] :
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+
+//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+// VSCALE-LABEL: func @matmul_lowering_f32f32f32_aarch64()
+//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
+//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
+//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_M]], %[[K]]}
+//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
+//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
+//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%[[TILED_N]], %[[K]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], %[[C8_VSCALE]], 1], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
+//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
+//  VSCALE-SAME:       outs(%[[OUTS]] :
+//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
 
 // -----
 
@@ -197,7 +228,7 @@ func.func @matvec_lowering_f32f32f32_aarch64() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f16f16f16_aarch64() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features="+sve", target_triple="aarch64-xyz-xyz", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -254,6 +285,36 @@ func.func @matmul_lowering_f16f16f16_aarch64() attributes {
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
 
+//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+// VSCALE-LABEL: func @matmul_lowering_f16f16f16_aarch64()
+//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
+//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1)
+//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(2)
+//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_M]], %[[K]]}
+//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
+//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
+//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf16>>{%[[TILED_N]], %[[K]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf16>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], %[[C8_VSCALE]], 1], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
+//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
+//  VSCALE-SAME:       outs(%[[OUTS]] :
+//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
@@ -268,7 +329,7 @@ func.func @matmul_lowering_f16f16f16_aarch64() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_f32f16f16_aarch64() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features="+sve", target_triple="aarch64-xyz-xyz", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -326,6 +387,29 @@ func.func @matmul_lowering_f32f16f16_aarch64() attributes {
 //       CHECK:   %[[LHS_F16:.+]] = linalg.generic {indexing_maps = [#[[$MAP_IDENTITY_4D]], #[[$MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[LHS]] : tensor<?x?x8x1xf32>) outs(%[[EMPTY]] : tensor<?x?x8x1xf16>) {
 //       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_F16]], %[[RHS]] : tensor<?x?x8x1xf16>, tensor<?x?x8x1xf16>) outs(%[[OUT]] : tensor<?x?x8x8xf16>)
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
+
+//   VSCALE-DAG: #[[$MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   VSCALE-DAG: #[[$MAP_VSCALE:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+//   VSCALE-DAG: #[[$MAP_IDENTITY_4D:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// VSCALE-LABEL: func.func @matmul_lowering_f32f16f16_aarch64()
+//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
+//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
+//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
+//   VSCALE-DAG:   %[[M_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[M]]]
+//   VSCALE-DAG:   %[[VSCALE:.+]] = vector.vscale
+//   VSCALE-DAG:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//   VSCALE-DAG:   %[[N_CEILDIV_VSCALE:.+]] = affine.apply #[[$MAP_VSCALE]]()[%[[N]], %[[C8_VSCALE]]]
+//   VSCALE-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[M_CEILDIV_8]], %[[K]]}
+//   VSCALE-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf16>>{%[[N_CEILDIV_VSCALE]], %[[K]], %[[C8_VSCALE]]}
+//   VSCALE-DAG:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) {{.*}} : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf16>>{%[[M_CEILDIV_8]], %[[N_CEILDIV_VSCALE]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M_CEILDIV_8]], %[[K]], 8, 1], {{.*}} -> tensor<?x?x8x1xf32>
+//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[N_CEILDIV_VSCALE]], %[[K]], %[[C8_VSCALE]], 1], {{.*}} -> tensor<?x?x?x1xf16>
+//       VSCALE:   %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M_CEILDIV_8]], %[[N_CEILDIV_VSCALE]], 8, %[[C8_VSCALE]]], {{.*}} -> tensor<?x?x8x?xf16>
+//       VSCALE:   %[[EMPTY:.+]] = tensor.empty(%[[M_CEILDIV_8]], %[[K]]) : tensor<?x?x8x1xf16>
+//       VSCALE:   %[[LHS_F16:.+]] = linalg.generic {indexing_maps = [#[[$MAP_IDENTITY_4D]], #[[$MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[LHS]] : tensor<?x?x8x1xf32>) outs(%[[EMPTY]] : tensor<?x?x8x1xf16>) {
+//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_F16]], %[[RHS]] : tensor<?x?x8x1xf16>, tensor<?x?x?x1xf16>) outs(%[[OUT]] : tensor<?x?x8x?xf16>)
+//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
 
 // -----
 
@@ -409,7 +493,7 @@ func.func @matmul_lowering_i8i8i32_aarch64() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod,+sve", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -468,6 +552,38 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
 
+//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//   VSCALE-DAG: #[[$MAP2:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+// VSCALE-LABEL: func @matmul_lowering_i8i8i32_aarch64_dotprod()
+//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
+//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
+//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//   VSCALE-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP1]]()[%[[K]]]
+//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_M]], %[[TILED_K]]}
+//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
+//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP2]]()[%[[N]], %[[C8_VSCALE]]]
+//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x4xi8>>{%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xi32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 4], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]], 4], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
+//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
+//  VSCALE-SAME:       outs(%[[OUTS]] :
+//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
@@ -482,7 +598,7 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod,+i8mm", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod,+i8mm,+sve", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -539,6 +655,37 @@ func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
 //  CHECK-SAME:       outs(%[[OUTS]] :
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+
+//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+// VSCALE-LABEL: func @matmul_lowering_i8i8i32_aarch64_i8mm()
+//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
+//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
+//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//   VSCALE-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP0]]()[%[[K]]]
+//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_M]], %[[TILED_K]]}
+//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
+//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
+//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x8xi8>>{%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xi32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 8], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]], 8], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
+//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
+//  VSCALE-SAME:       outs(%[[OUTS]] :
+//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
 
 // -----
 
@@ -759,35 +906,3 @@ func.func @matmul_lowering_i8i4i32_aarch64_i8mm() attributes {
 //  CHECK-SAME:       outs(%[[OUTS]] :
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 4, 8], strides = [1, 1, 1, 1]
-
-// -----
-
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+sve", target_triple="aarch64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
-} {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %M = tensor.dim %acc, %c0 : tensor<?x?xf32>
-  %N = tensor.dim %acc, %c1 : tensor<?x?xf32>
-  %0 = iree_encoding.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
-  %1 = iree_encoding.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
-  %2 = iree_encoding.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
-  %3 = linalg.matmul
-      ins(%0, %1 : tensor<?x?xf32, #encoding_lhs>,
-                   tensor<?x?xf32, #encoding_rhs>)
-      outs(%2 : tensor<?x?xf32, #encoding_result>)
-      -> tensor<?x?xf32, #encoding_result>
-  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%M, %N}
-  return %4 : tensor<?x?xf32>
-}
-
-// Targets that has "sve" features does not implement data-tiling yet.
-// CHECK-LABEL: func @matmul_lowering_f32f32f32_aarch64_sve
-//       CHECK:   %[[RES:.+]] = linalg.matmul
-//       CHECK:   return %[[RES]]

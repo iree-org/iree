@@ -61,6 +61,8 @@ bool mayHaveUndefinedBehaviorInMasking(Operation *op);
 int64_t
 getMaxVectorSizeForLargeVectorCheck(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+bool isScalableVectorizationEnabled();
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_
