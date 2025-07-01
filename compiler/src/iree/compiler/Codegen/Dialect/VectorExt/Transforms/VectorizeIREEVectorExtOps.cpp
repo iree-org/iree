@@ -6,11 +6,13 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -494,9 +496,17 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   return success();
 }
 
+Value maskOperation(RewriterBase &rewriter, Operation *op, Value mask) {
+  Value maskedOp =
+      cast<vector::MaskOp>(mlir::vector::maskOperation(rewriter, op, mask))
+          .getResult(0);
+  return maskedOp;
+}
+
 LogicalResult
 vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
-                                         IREE::LinalgExt::GatherOp gatherOp) {
+                                         IREE::LinalgExt::GatherOp gatherOp,
+                                         ArrayRef<int64_t> vectorSizes) {
 
   // TODO: need to split the innermost dim of `indices` into `indexDepth`
   // vectors so that each independent index can be passed to the
@@ -520,23 +530,29 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   ShapedType gatherTy = gatherOp.getOutputType();
   ShapedType sourceTy = gatherOp.getSourceType();
 
-  auto gatherVectorTy =
-      VectorType::get(gatherTy.getShape(), gatherTy.getElementType());
-  // Rank-reduced to remove the innermost unit dim.
-  auto indicesVecTy =
-      VectorType::get(indicesTy.getShape().take_front(gatherOp.getBatchRank()),
-                      rewriter.getIndexType());
+  if (vectorSizes.empty()) {
+    vectorSizes = gatherTy.getShape();
+  }
 
-  // Read `indices` tensor via `vector.transfer_read` and cast from int to
-  // index.
+  auto gatherVectorTy = VectorType::get(vectorSizes, gatherTy.getElementType());
+  // Rank-reduced to remove the innermost unit dim.
+  auto indicesVecTy = VectorType::get(
+      vectorSizes.take_front(gatherOp.getBatchRank()), rewriter.getIndexType());
+
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value indicesVec = rewriter.create<vector::TransferReadOp>(
+  auto indicesVecRead = rewriter.create<vector::TransferReadOp>(
       loc, indicesVecTy.clone(indicesTy.getElementType()),
       gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero));
+  VectorType indicesMaskType = indicesVecTy.clone(rewriter.getI1Type());
+  SmallVector<OpFoldResult> gatherDims =
+      tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());
+  Value indicesMask = rewriter.create<vector::CreateMaskOp>(
+      loc, indicesMaskType,
+      ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
+  Value indicesVec = maskOperation(rewriter, indicesVecRead, indicesMask);
   indicesVec =
       rewriter.create<arith::IndexCastOp>(loc, indicesVecTy, indicesVec);
 
-  // Create transfer_gather op
   SmallVector<Value> baseIndices(sourceTy.getRank(), zero);
   SmallVector<bool> indexed(sourceTy.getRank(), false);
   indexed[0] = true;
@@ -547,21 +563,59 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
       rewriter.getMultiDimIdentityMap(sourceTy.getRank()).getMajorSubMap(1)));
   Value padding = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getZeroAttr(gatherTy.getElementType()));
-
   auto transferGatherOp = rewriter.create<IREE::VectorExt::TransferGatherOp>(
       loc, gatherVectorTy, gatherOp.getSource(), baseIndices,
       ValueRange{indicesVec}, rewriter.getBoolArrayAttr(indexed), indexedMaps,
       rewriter.getMultiDimIdentityMap(gatherTy.getRank()), padding,
       /*mask=*/Value(), inBounds);
 
-  // Write back into tensor.
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, gatherTy.getShape(),
-                                                  gatherTy.getElementType());
+  VectorType gatherMaskType = gatherVectorTy.clone(rewriter.getI1Type());
+  Value gatherMask =
+      rewriter.create<vector::CreateMaskOp>(loc, gatherMaskType, gatherDims);
+  Value maskedGather = maskOperation(rewriter, transferGatherOp, gatherMask);
   SmallVector<Value> writeIndices(gatherTy.getRank(), zero);
   auto writeOp = rewriter.create<vector::TransferWriteOp>(
-      loc, transferGatherOp.getResult(), emptyOp, writeIndices);
-  rewriter.replaceOp(gatherOp, writeOp);
+      loc, maskedGather, gatherOp.getOutput(), writeIndices);
+  Value maskedWrite = maskOperation(rewriter, writeOp, gatherMask);
+
+  rewriter.replaceOp(gatherOp, maskedWrite);
   return success();
+}
+
+/// Lowers vector.mask %mask { iree_vector_ext.transfer_gather }
+///  into
+/// iree_vector_ext.transfer_gather %mask
+///
+/// Ideally, the mask should have just been put on transfer_gather directly,
+/// but this is done this way to match upstream vector.transfer_read masking.
+struct MaskedTransferGatherOpPattern : public OpRewritePattern<vector::MaskOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::MaskOp maskOp,
+                                PatternRewriter &rewriter) const override {
+    auto gatherOp = dyn_cast<TransferGatherOp>(maskOp.getMaskableOp());
+    if (!gatherOp) {
+      return failure();
+    }
+    // TODO: The 'vector.mask' passthru is a vector and 'transfer_gather'
+    // expects a scalar. We could only lower one to the other for cases where
+    // the passthru is a broadcast of a scalar.
+    if (maskOp.hasPassthru()) {
+      return rewriter.notifyMatchFailure(
+          maskOp, "can't lower passthru to transfer_gather");
+    }
+    rewriter.replaceOpWithNewOp<TransferGatherOp>(
+        maskOp, gatherOp.getVectorType(), gatherOp.getBase(),
+        gatherOp.getIndices(), gatherOp.getIndexVecs(), gatherOp.getIndexed(),
+        gatherOp.getIndexedMaps(), gatherOp.getPermutationMap(),
+        gatherOp.getPadding(), maskOp.getMask(), gatherOp.getInBounds());
+    return success();
+  }
+};
+
+void populateVectorMaskLoweringPatterns(RewritePatternSet &patterns) {
+  patterns.add<MaskedTransferGatherOpPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

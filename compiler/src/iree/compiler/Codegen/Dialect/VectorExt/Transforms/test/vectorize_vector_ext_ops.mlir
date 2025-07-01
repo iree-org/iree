@@ -146,3 +146,30 @@ func.func @linalg_ext_gather_unit_dim(%source : tensor<1024x128xi32>, %indices :
 //       CHECK:   %[[CAST:.+]] = arith.index_cast %[[READ]]
 //       CHECK:   %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
 //  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[CAST]]: vector<10xindex>, None]
+
+// -----
+
+func.func @linalg_ext_gather_masked(%source : tensor<?x128xi32>, %indices : tensor<?x1xi32>) -> (tensor<?x128xi32>) {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %indices, %c0 : tensor<?x1xi32>
+  %dim_ub = util.assume.int %dim[<umin = 1, umax = 12>] : index
+  %empty = tensor.empty(%dim_ub) : tensor<?x128xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+    ins(%source, %indices : tensor<?x128xi32>, tensor<?x1xi32>)
+    outs(%empty: tensor<?x128xi32>) -> tensor<?x128xi32>
+  return %result : tensor<?x128xi32>
+}
+
+// CHECK-LABEL: @linalg_ext_gather_masked
+//  CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
+//  CHECK: %[[DIM:.+]] = tensor.dim %[[INDICES]], %[[C0]]
+//  CHECK: %[[DIM_UB:.+]] = util.assume.int %[[DIM]]
+//  CHECK: %[[INDICES_MASK:.+]] = vector.create_mask %[[DIM_UB]]
+//  CHECK: vector.transfer_read %[[INDICES]]
+//  CHECK-SAME: %[[INDICES_MASK]]
+//  CHECK: %[[MASK:.+]] = vector.create_mask %[[DIM_UB]], %[[C128]]
+//  CHECK: iree_vector_ext.transfer_gather %[[SOURCE]]
+//  CHECK-SAME: %[[MASK]]
