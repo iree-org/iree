@@ -298,6 +298,28 @@ def PaddingAttr : IREEEncoding_Attr<"Padding", [
 }
 
 //===---------------------------------------------------------------------===//
+// iree_encoding.identity
+//===---------------------------------------------------------------------===//
+
+def IdentityAttr : IREEEncoding_Attr<"Identity", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "calculateStorageSizeInBytes",
+        "isIdentityLayout",
+        "isSerialized"
+        ]>
+    ]> {
+  let mnemonic = "identity";
+
+  let summary = [{The identity encoding.}];
+  let description = [{
+    An encoding attribute that represents the identity function on a type, i.e.
+    it represents the same type as if there was no encoding.
+  }];
+
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
 // iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
 
