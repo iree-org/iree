@@ -67,8 +67,6 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
       yieldReplacementsFor.insert(op);
     }
   }
-  bool useWARForConsumerFusionSSAViolation =
-      warForConsumerFusionSSAViolation(rootOp, tiledAndFusedOps);
 
   SmallVector<OpFoldResult> tileSizes =
       getLoweringConfig(rootOp).getTilingLevelSizes(rewriter, tilingLevel,
@@ -148,8 +146,10 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   if (!onlyFuseProducerInputOperands) {
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoLoops(rewriter, *rootTiledOp, tilingLoops,
-                               useWARForConsumerFusionSSAViolation);
+        fuseConsumersIntoForall(rewriter, *rootTiledOp, tilingLoops,
+                                [&tiledAndFusedOps](Operation *op) {
+                                  return tiledAndFusedOps.contains(op);
+                                });
 
     if (failed(newFusionOpportunities)) {
       rootTiledOp.value()->emitOpError("failed to fuse consumers");
