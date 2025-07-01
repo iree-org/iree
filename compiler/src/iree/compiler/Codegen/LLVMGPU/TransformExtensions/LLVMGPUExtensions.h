@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
 
+#include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
@@ -30,6 +31,16 @@ class WarpExecuteOnLane0Op;
 } // namespace mlir
 
 namespace mlir::iree_compiler {
+
+class TransformVectorLayoutOptions : public VectorLayoutOptions {
+public:
+  TransformVectorLayoutOptions(Operation *root, bool fullConversion)
+      : VectorLayoutOptions(root, fullConversion) {}
+
+  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
+    return VectorLayoutInterface();
+  }
+};
 
 /// Registers Flow transformations that require IREE-specific information into
 /// the transform dialect.

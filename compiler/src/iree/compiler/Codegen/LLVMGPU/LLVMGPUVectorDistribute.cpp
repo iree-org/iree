@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -26,35 +27,30 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_LLVMGPUVECTORDISTRIBUTEPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
+ContractionVectorLayoutOptions::ContractionVectorLayoutOptions(
+    Operation *root, Value laneId, int64_t subgroupSize)
+    : VectorLayoutOptions(root), patterns(root->getContext()) {
+  populateGPUDistributionPatterns(patterns);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
+}
+
+RewritePatternSet &ContractionVectorLayoutOptions::getPatterns() {
+  return patterns;
+}
+
+VectorLayoutInterface
+ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
+  // We only allow a default layout for 0-d vectors for now.
+  if (type.getRank() > 0) {
+    return VectorLayoutInterface();
+  }
+  ArrayRef<int64_t> empty = {};
+  return IREE::VectorExt::NestedLayoutAttr::get(
+      type.getContext(), empty, empty, empty, empty, empty, empty, empty);
+}
+
 namespace {
-
-class ContractionVectorLayoutOptions : public VectorLayoutOptions {
-public:
-  ContractionVectorLayoutOptions(Operation *root, Value laneId,
-                                 int64_t subgroupSize)
-      : VectorLayoutOptions(root), patterns(root->getContext()) {
-    populateGPUDistributionPatterns(patterns);
-    populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
-                                                  subgroupSize);
-    populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
-  }
-
-  RewritePatternSet &getPatterns() { return patterns; }
-
-  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
-    // We only allow a default layout for 0-d vectors for now.
-    if (type.getRank() > 0) {
-      return VectorLayoutInterface();
-    }
-    ArrayRef<int64_t> empty = {};
-    return IREE::VectorExt::NestedLayoutAttr::get(
-        type.getContext(), empty, empty, empty, empty, empty, empty, empty);
-  }
-
-private:
-  RewritePatternSet patterns;
-};
-
 struct LLVMGPUVectorDistributePass final
     : impl::LLVMGPUVectorDistributePassBase<LLVMGPUVectorDistributePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
