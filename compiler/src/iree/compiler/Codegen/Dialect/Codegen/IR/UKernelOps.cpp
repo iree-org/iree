@@ -160,10 +160,8 @@ lowerUKernelGenericToFunctionCall(RewriterBase &rewriter,
       return rewriter.notifyMatchFailure(
           op, "cannot lower a `ShapedType` return value to function call");
     }
-    int64_t outOperandIdx = idx + op.getInputs().size();
     if (failed(getCallOpType(rewriter.getContext(), resultType,
-                             op.getOperandStridedDims(outOperandIdx),
-                             callResultTypes))) {
+                             /*stridedDims=*/{}, callResultTypes))) {
       return rewriter.notifyMatchFailure(
           op, llvm::formatv("failed to lower result type {}", resultType));
     }

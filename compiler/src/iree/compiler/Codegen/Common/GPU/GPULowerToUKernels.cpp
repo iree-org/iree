@@ -152,7 +152,8 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
   applyPermutationToVector(swizzleDims, accSwizzle.permutation);
   int rankDiff = outputType.getRank() - swizzleDims.size();
   auto crossIntrinsic = IREE::Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
-  for (int swizzleIdx = swizzleDims.size() - 1; swizzleIdx >= 0; --swizzleIdx) {
+  for (size_t e = swizzleDims.size(), swizzleIdx = e - 1; swizzleIdx < e;
+       --swizzleIdx) {
     if (swizzleDims[swizzleIdx].kind != crossIntrinsic) {
       continue;
     }
