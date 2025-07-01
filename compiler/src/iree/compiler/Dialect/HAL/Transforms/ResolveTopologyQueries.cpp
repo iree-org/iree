@@ -146,7 +146,7 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
   OpBuilder builder(op);
   auto loc = op.getLoc();
 
-  // Get the default memory types and buffer usage based on lifetime
+  // Get the default memory types and buffer usage based on lifetime.
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
   if (failed(deriveAllowedResourceBufferBits(loc, op.getLifetime(), memoryTypes,
@@ -188,6 +188,7 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
 
   LLVM_DEBUG(llvm::dbgs() << "  -> Successfully resolved memory properties "
                              "with shared usage bits\n");
+
   // Create the resolved memory type and buffer usage ops.
   auto memoryTypeOp = builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
   auto bufferUsageOp =
