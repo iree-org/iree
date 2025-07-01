@@ -45,6 +45,16 @@ struct TileAndDistributeToWorkgroupsUsingForallOpPass final
 
 } // namespace
 
+static bool hasDistributedOps(FunctionOpInterface funcOp) {
+  return llvm::any_of(
+      funcOp.getFunctionBody().getOps<scf::ForallOp>(),
+      [](scf::ForallOp forallOp) {
+        return forallOp.getMapping().has_value() &&
+               llvm::any_of(*forallOp.getMapping(),
+                            llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>);
+      });
+}
+
 /// Find the lowering config to use for getting the tile sizes.
 // TODO: For now this is taking the "last op" in the dispatch, but
 // ideally this should take the "root op" that gets tiled and everything
@@ -58,7 +68,8 @@ struct TilingInfo {
 
 static FailureOr<TilingInfo>
 getTiledAndDistributionInfo(RewriterBase &rewriter,
-                            ArrayRef<Operation *> computeOps) {
+                            ArrayRef<Operation *> computeOps,
+                            bool canFoldUnitTripLoops) {
   // TODO: It is expected that at most one compute op has a workgroup tiling
   // level. Currently, it selects the last compute op that has workgroup tiling
   // level.
@@ -106,9 +117,13 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
-  // Set tile sizes for full tiles to zero. This prevents single trip loops from
-  // being created, which can sometimes block certain cleanup patterns from
-  // applying during producer fusion.
+  // If unit trip loop folding is allowed, set tile sizes for full tiles to
+  // zero. This prevents single trip loops from being created, which can
+  // sometimes block certain cleanup patterns from applying during producer
+  // fusion.
+  if (!canFoldUnitTripLoops) {
+    return TilingInfo{tilableOp, tileSizes, interchange};
+  }
   if (auto tilingInterfaceOp = dyn_cast<TilingInterface>(tilableOp)) {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(tilingInterfaceOp);
@@ -238,9 +253,11 @@ static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
 }
 
 /// Find dimensions of the loop that are unit-trip count and drop them from the
-/// distributed dimensions.
-static FailureOr<scf::ForallOp>
-dropUnitDistributedDims(RewriterBase &rewriter, scf::ForallOp forallOp) {
+/// distributed dimensions. If `canDropAllDims` is true, then at most N-1 dims
+/// can be dropped, for a forall of rank N.
+static FailureOr<scf::ForallOp> dropUnitDistributedDims(RewriterBase &rewriter,
+                                                        scf::ForallOp forallOp,
+                                                        bool canDropAllDims) {
   SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
   SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
   SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
@@ -249,7 +266,9 @@ dropUnitDistributedDims(RewriterBase &rewriter, scf::ForallOp forallOp) {
   llvm::SmallDenseSet<int> droppedLoops;
   for (auto [index, lb, ub, step] :
        llvm::enumerate(mixedLbs, mixedUbs, mixedSteps)) {
-
+    if (!canDropAllDims && droppedLoops.size() + 1 == mixedLbs.size()) {
+      break;
+    }
     std::optional<int64_t> lbVal = getConstantIntValue(lb);
     std::optional<int64_t> ubVal = getConstantIntValue(ub);
     std::optional<int64_t> stepVal = getConstantIntValue(step);
@@ -318,8 +337,12 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
 
   IRRewriter rewriter(context);
-  FailureOr<TilingInfo> tilingInfo =
-      getTiledAndDistributionInfo(rewriter, computeOps);
+  // Do not fold unit trip loops if there are predistributed ops, because this
+  // could fold away the entire scf.forall, which is needed to ensure
+  // distribution matches the predistributed ops.
+  bool hasPreDistributedOps = hasDistributedOps(funcOp);
+  FailureOr<TilingInfo> tilingInfo = getTiledAndDistributionInfo(
+      rewriter, computeOps, /*canFoldUnitTripLoops*/ !hasPreDistributedOps);
   if (failed(tilingInfo)) {
     return signalPassFailure();
   }
@@ -440,7 +463,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     }
 
     auto forallOp =
-        dropUnitDistributedDims(rewriter, cast<scf::ForallOp>(tilingLoops[0]));
+        dropUnitDistributedDims(rewriter, cast<scf::ForallOp>(tilingLoops[0]),
+                                /*canDropAllDims=*/!hasPreDistributedOps);
     if (failed(forallOp)) {
       tilingLoops[0]->emitOpError("failed to drop unit dimensions");
       return signalPassFailure();
