@@ -331,6 +331,21 @@ bool alwaysRunsFirstIteration(scf::ForOp op);
 /// the ForOp.
 bool neverRunsSecondIteration(scf::ForOp op);
 
+///  This function checks whether the `genericOp` has any external captures,
+///  i.e., whether it uses any values that are defined outside of its body.
+///  %10 = linalg.generic {indexing_maps = [#map, #map],
+///          iterator_types = ["parallel", "parallel"]}
+///         ins(%5 : tensor<4096x64xi64>) outs(%9 : tensor<4096x64xf16>) {
+///          ^bb0(%in: i64, %out: f16):
+///            %14 = linalg.index 0 : index
+///            %15 = arith.index_cast %in : i64 to index
+///            %extracted = tensor.extract %4[%14, %15] : tensor<4096x64xf16>
+///            linalg.yield %extracted : f16
+///           } -> tensor<4096x64xf16>
+///  Here %4 is an external capture used via tensor.extract inside
+///  linalg.generic hence the above `genericOp` has an external capture.
+bool hasExternalCapture(linalg::GenericOp genericOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
