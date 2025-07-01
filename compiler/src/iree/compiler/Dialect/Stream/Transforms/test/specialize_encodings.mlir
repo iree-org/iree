@@ -459,7 +459,7 @@ util.func public @drop_encoding(%arg0: index, %arg1: index, %scalar_f32 : f32) {
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.padding<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.identity]>
 // CHECK-LABEL: util.func public @drop_encoding
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 
@@ -476,7 +476,7 @@ util.func public @ignore_encoding_by_identity_resolver(%arg0: index, %arg1: inde
   %0 = stream.tensor.empty on(#hal.device.affinity<@device_a>) : tensor<?x0xf32, #encoding>{%arg0} in !stream.resource<*>{%arg1}
   util.return
 }
-// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.padding<[0, 0]>]>
+// CHECK-DAG:   #[[$IDENTITY_ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.identity]>
 // CHECK-LABEL: util.func public @ignore_encoding_by_identity_resolver
 // CHECK:         stream.tensor.empty {{.+}} : tensor<?x0xf32, #[[$IDENTITY_ENCODING]]>
 

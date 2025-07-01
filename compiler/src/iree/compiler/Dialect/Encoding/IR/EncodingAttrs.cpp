@@ -497,6 +497,39 @@ LogicalResult PaddingAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 }
 
 //===---------------------------------------------------------------------===//
+// iree_encoding.identity
+//===---------------------------------------------------------------------===//
+
+Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
+                                                OpBuilder &builder,
+                                                RankedTensorType type,
+                                                ValueRange dynamicDims) const {
+  const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
+  int64_t staticProduct = elementSize;
+  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+
+  size_t dynamicDimIdx = 0;
+  for (int64_t dimSize : type.getShape()) {
+    if (!ShapedType::isDynamic(dimSize)) {
+      staticProduct *= dimSize;
+      continue;
+    }
+
+    Value dynamicDimSize = dynamicDims[dynamicDimIdx];
+    ++dynamicDimIdx;
+    dynamicProduct = builder.createOrFold<arith::MulIOp>(
+        loc, dynamicProduct, dynamicDimSize, arith::IntegerOverflowFlags::nsw);
+  }
+  return builder.createOrFold<arith::MulIOp>(
+      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      dynamicProduct, arith::IntegerOverflowFlags::nsw);
+}
+
+bool IdentityAttr::isIdentityLayout() const { return true; }
+
+bool IdentityAttr::isSerialized() const { return true; }
+
+//===---------------------------------------------------------------------===//
 // iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
 
@@ -506,9 +539,7 @@ IdentityResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
 }
 
 Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
-  MLIRContext *ctx = getContext();
-  SmallVector<int64_t> zeros(type.getRank(), 0);
-  return Encoding::PaddingAttr::get(ctx, DenseI64ArrayAttr::get(ctx, zeros));
+  return Encoding::IdentityAttr::get(getContext());
 }
 
 //===---------------------------------------------------------------------===//
