@@ -95,12 +95,6 @@ static llvm::cl::opt<bool> clDisableVectorPeeling(
                    "heuristics to select the strategy)."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableScalableVectorization(
-    "iree-llvmcpu-enable-scalable-vectorization",
-    llvm::cl::desc("Enable scalable vectorization if it is supported by the "
-                   "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clDisableArmSMETiling(
     "iree-llvmcpu-disable-arm-sme-tiling",
     llvm::cl::desc("Disables tiling for SME even if it is supported by the "
@@ -271,7 +265,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
+    if (isScalableVectorizationEnabled() && hasAnySVEFeature(targetAttr)) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -685,7 +679,6 @@ static void limitVectorTileSizes(SmallVectorImpl<int64_t> &vecTileSizes,
                                  TypeRange operandTypes,
                                  ArrayRef<AffineMap> indexingMaps,
                                  ArrayRef<int64_t> bounds = {}) {
-
   int64_t numLoops = vecTileSizes.size();
   int numOperands = operandTypes.size();
 
@@ -1285,7 +1278,7 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     sizes.append({8, 16, 1});
 
     // Specialisation for scalable vectorization.
-    if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
+    if (isScalableVectorizationEnabled() && hasAnySVEFeature(targetAttr)) {
       // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
       scalableSizeFlags.append({false, true, false});
     }
@@ -1475,7 +1468,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
   // TODO: Compute vector tile sizes using heuristics.
 
   if (isAArch64(targetAttr)) {
-    if (clEnableScalableVectorization && !clDisableArmSMETiling &&
+    if (isScalableVectorizationEnabled() && !clDisableArmSMETiling &&
         hasSMEFeature(targetAttr)) {
       // Note: This may not pick any sizes (which will fallback to the scalable
       // vectorization heuristics below).
@@ -2246,7 +2239,7 @@ static void getTransposeAArch64VectorSizes(
   if (failed(elementType))
     return;
 
-  if (hasSMEFeature(targetAttr) && clEnableScalableVectorization &&
+  if (hasSMEFeature(targetAttr) && isScalableVectorizationEnabled() &&
       !clDisableArmSMETiling) {
     if (elementType->isF32()) {
       sizes.append({4, 4});
@@ -2535,7 +2528,7 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<bool> vecScalableFlags(numTilingDims, false);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
-      clEnableScalableVectorization &&
+      isScalableVectorizationEnabled() &&
       isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
     auto dims = linalg::inferConvolutionDims(convOp);
     // Make the channel dim scalable

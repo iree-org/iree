@@ -41,6 +41,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -61,6 +62,42 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Utilities.
 //===----------------------------------------------------------------------===//
+
+static FailureOr<IREE::Codegen::ScalableTileFlags>
+getScalableTileFlags(linalg::ContractionDimensions cDims,
+                     IREE::Encoding::EncodingAttr encoding,
+                     DictionaryAttr config) {
+  // TODO(egebeysel): I think this isScalable*Enabled flag should be temporary
+  // and the temporary SME flag should probably come next to it.
+  if (!isAArch64(config) || !isScalableVectorizationEnabled())
+    return failure();
+  std::optional<unsigned> mDim =
+      cDims.m.empty() ? std::nullopt
+                      : encoding.mapDimToOperandIndex(cDims.m[0]);
+  std::optional<unsigned> nDim =
+      cDims.n.empty() ? std::nullopt
+                      : encoding.mapDimToOperandIndex(cDims.n[0]);
+  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims.k[0]);
+  IREE::Codegen::ScalableTileFlags scalableTiles;
+  // TODO(egebeysel): Choosing between SME
+  // & SVE should also probably reside around here. I guess we could also just
+  // choose SME and then have the fallback option implemented with
+  // 2DScalableTo1D pass and also even from 1D to non-scalable. Currently,
+  // hard-coded to pick SVE since SME with DT is not yet supported.
+  if (mDim.has_value()) {
+    scalableTiles.push_back(/* dtWithSME */ false &&
+                            hasFeature(config, "+sme"));
+  }
+  if (nDim.has_value()) {
+    scalableTiles.push_back(
+        /* dtWithSVE */ true &&
+        (hasFeature(config, "+sve") || hasFeature(config, "+sve2")));
+  }
+  if (kDim.has_value()) {
+    scalableTiles.push_back(false);
+  }
+  return scalableTiles;
+}
 
 static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Vector cases: nothing to do.
@@ -409,10 +446,9 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
                                                        DictionaryAttr config) {
-  // Data-tiling for SVE is not implemented yet.
-  if (hasFeature(config, "+sve") || hasFeature(config, "+sve2")) {
-    return {};
-  }
+  // TODO(egebeysel): We currently enable SVE and the tile size selection should
+  // in theory be scalability-agnostic. Although we should back this up by
+  // emprical data.
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -669,6 +705,11 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     info = std::move(maybeEncodingInfo.value());
     if (IREE::Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
+    }
+    FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
+        getScalableTileFlags(*cDims, encoding, layoutAttr.getConfiguration());
+    if (succeeded(scalableFlags)) {
+      info.scalableTiles = std::move(scalableFlags);
     }
     return info;
   }
