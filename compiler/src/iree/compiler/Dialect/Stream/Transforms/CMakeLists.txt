@@ -26,7 +26,6 @@ iree_cc_library(
     "ElideAsyncCopies.cpp"
     "ElideAsyncTransfers.cpp"
     "ElideTimepoints.cpp"
-    "ElideTransferOps.cpp"
     "EmplaceAllocations.cpp"
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"

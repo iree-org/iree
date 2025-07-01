@@ -22,12 +22,6 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clElideTransfers(
-    "iree-stream-elide-transfers",
-    llvm::cl::desc("Elides all transfer ops that are between device links that "
-                   "do not require transfers"),
-    llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -122,18 +116,6 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Run inlining after having baked out affinities.
   passManager.addPass(mlir::createInlinerPass());
 
-  // Elide any redundant transfers now that affinities are baked out and we know
-  // where resources are located.
-  //
-  // TODO(benvanik): enable this pass after updating usage refinement: today
-  // the clones are not handled correctly and will result in usage analysis
-  // failing. This seems to be caused by transfers having some non-trivial logic
-  // during analysis that clone does not have and just applying the same logic
-  // to clones results in other errors around lifetime changes. The resource
-  // analysis and refinement logic likely needs a larger reworking.
-  //
-  // passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
-
   // Cleanup globals that were created during conversion.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
@@ -187,9 +169,8 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // lifetime assigned.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
-  if (clElideTransfers) {
-    passManager.addPass(IREE::Stream::createElideTransferOpsPass());
-  }
+  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
+
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides
   // ones that aren't needed. This is easier to verify than if there was one
