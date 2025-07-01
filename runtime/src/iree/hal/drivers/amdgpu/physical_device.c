@@ -218,6 +218,16 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
                                            i * total_queue_size);
   }
 
+  // Find the device pools used for blocks.
+  hsa_amd_memory_pool_t coarse_block_memory_pool = {0};
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_find_coarse_global_memory_pool(
+              libhsa, device_agent, &coarse_block_memory_pool));
+  hsa_amd_memory_pool_t fine_block_memory_pool = {0};
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_find_fine_global_memory_pool(
+              libhsa, device_agent, &fine_block_memory_pool));
+
   // Initialize the per-device block pool.
   // This should be pinned to the host NUMA node associated with the devices but
   // today we rely on the OS to migrate pages as needed.
@@ -230,16 +240,6 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
                 &out_physical_device->fine_host_block_pool,
                 options->host_block_pool_initial_capacity));
   }
-
-  // Find the device pools used for blocks.
-  hsa_amd_memory_pool_t coarse_block_memory_pool = {0};
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_amdgpu_find_coarse_global_memory_pool(
-              libhsa, device_agent, &coarse_block_memory_pool));
-  hsa_amd_memory_pool_t fine_block_memory_pool = {0};
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_amdgpu_find_fine_global_memory_pool(
-              libhsa, device_agent, &fine_block_memory_pool));
 
   // Create block pools and allocators used to back device-side resources.
   // Shared amongst all queues on the device.
