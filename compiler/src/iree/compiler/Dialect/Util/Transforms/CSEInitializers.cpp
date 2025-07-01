@@ -4,19 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <algorithm>
-#include <iterator>
-#include <optional>
-#include <tuple>
-#include <utility>
-
-#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -24,34 +13,24 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/Location.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
-#include "mlir/Interfaces/CallInterfaces.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-#define DEBUG_TYPE "iree-util-optimize-global-duplicates"
+#define DEBUG_TYPE "iree-util-cse-initializer"
 
 namespace mlir::iree_compiler::IREE::Util {
 
-#define GEN_PASS_DEF_OPTIMIZEGLOBALDUPLICATESPASS
+#define GEN_PASS_DEF_CSEINITIALIZERSPASS
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
 
 namespace {
-static llvm::cl::opt<bool>
-    clDisableOptimizeGlobalDuplicates("iree-disable-optimize-global-duplicates",
-                                      llvm::cl::desc("Disables this pass"),
-                                      llvm::cl::init(false));
+static llvm::cl::opt<bool> clDisableCSEInitializers(
+    "iree-disable-util-cse-initializers",
+    llvm::cl::desc("Disables the iree-util-cse-initializers pass"),
+    llvm::cl::init(false));
 
 bool areAttributesEquivalent(Operation &lhs, Operation &rhs) {
   auto storeOpLhs = llvm::dyn_cast_or_null<IREE::Util::GlobalStoreOp>(lhs);
@@ -61,19 +40,17 @@ bool areAttributesEquivalent(Operation &lhs, Operation &rhs) {
   }
   return false;
 }
-class OptimizeGlobalDuplicatesPass
-    : public impl::OptimizeGlobalDuplicatesPassBase<
-          OptimizeGlobalDuplicatesPass> {
+class CSEInitializersPass
+    : public impl::CSEInitializersPassBase<CSEInitializersPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
-    if (clDisableOptimizeGlobalDuplicates)
+    if (clDisableCSEInitializers)
       return;
 
-    // llvm::outs() << "Running OptimizeGlobalDuplicatesPass\n";
     auto moduleOp = getOperation();
 
     SmallVector<IREE::Util::InitializerOp> initOps;
@@ -121,8 +98,7 @@ public:
                 [](Operation &lhs, Operation &rhs) {
                   return areAttributesEquivalent(lhs, rhs);
                 })) {
-          // llvm::outs() << "Found structurally equivalent initializers: "
-          //  << initOps[i] << " and " << initOps[j] << "\n";
+
           initOpBitVector.set(i);
           initOpBitVector.set(j);
           ec.unionSets(initOps[i], initOps[j]);
@@ -131,7 +107,6 @@ public:
     }
 
     for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
-      // llvm::outs() << "Equivalence class: \n";
       if (!(*it)->isLeader()) {
         continue; // Ignore non-leader sets.
       }

@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "AnnotateOpOrdinals.cpp"
     "ApplyPatterns.cpp"
+    "CSEInitializers.cpp"
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
     "DumpModule.cpp"
@@ -29,7 +30,6 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
     "ImportResources.cpp"
-    "OptimizeGlobalDuplicates.cpp"
     "OptimizeIntArithmetic.cpp"
     "Passes.cpp"
     "Patterns.cpp"
