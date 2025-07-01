@@ -655,6 +655,12 @@ void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
       ctx);
 }
 
+// MaskableOpInterface methods.
+
+Type TransferGatherOp::getExpectedMaskType() {
+  return vector::inferTransferOpMaskType(getVectorType(), getPermutationMap());
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep
