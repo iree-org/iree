@@ -119,6 +119,10 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
 
+FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals);
+
 /// Lower the workgroup count region for the default code-generation path in
 /// IREE. Given the list `workgroupCount` (fastest varying dimension innermost)
 /// as computed within the `entryPointFn`, clones a backward slice of the
@@ -128,7 +132,7 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
 /// the `flow.dispatch.constant_ordinal` operations from within the
 /// `entryPointFn`. Expects the workgroup count region of the corresponding
 /// `hal.executable.export` to contain the
-/// `flow.dispatch.workgroup_count_default` operation as a placeholder for the
+/// `flow.dispatch.workgroup_count_slice` operation as a placeholder for the
 /// computation to compute the number of workgroups. In absence of this
 /// operation, this method does nothing assuming that the workgroup count
 /// computation has already been resolved.

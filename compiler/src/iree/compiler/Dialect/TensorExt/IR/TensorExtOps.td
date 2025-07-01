@@ -339,6 +339,12 @@ def IREETensorExt_DispatchWorkgroupCountSplitReductionModifierOp :
       "ValueRange":$workload
     )>,
   ];
+
+  let extraClassDeclaration = [{
+    SmallVector<Value> getSourceWorkgroupCount() {
+      return {getWorkgroupX(), getWorkgroupY(), getWorkgroupZ()};
+    }
+  }];
 }
 
 def IREETensorExt_DispatchWorkloadOrdinalOp :
