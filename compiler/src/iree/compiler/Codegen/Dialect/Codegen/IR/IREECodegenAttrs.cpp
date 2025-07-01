@@ -467,55 +467,41 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
 // iree_codegen.rotate_rows
 //===---------------------------------------------------------------------===//
 
-/// Given `r = |rotationInvariant|`, simplify affine maps of the following form:
+/// Given `r = |rotationInvariant|`, simplify additions of the following form:
 ///
-/// ```
-///   %offset = affine.apply (d0, ..., dn) -> (f(d0, ..., dn) + c)
-/// ```
+/// %offset = arith.addi %0, c
 ///
 /// Where `c` is a constant, to:
 ///
-/// ```
-///   %offset = affine.apply (d0, ..., dn) -> (f(d0, ..., dn) + c % r)
-/// ```
-static OpFoldResult getMinimumConstantOffsetMap(OpBuilder &b, Location loc,
-                                                OpFoldResult offset,
-                                                int64_t rotationInvariant) {
+/// %offset = arith.addi %0, c % r
+static OpFoldResult getMinimumConstantOffsetValue(OpBuilder &b, Location loc,
+                                                  OpFoldResult offset,
+                                                  int64_t rotationInvariant) {
   auto value = dyn_cast_if_present<Value>(offset);
   if (!value)
     return offset;
 
-  auto apply = value.getDefiningOp<affine::AffineApplyOp>();
-  if (!apply)
+  auto add = value.getDefiningOp<arith::AddIOp>();
+  if (!add)
     return offset;
 
-  AffineMap map = apply.getMap();
-  // Simplify the map to move `+ c` terms to the right most (first) expression
-  // in the tree.
-  map = simplifyAffineMap(map);
-  AffineExpr resultExpr = map.getResult(0);
-  auto addExpr = llvm::dyn_cast<AffineBinaryOpExpr>(resultExpr);
-
-  // After simplification, the add should be the first expression if present.
-  if (!addExpr || addExpr.getKind() != AffineExprKind::Add)
+  llvm::APInt constant;
+  if (!matchPattern(add.getRhs(), m_ConstantInt(&constant)))
     return offset;
 
-  // If RHS is not constant, nothing to do.
-  auto constantRhs = llvm::dyn_cast<AffineConstantExpr>(addExpr.getRHS());
-  if (!constantRhs)
-    return offset;
-
-  int64_t constantOffset = constantRhs.getValue();
+  int64_t constantOffset = constant.getSExtValue();
   int64_t baseMod = constantOffset % rotationInvariant;
 
   // Skip constructing the new apply if it's not needed (c < rotationInvariant).
   if (baseMod == constantOffset)
     return offset;
 
-  AffineExpr newExpr =
-      addExpr.getLHS() + getAffineConstantExpr(baseMod, b.getContext());
-  map = AffineMap::get(map.getNumDims(), map.getNumSymbols(), newExpr);
-  return b.create<affine::AffineApplyOp>(loc, map, apply.getOperands())
+  Value modOffset = b.create<arith::ConstantIndexOp>(loc, baseMod);
+  // If the original add is nsw/nuw, then the new add must also be given we're
+  // adding a smaller value.
+  return b
+      .create<arith::AddIOp>(loc, add.getLhs(), modOffset,
+                             add.getOverflowFlags())
       .getResult();
 }
 
@@ -531,7 +517,7 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   int64_t rotationInvariant =
       getRowWidth() * (getRowWidth() / getAccessWidth());
   OpFoldResult id =
-      getMinimumConstantOffsetMap(b, loc, offset, rotationInvariant);
+      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
 
   // Number of elements per row.
   Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());

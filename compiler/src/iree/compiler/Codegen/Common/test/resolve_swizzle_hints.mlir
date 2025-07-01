@@ -156,23 +156,26 @@ func.func @swizzle_dynamic(%src: memref<?xf32>, %vec: vector<4xf32>, %offset: in
 
 // -----
 
-func.func @swizzle_adjust_affine_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %offset_base: index) -> vector<4xf32> {
+func.func @swizzle_adjust_add_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %offset_base: index) -> vector<4xf32> {
   %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
-  %load_offset = affine.apply affine_map<()[s0] -> (16 + s0)>()[%offset_base]
+  %c16 = arith.constant 16 : index
+  %c1040 = arith.constant 1040 : index
+  %load_offset = arith.addi %offset_base, %c16 overflow<nsw> : index
   %1 = vector.load %0[%load_offset] : memref<?xf32>, vector<4xf32>
-  %store_offset = affine.apply affine_map<()[s0] -> (1040 + s0)>()[%offset_base]
+  %store_offset = arith.addi %offset_base, %c1040 overflow<nsw> : index
   vector.store %vec, %0[%store_offset] : memref<?xf32>, vector<4xf32>
   return %1: vector<4xf32>
 }
 
-// CHECK-LABEL: func @swizzle_adjust_affine_offset
+// CHECK-LABEL: func @swizzle_adjust_add_offset
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
 //  CHECK-SAME:   %[[VEC:[A-Za-z0-9]+]]: vector<4xf32>
 //  CHECK-SAME:   %[[OFFSET:[A-Za-z0-9]+]]: index
 //   CHECK-DAG:   %[[ROW_WIDTH:.+]] = arith.constant 64 : index
 //   CHECK-DAG:   %[[GROUP_COUNT:.+]] = arith.constant 16 : index
 //   CHECK-DAG:   %[[GROUP_WIDTH:.+]] = arith.constant 4 : index
-//       CHECK:   %[[APPLY_BASE:.+]] = affine.apply affine_map<()[s0] -> (s0 + 16)>()[%[[OFFSET]]]
+//   CHECK-DAG:   %[[C1040:.+]] = arith.constant 1040 : index
+//       CHECK:   %[[APPLY_BASE:.+]] = arith.addi %[[OFFSET]], %[[GROUP_COUNT]] overflow<nsw> : index
 //       CHECK:   %[[I:.+]] = arith.divui %[[APPLY_BASE]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[JELEM:.+]] = arith.remui %[[APPLY_BASE]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[J:.+]] = arith.divui %[[JELEM]], %[[GROUP_WIDTH]] : index
@@ -184,7 +187,7 @@ func.func @swizzle_adjust_affine_offset(%src: memref<?xf32>, %vec: vector<4xf32>
 
 //       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
 
-//       CHECK:   %[[STORE_BASE:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1040)>()[%[[OFFSET]]]
+//       CHECK:   %[[STORE_BASE:.+]] = arith.addi %[[OFFSET]], %[[C1040]] overflow<nsw> : index
 //       CHECK:   %[[OFFSET_DIFF:.+]] = arith.subi %[[SWOFF]], %[[APPLY_BASE]] : index
 //       CHECK:   %[[STORE_SWOFF:.+]] = arith.addi %[[STORE_BASE]], %[[OFFSET_DIFF]] : index
 //       CHECK:   vector.store %[[VEC]], %[[SRC]][%[[STORE_SWOFF]]]
