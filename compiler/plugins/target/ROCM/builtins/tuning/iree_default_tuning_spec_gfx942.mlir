@@ -547,14 +547,14 @@ util.func private @pingpong_large_bf16_expanded(%lhs_base: !bf16_exp_in_ty, %rhs
 
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c8 overflow<nsw, nuw> : index
     %lhs_thread_local = tensor.extract_slice %lhs_init [0, %delin#0, %vec] [1, 1, 8] [1, 1, 1] : !bf16_exp_block_in to tensor<1x1x8xbf16>
     %lhs_vec_local = vector.transfer_read %lhs_thread_local [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x8xbf16>, vector<1x8xbf16>
     vector.transfer_write %lhs_vec_local, %lhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x8xbf16>, !bf16_shared
   } {mapping = [#gpu.thread<linear_dim_0>]}
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c8 overflow<nsw, nuw> : index
     %rhs_thread_local = tensor.extract_slice %rhs_init [%delin#0, %vec] [1, 8] [1, 1] : !bf16_block_in to tensor<1x8xbf16>
     %rhs_vec_local = vector.transfer_read %rhs_thread_local [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xbf16>, vector<1x8xbf16>
     vector.transfer_write %rhs_vec_local, %rhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x8xbf16>, !bf16_shared
@@ -566,21 +566,21 @@ util.func private @pingpong_large_bf16_expanded(%lhs_base: !bf16_exp_in_ty, %rhs
   %0 = tensor.empty() : tensor<1x16x16x16x16xf32>
   %1 = scf.forall (%id) in (512) shared_outs(%out = %0) -> tensor<1x16x16x16x16xf32> {
     %ids:4 = affine.delinearize_index %id into (2, 4, 4, 16) : index, index, index, index
-    %inner_id = arith.muli %ids#2, %c4 : index
-    %m_outer_id = arith.muli %ids#0, %c8 : index
-    %n_outer_id = arith.muli %ids#1, %c4 : index
+    %inner_id = arith.muli %ids#2, %c4 overflow<nsw, nuw> : index
+    %m_outer_id = arith.muli %ids#0, %c8 overflow<nsw, nuw> : index
+    %n_outer_id = arith.muli %ids#1, %c4 overflow<nsw, nuw> : index
     %delin:2 = affine.delinearize_index %id into (64, 8) : index, index
     %wt:3 = affine.delinearize_index %id into (8, 8, 8) : index, index, index
 
     // Inner 64 loads 8 threads x 8 elements.
-    %gko = arith.muli %wt#2, %c8 : index
+    %gko = arith.muli %wt#2, %c8 overflow<nsw, nuw> : index
     // Each subgroup loads 32 contiguous rows out of 256.
-    %bpo = arith.muli %wt#0, %c32 : index
+    %bpo = arith.muli %wt#0, %c32 overflow<nsw, nuw> : index
     // Base index is remaining outer 8 lanes + subgroup base.
-    %glb0 = arith.addi %wt#1, %bpo : index
-    %glb1 = arith.addi %glb0, %c8 : index
-    %glb2 = arith.addi %glb1, %c8 : index
-    %glb3 = arith.addi %glb2, %c8 : index
+    %glb0 = arith.addi %wt#1, %bpo overflow<nsw, nuw>: index
+    %glb1 = arith.addi %glb0, %c8 overflow<nsw, nuw>: index
+    %glb2 = arith.addi %glb1, %c8 overflow<nsw, nuw>: index
+    %glb3 = arith.addi %glb2, %c8 overflow<nsw, nuw>: index
 
     %2 = arith.constant dense<0.0> : vector<8x4x1x4xf32>
 
@@ -771,14 +771,14 @@ util.func private @pingpong_large_bf16(%lhs_base: !bf16_in_ty, %rhs_base: !bf16_
 
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c8 overflow<nsw, nuw>: index
     %lhs_thread_local = tensor.extract_slice %lhs_init [%delin#0, %vec] [1, 8] [1, 1] : !bf16_block_in to tensor<1x8xbf16>
     %lhs_vec_local = vector.transfer_read %lhs_thread_local [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xbf16>, vector<1x8xbf16>
     vector.transfer_write %lhs_vec_local, %lhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x8xbf16>, !bf16_shared
   } {mapping = [#gpu.thread<linear_dim_0>]}
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c8 overflow<nsw, nuw>: index
     %rhs_thread_local = tensor.extract_slice %rhs_init [%delin#0, %vec] [1, 8] [1, 1] : !bf16_block_in to tensor<1x8xbf16>
     %rhs_vec_local = vector.transfer_read %rhs_thread_local [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xbf16>, vector<1x8xbf16>
     vector.transfer_write %rhs_vec_local, %rhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x8xbf16>, !bf16_shared
@@ -790,21 +790,21 @@ util.func private @pingpong_large_bf16(%lhs_base: !bf16_in_ty, %rhs_base: !bf16_
   %0 = tensor.empty() : tensor<16x16x16x16xf32>
   %1 = scf.forall (%id) in (512) shared_outs(%out = %0) -> tensor<16x16x16x16xf32> {
     %ids:4 = affine.delinearize_index %id into (2, 4, 4, 16) : index, index, index, index
-    %inner_id = arith.muli %ids#2, %c4 : index
-    %m_outer_id = arith.muli %ids#0, %c8 : index
-    %n_outer_id = arith.muli %ids#1, %c4 : index
+    %inner_id = arith.muli %ids#2, %c4 overflow<nsw, nuw>: index
+    %m_outer_id = arith.muli %ids#0, %c8 overflow<nsw, nuw>: index
+    %n_outer_id = arith.muli %ids#1, %c4 overflow<nsw, nuw>: index
     %delin:2 = affine.delinearize_index %id into (64, 8) : index, index
     %wt:3 = affine.delinearize_index %id into (8, 8, 8) : index, index, index
 
     // Inner 64 loads 8 threads x 8 elements.
-    %gko = arith.muli %wt#2, %c8 : index
+    %gko = arith.muli %wt#2, %c8 overflow<nsw, nuw>: index
     // Each subgroup loads 32 contiguous rows out of 256.
-    %bpo = arith.muli %wt#0, %c32 : index
+    %bpo = arith.muli %wt#0, %c32 overflow<nsw, nuw>: index
     // Base index is remaining outer 8 lanes + subgroup base.
-    %glb0 = arith.addi %wt#1, %bpo : index
-    %glb1 = arith.addi %glb0, %c8 : index
-    %glb2 = arith.addi %glb1, %c8 : index
-    %glb3 = arith.addi %glb2, %c8 : index
+    %glb0 = arith.addi %wt#1, %bpo overflow<nsw, nuw>: index
+    %glb1 = arith.addi %glb0, %c8 overflow<nsw, nuw>: index
+    %glb2 = arith.addi %glb1, %c8 overflow<nsw, nuw>: index
+    %glb3 = arith.addi %glb2, %c8 overflow<nsw, nuw>: index
 
     %2 = arith.constant dense<0.0> : vector<8x4x1x4xf32>
 
@@ -1416,14 +1416,14 @@ util.func private @pingpong_medium_bf16_expanded(%lhs_base: !mexp_in_ty_bf16, %r
 
   scf.forall (%id) in (1024) {
     %delin:2 = affine.delinearize_index %id into (128, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c8 overflow<nsw, nuw>: index
     %lhs_thread_local = tensor.extract_slice %lhs_init [0, %delin#0, %vec] [1, 1, 8] [1, 1, 1] : !mexp_block_in_bf16 to tensor<1x1x8xbf16>
     %lhs_vec_local = vector.transfer_read %lhs_thread_local [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x8xbf16>, vector<1x8xbf16>
     vector.transfer_write %lhs_vec_local, %lhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x8xbf16>, !mshared_bf16
   } {mapping = [#gpu.thread<linear_dim_0>]}
   scf.forall (%id) in (2048) {
     %delin:2 = affine.delinearize_index %id into (256, 8) : index, index
-    %vec = arith.muli %delin#1, %c8 : index
+    %vec = arith.muli %delin#1, %c8 overflow<nsw, nuw>: index
     %rhs_thread_local = tensor.extract_slice %rhs_init [%delin#0, %vec] [1, 8] [1, 1] : !block_in_bf16 to tensor<1x8xbf16>
     %rhs_vec_local = vector.transfer_read %rhs_thread_local [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xbf16>, vector<1x8xbf16>
     vector.transfer_write %rhs_vec_local, %rhs_shared[%delin#0, %vec] {in_bounds = [true, true]} : vector<1x8xbf16>, !shared_bf16
@@ -1435,25 +1435,25 @@ util.func private @pingpong_medium_bf16_expanded(%lhs_base: !mexp_in_ty_bf16, %r
   %0 = tensor.empty() : tensor<1x8x16x16x16xf32>
   %1 = scf.forall (%id) in (512) shared_outs(%out = %0) -> tensor<1x8x16x16x16xf32> {
     %ids:4 = affine.delinearize_index %id into (2, 4, 4, 16) : index, index, index, index
-    %inner_id = arith.muli %ids#2, %c4 : index
-    %m_outer_id = arith.muli %ids#0, %c4 : index
-    %n_outer_id = arith.muli %ids#1, %c4 : index
+    %inner_id = arith.muli %ids#2, %c4 overflow<nsw, nuw>: index
+    %m_outer_id = arith.muli %ids#0, %c4 overflow<nsw, nuw>: index
+    %n_outer_id = arith.muli %ids#1, %c4 overflow<nsw, nuw>: index
     %delin:2 = affine.delinearize_index %id into (64, 8) : index, index
     %wt:3 = affine.delinearize_index %id into (8, 8, 8) : index, index, index
 
     // Inner 64 loads 8 threads x 8 elements.
-    %gko = arith.muli %wt#2, %c8 : index
+    %gko = arith.muli %wt#2, %c8 overflow<nsw, nuw>: index
     // RHS indexing. Each subgroup loads 32 contiguous rows out of 256.
-    %bpo = arith.muli %wt#0, %c32 : index
+    %bpo = arith.muli %wt#0, %c32 overflow<nsw, nuw>: index
     // Base index is remaining outer 8 lanes + subgroup base.
-    %glb0 = arith.addi %wt#1, %bpo : index
-    %glb1 = arith.addi %glb0, %c8 : index
-    %glb2 = arith.addi %glb1, %c8 : index
-    %glb3 = arith.addi %glb2, %c8 : index
+    %glb0 = arith.addi %wt#1, %bpo overflow<nsw, nuw>: index
+    %glb1 = arith.addi %glb0, %c8 overflow<nsw, nuw>: index
+    %glb2 = arith.addi %glb1, %c8 overflow<nsw, nuw>: index
+    %glb3 = arith.addi %glb2, %c8 overflow<nsw, nuw>: index
     // LHS indexing.
-    %bpo_lhs = arith.muli %wt#0, %c16 : index
-    %glb0_lhs = arith.addi %wt#1, %bpo_lhs : index
-    %glb1_lhs = arith.addi %glb0_lhs, %c8 : index
+    %bpo_lhs = arith.muli %wt#0, %c16 overflow<nsw, nuw>: index
+    %glb0_lhs = arith.addi %wt#1, %bpo_lhs overflow<nsw, nuw>: index
+    %glb1_lhs = arith.addi %glb0_lhs, %c8 overflow<nsw, nuw>: index
 
     %2 = arith.constant dense<0.0> : vector<4x4x1x4xf32>
 
@@ -1606,7 +1606,7 @@ util.func private @pingpong_medium_f8_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
 
   %lhs_init = tensor.extract_slice %lhs [0, 0, 0] [1, 128, 128] [1, 1, 1] : !mexp_in_ty_f8 to !mexp_block_in_f8
   %rhs_init = tensor.extract_slice %rhs [0, 0] [256, 128] [1, 1] : !in_ty_f8 to !block_in_f8
-  
+
   scf.forall (%id) in (1024) {
     %delin:2 = affine.delinearize_index %id into (128, 8) : index, index
     %vec = arith.muli %delin#1, %c16 overflow<nsw, nuw> : index
@@ -2528,7 +2528,7 @@ transform.named_sequence
     : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  
+
   // M % 128 == 0, K % 128 == 0, N % 256 == 0
   transform.iree.match.dim_is_multiple_of  %lhs[1], 128 : !transform.any_value
   transform.iree.match.dim_is_multiple_of  %lhs[2], 128 : !transform.any_value
@@ -2744,7 +2744,6 @@ transform.named_sequence
     @match_mmt_f16_f16_f32_large -> @apply_pingpong_op_config,
     @match_mmt_bf16_bf16_f32_large_expanded -> @apply_expanded_bf16_pingpong_op_config,
     @match_mmt_bf16_bf16_f32_large -> @apply_bf16_pingpong_op_config,
-    
 
     // Medium pingpong variants are lower priority.
     @match_mmt_f16_f16_f32_medium_expanded -> @apply_expanded_medium_pingpong_op_config,
