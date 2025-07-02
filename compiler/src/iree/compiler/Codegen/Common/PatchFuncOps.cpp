@@ -9,6 +9,8 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "llvm/Support/Casting.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-debug-patch-func-ops"
@@ -27,18 +29,20 @@ llvm::cl::opt<std::string> clCodegenPatchedFuncOpsFileName(
 static LogicalResult getMatchedFuncOp(StringRef fileName,
                                       FunctionOpInterface funcOp,
                                       FunctionOpInterface &replacement) {
-  std::optional<ModuleOp> module;
+  std::optional<ModuleOp> moduleOp;
   auto dialect = funcOp->getContext()
                      ->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
-  auto maybeModule =
-      dialect->getOrLoadPatchedFuncOpsForDebugging(std::string(fileName));
-  if (failed(maybeModule)) {
+  FailureOr<ModuleOp> maybeModuleOp =
+      dialect->getOrLoadPatchedFuncOpsForDebugging(fileName.str());
+  if (failed(maybeModuleOp)) {
     return failure();
   }
-  module = *maybeModule;
+  moduleOp = *maybeModuleOp;
   LDBG("--found patching library @" << fileName);
 
-  for (auto candidate : module->getOps<FunctionOpInterface>()) {
+  moduleOp->dump();
+  for (auto candidate : moduleOp->getOps<FunctionOpInterface>()) {
+    funcOp.dump();
     if (funcOp.getName() == candidate.getName()) {
       replacement = candidate;
       break;
@@ -49,10 +53,6 @@ static LogicalResult getMatchedFuncOp(StringRef fileName,
 
 namespace {
 struct PatchFuncOpsPass : public impl::PatchFuncOpsPassBase<PatchFuncOpsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registerTransformDialectTranslationDependentDialects(registry);
-  }
-
   void runOnOperation() final;
 };
 } // namespace
@@ -62,7 +62,16 @@ void PatchFuncOpsPass::runOnOperation() {
     LDBG("skip, because no file is provided");
     return;
   }
-  auto moduleOp = getOperation();
+  Operation *startOp = getOperation();
+  while (!isa_and_present<ModuleOp>(startOp)) {
+    startOp = startOp->getParentOp();
+  }
+  ModuleOp moduleOp = dyn_cast<ModuleOp>(startOp);
+  if (!moduleOp) {
+    getOperation()->emitError(
+        "can not find ModuleOp in parent chain, wrong scope?");
+    return signalPassFailure();
+  }
   StringRef fileName = llvm::StringRef(clCodegenPatchedFuncOpsFileName);
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     FunctionOpInterface replacement;
@@ -71,13 +80,16 @@ void PatchFuncOpsPass::runOnOperation() {
                          << clCodegenPatchedFuncOpsFileName;
       return signalPassFailure();
     }
-
     if (!replacement) {
       LDBG("--did not find matching funcOp" << funcOp.getName());
       continue;
     }
-
-    funcOp.getCallableRegion()->takeBody(*replacement.getCallableRegion());
+    LDBG("--found matching funcOp" << funcOp.getName());
+    // Do not use takeBody method because it drops the reference in the module
+    // op that contains the patches.
+    IRMapping mapper;
+    funcOp.getBlocks().clear();
+    replacement.getFunctionBody().cloneInto(&funcOp.getFunctionBody(), mapper);
   }
 }
 

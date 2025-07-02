@@ -88,7 +88,7 @@ FailureOr<ModuleOp> IREECodegenDialect::getOrParseTransformLibraryModule(
       });
 }
 
-FailureOr<::mlir::ModuleOp>
+FailureOr<ModuleOp>
 IREECodegenDialect::getOrLoadPatchedFuncOpsForDebugging(std::string path) {
   // Acquire a lock on the map that will release once out of scope.
   std::lock_guard<std::mutex> guard(moduleForPatchesMutex);
@@ -103,7 +103,8 @@ IREECodegenDialect::getOrLoadPatchedFuncOpsForDebugging(std::string path) {
   }
 
   std::string errorMessage;
-  auto memoryBuffer = mlir::openInputFile(path, &errorMessage);
+  std::unique_ptr<llvm::MemoryBuffer> memoryBuffer =
+      mlir::openInputFile(path, &errorMessage);
   if (!memoryBuffer) {
     return emitError(
                FileLineColLoc::get(StringAttr::get(getContext(), path), 0, 0))
