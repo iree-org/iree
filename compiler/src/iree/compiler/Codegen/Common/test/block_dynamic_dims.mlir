@@ -427,3 +427,35 @@ func.func @block_dims_with_map_scatter(%size: index) -> tensor<?xf32> {
 //  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x16xf32>)
 //       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
 //       CHECK:   return %[[MAP_SCATTER]]
+
+// -----
+
+func.func @reshape_propagation_before_blocking_test() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 7, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(5) : i32
+  %1 = hal.interface.constant.load layout(<constants = 7, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(6) : i32
+  %2 = arith.index_castui %0 : i32 to index
+  %3 = arith.index_castui %1 : i32 to index
+  %4:2 = util.assume.int
+      %2<umin = 524288, umax = 2146959360, udiv = 524288>,
+      %3<umin = 128, umax = 524160, udiv = 128>
+    : index, index
+  %5 = iree_tensor_ext.dispatch.workload.ordinal %4#0, 0 : index
+  %6 = iree_tensor_ext.dispatch.workload.ordinal %4#1, 1 : index
+  %7 = hal.interface.binding.subspan layout(<constants = 7, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xbf16>>{%5}
+  %8 = hal.interface.binding.subspan layout(<constants = 7, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x4224xf8E4M3FNUZ>>{%6}
+  %9 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0], sizes = [%5], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xbf16>>{%5} -> tensor<?xbf16>
+  %10 = tensor.empty(%5) : tensor<?xf8E4M3FNUZ>
+  %11 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%9 : tensor<?xbf16>) outs(%10 : tensor<?xf8E4M3FNUZ>) {
+  ^bb0(%in: bf16, %out: f8E4M3FNUZ):
+    %12 = arith.truncf %in : bf16 to f8E4M3FNUZ
+    linalg.yield %12 : f8E4M3FNUZ
+  } -> tensor<?xf8E4M3FNUZ>
+  %expanded = tensor.expand_shape %11 [[0, 1]] output_shape [%6, 4096] : tensor<?xf8E4M3FNUZ> into tensor<?x4096xf8E4M3FNUZ>
+  iree_tensor_ext.dispatch.tensor.store %expanded, %8, offsets = [0, 0], sizes = [%6, 4096], strides = [1, 1] : tensor<?x4096xf8E4M3FNUZ> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x4224xf8E4M3FNUZ>>{%6}
+  return
+}
+// CHECK-LABEL: func @reshape_propagation_before_blocking_test(
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty{{.*}} tensor<?x128x4096xf8E4M3FNUZ>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x128x4096xf8E4M3FNUZ>)

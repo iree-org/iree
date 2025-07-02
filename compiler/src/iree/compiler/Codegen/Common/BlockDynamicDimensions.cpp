@@ -334,9 +334,49 @@ blockDynamicDimensions(RewriterBase &rewriter,
       .Default([&](Operation *op) { return success(); });
 }
 
+static void
+populateBubbleReshapePatterns(RewritePatternSet &patterns,
+                              const linalg::ControlFusionFn &controlFusionFn) {
+  linalg::populateFoldReshapeOpsByExpansionPatterns(patterns, controlFusionFn);
+  IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                             controlFusionFn);
+  // Add patterns to fold the "bubbled-up" `tensor.expand_shape` operation and
+  // "pushed-down" `tensor.collapse_shape` operation with their interface
+  // bindings or `tensor.empty` operations.
+  populateReshapeToInterfaceTensorPatterns(patterns);
+  populateCombineRelayoutOpPatterns(patterns);
+  populateFoldTensorReshapeIntoBufferPatterns(patterns);
+  tensor::populateFoldTensorEmptyPatterns(patterns);
+  tensor::populateBubbleUpExpandShapePatterns(patterns);
+  linalg::FillOp::getCanonicalizationPatterns(patterns, patterns.getContext());
+  // Add some additional patterns that can simplify the IR and remove dead
+  // operations.
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+  populateRemoveDeadMemAllocPatterns(patterns);
+}
+
 void BlockDynamicDimensionsPass::runOnOperation() {
   Operation *operation = getOperation();
   MLIRContext *context = &getContext();
+
+  {
+    // Bubble up/down reshape operations before blocking to avoid creating
+    // chains of reshape operations after blocking as much as possible.
+    RewritePatternSet patterns(context);
+    linalg::ControlFusionFn bubbleUpExpansionControlFn =
+        [](OpOperand *opOperand) { return true; };
+    populateBubbleReshapePatterns(patterns, bubbleUpExpansionControlFn);
+    if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "After initial reshape propagation:\n";
+    operation->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n";
+  });
+
   TensorDynamicDimAnalysis dynamicDimAnalysis(operation);
   if (failed(dynamicDimAnalysis.run())) {
     return signalPassFailure();
@@ -367,25 +407,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
       return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
           opOperand->get().getDefiningOp());
     };
-    linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
-                                                      controlFn);
-    IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
-        bubbleExpandShapePatterns, controlFn);
-    // Add patterns to fold the "bubbled-up" `tensor.expand_shape` operation and
-    // "pushed-down" `tensor.collapse_shape` operation with their interface
-    // bindings or `tensor.empty` operations.
-    populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
-    populateCombineRelayoutOpPatterns(bubbleExpandShapePatterns);
-    populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
-    tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
-    tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
-    linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
-                                                context);
-    // Add some additional patterns that can simplify the IR and remove dead
-    // operations.
-    memref::populateResolveRankedShapedTypeResultDimsPatterns(
-        bubbleExpandShapePatterns);
-    populateRemoveDeadMemAllocPatterns(bubbleExpandShapePatterns);
+    populateBubbleReshapePatterns(bubbleExpandShapePatterns, controlFn);
     if (failed(applyPatternsGreedily(operation,
                                      std::move(bubbleExpandShapePatterns)))) {
       operation->emitOpError(
