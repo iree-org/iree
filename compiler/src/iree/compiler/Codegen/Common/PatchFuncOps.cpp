@@ -51,6 +51,9 @@ static LogicalResult getMatchedFuncOp(StringRef fileName,
 
 namespace {
 struct PatchFuncOpsPass : public impl::PatchFuncOpsPassBase<PatchFuncOpsPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Codegen::IREECodegenDialect>();
+  }
   void runOnOperation() final;
 };
 } // namespace
