@@ -676,6 +676,7 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     workgroupTileSizes[batch] = 1;
   }
 
+  // #TODO: NEED TO FIX THE REDUCTION TILE SIZES HERE MUZASYED.
   // Tile all m, n, and k dimensions to 1 except the innermost. Unit dims
   // from this tiling are folded before vectorization.
   for (int64_t m : llvm::drop_end(contractionM)) {
