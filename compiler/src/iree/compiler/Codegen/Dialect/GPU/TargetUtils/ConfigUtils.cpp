@@ -336,7 +336,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   if (!schedule && canSupportUnaligned) {
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
-    doCPromotion = true;
+    // doCPromotion = true;
     schedule = getMmaScheduleFromProblemAndTarget(target, problem,
                                                   transposedLhs, transposedRhs,
                                                   mustBeAligned, doCPromotion);
@@ -420,7 +420,8 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+    // GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1});
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
