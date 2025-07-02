@@ -442,7 +442,8 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     // because we don't have access to the vectorization infra, but maybe there
     // are easier ways to do it here.
     auto read = rewriter.create<vector::TransferReadOp>(
-        loc, readType, tensor, operandIndices, readMap);
+        loc, readType, tensor, operandIndices, /*padding=*/std::nullopt,
+        readMap);
 
     baseIndices.push_back(zero);
     indexed.push_back(true);
@@ -542,7 +543,8 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   auto indicesVecRead = rewriter.create<vector::TransferReadOp>(
       loc, indicesVecTy.clone(indicesTy.getElementType()),
-      gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero));
+      gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero),
+      std::nullopt);
   VectorType indicesMaskType = indicesVecTy.clone(rewriter.getI1Type());
   SmallVector<OpFoldResult> gatherDims =
       tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());

@@ -171,9 +171,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGID]]#1]
 // CHECK: gpu.barrier
 // CHECK-DAG: %[[BATCH0:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 16) : index, index, index
-// CHECK-DAG: %[[SG_READ0:.+]] = vector.transfer_read %alloc[%[[BATCH0]]#2, %[[BATCH0]]#1], %cst : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
+// CHECK-DAG: %[[SG_READ0:.+]] = vector.transfer_read %alloc[%[[BATCH0]]#2, %[[BATCH0]]#1], %{{.*}} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
 // CHECK-DAG: %[[BATCH1:.+]] = affine.linearize_index disjoint [%c1, %[[BATCH0]]#2] by (2, 16) : index
-// CHECK-DAG: %[[SG_READ1:.+]] = vector.transfer_read %alloc[%[[BATCH1]], %[[BATCH0]]#1], %cst : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
+// CHECK-DAG: %[[SG_READ1:.+]] = vector.transfer_read %alloc[%[[BATCH1]], %[[BATCH0]]#1], %{{.*}} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
 // CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
 // CHECK-DAG: %[[DISTR0:.+]] = vector.extract %[[SG_READ0]][0, 0] : f32 from vector<1x1xf32>
 // CHECK-DAG: %[[RED0:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR0]] cluster(size = 2, stride = 16) : (f32) -> f32

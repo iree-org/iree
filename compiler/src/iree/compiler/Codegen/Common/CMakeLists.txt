@@ -227,6 +227,7 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToSCF

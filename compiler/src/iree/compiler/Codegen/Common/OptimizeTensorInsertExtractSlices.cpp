@@ -11,6 +11,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Dominance.h"
@@ -336,6 +337,12 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     assert(!isa<VectorType>(rPad.getType()) &&
            "search `NOTE[FoldMaskedTransferRAW]` in "
            "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
+
+    // Fold to the stored value if the padding value is poison
+    if (isa_and_present<ub::PoisonOp>(rPad.getDefiningOp())) {
+      rewriter.replaceOp(op, valToStore);
+      return success();
+    }
 
     // Materialize the padding with a constant.
     auto padVal = rewriter.create<vector::SplatOp>(rPad.getLoc(),

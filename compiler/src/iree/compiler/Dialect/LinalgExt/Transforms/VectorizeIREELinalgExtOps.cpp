@@ -39,7 +39,8 @@ struct VectorizeStaticMapScatterOpPattern final
     auto inputVectorType =
         VectorType::get(inputType.getShape(), inputType.getElementType());
     Value inputVector = rewriter.create<vector::TransferReadOp>(
-        loc, inputVectorType, mapScatterOp.getInput(), /*indices=*/zeros);
+        loc, inputVectorType, mapScatterOp.getInput(), /*indices=*/zeros,
+        /*padding=*/std::nullopt);
     auto vectorizedMapScatterOp =
         clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
               {inputVector, mapScatterOp.getOutput()});

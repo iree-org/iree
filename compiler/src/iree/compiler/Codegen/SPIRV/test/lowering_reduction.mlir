@@ -42,7 +42,6 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 //     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
 //     CHECK-DAG:    %[[C512:.+]] = arith.constant 512 : index
 //     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
-//     CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0.000000e+00 : f32
 //     CHECK-DAG:    %[[CF:.+]] = arith.constant 1.000000e+00 : f32
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
@@ -126,6 +125,7 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //     CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 //     CHECK-DAG:    %[[C9216:.+]] = arith.constant 9216 : index
 
+//     CHECK-DAG:    %[[PV:.+]] = ub.poison : f16
 //     CHECK-DAG:    %[[F0:.+]] = arith.constant 0.000000e+00 : f16
 
 //     CHECK-DAG:    %[[WGIDX:.+]] = hal.interface.workgroup.id[0] upper_bound 65535 : index
@@ -147,7 +147,7 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //         CHECK:    %[[SPLAT:.+]] = vector.splat %[[ADD1]] : vector<4xf16>
 //         CHECK:    scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
 //         CHECK:      %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
-//         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[F0]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
+//         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[PV]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
 //         CHECK:      %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
 //         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[SPLAT]] : vector<4xf16>
 //         CHECK:      %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
@@ -284,7 +284,7 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK-DAG:     %[[MIN_F16:.+]] = arith.constant dense<0xFE00> : vector<1xf16>
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
-// CHECK-DAG:     %[[C0_F16:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:     %[[PV:.+]] = ub.poison : f16
 
 // CHECK:         %[[DIM_LBITS:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
 // CHECK:         %[[DIM_UBITS:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
@@ -298,16 +298,16 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:         vector.transfer_write %[[MIN_F16]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
-// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %[[PV]], %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[PV]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
 // CHECK:           %[[MAX:.+]] = arith.maxnumf %[[NEW]], %[[ACC]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:           gpu.barrier
 
 // Finish the first reduction.
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK:         vector.extract {{.*}} : f16 from vector<1xf16>
-// CHECK:         gpu.subgroup_reduce  maxnumf %10 : (f16) -> f16
+// CHECK:         %[[V11:.*]] = vector.extract {{.*}} : f16 from vector<1xf16>
+// CHECK:         gpu.subgroup_reduce  maxnumf %[[V11]] : (f16) -> f16
 
 // Do the elementwise scaling and second local reduction.
 // CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
