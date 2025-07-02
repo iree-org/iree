@@ -981,6 +981,9 @@ struct DistributeMultiReduction final
     return res;
   }
 
+  // TODO: nico look at order of dimensions for shared memory.
+  // we can either transpose or linearize.
+
   // The reductions across subgroups are performed
   // as follows:
   // 1) Re-cover the subgroup-local result as the same rank as the
@@ -1042,7 +1045,7 @@ struct DistributeMultiReduction final
         loc, unDistributedType, isoRankThreadReduced);
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> indices(unDistributedType.getRank(), c0);
-    SmallVector<bool> inBounds(unDistributedType.getRank(), false);
+    SmallVector<bool> inBounds(unDistributedType.getRank(), true);
     // Insert gpu.barrier to make sure previuos iteration
     // of batch loop has fully read the subgroup partial
     // reductions.
