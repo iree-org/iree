@@ -1095,7 +1095,8 @@ struct DistributeMultiReduction final
     // Insert gpu.barrier
     rewriter.create<gpu::BarrierOp>(write.getLoc());
     auto read = rewriter.create<vector::TransferReadOp>(
-        loc, unDistributedType, alloc, indices, inBounds);
+        loc, unDistributedType, alloc, indices, /*padding=*/std::nullopt,
+        inBounds);
     // Create new layout where the elements of a subgroup are
     // distributed to every threads.
     IREE::VectorExt::NestedLayoutAttr subgroupToThreadsLayout;
