@@ -126,6 +126,7 @@ iree_lit_test_suite(
     batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
     external_strategy_spec.mlir
+    patch_func_ops_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir
