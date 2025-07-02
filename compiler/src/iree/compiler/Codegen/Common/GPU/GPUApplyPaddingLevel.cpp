@@ -11,8 +11,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -179,13 +181,44 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
              DBGS() << "--with padToMultipleOf: " << options.padToMultipleOf
                     << "\n");
 
-  // 4. Pad and return.
+  // 4. Pad.
   SmallVector<tensor::PadOp> padOps;
   FailureOr<TilingInterface> maybePaddedOp =
       linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options, padOps);
   if (failed(maybePaddedOp)) {
     tilingInterfaceOp.emitWarning("failed to pad op");
     return failure();
+  }
+
+  // 5. For each PadOp, create a linalg::CopyOp to allow dim propagations.
+  TilingInterface paddedOp = *maybePaddedOp;
+  for (auto padOp : padOps) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointAfter(padOp);
+
+    // Record users for RAUW before creating new users.
+    llvm::SmallDenseSet<Operation *> users(padOp.getResult().getUsers().begin(),
+                                           padOp.getResult().getUsers().end());
+
+    RankedTensorType tensorTy = padOp.getResultType();
+    int64_t rank = tensorTy.getRank();
+    SmallVector<OpFoldResult> sizes(rank, OpFoldResult());
+    for (int64_t i = 0; i < rank; ++i) {
+      sizes[i] = rewriter.createOrFold<tensor::DimOp>(paddedOp->getLoc(),
+                                                      padOp.getResult(), i);
+      if (auto v = dyn_cast<Value>(sizes[i]))
+        sizes[i] = getAsOpFoldResult(v);
+    }
+
+    // padOp.getResultType(),
+    Value out = rewriter.create<tensor::EmptyOp>(
+        paddedOp.getLoc(), sizes, getElementTypeOrSelf(tensorTy));
+    auto copied = rewriter.create<linalg::CopyOp>(paddedOp.getLoc(),
+                                                  padOp.getResult(), out);
+    rewriter.replaceUsesWithIf(padOp.getResult(), copied.getResult(0),
+                               [&](OpOperand &opOperand) {
+                                 return users.contains(opOperand.getOwner());
+                               });
   }
 
   return success();
