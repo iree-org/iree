@@ -656,6 +656,18 @@ def PadDynamicAllocPass :
   let summary = "Pass to pad dynamic alloc into static one.";
 }
 
+def PatchFuncOpsPass : Pass<"iree-codegen-debug-patch-func-ops", "ModuleOp"> {
+  let summary = "A debugging pass for patching func ops with external func ops";
+  let description = [{
+    Pass to replace func ops if they matches the provided func op names. It is
+    useful when you know what the intermediate IR is, since you can patch the
+    func op without modifying any transformation code.
+
+    NOTE: This is for debugging purpose. You should not rely on the pass in
+          default pipelines.
+  }];
+}
+
 def MathTransformPass :
     Pass<"iree-codegen-math-transform", ""> {
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
