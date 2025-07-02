@@ -10,7 +10,7 @@ func.func @matmul_1x4x4(%lhs: tensor<1x4xf32>, %rhs: tensor<4x4xf32>, %init: ten
 // CHECK-LABEL: func.func @matmul_1x4x4
 //  CHECK-SAME: (%[[LHS:.+]]: tensor<1x4xf32>, %[[RHS:.+]]: tensor<4x4xf32>, %[[INIT:.+]]: tensor<1x4xf32>)
 
-//   CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[PAD:.+]] = ub.poison : f32
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -225,19 +225,19 @@ func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -
 
 // CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
-// CHECK-DAG:     %[[CST0:.+]]   = arith.constant 0 : i8
+// CHECK-DAG:     %[[PV:.+]]   = ub.poison : i8
 // CHECK-DAG:     %[[IDX0:.+]]   = arith.constant 0 : index
 // CHECK-DAG:     %[[IDX1:.+]]   = arith.constant 1 : index
 // CHECK-DAG:     %[[IDX2:.+]]   = arith.constant 2 : index
 // CHECK-DAG:     %[[IDX3:.+]]   = arith.constant 3 : index
-// CHECK:         %[[LHS0:.+]]   = vector.transfer_read %[[LHS]][%[[IDX0]], %[[IDX0]]], %[[CST0]]
-// CHECK-NEXT:    %[[LHS1:.+]]   = vector.transfer_read %[[LHS]][%[[IDX1]], %[[IDX0]]], %[[CST0]]
-// CHECK-NEXT:    %[[LHS2:.+]]   = vector.transfer_read %[[LHS]][%[[IDX2]], %[[IDX0]]], %[[CST0]]
-// CHECK-NEXT:    %[[LHS3:.+]]   = vector.transfer_read %[[LHS]][%[[IDX3]], %[[IDX0]]], %[[CST0]]
-// CHECK:         %[[RHS0:.+]]   = vector.transfer_read %[[RHS]][%[[IDX0]], %[[IDX0]]], %[[CST0]]
-// CHECK-NEXT:    %[[RHS1:.+]]   = vector.transfer_read %[[RHS]][%[[IDX1]], %[[IDX0]]], %[[CST0]]
-// CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[CST0]]
-// CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[CST0]]
+// CHECK:         %[[LHS0:.+]]   = vector.transfer_read %[[LHS]][%[[IDX0]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[LHS1:.+]]   = vector.transfer_read %[[LHS]][%[[IDX1]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[LHS2:.+]]   = vector.transfer_read %[[LHS]][%[[IDX2]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[LHS3:.+]]   = vector.transfer_read %[[LHS]][%[[IDX3]], %[[IDX0]]], %[[PV]]
+// CHECK:         %[[RHS0:.+]]   = vector.transfer_read %[[RHS]][%[[IDX0]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[RHS1:.+]]   = vector.transfer_read %[[RHS]][%[[IDX1]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[PV]]
 // CHECK:         %[[LHS0E:.+]]  = arith.extsi %[[LHS0]] : vector<4xi8> to vector<4xi32>
 // CHECK-NEXT:    %[[LHS1E:.+]]  = arith.extsi %[[LHS1]] : vector<4xi8> to vector<4xi32>
 // CHECK-NEXT:    %[[LHS2E:.+]]  = arith.extsi %[[LHS2]] : vector<4xi8> to vector<4xi32>
@@ -283,7 +283,7 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 
 // CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
-// CHECK-DAG:     %[[C0I8:.+]]   = arith.constant 0 : i8
+// CHECK-DAG:     %[[PV:.+]]   = ub.poison : i8
 // CHECK-DAG:     %[[C0I32:.+]]  = arith.constant 0 : i32
 // CHECK-DAG:     %[[V4I8:.+]]   = ub.poison : vector<4xi8>
 // CHECK-DAG:     %[[V4I32:.+]]  = arith.constant dense<0> : vector<4xi32>
@@ -292,14 +292,14 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // CHECK-DAG:     %[[IDX1:.+]]   = arith.constant 1 : index
 // CHECK-DAG:     %[[IDX2:.+]]   = arith.constant 2 : index
 // CHECK-DAG:     %[[IDX3:.+]]   = arith.constant 3 : index
-// CHECK:         %[[LHS0:.+]]   = vector.transfer_read %[[LHS]][%[[IDX0]], %[[IDX0]]], %[[C0I8]]
-// CHECK-NEXT:    %[[LHS1:.+]]   = vector.transfer_read %[[LHS]][%[[IDX1]], %[[IDX0]]], %[[C0I8]]
-// CHECK-NEXT:    %[[LHS2:.+]]   = vector.transfer_read %[[LHS]][%[[IDX2]], %[[IDX0]]], %[[C0I8]]
-// CHECK-NEXT:    %[[LHS3:.+]]   = vector.transfer_read %[[LHS]][%[[IDX3]], %[[IDX0]]], %[[C0I8]]
-// CHECK:         %[[RHS0:.+]]   = vector.transfer_read %[[RHS]][%[[IDX0]], %[[IDX0]]], %[[C0I8]]
-// CHECK-NEXT:    %[[RHS1:.+]]   = vector.transfer_read %[[RHS]][%[[IDX1]], %[[IDX0]]], %[[C0I8]]
-// CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[C0I8]]
-// CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[C0I8]]
+// CHECK:         %[[LHS0:.+]]   = vector.transfer_read %[[LHS]][%[[IDX0]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[LHS1:.+]]   = vector.transfer_read %[[LHS]][%[[IDX1]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[LHS2:.+]]   = vector.transfer_read %[[LHS]][%[[IDX2]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[LHS3:.+]]   = vector.transfer_read %[[LHS]][%[[IDX3]], %[[IDX0]]], %[[PV]]
+// CHECK:         %[[RHS0:.+]]   = vector.transfer_read %[[RHS]][%[[IDX0]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[RHS1:.+]]   = vector.transfer_read %[[RHS]][%[[IDX1]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[PV]]
+// CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[PV]]
 // CHECK:         %[[EXTR0:.+]]  = vector.extract %[[RHS0]][0]
 // CHECK-NEXT:    %[[INS0:.+]]   = vector.insert %[[EXTR0]], %[[V4I8]] [0]
 // CHECK-NEXT:    %[[EXTR1:.+]]  = vector.extract %[[RHS1]][0]
