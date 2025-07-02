@@ -31,7 +31,7 @@ hal.executable @transpose_dispatch_0 {
 }
 
 // CHECK-LABEL:  hal.executable public @transpose_dispatch_0
-//   CHECK-DAG:  %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:  %[[PV:.*]] = ub.poison : f32
 //   CHECK-DAG:  %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG:  %[[TX:.*]] = gpu.thread_id  x
 //   CHECK-DAG:  %[[TY:.*]] = gpu.thread_id  y
@@ -43,11 +43,11 @@ hal.executable @transpose_dispatch_0 {
 //       CHECK:  gpu.barrier
 //       CHECK:  %[[D2:.*]] = affine.apply #{{.*}}()[%{{.+}}, %[[TY]]]
 //       CHECK:  %[[D3:.*]] = affine.apply #{{.*}}()[%{{.+}}, %[[TX]]]
-//       CHECK:  %[[D4:.*]] = vector.transfer_read %[[D0]][%[[D2]], %[[D3]]], %[[CST]] {in_bounds = [true, true]} : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
+//       CHECK:  %[[D4:.*]] = vector.transfer_read %[[D0]][%[[D2]], %[[D3]]], %[[PV]] {in_bounds = [true, true]} : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
 //       CHECK:  %[[D5:.*]] = affine.apply #{{.*}}()[%[[TX]]]
 //       CHECK:  vector.transfer_write %[[D4]], %[[ALLOC]][%[[TY]], %[[D5]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D6:.*]] = vector.transfer_read %[[ALLOC]][%[[D5]], %[[TY]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:  %[[D6:.*]] = vector.transfer_read %[[ALLOC]][%[[D5]], %[[TY]]], %[[PV]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:  %[[D7:.*]] = vector.shape_cast %[[D6]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:  %[[D8:.*]] = affine.apply #{{.*}}()[%{{.+}}, %[[TY]]]
 //       CHECK:  %[[D9:.*]] = affine.apply #{{.*}}()[%{{.+}}, %[[TX]]]
@@ -89,7 +89,7 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 }
 
 // CHECK-LABEL:  hal.executable public @transpose_single_operand_dispatch_0_generic_768x2048
-//       CHECK:  %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//       CHECK:  %[[PV:.*]] = ub.poison : f32
 //       CHECK:  %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:  %[[TX:.*]] = gpu.thread_id  x
 //       CHECK:  %[[TY:.*]] = gpu.thread_id  y
@@ -104,13 +104,13 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 //       CHECK:  %[[D3:.*]] = affine.apply #{{.*}}()[%[[TX]]]
 //       CHECK:  %[[D4:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
 //       CHECK:  %[[D5:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TX]]]
-//       CHECK:  %[[D6:.*]] = vector.transfer_read %[[D0]][%[[D4]], %[[D5]]], %[[CST]] {in_bounds = [true, true]} : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
+//       CHECK:  %[[D6:.*]] = vector.transfer_read %[[D0]][%[[D4]], %[[D5]]], %[[PV]] {in_bounds = [true, true]} : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>, vector<1x4xf32>
 //       CHECK:  vector.transfer_write %[[D6]], %[[ALLOC]][%[[TY]], %[[D3]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D7:.*]] = vector.transfer_read %[[ALLOC]][%[[D3]], %[[TY]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:  %[[D7:.*]] = vector.transfer_read %[[ALLOC]][%[[D3]], %[[TY]]], %[[PV]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:  %[[D8:.*]] = arith.addi %[[TY]], %{{.*}}
 //       CHECK:  %[[D9:.*]] = arith.addi %[[D3]], %{{.*}}
-//       CHECK:  %[[D10:.*]] = vector.transfer_read %[[D1]][%[[D8]], %[[D9]]], %[[CST]] {in_bounds = [true]} : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//       CHECK:  %[[D10:.*]] = vector.transfer_read %[[D1]][%[[D8]], %[[D9]]], %[[PV]] {in_bounds = [true]} : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //       CHECK:  %[[D11:.*]] = vector.shape_cast %[[D7]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:  %[[D12:.*]] = arith.addf %[[D11]], %[[D10]] : vector<4xf32>
 //       CHECK:  %[[D13:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
@@ -193,7 +193,7 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 }
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
-//   CHECK-DAG:   %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[PV:.*]] = ub.poison : f32
 //   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:   %[[TX:.*]] = gpu.thread_id  x
 //       CHECK:   %[[TY:.*]] = gpu.thread_id  y
@@ -208,13 +208,13 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 //       CHECK:   %[[D3:.*]] = affine.apply #{{.*}}()[%[[TX]]]
 //       CHECK:   %[[D4:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
 //       CHECK:   %[[D5:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TX]]]
-//       CHECK:   %[[D6:.*]] = vector.transfer_read %[[D0]][%{{.*}}, %[[D4]], %[[D5]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
+//       CHECK:   %[[D6:.*]] = vector.transfer_read %[[D0]][%{{.*}}, %[[D4]], %[[D5]]], %[[PV]] {in_bounds = [true, true, true]} : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
 //       CHECK:   vector.transfer_write %[[D6]], %[[ALLOC]][%[[C0]], %[[TY]], %[[D3]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[D7:.*]] = vector.transfer_read %[[ALLOC]][%[[C0]], %[[D3]], %[[TY]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:   %[[D7:.*]] = vector.transfer_read %[[ALLOC]][%[[C0]], %[[D3]], %[[TY]]], %[[PV]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:   %[[D8:.*]] = arith.addi %[[TY]], %{{.*}}
 //       CHECK:   %[[D9:.*]] = arith.addi %[[D3]], %{{.*}}
-//       CHECK:   %[[D10:.*]] = vector.transfer_read %[[D1]][%{{.*}}, %[[D8]], %[[D9]]], %[[CST]] {in_bounds = [true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//       CHECK:   %[[D10:.*]] = vector.transfer_read %[[D1]][%{{.*}}, %[[D8]], %[[D9]]], %[[PV]] {in_bounds = [true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //       CHECK:   %[[D11:.*]] = vector.shape_cast %[[D7]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   %[[D12:.*]] = arith.addf %[[D11]], %[[D10]] : vector<4xf32>
 //       CHECK:   %[[D13:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
@@ -257,7 +257,7 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 }
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
-//   CHECK-DAG:   %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[PV:.*]] = ub.poison
 //   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:   %[[TX:.*]] = gpu.thread_id  x
 //       CHECK:   %[[TY:.*]] = gpu.thread_id  y
@@ -272,14 +272,14 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[D3:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]
 //       CHECK:   %[[D4:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TX]]]
-//       CHECK:   %[[D5:.*]] = vector.transfer_read %[[D0]][%{{.*}}, %[[D3]], %[[D4]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
+//       CHECK:   %[[D5:.*]] = vector.transfer_read %[[D0]][%{{.*}}, %[[D3]], %[[D4]]], %[[PV]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
 //       CHECK:   %[[D6:.*]] = affine.apply #{{.*}}()[%[[TX]]]
 //       CHECK:   vector.transfer_write %[[D5]], %[[ALLOC1]][%[[C0]], %[[TY]], %[[D6]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[D7:.*]] = vector.transfer_read %[[D1]][%{{.*}}, %[[D3]], %[[D4]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
+//       CHECK:   %[[D7:.*]] = vector.transfer_read %[[D1]][%{{.*}}, %[[D3]], %[[D4]]], %[[PV]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
 //       CHECK:   vector.transfer_write %[[D7]], %[[ALLOC]][%[[C0]], %[[TY]], %[[D6]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[D8:.*]] = vector.transfer_read %[[ALLOC1]][%[[C0]], %[[D6]], %[[TY]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
-//       CHECK:   %[[D9:.*]] = vector.transfer_read %[[ALLOC]][%[[C0]], %[[D6]], %[[TY]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:   %[[D8:.*]] = vector.transfer_read %[[ALLOC1]][%[[C0]], %[[D6]], %[[TY]]], %[[PV]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:   %[[D9:.*]] = vector.transfer_read %[[ALLOC]][%[[C0]], %[[D6]], %[[TY]]], %[[PV]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:   %[[D10:.*]] = arith.addf %[[D8]], %[[D9]] : vector<4x1xf32>
 //       CHECK:   %[[D11:.*]] = vector.shape_cast %[[D10]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   %[[D12:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[TY]]]

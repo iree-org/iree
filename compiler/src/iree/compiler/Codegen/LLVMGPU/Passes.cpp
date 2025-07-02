@@ -846,8 +846,8 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
   SmallVector<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
-  Value read = builder.create<vector::TransferReadOp>(loc, vectorType, from,
-                                                      indices, inBounds);
+  Value read = builder.create<vector::TransferReadOp>(
+      loc, vectorType, from, indices, /*padding=*/std::nullopt, inBounds);
   builder.create<vector::TransferWriteOp>(loc, read, to, indices, inBounds);
   if (needsBarrier) {
     builder.create<gpu::BarrierOp>(loc);

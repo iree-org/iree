@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -pass-pipeline='builtin.module(func.func(iree-vector-ext-vectorize-ops, iree-codegen-generic-vectorization{enable-vector-masking=true}),canonicalize,cse,canonicalize)' --split-input-file --mlir-print-local-scope | FileCheck %s
+// RUN: iree-opt %s -pass-pipeline='builtin.module(func.func(iree-vector-ext-vectorize-ops, iree-codegen-generic-vectorization{enable-vector-masking=true}),canonicalize,cse,func.func(iree-codegen-optimize-tensor-insert-extract-slices),canonicalize)' --split-input-file --mlir-print-local-scope | FileCheck %s
 
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
