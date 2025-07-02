@@ -116,7 +116,6 @@ IREECodegenDialect::getOrLoadPatchedFuncOpsForDebugging(std::string path) {
   auto moduleOp =
       OwningOpRef<ModuleOp>(parseSourceFile<ModuleOp>(sourceMgr, getContext()));
   if (!moduleOp) {
-    // Failed to parse the transform module.
     // Don't need to emit an error here as the parsing should have already done
     // that.
     return failure();
