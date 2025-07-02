@@ -8,9 +8,11 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/APInt.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
@@ -79,13 +81,26 @@ static std::optional<int64_t> getDynamicSizeMax(Value size) {
   if (matchPattern(size, m_ConstantInt(&constVal))) {
     return constVal.getZExtValue();
   }
+
+  // Go through one level of IREE::TensorExt::DispatchWorkloadOrdinalOp.
+  // TODO: just use ValueBoundsInterface that is known to work well.
+  if (auto dispatchOrdinal =
+          size.getDefiningOp<IREE::TensorExt::DispatchWorkloadOrdinalOp>()) {
+    LDBG("------found dispatchOrdinal " << dispatchOrdinal);
+    auto assumeOp =
+        dispatchOrdinal.getOperand().getDefiningOp<IREE::Util::AssumeIntOp>();
+    int64_t ordinal = dispatchOrdinal.getOrdinal().getSExtValue();
+    if (assumeOp)
+      return assumeOp.getUnionedUnsignedRange(ordinal).second;
+  }
+
   auto assumeOp = size.getDefiningOp<IREE::Util::AssumeIntOp>();
   if (!assumeOp)
     return std::nullopt;
-  std::optional<int64_t> maybeMax =
-      assumeOp.getUnionedUnsignedRange(cast<OpResult>(size).getResultNumber())
-          .second;
-  return maybeMax;
+  LDBG("------found assumeOp " << assumeOp);
+  return assumeOp
+      .getUnionedUnsignedRange(cast<OpResult>(size).getResultNumber())
+      .second;
 }
 
 static std::optional<int64_t>
@@ -99,6 +114,7 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   if (!resultTy || !resultTy.hasRank())
     return std::nullopt;
   for (Value dynArg : binding.getResultDynamicDims(0)) {
+    LDBG("----compute max dynamic size for " << dynArg);
     std::optional<int64_t> dimMax = getDynamicSizeMax(dynArg);
     if (!dimMax)
       return std::nullopt;
@@ -132,22 +148,24 @@ struct ROCDLConfigureBufferInstructionsPass final
         gpuDialect->getUseRocdlBufferInstructionsAttrHelper();
     auto unitAttr = UnitAttr::get(&getContext());
     func.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
+      LDBG("--Analyze binding " << binding << "");
       Value offset = binding.getByteOffset();
       if (offset && !isDefinitelyWorkgroupUniform(offset)) {
-        LDBG("Binding offset " << offset << " not known workgroup-uniform\n");
+        LDBG("----offset " << offset << " not known workgroup-uniform");
         return;
       }
       std::optional<int64_t> maxBytes = getSpannedBytes(binding);
       if (!maxBytes) {
-        LDBG("Couldn't bound binding size for " << binding);
+        LDBG("----binding size not bound for " << binding);
         return;
       }
       if (*maxBytes >=
           static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
-        LDBG("Size of " << binding << " too large (" << *maxBytes << " bytes)");
+        LDBG("----size too large (" << *maxBytes << " bytes)");
         return;
       }
       annotationHelper.setAttr(binding, unitAttr);
+      LDBG("--SUCCESS binding updated to " << binding);
     });
   }
 };
