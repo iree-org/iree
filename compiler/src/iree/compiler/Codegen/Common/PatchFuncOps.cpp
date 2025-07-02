@@ -40,9 +40,7 @@ static LogicalResult getMatchedFuncOp(StringRef fileName,
   moduleOp = *maybeModuleOp;
   LDBG("--found patching library @" << fileName);
 
-  moduleOp->dump();
   for (auto candidate : moduleOp->getOps<FunctionOpInterface>()) {
-    funcOp.dump();
     if (funcOp.getName() == candidate.getName()) {
       replacement = candidate;
       break;
