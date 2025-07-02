@@ -226,7 +226,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned*/ mustBeAligned, doCPromotion);
+      /*mustBeAligned*/ mustBeAligned);
   return schedule;
 }
 
@@ -325,7 +325,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   bool mustBeAligned = true;
-  bool doCPromotion = false;
+  // bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs);
 
@@ -337,9 +337,8 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
     mustBeAligned = false;
     // doCPromotion = true;
-    schedule = getMmaScheduleFromProblemAndTarget(target, problem,
-                                                  transposedLhs, transposedRhs,
-                                                  mustBeAligned, doCPromotion);
+    schedule = getMmaScheduleFromProblemAndTarget(
+        target, problem, transposedLhs, transposedRhs, mustBeAligned);
   }
 
   if (!schedule) {
