@@ -3030,6 +3030,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG("Contract Config");
       return success();
     }
+    // TODO: nico layernorm stuff.
     if (succeeded(setReductionVectorDistributionConfig(target, entryPointFn,
                                                        linalgOp))) {
       LDBG("Vector Distribution Subgroup Reduction Config");
