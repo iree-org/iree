@@ -477,7 +477,8 @@ struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
 
 FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
                                    int64_t startDim, int64_t numDims,
-                                   Value operand, ShapedType ty) {
+                                   Value operand, ShapedType ty,
+                                   const linalg::ControlDropUnitDims &options) {
   if (numDims == 0) {
     return failure();
   }
@@ -510,15 +511,63 @@ FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
     return failure();
   }
   // Drop unit dims using extract_slice.
-  FailureOr<Value> rankReducingExtract =
-      tensor::ExtractSliceOp::rankReduceIfNeeded(rewriter, loc, operand,
-                                                 targetShape);
-  assert(succeeded(rankReducingExtract) && "not a unit-extent collapse");
-  return rankReducingExtract.value();
+  if (options.rankReductionStrategy ==
+      linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice) {
+    FailureOr<Value> rankReducingExtract =
+        tensor::ExtractSliceOp::rankReduceIfNeeded(rewriter, loc, operand,
+                                                   targetShape);
+    assert(succeeded(rankReducingExtract) && "not a unit-extent collapse");
+    return rankReducingExtract.value();
+  } else if (options.rankReductionStrategy ==
+             linalg::ControlDropUnitDims::RankReductionStrategy::
+                 ReassociativeReshape) {
+    std::optional<SmallVector<ReassociationIndices>> reassoc =
+        getReassociationIndicesForCollapse(shape, targetShape);
+    assert(reassoc.has_value());
+    return rewriter
+        .create<tensor::CollapseShapeOp>(loc, ty.clone(targetShape), operand,
+                                         reassoc.value())
+        .getResult();
+  }
+  llvm_unreachable("unhandled rank reduction strategy");
 };
 
+// Expands the rank of `val` to match `destVal` (by adding unit dimensions)
+// using either `expand_shape` or `insert_slice`.
+Value rankExpandValue(RewriterBase &rewriter, Location loc, Value destVal,
+                      Value val, const linalg::ControlDropUnitDims &options) {
+  if (val.getType() == destVal.getType()) {
+    return val;
+  }
+  if (options.rankReductionStrategy ==
+      linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice) {
+    int64_t rank = cast<ShapedType>(destVal.getType()).getRank();
+    SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> sizes =
+        tensor::getMixedSizes(rewriter, loc, destVal);
+    SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
+    return rewriter.create<tensor::InsertSliceOp>(loc, val, destVal, offsets,
+                                                  sizes, strides);
+  } else if (options.rankReductionStrategy ==
+             linalg::ControlDropUnitDims::RankReductionStrategy::
+                 ReassociativeReshape) {
+    std::optional<SmallVector<ReassociationIndices>> reassoc =
+        getReassociationIndicesForReshape(cast<ShapedType>(val.getType()),
+                                          cast<ShapedType>(destVal.getType()));
+    assert(reassoc.has_value());
+    return rewriter.create<tensor::ExpandShapeOp>(loc, destVal.getType(), val,
+                                                  reassoc.value());
+  } else {
+    llvm_unreachable("unhandled rank reduction strategy");
+  }
+}
+
 struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
-  using OpRewritePattern<GatherOp>::OpRewritePattern;
+  DropGatherUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
+                     PatternBenefit benefit = 1)
+      : OpRewritePattern<GatherOp>(context, benefit),
+        options(std::move(options)) {}
+
   LogicalResult matchAndRewrite(GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = gatherOp.getLoc();
@@ -539,10 +588,10 @@ struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
       // TODO: Do the rank reduction in one go after this behavior is changed.
       FailureOr<Value> newIndices = rankReduceOperand(
           rewriter, loc, /*startDim=*/0, /*numDims=*/gatherOp.getBatchRank(),
-          gatherOp.getIndices(), gatherOp.getIndicesType());
+          gatherOp.getIndices(), gatherOp.getIndicesType(), options);
       FailureOr<Value> newOutput = rankReduceOperand(
           rewriter, loc, /*startDim=*/0, /*numDims=*/gatherOp.getBatchRank(),
-          gatherOp.getOutput(), gatherOp.getOutputType());
+          gatherOp.getOutput(), gatherOp.getOutputType(), options);
       if (succeeded(newIndices) && succeeded(newOutput)) {
         reducedIndices = newIndices.value();
         reducedOutput = newOutput.value();
@@ -550,15 +599,16 @@ struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
       }
     }
     // Drop slice dimensions.
-    FailureOr<Value> newSource =
-        rankReduceOperand(rewriter, loc, /*startDim=*/gatherOp.getIndexDepth(),
-                          /*numDims=*/gatherOp.getOutputSliceRank(),
-                          gatherOp.getSource(), gatherOp.getSourceType());
+    FailureOr<Value> newSource = rankReduceOperand(
+        rewriter, loc, /*startDim=*/gatherOp.getIndexDepth(),
+        /*numDims=*/gatherOp.getOutputSliceRank(), gatherOp.getSource(),
+        gatherOp.getSourceType(), options);
     ShapedType newOutputTy = cast<ShapedType>(reducedOutput.getType());
     FailureOr<Value> newOutput = rankReduceOperand(
         rewriter, loc,
         /*startDim=*/newOutputTy.getRank() - gatherOp.getOutputSliceRank(),
-        /*numDims=*/gatherOp.getOutputSliceRank(), reducedOutput, newOutputTy);
+        /*numDims=*/gatherOp.getOutputSliceRank(), reducedOutput, newOutputTy,
+        options);
     if (succeeded(newSource) && succeeded(newOutput)) {
       reducedSource = newSource.value();
       reducedOutput = newOutput.value();
@@ -573,17 +623,83 @@ struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
         gatherOp.getLoc(), TypeRange{reducedOutput.getType()},
         ValueRange{reducedSource, reducedIndices}, ValueRange{reducedOutput},
         gatherOp.getDimensionMap());
-    Value dest = gatherOp.getOutput();
-    int64_t rank = gatherOp.getOutputType().getRank();
-    SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> sizes =
-        tensor::getMixedSizes(rewriter, loc, dest);
-    SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
-    rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
-        gatherOp, newGather.getResult(0), dest, offsets, sizes, strides);
-
+    rewriter.replaceOp(gatherOp,
+                       rankExpandValue(rewriter, loc, gatherOp.getOutput(),
+                                       newGather.getResult(0), options));
     return success();
   }
+
+private:
+  linalg::ControlDropUnitDims options;
+};
+
+struct DropScatterUnitDims final : public OpRewritePattern<ScatterOp> {
+  DropScatterUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
+                      PatternBenefit benefit = 1)
+      : OpRewritePattern<ScatterOp>(context, benefit),
+        options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = scatterOp.getLoc();
+    if (!scatterOp.hasPureTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          scatterOp, "dropping unit dims not implemented for buffer semantics");
+    }
+
+    bool changed = false;
+    // Drop batch dimensions.
+    Value original = scatterOp.getOriginal();
+    Value indices = scatterOp.getIndices();
+    Value updates = scatterOp.getUpdates();
+    if (scatterOp.getBatchRank() > 1) {
+      FailureOr<Value> newIndices = rankReduceOperand(
+          rewriter, loc, /*startDim=*/0, /*numDims=*/scatterOp.getBatchRank(),
+          indices, cast<ShapedType>(indices.getType()), options);
+      FailureOr<Value> newOutput = rankReduceOperand(
+          rewriter, loc, /*startDim=*/0, /*numDims=*/scatterOp.getBatchRank(),
+          updates, cast<ShapedType>(updates.getType()), options);
+      if (succeeded(newIndices) && succeeded(newOutput)) {
+        indices = newIndices.value();
+        updates = newOutput.value();
+        changed = true;
+      }
+    }
+    // Drop slice dimensions.
+    FailureOr<Value> newSource =
+        rankReduceOperand(rewriter, loc, /*startDim=*/scatterOp.getIndexDepth(),
+                          /*numDims=*/scatterOp.getUpdateSliceRank(), original,
+                          cast<ShapedType>(original.getType()), options);
+    ShapedType newOutputTy = cast<ShapedType>(updates.getType());
+    FailureOr<Value> newOutput = rankReduceOperand(
+        rewriter, loc,
+        /*startDim=*/newOutputTy.getRank() - scatterOp.getUpdateSliceRank(),
+        /*numDims=*/scatterOp.getUpdateSliceRank(), updates, newOutputTy,
+        options);
+    if (succeeded(newSource) && succeeded(newOutput)) {
+      original = newSource.value();
+      updates = newOutput.value();
+      changed = true;
+    }
+
+    if (!changed) {
+      return failure();
+    }
+
+    auto newScatter = rewriter.create<ScatterOp>(
+        scatterOp.getLoc(), TypeRange{original.getType()},
+        ValueRange{updates, indices}, ValueRange{original},
+        scatterOp.getDimensionMap());
+    rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
+                                newScatter.getRegion().begin());
+    rewriter.replaceOp(scatterOp,
+                       rankExpandValue(rewriter, loc, scatterOp.getOriginal(),
+                                       newScatter.getResult(0), options));
+    return success();
+  }
+
+private:
+  linalg::ControlDropUnitDims options;
 };
 
 template <typename OpTy>
@@ -886,8 +1002,9 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
 
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
-  patterns.add<DropScatterUnitIndexDepth, DropGatherUnitDims>(
-      patterns.getContext());
+  patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
+  patterns.add<DropGatherUnitDims, DropScatterUnitDims>(patterns.getContext(),
+                                                        options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
