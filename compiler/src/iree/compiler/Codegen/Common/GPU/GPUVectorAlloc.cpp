@@ -92,7 +92,8 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   return b
       .create<vector::TransferReadOp>(tensor.getLoc(), vectorType, tensor,
-                                      indices, inBounds)
+                                      indices, /*padding=*/std::nullopt,
+                                      inBounds)
       .getResult();
 }
 
