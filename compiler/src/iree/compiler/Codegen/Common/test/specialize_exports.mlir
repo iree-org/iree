@@ -366,3 +366,41 @@ hal.executable private @no_assume {
 //   CHECK-DAG:       util.assume.int %{{.*}}<umin = 4096, udiv = 256>
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1
 //   CHECK-NOT:       util.assume.int
+
+// -----
+
+#executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
+  #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+hal.executable private @static_never_applies_udiv {
+  hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
+    hal.executable.export public @fill_4xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @fill_4xf32() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %dest = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect)
+          : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+        %empty = tensor.empty() : tensor<4xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4xf32>) {
+          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[[<udiv = 256>]]>}
+          -> tensor<4xf32>
+        iree_tensor_ext.dispatch.tensor.store %fill, %dest, offsets = [0], sizes = [4], strides = [1]
+          : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: hal.executable private @static_never_applies_udiv
+
+//       CHECK:   hal.executable.export public @fill_4xf32 ordinal(0)
+//   CHECK-NOT:   hal.executable.export
+
+//       CHECK:   builtin.module
+//       CHECK:     func.func @fill_4xf32
+//   CHECK-NOT:     func.func
