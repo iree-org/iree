@@ -35,6 +35,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
+    iree::compiler::Utils::PackingUtils
   PUBLIC
 )
 
@@ -259,6 +260,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+    iree::compiler::Utils::PackingUtils
   PUBLIC
 )
 
@@ -331,6 +333,7 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
+    iree::compiler::Utils::PackingUtils
   PUBLIC
 )
 

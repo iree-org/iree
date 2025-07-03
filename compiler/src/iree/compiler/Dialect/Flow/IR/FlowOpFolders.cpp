@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -424,36 +425,6 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
     dimMultiplier *= shape[i];
   }
   return valueIndex;
-}
-
-static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
-                               ShapedType rhsType, ValueRange rhsDynamicDims) {
-  if (lhsType.hasStaticShape() && rhsType.hasStaticShape()) {
-    // Static shape equivalence means we can fast-path the check.
-    return lhsType == rhsType;
-  }
-  if (lhsType.getRank() != rhsType.getRank()) {
-    return false;
-  }
-  unsigned dynamicDimIndex = 0;
-  unsigned numNonmatchingSSADims = 0;
-  for (unsigned i = 0; i < lhsType.getRank(); ++i) {
-    if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
-      // Static/dynamic dimension mismatch - definitely differ.
-      return false;
-    } else if (lhsType.isDynamicDim(i)) {
-      unsigned j = dynamicDimIndex++;
-      if (lhsDynamicDims[j] != rhsDynamicDims[j]) {
-        numNonmatchingSSADims++;
-      }
-    } else {
-      if (lhsType.getDimSize(i) != rhsType.getDimSize(i)) {
-        // Static dimensions differ.
-        return false;
-      }
-    }
-  }
-  return numNonmatchingSSADims <= 1;
 }
 
 //===----------------------------------------------------------------------===//

@@ -17,6 +17,8 @@ iree_lit_test_suite(
     "dispatch_tensor_folding.mlir"
     "dispatch_workload_ordinal_folding.mlir"
     "roundtrip.mlir"
+    "tensor_ext_folding.mlir"
+    "tensor_ext_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

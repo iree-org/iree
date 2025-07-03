@@ -18,20 +18,19 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
-        "ElementPackingUtils.cpp",
         "EquivalenceUtils.cpp",
         "FlatbufferUtils.cpp",
         "Indexing.cpp",
         "ModuleUtils.cpp",
         "OptionUtils.cpp",
         "PassUtils.cpp",
+        "ShapeUtils.cpp",
         "StringUtils.cpp",
         "ToolUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
         "ConversionUtils.h",
-        "ElementPackingUtils.h",
         "EmbeddedDataDirectory.h",
         "EquivalenceUtils.h",
         "FlatbufferUtils.h",
@@ -44,14 +43,12 @@ iree_compiler_cc_library(
         "PassUtils.h",
         "PatternUtils.h",
         "Permutation.h",
+        "ShapeUtils.h",
         "StringUtils.h",
         "ToolUtils.h",
         "TracingUtils.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Dialect/Encoding/IR",
-        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
-        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal/flatcc:building",
         "//runtime/src/iree/base/internal/flatcc:debugging",
@@ -69,5 +66,23 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "PackingUtils",
+    srcs = [
+        "ElementPackingUtils.cpp",
+    ],
+    hdrs = [
+        "ElementPackingUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
     ],
 )
