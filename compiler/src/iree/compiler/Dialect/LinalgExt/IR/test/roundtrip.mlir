@@ -2087,3 +2087,16 @@ func.func @custom_op_index(%arg0 : tensor<?x?xindex>) -> tensor<?x?xindex> {
 //       CHECK:     iree_linalg_ext.index 0
 //       CHECK:     iree_linalg_ext.index 1
 //       CHECK:     iree_linalg_ext.yield
+
+// -----
+
+// Round trip test for split-reduction mapping attribute
+
+func.func @split_reduction_mapping(%arg0 : index) {
+  scf.forall (%iv) in (%arg0) {
+
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  return
+}
+// CHECK-LABEL: func @split_reduction_mapping
+//       CHECK:   mapping = #iree_codegen.split_reduction_mapping
