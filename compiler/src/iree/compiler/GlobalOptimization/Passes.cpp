@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
@@ -82,7 +82,7 @@ void buildGlobalOptExprHoistingPassPipeline(
   options.maxSizeIncreaseThreshold =
       transformOptions.options.constExprMaxSizeIncreaseThreshold;
   options.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
 }

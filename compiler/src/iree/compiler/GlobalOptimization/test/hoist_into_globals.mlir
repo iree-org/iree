@@ -5,13 +5,13 @@ module @hoist_sub_byte_tensor_store {
   // CHECK: util.global private @{{.*}} : tensor<32xi8>
   // CHECK: util.initializer
   // CHECK:   %[[CEXPR:.+]] = "iree_unregistered.const_expr"
-  // CHECK:   %[[CASTED_GLOBAL:.+]] = flow.tensor.bitcast %[[CEXPR]] : tensor<64xi4> -> tensor<32xi8>
+  // CHECK:   %[[CASTED_GLOBAL:.+]] = iree_tensor_ext.bitcast %[[CEXPR]] : tensor<64xi4> -> tensor<32xi8>
   // CHECK:   util.global.store %[[CASTED_GLOBAL]]
   // CHECK:   util.return
 
   // CHECK: util.func public @main() -> tensor<64xi4>
   // CHECK:   %[[GLOBAL_LD:.+]] = util.global.load immutable @{{.*}} : tensor<32xi8>
-  // CHECK:   %[[ORIG_VAL:.+]] = flow.tensor.bitcast %[[GLOBAL_LD]] : tensor<32xi8> -> tensor<64xi4>
+  // CHECK:   %[[ORIG_VAL:.+]] = iree_tensor_ext.bitcast %[[GLOBAL_LD]] : tensor<32xi8> -> tensor<64xi4>
   // CHECK:   util.return %[[ORIG_VAL]]
   util.func public @main() -> (tensor<64xi4>) {
     %0 = arith.constant dense<3> : tensor<64xi32>
@@ -32,26 +32,26 @@ module @hoist_tree_const_expr_i4 {
   // CHECK:   %[[C0:.*]] = arith.constant dense<0> : tensor<8xi4>
   // CHECK:   %[[C1:.*]] = arith.constant dense<1> : tensor<8xi4>
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
-  // CHECK:   %[[BITCAST_2:.*]] = flow.tensor.bitcast %[[CE0]] : tensor<8xi4> -> tensor<4xi8>
+  // CHECK:   %[[BITCAST_2:.*]] = iree_tensor_ext.bitcast %[[CE0]] : tensor<8xi4> -> tensor<4xi8>
   // CHECK:   util.global.store %[[BITCAST_2]], @[[HOISTED_0]] : tensor<4xi8>
   // CHECK:   util.return
 
   // CHECK: util.global private @[[HOISTED_1:.*]] : tensor<4xi8>
   // CHECK: util.initializer
   // CHECK:   %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : tensor<4xi8>
-  // CHECK:   %[[BITCAST_3:.*]] = flow.tensor.bitcast %[[LOAD_HOISTED_0]] : tensor<4xi8> -> tensor<8xi4>
+  // CHECK:   %[[BITCAST_3:.*]] = iree_tensor_ext.bitcast %[[LOAD_HOISTED_0]] : tensor<4xi8> -> tensor<8xi4>
   // CHECK:   %[[LOAD_LATENT_GLOBAL:.*]] = util.global.load @latent_global : tensor<8xi4>
   // CHECK:   %[[CE1:.*]] = "iree_unregistered.const_expr"(%[[BITCAST_3]], %[[LOAD_LATENT_GLOBAL]])
-  // CHECK:   %[[BITCAST_4:.*]] = flow.tensor.bitcast %[[CE1]] : tensor<8xi4> -> tensor<4xi8>
+  // CHECK:   %[[BITCAST_4:.*]] = iree_tensor_ext.bitcast %[[CE1]] : tensor<8xi4> -> tensor<4xi8>
   // CHECK:   util.global.store %[[BITCAST_4]], @[[HOISTED_1]] : tensor<4xi8>
   // CHECK:   util.return
 
   // CHECK: util.func public @main
   util.func public @main() -> (tensor<8xi4>, tensor<8xi4>, tensor<8xi4>) {
     // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load immutable @[[HOISTED_0]] : tensor<4xi8>
-    // CHECK-DAG: %[[BITCAST_0:.*]] = flow.tensor.bitcast %[[LOAD_HOISTED_0]] : tensor<4xi8> -> tensor<8xi4>
+    // CHECK-DAG: %[[BITCAST_0:.*]] = iree_tensor_ext.bitcast %[[LOAD_HOISTED_0]] : tensor<4xi8> -> tensor<8xi4>
     // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load immutable @[[HOISTED_1]] : tensor<4xi8>
-    // CHECK-DAG: %[[BITCAST_1:.*]] = flow.tensor.bitcast %[[LOAD_HOISTED_1]] : tensor<4xi8> -> tensor<8xi4>
+    // CHECK-DAG: %[[BITCAST_1:.*]] = iree_tensor_ext.bitcast %[[LOAD_HOISTED_1]] : tensor<4xi8> -> tensor<8xi4>
     // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[BITCAST_1]])
     // CHECK: util.return %[[BITCAST_0]], %[[BITCAST_1]], %[[RESULT]]
     %0 = arith.constant dense<0> : tensor<8xi4>
@@ -71,7 +71,7 @@ module @hoist_sub_byte_tensor_transitive {
   // CHECK: util.global
   // CHECK: util.initializer
   // We do not need to cast for transitive sub-byte values.
-  // CHECK-NOT: flow.tensor.bitcast
+  // CHECK-NOT: iree_tensor_ext.bitcast
   util.func public @main() -> (i32) {
     %0 = arith.constant dense<3> : tensor<i4>
     %2 = "iree_unregistered.const_expr"(%0) : (tensor<i4>) -> i32
@@ -112,9 +112,14 @@ module @hoist_constant_pack_computation {
 // CHECK-LABEL: @do_not_hoist_metadata_leaf
 module @do_not_hoist_metadata_leaf {
   // CHECK-NOT: util.global
-  util.func public @main() -> tensor<1xi32> {
+  util.func public @flow_main() -> tensor<1xi32> {
     %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi8>
     %1 = flow.tensor.bitcast %0 : tensor<4xi8> -> tensor<1xi32>
+    util.return %1 : tensor<1xi32>
+  }
+  util.func public @tensor_ext_main() -> tensor<1xi32> {
+    %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi8>
+    %1 = iree_tensor_ext.bitcast %0 : tensor<4xi8> -> tensor<1xi32>
     util.return %1 : tensor<1xi32>
   }
 }
