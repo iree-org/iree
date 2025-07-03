@@ -242,9 +242,9 @@ struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
           resultReplacementMap.insert({operand, idx});
       if (didInsert) {
         valuesToReplace.push_back(op.getResult(idx));
-      } else {
         newRanges.push_back(assumptionReplacements[operand]);
         newOperands.push_back(operand);
+      } else {
         // Replace all the uses of deleted results now to avoid the need to
         // re-iterate over results after constructing the new assume.
         rewriter.replaceAllUsesWith(op.getResult(idx),

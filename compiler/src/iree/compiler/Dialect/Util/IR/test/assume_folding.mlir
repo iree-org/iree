@@ -120,6 +120,38 @@ util.func public @dedup_operands_multiple_groups(%arg0: index, %arg1: index) -> 
 
 // -----
 
+// CHECK-LABEL: @dedup_operands_multiple_groups_and_singleton
+util.func public @dedup_operands_multiple_groups_and_singleton(
+  %arg0: index, %arg1: index, %arg2: index) -> index, index, index, index, index {
+  // CHECK: %[[ASSUME:.*]]:3 = util.assume.int
+  // CHECK-NEXT: %arg2<udiv = 64>,
+  // CHECK-NEXT: %arg0<umin = 3>,
+  // CHECK-NEXT: %arg1<umax = 5>
+  %0:5 = util.assume.int
+    %arg2<udiv=64>,
+    %arg0<umin=2>,
+    %arg1<umax=5>,
+    %arg0<umin=3>,
+    %arg1<umax=6> : index, index, index, index, index
+  // CHECK: util.return %[[ASSUME]]#0, %[[ASSUME]]#1, %[[ASSUME]]#2, %[[ASSUME]]#1, %[[ASSUME]]#2
+  util.return %0#0, %0#1, %0#2, %0#3, %0#4 : index, index, index, index, index
+}
+
+// -----
+
+// CHECK-LABEL: @dedup_operands_three
+util.func public @dedup_operands_three(%arg0: index) -> index, index, index {
+  // CHECK: %[[ASSUME:.*]] = util.assume.int %arg0<umin = 3>
+  %0:3 = util.assume.int
+    %arg0<umin=1>,
+    %arg0<umin=2>,
+    %arg0<umin=3> : index, index, index
+  // CHECK: util.return %[[ASSUME]], %[[ASSUME]], %[[ASSUME]]
+  util.return %0#0, %0#1, %0#2 : index, index, index
+}
+
+// -----
+
 // CHECK-LABEL: @fold_assume_of_div_mul
 util.func public @fold_assume_of_div_mul(%arg0: index) -> index  {
   // CHECK-SAME: %[[ARG0:.+]]: index
