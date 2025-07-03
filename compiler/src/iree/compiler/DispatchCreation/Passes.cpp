@@ -68,13 +68,6 @@ static llvm::cl::opt<bool> clEnableDataTiling(
                    "path, --iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clHoistEncodingsForConstExpr(
-    "iree-dispatch-creation-hoist-encodings-for-constexpr",
-    llvm::cl::desc("Enable the hoisting of encoding ops when the source is "
-                   "from globals. To use this path, "
-                   "--iree-opt-data-tiling=false must be set as wells"),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
@@ -253,15 +246,13 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
         .addPass([&]() {
           return DispatchCreation::createSetEncodingPass(
               DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
-        })
-        // SetEncodingOps should not be in the same dispatch as the data-tiled
-        // op, so hoist them out of their current dispatch regions. Also, bubble
-        // SetEncodingOps through special operations like bit-extending ops and
-        // broadcasting ops.
-        .addPass([&]() {
-          return DispatchCreation::createHoistEncodingOpsPass(
-              HoistEncodingOpsPassOptions{clHoistEncodingsForConstExpr});
-        })
+        });
+    // SetEncodingOps should not be in the same dispatch as the data-tiled
+    // op, so hoist them out of their current dispatch regions. Also, bubble
+    // SetEncodingOps through special operations like bit-extending ops and
+    // broadcasting ops.
+    passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
+    FunctionLikeNest(passManager)
         .addPass(DispatchCreation::createPropagateEncodingsPass)
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
