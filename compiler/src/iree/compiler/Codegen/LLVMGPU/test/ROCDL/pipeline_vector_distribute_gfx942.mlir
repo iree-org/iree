@@ -1284,4 +1284,6 @@ hal.executable private @attention_4xDx1x32x128xf16 {
 //           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1xf32>, vector<16x1x1x1x1x1x8x1x1xf32>) {
 //       CHECK-NOT:       gpu.subgroup_reduce
 //           CHECK:       scf.yield
+//
+// Warning: the above layout_config for vector distribution on attention goes overboard on the tail part.
 // CHECK-COUNT-390:     gpu.subgroup_reduce {{.*}} : (f32) -> f32

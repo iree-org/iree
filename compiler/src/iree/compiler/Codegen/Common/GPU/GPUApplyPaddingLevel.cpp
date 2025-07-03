@@ -150,7 +150,6 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
         sizes[i] = getAsOpFoldResult(v);
     }
 
-    // padOp.getResultType(),
     Value out = rewriter.create<tensor::EmptyOp>(
         paddedOp.getLoc(), sizes, getElementTypeOrSelf(tensorTy));
     auto copied = rewriter.create<linalg::CopyOp>(paddedOp.getLoc(),
@@ -174,10 +173,6 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
     // If some op does not get padded, that is fine for now.
     (void)applyPaddingLevel(rewriter, op, tilingLevel);
   }
-
-  // TODO: in the pad then tile case (technically not applicable right now),
-  // we will need some cleanup stuff to make things fold properly to static
-  // shapes.
 }
 
 } // namespace mlir::iree_compiler
