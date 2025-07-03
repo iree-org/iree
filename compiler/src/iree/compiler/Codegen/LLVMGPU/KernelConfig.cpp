@@ -35,6 +35,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
@@ -374,11 +375,10 @@ getVectorDistributeReductionConfig(
     }
 
     int64_t parallelSize = bounds[parallelDims.back()];
-    if (ShapedType::isDynamic(parallelSize) ||
-        parallelSize % threadLoads != 0) {
-      return failure();
-    }
     int64_t lastDimReductionTileSize = workgroupSize * threadLoads;
+    parallelSize = ShapedType::isDynamic(parallelSize)
+                       ? lastDimReductionTileSize
+                       : parallelSize;
 
     // Setting subgroupBasis to minimum i.e., 1 and threadBasis
     // to maximum i.e., subgroupSize.
@@ -391,7 +391,8 @@ getVectorDistributeReductionConfig(
             {64, static_cast<uint64_t>(lastDimReductionTileSize)})
             .getZExtValue();
 
-    if (!(sharedWgpTiles.size() == op.getNumLoops())) {
+    if (!(sharedWgpTiles.size() == op.getNumLoops()) &&
+        (lastDimReductionTileSize >= threadLoads)) {
       int subgroupStride = threadBasis * threadLoads;
       while (lastDimReductionTileSize % subgroupStride != 0) {
         threadBasis >>= 1;
@@ -400,10 +401,9 @@ getVectorDistributeReductionConfig(
       int subgroup = lastDimReductionTileSize / subgroupStride;
       subgroupBasis = (subgroup == 0) ? 1 : subgroup;
     }
-
     // Since all the dimensions are contained within the shared parallel
     // dimension, set the tile sizes to 1.
-    if (sharedWgpTiles.size() == op.getNumLoops()) {
+    else {
       lastDimReductionTileSize = 1;
       threadLoads = 1;
       threadBasis = 1;
@@ -468,7 +468,7 @@ getVectorDistributeReductionConfig(
 
   int64_t lastReductionDimSize = bounds[reductionDims.back()];
   if (ShapedType::isDynamic(lastReductionDimSize)) {
-    return failure();
+    lastReductionDimSize = workgroupSize * threadLoads;
   }
   if (lastReductionDimSize % threadLoads != 0) {
     return failure();
@@ -599,8 +599,9 @@ static FailureOr<SetVector<linalg::LinalgOp>>
 checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
   SmallVector<Operation *> storeOps;
 
-  entryPoint.walk([&](IREE::TensorExt::DispatchTensorStoreOp op) {
-    storeOps.push_back(op.getOperation());
+  entryPoint.walk([&](Operation *op) {
+    if (isa<IREE::TensorExt::DispatchTensorStoreOp, func::ReturnOp>(op))
+      storeOps.push_back(op);
   });
 
   if (storeOps.empty()) {
@@ -620,62 +621,23 @@ checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
   }
 
   SetVector<linalg::LinalgOp> computeOps;
-  bool containsValidReductionOp = true;
   for (Operation *op : llvm::reverse(slice)) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       if (isa<linalg::FillOp>(op)) {
         continue;
       }
       if (hasReductionIterator(linalgOp) &&
-          failed(checkSingleCombiner(linalgOp))) {
-        containsValidReductionOp = false;
-        break;
+          (failed(checkSingleCombiner(linalgOp)) ||
+           llvm::any_of(linalgOp.getDpsInputOperands(), [&](OpOperand *input) {
+             return !linalgOp.getMatchingIndexingMap(input)
+                         .isProjectedPermutation();
+           }))) {
+        return failure();
       }
       computeOps.insert(linalgOp);
     }
   }
 
-  // Return failure if the dispatch contains no reduction op.
-  if (!containsValidReductionOp) {
-    return failure();
-  }
-
-  // Get the reduction dimensions.
-  auto getReductionDims = [](linalg::LinalgOp &linalgOp) -> SetVector<int64_t> {
-    SetVector<int64_t> reductionDims;
-    for (auto [idx, iterator] :
-         llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-      if (linalg::isReductionIterator(iterator)) {
-        reductionDims.insert(idx);
-      }
-    }
-    return reductionDims;
-  };
-
-  for (linalg::LinalgOp linalgOp : computeOps) {
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      int64_t operandIdx = linalgOp.getIndexingMapIndex(operand);
-      AffineMap indexingMap = linalgOp.getIndexingMapsArray()[operandIdx];
-
-      // Check whether the producer exists.
-      Operation *producer = dyn_cast<OpResult>(operand->get()).getOwner();
-      auto producerOp = dyn_cast<linalg::LinalgOp>(producer);
-      if (!producerOp || !computeOps.contains(producerOp)) {
-        continue;
-      }
-
-      // Check whether the op operand is not reduced and producer of that
-      // operand is not a reduction op.
-      auto reductionDims = getReductionDims(linalgOp);
-      bool isOperandReduced = llvm::any_of(
-          llvm::seq<int>(indexingMap.getNumResults()), [&](int val) {
-            return reductionDims.contains(indexingMap.getDimPosition(val));
-          });
-      if (isOperandReduced && hasReductionIterator(producerOp)) {
-        return failure();
-      }
-    }
-  }
   return computeOps;
 }
 
@@ -739,14 +701,24 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       ++numDynamicReductionDims;
     }
   }
-
-  int64_t subgroupSize = 0;
-  for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0 || numDynamicReductionDims > 0) {
-      subgroupSize = s;
-      break;
+  auto getSubgroupSize = [&]() -> int64_t {
+    if (numDynamicReductionDims > 0) {
+      int64_t subgroupSize = target.getPreferredSubgroupSize();
+      if (ShapedType::isDynamic(reductionSize)) {
+        reductionSize = subgroupSize;
+      }
+      return subgroupSize;
     }
-  }
+    int64_t subgroupSize = 0;
+    for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
+      if (reductionSize % s == 0) {
+        return s;
+      }
+    }
+    return subgroupSize;
+  };
+
+  int64_t subgroupSize = getSubgroupSize();
 
   if (subgroupSize == 0)
     return failure();
