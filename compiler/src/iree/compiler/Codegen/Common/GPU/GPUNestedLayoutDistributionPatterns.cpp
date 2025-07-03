@@ -13,11 +13,14 @@
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/Utils/GPUUtils.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -27,10 +30,35 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 
+#define DEBUG_TYPE "iree-codegen-gpu-nested-layout-distribution-patterns"
+
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
+#define DBGSNL() (llvm::dbgs() << "\n")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler {
 
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
+
+static llvm::StringLiteral kBeginDistribute = "begin_distribute";
+static llvm::StringLiteral kEndDistribute = "end_distribute";
+static void insertDebugInfoOp(RewriterBase &rewriter, Operation *anchor,
+                              llvm::StringRef beginOrEnd) {
+  // OperationState s(
+  //     anchor->getLoc(), beginOrEnd, ValueRange{}, ValueRange{},
+  //     NamedAttribute(rewriter.getStringAttr("op_name"),
+  //                    rewriter.getStringAttr(anchor->getName().getStringRef())));
+  // OpBuilder::InsertionGuard g(rewriter);
+  // if (beginOrEnd == kBeginDistribute)
+  //   rewriter.setInsertionPoint(anchor);
+  // else if (beginOrEnd == kEndDistribute)
+  //   rewriter.setInsertionPointAfter(anchor);
+  // else
+  //   llvm_unreachable("unknown: expected begin_distribute or end_distribute");
+
+  // rewriter.create(s);
+}
 
 static bool isBroadcast(AffineExpr expr) {
   if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
@@ -847,6 +875,11 @@ struct DistributeMultiReduction final
               .getResult());
     }
 
+    LDBG("");
+    LDBG("");
+    LDBG("");
+    LDBG("--start DistributeMultiReduction on " << multiReduceOp);
+    insertDebugInfoOp(rewriter, multiReduceOp, kBeginDistribute);
     SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
     int64_t rank = srcVector.getType().getRank();
 
@@ -861,9 +894,11 @@ struct DistributeMultiReduction final
     }
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, multiReduceOp.getKind(), disAcc.getType());
+
     Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
+    LDBG("----localReduction: " << localReduction);
 
     // TODO: As per current upstream lowering implementations, there is no point
     // in doing this because it does a select much later in a finer granularity
@@ -929,6 +964,7 @@ struct DistributeMultiReduction final
       if (!accReduced) {
         return failure();
       }
+      insertDebugInfoOp(rewriter, multiReduceOp, kEndDistribute);
       if (resVector) {
         replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
       } else {
@@ -938,11 +974,54 @@ struct DistributeMultiReduction final
       }
       return success();
     }
+    LDBG("--doSubgroupReduction "
+         << "multiReduceOp: " << multiReduceOp << "\n\tsrcLayout: " << srcLayout
+         << "\n\tsrcVector: " << srcVector
+         << "\n\tthreadReduced: " << threadReduced);
+    // do inter-subgroup reductions
+    // TODO(ntv): maybe wrap within single thread condition.
+
+    insertDebugInfoOp(rewriter, multiReduceOp, kEndDistribute);
+#if 0
+    Value threadX = rewriter.create<gpu::ThreadIdOp>(
+        loc, rewriter.getIndexType(), gpu::Dimension::x);
+    Value threadY = rewriter.create<gpu::ThreadIdOp>(
+        loc, rewriter.getIndexType(), gpu::Dimension::y);
+    Value threadZ = rewriter.create<gpu::ThreadIdOp>(
+        loc, rewriter.getIndexType(), gpu::Dimension::z);
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value tx0 = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                               threadX, zero);
+    Value ty0 = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                               threadY, zero);
+    Value tz0 = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                               threadZ, zero);
+    Value txy0 = rewriter.create<arith::AndIOp>(loc, tx0, ty0);
+    Value isThread0 = rewriter.create<arith::AndIOp>(loc, txy0, tz0);
+
+    auto ifOp = rewriter.create<scf::IfOp>(
+        loc, isThread0,
+        // then lambda
+        [&](OpBuilder &b, Location loc) {
+          Value subgroupReduced = doSubgroupReduction(
+              rewriter, loc, srcVector, srcLayout,
+              multiReduceOp.getReductionDims(), threadReduced,
+              multiReduceOp.getKind(), acc, signature[resVector]);
+          b.create<scf::YieldOp>(loc, subgroupReduced);
+        });
+    LDBG("----cross-warp reduction: " << ifOp.getResult(0));
+    rewriter.replaceOp(multiReduceOp, ifOp.getResult(0));
+#else
     // do inter-subgroup reductions
     Value subgroupReduced = doSubgroupReduction(
         rewriter, loc, srcVector, srcLayout, multiReduceOp.getReductionDims(),
         threadReduced, multiReduceOp.getKind(), acc, signature[resVector]);
     rewriter.replaceOp(multiReduceOp, subgroupReduced);
+#endif
+
+    LDBG("----cross-warp reduction: " << subgroupReduced);
+    LDBG(*subgroupReduced.getDefiningOp()->getParentOp());
+
     return success();
   }
 
@@ -978,6 +1057,7 @@ struct DistributeMultiReduction final
 
       res = rewriter.create<vector::InsertOp>(loc, extracted, res, i);
     }
+
     return res;
   }
 
@@ -1000,11 +1080,10 @@ struct DistributeMultiReduction final
     // e.g.:
     // p1 x p2 x p3 x r2 x r1 --> p1 x p2 x p3
     // However, the reduction is not complete until inter-subgroup results
-    // are combined. Therefore, we need to maintain the rank to get them back to
-    // the SIMD domain to re-layout the vector.
-    // Thus, we re-insert the reduction dimensions in
-    // their original positions as :
-    // p1 x p2 x p3 -> p1 x p2 x p3 x 1 x 1
+    // are combined. Therefore, we need to maintain the rank to get them back
+    // to the SIMD domain to re-layout the vector. Thus, we re-insert the
+    // reduction dimensions in their original positions as : p1 x p2 x p3 ->
+    // p1 x p2 x p3 x 1 x 1
     int64_t rank = srcLayout.getRank();
     SmallVector<int64_t> partialReducedDistributedShape =
         srcLayout.getDistributedShape();
@@ -1049,6 +1128,8 @@ struct DistributeMultiReduction final
     rewriter.create<gpu::BarrierOp>(loc);
     auto write = rewriter.create<vector::TransferWriteOp>(
         loc, undistrWrite, alloc, indices, inBounds);
+    LDBG("----VTW: " << write);
+
     // Set layouts signature for write.
     // We need to set the layout on the srcVector/first operand.
     auto unitAttr = UnitAttr::get(rewriter.getContext());
@@ -1086,6 +1167,8 @@ struct DistributeMultiReduction final
       ArrayAttr writeResultsAttr = ArrayAttr::get(rewriter.getContext(), {});
       setSignatureForRedistribution(rewriter, write.getOperation(),
                                     writeOperandsAttr, writeResultsAttr);
+      LDBG("----writeOperandsAttr: " << writeOperandsAttr);
+      LDBG("----writeResultsAttr: " << writeResultsAttr);
     }
 
     auto ceilToPowerOf2 = [](uint32_t x) {
@@ -1169,10 +1252,10 @@ struct DistributeMultiReduction final
   int64_t maxBitsPerShuffle;
 };
 
-/// The distribution of contract is performed by doing a local contraction where
-/// each thread performs operations on its locally distributed elements. Then,
-/// the resulting vector is interpreted in undistributed domain. The said
-/// undistributed vector is a partial reduction when contraction has been
+/// The distribution of contract is performed by doing a local contraction
+/// where each thread performs operations on its locally distributed elements.
+/// Then, the resulting vector is interpreted in undistributed domain. The
+/// said undistributed vector is a partial reduction when contraction has been
 /// performed only thread locally. Therefore, a to-be-distributed
 /// vector.multi_reduce
 ////is added to complete the contraction.
@@ -1287,11 +1370,11 @@ struct DistributeContract final
     Value localContract = doDistributedContraction(
         rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
 
-    // TODO: As per current upstream lowering implementations, there is no point
-    // in doing this because it does a select much later in a finer granularity
-    // rather than supporting predication. Moreover, since we are doing a select
-    // to cater reductions accross the distribution, we can choose not to mask
-    // the op post-distribution.
+    // TODO: As per current upstream lowering implementations, there is no
+    // point in doing this because it does a select much later in a finer
+    // granularity rather than supporting predication. Moreover, since we are
+    // doing a select to cater reductions accross the distribution, we can
+    // choose not to mask the op post-distribution.
 
     VectorValue localContractValue;
     if (accVector) {
@@ -1443,11 +1526,12 @@ struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
 
     /// Transpose only changes the notion of where the data carried by each
     /// thread comes from in the transposed SIMD vector. The data carried by
-    /// each thread is still the same, transposed as requested by the operation.
-    /// So, for distributed dimensions (thread and subgroup) transpose is a
-    /// no-op.
+    /// each thread is still the same, transposed as requested by the
+    /// operation. So, for distributed dimensions (thread and subgroup)
+    /// transpose is a no-op.
     ///
-    /// Example (indices [0-3] represent ids of the threads carrying the data):
+    /// Example (indices [0-3] represent ids of the threads carrying the
+    /// data):
     ///
     /// input: vector<2x4xf16>
     ///
