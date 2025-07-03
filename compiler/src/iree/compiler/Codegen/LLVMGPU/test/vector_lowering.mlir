@@ -37,21 +37,3 @@ module {
 // CHECK: %[[LHS_SPLAT:.+]] = vector.splat %[[LHS_CAST]] : vector<2xf32>
 // CHECK: %[[FMA:.+]] = vector.fma %[[RHS_CAST]], %[[LHS_SPLAT]], %[[ACC]] : vector<2xf32>
 // CHECK: arith.select %[[MASK_EXTRACT]], %[[FMA]], %[[ACC]] : vector<2xi1>, vector<2xf32>
-
-// -----
-
-module {
-  func.func @transfer_read_lowering(%arg0: memref<8x8xf32, #amdgpu.address_space<fat_raw_buffer>>, %idx : index, %mask: vector<4xi1>) -> vector<4xf32> {
-    %cst_0 = arith.constant 0.000000e+00 : f32
-    %v = vector.transfer_read %arg0[%idx, %idx], %cst_0, %mask {in_bounds = [true]} : memref<8x8xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
-    return %v : vector<4xf32>
-  }
-}
-
-// CHECK-LABEL: func.func @transfer_read_lowering(
-// CHECK-SAME: %[[ARG0:.+]]: memref<8x8xf32, #amdgpu.address_space<fat_raw_buffer>>,
-// CHECK-SAME: %[[ARG1:.+]]: index,
-// CHECK-SAME: %[[MASK:.+]]: vector<4xi1>
-// CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00>
-// CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]][%[[ARG1]], %[[ARG1]]]
-// CHECK: %[[SELECT:.+]] = arith.select %[[MASK]], %[[LOAD]], %[[CST]]
