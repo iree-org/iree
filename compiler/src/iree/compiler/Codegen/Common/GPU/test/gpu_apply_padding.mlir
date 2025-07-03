@@ -1,12 +1,12 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level),canonicalize,cse,func.func(iree-codegen-gpu-apply-padding-level),canonicalize,cse)" --split-input-file --verify-diagnostics %s | FileCheck  %s
 
-
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
 #mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
 
 //                                                        batch, m, k1, k2
 #lowering_config = #iree_gpu.lowering_config<{reduction = [   0, 0,  0, 32]}>
@@ -32,7 +32,7 @@ func.func @online_attention_fail_to_pad_no_mask(%query: tensor<192x1024x64xf32>,
   %out:3 = iree_linalg_ext.online_attention
         {
           indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config 
+          lowering_config = #lowering_config
         }
         ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
@@ -78,7 +78,7 @@ func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key:
   %out:3 = iree_linalg_ext.online_attention
         {
           indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config 
+          lowering_config = #lowering_config
         }
         ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<192x1024x?xf32>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
@@ -127,7 +127,7 @@ func.func @online_attention_tile_then_pad_7(%n_batches: index, %query: tensor<?x
   %out:3 = iree_linalg_ext.online_attention
         {
           indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config 
+          lowering_config = #lowering_config
         }
         ins(%query, %key, %value, %scale, %mask : tensor<?x1021x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<?x1021xf32>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<?x1021x64xf32>, tensor<?x1021xf32>, tensor<?x1021xf32>)
