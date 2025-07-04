@@ -2183,3 +2183,40 @@ func.func @unset_encoding_RES_with_layout() attributes {
 //  CHECK-SAME:     inner_tiles = [1, 16]
 //  CHECK-SAME:     tensor<1x1x1x16xf32> -> tensor<1x10xf32>
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[UNPACK]], %[[RESULT_BINDING]]
+
+// -----
+
+// FoldIntoPackUnpack patterns sometimes inhibit fusion, we can pass a controlFn that blocks the application of folding patterns that would
+// block fusion in subsequent passes. This test is actually target-independent.
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [3], innerTileSizes = [32], outerDimsPerm = [0, 2, 1, 3]}}>]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d0, d1, d3)>
+func.func @set_encoding_transpose_multi_result() attributes {
+  hal.executable.target = #executable_target
+} {
+    %c0 = arith.constant  0 : index
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<56x57x1x64xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x56x57x64xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x56x57x64xf32, #encoding>>
+    %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [56, 57, 1, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<56x57x1x64xf32>> -> tensor<56x57x1x64xf32>
+    %4 = tensor.empty() : tensor<1x56x57x64xf32>
+    %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%3 : tensor<56x57x1x64xf32>) outs(%4 : tensor<1x56x57x64xf32>) {
+    ^bb0(%in: f32 , %out: f32):
+      linalg.yield %in : f32
+    } -> tensor<1x56x57x64xf32>
+    %6 = iree_encoding.set_encoding %5 : tensor<1x56x57x64xf32> -> tensor<1x56x57x64xf32, #encoding>
+    iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0, 0, 0, 0], sizes = [1, 56, 57, 64], strides = [1, 1, 1, 1] : tensor<1x56x57x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x56x57x64xf32>>
+    iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0], sizes = [1, 56, 57, 64], strides = [1, 1, 1, 1] : tensor<1x56x57x64xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x56x57x64xf32, #encoding>>
+    return
+}
+// CHECK-LABEL: func.func @set_encoding_transpose_multi_result
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<56x57x1x64xf32>>
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1) {{.*}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x56x57x64xf32>>
+//   CHECK-DAG:   %[[RESULT_BINDING1:.+]] = hal.interface.binding.subspan {{.*}} binding(2) {{.*}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x57x56x2x32xf32>>
+//       CHECK:   %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_BINDING]]
+//       CHECK:   %[[TRANSPOSE:.+]] = linalg.generic {{.*}} ins(%[[INPUT]] : tensor<56x57x1x64xf32>)
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[TRANSPOSE]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[TRANSPOSE]], %[[RESULT_BINDING]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING1]]
