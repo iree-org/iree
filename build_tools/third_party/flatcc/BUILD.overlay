@@ -4,7 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@iree_core//build_tools/bazel:workspace_root.bzl", "workspace_root")
+
 package(default_visibility = ["//visibility:public"])
+
+workspace_root(name = "workspace_root")
+
 
 cc_library(
     name = "runtime",
@@ -42,14 +47,15 @@ cc_library(
         "include/flatcc/flatcc_json_printer.h",
     ],
     copts = [
-        "-Iexternal/com_github_dvidelabs_flatcc/config/",
-        "-Iexternal/com_github_dvidelabs_flatcc/include/",
+        "-I$(WORKSPACE_ROOT)/config/",
+        "-I$(WORKSPACE_ROOT)/include/",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": [
             "-Wno-implicit-fallthrough",
         ],
     }),
+    toolchains = [":workspace_root"],
     includes = [
         "include/",
     ],
@@ -83,14 +89,15 @@ cc_library(
         "include/flatcc/reflection/flatbuffers_common_reader.h",
     ] + glob(["include/flatcc/portable/**/*.h"]),
     copts = [
-        "-Iexternal/com_github_dvidelabs_flatcc/config/",
-        "-Iexternal/com_github_dvidelabs_flatcc/include/",
+        "-I$(WORKSPACE_ROOT)/config/",
+        "-I$(WORKSPACE_ROOT)/cnclude/",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": [
             "-Wno-implicit-fallthrough",
         ],
     }),
+    toolchains = [":workspace_root"],
     includes = [
         "include/",
     ],
@@ -117,10 +124,11 @@ cc_library(
     ] + glob([
         "external/**/*.h",
     ]),
+    toolchains = [":workspace_root"],
     copts = [
-      "-Iexternal/com_github_dvidelabs_flatcc/config/",
-      "-Iexternal/com_github_dvidelabs_flatcc/external/",
-      "-Iexternal/com_github_dvidelabs_flatcc/include/",
+      "-I$(WORKSPACE_ROOT)/config/",
+      "-I$(WORKSPACE_ROOT)/external/",
+      "-I$(WORKSPACE_ROOT)/include/",
     ],
 )
 
@@ -133,9 +141,10 @@ cc_binary(
         ":compiler",
         ":runtime",
     ],
+    toolchains = [":workspace_root"],
     copts = [
-      "-Iexternal/com_github_dvidelabs_flatcc/config/",
-      "-Iexternal/com_github_dvidelabs_flatcc/external/",
-      "-Iexternal/com_github_dvidelabs_flatcc/include/",
+      "-I$(WORKSPACE_ROOT)/config/",
+      "-I$(WORKSPACE_ROOT)/external/",
+      "-I$(WORKSPACE_ROOT)/include/",
     ],
 )
