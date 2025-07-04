@@ -39,6 +39,7 @@ iree_lit_test_suite(
     "resolve_device_promises.mlir"
     "resolve_export_ordinals.mlir"
     "resolve_ranked_shaped_type.mlir"
+    "resolve_topology_queries.mlir"
     "strip_executable_contents.mlir"
     "substitute_executables.mlir"
     "verify_devices.mlir"
