@@ -41,6 +41,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -943,6 +944,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
   }
 
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
