@@ -36,6 +36,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
   PUBLIC
 )
 
