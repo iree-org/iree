@@ -291,3 +291,39 @@ func.func @test_gather_config(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:t
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1], [0, 1]],
 // CHECK-SAME:               thread = [0, 1], thread_basis = {{\[}}[1, 64], [0, 1]],
 // CHECK-SAME:               workgroup = [1, 0]
+
+// -----
+
+func.func @split_reduction_config(%arg0 : tensor<?x131072xf32>,
+    %result : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f32
+  %1 = tensor.dim %arg0, %c0 : tensor<?x131072xf32>
+  %2 = tensor.empty(%1) : tensor<?x1024xf32>
+  %3 = scf.forall (%arg1) = (0) to (131072) step (128) shared_outs(%arg2 = %2) -> (tensor<?x1024xf32>) {
+    %4 = tensor.extract_slice %arg0[0, %arg1] [%1, 128] [1, 1] : tensor<?x131072xf32> to tensor<?x128xf32>
+    %5 = affine.apply affine_map<()[s0] -> (s0 floordiv 128)>()[%arg1]
+    %extracted_slice = tensor.extract_slice %arg2[0, %5] [%1, 1] [1, 1] : tensor<?x1024xf32> to tensor<?xf32>
+    %6 = linalg.fill ins(%cst : f32) outs(%extracted_slice : tensor<?xf32>) -> tensor<?xf32>
+    %7 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                         affine_map<(d0, d1) -> (d0)>],
+        iterator_types = ["parallel", "reduction"]}
+        ins(%4 : tensor<?x128xf32>) outs(%6 : tensor<?xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %8 = arith.addf %in, %out : f32
+        linalg.yield %8 : f32
+    } -> tensor<?xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %7 into %arg2[0, %5] [%1, 1] [1, 1] : tensor<?xf32> into tensor<?x1024xf32>
+    }
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  iree_tensor_ext.dispatch.tensor.store %3, %result,
+      offsets = [0, 0], sizes = [%1, 1024], strides = [1, 1]
+      : tensor<?x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>{%1}
+  return
+}
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: func @split_reduction_config
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
