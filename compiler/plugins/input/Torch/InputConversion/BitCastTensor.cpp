@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -73,7 +73,7 @@ public:
       }
     }
 
-    Value flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
+    Value flowBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
         loc, rType, builtinCast, inDynamicDims, outDynamicDims);
 
     auto torchCast =
@@ -110,7 +110,7 @@ public:
       }
     }
 
-    Value flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
+    Value flowBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
         loc, rType, builtinCast, dynDims, dynDims);
 
     auto torchCast =
@@ -184,7 +184,7 @@ public:
             loc, rhsType.toBuiltinTensor(), rhs);
 
     // No dynamic dims because we are bitcasting a constant.
-    auto flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
+    auto flowBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
         loc, bitCastTargetType, builtinCast, ValueRange(), ValueRange());
 
     // Cast back to the (un)signed torch tensor type to inform later lowerings.
@@ -209,7 +209,7 @@ namespace {
 class BitCastTensorPass final
     : public impl::BitCastTensorPassBase<BitCastTensorPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
     registry.insert<torch::Torch::TorchDialect>();
     registry.insert<torch::TorchConversion::TorchConversionDialect>();
   }

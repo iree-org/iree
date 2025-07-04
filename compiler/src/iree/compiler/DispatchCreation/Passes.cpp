@@ -7,6 +7,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -192,7 +193,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   IREE::Util::ExprHoistingOptions options;
   options.maxSizeIncreaseThreshold = 0;
   options.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
   FunctionLikeNest(passManager)
@@ -272,7 +273,7 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
   IREE::Util::ExprHoistingOptions hoistingOptions;
   hoistingOptions.maxSizeIncreaseThreshold = 0;
   hoistingOptions.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
 }
