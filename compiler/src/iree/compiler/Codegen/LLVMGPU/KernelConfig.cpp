@@ -595,13 +595,12 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
 /// Check if the dispatch has a single store operation.
 /// If the dispatch meets the criterion, it returns the set of
 /// compute ops.
+template <typename StoreOpTy>
 static FailureOr<SetVector<linalg::LinalgOp>>
-checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
+checkDispatchForVectorDistribution(Operation *parentOp) {
   SmallVector<Operation *> storeOps;
 
-  entryPoint.walk([&](IREE::TensorExt::DispatchTensorStoreOp op) {
-    storeOps.push_back(op.getOperation());
-  });
+  parentOp->walk([&](StoreOpTy op) { storeOps.push_back(op.getOperation()); });
 
   if (storeOps.empty()) {
     return failure();
@@ -620,6 +619,36 @@ checkDispatchForVectorDistribution(mlir::FunctionOpInterface entryPoint) {
   }
 
   SetVector<linalg::LinalgOp> computeOps;
+  // Check if the op contains an scf.forall. This could be generalized, but for
+  // now only check for split-reduction generated scf.forall.
+  std::optional<scf::ForallOp> forallOp;
+  bool foundLinalgOp = false;
+  for (Operation *op : slice) {
+    if (isa<scf::ForallOp>(op)) {
+      if (forallOp) {
+        return failure();
+      }
+      forallOp = cast<scf::ForallOp>(op);
+      continue;
+    }
+    if (isa<linalg::LinalgOp>(op)) {
+      foundLinalgOp = true;
+    }
+  }
+  if (forallOp) {
+    std::optional<ArrayAttr> mapping = forallOp->getMapping();
+    if (!mapping || mapping->size() != 1 ||
+        !isa<IREE::LinalgExt::SplitReductionMappingAttr>(
+            mapping->getValue().front())) {
+      return failure();
+    }
+    if (foundLinalgOp) {
+      return failure();
+    }
+    return checkDispatchForVectorDistribution<tensor::ParallelInsertSliceOp>(
+        forallOp.value());
+  }
+
   bool containsValidReductionOp = true;
   for (Operation *op : llvm::reverse(slice)) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
@@ -718,7 +747,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   FailureOr<SetVector<linalg::LinalgOp>> computeOps =
-      checkDispatchForVectorDistribution(entryPoint);
+      checkDispatchForVectorDistribution<
+          IREE::TensorExt::DispatchTensorStoreOp>(entryPoint);
 
   if (failed(computeOps)) {
     return failure();
@@ -732,6 +762,9 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
+  if (ShapedType::isDynamic(reductionSize)) {
+    return failure();
+  }
 
   int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {
