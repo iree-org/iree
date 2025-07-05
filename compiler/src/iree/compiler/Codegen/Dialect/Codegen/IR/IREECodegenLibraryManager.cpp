@@ -5,9 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/FileUtilities.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
@@ -81,6 +86,46 @@ FailureOr<ModuleOp> IREECodegenDialect::getOrParseTransformLibraryModule(
             parseSourceString<ModuleOp>(libraryMLIRSource, ctx, libraryPath);
         return success(*parsedLibrary != nullptr);
       });
+}
+
+FailureOr<ModuleOp>
+IREECodegenDialect::getOrLoadPatchedFuncOpsForDebugging(std::string path) {
+  // Acquire a lock on the map that will release once out of scope.
+  std::lock_guard<std::mutex> guard(moduleForPatchesMutex);
+
+  auto loadedLibrary = moduleForPatches.find(path);
+  if (loadedLibrary != moduleForPatches.end()) {
+    // Check whether the library already failed to load.
+    if (!(loadedLibrary->second) || !(*(loadedLibrary->second))) {
+      return failure();
+    }
+    return *(loadedLibrary->second);
+  }
+
+  std::string errorMessage;
+  std::unique_ptr<llvm::MemoryBuffer> memoryBuffer =
+      mlir::openInputFile(path, &errorMessage);
+  if (!memoryBuffer) {
+    return emitError(
+               FileLineColLoc::get(StringAttr::get(getContext(), path), 0, 0))
+           << "failed to open transform file: " << errorMessage;
+  }
+  // Tell sourceMgr about this buffer, the parser will pick it up.
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+  auto moduleOp =
+      OwningOpRef<ModuleOp>(parseSourceFile<ModuleOp>(sourceMgr, getContext()));
+  if (!moduleOp) {
+    // Don't need to emit an error here as the parsing should have already done
+    // that.
+    return failure();
+  }
+  if (failed(mlir::verify(*moduleOp))) {
+    return failure();
+  }
+
+  moduleForPatches[path] = std::move(moduleOp);
+  return *moduleForPatches[path];
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen
