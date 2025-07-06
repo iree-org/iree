@@ -229,15 +229,9 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() == 1 &&
          "expected intrinsic to have a single M, N, and K dimension.");
-  llvm::errs() << "[DEBUG] - canTargetIntrinsic 1\n";
-  llvm::errs() << "\t" << problem.aType << "\n";
-  llvm::errs() << "\t" << problem.bType << "\n";
-  llvm::errs() << "\t" << intrinsic.aType << "\n";
-  llvm::errs() << "\t" << intrinsic.bType << "\n";
   if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
     return failure(); // Cannot use this intrinsic for mismatched types
   }
-  llvm::errs() << "[DEBUG] - canTargetIntrinsic 2\n";
   if (problem.cType != intrinsic.cType) {
     bool isFpCase =
         isa<FloatType>(problem.cType) && isa<FloatType>(intrinsic.cType);
@@ -247,7 +241,7 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
       return failure(); // Cannot use this intrinsic if not upcasting.
     }
   }
-  llvm::errs() << "[DEBUG] - canTargetIntrinsic 3\n";
+
   if (mustBeAligned) {
     if ((problem.mSizes.back() % intrinsic.mSizes[0] != 0 ||
          problem.nSizes.back() % intrinsic.nSizes[0] != 0 ||
@@ -256,7 +250,7 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     }
     return success();
   }
-  llvm::errs() << "[DEBUG] - canTargetIntrinsic 4\n";
+
   // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
   // pipeline, similar to matvec.
   // TODO: Figure out what the precise cutoff is, this may be machine dependent.
@@ -278,7 +272,6 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
       return failure();
     }
   }
-  llvm::errs() << "[DEBUG] - canTargetIntrinsic 5\n";
   return success();
 }
 
@@ -422,14 +415,12 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
     bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
-  llvm::errs() << "[DEBUG] - deduceMMASchedule\n";
   for (const GPUIntrinsicType &intrinsic : intrinsics) {
-    llvm::errs() << "[DEBUG] - deduceMMASchedule - 1\n";
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
     }
-    llvm::errs() << "[DEBUG] - deduceMMASchedule - 2\n";
+
     GPUMMASchedule schedule = getOptimalMMASchedule(problem, intrinsic, seeds);
 
     LLVM_DEBUG({

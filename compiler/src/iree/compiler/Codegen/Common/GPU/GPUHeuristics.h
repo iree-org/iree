@@ -32,7 +32,6 @@ struct GPUMatmulShapeType {
 /// Struct containing information about a GPU MMA intrinsic type.
 struct GPUIntrinsicType : public GPUMatmulShapeType {
   IREE::GPU::MmaInterfaceAttr mmaKind;
-  // IREE::GPU::ScaledMmaInterfaceAttr scaledMmaKind;
   GPUIntrinsicType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c,
                    IREE::GPU::MmaInterfaceAttr kind)
       : GPUMatmulShapeType(m, n, k, a, b, c), mmaKind(kind) {}
@@ -40,10 +39,6 @@ struct GPUIntrinsicType : public GPUMatmulShapeType {
                    ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a, Type b,
                    Type c, IREE::GPU::MmaInterfaceAttr kind)
       : GPUMatmulShapeType(m, n, k, batch, a, b, c), mmaKind(kind) {}
-  // GPUIntrinsicType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
-  //                  ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a, Type b,
-  //                  Type c, IREE::GPU::ScaledMmaInterfaceAttr kind)
-  //     : GPUMatmulShapeType(m, n, k, batch, a, b, c), scaledMmaKind(kind) {}
 };
 
 /// Struct containing seed tile sizes for GPU MMA heuristics deduction logic.

@@ -854,19 +854,21 @@ AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
                         context);
 }
 
-FailureOr<std::tuple<unsigned, unsigned, unsigned>>
+FailureOr<std::tuple<unsigned, unsigned, unsigned, unsigned>>
 getInnerDims(linalg::LinalgOp linalgOp) {
   auto extractDims = [](SmallVector<SmallVector<unsigned, 2>> dims)
-      -> FailureOr<std::tuple<unsigned, unsigned, unsigned>> {
-    if (dims[0].empty() || dims[1].empty() || dims[2].empty()) {
-      return failure();
+      -> FailureOr<std::tuple<unsigned, unsigned, unsigned, unsigned>> {
+    for (auto dim : dims) {
+      if (dim.empty()) {
+        return failure();
+      }
     }
-    std::tuple<unsigned, unsigned, unsigned> res{dims[0].back(), dims[1].back(), dims[2].back()};
+    std::tuple<unsigned, unsigned, unsigned, unsigned> res{dims[0].back(), dims[1].back(), dims[2].back(), dims[3].back()};
     return res;
   };
   linalgOp.print(llvm::errs()), llvm::errs() << "\n";
-  FailureOr<linalg::ScaledContractionDimensions> maybeScaledContrDims =
-      linalg::inferScaledContractionDims(linalgOp);
+  FailureOr<ScaledContractionDimensions> maybeScaledContrDims =
+      inferScaledContractionDims(linalgOp);
   auto printArray = [](SmallVector<unsigned, 2> a) -> int {
     llvm::errs() << "------------\n";
     for (auto b : a)
@@ -879,7 +881,7 @@ getInnerDims(linalg::LinalgOp linalgOp) {
     printArray(maybeScaledContrDims->n);
     printArray(maybeScaledContrDims->k);
     return extractDims({maybeScaledContrDims->m, maybeScaledContrDims->n,
-                        maybeScaledContrDims->k});
+                        maybeScaledContrDims->k, maybeScaledContrDims->kB});
   }
   FailureOr<linalg::ContractionDimensions> maybeContractionDims =
       linalg::inferContractionDims(linalgOp);
@@ -903,16 +905,17 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
   }
   linalgOp.print(llvm::errs());
   llvm::errs() << "\n";
-  FailureOr<std::tuple<unsigned, unsigned, unsigned>> innerDims = getInnerDims(linalgOp);
+  FailureOr<std::tuple<unsigned, unsigned, unsigned, unsigned>> innerDims = getInnerDims(linalgOp);
   llvm::errs() << "[DEBUG] - IN INNERTILER\n";
   if (failed(innerDims)) {
     return failure();
   }
   llvm::errs() << "[DEBUG] - IN INNERTILER 1 \n";
-  auto [innerM, innerN, innerK] = *innerDims;
+  auto [innerM, innerN, innerK, innerKb] = *innerDims;
   llvm::errs() << innerM << " <- ->\n";
   llvm::errs() << innerN << " <- ->\n";
   llvm::errs() << innerK << " <- ->\n";
+  llvm::errs() << innerKb << " <- ->\n";
   MLIRContext *context = rewriter.getContext();
   AffineExpr d0, d1, d2;
   bindDims(context, d0, d1, d2);
@@ -920,10 +923,13 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
   AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
   AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
   AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
+  AffineExpr kBExpr = rewriter.getAffineDimExpr(innerKb);
 
   SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
   AffineMap lhsMap = indexingMaps[0];
   AffineMap rhsMap = indexingMaps[1];
+  AffineMap sc1Map = indexingMaps[2];
+  AffineMap sc2Map = indexingMaps[3];
   AffineMap accMap = indexingMaps[4];
 
   auto getNormalizedPermutation =
@@ -958,8 +964,12 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
   for (auto a : lhsInnerPerm)
     llvm::errs() << a << "\n";
   llvm::errs() << "[DEBUG] - RHS\n";
+  SmallVector<int64_t> sc1InnerPerm =
+      getNormalizedPermutation(sc1Map.getMinorSubMap(2), {mExpr, kBExpr});
   SmallVector<int64_t> rhsInnerPerm =
       getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
+  SmallVector<int64_t> sc2InnerPerm =
+      getNormalizedPermutation(sc1Map.getMinorSubMap(2), {nExpr, kBExpr});
   llvm::errs() << rhsMap << "\n";
   llvm::errs() << rhsMap.getMinorSubMap(2) << "\n";
   for (auto a : rhsInnerPerm)
@@ -977,30 +987,51 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
   }
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  llvm::errs() << "[DEBUG] - bounds \n";
+  for (auto b : bounds)
+    llvm::errs() << b << "\n";
+    
   llvm::errs() << "[DEBUG] - IN INNERTILER 5 \n";
   auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getScaledMNKShape();
+  llvm::errs() << "[DEBUG] - intrinsic \n";
+  llvm::errs() << intrinsicM << " " << intrinsicN << " " << intrinsicK << "\n";
   if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
       intrinsicK != bounds[innerK]) {
     return failure();
   }
   llvm::errs() << "[DEBUG] - IN INNERTILER 6 \n";
 
-  SmallVector<Value> inputs = linalgOp->getOperands();
+  
+  auto reorderInputs = [](SmallVector<Value> inputs) {
+    SmallVector<Value> res;
+    int numInputs = inputs.size() - 1;
+    int offset = numInputs / 2;
+    for (int i = 0; i < numInputs; i++) {
+      llvm::errs() << " s " << i/2 + (i%2)*offset << "\n";
+      res.push_back(inputs[i/2 + (i%2)*offset]);
+    }
+    res.push_back(inputs.back());
+    return res;
+  };
+  SmallVector<Value> inputs = reorderInputs(linalgOp->getOperands());
+
   SmallVector<Type> eltTypes;
   mmaKind.getElementTypes(eltTypes);
+  for (auto ty : eltTypes)
+    llvm::errs() << "\t" << ty << "\n";
   for (auto in : inputs)
     llvm::errs() << "\t" << in << "\n";
   llvm::errs() << "Element types\n";
   llvm::errs() << "\t" << inputs[0] << "\n";
-  llvm::errs() << "\t" << inputs[1] << "\n";
+  llvm::errs() << "\t" << inputs[2] << "\n";
   llvm::errs() << "\t" << inputs[4] << "\n";
   llvm::errs() << "\t" << eltTypes[0] << "\n";
   llvm::errs() << "\t" << eltTypes[1] << "\n";
   llvm::errs() << "\t" << eltTypes[4] << "\n";
   if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
           eltTypes[0] ||
-      cast<RankedTensorType>(inputs[1].getType()).getElementType() !=
-          eltTypes[1] ||
+      cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
+          eltTypes[2] ||
       cast<RankedTensorType>(inputs[4].getType()).getElementType() !=
           eltTypes[4]) {
     return failure();
@@ -1025,12 +1056,16 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
       dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
   AffineMap outerRhsMap =
       dropDims(context, numDims - 3, rhsMap, oldDimsToNewDimsMap);
+  AffineMap outerSc1Map =
+      dropDims(context, numDims - 3, sc1Map, oldDimsToNewDimsMap);
+  AffineMap outerSc2Map =
+      dropDims(context, numDims - 3, sc2Map, oldDimsToNewDimsMap);
   AffineMap outerAccMap =
       dropDims(context, numDims - 3, accMap, oldDimsToNewDimsMap);
 
   std::optional<SmallVector<SmallVector<int64_t>>> perms =
-      SmallVector<SmallVector<int64_t>>{lhsInnerPerm, rhsInnerPerm,
-                                        accInnerPerm};
+      SmallVector<SmallVector<int64_t>>{
+          lhsInnerPerm, sc1InnerPerm, rhsInnerPerm, sc2InnerPerm, accInnerPerm};
   SmallVector<int64_t> identityPerm = {0, 1};
   
   llvm::errs() << "[DEBUG] - IN INNERTILER 9 \n";
@@ -1044,7 +1079,7 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
-      ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
+      ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map, outerAccMap}, iteratorTypes,
       mmaKind, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
@@ -1059,11 +1094,15 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 FailureOr<Operation *>
 distributeInnerTiledOp(RewriterBase &rewriter,
                        IREE::Codegen::InnerTiledOp tiledOp) {
+  llvm::errs() << "[DEBUG] - Transforms [0]\n";
+  tiledOp.print(llvm::errs()), llvm::errs() << "\n";
+  llvm::errs() << tiledOp.hasTensorSemantics() << "\n";
+  llvm::errs() << tiledOp.hasThreadSemantics() << "\n";
   if (!tiledOp.hasTensorSemantics() || tiledOp.hasThreadSemantics()) {
     return rewriter.notifyMatchFailure(
         tiledOp, "tiledOp must have vector and subgroup for distribution.");
   }
-
+  llvm::errs() << "[DEBUG] - Transforms [1]\n";
   RewriterBase::InsertionGuard g(rewriter);
 
   Location loc = tiledOp.getLoc();
@@ -1071,7 +1110,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 
   OpFoldResult zero = rewriter.getIndexAttr(0);
   OpFoldResult one = rewriter.getIndexAttr(1);
-
+  llvm::errs() << "[DEBUG] - Transforms [2]\n";
   // Step 1. Create the new scf.forall op with a lane id mapping.
   Attribute mappingType = tiledOp.getKind().getDistributionMappingKind();
   if (!mappingType) {
@@ -1084,21 +1123,21 @@ distributeInnerTiledOp(RewriterBase &rewriter,
     return tiledOp.emitOpError("failed to specify a worker count for the "
                                "forall it's to be distributed into.");
   }
-
+  llvm::errs() << "[DEBUG] - Transforms [3]\n";
   auto newForallOp = rewriter.create<scf::ForallOp>(
       loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
       ArrayRef<OpFoldResult>{one}, tiledOp.getOutputs(),
       ArrayAttr::get(context, {mappingType}));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
-
+  llvm::errs() << "[DEBUG] - Transforms [4]\n";
   // Step 2. Compute the offsets/sizes/strides for each of the operands.
   Value id = newForallOp.getInductionVar(0);
   SmallVector<Value> inputSlices, initSlices;
   SmallVector<tensor::ExtractSliceOp> initSliceOps;
   std::optional<ArrayAttr> maybePerms = tiledOp.getPermutations();
   int64_t firstOutIdx = tiledOp.getNumInputs();
-
+  llvm::errs() << "[DEBUG] - DOES IT GET HERE?\n";
   for (auto [opIndex, operand] : llvm::enumerate(tiledOp.getOperands())) {
     int64_t outerRank = tiledOp.getOperandOuterRank(opIndex);
     SmallVector<OpFoldResult> offsets(outerRank, zero);
@@ -1115,6 +1154,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
       permutation = llvm::to_vector(llvm::seq(
           static_cast<int64_t>(0), static_cast<int64_t>(innerShape.size())));
     }
+    llvm::errs() << "[DEBUG] - DOES IT GET HERE? 1\n";
     // Slice offsets.
     SmallVector<OpFoldResult> strides(outerRank, one);
     if (failed(tiledOp.getKind().populateOperandOffsetsSizesStrides(
@@ -1123,6 +1163,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
       return tiledOp->emitOpError("failed to populate offsets for operand " +
                                   Twine(opIndex));
     }
+    llvm::errs() << "[DEBUG] - DOES IT GET HERE? 2\n";
     // Extract the rank-reduced slice of the operand based on the expected inner
     // vector shape. If we're slicing the accumulator, extract from the loop
     // variable, since the accumulator operand has been used to create the
@@ -1138,6 +1179,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
           loc, operand, offsets, sizes, strides);
       inputSlices.push_back(slice);
     }
+    llvm::errs() << "[DEBUG] - DOES IT GET HERE? 3\n";
   }
 
   // Step 3. Create the new inner_tiled op.

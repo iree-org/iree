@@ -553,8 +553,8 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   if (target.getWgp().getMma().empty())
     return failure();
 
-  FailureOr<mlir::linalg::ScaledContractionDimensions> scaledContractionDims =
-      mlir::linalg::inferScaledContractionDims(maps);
+  FailureOr<ScaledContractionDimensions> scaledContractionDims =
+      inferScaledContractionDims(maps);
   if (failed(scaledContractionDims)) {
     return failure();
   }
@@ -824,7 +824,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       Operation *op, bool useDirectLoad) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) &&
-                    !linalg::isaScaledContractionOpInterface(linalgOp))) {
+                    !IREE::GPU::isaScaledContractionOpInterface(linalgOp))) {
     llvm::errs() << "[DEBUG] - Failure 1\n";
     return failure();
   }

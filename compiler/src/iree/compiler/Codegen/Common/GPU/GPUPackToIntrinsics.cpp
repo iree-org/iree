@@ -53,11 +53,23 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     return packedSizes;
   };
 
-  FailureOr<linalg::ScaledContractionDimensions> scaledContrDims =
-      linalg::inferScaledContractionDims(linalgOp);
+  FailureOr<IREE::GPU::ScaledContractionDimensions> scaledContrDims =
+      IREE::GPU::inferScaledContractionDims(linalgOp);
   if (succeeded(scaledContrDims)) {
     auto [m, n, k] = kind.getScaledMNKShape();
     indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k};
+    llvm::errs() << "[DEBUG] scaled shapes m " << m << "\n";
+    llvm::errs() << "[DEBUG] scaled shapes n " << n << "\n";
+    llvm::errs() << "[DEBUG] scaled shapes k " << k << "\n";
+    for (auto m1 : scaledContrDims->m)
+      llvm::errs() << m1 << ", ";
+    llvm::errs() << "\n";
+    for (auto m1 : scaledContrDims->n)
+      llvm::errs() << m1 << ", ";
+    llvm::errs() << "\n";
+    for (auto m1 : scaledContrDims->k)
+      llvm::errs() << m1 << ", ";
+    llvm::errs() << "\n";
     return createPackedSizes({m, n, k}, indices);
   }
 
@@ -89,7 +101,11 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
   if (failed(maybeResult)) {
     return rewriter.notifyMatchFailure(linalgOp, "packing failed");
   }
+  llvm::errs() << "[DEBUG] - what is lowering config\n";
+  llvm::errs() << loweringConfig;
   setLoweringConfig(maybeResult->packedLinalgOp, loweringConfig);
+  llvm::errs() << "[DEBUG] - what is lowering config now?\n";
+  maybeResult->packedLinalgOp.print(llvm::errs()), llvm::errs() << "\n";
   return success();
 }
 

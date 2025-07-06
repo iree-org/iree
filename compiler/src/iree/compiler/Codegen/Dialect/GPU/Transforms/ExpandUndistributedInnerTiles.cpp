@@ -32,14 +32,14 @@ static LogicalResult materializeOperandExpandedShape(
     std::optional<ArrayRef<int64_t>> permutation,
     SmallVectorImpl<ReassociationIndices> &reassociations,
     RankedTensorType &resultType) {
-
+  llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 1\n";
   Codegen::InnerTileDescAttrInterface tiledOpKind = tiledOp.getKind();
   Value operand = tiledOp.getOperand(operandIndex);
   auto operandType = cast<RankedTensorType>(operand.getType());
   ArrayRef<int64_t> operandShape = operandType.getShape();
   int64_t outerRank = tiledOp.getOperandOuterRank(operandIndex);
   int64_t innerRank = operandType.getRank() - outerRank;
-
+  llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 2\n";
   SmallVector<int64_t> unexpandedSizes(unexpandedInnerLogicalType.getShape());
   if (permutation.has_value()) {
     // Guard against re-running this pattern or other unusial states
@@ -53,16 +53,19 @@ static LogicalResult materializeOperandExpandedShape(
       ArrayRef<int64_t>{unexpandedSizes}) {
     return failure();
   }
+  llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 3\n";
 
   SmallVector<int64_t> resultShape(operandShape.drop_back(innerRank));
   SmallVector<ReassociationIndices> reInds = llvm::map_to_vector(
       llvm::seq<int64_t>(outerRank), [](int64_t idx) -> ReassociationIndices {
         return ReassociationIndices({idx});
       });
+  llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 4\n";
   int64_t reAssocIdx = outerRank;
   bool isNonTrivial = false;
   for (int64_t innerDim : llvm::seq(innerRank)) {
     int64_t logicalInnerDim = innerDim;
+    llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 5\n";
     if (permutation.has_value()) {
       // The permutation semantics are that permutation[i] is the index in the
       // logical (for matmul, this is row-major) layout of the intrinsic that
@@ -73,6 +76,7 @@ static LogicalResult materializeOperandExpandedShape(
       // reshapes) with a simple array lookup.
       logicalInnerDim = (*permutation)[innerDim];
     }
+    llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 6\n";
     std::optional<SmallVector<int64_t, 2>> maybeExpansion =
         tiledOpKind.getUndistributedTileDimExpansion(operandIndex,
                                                      logicalInnerDim);
@@ -81,18 +85,22 @@ static LogicalResult materializeOperandExpandedShape(
       reInds.push_back(ReassociationIndices{reAssocIdx++});
       continue;
     }
+    llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 7\n";
     int64_t expandRank = maybeExpansion->size();
     llvm::append_range(resultShape, *maybeExpansion);
     reInds.push_back(
         llvm::to_vector(llvm::seq(reAssocIdx, reAssocIdx + expandRank)));
     reAssocIdx += expandRank;
+    llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 8\n";
     isNonTrivial = true;
   }
+  llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 9\n";
   if (!isNonTrivial) {
     // Three's nothing to expand. Note that this is always the case for
     // DataTiledMMAAttr and VirtualMMAAttr.
     return failure();
   }
+  llvm::errs() << "[DEBUG] - materializeOperandExpandedShape - 10\n";
 
   reassociations = reInds;
   resultType = operandType.clone(resultShape);
@@ -110,11 +118,12 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
 
   LogicalResult matchAndRewrite(Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
+                                  llvm::errs() << "[DEBUG] - Expand inner 1 \n";
     if (!tiledOp.hasTensorSemantics()) {
       return failure();
     }
     Location loc = tiledOp.getLoc();
-
+    llvm::errs() << "[DEBUG] - Expand inner 2 "<< expandInputs << " " << expandOutputs << "\n";
     int64_t numInputs = tiledOp.getNumInputs();
     int64_t numOperands = tiledOp.getNumOperands();
     int64_t firstOperand = expandInputs ? 0 : numInputs;
@@ -128,7 +137,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
     if (permutationsAttr.has_value() && *permutationsAttr) {
       newPermutations = llvm::to_vector(*permutationsAttr);
     }
-
+    llvm::errs() << "[DEBUG] - Expand inner 3 \n";
     SmallVector<VectorType> unexpandedLogicalTypes;
     tiledOp.getKind().getUndistributedTileTypes(unexpandedLogicalTypes);
     for (int64_t opIndex : llvm::seq(firstOperand, lastOperand)) {
@@ -138,7 +147,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
         permutation =
             cast<DenseI64ArrayAttr>((*permutationsAttr)[opIndex]).asArrayRef();
       }
-
+      llvm::errs() << "[DEBUG] - Expand inner 41 \n";
       SmallVector<ReassociationIndices> reassociations;
       RankedTensorType expandedType;
       // Note: failure here includes being trivial.
@@ -147,6 +156,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
               permutation, reassociations, expandedType))) {
         continue;
       }
+      llvm::errs() << "[DEBUG] - Expand inner 5 \n";
       auto expandOp = rewriter.create<tensor::ExpandShapeOp>(
           loc, expandedType, operand, reassociations);
       maybeExpands[opIndex] = expandOp;
@@ -158,6 +168,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       // reassociation indices (and subtract off the outer rank), they'll
       // be indexes into the new physical dimensions in logical order.
       // Inverting again will give the permutation we want to use.
+      llvm::errs() << "[DEBUG] - Expand inner 6 \n";
       if (permutation) {
         int64_t outerRank = tiledOp.getOperandOuterRank(opIndex);
         SmallVector<int64_t> invPermutation =
@@ -176,6 +187,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
         newPermutations[opIndex] = rewriter.getDenseI64ArrayAttr(
             invertPermutationVector(newInvPermutation));
       }
+      llvm::errs() << "[DEBUG] - Expand inner 7 \n";
     }
 
     if (llvm::all_of(maybeExpands, [](auto e) { return e == nullptr; })) {
@@ -186,6 +198,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
     if (permutationsAttr) {
       newPermutationsAttr = rewriter.getArrayAttr(newPermutations);
     }
+    llvm::errs() << "[DEBUG] - Expand inner 8 \n";
     // Create the new inner_tiled op with the expanded type.
     auto expandedTiledOp = rewriter.create<Codegen::InnerTiledOp>(
         loc, /*inputs=*/ValueRange{newOperands}.take_front(numInputs),
@@ -196,11 +209,12 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
     if (auto config = getLoweringConfig(tiledOp)) {
       setLoweringConfig(expandedTiledOp, config);
     }
-
+    llvm::errs() << "[DEBUG] - Expand inner 9 \n";
     SmallVector<Value> newResults(expandedTiledOp.getResults());
     // If we had to expnad any accumulators, collapse the corresponding results
     // back to their original shape.
     for (auto [resIndex, result] : llvm::enumerate(newResults)) {
+      llvm::errs() << "[DEBUG] - Expand inner 10 \n";
       tensor::ExpandShapeOp tiedInitExpand = maybeExpands[numInputs + resIndex];
       if (!tiedInitExpand) {
         continue;
@@ -209,7 +223,7 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
           loc, tiledOp.getResultTypes()[resIndex], result,
           tiedInitExpand.getReassociation());
     }
-
+    llvm::errs() << "[DEBUG] - Expand inner 11 \n";
     rewriter.replaceOp(tiledOp, newResults);
     return success();
   }
