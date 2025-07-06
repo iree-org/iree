@@ -819,7 +819,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
 // CHECK-COUNT-2:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 

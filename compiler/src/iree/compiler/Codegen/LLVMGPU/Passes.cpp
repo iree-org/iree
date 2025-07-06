@@ -41,6 +41,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -887,9 +888,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Tile to reduction loops.
   {
-    GPUApplyPaddingLevelPassOptions padOptions;
-    padOptions.tilingLevel = IREE::GPU::TilingLevel::Reduction;
-    funcPassManager.addPass(createGPUApplyPaddingLevelPass(padOptions));
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
     options.allowZeroSlices = true;
@@ -908,6 +906,14 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
     options.allowZeroSlices = true;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+    // Post tiling, the tensor.pad multiples can be simplified to static
+    // sizes, run dim simplification to infer and propagate these sizes.
+    funcPassManager.addPass(affine::createSimplifyAffineMinMaxPass());
+    funcPassManager.addPass(memref::createReifyResultShapesPass());
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
     funcPassManager.addPass(affine::createLoopCoalescingPass());
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -938,6 +944,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
   }
 
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
