@@ -1032,7 +1032,6 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
-  llvm::errs() << "[DEBUG] - setMmaKind 1\n";
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
@@ -1288,7 +1287,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto promotedOperands =
       llvm::to_vector(llvm::seq<int64_t>(op.getNumDpsInputs()));
   IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
-  llvm::errs() << "[DEBUG] - setMmaKind 2\n";
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
   IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
@@ -1515,14 +1513,12 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   // Configuring for qk matmul.
   // subgroup_n count for qk matmul is always 1, since we do not tile K1.
   IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
-  llvm::errs() << "[DEBUG] - setMmaKind 3\n";
   IREE::GPU::setMmaKind(context, qkConfig, schedule->mmaKind);
   IREE::GPU::setSubgroupMCount(context, qkConfig, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, qkConfig, 1);
 
   // Configuring for pv matmul.
   IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
-  llvm::errs() << "[DEBUG] - setMmaKind 4\n";
   IREE::GPU::setMmaKind(context, pvConfig, schedule->mmaKind);
   IREE::GPU::setSubgroupMCount(context, pvConfig, schedule->mSubgroupCounts[0]);
   IREE::GPU::setSubgroupNCount(context, pvConfig, schedule->nSubgroupCounts[0]);
@@ -3002,10 +2998,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Tile and fuse data tiled MMA inner_tiled config");
     return success();
   }
-  
-  llvm::errs() << "[DEBUG] - Attempting early tile and fuse\n";
   if (clGPUEarlyTileAndFuseMatmul) {
-    llvm::errs() << "[DEBUG] - Attempted early tile and fuse\n";
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG("Tile and fuse matmul config");
