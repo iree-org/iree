@@ -41,6 +41,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRIR
+    MLIRMaskableOpInterface
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect

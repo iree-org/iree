@@ -46,6 +46,7 @@ iree_cc_library(
   DEPS
     LLVMPasses
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
