@@ -989,7 +989,7 @@ func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
       iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
       ins(%3 : tensor<3x?x32x32xf32>) outs(%5 : tensor<3x?x32xf32>)
-      attrs = {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 4], thread = [1, 1, 1, 0], workgroup = [1, 1, 64, 0]}>} {
+      attrs = {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 4], thread = [1, 1, 1, 0], workgroup = [1, 1, 32, 0]}>} {
   ^bb0(%in: f32, %out: f32):
     %8 = math.fpowi %in, %c2_i64 : f32, i64
     %9 = arith.addf %8, %out : f32
@@ -1016,8 +1016,6 @@ func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
 // CHECK-LABEL: func @multi_slice_fusion_broadcast
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<3x?x32xi64>
 //  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<32xf32>
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty
 //       CHECK:    %[[RESULT:.+]]:2 = scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]])
 //  CHECK-SAME:        shared_outs(%[[INIT0:[a-zA-Z0-9]+]] = %[[EMPTY]], %[[INIT1:[a-zA-Z0-9]+]] = %[[EMPTY]])
@@ -1026,7 +1024,6 @@ func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
 //       CHECK:      %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:          ins(%[[ARG1_SLICE]] :
 //  CHECK-SAME:          outs(%[[INIT0_SLICE]] :
-//       CHECK:      %[[CAST0:.+]] = tensor.cast %[[GENERIC0]]
 //       CHECK:      %[[EMPTYTILE:.+]] = tensor.empty() : tensor<1x1x32xf32>
 //       CHECK:      %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:          outs(%[[EMPTYTILE]] :
@@ -1037,9 +1034,8 @@ func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
 //       CHECK:      %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:          ins(%[[ARG3]], %[[GENERIC0]], %[[GENERIC1]] :
 //  CHECK-SAME:          outs(%[[INIT1_SLICE]] :
-//       CHECK:      %[[CAST1:.+]] = tensor.cast %[[GENERIC2]]
-//   CHECK-DAG:      tensor.parallel_insert_slice %[[CAST0]] into %[[INIT0]][%[[IV0]], %[[IV1]], %[[C0]], 0] [1, 1, %[[C32]], 32]
-//   CHECK-DAG:      tensor.parallel_insert_slice %[[CAST1]] into %[[INIT1]][%[[IV0]], %[[IV1]], %[[C0]], 0] [1, 1, %[[C32]], 32]
+//   CHECK-DAG:      tensor.parallel_insert_slice %[[GENERIC0]] into %[[INIT0]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32]
+//   CHECK-DAG:      tensor.parallel_insert_slice %[[GENERIC2]] into %[[INIT1]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32]
 //       CHECK:    return %[[RESULT]]#0, %[[RESULT]]#1
 
 // -----
