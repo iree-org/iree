@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -70,7 +71,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, resultTypes, kernelName, ValueRange{input}, outputs,
       ValueRange{reductionDimSize, writeMaxValueFlag},
-      ukernelAttr.getDefAttrs(), rewriter.getIndexAttr(0));
+      ukernelAttr.getDefAttrs(), /*num_strided_outer_dims=*/0);
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -131,6 +132,40 @@ static Value createSharedMemory(PatternRewriter &rewriter, Location loc,
   return allocOp;
 }
 
+/// Returns the index of the innermost CrossIntrinsic dimension of the C matrix,
+/// if it is static, and std::nullopt if it is dynamic or if there are no
+/// CrossIntrinsic dims.
+static std::optional<unsigned>
+getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
+  auto outputType = dyn_cast<ShapedType>(op.getResultTypes()[0]);
+  if (!outputType) {
+    return std::nullopt;
+  }
+  auto mma = cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
+  IREE::Codegen::TileSwizzle accSwizzle =
+      getSwizzle(mma, IREE::GPU::MMAFragment::Acc);
+  SmallVector<IREE::Codegen::TileSwizzle::Dim> swizzleDims;
+  for (IREE::Codegen::TileSwizzle::ExpandShapeDimVectorType group :
+       accSwizzle.expandShape) {
+    swizzleDims.append(group);
+  }
+  applyPermutationToVector(swizzleDims, accSwizzle.permutation);
+  int rankDiff = outputType.getRank() - swizzleDims.size();
+  auto crossIntrinsic = IREE::Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
+  for (size_t e = swizzleDims.size(), swizzleIdx = e - 1; swizzleIdx < e;
+       --swizzleIdx) {
+    if (swizzleDims[swizzleIdx].kind != crossIntrinsic) {
+      continue;
+    }
+    int outputIdx = swizzleIdx + rankDiff;
+    if (outputType.isDynamicDim(outputIdx)) {
+      return std::nullopt;
+    }
+    return outputIdx;
+  }
+  return std::nullopt;
+}
+
 struct LowerInnerTiledMmaToUKernelPattern
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   LowerInnerTiledMmaToUKernelPattern(MLIRContext *context)
@@ -151,6 +186,12 @@ struct LowerInnerTiledMmaToUKernelPattern
     if (!mma) {
       return rewriter.notifyMatchFailure(op, "unhandled MMAInterfaceAttr");
     }
+    std::optional<int64_t> innerCrossIntrinsicDim =
+        getCInnermostStaticCrossIntrinsicDim(op);
+    if (!innerCrossIntrinsicDim) {
+      return rewriter.notifyMatchFailure(
+          op, "inner cross-intrinsic dim is dynamic or not found");
+    }
     Location loc = op->getLoc();
     Type I32Type = rewriter.getI32Type();
     auto castIndexToI32 = [&](Value val) {
@@ -168,13 +209,29 @@ struct LowerInnerTiledMmaToUKernelPattern
     Value intrinsicsN = constI32(mma.getIntrinsicsN());
     Value subgroupsN = constI32(mma.getSubgroupsN());
     Value intrinsicsK = constI32(mma.getIntrinsicsK());
+    // There are 3 shaped input/output operands (A/B/C matrices).
+    SmallVector<SmallVector<int64_t>> stridedDims(3, {});
+    // Only the C matrix gets strides, and we pass the stride of the innermost
+    // CrossIntrinsic dim, because the ukernel needs to know where to store the
+    // result vector from each unrolled intrinsic. Offsets into all other
+    // dimensions are handled by the compiler, and passed as part of the base
+    // pointer + offset. The A and B matrices don't get strides, because we
+    // expect them to always be passed as global memory pointers, and the
+    // strides can be inferred by the ukernel implementation.
+    stridedDims[2].push_back(innerCrossIntrinsicDim.value());
+    // The only additional shaped operand is the shared memory buffer. Only
+    // create a stride list for it if we have shared memory. Otherwise, the
+    // operand is an iree_codegen.null_pointer op.
+    if (sharedMemoryBytes != 0) {
+      // Shared memory does not need strides.
+      stridedDims.push_back({});
+    }
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         op, op.getOutputs().getTypes(), ukernelAttr.getName(), op.getInputs(),
         op.getOutputs(),
         ValueRange{sharedMemory, constI32(sharedMemoryBytes), k, intrinsicsM,
                    subgroupsM, intrinsicsN, subgroupsN, intrinsicsK},
-        ukernelAttr.getDefAttrs(),
-        /*strided_outer_dims=*/rewriter.getIndexAttr(0));
+        ukernelAttr.getDefAttrs(), stridedDims);
     return success();
   }
 };
