@@ -143,6 +143,8 @@ static LogicalResult bubbleUpSetEncoding(RewriterBase &rewriter,
   return bubbleUpSetEncodingThroughGenericOp(rewriter, setEncoding, producer);
 }
 
+/// Returns true if the op is hoistable outside dispatches, which indicates that
+/// the ops can be either mappable to Flow ops or get hoisted to globals.
 static bool isHoistableOp(Operation *op) {
   if (auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
     SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
@@ -152,10 +154,13 @@ static bool isHoistableOp(Operation *op) {
     return IREE::Flow::isOffsetSizeAndStrideMappableToFlow(offsets, sizes,
                                                            strides, srcShape);
   }
-
-  // Compute ops are not hoistable after dispatch formation.
-  return !isa<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect>(
-      op->getDialect());
+  // ConstExprHoistingPolicy has an assumption that any root op is not hoistable
+  // because they are already hoisted. This is not the case when the parent op
+  // is a constant-like op, so we have a special rule here.
+  if (op->hasTrait<OpTrait::ConstantLike>()) {
+    return true;
+  }
+  return false;
 }
 
 namespace {
@@ -199,14 +204,14 @@ struct BubbleUpSetEncodingOp
 /// Create dispatch.region Ops based on a fusion heuristic.
 void HoistEncodingOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  ModuleOp moduleOp = getOperation();
 
   RewritePatternSet bubblingPatterns(ctx);
   bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
   GreedyRewriteConfig config;
   config.enableConstantCSE(false);
-  if (failed(
-          applyPatternsGreedily(funcOp, std::move(bubblingPatterns), config))) {
+  if (failed(applyPatternsGreedily(moduleOp, std::move(bubblingPatterns),
+                                   config))) {
     return signalPassFailure();
   }
 
@@ -218,7 +223,7 @@ void HoistEncodingOpsPass::runOnOperation() {
   // follow the order in the vector to hoist the ops. The last operation is
   // expected to be the corresponding SetEncoding op.
   SmallVector<SmallVector<Operation *>> candidates;
-  funcOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
+  moduleOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
     if (!setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
       return;
     }
@@ -237,12 +242,11 @@ void HoistEncodingOpsPass::runOnOperation() {
       worklist.pop();
       opsWithinDispatch.insert(op);
       for (auto input : op->getOperands()) {
-        if (auto inputOp = input.getDefiningOp();
-            inputOp &&
+        auto inputOp = input.getDefiningOp();
+        if (inputOp &&
             inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
             !opsWithinDispatch.contains(inputOp)) {
           if (!isHoistableOp(inputOp)) {
-            inputOp->dump();
             isHoistable = false;
           }
           worklist.push(inputOp);
@@ -255,7 +259,8 @@ void HoistEncodingOpsPass::runOnOperation() {
     }
 
     // The ops are hoistable if they are const-exprs.
-    auto *constInfo = constExprs.lookup(setEncodingOp.getSource());
+    const IREE::Util::ConstExprAnalysis::ConstValueInfo *constInfo =
+        constExprs.lookup(setEncodingOp.getSource());
     if (!constInfo) {
       LDBG("Non-hoistable op (failed to get constInfo): " << setEncodingOp);
       return;
@@ -269,9 +274,9 @@ void HoistEncodingOpsPass::runOnOperation() {
   });
 
   IRRewriter rewriter(ctx);
-  for (auto hoistableOps : candidates) {
+  for (ArrayRef<Operation *> hoistableOps : candidates) {
     LDBG("Hoisting the ops for " << *hoistableOps.back());
-    for (auto op : hoistableOps) {
+    for (Operation *op : hoistableOps) {
       if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, op))) {
         op->emitOpError("failed to hoist the op out of dispatch");
         return signalPassFailure();
@@ -282,7 +287,8 @@ void HoistEncodingOpsPass::runOnOperation() {
   RewritePatternSet cleanPatterns(ctx);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanPatterns);
   IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(cleanPatterns, ctx);
-  if (failed(applyPatternsGreedily(funcOp, std::move(cleanPatterns), config))) {
+  if (failed(
+          applyPatternsGreedily(moduleOp, std::move(cleanPatterns), config))) {
     return signalPassFailure();
   }
 }
