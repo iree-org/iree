@@ -209,7 +209,7 @@ struct LowerInnerTiledMmaToUKernelPattern
     Value intrinsicsN = constI32(mma.getIntrinsicsN());
     Value subgroupsN = constI32(mma.getSubgroupsN());
     Value intrinsicsK = constI32(mma.getIntrinsicsK());
-    // There are 4 shaped operands (A/B/C matrices and shared memory buffer).
+    // There are 3 shaped input/output operands (A/B/C matrices).
     SmallVector<SmallVector<int64_t>> stridedDims(3, {});
     // Only the C matrix gets strides, and we pass the stride of the innermost
     // CrossIntrinsic dim, because the ukernel needs to know where to store the
@@ -219,6 +219,9 @@ struct LowerInnerTiledMmaToUKernelPattern
     // expect them to always be passed as global memory pointers, and the
     // strides can be inferred by the ukernel implementation.
     stridedDims[2].push_back(innerCrossIntrinsicDim.value());
+    // The only additional shaped operand is the shared memory buffer. Only
+    // create a stride list for it if we have shared memory. Otherwise, the
+    // operand is an iree_codegen.null_pointer op.
     if (sharedMemoryBytes != 0) {
       // Shared memory does not need strides.
       stridedDims.push_back({});

@@ -93,8 +93,8 @@ static LogicalResult getCallOpType(MLIRContext *context,
         auto indexType = IndexType::get(context);
         callOperandTypes.push_back(indexType);
         // Strides.
-        callOperandTypes.resize(
-            callOperandTypes.size() + stridedDims.size(), indexType);
+        callOperandTypes.resize(callOperandTypes.size() + stridedDims.size(),
+                                indexType);
         return success();
       })
       .Case<NullPointerType>([&](NullPointerType nullPointerType) {

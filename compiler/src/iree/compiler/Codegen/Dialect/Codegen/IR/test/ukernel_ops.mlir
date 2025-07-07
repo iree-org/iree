@@ -24,7 +24,7 @@ func.func @ukernel_generic(
 // CHECK-SAME:       ins(%[[IN0]], %[[IN1]] :
 // CHECK-SAME:       outs(%[[OUT0]], %[[OUT1]] :
 // CHECK-SAME:       (%[[B0]], %[[B1]] :
-// CHECK-SAME:       strided_dims([[0, 1], [], [1]])
+// CHECK-SAME:       strided_dims({{\[}}[0, 1], [], [1]])
 //      CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
 
 // -----

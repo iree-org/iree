@@ -86,11 +86,12 @@ def IREECodegen_UKernelGenericOp :
       "ArrayRef<SmallVector<int64_t>>":$strided_dims)>
   ];
   let extraClassDeclaration = [{
-    // Get the number of strided outer dims for the given operand index.
-    // the strided_dims array contains the dims for only the ShapedType
-    // operands, so this returns the corresponding strided_dims value for
-    // the operand, or std::nullopt if the operand is not a ShapedType or
-    // strided_dims is null.
+    // Get the list of strided dims for the operand at `operandIdx`.
+    //   - Always returns and empty list for non ShapedType operands.
+    //   - Returns {0, 1, ..., N-1} for ShapedType operands with rank N, when
+    //     the `strided_dims` attribute is null.
+    //   - Returns the corresponding dim list in `strided_dims` for ShapedType
+    //     operands if `strided_dims` is not null.
     SmallVector<int64_t> getOperandStridedDims(int64_t operandIdx);
   }];
 }
