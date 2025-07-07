@@ -14,16 +14,20 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "ElementPackingUtils.h"
     "Utils.h"
   SRCS
+    "ElementPackingUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
     MLIRLinalgUtils
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

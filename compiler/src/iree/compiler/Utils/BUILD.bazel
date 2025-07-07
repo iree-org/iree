@@ -68,21 +68,3 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Transforms",
     ],
 )
-
-iree_compiler_cc_library(
-    name = "PackingUtils",
-    srcs = [
-        "ElementPackingUtils.cpp",
-    ],
-    hdrs = [
-        "ElementPackingUtils.h",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Dialect/Encoding/IR",
-        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
-        "//compiler/src/iree/compiler/Dialect/Util/IR",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:IR",
-    ],
-)

@@ -63,23 +63,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    PackingUtils
-  HDRS
-    "ElementPackingUtils.h"
-  SRCS
-    "ElementPackingUtils.cpp"
-  DEPS
-    LLVMSupport
-    MLIRArithDialect
-    MLIRIR
-    iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Encoding::Utils
-    iree::compiler::Dialect::Util::IR
-  PUBLIC
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 if(IREE_ENABLE_COMPILER_TRACING)
