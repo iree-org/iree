@@ -145,9 +145,9 @@ struct DropUnitDimsFromCollapseOfExpand
     ArrayRef<int64_t> outShape = collapseOp.getType().getShape();
     SmallVector<int64_t> interToOutMap(expandOp.getType().getRank());
 
-    // Step 1: construct a set of dimensions (with respect to the intermediate
+    // Construct a set of dimensions (with respect to the intermediate
     // shape) that are unit length and get collapsed away by the final
-    // `collapse_shape` op.
+    // `collapseOp` op.
     llvm::SmallDenseSet<int64_t> toDrop;
     for (const auto &[outDim, indices] : llvm::enumerate(collapseReassoc)) {
       for (auto [innerIdx, inDim] : llvm::enumerate(indices)) {
@@ -166,8 +166,8 @@ struct DropUnitDimsFromCollapseOfExpand
       }
     }
 
-    // Step 2: remove dimensions from `toDrop` that weren't introduced by the
-    // `expand_shape` op.
+    // Remove dimensions from `toDrop` that weren't introduced by the
+    // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
     for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
       if (indices.size() == 1) {
@@ -179,18 +179,18 @@ struct DropUnitDimsFromCollapseOfExpand
                                          "Didn't find any unit dims to drop");
     }
 
-    // Step 3: construct a new intermediate shape without the foldable dims.
+    // Construct a new intermediate shape without the foldable dims.
     SmallVector<int64_t> newInterShape;
-    SmallVector<OpFoldResult> newOutputSizes;
+    SmallVector<OpFoldResult> newInterSizes;
     newInterShape.reserve(interShape.size() - toDrop.size());
-    newOutputSizes.reserve(interShape.size() - toDrop.size());
-    SmallVector<OpFoldResult> outputSizes = getMixedValues(
+    newInterSizes.reserve(interShape.size() - toDrop.size());
+    SmallVector<OpFoldResult> origInterSizes = getMixedValues(
         expandOp.getStaticOutputShape(), expandOp.getOutputShape(), rewriter);
-    for (auto [idx, ofr] : llvm::enumerate(outputSizes)) {
+    for (auto [idx, ofr] : llvm::enumerate(origInterSizes)) {
       if (!toDrop.contains(idx)) {
         std::optional<int64_t> staticDim = getConstantIntValue(ofr);
         newInterShape.push_back(staticDim.value_or(ShapedType::kDynamic));
-        newOutputSizes.push_back(ofr);
+        newInterSizes.push_back(ofr);
       }
     }
 
@@ -199,64 +199,65 @@ struct DropUnitDimsFromCollapseOfExpand
     /// Returns true if new `ReassociationIndices` were appended to `reassoc`.
     auto pushBackReassociation =
         [&toDrop](SmallVectorImpl<ReassociationIndices> &reassoc, int64_t start,
-                  int64_t count, int64_t origStart) {
-          ReassociationIndices indices;
-          indices.reserve(count);
-          int64_t dim = start;
-          for (int64_t idx : llvm::seq<int64_t>(origStart, origStart + count)) {
-            if (!toDrop.contains(idx)) {
-              indices.push_back(dim++);
-            }
-          }
-          if (!indices.empty()) {
-            reassoc.push_back(std::move(indices));
-            return true;
-          }
-          return false;
-        };
-
-    auto isIdentityReassociation = [](ArrayRef<ReassociationIndices> reassoc) {
-      return llvm::all_of(reassoc,
-                          [](auto &indices) { return indices.size() == 1; });
+                  int64_t origStart, int64_t count) -> bool {
+      ReassociationIndices indices;
+      indices.reserve(count);
+      int64_t dim = start;
+      for (auto idx : llvm::seq<int64_t>(origStart, origStart + count)) {
+        if (!toDrop.contains(idx)) {
+          indices.push_back(dim++);
+        }
+      }
+      if (!indices.empty()) {
+        reassoc.push_back(std::move(indices));
+        return true;
+      }
+      return false;
     };
 
-    // Step 4: construct new reassociations for the `collapse_shape` that does
+    // Construct new reassociations for the `collapse_shape` that does
     // not include the dropped dimensions.
     SmallVector<ReassociationIndices, 4> newCollapseReassoc;
     int64_t collapsedDim = 0;
     for (auto dim : llvm::seq<int64_t>(0, outShape.size())) {
       bool changed = pushBackReassociation(newCollapseReassoc, collapsedDim,
-                                           collapseReassoc[dim].size(),
-                                           collapseReassoc[dim].front());
+                                           collapseReassoc[dim][0],
+                                           collapseReassoc[dim].size());
       if (changed) {
         collapsedDim += newCollapseReassoc.back().size();
       }
     }
 
-    // Step 5: construct new reassociations for the `expand_shape` op that does
+    // Construct new reassociations for the `expand_shape` op that does
     // not include the dropped dimensions.
     SmallVector<ReassociationIndices, 4> newExpandReassoc;
     ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
     int64_t expandedDim = 0;
     for (auto dim : llvm::seq<int64_t>(0, srcShape.size())) {
       bool changed = pushBackReassociation(newExpandReassoc, expandedDim,
-                                           expandReassoc[dim].size(),
-                                           expandReassoc[dim].front());
+                                           expandReassoc[dim][0],
+                                           expandReassoc[dim].size());
       if (changed) {
         expandedDim += newExpandReassoc.back().size();
       }
     }
 
-    // Step 6: construct the new `expand_shape` and `collapse_shape` ops.
+    // Construct the new expand_shape and collapse_shape ops.
     // Note: we must handle the cases where the expand/collapse is no longer
-    // needed.
+    // needed. Both ops require a non-identity reassociation (i.e. they can't be
+    // no-ops).
+    auto isIdentityReassociation = [](ArrayRef<ReassociationIndices> reassoc) {
+      return llvm::all_of(reassoc,
+                          [](auto &indices) { return indices.size() == 1; });
+    };
+
     Value newExpanded = expandOp.getSrc();
     if (!isIdentityReassociation(newExpandReassoc)) {
       newExpanded = rewriter.create<tensor::ExpandShapeOp>(
           expandOp.getLoc(),
           RankedTensorType::get(newInterShape,
                                 expandOp.getType().getElementType()),
-          expandOp.getSrc(), newExpandReassoc, newOutputSizes);
+          expandOp.getSrc(), newExpandReassoc, newInterSizes);
     }
 
     Value result = newExpanded;
