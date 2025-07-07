@@ -97,6 +97,10 @@ def ConvertAttentionToOnlineAttentionPass :
 def FoldUnitExtentDimsPass :
       Pass<"iree-linalg-ext-fold-unit-extent-dims", "">  {
   let summary = "Folds unit dims for iree_linalg_ext ops";
+  let options = [
+    Option<"useReshapes", "use-reshapes", "bool", /*default=*/"true",
+           "Use reshapes vs slices for rank reduction">,
+  ];
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
