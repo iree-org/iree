@@ -1,39 +1,55 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(torch-iree-func-conversion)" --allow-unregistered-dialect --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(torch-iree-func-conversion)" --allow-unregistered-dialect --split-input-file %s | FileCheck %s --check-prefix=CHECK-ASYNC
+// RUN: iree-opt --pass-pipeline="builtin.module(torch-iree-func-conversion{emit-async-entry-points=false})" --allow-unregistered-dialect --split-input-file %s | FileCheck %s --check-prefix=CHECK-SYNC
 
 // Canonical test of the immutable input->compute->return case. This is
 // exhaustively verified for both the async and sync wrapper function.
 // There shouldn't be much need to further verify the sync wrapper function.
-// CHECK-LABEL: @immutable_import_export
-//       CHECK: util.func public @main$async(
-//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
-//  CHECK-SAME:     %arg2: !hal.fence, %arg3: !hal.fence) ->
-//  CHECK-SAME:     (!hal.buffer_view, !hal.buffer_view)
-//  CHECK-SAME:     iree.abi.model = "coarse-fences"
-//  CHECK-SAME:     iree.abi.stub
-//   CHECK-DAG:   %[[WAIT_ARG0:.+]] = hal.tensor.import wait(%arg2) => %arg0 : !hal.buffer_view -> tensor<4x5xi32>
-//   CHECK-DAG:   %[[WAIT_ARG1:.+]] = hal.tensor.import wait(%arg2) => %arg1 : !hal.buffer_view -> tensor<5x4xf32>
-//   CHECK-DAG:   %[[TORCH_ARG0:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG0]] : tensor<4x5xi32> -> !torch.vtensor<[4,5],si32>
-//   CHECK-DAG:   %[[TORCH_ARG1:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG1]] : tensor<5x4xf32> -> !torch.vtensor<[5,4],f32>
-//   CHECK-DAG:   %[[TORCH_RESULT0:.+]] = torch.operator "foobar0"(%[[TORCH_ARG0]])
-//   CHECK-DAG:   %[[TORCH_RESULT1:.+]] = torch.operator "foobar1"(%[[TORCH_ARG1]])
-//   CHECK-DAG:   %[[TENSOR_RESULT0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
-//   CHECK-DAG:   %[[TENSOR_RESULT1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
-//       CHECK:   %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[TENSOR_RESULT0]], %[[TENSOR_RESULT1]] : tensor<4x5xi32>, tensor<5x4xf32>) => %arg3
-//   CHECK-DAG:   %[[FUNC_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0
-//   CHECK-DAG:   %[[FUNC_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1
-//       CHECK:   util.return %[[FUNC_RESULT0]], %[[FUNC_RESULT1]]
+// CHECK-ASYNC-LABEL: @immutable_import_export
+//       CHECK-ASYNC: util.func public @main$async(
+//  CHECK-ASYNC-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
+//  CHECK-ASYNC-SAME:     %arg2: !hal.fence, %arg3: !hal.fence) ->
+//  CHECK-ASYNC-SAME:     (!hal.buffer_view, !hal.buffer_view)
+//  CHECK-ASYNC-SAME:     iree.abi.model = "coarse-fences"
+//  CHECK-ASYNC-SAME:     iree.abi.stub
+//   CHECK-ASYNC-DAG:   %[[WAIT_ARG0:.+]] = hal.tensor.import wait(%arg2) => %arg0 : !hal.buffer_view -> tensor<4x5xi32>
+//   CHECK-ASYNC-DAG:   %[[WAIT_ARG1:.+]] = hal.tensor.import wait(%arg2) => %arg1 : !hal.buffer_view -> tensor<5x4xf32>
+//   CHECK-ASYNC-DAG:   %[[TORCH_ARG0:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG0]] : tensor<4x5xi32> -> !torch.vtensor<[4,5],si32>
+//   CHECK-ASYNC-DAG:   %[[TORCH_ARG1:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG1]] : tensor<5x4xf32> -> !torch.vtensor<[5,4],f32>
+//   CHECK-ASYNC-DAG:   %[[TORCH_RESULT0:.+]] = torch.operator "foobar0"(%[[TORCH_ARG0]])
+//   CHECK-ASYNC-DAG:   %[[TORCH_RESULT1:.+]] = torch.operator "foobar1"(%[[TORCH_ARG1]])
+//   CHECK-ASYNC-DAG:   %[[TENSOR_RESULT0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
+//   CHECK-ASYNC-DAG:   %[[TENSOR_RESULT1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
+//       CHECK-ASYNC:   %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[TENSOR_RESULT0]], %[[TENSOR_RESULT1]] : tensor<4x5xi32>, tensor<5x4xf32>) => %arg3
+//   CHECK-ASYNC-DAG:   %[[FUNC_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0
+//   CHECK-ASYNC-DAG:   %[[FUNC_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1
+//       CHECK-ASYNC:   util.return %[[FUNC_RESULT0]], %[[FUNC_RESULT1]]
 //
-//       CHECK: util.func public @main(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view)
-//  CHECK-SAME:     -> (!hal.buffer_view, !hal.buffer_view)
-//  CHECK-SAME:     iree.abi.stub
-//   CHECK-DAG:   %[[CONSTANT0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[CONSTANT1:.+]] = arith.constant -1 : i32
-//   CHECK-DAG:   %[[DEVICE0:.+]] = hal.devices.get %[[CONSTANT0]] : !hal.device
-//   CHECK-DAG:   %[[NULL_FENCE:.+]] = util.null : !hal.fence
-//       CHECK:   %[[NEW_FENCE:.+]] = hal.fence.create device(%[[DEVICE0]] : !hal.device) flags("None")
-//       CHECK:   %[[CALL_RESULTS:.+]]:2 = util.call @main$async(%arg0, %arg1, %[[NULL_FENCE]], %[[NEW_FENCE]])
-//       CHECK:   %[[AWAIT_STATUS:.+]] = hal.fence.await until([%[[NEW_FENCE]]]) timeout_millis(%[[CONSTANT1]])
-//       CHECK:   util.return %[[CALL_RESULTS]]#0, %[[CALL_RESULTS]]#1 : !hal.buffer_view, !hal.buffer_view
+//       CHECK-ASYNC: util.func public @main(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view)
+//  CHECK-ASYNC-SAME:     -> (!hal.buffer_view, !hal.buffer_view)
+//  CHECK-ASYNC-SAME:     iree.abi.stub
+//   CHECK-ASYNC-DAG:   %[[CONSTANT0:.+]] = arith.constant 0 : index
+//   CHECK-ASYNC-DAG:   %[[CONSTANT1:.+]] = arith.constant -1 : i32
+//   CHECK-ASYNC-DAG:   %[[DEVICE0:.+]] = hal.devices.get %[[CONSTANT0]] : !hal.device
+//   CHECK-ASYNC-DAG:   %[[NULL_FENCE:.+]] = util.null : !hal.fence
+//       CHECK-ASYNC:   %[[NEW_FENCE:.+]] = hal.fence.create device(%[[DEVICE0]] : !hal.device) flags("None")
+//       CHECK-ASYNC:   %[[CALL_RESULTS:.+]]:2 = util.call @main$async(%arg0, %arg1, %[[NULL_FENCE]], %[[NEW_FENCE]])
+//       CHECK-ASYNC:   %[[AWAIT_STATUS:.+]] = hal.fence.await until([%[[NEW_FENCE]]]) timeout_millis(%[[CONSTANT1]])
+//       CHECK-ASYNC:   util.return %[[CALL_RESULTS]]#0, %[[CALL_RESULTS]]#1 : !hal.buffer_view, !hal.buffer_view
+
+// CHECK-SYNC-LABEL: @immutable_import_export
+//       CHECK-SYNC: util.func public @main(
+//  CHECK-SYNC-SAME:     %arg0: tensor<4x5xi32>, %arg1: tensor<5x4xf32>) ->
+//  CHECK-SYNC-SAME:     (tensor<4x5xi32>, tensor<5x4xf32>)
+//   CHECK-SYNC-DAG:   %[[TORCH_ARG0:.+]] = torch_c.from_builtin_tensor %arg0 : tensor<4x5xi32> -> !torch.vtensor<[4,5],si32>
+//   CHECK-SYNC-DAG:   %[[TORCH_ARG1:.+]] = torch_c.from_builtin_tensor %arg1 : tensor<5x4xf32> -> !torch.vtensor<[5,4],f32>
+//   CHECK-SYNC-DAG:   %[[TORCH_RESULT0:.+]] = torch.operator "foobar0"(%[[TORCH_ARG0]])
+//   CHECK-SYNC-DAG:   %[[TORCH_RESULT1:.+]] = torch.operator "foobar1"(%[[TORCH_ARG1]])
+//   CHECK-SYNC-DAG:   %[[TENSOR_RESULT0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
+//   CHECK-SYNC-DAG:   %[[TENSOR_RESULT1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
+//       CHECK-SYNC:   util.return %[[TENSOR_RESULT0]], %[[TENSOR_RESULT1]]
+//   CHECK-SYNC-NOT:   hal.tensor
+//   CHECK-SYNC-NOT:   hal.fence
+//   CHECK-SYNC-NOT:   @main$async
 builtin.module @immutable_import_export {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.vtensor<[5,4],f32>)
     -> (!torch.vtensor<[4,5],si32>, !torch.vtensor<[5,4],f32>) {
@@ -44,10 +60,17 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.vtensor<[5,4],f
 }
 
 // -----
-// CHECK-LABEL: @return_immutable_arg
-// CHECK: util.func public @main$async
-// CHECK: hal.fence.signal<%arg2 : !hal.fence>
-// CHECK: util.return %arg0
+// CHECK-ASYNC-LABEL: @return_immutable_arg
+// CHECK-ASYNC: util.func public @main$async
+// CHECK-ASYNC: hal.fence.signal<%arg2 : !hal.fence>
+// CHECK-ASYNC: util.return %arg0
+
+// CHECK-SYNC-LABEL: @return_immutable_arg
+// CHECK-SYNC: util.func public @main(
+// CHECK-SYNC-SAME:     %arg0: tensor<4x5xi32>) -> tensor<4x5xi32>
+// CHECK-SYNC: util.return %arg0
+// CHECK-SYNC-NOT: hal.fence
+// CHECK-SYNC-NOT: @main$async
 builtin.module @return_immutable_arg {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>  {
   return %arg0 : !torch.vtensor<[4,5],si32>
@@ -55,98 +78,16 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>
 }
 
 // -----
-// Tests the immutable + mutable argument case where the mutable argument is
-// overwritten as part of the function cleanup and the argument is not returned.
-// This exhaustively verifies the async function.
-// Note that the order of the barrier operands and successors is implementation
-// dependent, and the current implementation processes mutable before
-// immutable.
-// CHECK-LABEL: @mutable_input_overwrite_no_return
-//       CHECK: util.func public @main$async(
-//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
-//  CHECK-SAME:     %arg2: !hal.fence, %arg3: !hal.fence) -> !hal.buffer_view
-//   CHECK-DAG: %[[WAIT_ARG0:.+]] = hal.tensor.import wait(%arg2) => %arg0
-//   CHECK-DAG: %[[TORCH_ARG0:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG0]]
-//   CHECK-DAG: %[[WAIT_ARG1:.+]] = hal.tensor.import wait(%arg2) => %arg1
-//   CHECK-DAG: %[[TORCH_ARG1:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG1]]
-//   CHECK-DAG: %[[TORCH_RESULT0:.+]] = torch.operator "other_calc"(%[[TORCH_ARG0]])
-//   CHECK-DAG: %[[TORCH_RESULT1:.+]] = torch.operator "mutate_inplace"(%[[TORCH_ARG1]])
-//   CHECK-DAG: %[[TENSOR_ARG0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
-//   CHECK-DAG: %[[TENSOR_ARG1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
-//       CHECK: %[[EXPORT_ALIAS1:.+]] = hal.tensor.alias wait(%arg2) => %[[TENSOR_ARG1]] : tensor<5x4xf32> to %arg1 : !hal.buffer_view
-//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[EXPORT_ALIAS1]], %[[TENSOR_ARG0]] : tensor<5x4xf32>, tensor<4x5xi32>) => %arg3 : !hal.fence
-//   CHECK-DAG: %[[EXPORT_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0
-//   CHECK-DAG: %[[EXPORT_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1
-//       CHECK: util.return %[[EXPORT_RESULT1]]
-builtin.module @mutable_input_overwrite_no_return {
-func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.tensor<[5,4],f32>)
-    -> (!torch.vtensor<[4,5],si32>) {
-  %0 = torch.copy.to_vtensor %arg1 : !torch.vtensor<[5,4],f32>
-  %1 = torch.operator "mutate_inplace"(%0) : (!torch.vtensor<[5,4],f32>) -> !torch.vtensor<[5,4],f32>
-  %2 = torch.operator "other_calc"(%arg0) : (!torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>
-  torch.overwrite.tensor.contents %1 overwrites %arg1 : !torch.vtensor<[5,4],f32>, !torch.tensor<[5,4],f32>
-  return %2 : !torch.vtensor<[4,5],si32>
-}
-}
+// CHECK-ASYNC-LABEL: @retained_attribute_reflection
+//      CHECK-ASYNC: util.func public @main$async(
+// CHECK-ASYNC-SAME:   iree.reflection = {some.attr = 4 : index}
+//      CHECK-ASYNC: util.func public @main(
+// CHECK-ASYNC-SAME:   iree.reflection = {some.attr = 4 : index}
 
-// -----
-// This isn't a great program to write but is legal. It verifies that if the
-// function returns an intermediate vtensor just before it was noted as mutated
-// that we export it properly. This would be a hard program to write in PyTorch
-// but possible to end up this way so testing the corner.
-// Not a good idea to do but legal. This verifies that if returning a mutated
-// tensor's intermediate value, you will get two exports, indicating a copy.
-// CHECK-LABEL: @mutable_input_overwrite_return_alias_copies
-//       CHECK: %[[ALIASED:.+]] = hal.tensor.alias wait({{.+}}) => %{{.+}} : tensor<5x4xf32> to %arg0 : !hal.buffer_view
-//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[ALIASED]], %{{.*}} : tensor<5x4xf32>, tensor<5x4xf32>)
-//   CHECK-DAG: = hal.tensor.export %[[BARRIER_RESULTS]]#0
-//   CHECK-DAG: = hal.tensor.export %[[BARRIER_RESULTS]]#1
-builtin.module @mutable_input_overwrite_return_alias_copies {
-func.func @main(%arg0: !torch.tensor<[5,4],f32>) -> (!torch.vtensor<[5,4],f32>) {
-  %0 = torch.copy.to_vtensor %arg0 : !torch.vtensor<[5,4],f32>
-  %1 = torch.operator "mutate_inplace"(%0) : (!torch.vtensor<[5,4],f32>) -> !torch.vtensor<[5,4],f32>
-  torch.overwrite.tensor.contents %1 overwrites %arg0 : !torch.vtensor<[5,4],f32>, !torch.tensor<[5,4],f32>
-  return %1 : !torch.vtensor<[5,4],f32>
-}
-}
-
-// -----
-// Tests the immutable + mutable argument case with explicit affinities.
-// CHECK-LABEL: @mutable_input_overwrite_no_return
-//       CHECK: util.func public @main$async(
-//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
-//  CHECK-SAME:     %arg2: !hal.fence, %arg3: !hal.fence) -> !hal.buffer_view
-//   CHECK-DAG: %[[WAIT_ARG0:.+]] = hal.tensor.import on(#hal.device.promise<@dev_a>) wait(%arg2) => %arg0
-//   CHECK-DAG: %[[TORCH_ARG0:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG0]]
-//   CHECK-DAG: %[[WAIT_ARG1:.+]] = hal.tensor.import on(#hal.device.promise<@dev_b>) wait(%arg2) => %arg1
-//   CHECK-DAG: %[[TORCH_ARG1:.+]] = torch_c.from_builtin_tensor %[[WAIT_ARG1]]
-//   CHECK-DAG: %[[TORCH_RESULT0:.+]] = torch.operator "other_calc"(%[[TORCH_ARG0]])
-//   CHECK-DAG: %[[TORCH_RESULT1:.+]] = torch.operator "mutate_inplace"(%[[TORCH_ARG1]])
-//   CHECK-DAG: %[[TENSOR_ARG0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
-//   CHECK-DAG: %[[TENSOR_ARG1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
-//       CHECK: %[[EXPORT_ALIAS1:.+]] = hal.tensor.alias on(#hal.device.promise<@dev_b>) wait(%arg2) => %[[TENSOR_ARG1]] : tensor<5x4xf32> to %arg1 : !hal.buffer_view
-//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[EXPORT_ALIAS1]], %[[TENSOR_ARG0]] : tensor<5x4xf32>, tensor<4x5xi32>) => %arg3 : !hal.fence
-//   CHECK-DAG: %[[EXPORT_RESULT0:.+]] = hal.tensor.export on(#hal.device.promise<@dev_b>) %[[BARRIER_RESULTS]]#0
-//   CHECK-DAG: %[[EXPORT_RESULT1:.+]] = hal.tensor.export on(#hal.device.promise<@dev_a>) %[[BARRIER_RESULTS]]#1
-//       CHECK: util.return %[[EXPORT_RESULT1]]
-builtin.module @mutable_input_overwrite_no_return_affinities {
-func.func @main(%arg0: !torch.vtensor<[4,5],si32> {iree.abi.affinity = #hal.device.promise<@dev_a>},
-                %arg1: !torch.tensor<[5,4],f32> {iree.abi.affinity = #hal.device.promise<@dev_b>})
-    -> (!torch.vtensor<[4,5],si32> {iree.abi.affinity = #hal.device.promise<@dev_a>}) {
-  %0 = torch.copy.to_vtensor %arg1 : !torch.vtensor<[5,4],f32>
-  %1 = torch.operator "mutate_inplace"(%0) : (!torch.vtensor<[5,4],f32>) -> !torch.vtensor<[5,4],f32>
-  %2 = torch.operator "other_calc"(%arg0) : (!torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>
-  torch.overwrite.tensor.contents %1 overwrites %arg1 : !torch.vtensor<[5,4],f32>, !torch.tensor<[5,4],f32>
-  return %2 : !torch.vtensor<[4,5],si32>
-}
-}
-
-// -----
-// CHECK-LABEL: @retained_attribute_reflection
-//      CHECK: util.func public @main$async(
-// CHECK-SAME:   iree.reflection = {some.attr = 4 : index}
-//      CHECK: util.func public @main(
-// CHECK-SAME:   iree.reflection = {some.attr = 4 : index}
+// CHECK-SYNC-LABEL: @retained_attribute_reflection
+//      CHECK-SYNC: util.func public @main(
+// CHECK-SYNC-SAME:   iree.reflection = {some.attr = 4 : index}
+// CHECK-SYNC-NOT: @main$async
 builtin.module @retained_attribute_reflection {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>
   attributes {
@@ -201,10 +142,15 @@ func.func private @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,
 }
 
 // -----
-// CHECK-LABEL: @tied_operand
-// CHECK: util.func public @main$async(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> %arg0
-// CHECK: util.func public @main(%arg0: !hal.buffer_view) -> !hal.buffer_view
-// CHECK: = util.call @main$async{{.*}} -> %arg0
+// CHECK-ASYNC-LABEL: @tied_operand
+// CHECK-ASYNC: util.func public @main$async(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> %arg0
+// CHECK-ASYNC: util.func public @main(%arg0: !hal.buffer_view) -> !hal.buffer_view
+// CHECK-ASYNC: = util.call @main$async{{.*}} -> %arg0
+
+// CHECK-SYNC-LABEL: @tied_operand
+// CHECK-SYNC: util.func public @main(%arg0: tensor<4x5xi32>) -> %arg0
+// CHECK-SYNC: util.return %arg0
+// CHECK-SYNC-NOT: @main$async
 builtin.module @tied_operand {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>) ->
   (!torch.vtensor<[4,5],si32> {iree.abi.tied = 0})
@@ -228,9 +174,14 @@ func.func @main(%arg0: !torch.vtensor<[4,?],si32>, %arg1: !torch.vtensor<[?,4],f
 }
 
 // -----
-// CHECK-LABEL: @torch_bool_return
-// CHECK: torch_c.to_i1
-// CHECK: util.return {{.*}} : i1
+// CHECK-ASYNC-LABEL: @torch_bool_return
+// CHECK-ASYNC: torch_c.to_i1
+// CHECK-ASYNC: util.return {{.*}} : i1
+
+// CHECK-SYNC-LABEL: @torch_bool_return
+// CHECK-SYNC: torch_c.to_i1
+// CHECK-SYNC: util.return {{.*}} : i1
+// CHECK-SYNC-NOT: hal.fence
 module @torch_bool_return {
   func.func @main() -> !torch.bool {
     %0 = torch.operator "some.primitive"() : () -> !torch.bool
@@ -239,9 +190,14 @@ module @torch_bool_return {
 }
 
 // -----
-// CHECK-LABEL: @torch_int_return
-// CHECK: torch_c.to_i64
-// CHECK: util.return {{.*}} : i64
+// CHECK-ASYNC-LABEL: @torch_int_return
+// CHECK-ASYNC: torch_c.to_i64
+// CHECK-ASYNC: util.return {{.*}} : i64
+
+// CHECK-SYNC-LABEL: @torch_int_return
+// CHECK-SYNC: torch_c.to_i64
+// CHECK-SYNC: util.return {{.*}} : i64
+// CHECK-SYNC-NOT: hal.fence
 module @torch_int_return {
   func.func @main() -> !torch.int {
     %0 = torch.operator "some.primitive"() : () -> !torch.int
@@ -272,8 +228,12 @@ module @torch_generator_return {
 }
 
 // -----
-// CHECK-LABEL: @torch_bool_arg
-// CHECK: torch_c.from_i1 %arg0
+// CHECK-ASYNC-LABEL: @torch_bool_arg
+// CHECK-ASYNC: torch_c.from_i1 %arg0
+
+// CHECK-SYNC-LABEL: @torch_bool_arg
+// CHECK-SYNC: torch_c.from_i1 %arg0
+// CHECK-SYNC-NOT: hal.fence
 module @torch_bool_arg {
   func.func @main(%arg0 : !torch.bool) -> (!torch.vtensor<[1],f32>) {
     %0 = torch.operator "some.primitive"(%arg0) : (!torch.bool) ->  (!torch.vtensor<[1],f32>)
@@ -282,8 +242,12 @@ module @torch_bool_arg {
 }
 
 // -----
-// CHECK-LABEL: @torch_int_arg
-// CHECK: torch_c.from_i64 %arg0
+// CHECK-ASYNC-LABEL: @torch_int_arg
+// CHECK-ASYNC: torch_c.from_i64 %arg0
+
+// CHECK-SYNC-LABEL: @torch_int_arg
+// CHECK-SYNC: torch_c.from_i64 %arg0
+// CHECK-SYNC-NOT: hal.fence
 module @torch_int_arg {
   func.func @main(%arg0 : !torch.int) -> (!torch.vtensor<[1],f32>) {
     %0 = torch.operator "some.primitive"(%arg0) : (!torch.int) ->  (!torch.vtensor<[1],f32>)
