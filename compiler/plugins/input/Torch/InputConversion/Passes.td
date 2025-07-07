@@ -47,7 +47,13 @@ def FuncConversionPass :
            /*default=*/"false",
           "If enabled, this option will append an external hal buffer to "
           "program inputs. This buffer will be used for storing transient "
-          "memory and must be provided by the user.">];
+          "memory and must be provided by the user.">,
+    Option<"emitAsyncEntryPoints", "emit-async-entry-points", "bool",
+           /*default=*/"true",
+           "Generate async functions with coarse-fences ABI and sync wrapper. "
+           "When false, generates only lightweight sync functions without "
+           "mutable tensor support.">
+  ];
 }
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES
