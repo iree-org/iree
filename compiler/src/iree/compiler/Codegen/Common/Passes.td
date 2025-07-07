@@ -83,7 +83,7 @@ def ConcretizePadResultShapePass :
 }
 
 def ConvertAccGEMMToGEMMPass :
-    Pass<"iree-convert-accgemm-to-gemm", ""> {
+    InterfacePass<"iree-convert-accgemm-to-gemm", "mlir::FunctionOpInterface"> {
   let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
 }
 
