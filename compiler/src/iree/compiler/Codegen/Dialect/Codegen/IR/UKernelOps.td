@@ -42,10 +42,10 @@ def IREECodegen_UKernelGenericOp :
     function arguments:
       `base_pointer, offset, stride0, stride1, stride2, ...`
     By default, all N strides are passed for each memref of rank N. This can be
-    overridden by the optional `strided_outer_dims` attribute: if set, its value
-    is how many strides (started from the outer-most dimension) are passed for
-    each memref. For memrefs of rank less than the value of
-    `strided_outer_dims`, all strides are passed.
+    overridden by the optional `strided_dims` attribute: if set, its value
+    is a list of dimensions for which strides are passed for each ShapedType
+    operand, in the order that they appear as operands. Non-ShapedType operands
+    are ignored in the strided_dims list.
 
     Note that `memref` semantics only guarantee that a `base_pointer + offset`
     represents the position to read from. So all micro-kernel implementations
@@ -65,7 +65,7 @@ def IREECodegen_UKernelGenericOp :
     Variadic<AnyRankedTensorOrMemRefType>:$outputs,
     Variadic<AnyType>:$other_operands,
     OptionalAttr<DictionaryAttr>:$fn_def_attrs,
-    OptionalAttr<IndexAttr>:$strided_outer_dims);
+    OptionalAttr<IndexListArrayAttr>:$strided_dims);
   let results = (outs Variadic<AnyType>:$results);
   let assemblyFormat = [{
     attr-dict $u_kernel_fn_name
@@ -73,7 +73,26 @@ def IREECodegen_UKernelGenericOp :
     (`outs` `(` $outputs^  `:` type($outputs) `)`)?
     (`(` $other_operands^ `:` type($other_operands) `)`)?
     ( `fn_def_attrs` $fn_def_attrs^ )?
-    (`strided_outer_dims` `(` $strided_outer_dims^ `)`)? (`->` type($results)^)?
+    (`strided_dims` `(` $strided_dims^ `)`)? (`->` type($results)^)?
+  }];
+
+  let builders = [
+    OpBuilder<(ins "TypeRange":$result_types, "StringRef":$u_kernel_fn_name,
+      "ValueRange":$inputs, "ValueRange":$outputs, "ValueRange":$other_operands,
+      "DictionaryAttr":$fn_def_attrs, "int64_t":$num_strided_outer_dims)>,
+    OpBuilder<(ins "TypeRange":$result_types, "StringRef":$u_kernel_fn_name,
+      "ValueRange":$inputs, "ValueRange":$outputs, "ValueRange":$other_operands,
+      "DictionaryAttr":$fn_def_attrs,
+      "ArrayRef<SmallVector<int64_t>>":$strided_dims)>
+  ];
+  let extraClassDeclaration = [{
+    // Get the list of strided dims for the operand at `operandIdx`.
+    //   - Always returns and empty list for non ShapedType operands.
+    //   - Returns {0, 1, ..., N-1} for ShapedType operands with rank N, when
+    //     the `strided_dims` attribute is null.
+    //   - Returns the corresponding dim list in `strided_dims` for ShapedType
+    //     operands if `strided_dims` is not null.
+    SmallVector<int64_t> getOperandStridedDims(int64_t operandIdx);
   }];
 }
 
