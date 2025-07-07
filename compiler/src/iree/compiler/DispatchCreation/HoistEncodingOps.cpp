@@ -234,9 +234,10 @@ void HoistEncodingOpsPass::runOnOperation() {
     }
 
     bool isHoistable = true;
-    SetVector<Operation *> opsWithinDispatch;
+    SetVector<Operation *> opsWithinDispatch, seen;
     std::queue<Operation *> worklist;
     worklist.push(setEncodingOp);
+    seen.insert(setEncodingOp);
     while (!worklist.empty()) {
       Operation *op = worklist.front();
       worklist.pop();
@@ -245,11 +246,12 @@ void HoistEncodingOpsPass::runOnOperation() {
         auto inputOp = input.getDefiningOp();
         if (inputOp &&
             inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
-            !opsWithinDispatch.contains(inputOp)) {
+            !seen.contains(inputOp)) {
           if (!isHoistableOp(inputOp)) {
             isHoistable = false;
           }
           worklist.push(inputOp);
+          seen.insert(inputOp);
         }
       }
     }
