@@ -262,3 +262,11 @@ func.func @dynamic_layout_encoding(%arg0: tensor<?x?x?xf32, #encoding>) -> tenso
 }
 //      CHECK: #[[ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.padding<[0, ?, 64]>]>
 //      CHECK: func.func @dynamic_layout_encoding(%[[ARG0:.+]]: tensor<?x?x?xf32, #[[ENCODING]]>)
+
+// -----
+
+#encoding = #iree_encoding.identity
+func.func @identity_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
+  return %arg0 : tensor<?x?xf32, #encoding>
+}
+//      CHECK: func.func @identity_encoding(%[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.identity>

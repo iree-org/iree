@@ -18,17 +18,17 @@ func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>)
 // CHECK-LABEL: func @reduce_outmost_dim
 //  CHECK-SAME: (%[[INPUT:.+]]: tensor<4x1x4xf32>, %[[INIT:.+]]: tensor<1x4xf32>)
 
-//   CHECK-DAG:   %[[F0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[PV:.+]] = ub.poison : f32
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
 
-//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[INPUT]][%[[C0]], %[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
-//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[INPUT]][%[[C1]], %[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
-//       CHECK:   %[[V2:.+]] = vector.transfer_read %[[INPUT]][%[[C2]], %[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
-//       CHECK:   %[[V3:.+]] = vector.transfer_read %[[INPUT]][%[[C3]], %[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
-//       CHECK:   %[[VI:.+]] = vector.transfer_read %[[INIT]][%[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<1x4xf32>, vector<4xf32>
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[INPUT]][%[[C0]], %[[C0]], %[[C0]]], %[[PV]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[INPUT]][%[[C1]], %[[C0]], %[[C0]]], %[[PV]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
+//       CHECK:   %[[V2:.+]] = vector.transfer_read %[[INPUT]][%[[C2]], %[[C0]], %[[C0]]], %[[PV]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
+//       CHECK:   %[[V3:.+]] = vector.transfer_read %[[INPUT]][%[[C3]], %[[C0]], %[[C0]]], %[[PV]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
+//       CHECK:   %[[VI:.+]] = vector.transfer_read %[[INIT]][%[[C0]], %[[C0]]], %[[PV]] {in_bounds = [true]} : tensor<1x4xf32>, vector<4xf32>
 
 //       CHECK:   %[[ADD0:.+]] = arith.addf %[[V0]], %[[VI]] : vector<4xf32>
 //       CHECK:   %[[ADD1:.+]] = arith.addf %[[V1]], %[[ADD0]] : vector<4xf32>

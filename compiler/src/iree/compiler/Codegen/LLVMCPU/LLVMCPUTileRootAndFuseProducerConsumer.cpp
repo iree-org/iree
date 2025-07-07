@@ -37,11 +37,11 @@ namespace mlir::iree_compiler {
 /// the root operation and fuse the producers of the root operation then
 /// consumers (finds any missing fusion opportunities, then apply producer
 /// fusion). If `onlyFuseProducerInputOperands` is set, only fuse producer input
-/// operands. If `tileUsingForall` is set, creates `scf.forall`, rather than
-/// `scf.for` loops during tiling.
-static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
-    IRRewriter &rewriter, TilingInterface rootOp, int64_t tilingLevel,
-    bool onlyFuseProducerInputOperands, bool tileUsingForall) {
+/// operands.
+static FailureOr<Operation *>
+tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
+                                int64_t tilingLevel,
+                                bool onlyFuseProducerInputOperands) {
   auto *context = rewriter.getContext();
   mlir::DominanceInfo dominanceInfo(rootOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
@@ -67,8 +67,6 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
       yieldReplacementsFor.insert(op);
     }
   }
-  bool useWARForConsumerFusionSSAViolation =
-      warForConsumerFusionSSAViolation(rootOp, tiledAndFusedOps);
 
   SmallVector<OpFoldResult> tileSizes =
       getLoweringConfig(rootOp).getTilingLevelSizes(rewriter, tilingLevel,
@@ -88,7 +86,7 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   tilingOptions.setTileSizes(tileSizes);
 
   // onlyFuseProducerInputOperands implies reduction tiling.
-  if (tileUsingForall && !onlyFuseProducerInputOperands) {
+  if (!onlyFuseProducerInputOperands) {
     tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
   }
 
@@ -148,8 +146,10 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
 
   if (!onlyFuseProducerInputOperands) {
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoLoops(rewriter, *rootTiledOp, tilingLoops,
-                               useWARForConsumerFusionSSAViolation);
+        fuseConsumersIntoForall(rewriter, *rootTiledOp, tilingLoops,
+                                [&tiledAndFusedOps](Operation *op) {
+                                  return tiledAndFusedOps.contains(op);
+                                });
 
     if (failed(newFusionOpportunities)) {
       rootTiledOp.value()->emitOpError("failed to fuse consumers");
@@ -218,7 +218,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 
   if (failed(tileRootAndFuseProducerConsumer(
           rewriter, cast<TilingInterface>(rootOp.value()), tilingLevel,
-          onlyFuseProducerInputOperands, tileUsingForall))) {
+          onlyFuseProducerInputOperands))) {
     funcOp.emitError() << "tiling of level " << tilingLevel.getValue()
                        << " failed\n";
     return signalPassFailure();
@@ -242,12 +242,10 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel,
-                                             bool tileUsingForAll) {
+createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel) {
   LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = false;
-  options.tileUsingForall = tileUsingForAll;
   return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -255,7 +253,6 @@ createLLVMCPUTileRootAndFuseInputOperands(int64_t tilingLevel) {
   LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = true;
-  options.tileUsingForall = false;
   return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
 }
 } // namespace mlir::iree_compiler

@@ -122,7 +122,7 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
     SmallVector<Value> indices = {allocaIndex};
     indices.append(allocaOp.getType().getShape().size() - 1, constantZero);
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        readOp, readOp.getVectorType(), allocaOp, indices);
+        readOp, readOp.getVectorType(), allocaOp, indices, readOp.getPadding());
   }
 
   LDBG("Write loop: \n" << writeLoop << "\n");

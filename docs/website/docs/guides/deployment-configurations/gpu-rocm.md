@@ -204,7 +204,7 @@ architectures:
 | AMD RX 9060XT            | `rx9060xt`  | `gfx1200`           | `rdna4`                |
 | AMD RX 9070              | `rx9070`    | `gfx1201`           | `rdna4`                |
 | AMD RX 9070XT            | `rx9070xt`  | `gfx1201`           | `rdna4`                |
-| AMD AI PRO R9070         | `r9070`     | `gfx1201`           | `rdna4`                |
+| AMD AI PRO R9700         | `r9700`     | `gfx1201`           | `rdna4`                |
 
 For a more comprehensive list of prior GPU generations, you can refer to the
 [LLVM AMDGPU backend](https://llvm.org/docs/AMDGPUUsage.html#processors).

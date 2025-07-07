@@ -73,6 +73,13 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           return;
         vectorSizes = SmallVector<int64_t>(ty.getShape());
       })
+      .Case<IREE::LinalgExt::GatherOp>([&](IREE::LinalgExt::GatherOp gatherOp) {
+        std::optional<VectorizationTileSizes> result =
+            inferSizesFromIR(gatherOp.getOutput());
+        if (result) {
+          vectorSizes = result->vectorSizes;
+        }
+      })
       .Default([&](Operation *) {});
 
   if (vectorSizes) {
@@ -168,8 +175,8 @@ void GenericVectorizationPass::runOnOperation() {
           rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
           vectorizeGatherAccesses);
     } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
-      (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(rewriter,
-                                                                      gatherOp);
+      (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
+          rewriter, gatherOp, vectorSizes);
     } else {
       FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
           rewriter, op, vectorSizes, scalableVecDims, vectorizeGatherAccesses);
@@ -221,6 +228,7 @@ void GenericVectorizationPass::runOnOperation() {
   if (enableVectorMasking) {
     vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
         vectorizationPatterns);
+    IREE::VectorExt::populateVectorMaskLoweringPatterns(vectorizationPatterns);
     vectorizationPatterns.add<linalg::LinalgCopyVTRForwardingPattern,
                               linalg::LinalgCopyVTWForwardingPattern>(
         funcOp.getContext(), /*benefit=*/2);

@@ -31,6 +31,7 @@
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
@@ -40,6 +41,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -846,8 +848,8 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
   SmallVector<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
-  Value read = builder.create<vector::TransferReadOp>(loc, vectorType, from,
-                                                      indices, inBounds);
+  Value read = builder.create<vector::TransferReadOp>(
+      loc, vectorType, from, indices, /*padding=*/std::nullopt, inBounds);
   builder.create<vector::TransferWriteOp>(loc, read, to, indices, inBounds);
   if (needsBarrier) {
     builder.create<gpu::BarrierOp>(loc);
@@ -886,9 +888,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Tile to reduction loops.
   {
-    GPUApplyPaddingLevelPassOptions padOptions;
-    padOptions.tilingLevel = IREE::GPU::TilingLevel::Reduction;
-    funcPassManager.addPass(createGPUApplyPaddingLevelPass(padOptions));
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
     options.allowZeroSlices = true;
@@ -907,6 +906,14 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
     options.allowZeroSlices = true;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+    // Post tiling, the tensor.pad multiples can be simplified to static
+    // sizes, run dim simplification to infer and propagate these sizes.
+    funcPassManager.addPass(affine::createSimplifyAffineMinMaxPass());
+    funcPassManager.addPass(memref::createReifyResultShapesPass());
+    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
     funcPassManager.addPass(affine::createLoopCoalescingPass());
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -940,9 +947,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
+    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+    funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
   }
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
@@ -1103,6 +1111,11 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       // full complexity.
       .addPass(createVectorTransferLoweringPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
+      // Propagate constants close to loads/stores to improve the ability for
+      // swizzling to CSE.
+      .addPass(createPropagateConstantOffsetsPass)
+      // Propagating constants introduces CSE opportunities.
+      .addPass(createCSEPass)
       // Resolve swizzling hints before lowering affine ops but after
       // lowering vector (transfer) ops.
       .addPass(createResolveSwizzleHintsPass)
@@ -1157,7 +1170,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       // Hoist any newly static allocations from PadDynamicAlloc.
       .addPass(createHoistStaticallyBoundAllocationsPass)
 
-      .addPass(createLowerAffinePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 
@@ -1170,6 +1182,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createExpandGPUOpsPass)
       // Barrier elimination before we reach unstructured control flow.
       .addPass(createGpuEliminateBarriers);
+
+  if (forROCDL) {
+    funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
+  }
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);

@@ -178,6 +178,7 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x1x1x2x8xi8>, %b : te
 //       CHECK:   bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16384xi8>
 //       CHECK:   iree_codegen.ukernel.generic
 //  CHECK-SAME:      "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
+//  CHECK-SAME:      strided_dims({{\[}}[], [], [4], []])
 
 // -----
 
@@ -198,3 +199,4 @@ func.func @multi_mma_mfma_i32_16x16x32_i8_one_subgroup_no_shared_memory(%a : ten
 //       CHECK:   iree_codegen.null_pointer
 //       CHECK:   iree_codegen.ukernel.generic
 //  CHECK-SAME:      "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
+//  CHECK-SAME:      strided_dims({{\[}}[], [], [4]])

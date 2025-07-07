@@ -544,6 +544,11 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   // LinalgOp with only parallel dims. This is needed if the op cannot be fused
   // with a reduction or introduces new loop dimensions.
   auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
+    // If the operation has a gather, we want to fuse it with the
+    // reduction.
+    if (hasExternalCapture(cast<linalg::GenericOp>(linalgOp))) {
+      return false;
+    }
     // If some of the users are in computeOps and some are outside of
     // computeOps; attach lowering config, since the op can't be fused.
     if (llvm::any_of(linalgOp->getUsers(),

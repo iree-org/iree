@@ -61,6 +61,18 @@ int32_t iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_query_shared_memory_bytes(
 // into shared memory), care is taken to subtract the thread-relative offset,
 // which is computed from the thread id.
 //
+// Each MFMA intrinsic produces a vector which is contiguous within in the C
+// matrix, but there may be strides between the vectors produced by each
+// intrinsic. This inter-intrinsic dimension stride is passed to the ukernel
+// in order to compute the correct offsets into the C matrix for each intrinsic
+// result. As an example of why this could be needed, the compiler may pass
+// global memory or thread-local, private memory for the C matrix. For private
+// memory, the thead gets a contiguous block of memory, so the stride would just
+// be the size of the vector produced by each instruction. For global memory,
+// the C matrix is shared by many threads in the same subgroup, and the subgroup
+// collectively produces the C matrix tile, so the stride would be the size of
+// the full tile produced by the subgroup.
+//
 // As this function is always_inline, some of its parameters are actually
 // constant values after inlining, so some for() loops and if() branches here
 // are actually unrolled/resolved at compile time, making this microkernel
@@ -72,20 +84,22 @@ int32_t iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_query_shared_memory_bytes(
 // b_base, b_offset            | No         | B-matrix pointer (thread-distrib.)
 // c_base, c_offset            | No         | C-matrix pointer (thread-distrib.)
 // shared_memory_{base,offset} | No         | Shared memory workspace pointer
-// shared_memory_bytes          | Yes        | Shared memory workspace size
+// shared_memory_bytes         | Yes        | Shared memory workspace size
 // k_size                      | From shape | Size of outer K dimension
 // intrinsics_m, subgroups_m   | Yes        | See DataTiledMMAAttr
 // intrinsics_n, subgroups_n   | Yes        | See DataTiledMMAAttr
 // intrinsics_k                | Yes        | See DataTiledMMAAttr
+// c_inter_intrinsic_stride    | Yes        | C-matrix stride of inter-intrinsic
+//                             |            | dimension
 //
 // TODO(bjacob): Better scheduling via either barrier intrinsics or inline asm.
 [[clang::always_inline]] void iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8(
     const int8_t *a_base, int64_t a_offset, const int8_t *b_base,
     int64_t b_offset, int32_t *c_base, int64_t c_offset,
-    int8_t *shared_memory_base, int64_t shared_memory_offset,
-    int32_t shared_memory_bytes, int32_t k_size, int32_t intrinsics_m,
-    int32_t subgroups_m, int32_t intrinsics_n, int32_t subgroups_n,
-    int32_t intrinsics_k) {
+    int64_t c_inter_intrinsic_stride, int8_t *shared_memory_base,
+    int64_t shared_memory_offset, int32_t shared_memory_bytes, int32_t k_size,
+    int32_t intrinsics_m, int32_t subgroups_m, int32_t intrinsics_n,
+    int32_t subgroups_n, int32_t intrinsics_k) {
   ab_tile_info_t a_tile =
       get_ab_tile_info(intrinsics_m * intrinsics_k, subgroups_m, subgroups_n);
   ab_tile_info_t b_tile =
@@ -124,9 +138,12 @@ int32_t iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_query_shared_memory_bytes(
   // Load existing accumulators from global memory into registers.
   // The VLA becomes a normal array after inlining.
   int32x4_t c_regs[intrinsics_m][intrinsics_n];
+  // Divide the c_inter_intrinsic_stride by 4, because c_global contains vectors
+  // of 4 elements.
+  int c_inner_stride = c_inter_intrinsic_stride / 4;
   for (int m = 0; m < intrinsics_m; ++m) {
     for (int n = 0; n < intrinsics_n; ++n) {
-      c_regs[m][n] = c_global[64 * (m * intrinsics_n + n)];
+      c_regs[m][n] = c_global[c_inner_stride * (m * intrinsics_n + n)];
     }
   }
 
@@ -175,7 +192,7 @@ int32_t iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8_query_shared_memory_bytes(
   // Store accumulators.
   for (int m = 0; m < intrinsics_m; ++m) {
     for (int n = 0; n < intrinsics_n; ++n) {
-      c_global[64 * (m * intrinsics_n + n)] = c_regs[m][n];
+      c_global[c_inner_stride * (m * intrinsics_n + n)] = c_regs[m][n];
     }
   }
 }
