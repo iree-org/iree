@@ -761,6 +761,7 @@ hal.executable public @main {
 // CHECK-DAG:  %[[BUFFER_C:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_BINDING_C]]
 // CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x8x4x4x4x4xf32, #gpu.address_space<workgroup>>
 // CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x4x2x4x16x4xf32, #gpu.address_space<workgroup>>
+// CHECK-DAG:  %[[C_INIT:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 // CHECK:      gpu.barrier
 // CHECK-DAG:  %[[A_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_A]]{{.*}} vector<4xf32>
 // CHECK-DAG:  %[[B_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_B]]{{.*}} vector<4xf32>
@@ -769,11 +770,6 @@ hal.executable public @main {
 // CHECK:      gpu.barrier
 // CHECK-DAG:  %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x1x1x1x4xf32>
 // CHECK-DAG:  %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x1x1x4xf32>
-// CHECK-DAG:  %[[C_READ:.+]] = vector.transfer_read %[[BUFFER_C]]{{.*}} vector<8x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_00_0:.+]] = vector.extract %[[C_READ]][0, 0, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_01_0:.+]] = vector.extract %[[C_READ]][0, 1, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_70_0:.+]] = vector.extract %[[C_READ]][7, 0, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_71_0:.+]] = vector.extract %[[C_READ]][7, 1, 0, 0] : vector<4xf32> from vector<8x2x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 0] : f32 from vector<8x1x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 1] : f32 from vector<8x1x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0, 2] : f32 from vector<8x1x1x1x4xf32>
@@ -790,19 +786,19 @@ hal.executable public @main {
 // CHECK-DAG:  %[[B_EXTRACT11:.+]] = vector.extract %[[B_READ]][1, 0, 0, 1] : f32 from vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT12:.+]] = vector.extract %[[B_READ]][1, 0, 0, 2] : f32 from vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT13:.+]] = vector.extract %[[B_READ]][1, 0, 0, 3] : f32 from vector<2x1x1x4xf32>
-// CHECK-DAG:  %[[C_00_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT00]] + %[[C_00_0]]
+// CHECK-DAG:  %[[C_00_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT00]] + %[[C_INIT]]
 // CHECK-DAG:  %[[C_00_2:.+]] = amdgpu.mfma %[[A_EXTRACT01]] * %[[B_EXTRACT01]] + %[[C_00_1]]
 // CHECK-DAG:  %[[C_00_3:.+]] = amdgpu.mfma %[[A_EXTRACT02]] * %[[B_EXTRACT02]] + %[[C_00_2]]
 // CHECK-DAG:  %[[C_00_4:.+]] = amdgpu.mfma %[[A_EXTRACT03]] * %[[B_EXTRACT03]] + %[[C_00_3]]
-// CHECK-DAG:  %[[C_01_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT10]] + %[[C_01_0]]
+// CHECK-DAG:  %[[C_01_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT10]] + %[[C_INIT]]
 // CHECK-DAG:  %[[C_01_2:.+]] = amdgpu.mfma %[[A_EXTRACT01]] * %[[B_EXTRACT11]] + %[[C_01_1]]
 // CHECK-DAG:  %[[C_01_3:.+]] = amdgpu.mfma %[[A_EXTRACT02]] * %[[B_EXTRACT12]] + %[[C_01_2]]
 // CHECK-DAG:  %[[C_01_4:.+]] = amdgpu.mfma %[[A_EXTRACT03]] * %[[B_EXTRACT13]] + %[[C_01_3]]
-// CHECK-DAG:  %[[C_70_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT00]] + %[[C_70_0]]
+// CHECK-DAG:  %[[C_70_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT00]] + %[[C_INIT]]
 // CHECK-DAG:  %[[C_70_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT01]] + %[[C_70_1]]
 // CHECK-DAG:  %[[C_70_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT02]] + %[[C_70_2]]
 // CHECK-DAG:  %[[C_70_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT03]] + %[[C_70_3]]
-// CHECK-DAG:  %[[C_71_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT10]] + %[[C_71_0]]
+// CHECK-DAG:  %[[C_71_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT10]] + %[[C_INIT]]
 // CHECK-DAG:  %[[C_71_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT11]] + %[[C_71_1]]
 // CHECK-DAG:  %[[C_71_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT12]] + %[[C_71_2]]
 // CHECK-DAG:  %[[C_71_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT13]] + %[[C_71_3]]
@@ -810,6 +806,8 @@ hal.executable public @main {
 // CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+// CHECK:  vector.transfer_read %[[BUFFER_C]]
+// CHECK:  arith.addf
 // CHECK:  vector.transfer_write
 
 // -----
