@@ -280,3 +280,16 @@ util.func @collapse_of_expand_5(%arg0: tensor<1x?x4x32xf16>, %arg1: index) -> te
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //  CHECK-SAME:     tensor<1x?x4x32xf16> into tensor<?x4x32xf16>
 //       CHECK:   util.return %[[COLLAPSED]] : tensor<?x4x32xf16>
+
+// -----
+
+util.func @collapse_of_expand_to_scalar(%arg0: tensor<1x1xf16>, %arg1: index, %arg2: index) -> tensor<f16> {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [%arg1, 1, 1, %arg2] : tensor<1x1xf16> into tensor<1x1x1x1xf16>
+  %collapsed = tensor.collapse_shape %expanded [] : tensor<1x1x1x1xf16> into tensor<f16>
+  util.return %collapsed : tensor<f16>
+}
+// CHECK-LABEL: util.func public @collapse_of_expand_to_scalar
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<1x1xf16>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<1x1xf16> into tensor<f16>
+//       CHECK:   util.return %[[COLLAPSED]] : tensor<f16>
