@@ -463,3 +463,36 @@ module @partially_analyzed_op {
     util.return %barrier1#0, %barrier1#1 : i32, i32
   }
 }
+
+// -----
+
+// Check that computations on globals that end up with different layouts dont get hoisted.
+
+util.global private @"weights" : tensor<4096x4096xf8E4M3FNUZ>
+util.func public @func1() -> (tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>) {
+  %0 = util.global.load immutable @"weights" : tensor<4096x4096xf8E4M3FNUZ>
+  %1 = flow.tensor.encode %0 : tensor<4096x4096xf8E4M3FNUZ> -> tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>
+  util.return %1 : tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>
+}
+util.func public @func2() -> (tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 4, 32, 32>>>) {
+  %0 = util.global.load immutable @"weights" : tensor<4096x4096xf8E4M3FNUZ>
+  %1 = flow.tensor.encode %0 : tensor<4096x4096xf8E4M3FNUZ> -> tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 4, 32, 32>>>
+  util.return %1 : tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 4, 32, 32>>>
+}
+
+// -----
+
+
+// Check that computations on globals that end up with different layouts do get hoisted
+
+util.global private @"weights" : tensor<4096x4096xf8E4M3FNUZ>
+util.func public @func1() -> (tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>) {
+  %0 = util.global.load immutable @"weights" : tensor<4096x4096xf8E4M3FNUZ>
+  %1 = flow.tensor.encode %0 : tensor<4096x4096xf8E4M3FNUZ> -> tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>
+  util.return %1 : tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>
+}
+util.func public @func2() -> (tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>) {
+  %0 = util.global.load immutable @"weights" : tensor<4096x4096xf8E4M3FNUZ>
+  %1 = flow.tensor.encode %0 : tensor<4096x4096xf8E4M3FNUZ> -> tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>
+  util.return %1 : tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 32, 32, 32>>>
+}
