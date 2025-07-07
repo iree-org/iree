@@ -15,6 +15,13 @@ util.func public @gather_unit_batch_dims(%source: tensor<4x4x4x4xf16>, %indices:
 //  SLICE-SAME:     -> tensor<4x4x4xf16>
 //       SLICE:   %[[EXPANDED_RESULT:.+]] = tensor.insert_slice %[[RESULT]] into %{{.*}}[0, 0, 0, 0] [4, 1, 4, 4] [1, 1, 1, 1] : tensor<4x4x4xf16> into tensor<4x1x4x4xf16>
 
+// RESHAPE-LABEL: util.func public @gather_unit_batch_dims
+//       RESHAPE:   %[[INDICES:.+]] = tensor.collapse_shape %{{.*}} : tensor<4x1x2xi64> into tensor<4x2xi64>
+//       RESHAPE:   %[[OUTPUT:.+]] = tensor.collapse_shape %{{.*}} : tensor<4x1x4x4xf16> into tensor<4x4x4xf16>
+//       RESHAPE:   %[[RESULT:.+]] = iree_linalg_ext.gather
+//  RESHAPE-SAME:     -> tensor<4x4x4xf16>
+//       RESHAPE:   tensor.expand_shape %[[RESULT]] {{.*}} : tensor<4x4x4xf16> into tensor<4x1x4x4xf16>
+
 // -----
 
 util.func public @gather_batch_and_slice_dims(%source: tensor<4x4x1x4xf16>, %indices: tensor<4x1x2xi64>) -> tensor<4x1x1x4xf16> {
@@ -39,6 +46,14 @@ util.func public @gather_batch_and_slice_dims(%source: tensor<4x4x1x4xf16>, %ind
 //       SLICE:   iree_linalg_ext.gather
 //  SLICE-SAME:     ins(%[[SOURCE_SLICE]], %[[INDICES_BATCH]]
 //  SLICE-SAME:     outs(%[[OUTPUT_SLICE]]
+
+// RESHAPE-LABEL: util.func public @gather_batch_and_slice_dims
+//       RESHAPE:   %[[INDICES:.+]] = tensor.collapse_shape %{{.*}} : tensor<4x1x2xi64> into tensor<4x2xi64>
+//       RESHAPE:   %[[SOURCE:.+]] = tensor.collapse_shape %{{.*}} : tensor<4x4x1x4xf16> into tensor<4x4x4xf16>
+//       RESHAPE:   %[[OUTPUT:.+]] = tensor.collapse_shape %{{.*}} : tensor<4x1x1x4xf16> into tensor<4x4xf16>
+//       RESHAPE:   %[[RESULT:.+]] = iree_linalg_ext.gather
+//  RESHAPE-SAME:     -> tensor<4x4xf16>
+//       RESHAPE:   tensor.expand_shape %[[RESULT]] {{.*}} : tensor<4x4xf16> into tensor<4x1x1x4xf16>
 
 // -----
 
