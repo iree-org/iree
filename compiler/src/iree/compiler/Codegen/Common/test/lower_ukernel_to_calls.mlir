@@ -29,7 +29,7 @@ func.func @ukernel_generic_memref_1D(%arg0 : memref<?xf32, strided<[1], offset: 
 // -----
 
 func.func @ukernel_generic_memref_1D_strided_outer_dims_0(%arg0 : memref<?xf32, strided<[1], offset: ?>>) {
-  iree_codegen.ukernel.generic "test1d" outs(%arg0 : memref<?xf32, strided<[1], offset: ?>>) strided_outer_dims(0)
+  iree_codegen.ukernel.generic "test1d" outs(%arg0 : memref<?xf32, strided<[1], offset: ?>>) strided_dims([[]])
   return
 }
 //      CHECK: func.func private @test1d(memref<f32>, index)
@@ -53,7 +53,7 @@ func.func @ukernel_generic_memref_3D(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1]
 // -----
 
 func.func @ukernel_generic_memref_3D_strided_outer_dims_2(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) {
-  iree_codegen.ukernel.generic "test3d" outs(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) strided_outer_dims(2)
+  iree_codegen.ukernel.generic "test3d" outs(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) strided_dims([[0, 1]])
   return
 }
 //      CHECK: func.func private @test3d(memref<f32>, index, index, index)
@@ -61,6 +61,19 @@ func.func @ukernel_generic_memref_3D_strided_outer_dims_2(%arg0 : memref<?x?x?xf
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>
 //      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]], %[[SIZE:.+]]:3, %[[STRIDES:.+]]:3 = memref.extract_strided_metadata %[[ARG0]]
 //      CHECK:   call @test3d(%[[BASE]], %[[OFFSET]], %[[STRIDES]]#0, %[[STRIDES]]#1)
+
+
+// -----
+
+func.func @ukernel_generic_memref_strided_non_outer_dims(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) {
+  iree_codegen.ukernel.generic "test3d" outs(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) strided_dims([[0, 2]])
+  return
+}
+//      CHECK: func.func private @test3d(memref<f32>, index, index, index)
+//      CHECK: func.func @ukernel_generic_memref_strided_non_outer_dims
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>
+//      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]], %[[SIZE:.+]]:3, %[[STRIDES:.+]]:3 = memref.extract_strided_metadata %[[ARG0]]
+//      CHECK:   call @test3d(%[[BASE]], %[[OFFSET]], %[[STRIDES]]#0, %[[STRIDES]]#2)
 
 
 // -----
@@ -81,7 +94,7 @@ func.func @ukernel_generic(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
   %dim_1 = memref.dim %arg0, %c0 : memref<?x?xf32>
   %dim_2 = memref.dim %arg1, %c1 : memref<?x?xf32>
   %dim_3 = memref.dim %arg2, %c1 : memref<?x?xf32>
-  iree_codegen.ukernel.generic "vmvx.matmul.f32f32f32" ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>) outs(%arg2 : memref<?x?xf32>) (%dim_1, %dim_2, %dim_3, %c0_i32 : index, index, index, i32) strided_outer_dims(1)
+  iree_codegen.ukernel.generic "vmvx.matmul.f32f32f32" ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>) outs(%arg2 : memref<?x?xf32>) (%dim_1, %dim_2, %dim_3, %c0_i32 : index, index, index, i32) strided_dims([[0], [0], [0]])
   return
 }
 // CHECK-LABEL: func.func private @vmvx.matmul.f32f32f32
@@ -110,7 +123,7 @@ func.func @ukernel_generic(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
 func.func @ukernel_mmt4d_f32f32f32(%lhs : memref<?x?x?x?xf32>, %rhs : memref<?x?x?x?xf32>,
     %acc : memref<?x?x?x?xf32>, %m : index, %n : index, %k : index, %m0 : i32, %n0 : i32, %k0 : i32, %flags : i32) {
   iree_codegen.ukernel.generic "vmvx.mmt4d.f32f32f32" ins(%lhs, %rhs : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
-      outs(%acc : memref<?x?x?x?xf32>) (%m, %n, %k, %m0, %n0, %k0, %flags : index, index, index, i32, i32, i32, i32) strided_outer_dims(1)
+      outs(%acc : memref<?x?x?x?xf32>) (%m, %n, %k, %m0, %n0, %k0, %flags : index, index, index, i32, i32, i32, i32) strided_dims([[0], [0], [0]])
   return
 }
 // CHECK-LABEL: func.func private @vmvx.mmt4d.f32f32f32
@@ -141,7 +154,7 @@ func.func @ukernel_mmt4d_f32f32f32(%lhs : memref<?x?x?x?xf32>, %rhs : memref<?x?
 func.func @ukernel_mmt4d_i8i8i32(%lhs : memref<?x?x?x?xi8>, %rhs : memref<?x?x?x?xi8>,
     %acc : memref<?x?x?x?xi32>, %m : index, %n : index, %k : index, %m0 : i32, %n0 : i32, %k0 : i32, %flags : i32) {
   iree_codegen.ukernel.generic "vmvx.mmt4d.i8i8i32" ins(%lhs, %rhs : memref<?x?x?x?xi8>, memref<?x?x?x?xi8>)
-      outs(%acc : memref<?x?x?x?xi32>) (%m, %n, %k, %m0, %n0, %k0, %flags : index, index, index, i32, i32, i32, i32) strided_outer_dims(1)
+      outs(%acc : memref<?x?x?x?xi32>) (%m, %n, %k, %m0, %n0, %k0, %flags : index, index, index, i32, i32, i32, i32) strided_dims([[0], [0], [0]])
   return
 }
 // CHECK-LABEL: func.func private @vmvx.mmt4d.i8i8i32

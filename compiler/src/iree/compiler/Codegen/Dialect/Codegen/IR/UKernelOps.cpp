@@ -77,7 +77,7 @@ createFunctionCall(RewriterBase &rewriter, Operation *op, StringRef fnName,
 /// the type(s) of the function call arguments(s) it lowers to.
 static LogicalResult getCallOpType(MLIRContext *context,
                                    Type microKernelOpOperandType,
-                                   IntegerAttr stridedOuterDimsAttr,
+                                   ArrayRef<int64_t> stridedDims,
                                    SmallVector<Type> &callOperandTypes) {
   return TypeSwitch<Type, LogicalResult>(microKernelOpOperandType)
       .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
@@ -93,10 +93,7 @@ static LogicalResult getCallOpType(MLIRContext *context,
         auto indexType = IndexType::get(context);
         callOperandTypes.push_back(indexType);
         // Strides.
-        int stridedOuterDims = stridedOuterDimsAttr
-                                   ? stridedOuterDimsAttr.getInt()
-                                   : memrefType.getRank();
-        callOperandTypes.resize(callOperandTypes.size() + stridedOuterDims,
+        callOperandTypes.resize(callOperandTypes.size() + stridedDims.size(),
                                 indexType);
         return success();
       })
@@ -112,7 +109,7 @@ static LogicalResult getCallOpType(MLIRContext *context,
 /// the function call it lowers to.
 static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
                                          Value operand,
-                                         IntegerAttr stridedOuterDimsAttr,
+                                         ArrayRef<int64_t> stridedDims,
                                          SmallVector<Value> &callOperands) {
   return TypeSwitch<Type, LogicalResult>(operand.getType())
       .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
@@ -127,12 +124,9 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
         // Offset.
         callOperands.push_back(extractStridedMetadataOp.getOffset());
         // Strides.
-        int stridedOuterDims = stridedOuterDimsAttr
-                                   ? stridedOuterDimsAttr.getInt()
-                                   : memrefType.getRank();
         auto strides = extractStridedMetadataOp.getStrides();
-        for (int i = 0; i < stridedOuterDims; ++i) {
-          callOperands.push_back(strides[i]);
+        for (int64_t dim : stridedDims) {
+          callOperands.push_back(strides[dim]);
         }
         return success();
       })
@@ -144,27 +138,30 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
       .Default([](Type) { return failure(); });
 }
 
-static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
-    RewriterBase &rewriter, IREE::Codegen::UKernelGenericOp op,
-    StringRef fnName, IntegerAttr stridedOuterDimsAttr) {
+static FailureOr<func::CallOp>
+lowerUKernelGenericToFunctionCall(RewriterBase &rewriter,
+                                  IREE::Codegen::UKernelGenericOp op,
+                                  StringRef fnName) {
   // Create the function type based on the operands and results.
   SmallVector<Type> callArgumentTypes;
-  for (auto microKernelOpOperandType : op->getOperandTypes()) {
+  for (auto [idx, microKernelOpOperandType] :
+       llvm::enumerate(op->getOperandTypes())) {
     if (failed(getCallOpType(rewriter.getContext(), microKernelOpOperandType,
-                             stridedOuterDimsAttr, callArgumentTypes))) {
+                             op.getOperandStridedDims(idx),
+                             callArgumentTypes))) {
       return rewriter.notifyMatchFailure(
           op, llvm::formatv("failed to lower operand type {}",
                             microKernelOpOperandType));
     }
   }
   SmallVector<Type> callResultTypes;
-  for (auto resultType : op->getResultTypes()) {
+  for (auto [idx, resultType] : llvm::enumerate(op->getResultTypes())) {
     if (llvm::isa<ShapedType>(resultType)) {
       return rewriter.notifyMatchFailure(
           op, "cannot lower a `ShapedType` return value to function call");
     }
     if (failed(getCallOpType(rewriter.getContext(), resultType,
-                             stridedOuterDimsAttr, callResultTypes))) {
+                             /*stridedDims=*/{}, callResultTypes))) {
       return rewriter.notifyMatchFailure(
           op, llvm::formatv("failed to lower result type {}", resultType));
     }
@@ -172,9 +169,10 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
 
   // Get the operands for the function call.
   SmallVector<Value> callOperands;
-  for (auto operand : op->getOperands()) {
+  for (auto [idx, operand] : llvm::enumerate(op->getOperands())) {
     if (failed(lowerToCallOperands(op->getLoc(), rewriter, operand,
-                                   stridedOuterDimsAttr, callOperands))) {
+                                   op.getOperandStridedDims(idx),
+                                   callOperands))) {
       return rewriter.notifyMatchFailure(
           op, "failed to lower operands to function call operands");
     }
@@ -187,14 +185,77 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
                             callResultTypes, callOperands, fnDefAttrs);
 }
 
+void UKernelGenericOp::build(OpBuilder &builder, OperationState &result,
+                             TypeRange resultTypes, StringRef uKernelFnName,
+                             ValueRange inputs, ValueRange outputs,
+                             ValueRange otherOperands,
+                             DictionaryAttr fnDefAttrs,
+                             int64_t numStridedOuterDims) {
+  SmallVector<Attribute> stridedOuterDimsAttrs;
+  auto appendStridedOuterDims = [&](ValueRange operands) {
+    for (Value operand : operands) {
+      if (!isa<ShapedType>(operand.getType())) {
+        continue;
+      }
+      auto outerDims = builder.getI64ArrayAttr(
+          llvm::to_vector(llvm::seq<int64_t>(numStridedOuterDims)));
+      stridedOuterDimsAttrs.push_back(outerDims);
+    }
+  };
+  appendStridedOuterDims(inputs);
+  appendStridedOuterDims(outputs);
+  appendStridedOuterDims(otherOperands);
+  auto stridedDimsArrayAttr =
+      ArrayAttr::get(builder.getContext(), stridedOuterDimsAttrs);
+  build(builder, result, resultTypes, uKernelFnName, inputs, outputs,
+        otherOperands, fnDefAttrs, stridedDimsArrayAttr);
+}
+
+void UKernelGenericOp::build(OpBuilder &builder, OperationState &result,
+                             TypeRange resultTypes, StringRef uKernelFnName,
+                             ValueRange inputs, ValueRange outputs,
+                             ValueRange otherOperands,
+                             DictionaryAttr fnDefAttrs,
+                             ArrayRef<SmallVector<int64_t>> stridedDims) {
+  SmallVector<Attribute> stridedDimsAttrs = llvm::map_to_vector(
+      stridedDims, [&](ArrayRef<int64_t> dims) -> Attribute {
+        return builder.getI64ArrayAttr(dims);
+      });
+  auto stridedDimsArrayAttr =
+      ArrayAttr::get(builder.getContext(), stridedDimsAttrs);
+  build(builder, result, outputs.getTypes(), uKernelFnName, inputs, outputs,
+        otherOperands, fnDefAttrs, stridedDimsArrayAttr);
+}
+
+SmallVector<int64_t>
+UKernelGenericOp::getOperandStridedDims(int64_t operandIdx) {
+  auto operandType = dyn_cast<ShapedType>(getOperandTypes()[operandIdx]);
+  if (!operandType) {
+    return {};
+  }
+  ArrayAttr dimStrides = getStridedDimsAttr();
+  if (!dimStrides) {
+    return llvm::to_vector(llvm::seq<int64_t>(operandType.getRank()));
+  }
+  int64_t dimStridesListIdx = 0;
+  for (int i = 0; i < operandIdx; ++i) {
+    if (isa<ShapedType>(getOperandTypes()[i])) {
+      ++dimStridesListIdx;
+    }
+  }
+  SmallVector<ArrayAttr> strideLists(dimStrides.getAsRange<ArrayAttr>());
+  return llvm::map_to_vector(
+      strideLists[dimStridesListIdx].getAsRange<IntegerAttr>(),
+      [](IntegerAttr dim) { return dim.getInt(); });
+}
+
 MutableOperandRange UKernelGenericOp::getDpsInitsMutable() {
   return getOutputsMutable();
 }
 
 FailureOr<mlir::CallOpInterface>
 UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
-  return lowerUKernelGenericToFunctionCall(rewriter, *this, getUKernelFnName(),
-                                           getStridedOuterDimsAttr());
+  return lowerUKernelGenericToFunctionCall(rewriter, *this, getUKernelFnName());
 }
 
 void UKernelGenericOp::getEffects(
