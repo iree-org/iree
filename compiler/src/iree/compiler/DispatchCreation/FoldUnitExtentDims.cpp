@@ -117,12 +117,14 @@ struct FoldAttentionMaskUnitDim final
 /// Simplify collapse_shape(expand_shape) by removing unneeded unit dimensions
 /// that get expanded and subsequently collapsed.
 ///
+/// TODO: move this upstream with the other reshape folding patterns. This can
+/// also be generalized to fold non-unit dimensions.
+///
 /// For example:
 /// ```
 /// %0 = expand_shape ... tensor<3x3x10xf32> into tensor<3x3x5x1x2xf32>
 /// %1 = collapse_shape %1 ... tensor<3x3x5x1x2xf32> into tensor<9x5x2xf32>
 /// ```
-///
 /// simplifies to
 /// ```
 /// %0 = expand_shape ... tensor<3x3x10xf32> into tensor<3x3x5x2xf32>
