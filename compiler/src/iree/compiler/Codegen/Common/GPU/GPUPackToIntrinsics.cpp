@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/OpDefinition.h"
@@ -53,23 +54,11 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     return packedSizes;
   };
 
-  FailureOr<IREE::GPU::ScaledContractionDimensions> scaledContrDims =
-      IREE::GPU::inferScaledContractionDims(linalgOp);
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledContrDims =
+      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (succeeded(scaledContrDims)) {
     auto [m, n, k] = kind.getScaledMNKShape();
     indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k};
-    llvm::errs() << "[DEBUG] scaled shapes m " << m << "\n";
-    llvm::errs() << "[DEBUG] scaled shapes n " << n << "\n";
-    llvm::errs() << "[DEBUG] scaled shapes k " << k << "\n";
-    for (auto m1 : scaledContrDims->m)
-      llvm::errs() << m1 << ", ";
-    llvm::errs() << "\n";
-    for (auto m1 : scaledContrDims->n)
-      llvm::errs() << m1 << ", ";
-    llvm::errs() << "\n";
-    for (auto m1 : scaledContrDims->k)
-      llvm::errs() << m1 << ", ";
-    llvm::errs() << "\n";
     return createPackedSizes({m, n, k}, indices);
   }
 
@@ -86,7 +75,6 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
 
 LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
                               RewriterBase &rewriter) {
-  llvm::errs() << "[DEBUG] - packToIntrinsic\n";
   auto loweringConfig =
       getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
   assert(loweringConfig && "Packing unconfigured op");
@@ -94,18 +82,12 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
   assert(kind && "Packing op without mma kind");
   FailureOr<SmallVector<OpFoldResult>> packedSizes =
       getPackedSizes(linalgOp, rewriter, kind);
-  linalgOp.print(llvm::errs()), llvm::errs() << "\n!?! \n";
   FailureOr<linalg::PackResult> maybeResult =
       linalg::pack(rewriter, linalgOp, packedSizes.value());
-  maybeResult->packedLinalgOp.print(llvm::errs()), llvm::errs() << "\n!??????????????????! \n";
   if (failed(maybeResult)) {
     return rewriter.notifyMatchFailure(linalgOp, "packing failed");
   }
-  llvm::errs() << "[DEBUG] - what is lowering config\n";
-  llvm::errs() << loweringConfig;
   setLoweringConfig(maybeResult->packedLinalgOp, loweringConfig);
-  llvm::errs() << "[DEBUG] - what is lowering config now?\n";
-  maybeResult->packedLinalgOp.print(llvm::errs()), llvm::errs() << "\n";
   return success();
 }
 
@@ -113,11 +95,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    llvm::errs() << "[DEBUG] - ConvertToMultiMma \n";
-    linalgOp.print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "[DEBUG] - IN\n";
-                                  auto loweringConfig =
+    auto loweringConfig =
         getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
     if (!loweringConfig) {
       return failure();
@@ -126,7 +104,6 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!kind) {
       return failure();
     }
-    llvm::errs() << "[DEBUG] - NEEDS TO GET HERE\n";
     if (failed(convertContractionToInnerTiledMma(rewriter, linalgOp, kind))) {
       return failure();
     }
@@ -137,7 +114,6 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-  llvm::errs() << "[DEBUG] - GPUPackToIntrinsicsPass\n";
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> packingCandidates;
@@ -148,12 +124,9 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
       return;
     }
     if (!getMmaKind(loweringConfig)) {
-      llvm::errs() << "[DEBUG] - !getMmaKind(loweringConfig)\n";
       return;
     }
     packingCandidates.push_back(linalgOp);
-    llvm::errs() << "[DEBUG] - packingCandidates\n";
-    linalgOp.print(llvm::errs()), llvm::errs() << "\n";
   });
 
   for (auto candidate : packingCandidates) {
@@ -167,7 +140,6 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
   // Step 2. Convert configured linalg ops to inner_tiled ops with multi-MMA
   // intrinsic kinds.
   {
-    llvm::errs() << "convert to multimma\n";
     RewritePatternSet patterns(context);
     patterns.add<ConvertToMultiMma>(context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

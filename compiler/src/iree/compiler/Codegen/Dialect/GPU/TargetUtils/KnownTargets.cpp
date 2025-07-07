@@ -102,7 +102,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
   mmaAttrs.reserve(wgp->mmaCount);
   for (int i = 0; i < wgp->mmaCount; ++i)
     mmaAttrs.push_back(MMAAttr::get(context, wgp->mmaOps[i]));
-  
+
   SmallVector<ScaledMMAAttr, 8> scaledMmaAttrs;
   scaledMmaAttrs.reserve(wgp->scaledMmaCount);
   for (int i = 0; i < wgp->scaledMmaCount; ++i) {
@@ -381,28 +381,36 @@ const WgpDetails *getRDNA3WgpDetails() {
 }
 
 const WgpDetails *getRDNA2WgpDetails() {
-  static const WgpDetails rdna2Wgp = {
-      allComputeBits,     allStorageBits,
-      allSubgroupOps,     allDotProductOps,
-      /*mmaCount=*/0,
-      /*mmaOps=*/nullptr, 
-      /*scaledMmaCount=*/0,
-      /*scaledMmaOps=*/nullptr, {32, 64},
-      {1024, 1024, 1024}, 1024,
-      64 * 1024,          {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+  static const WgpDetails rdna2Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      /*mmaCount=*/0,
+                                      /*mmaOps=*/nullptr,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
   return &rdna2Wgp;
 }
 
 const WgpDetails *getRDNA1WgpDetails() {
-  static const WgpDetails rdna1Wgp = {
-      allComputeBits,     allStorageBits,
-      allSubgroupOps,     DotProductOps::None,
-      /*mmaCount=*/0,
-      /*mmaOps=*/nullptr, 
-      /*scaledMmaCount=*/0,
-      /*scaledMmaOps=*/nullptr, {32, 64},
-      {1024, 1024, 1024}, 1024,
-      64 * 1024,          {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+  static const WgpDetails rdna1Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      DotProductOps::None,
+                                      /*mmaCount=*/0,
+                                      /*mmaOps=*/nullptr,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
   return &rdna1Wgp;
 }
 

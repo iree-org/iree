@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -863,23 +864,13 @@ getInnerDims(linalg::LinalgOp linalgOp) {
         return failure();
       }
     }
-    std::tuple<unsigned, unsigned, unsigned, unsigned> res{dims[0].back(), dims[1].back(), dims[2].back(), dims[3].back()};
+    std::tuple<unsigned, unsigned, unsigned, unsigned> res{
+        dims[0].back(), dims[1].back(), dims[2].back(), dims[3].back()};
     return res;
   };
-  linalgOp.print(llvm::errs()), llvm::errs() << "\n";
-  FailureOr<ScaledContractionDimensions> maybeScaledContrDims =
-      inferScaledContractionDims(linalgOp);
-  auto printArray = [](SmallVector<unsigned, 2> a) -> int {
-    llvm::errs() << "------------\n";
-    for (auto b : a)
-      llvm::errs() << "\t" << b << "\n";
-    return 1;
-  };
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> maybeScaledContrDims =
+      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (succeeded(maybeScaledContrDims)) {
-    llvm::errs() << "[DEBUG] - sd 1\n";
-    printArray(maybeScaledContrDims->m);
-    printArray(maybeScaledContrDims->n);
-    printArray(maybeScaledContrDims->k);
     return extractDims({maybeScaledContrDims->m, maybeScaledContrDims->n,
                         maybeScaledContrDims->k, maybeScaledContrDims->kB});
   }
@@ -888,35 +879,32 @@ getInnerDims(linalg::LinalgOp linalgOp) {
   if (failed(maybeContractionDims)) {
     return failure();
   }
-  llvm::errs() << "[DEBUG] - sd 2\n";
   return extractDims({maybeContractionDims->m, maybeContractionDims->n,
                       maybeContractionDims->k});
 }
 
-// Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
-// op with a MMA-like intrinsic descriptor.
 FailureOr<IREE::Codegen::InnerTiledOp>
-convertContractionToInnerTiledMma(RewriterBase &rewriter,
+convertScaledContractionToInnerTiledMma(RewriterBase &rewriter,
                                   linalg::LinalgOp linalgOp,
                                   IREE::GPU::MmaInterfaceAttr mmaKind) {
-  llvm::errs() << "[DEBUG] - convertContractionToInnerTiledMma\n";
-  if (!linalgOp.hasPureTensorSemantics()) {
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> contractionDims =
+      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+  if (failed(contractionDims)) {
     return failure();
   }
-  linalgOp.print(llvm::errs());
-  llvm::errs() << "\n";
-  FailureOr<std::tuple<unsigned, unsigned, unsigned, unsigned>> innerDims = getInnerDims(linalgOp);
-  llvm::errs() << "[DEBUG] - IN INNERTILER\n";
-  if (failed(innerDims)) {
+
+  if (contractionDims->m.empty() || contractionDims->n.empty() ||
+      contractionDims->k.empty() || contractionDims->kB.empty()) {
     return failure();
   }
-  llvm::errs() << "[DEBUG] - IN INNERTILER 1 \n";
-  auto [innerM, innerN, innerK, innerKb] = *innerDims;
-  llvm::errs() << innerM << " <- ->\n";
-  llvm::errs() << innerN << " <- ->\n";
-  llvm::errs() << innerK << " <- ->\n";
-  llvm::errs() << innerKb << " <- ->\n";
+
   MLIRContext *context = rewriter.getContext();
+
+  int64_t innerM = contractionDims->m.back();
+  int64_t innerN = contractionDims->n.back();
+  int64_t innerK = contractionDims->k.back();
+  int64_t innerKb = contractionDims->kB.back();
+
   AffineExpr d0, d1, d2;
   bindDims(context, d0, d1, d2);
   llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
@@ -937,78 +925,47 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
           ArrayRef<AffineExpr> expectedDimOrder) -> SmallVector<int64_t> {
     llvm::SmallDenseMap<AffineExpr, int64_t> dimMap;
     for (auto [i, expr] : llvm::enumerate(expectedDimOrder)) {
-      llvm::errs() << expr << "\n";
       dimMap[expr] = i;
     }
-    llvm::errs() << "[DEBUG] - IN INNERTILER 2\n";
     SmallVector<int64_t> permutation;
     for (AffineExpr resExpr : map.getResults()) {
-      llvm::errs() << "[DEBUG] - IN INNERTILER 2.5\n";
       if (!dimMap.contains(resExpr)) {
-        llvm::errs() << resExpr << "\n";
         return {};
       }
       permutation.push_back(dimMap[resExpr]);
     }
-    llvm::errs() << "[DEBUG] - IN INNERTILER 3 \n";
     return permutation;
   };
 
   // TODO: Enable batched intrinsics and get the appropriate sub-map here.
-  llvm::errs() << "[DEBUG] - LHS\n";
   SmallVector<int64_t> lhsInnerPerm =
       getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
-  
-  llvm::errs() << lhsMap << "\n";
-  llvm::errs() << lhsMap.getMinorSubMap(2) << "\n";
-  for (auto a : lhsInnerPerm)
-    llvm::errs() << a << "\n";
-  llvm::errs() << "[DEBUG] - RHS\n";
   SmallVector<int64_t> sc1InnerPerm =
       getNormalizedPermutation(sc1Map.getMinorSubMap(2), {mExpr, kBExpr});
   SmallVector<int64_t> rhsInnerPerm =
       getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
   SmallVector<int64_t> sc2InnerPerm =
-      getNormalizedPermutation(sc1Map.getMinorSubMap(2), {nExpr, kBExpr});
-  llvm::errs() << rhsMap << "\n";
-  llvm::errs() << rhsMap.getMinorSubMap(2) << "\n";
-  for (auto a : rhsInnerPerm)
-    llvm::errs() << a << "\n";
-  llvm::errs() << "[DEBUG] - ACC\n";
+      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {nExpr, kBExpr});
   SmallVector<int64_t> accInnerPerm =
       getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
-  llvm::errs() << accMap << "\n";
-  llvm::errs() << accMap.getMinorSubMap(2) << "\n";
-  for (auto a : accInnerPerm)
-    llvm::errs() << a << "\n";
-  llvm::errs() << "[DEBUG] - IN INNERTILER 4 \n";
-  if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+  if (lhsInnerPerm.empty() || sc1InnerPerm.empty() || rhsInnerPerm.empty() ||
+      sc2InnerPerm.empty() || accInnerPerm.empty()) {
     return failure();
   }
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
-  llvm::errs() << "[DEBUG] - bounds \n";
-  for (auto b : bounds)
-    llvm::errs() << b << "\n";
-    
-  llvm::errs() << "[DEBUG] - IN INNERTILER 5 \n";
   auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getScaledMNKShape();
-  llvm::errs() << "[DEBUG] - intrinsic \n";
-  llvm::errs() << intrinsicM << " " << intrinsicN << " " << intrinsicK << "\n";
   if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
       intrinsicK != bounds[innerK]) {
     return failure();
   }
-  llvm::errs() << "[DEBUG] - IN INNERTILER 6 \n";
 
-  
   auto reorderInputs = [](SmallVector<Value> inputs) {
     SmallVector<Value> res;
     int numInputs = inputs.size() - 1;
     int offset = numInputs / 2;
     for (int i = 0; i < numInputs; i++) {
-      llvm::errs() << " s " << i/2 + (i%2)*offset << "\n";
-      res.push_back(inputs[i/2 + (i%2)*offset]);
+      res.push_back(inputs[i / 2 + (i % 2) * offset]);
     }
     res.push_back(inputs.back());
     return res;
@@ -1017,17 +974,6 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 
   SmallVector<Type> eltTypes;
   mmaKind.getElementTypes(eltTypes);
-  for (auto ty : eltTypes)
-    llvm::errs() << "\t" << ty << "\n";
-  for (auto in : inputs)
-    llvm::errs() << "\t" << in << "\n";
-  llvm::errs() << "Element types\n";
-  llvm::errs() << "\t" << inputs[0] << "\n";
-  llvm::errs() << "\t" << inputs[2] << "\n";
-  llvm::errs() << "\t" << inputs[4] << "\n";
-  llvm::errs() << "\t" << eltTypes[0] << "\n";
-  llvm::errs() << "\t" << eltTypes[1] << "\n";
-  llvm::errs() << "\t" << eltTypes[4] << "\n";
   if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
           eltTypes[0] ||
       cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
@@ -1036,7 +982,7 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
           eltTypes[4]) {
     return failure();
   }
-  llvm::errs() << "[DEBUG] - IN INNERTILER 7 \n";
+
   SmallVector<utils::IteratorType> linalgIteratorTypes =
       linalgOp.getIteratorTypesArray();
   llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK};
@@ -1051,7 +997,7 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
     iteratorTypes.push_back(linalgIteratorTypes[dim]);
     oldDimsToNewDimsMap[dim] = currentDim++;
   }
-  llvm::errs() << "[DEBUG] - IN INNERTILER 8 \n";
+
   AffineMap outerLhsMap =
       dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
   AffineMap outerRhsMap =
@@ -1067,19 +1013,157 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
       SmallVector<SmallVector<int64_t>>{
           lhsInnerPerm, sc1InnerPerm, rhsInnerPerm, sc2InnerPerm, accInnerPerm};
   SmallVector<int64_t> identityPerm = {0, 1};
-  
-  llvm::errs() << "[DEBUG] - IN INNERTILER 9 \n";
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
       accInnerPerm == identityPerm)
     perms = std::nullopt;
 
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
-  llvm::errs() << "[DEBUG] - IN INNERTILER 10 \n";
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
-      ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map, outerAccMap}, iteratorTypes,
+      ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map,
+                          outerAccMap},
+      iteratorTypes, mmaKind, perms);
+  if (maybeLoweringConfig) {
+    setLoweringConfig(newMmaOp, maybeLoweringConfig);
+  }
+  return newMmaOp;
+}
+
+// Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
+// op with a MMA-like intrinsic descriptor.
+FailureOr<IREE::Codegen::InnerTiledOp>
+convertContractionToInnerTiledMma(RewriterBase &rewriter,
+                                  linalg::LinalgOp linalgOp,
+                                  IREE::GPU::MmaInterfaceAttr mmaKind) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return failure();
+  }
+
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> maybeScaledContrDims =
+      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+  if (succeeded(maybeScaledContrDims)) {
+    return convertScaledContractionToInnerTiledMma(rewriter, linalgOp, mmaKind);
+  }
+
+  FailureOr<linalg::ContractionDimensions> maybeContractionDims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(maybeContractionDims)) {
+    return failure();
+  }
+
+  linalg::ContractionDimensions contractionDims = *maybeContractionDims;
+  if (contractionDims.m.empty() || contractionDims.n.empty() ||
+      contractionDims.k.empty()) {
+    return failure();
+  }
+
+  MLIRContext *context = rewriter.getContext();
+
+  int64_t innerM = contractionDims.m.back();
+  int64_t innerN = contractionDims.n.back();
+  int64_t innerK = contractionDims.k.back();
+
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
+  AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
+  AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
+  AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
+
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  AffineMap lhsMap = indexingMaps[0];
+  AffineMap rhsMap = indexingMaps[1];
+  AffineMap accMap = indexingMaps[2];
+
+  auto getNormalizedPermutation =
+      [&](AffineMap map,
+          ArrayRef<AffineExpr> expectedDimOrder) -> SmallVector<int64_t> {
+    llvm::SmallDenseMap<AffineExpr, int64_t> dimMap;
+    for (auto [i, expr] : llvm::enumerate(expectedDimOrder)) {
+      dimMap[expr] = i;
+    }
+    SmallVector<int64_t> permutation;
+    for (AffineExpr resExpr : map.getResults()) {
+      if (!dimMap.contains(resExpr)) {
+        return {};
+      }
+      permutation.push_back(dimMap[resExpr]);
+    }
+    return permutation;
+  };
+
+  // TODO: Enable batched intrinsics and get the appropriate sub-map here.
+  SmallVector<int64_t> lhsInnerPerm =
+      getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
+  SmallVector<int64_t> rhsInnerPerm =
+      getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
+  SmallVector<int64_t> accInnerPerm =
+      getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
+
+  if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+    return failure();
+  }
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+
+  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
+  if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
+      intrinsicK != bounds[innerK]) {
+    return failure();
+  }
+
+  SmallVector<Value> inputs = linalgOp->getOperands();
+  auto [lhsElementType, rhsElementType, accElementType] =
+      mmaKind.getABCElementTypes();
+  if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
+          lhsElementType ||
+      cast<RankedTensorType>(inputs[1].getType()).getElementType() !=
+          rhsElementType ||
+      cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
+          accElementType) {
+    return failure();
+  }
+
+  SmallVector<utils::IteratorType> linalgIteratorTypes =
+      linalgOp.getIteratorTypesArray();
+  llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK};
+  llvm::SmallDenseMap<int64_t, int64_t> oldDimsToNewDimsMap;
+  int64_t currentDim = 0;
+  int64_t numDims = lhsMap.getNumDims();
+  SmallVector<utils::IteratorType> iteratorTypes;
+  for (int64_t dim = 0, e = numDims; dim < e; ++dim) {
+    if (droppedDims.contains(dim)) {
+      continue;
+    }
+    iteratorTypes.push_back(linalgIteratorTypes[dim]);
+    oldDimsToNewDimsMap[dim] = currentDim++;
+  }
+
+  AffineMap outerLhsMap =
+      dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
+  AffineMap outerRhsMap =
+      dropDims(context, numDims - 3, rhsMap, oldDimsToNewDimsMap);
+  AffineMap outerAccMap =
+      dropDims(context, numDims - 3, accMap, oldDimsToNewDimsMap);
+
+  std::optional<SmallVector<SmallVector<int64_t>>> perms =
+      SmallVector<SmallVector<int64_t>>{lhsInnerPerm, rhsInnerPerm,
+                                        accInnerPerm};
+  SmallVector<int64_t> identityPerm = {0, 1};
+
+  if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
+      accInnerPerm == identityPerm)
+    perms = std::nullopt;
+
+  IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+      getLoweringConfig(linalgOp);
+
+  auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
+      linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
+      /*inits=*/ValueRange{inputs}.back(),
+      ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
       mmaKind, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
@@ -1094,23 +1178,16 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 FailureOr<Operation *>
 distributeInnerTiledOp(RewriterBase &rewriter,
                        IREE::Codegen::InnerTiledOp tiledOp) {
-  llvm::errs() << "[DEBUG] - Transforms [0]\n";
-  tiledOp.print(llvm::errs()), llvm::errs() << "\n";
-  llvm::errs() << tiledOp.hasTensorSemantics() << "\n";
-  llvm::errs() << tiledOp.hasThreadSemantics() << "\n";
   if (!tiledOp.hasTensorSemantics() || tiledOp.hasThreadSemantics()) {
     return rewriter.notifyMatchFailure(
         tiledOp, "tiledOp must have vector and subgroup for distribution.");
   }
-  llvm::errs() << "[DEBUG] - Transforms [1]\n";
   RewriterBase::InsertionGuard g(rewriter);
-
   Location loc = tiledOp.getLoc();
   MLIRContext *context = rewriter.getContext();
-
   OpFoldResult zero = rewriter.getIndexAttr(0);
   OpFoldResult one = rewriter.getIndexAttr(1);
-  llvm::errs() << "[DEBUG] - Transforms [2]\n";
+
   // Step 1. Create the new scf.forall op with a lane id mapping.
   Attribute mappingType = tiledOp.getKind().getDistributionMappingKind();
   if (!mappingType) {
@@ -1123,21 +1200,20 @@ distributeInnerTiledOp(RewriterBase &rewriter,
     return tiledOp.emitOpError("failed to specify a worker count for the "
                                "forall it's to be distributed into.");
   }
-  llvm::errs() << "[DEBUG] - Transforms [3]\n";
+
   auto newForallOp = rewriter.create<scf::ForallOp>(
       loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
       ArrayRef<OpFoldResult>{one}, tiledOp.getOutputs(),
       ArrayAttr::get(context, {mappingType}));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
-  llvm::errs() << "[DEBUG] - Transforms [4]\n";
+
   // Step 2. Compute the offsets/sizes/strides for each of the operands.
   Value id = newForallOp.getInductionVar(0);
   SmallVector<Value> inputSlices, initSlices;
   SmallVector<tensor::ExtractSliceOp> initSliceOps;
   std::optional<ArrayAttr> maybePerms = tiledOp.getPermutations();
   int64_t firstOutIdx = tiledOp.getNumInputs();
-  llvm::errs() << "[DEBUG] - DOES IT GET HERE?\n";
   for (auto [opIndex, operand] : llvm::enumerate(tiledOp.getOperands())) {
     int64_t outerRank = tiledOp.getOperandOuterRank(opIndex);
     SmallVector<OpFoldResult> offsets(outerRank, zero);
@@ -1154,7 +1230,6 @@ distributeInnerTiledOp(RewriterBase &rewriter,
       permutation = llvm::to_vector(llvm::seq(
           static_cast<int64_t>(0), static_cast<int64_t>(innerShape.size())));
     }
-    llvm::errs() << "[DEBUG] - DOES IT GET HERE? 1\n";
     // Slice offsets.
     SmallVector<OpFoldResult> strides(outerRank, one);
     if (failed(tiledOp.getKind().populateOperandOffsetsSizesStrides(
@@ -1163,7 +1238,6 @@ distributeInnerTiledOp(RewriterBase &rewriter,
       return tiledOp->emitOpError("failed to populate offsets for operand " +
                                   Twine(opIndex));
     }
-    llvm::errs() << "[DEBUG] - DOES IT GET HERE? 2\n";
     // Extract the rank-reduced slice of the operand based on the expected inner
     // vector shape. If we're slicing the accumulator, extract from the loop
     // variable, since the accumulator operand has been used to create the
@@ -1179,7 +1253,6 @@ distributeInnerTiledOp(RewriterBase &rewriter,
           loc, operand, offsets, sizes, strides);
       inputSlices.push_back(slice);
     }
-    llvm::errs() << "[DEBUG] - DOES IT GET HERE? 3\n";
   }
 
   // Step 3. Create the new inner_tiled op.

@@ -1437,14 +1437,9 @@ int64_t ScaledMMAAttr::getSubgroupSize() const {
 }
 
 SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
-  return {
-    Float8E8M0FNUType::get(ctx),
-    Float8E5M2Type::get(ctx),
-    Float8E5M2FNUZType::get(ctx),
-    Float8E4M3FNType::get(ctx),
-    Float8E4M3FNUZType::get(ctx),
-    Float4E2M1FNType::get(ctx)
-  };
+  return {Float8E8M0FNUType::get(ctx),  Float8E5M2Type::get(ctx),
+          Float8E5M2FNUZType::get(ctx), Float8E4M3FNType::get(ctx),
+          Float8E4M3FNUZType::get(ctx), Float4E2M1FNType::get(ctx)};
 }
 
 SmallVector<Type> ScaledMMAAttr::getSupportedOutputTypes(MLIRContext *ctx) {
@@ -1454,7 +1449,6 @@ SmallVector<Type> ScaledMMAAttr::getSupportedOutputTypes(MLIRContext *ctx) {
 LogicalResult
 ScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   if (failed(verifyMmaIndexingMaps({maps[0], maps[2], maps[4]}))) {
-    llvm::errs() << "[DEBUG] - verifyIndexingMaps 1\n ";
     return failure();
   }
 
@@ -1468,13 +1462,11 @@ ScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   // Check LHS scales aren't using indexes that LHS isn't.
   if (llvm::any_of(resExprs[1],
                    [&](auto e) { return !resExprs[0].contains(e); })) {
-    llvm::errs() << "[DEBUG] - verifyIndexingMaps 2\n ";
     return failure();
   }
   // Check RHS scales aren't using indexes that RHS isn't.
   if (llvm::any_of(resExprs[3],
                    [&](auto e) { return !resExprs[2].contains(e); })) {
-    llvm::errs() << "[DEBUG] - verifyIndexingMaps 3\n ";
     return failure();
   }
   return success();
