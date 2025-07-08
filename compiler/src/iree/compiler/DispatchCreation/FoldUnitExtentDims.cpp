@@ -248,13 +248,9 @@ struct DropUnitDimsFromCollapseOfExpand
     // Note: we must handle the cases where the expand/collapse is no longer
     // needed. Both ops require a non-identity reassociation (i.e. they can't be
     // no-ops).
-    auto isIdentityReassociation = [](ArrayRef<ReassociationIndices> reassoc) {
-      return llvm::all_of(reassoc,
-                          [](auto &indices) { return indices.size() == 1; });
-    };
-
     Value newExpanded = expandOp.getSrc();
-    if (!isIdentityReassociation(newExpandReassoc)) {
+    if (!llvm::all_of(newExpandReassoc,
+                      llvm::hasSingleElement<ReassociationIndicesRef>)) {
       newExpanded = rewriter.create<tensor::ExpandShapeOp>(
           expandOp.getLoc(),
           RankedTensorType::get(newInterShape,
@@ -263,7 +259,8 @@ struct DropUnitDimsFromCollapseOfExpand
     }
 
     Value result = newExpanded;
-    if (!isIdentityReassociation(newCollapseReassoc)) {
+    if (!llvm::all_of(newCollapseReassoc,
+                      llvm::hasSingleElement<ReassociationIndicesRef>)) {
       result = rewriter.create<tensor::CollapseShapeOp>(
           collapseOp.getLoc(), collapseOp.getType(), newExpanded,
           newCollapseReassoc);
