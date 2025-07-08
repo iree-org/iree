@@ -233,12 +233,12 @@ util.func @collapse_of_expand_1(%arg0: tensor<?x128xf16>, %arg1: index) -> tenso
 
 // -----
 
-util.func @collapse_of_expand_2(%arg0: tensor<?x1xf16>, %arg1: index) -> tensor<4x?x1xf16> {
+util.func @collapse_of_expand_to_expand(%arg0: tensor<?x1xf16>, %arg1: index) -> tensor<4x?x1xf16> {
   %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3, 4]] output_shape [4, %arg1, 1, 1, 1] : tensor<?x1xf16> into tensor<4x?x1x1x1xf16>
   %collapsed = tensor.collapse_shape %expanded [[0], [1, 2, 3], [4]] : tensor<4x?x1x1x1xf16> into tensor<4x?x1xf16>
   util.return %collapsed : tensor<4x?x1xf16>
 }
-// CHECK-LABEL: util.func public @collapse_of_expand_2
+// CHECK-LABEL: util.func public @collapse_of_expand_to_expand
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x1xf16>, %[[ARG1:.+]]: index
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
 //  CHECK-SAME:     tensor<?x1xf16> into tensor<4x?x1xf16>
@@ -246,23 +246,23 @@ util.func @collapse_of_expand_2(%arg0: tensor<?x1xf16>, %arg1: index) -> tensor<
 
 // -----
 
-util.func @collapse_of_expand_3(%arg0: tensor<?x?xf16>, %arg1: index, %arg2: index) -> tensor<?x?xf16> {
+util.func @collapse_of_expand_fully_dynamic(%arg0: tensor<?x?xf16>, %arg1: index, %arg2: index) -> tensor<?x?xf16> {
   %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3]] output_shape [%arg1, 1, 1, %arg2] : tensor<?x?xf16> into tensor<?x1x1x?xf16>
   %collapsed = tensor.collapse_shape %expanded [[0], [1, 2, 3]] : tensor<?x1x1x?xf16> into tensor<?x?xf16>
   util.return %collapsed : tensor<?x?xf16>
 }
-// CHECK-LABEL: util.func public @collapse_of_expand_3
+// CHECK-LABEL: util.func public @collapse_of_expand_fully_dynamic
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf16>
 //       CHECK:   util.return %[[ARG0]] : tensor<?x?xf16>
 
 // -----
 
-util.func @collapse_of_expand_4(%arg0: tensor<1x1xf16>, %arg1: index, %arg2: index) -> tensor<1xf16> {
+util.func @collapse_of_expand_all_unit_dim_groups(%arg0: tensor<1x1xf16>, %arg1: index, %arg2: index) -> tensor<1xf16> {
   %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [%arg1, 1, 1, %arg2] : tensor<1x1xf16> into tensor<1x1x1x1xf16>
   %collapsed = tensor.collapse_shape %expanded [[0, 1, 2, 3]] : tensor<1x1x1x1xf16> into tensor<1xf16>
   util.return %collapsed : tensor<1xf16>
 }
-// CHECK-LABEL: util.func public @collapse_of_expand_4
+// CHECK-LABEL: util.func public @collapse_of_expand_all_unit_dim_groups
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<1x1xf16>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //  CHECK-SAME:     tensor<1x1xf16> into tensor<1xf16>
@@ -270,12 +270,12 @@ util.func @collapse_of_expand_4(%arg0: tensor<1x1xf16>, %arg1: index, %arg2: ind
 
 // -----
 
-util.func @collapse_of_expand_5(%arg0: tensor<1x?x4x32xf16>, %arg1: index) -> tensor<?x4x32xf16> {
+util.func @collapse_of_expand_to_collapse(%arg0: tensor<1x?x4x32xf16>, %arg1: index) -> tensor<?x4x32xf16> {
   %expanded = tensor.expand_shape %arg0 [[0], [1], [2], [3, 4]] output_shape [1, %arg1, 4, 1, 32] : tensor<1x?x4x32xf16> into tensor<1x?x4x1x32xf16>
   %collapsed = tensor.collapse_shape %expanded [[0, 1], [2, 3], [4]] : tensor<1x?x4x1x32xf16> into tensor<?x4x32xf16>
   util.return %collapsed : tensor<?x4x32xf16>
 }
-// CHECK-LABEL: util.func public @collapse_of_expand_5
+// CHECK-LABEL: util.func public @collapse_of_expand_to_collapse
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<1x?x4x32xf16>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //  CHECK-SAME:     tensor<1x?x4x32xf16> into tensor<?x4x32xf16>
