@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target, iree-llvmcpu-check-ir-before-llvm-conversion))' --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -478,3 +478,50 @@ module {
 // CHECK:             vector.fma
 // CHECK:             vector.insert
 // CHECK:           arith.addf
+
+// -----
+
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", native_vector_size = 64 : i64, ukernels = "none"}>
+func.func @mmt4d_unpack_elementwise() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
+  %4 = arith.index_castui %0 : i32 to index
+  %5 = arith.index_castui %1 : i32 to index
+  %6 = arith.index_castui %2 : i32 to index
+  %7 = arith.index_castui %3 : i32 to index
+  %8:4 = util.assume.int
+      %4<umin = 127552, umax = 480448>,
+      %5<umin = 32768, umax = 98304>,
+      %6[<umin = 557056, umax = 557056, udiv = 557056>, <umin = 994816, umax = 994816, udiv = 994816>, <umin = 1432576, umax = 1432576, udiv = 1432576>],
+      %7<umin = 32, umax = 96, udiv = 32>
+    : index, index, index, index
+  %9 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%8#2) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x23x16x1xf16>>
+  %10 = iree_tensor_ext.dispatch.workload.ordinal %8#3, 0 : index
+  %11 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%8#0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x23x1x1xf16>>{%10}
+  %12 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%8#1) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf16>>{%10}
+  %13 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x256xf16>>{%10}
+  %14 = iree_tensor_ext.dispatch.tensor.load %11, offsets = [0, 0, 0, 0], sizes = [%10, 23, 1, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x23x1x1xf16>>{%10} -> tensor<?x23x1x1xf16>
+  %15 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0, 0, 0, 0], sizes = [16, 23, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x23x16x1xf16>> -> tensor<16x23x16x1xf16>
+  %16 = iree_tensor_ext.dispatch.tensor.load %12, offsets = [0, 0], sizes = [%10, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf16>>{%10} -> tensor<?x256xf16>
+  %17 = tensor.empty(%10) : tensor<?x256xf16>
+  %18 = tensor.empty(%10) : tensor<?x16x1x16xf32>
+  %19 = linalg.fill ins(%cst : f32) outs(%18 : tensor<?x16x1x16xf32>) -> tensor<?x16x1x16xf32>
+  %20 = linalg.mmt4d ins(%14, %15 : tensor<?x23x1x1xf16>, tensor<16x23x16x1xf16>) outs(%19 : tensor<?x16x1x16xf32>) -> tensor<?x16x1x16xf32>
+  %21 = tensor.empty(%10) : tensor<?x256xf32>
+  %unpack = linalg.unpack %20 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 16] into %21 : tensor<?x16x1x16xf32> -> tensor<?x256xf32>
+  %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%16, %unpack : tensor<?x256xf16>, tensor<?x256xf32>) outs(%17 : tensor<?x256xf16>) {
+  ^bb0(%in: f16, %in_0: f32, %out: f16):
+    %23 = arith.truncf %in_0 : f32 to f16
+    %24 = arith.addf %in, %23 : f16
+    linalg.yield %24 : f16
+  } -> tensor<?x256xf16>
+  iree_tensor_ext.dispatch.tensor.store %22, %13, offsets = [0, 0], sizes = [%10, 256], strides = [1, 1] : tensor<?x256xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x256xf16>>{%10}
+  return
+}
+// Checks that the stack allocation is in bounds, which implies that the fusion
+// happens. Otherwise, it requires a large buffer for intermediate data.
+// CHECK-LABEL: func.func @mmt4d_unpack_elementwise
