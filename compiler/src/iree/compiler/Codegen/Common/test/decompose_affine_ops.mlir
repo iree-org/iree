@@ -5,7 +5,7 @@
 // And that we combine them together following the nesting level
 // of the loop: IV2 -> IV1 -> IV0
 // CHECK: #[[$SINGLE_VALUE_MAP:.*]] = affine_map<()[s0] -> (s0)>
-// CHECK: #[[$MUL_MAP:.*]] = affine_map<()[s0, s1] -> (s1 * s0)>
+// CHECK: #[[$MUL_MAP:.*]] = affine_map<()[s0, s1] -> (s0 * s1)>
 // CHECK: #[[$ADD_MAP:.*]] = affine_map<()[s0, s1] -> (s0 + s1)>
 // CHECK-LABEL:   func.func @decomposeAffine(
 // CHECK-SAME:                            %[[VAL_0:.*]]: memref<?x?x?xf32, strided<[?, ?, ?], offset: ?>>) -> f32 {
