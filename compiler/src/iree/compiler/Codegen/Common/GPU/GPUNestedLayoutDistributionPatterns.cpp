@@ -983,32 +983,12 @@ struct DistributeMultiReduction final
 
   Value getBufferForSubgroupReduction(RewriterBase &rewriter, MemRefType memTy,
                                       Value val) const {
-    // Check if the defining op is actually in a scf.for loop, and hoist out the
-    // alloc of the scf.for loop so we can reuse the allocation and not have
-    // to worry about the compiler reasoning if we can actually do any memory
-    // reuse.
-    Operation *parentOp = val.getParentBlock()->getParentOp();
-    scf::ForOp parentFor = nullptr;
-    while (parentOp) {
-      if (auto forOp = dyn_cast<scf::ForOp>(parentOp)) {
-        parentFor = forOp;
-        break;
-      }
-      parentOp = parentOp->getParentOp();
-    }
-    memref::AllocOp alloc;
-    {
-      OpBuilder::InsertionGuard g(rewriter);
-      if (parentFor) {
-        rewriter.setInsertionPoint(parentFor);
-      }
-      alloc = rewriter.create<memref::AllocOp>(val.getLoc(), memTy);
-    }
-    if (parentOp) {
-      // Insert gpu.barrier to make sure previous iteration of batch loop has
-      // fully read the subgroup partial reductions.
-      rewriter.create<gpu::BarrierOp>(val.getLoc());
-    }
+    auto alloc = rewriter.create<memref::AllocOp>(val.getLoc(), memTy);
+    // Insert gpu.barrier to make sure previous iteration of batch loop has
+    // fully read the subgroup partial reductions.
+    // TODO: We should be only creating a barrier if this buffer is going to be
+    // reused.
+    rewriter.create<gpu::BarrierOp>(val.getLoc());
     return alloc;
   }
 

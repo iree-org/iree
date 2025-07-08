@@ -161,6 +161,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[THREAD_RED4:.+]] = vector.shape_cast %[[THREAD_RED3]] : vector<2xf32> to vector<2x1x1xf32>
 // Subgroup reduction
 // CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
+// CHECK: gpu.barrier
 // CHECK-DAG: %[[SGID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
 // CHECK-DAG: %[[TIDX:.+]]:2 = affine.delinearize_index %thread_id_x into (16)
 // CHECK-DAG: %[[EXTRACT0:.+]] = vector.extract %[[THREAD_RED4]][0] : vector<1x1xf32> from vector<2x1x1xf32>
