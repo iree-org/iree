@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -3208,8 +3209,13 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The transform dialect codegen has differnet logics and codegen flow.
   // Ignore the tile sizes adjustment.
+  // TODO(#21297): Fix the propagation logic and use the upcoming
+  // IREE::CPU::LoweringCongigAttr for mmt4d pipelines. The current workaround
+  // is mainly to by pass existing complicated logic which makes the migration
+  // easier.
   auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
-  if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
+  if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen &&
+      pipeline != DispatchLoweringPassPipeline::Mmt4dTilingExpert) {
     if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
       return failure();
     }
