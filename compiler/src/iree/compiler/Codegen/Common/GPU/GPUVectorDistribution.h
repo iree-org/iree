@@ -51,9 +51,10 @@ protected:
   // When "vector layout storage" and "vector layout redistribution"
   // is defined, VectorDistributionRewriter would add it to worklist
   // of operations to be distributed.
-  void setSignatureForRedistribution(PatternRewriter &rewriter, Operation *op,
-                                     Attribute inputLayoutsAttr,
-                                     Attribute outputLayoutsAttr) const;
+  void setSignatureForRedistribution(
+      RewriterBase &rewriter, Operation *op,
+      ArrayRef<VectorLayoutInterface> inputLayouts,
+      ArrayRef<VectorLayoutInterface> outputLayouts) const;
 
   LogicalResult replaceParentMask(PatternRewriter &rewriter,
                                   vector::MaskOp) const;
