@@ -243,15 +243,11 @@ static std::optional<GPUMMASchedule> getScaledMmaScheduleFromProblemAndTarget(
     if (smma.getSubgroupSize() != targetSubgroupSize)
       continue;
 
-    SmallVector<VectorType> preThreadTypes;
-    smma.getUndistributedTileTypes(preThreadTypes);
-    ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
-    llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
+    auto [m, n, k] = smma.getScaledMNKShape();
     SmallVector<Type> elementTypes;
     smma.getElementTypes(elementTypes);
-    intrinsics.emplace_back(accShape[0], accShape[1], lhsShape[1],
-                            elementTypes[0], elementTypes[2], elementTypes[4],
-                            smma);
+    intrinsics.emplace_back(m, n, k, elementTypes[0], elementTypes[2],
+                            elementTypes[4], smma);
   }
   if (intrinsics.empty())
     return std::nullopt;
@@ -530,6 +526,7 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   SmallVector<unsigned, 2> contractionM = scaledContractionDims.value().m;
   SmallVector<unsigned, 2> contractionN = scaledContractionDims.value().n;
   SmallVector<unsigned, 2> contractionK = scaledContractionDims.value().k;
+  SmallVector<unsigned, 2> contractionKB = scaledContractionDims.value().kB;
   SmallVector<unsigned, 2> contractionB = scaledContractionDims.value().batch;
 
   if (contractionK.empty() || contractionM.empty() || contractionN.empty()) {
@@ -552,7 +549,7 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
   // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
   // computing an MMA schedule.
-  SmallVector<int64_t> mDims, nDims, kDims, batchDims;
+  SmallVector<int64_t> mDims, nDims, kDims, kBDims, batchDims;
   for (int64_t mDim : contractionM) {
     if (ShapedType::isDynamic(bounds[mDim])) {
       canSupportUnaligned = false;
@@ -567,13 +564,26 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     }
     nDims.push_back(nDim);
   }
+  llvm::errs() << "These are the kDims: \n ";
   for (int64_t kDim : contractionK) {
     if (ShapedType::isDynamic(bounds[kDim])) {
       canSupportUnaligned = false;
       continue;
     }
+    llvm::errs() << kDim << ", ";
     kDims.push_back(kDim);
   }
+  llvm::errs() << "\n";
+  llvm::errs() << "These are the kBDim: \n ";
+  for (int64_t kBDim : contractionKB) {
+    if (ShapedType::isDynamic(bounds[kBDim])) {
+      canSupportUnaligned = false;
+      continue;
+    }
+    llvm::errs() << kBDim << ", ";
+    kBDims.push_back(kBDim);
+  }
+  llvm::errs() << "\n";
   for (int64_t batchDim : contractionB) {
     if (ShapedType::isDynamic(bounds[batchDim])) {
       canSupportUnaligned = false;
@@ -708,16 +718,39 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
     GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+    
+    llvm::errs() << "This is the workgroup tile sizes\n";
+    for (auto a : workgroupTileSizes) {
+      llvm::errs() << a << ", ";
+    }
+    llvm::errs() << "\n";
+
+    for (auto a : reductionTileSizes) {
+      llvm::errs() << a << ", ";
+    }
+    llvm::errs() << "\n";
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
     for (int64_t kDim : kDims) {
+      llvm::errs() << kDim <<  ", ";
       paddingTileSizes[kDim] = reductionTileSizes[kDim];
     }
+    llvm::errs() << "\n";
 
     int64_t innerKDim = contractionK.back();
-    int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
+    int64_t innerKBDim = contractionKB.back();
+    for (auto k : contractionK) {
+      llvm::errs() << k << " - ";
+    }
+    llvm::errs() << "\n";
+    int64_t blockSize = mmaKind.getBlockSize();
+    int64_t kPackFactor = std::get<2>(mmaKind.getScaledMNKShape()) / blockSize;
+    llvm::errs() << "kPackFactor " << kPackFactor << "\n";
+    llvm::errs() << "blockSize " << blockSize << "\n";
+    llvm::errs() << "blockSize " << innerKBDim << "\n";
     paddingTileSizes[innerKDim] *= kPackFactor;
+    paddingTileSizes[innerKBDim] = blockSize;
 
     attrs.emplace_back(StringAttr::get(context, "padding"),
                        b.getI64ArrayAttr(paddingTileSizes));

@@ -201,6 +201,12 @@ static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
 
 static bool countsMatchTileTypes(ArrayRef<int64_t> innerElemCounts,
                                  ArrayRef<VectorType> tileTypes) {
+  for (auto a : innerElemCounts) {
+    llvm::errs() << a << "\n";
+  }
+  for (auto a : tileTypes) {
+    llvm::errs() << a << "\n";
+  }
   return llvm::all_of_zip(
       innerElemCounts, tileTypes,
       [](int64_t ec, VectorType tt) { return ec == tt.getNumElements(); });
@@ -213,6 +219,10 @@ static SmallVector<int64_t> getInnerElemCounts(InnerTiledOp tiledOp) {
            tiledOp.getOperandTypes(),
            tiledOp.getIndexingMapsAttr().getAsValueRange<AffineMapAttr>())) {
     ArrayRef<int64_t> shape = cast<ShapedType>(opType).getShape();
+    llvm::errs() << "[DEBUG] - What is going on here\n";
+    llvm::errs() << opType << "\n";
+    llvm::errs() << map << "\n";
+    llvm::errs() << map.getNumResults() << "\n";
     result.push_back(multiplyAcc(shape.drop_front(map.getNumResults())));
   }
   return result;

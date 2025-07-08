@@ -1178,6 +1178,9 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 FailureOr<Operation *>
 distributeInnerTiledOp(RewriterBase &rewriter,
                        IREE::Codegen::InnerTiledOp tiledOp) {
+  tiledOp.print(llvm::errs()), llvm::errs() << "\n";
+  llvm::errs() << tiledOp.hasTensorSemantics() << "\n";
+  llvm::errs() << tiledOp.hasThreadSemantics() << "\n";
   if (!tiledOp.hasTensorSemantics() || tiledOp.hasThreadSemantics()) {
     return rewriter.notifyMatchFailure(
         tiledOp, "tiledOp must have vector and subgroup for distribution.");
