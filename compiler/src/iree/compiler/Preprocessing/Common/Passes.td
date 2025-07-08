@@ -159,9 +159,6 @@ def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
            )}]>
   ];
   let dependentDialects = [
-    // TODO(hanchung): Remove the dep after switching upstream patterns to not
-    // use bufferization::hasTensorSemantics method.
-    "mlir::bufferization::BufferizationDialect",
     "mlir::linalg::LinalgDialect",
   ];
 }
