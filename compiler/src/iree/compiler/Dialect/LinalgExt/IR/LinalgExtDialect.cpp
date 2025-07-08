@@ -74,3 +74,15 @@ void IREELinalgExtDialect::initialize() {
 }
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"
+
+//===---------------------------------------------------------------------===//
+// iree_linalg_ext.split_reduction_mapping
+//===---------------------------------------------------------------------===//
+
+int64_t SplitReductionMappingAttr::getMappingId() const { return 0; }
+
+bool SplitReductionMappingAttr::isLinearMapping() const { return false; }
+
+int64_t SplitReductionMappingAttr::getRelativeIndex() const {
+  return getMappingId();
+}
