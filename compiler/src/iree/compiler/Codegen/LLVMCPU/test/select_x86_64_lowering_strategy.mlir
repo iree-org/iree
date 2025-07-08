@@ -1607,6 +1607,8 @@ func.func @mmt4d_with_large_reduction() attributes {hal.executable.target = #exe
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 0, 0, 0, 0], [1, 1, 0, 2, 16, 0], [0, 0, 1, 0, 0, 1]]>
 //      CHECK: func.func @mmt4d_with_large_reduction()
+//      CHECK:   linalg.fill
+//  CHECK-NOT:     lowering_config
 //      CHECK:   linalg.mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
