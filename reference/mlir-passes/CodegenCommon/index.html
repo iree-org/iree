@@ -2902,6 +2902,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-debug-patch-func-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-debug-patch-func-ops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-decompose-affine-ops" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-decompose-affine-ops
@@ -5774,6 +5783,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-debug-patch-func-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-debug-patch-func-ops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-decompose-affine-ops" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-decompose-affine-ops
@@ -6776,6 +6794,15 @@ comprehensive bufferization pass.</p>
 </code></pre></div>
 <h3 id="-iree-codegen-convolution-to-igemm"><code>-iree-codegen-convolution-to-igemm</code><a class="headerlink" href="#-iree-codegen-convolution-to-igemm" title="Permanent link">link</a></h3>
 <p><em>Transforms convolution operations into an implicit GEMM format.</em></p>
+<h3 id="-iree-codegen-debug-patch-func-ops"><code>-iree-codegen-debug-patch-func-ops</code><a class="headerlink" href="#-iree-codegen-debug-patch-func-ops" title="Permanent link">link</a></h3>
+<p><em>A debugging pass for patching func ops with external func ops</em></p>
+<p>Pass to replace func ops if they matches the provided func op names. It is
+useful when you know what the intermediate IR is, since you can patch the
+func op without modifying any transformation code.</p>
+<p>If the pass is not run at ModuleOp scope, it will track the parent chain to
+find the first ModuleOp and apply patches.</p>
+<p>NOTE: This is for debugging purpose. You should not rely on the pass in
+      default pipelines.</p>
 <h3 id="-iree-codegen-decompose-affine-ops"><code>-iree-codegen-decompose-affine-ops</code><a class="headerlink" href="#-iree-codegen-decompose-affine-ops" title="Permanent link">link</a></h3>
 <p><em>Decompose <code>affine.apply</code> operations into sub <code>affine.apply</code></em></p>
 <p>Decompose <code>affine.apply</code> operations into sub <code>affine.apply</code> where each
