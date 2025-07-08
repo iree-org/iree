@@ -4,12 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cassert>
+#include <queue>
+
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -31,6 +37,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-hoist-encoding-ops"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
@@ -135,6 +143,26 @@ static LogicalResult bubbleUpSetEncoding(RewriterBase &rewriter,
   return bubbleUpSetEncodingThroughGenericOp(rewriter, setEncoding, producer);
 }
 
+/// Returns true if the op is hoistable outside dispatches, which indicates that
+/// the ops can be either mappable to Flow ops or get hoisted to globals.
+static bool isHoistableOp(Operation *op) {
+  if (auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
+    SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+    SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
+    ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
+    return IREE::Flow::isOffsetSizeAndStrideMappableToFlow(offsets, sizes,
+                                                           strides, srcShape);
+  }
+  // ConstExprHoistingPolicy has an assumption that any root op is not hoistable
+  // because they are already hoisted. This is not the case when the parent op
+  // is a constant-like op, so we have a special rule here.
+  if (op->hasTrait<OpTrait::ConstantLike>()) {
+    return true;
+  }
+  return false;
+}
+
 namespace {
 /// Pass declaration.
 struct HoistEncodingOpsPass
@@ -176,19 +204,26 @@ struct BubbleUpSetEncodingOp
 /// Create dispatch.region Ops based on a fusion heuristic.
 void HoistEncodingOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  ModuleOp moduleOp = getOperation();
 
   RewritePatternSet bubblingPatterns(ctx);
   bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
   GreedyRewriteConfig config;
   config.enableConstantCSE(false);
-  if (failed(
-          applyPatternsGreedily(funcOp, std::move(bubblingPatterns), config))) {
+  if (failed(applyPatternsGreedily(moduleOp, std::move(bubblingPatterns),
+                                   config))) {
     return signalPassFailure();
   }
 
-  SmallVector<IREE::Encoding::SetEncodingOp> candidates;
-  funcOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
+  const auto &constExprs = getAnalysis<IREE::Util::ConstExprAnalysis>();
+  IREE::Util::ConstExprHoistingPolicy policy(constExprs, /*threshold=*/0);
+  policy.initialize();
+
+  // Each element indicates ops that are expected to be hoisted. It is valid to
+  // follow the order in the vector to hoist the ops. The last operation is
+  // expected to be the corresponding SetEncoding op.
+  SmallVector<SmallVector<Operation *>> candidates;
+  moduleOp->walk([&](IREE::Encoding::SetEncodingOp setEncodingOp) {
     if (!setEncodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
       return;
     }
@@ -197,35 +232,65 @@ void HoistEncodingOpsPass::runOnOperation() {
     if (isa_and_nonnull<IREE::Encoding::PaddingAttr>(encoding)) {
       return;
     }
-    Operation *src = setEncodingOp.getSource().getDefiningOp();
-    if (!hoistEncodingsForConstExpr && src &&
-        (isa<IREE::Util::GlobalLoadOp>(src) ||
-         src->hasTrait<OpTrait::ConstantLike>())) {
+
+    bool isHoistable = true;
+    SetVector<Operation *> opsWithinDispatch, seen;
+    std::queue<Operation *> worklist;
+    worklist.push(setEncodingOp);
+    seen.insert(setEncodingOp);
+    while (!worklist.empty()) {
+      Operation *op = worklist.front();
+      worklist.pop();
+      opsWithinDispatch.insert(op);
+      for (auto input : op->getOperands()) {
+        auto inputOp = input.getDefiningOp();
+        if (inputOp &&
+            inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
+            !seen.contains(inputOp)) {
+          if (!isHoistableOp(inputOp)) {
+            isHoistable = false;
+          }
+          worklist.push(inputOp);
+          seen.insert(inputOp);
+        }
+      }
+    }
+    if (isHoistable) {
+      candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
       return;
     }
-    candidates.push_back(setEncodingOp);
-  });
-  IRRewriter rewriter(ctx);
-  for (auto setEncodingOp : candidates) {
-    // TODO: Hoist the entire slice of IR up to the root if there is a ConstExpr
-    // root op.
-    Operation *src = setEncodingOp.getSource().getDefiningOp();
-    if (src && src->hasTrait<OpTrait::ConstantLike>() &&
-        src->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
-        failed(IREE::Flow::hoistOutOfDispatch(rewriter, src))) {
-      src->emitOpError("failed to hoist the source out of dispatch");
-      return signalPassFailure();
+
+    // The ops are hoistable if they are const-exprs.
+    const IREE::Util::ConstExprAnalysis::ConstValueInfo *constInfo =
+        constExprs.lookup(setEncodingOp.getSource());
+    if (!constInfo) {
+      LDBG("Non-hoistable op (failed to get constInfo): " << setEncodingOp);
+      return;
     }
-    if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, setEncodingOp))) {
-      setEncodingOp.emitOpError("failed to hoist the op out of dispatch");
-      return signalPassFailure();
+    if (policy.getDecision(constInfo)->getOutcome() ==
+        IREE::Util::ConstExprHoistingPolicy::ENABLE_HOIST) {
+      candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
+      return;
+    }
+    LDBG("Non-hoistable op: " << setEncodingOp);
+  });
+
+  IRRewriter rewriter(ctx);
+  for (ArrayRef<Operation *> hoistableOps : candidates) {
+    LDBG("Hoisting the ops for " << *hoistableOps.back());
+    for (Operation *op : hoistableOps) {
+      if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, op))) {
+        op->emitOpError("failed to hoist the op out of dispatch");
+        return signalPassFailure();
+      }
     }
   }
 
   RewritePatternSet cleanPatterns(ctx);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanPatterns);
   IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(cleanPatterns, ctx);
-  if (failed(applyPatternsGreedily(funcOp, std::move(cleanPatterns), config))) {
+  if (failed(
+          applyPatternsGreedily(moduleOp, std::move(cleanPatterns), config))) {
     return signalPassFailure();
   }
 }
