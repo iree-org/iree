@@ -23,7 +23,9 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 llvm::cl::opt<std::string> clCodegenPatchedFuncOpsFileName(
-    "iree-codegen-debug-patched-func-ops-file-name", llvm::cl::desc("TBD"),
+    "iree-codegen-debug-patched-func-ops-file-name",
+    llvm::cl::desc("File path to a module containing func ops that will be "
+                   "used for patching existing func ops."),
     llvm::cl::init(""));
 
 static LogicalResult getMatchedFuncOp(StringRef fileName,
