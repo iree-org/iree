@@ -19,10 +19,12 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -124,7 +126,21 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::PackOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
-    linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
+    linalg::populateFoldIntoPackAndUnpackPatterns(
+        patterns, [](OpOperand *opOperand) {
+          Operation *producer = opOperand->get().getDefiningOp();
+          Operation *consumer = opOperand->getOwner();
+          // If we have a pack/unpack consumer and a producer that has multiple
+          // uses, this _probably_ means the producer won't get dce'd. If that
+          // is the case, by folding the consumer pack/unpack, we break the
+          // producer consumer chain between them and inhibit fusion later in
+          // the pipeline.
+          if (isa<linalg::PackOp, linalg::UnPackOp>(consumer) &&
+              isa_and_nonnull<TilingInterface>(producer) &&
+              !producer->hasOneUse())
+            return false;
+          return true;
+        });
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
