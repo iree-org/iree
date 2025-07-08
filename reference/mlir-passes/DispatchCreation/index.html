@@ -2877,21 +2877,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-dispatch-creation-hoist-encoding-ops">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -2932,7 +2917,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_8" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2974,7 +2959,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_8" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5228,21 +5213,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-dispatch-creation-hoist-encoding-ops">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -5283,7 +5253,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_8" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5325,7 +5295,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_8" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5474,9 +5444,6 @@ num-size-3-groups : Number of fusion groups of size 3
 <p><em>Run useful preprocessing patterns that help with fusion.</em></p>
 <h3 id="-iree-dispatch-creation-hoist-encoding-ops"><code>-iree-dispatch-creation-hoist-encoding-ops</code><a class="headerlink" href="#-iree-dispatch-creation-hoist-encoding-ops" title="Permanent link">link</a></h3>
 <p><em>Hoists tensor encoding ops out of flow dispatch regions.</em></p>
-<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-hoist-encodings-for-constexpr : Enable the hoisting when the source is a ConstExpr.
-</code></pre></div>
 <h3 id="-iree-dispatch-creation-hoist-uniform-scalar-compute"><code>-iree-dispatch-creation-hoist-uniform-scalar-compute</code><a class="headerlink" href="#-iree-dispatch-creation-hoist-uniform-scalar-compute" title="Permanent link">link</a></h3>
 <p><em>Hoists scalar (computation) out of dispatch regions.</em></p>
 <h3 id="-iree-dispatch-creation-materialize-default-workgroup-count-region"><code>-iree-dispatch-creation-materialize-default-workgroup-count-region</code><a class="headerlink" href="#-iree-dispatch-creation-materialize-default-workgroup-count-region" title="Permanent link">link</a></h3>
@@ -5486,7 +5453,7 @@ num-size-3-groups : Number of fusion groups of size 3
 <p><em>Propagate encodings across other operations.</em></p>
 <h3 id="-iree-dispatch-creation-set-encoding"><code>-iree-dispatch-creation-set-encoding</code><a class="headerlink" href="#-iree-dispatch-creation-set-encoding" title="Permanent link">link</a></h3>
 <p><em>Introduces tensor encoding for flow dispatch regions.</em></p>
-<h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
+<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-encoding-option : Select the type of encoding options to add.
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-sink-reshapes"><code>-iree-dispatch-creation-sink-reshapes</code><a class="headerlink" href="#-iree-dispatch-creation-sink-reshapes" title="Permanent link">link</a></h3>
@@ -5495,7 +5462,7 @@ num-size-3-groups : Number of fusion groups of size 3
 <p><em>Split reduction dimension to increase parallelism.</em></p>
 <h3 id="-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice"><code>-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice</code><a class="headerlink" href="#-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice" title="Permanent link">link</a></h3>
 <p><em>Convert tensor.pad into linalg.fill + tensor.insert_slice.</em></p>
-<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
+<h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-skip-one-linalg-use-case : Skip the op that has only one use which is usedby a Linalg op
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-transpose-generic-ops"><code>-iree-dispatch-creation-transpose-generic-ops</code><a class="headerlink" href="#-iree-dispatch-creation-transpose-generic-ops" title="Permanent link">link</a></h3>
