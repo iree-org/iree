@@ -32,6 +32,10 @@ struct FormSplitReductionDispatchesPass final
           FormSplitReductionDispatchesPass> {
   using Base::Base;
   void runOnOperation() override;
+
+private:
+  std::optional<SmallVector<OpFoldResult>>
+  getUserSpecifiedTileSize(PartialReductionOpInterface op) const;
 };
 } // namespace
 
@@ -47,7 +51,7 @@ static SmallVector<unsigned> getReductionDims(TilingInterface op) {
 
 static FailureOr<IREE::Flow::DispatchRegionOp>
 tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
-                        OpFoldResult splitSize) {
+                        ArrayRef<OpFoldResult> splitSize) {
   IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
@@ -59,11 +63,12 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   // Set tile sizes.
   SmallVector<OpFoldResult> tileSizes;
   auto zeroAttr = rewriter.getIndexAttr(0);
+  int splitSizeIndex = 0;
   for (utils::IteratorType iteratorType : op.getLoopIteratorTypes()) {
     if (iteratorType == utils::IteratorType::parallel) {
       tileSizes.push_back(zeroAttr);
     } else {
-      tileSizes.push_back(splitSize);
+      tileSizes.push_back(splitSize[splitSizeIndex++]);
     }
   }
   options.setTileSizes(tileSizes);
@@ -116,25 +121,65 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   return maybeRegionOp.value();
 }
 
+std::optional<SmallVector<OpFoldResult>>
+FormSplitReductionDispatchesPass::getUserSpecifiedTileSize(
+    PartialReductionOpInterface op) const {
+  {
+    // First preference given to attribute set on the op.
+    std::optional<SmallVector<int64_t>> attributeTileSize =
+        IREE::LinalgExt::getSplitReductionSizes(op);
+    if (attributeTileSize) {
+      MLIRContext *context = op->getContext();
+      return getAsIndexOpFoldResult(context, attributeTileSize.value());
+    }
+  }
+
+  // Use the pass option as the next lever. This is mostly used for testing.
+  if (!splitSize.empty()) {
+    unsigned numReduction = llvm::count_if(
+        op.getLoopIteratorTypes(), [](utils::IteratorType iteratorType) {
+          return iteratorType == utils::IteratorType::reduction;
+        });
+    if (numReduction == 0) {
+      return std::nullopt;
+    }
+    SmallVector<int64_t> tileSizes(numReduction, 0);
+    for (auto [index, tileSize] : llvm::enumerate(llvm::reverse(splitSize))) {
+      tileSizes[numReduction - 1 - index] = tileSize;
+    }
+    MLIRContext *context = op->getContext();
+    return getAsIndexOpFoldResult(context, tileSizes);
+  }
+
+  // Default.
+  return std::nullopt;
+}
+
 void FormSplitReductionDispatchesPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
 
-  SmallVector<TilingInterface> reductionOps;
-  funcOp.walk([&](TilingInterface tilingOp) {
-    // TODO: implement better selection.
-    if (llvm::is_contained(tilingOp.getLoopIteratorTypes(),
-                           utils::IteratorType::reduction)) {
-      reductionOps.push_back(tilingOp);
+  SmallVector<std::pair<PartialReductionOpInterface, SmallVector<OpFoldResult>>>
+      reductionOps;
+  funcOp.walk([&](PartialReductionOpInterface tilingOp) {
+    std::optional<SmallVector<OpFoldResult>> tileSizes =
+        getUserSpecifiedTileSize(tilingOp);
+    if (!tileSizes) {
+      return;
     }
+    reductionOps.emplace_back(tilingOp, std::move(tileSizes.value()));
   });
 
+  if (reductionOps.empty()) {
+    // Nothing to do.
+    return;
+  }
+
   SmallVector<IREE::Flow::DispatchRegionOp> splitReductionDispatches;
-  for (TilingInterface op : reductionOps) {
+  for (auto [op, tileSizes] : reductionOps) {
     FailureOr<IREE::Flow::DispatchRegionOp> formedDispatch =
-        tileOpAndWrapInDispatch(rewriter, op,
-                                rewriter.getIndexAttr(splitSize.getValue()));
+        tileOpAndWrapInDispatch(rewriter, op, tileSizes);
     if (failed(formedDispatch)) {
       op->emitOpError("failed to form split reduction dispatch");
       return signalPassFailure();

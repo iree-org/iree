@@ -78,6 +78,7 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir",
+        "split_reduction_using_tiling.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
@@ -135,6 +136,25 @@ iree_check_single_backend_test_suite(
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_hip",
+    srcs = [
+        "split_reduction_using_tiling.mlir",
+    ],
+    compiler_flags = [
+        "--iree-opt-level=O3",
+    ],
+    driver = "hip",
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-amd",
+    ],
+    target_backend = "rocm",
 )
 
 iree_check_single_backend_test_suite(

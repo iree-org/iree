@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -564,7 +565,9 @@ class CheckModuleState final {
         os << " Contents does not match to tolerance parameters atol=" << atol
            << ", rtol=" << rtol << ". The first failure occurs at index "
            << diagnostic.index << " as the lhs value " << diagnostic.lhs_value
-           << " differs from the rhs value " << diagnostic.rhs_value << ".";
+           << " differs from the rhs value " << diagnostic.rhs_value << " by "
+           << std::scientific << std::setprecision(3)
+           << diagnostic.rhs_value - diagnostic.lhs_value << ".";
       }
       // TODO(gcmn): Propagate original variable names.
       os << "\n"

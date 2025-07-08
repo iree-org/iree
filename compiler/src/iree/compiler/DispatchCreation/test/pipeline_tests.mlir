@@ -395,3 +395,34 @@ util.func public @collapse_dynamic_matmul(%arg0: tensor<4x?x2048xbf16>, %arg1: t
 
 //       CHECK:   %[[W:.+]] = iree_tensor_ext.dispatch.workload.ordinal %[[ARG2]], 0
 //       CHECK:   tensor.empty(%[[W]])
+
+// -----
+
+util.func @split_reduction_by_tiling(%arg0 : tensor<?x131072xf32>) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x131072xf32>
+  %empty = tensor.empty(%d0) : tensor<?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?xf32>) -> tensor<?xf32>
+  %reduce = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"],
+      iree_linalg_ext.split_reduction = [128]}
+      ins(%arg0 : tensor<?x131072xf32>) outs(%fill : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %0 = arith.addf %b0, %b1 : f32
+      linalg.yield %0 : f32
+  } -> tensor<?xf32>
+  util.return %reduce : tensor<?xf32>
+}
+// CHECK-LABEL: @split_reduction_by_tiling
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x131072xf32>
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
+//  CHECK-SAME:       [%[[D0]]](%[[ARG0]], %[[D0]])
+//       CHECK:     %[[FORALL:.+]] = scf.forall
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[FORALL]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups[%[[D0]]](%[[DISPATCH0]], %[[D0]])
+//       CHECK:   return %[[DISPATCH1]]
