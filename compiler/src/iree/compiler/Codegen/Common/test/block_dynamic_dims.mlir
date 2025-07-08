@@ -80,9 +80,10 @@ func.func @block_attention_dims() {
 //       CHECK:   %[[MASK_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(3)
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
+//       CHECK:   %[[M_DYNAMIC2:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[M]]]
 //       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(4)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC2]]}
 //       CHECK:   %[[Q:.+]] = iree_tensor_ext.dispatch.tensor.load %[[Q_BINDING]]
 //  CHECK-SAME:       sizes = [4, %[[M_DYNAMIC]], 16, 32, 128]
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
@@ -342,14 +343,14 @@ func.func @fold_reshapes_with_bindings() {
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%[[DIM:.+]]}
 //       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(1)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM2:.+]]}
 //       CHECK:   %[[INPUT_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_BINDING]]
 //  CHECK-SAME:       sizes = [%[[DIM]]]
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%[[DIM]]}
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?xf32>)
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM2]]}
 
 // -----
 
