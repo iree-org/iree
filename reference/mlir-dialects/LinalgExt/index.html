@@ -2095,6 +2095,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#splitreductionmappingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SplitReductionMappingAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5117,6 +5126,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#splitreductionmappingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SplitReductionMappingAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5229,6 +5247,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 </li>
 <li><a href="#attributes_16">Attributes</a><ul>
 <li><a href="#iteratortypeattr">IteratorTypeAttr</a></li>
+<li><a href="#splitreductionmappingattr">SplitReductionMappingAttr</a></li>
 </ul>
 </li>
 <li><a href="#enums">Enums</a><ul>
@@ -6651,6 +6670,12 @@ only the non-padded part of the output.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="splitreductionmappingattr">SplitReductionMappingAttr<a class="headerlink" href="#splitreductionmappingattr" title="Permanent link">link</a></h3>
+<p>Syntax: <code>#iree_linalg_ext.split_reduction_mapping</code></p>
+<p>Mapping attribute to indicate distribution for split-reduction.</p>
+<p>This attribute indicates that the <code>scf.forall</code> represent parallel partial
+reductions generated through the use of
+<code>ReductionTilingStrategy::PartialReductionOuterParallel</code>.</p>
 <h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
 <h3 id="iteratortype">IteratorType<a class="headerlink" href="#iteratortype" title="Permanent link">link</a></h3>
 <p><em>Iterator type</em></p>
