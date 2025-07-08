@@ -41,8 +41,7 @@ void DropVectorUnitDimsPass::runOnOperation() {
 
   RewritePatternSet patterns(ctx);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
-      patterns);
+  vector::populateDropInnerMostUnitDimsXferOpPatterns(patterns);
   vector::populateVectorTransferDropUnitDimsPatterns(patterns);
   vector::populateDropUnitDimWithShapeCastPatterns(patterns);
   vector::InsertOp::getCanonicalizationPatterns(patterns, ctx);

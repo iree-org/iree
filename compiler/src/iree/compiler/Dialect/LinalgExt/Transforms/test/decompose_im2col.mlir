@@ -108,7 +108,7 @@ module {
   }
 }
 //   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0)[s0] -> (d0 * 4 + s0 * 4)
-//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s0 + d1 + s1 * s0 + s2)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s0 + s0 * s1 + d1 + s2)>
 //   CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
 // CHECK-LABEL: func.func @im2col_expanded
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]
