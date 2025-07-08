@@ -1,5 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-hoist-encoding-ops))" --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-hoist-encoding-ops{hoist-encodings-for-constexpr=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-CONST
+// RUN: iree-opt --iree-dispatch-creation-hoist-encoding-ops --split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -148,7 +147,7 @@ util.func public @bubble_through_broadcast(
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
 module {
-  util.func public @hoist_below(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
+  util.func public @no_hoist_if_source_is_compute_op(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %0 = flow.dispatch.region -> (tensor<2x11008x128xf32, #encoding>) {
       %1 = tensor.empty() : tensor<2x11008x128xf32>
       %2 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg0 : tensor<2x11008x128xf32>, tensor<2x11008x128xf32>) outs(%1 : tensor<2x11008x128xf32>) {
@@ -163,52 +162,15 @@ module {
   }
 }
 
-// CHECK-LABEL: @hoist_below
+// CHECK-LABEL: @no_hoist_if_source_is_compute_op
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xf32>
 // CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region
 // CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<2x11008x128xf32>
 // CHECK:         %[[ADD:.+]] = linalg.generic {{.*}} ins(%[[ARG0]], %[[ARG0]] : {{.*}} outs(%[[INIT]] :
-// CHECK:         flow.return %[[ADD]]
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ADD]]
+// CHECK:         flow.return %[[SET_ENCODING]]
 // CHECK:       }
-// CHECK:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]]
-// CHECK:       util.return %[[SET_ENCODING]]
-
-// -----
-
-#map = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
-#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
-module {
-  util.func public @hoist_dynamic(%arg0: tensor<?x?x?xf32>, %d0: index, %d1: index, %d2: index) -> (tensor<?x?x?xf32>, tensor<?x?x?xf32, #encoding>) {
-    %0:2 = flow.dispatch.region -> (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<?x?x?xf32, #encoding>{%d0, %d1, %d2}) {
-      %1 = tensor.empty(%d0, %d1, %d2) : tensor<?x?x?xf32>
-      %2 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg0 : tensor<?x?x?xf32>, tensor<?x?x?xf32>) outs(%1 : tensor<?x?x?xf32>) {
-      ^bb0(%in: f32, %in_0: f32, %out: f32):
-        %4 = arith.addf %in, %in_0 : f32
-        linalg.yield %4 : f32
-      } -> tensor<?x?x?xf32>
-      %3 = iree_encoding.set_encoding %2 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #encoding>
-      flow.return %2, %3 : tensor<?x?x?xf32>, tensor<?x?x?xf32, #encoding>
-    }
-    util.return %0#0, %0#1 : tensor<?x?x?xf32>, tensor<?x?x?xf32, #encoding>
-  }
-}
-// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
-// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
-// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>
-// CHECK-LABEL: @hoist_dynamic
-// CHECK-SAME:    %[[ARG0:.+]]: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
-// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32>{%[[D0]], %[[D1]], %[[D2]]})
-// CHECK:         %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]], %[[D2]]) : tensor<?x?x?xf32>
-// CHECK:         %[[ADD:.+]] = linalg.generic {{.*}} ins(%[[ARG0]], %[[ARG0]] : {{.*}} outs(%[[INIT]] :
-// CHECK:         flow.return %[[ADD]]
-// CHECK:       }
-// CHECK:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #[[$ENCODING]]>
-// CHECK:       util.return %[[DISPATCH]], %[[SET_ENCODING]]
+// CHECK:       util.return %[[DISPATCH]]
 
 // -----
 
@@ -230,29 +192,50 @@ util.func public @hoist_both_src_and_encoding() -> tensor<640x320xf32> {
 
 // -----
 
-// It tests that the constant-like source is already outside the region, and the
-// hoisting does not happen to it. Otherwise, it crashes.
+// It tests that the constant-like ops within the dispatch are hoisted out.
 
 #encoding = #iree_encoding.testing<>
+util.global private @weight : tensor<640x320xf32>
 util.func private @get_tensor(tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
-util.func public @hoist_encoding_only() -> tensor<640x320xf32> {
-  %cst = arith.constant dense<1.0> : tensor<640x320xf32>
+util.func public @hoist_encoding_const_exprs() -> tensor<640x320xf32> {
+  %init = tensor.empty() : tensor<640x320xf32>
   %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
-    %1 = iree_encoding.set_encoding %cst : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
-    %2 = util.call @get_tensor(%1) : (tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
-    flow.return %2 : tensor<640x320xf32>
+    %input = util.global.load @weight : tensor<640x320xf32>
+    %1 = linalg.elementwise kind=#linalg.elementwise_kind<exp>
+      ins(%input: tensor<640x320xf32>)
+      outs(%init: tensor<640x320xf32>)
+      -> tensor<640x320xf32>
+    %2 = iree_encoding.set_encoding %1 : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
+    %3 = util.call @get_tensor(%2) : (tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+    flow.return %3 : tensor<640x320xf32>
   }
   util.return %0 : tensor<640x320xf32>
 }
-// CHECK-LABEL: util.func public @hoist_encoding_only(
-// CHECK:         %[[CST:.+]] = arith.constant
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+
+// CHECK-LABEL: util.func public @hoist_encoding_const_exprs(
+// CHECK:         %[[LOAD:.+]] = util.global.load
+// CHECK:         %[[SRC:.+]] = linalg.elementwise
+// CHECK-SAME:      ins(%[[LOAD]]
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
 // CHECK:         flow.dispatch.region
 
-// NO-CONST-LABEL: util.func public @hoist_encoding_only(
-// NO-CONST:         %[[CST:.+]] = arith.constant
-// NO-CONST:         flow.dispatch.region
-// NO-CONST:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CST]]
+// -----
+
+#encoding = #iree_encoding.testing<>
+util.func private @get_tensor(tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+util.func public @hoist_convertable_slice_op(%input: tensor<1024x320xf32>) -> tensor<640x320xf32> {
+  %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
+    %1 = tensor.extract_slice %input[7, 0] [640, 320] [1, 1] : tensor<1024x320xf32> to tensor<640x320xf32>
+    %2 = iree_encoding.set_encoding %1 : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
+    %3 = util.call @get_tensor(%2) : (tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
+    flow.return %3 : tensor<640x320xf32>
+  }
+  util.return %0 : tensor<640x320xf32>
+}
+// CHECK-LABEL: util.func public @hoist_convertable_slice_op(
+// CHECK:         %[[SRC:.+]] = tensor.extract_slice
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
+// CHECK:         flow.dispatch.region
 
 // -----
 

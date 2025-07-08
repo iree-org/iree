@@ -92,6 +92,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
