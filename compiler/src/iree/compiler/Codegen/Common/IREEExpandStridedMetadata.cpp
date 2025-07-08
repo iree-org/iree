@@ -284,7 +284,6 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
   RewritePatternSet patterns(context);
   populateIREEResolveExtractStridedMetadataPatterns(patterns,
                                                     allowSubviewExpansion);
-  populateRemoveDeadMemAllocPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }

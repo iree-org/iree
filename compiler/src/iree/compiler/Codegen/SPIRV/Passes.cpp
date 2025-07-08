@@ -220,7 +220,8 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
   modulePassManager.addPass(createFlattenMemRefSubspanPass());
 
   FunctionLikeNest(modulePassManager)
-      .addPass(createSPIRVEraseStorageBufferStaticShapePass);
+      .addPass(createSPIRVEraseStorageBufferStaticShapePass)
+      .addPass(createCSEPass);
 }
 
 /// Adds passes to perform the final SPIR-V conversion.

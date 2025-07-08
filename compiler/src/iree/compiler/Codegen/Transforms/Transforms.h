@@ -99,9 +99,6 @@ using GetMinMaxExprFn =
 /// single iteration loops based on the range returned ValueBoundsOpInterface.
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns);
 
-/// Populate patterns that remove dead allocations
-void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
-
 // Group of Alloc operations that have overlapping liveranges.
 using AliasGroup = SmallVector<Operation *>;
 

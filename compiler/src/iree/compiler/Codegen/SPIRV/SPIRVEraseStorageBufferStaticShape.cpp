@@ -119,14 +119,6 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
     replaceMemrefUsesAndPropagateType(rewriter, subspanOp.getLoc(), subspanOp,
                                       newSubspanOp);
   }
-
-  {
-    RewritePatternSet patterns(&getContext());
-    populateRemoveDeadMemAllocPatterns(patterns);
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
 }
 
 } // namespace mlir::iree_compiler
