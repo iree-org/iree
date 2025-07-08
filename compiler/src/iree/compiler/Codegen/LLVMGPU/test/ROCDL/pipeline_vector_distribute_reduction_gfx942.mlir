@@ -487,3 +487,95 @@ hal.executable private @matvec_fp16_unaligned {
 //      CHECK-NOT:   vector.transfer_write
 //          CHECK:   gpu.subgroup_reduce
 //          CHECK:   vector.transfer_write
+
+// -----
+
+/// Paged attention reduction distribution to multiple subgroups.
+/// Distribute 8x32 reduction dims across 4 subbroups with 2x32 threads shape per subgroup.
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64>
+#pv_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], thread_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
+#qk_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], thread_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
+#attention_lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 0, 0, 8, 0], workgroup = [1, 1, 1, 0, 0, 0, 0]}>
+
+hal.executable private @attention_4xDx1x32x128xf16 {
+  hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  // hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<MFMA_F32_16x16x16_BF16>, <MFMA_F32_32x32x8_BF16>, <MFMA_F32_16x16x32_F8E5M2FNUZ>, <MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>, <MFMA_F64_16x16x4_F64>, <MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>], subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>, iree_codegen.default_tuning_spec = #rocm.builtin.tuning_module<"iree_default_tuning_spec_gfx942.mlir">, ukernels = "none"}>) {
+    hal.executable.export public @attention_4xDx1x32x128xf16 ordinal(0) layout(#hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @attention_4xDx1x32x128xf16() attributes {translation_info = #translation} {
+        %cst = arith.constant 8.837890e-02 : f16
+        %cst_0 = arith.constant 0.000000e+00 : f16
+        %cst_1 = arith.constant 0xFC00 : f16
+        %c32 = arith.constant 32 : index
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+        %1 = arith.index_castui %0 : i32 to index
+        %2 = util.assume.int %1<umin = 1, umax = 512> : index
+        %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x1x2x1x32x128xf16>>
+        %4 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(3) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1x1x128xf16>>
+        %5 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(4) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1x1x128xf16>>
+        %6 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
+        %7 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xi64>>{%6}
+        %8 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xi64>>{%6}
+        %9 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0], sizes = [4, %6], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xi64>>{%6} -> tensor<4x?xi64>
+        %10 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [4, %6], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?xi64>>{%6} -> tensor<4x?xi64>
+        %11 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0, 0], sizes = [4, 1, 1, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1x1x128xf16>> -> tensor<4x1x1x128xf16>
+        %12 = tensor.empty() : tensor<4x1x1x128xf16>
+        %13 = tensor.empty(%6) : tensor<4x1x1x?x32xf16>
+        %14 = tensor.empty(%6) : tensor<4x?x1x32x128xf16>
+        %15 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0, 0, 0], sizes = [4096, 1, 1, 1, 32, 128], strides = [1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x1x2x1x32x128xf16>> -> tensor<4096x1x32x128xf16>
+        %16 = iree_linalg_ext.gather dimension_map = [0] ins(%15, %9 : tensor<4096x1x32x128xf16>, tensor<4x?xi64>) outs(%14 : tensor<4x?x1x32x128xf16>) -> tensor<4x?x1x32x128xf16>
+        %17 = iree_linalg_ext.gather dimension_map = [0] ins(%15, %10 : tensor<4096x1x32x128xf16>, tensor<4x?xi64>) outs(%14 : tensor<4x?x1x32x128xf16>) -> tensor<4x?x1x32x128xf16>
+        %18 = linalg.generic {
+            indexing_maps = [
+              affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+            ],
+            iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+          }
+          outs(%13 : tensor<4x1x1x?x32xf16>) {
+            ^bb0(%out: f16):
+              %20 = linalg.index 4 : index
+              %21 = linalg.index 3 : index
+              %22 = arith.muli %21, %c32 overflow<nsw> : index
+              %23 = arith.addi %20, %22 : index
+              %24 = arith.cmpi sle, %23, %c0 : index
+              %25 = arith.select %24, %cst_0, %cst_1 : f16
+            linalg.yield %25 : f16
+        } -> tensor<4x1x1x?x32xf16>
+        %19 = iree_linalg_ext.attention {
+            decomposition_config = {
+              pv_attrs = {lowering_config = #pv_attrs_config},
+              qk_attrs = {lowering_config = #qk_attrs_config}
+            },
+            indexing_maps = [
+              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
+              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
+              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d3)>,
+              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
+              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>],
+            lowering_config = #attention_lowering_config
+          }
+           ins(%11, %16, %17, %cst, %18 : tensor<4x1x1x128xf16>, tensor<4x?x1x32x128xf16>, tensor<4x?x1x32x128xf16>, f16, tensor<4x1x1x?x32xf16>)
+          outs(%12 : tensor<4x1x1x128xf16>) {
+            ^bb0(%arg0: f32):
+              iree_linalg_ext.yield %arg0 : f32
+        } -> tensor<4x1x1x128xf16>
+        iree_tensor_ext.dispatch.tensor.store %19, %5, offsets = [0, 0, 0, 0], sizes = [4, 1, 1, 128], strides = [1, 1, 1, 1] : tensor<4x1x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1x1x128xf16>>
+        return
+      }
+    }
+  }
+}
+
+//     CHECK-LABEL: func.func @attention_4xDx1x32x128xf16
+//           CHECK:   scf.forall ({{.*}}) in (4)
+//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1xf32>, vector<16x1x1x1x1x1x8x1x1xf32>) {
+//       CHECK-NOT:       gpu.subgroup_reduce
+//           CHECK:       scf.yield
+//
+// Warning: the above layout_config for vector distribution on attention goes overboard on the tail part.
+// CHECK-COUNT-390:     gpu.subgroup_reduce {{.*}} : (f32) -> f32

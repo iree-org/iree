@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
@@ -19,10 +20,14 @@ namespace {
 
 struct FoldUnitExtentDimsPass final
     : impl::FoldUnitExtentDimsPassBase<FoldUnitExtentDimsPass> {
+  using impl::FoldUnitExtentDimsPassBase<
+      FoldUnitExtentDimsPass>::FoldUnitExtentDimsPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<IREE::LinalgExt::IREELinalgExtDialect, tensor::TensorDialect>();
   }
+
   void runOnOperation() override;
 };
 
@@ -31,6 +36,13 @@ struct FoldUnitExtentDimsPass final
 void FoldUnitExtentDimsPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   linalg::ControlDropUnitDims options;
+  if (useReshapes) {
+    options.rankReductionStrategy = linalg::ControlDropUnitDims::
+        RankReductionStrategy::ReassociativeReshape;
+  } else {
+    options.rankReductionStrategy =
+        linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice;
+  }
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(patterns, options);
   walkAndApplyPatterns(getOperation(), std::move(patterns));
 }
