@@ -79,6 +79,12 @@ def IREECodegen_Dialect : Dialect {
     getOrParseTransformLibraryModule(StringRef libraryPath,
                                      StringRef libraryMLIRSource);
 
+    /// Returns the parsed module for the `path` that contains the patches for
+    /// func ops. If the module has already been parsed in the past, returns the
+    /// memorized module without parsing the source again.
+    FailureOr<::mlir::ModuleOp>
+    getOrLoadPatchedFuncOpsForDebugging(std::string path);
+
     private:
 
     /// Map containing modules containing symbols, e.g. named sequences, that
@@ -91,21 +97,27 @@ def IREECodegen_Dialect : Dialect {
     /// Lock to control the updating of the library modules such that we only load
     /// the module once and can reuse it across all invocations.
     std::mutex libraryMutex;
-  }];
-  // We use linalg.iterator_type to avoid clashing definitions for the
-  // enum attribute that wraps mlir::utils::IteratorType, so we need to be
-  // able to parse it.
-  let dependentDialects = ["::mlir::linalg::LinalgDialect"];
-  let useDefaultTypePrinterParser = 1;
-  let useDefaultAttributePrinterParser = 1;
-  let hasOperationAttrVerify = 1;
-}
 
-//===----------------------------------------------------------------------===//
-// Type definitions
-//===----------------------------------------------------------------------===//
+    /// Map containing modules that contains the patches for func ops.
+    ::llvm::StringMap<::mlir::OwningOpRef<::mlir::ModuleOp>> moduleForPatches;
 
-def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
+    /// Lock to control the parsing patches function.
+    std::mutex moduleForPatchesMutex;
+    }];
+    // We use linalg.iterator_type to avoid clashing definitions for the
+    // enum attribute that wraps mlir::utils::IteratorType, so we need to be
+    // able to parse it.
+    let dependentDialects = ["::mlir::linalg::LinalgDialect"];
+    let useDefaultTypePrinterParser = 1;
+    let useDefaultAttributePrinterParser = 1;
+    let hasOperationAttrVerify = 1;
+  }
+
+  //===----------------------------------------------------------------------===//
+  // Type definitions
+  //===----------------------------------------------------------------------===//
+
+  def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
 
 class RankedTensorOrMemRefType<list<Type> allowedTypes, list<int> ranks>
     : AnyTypeOf<[TensorRankOf<allowedTypes, ranks>,
