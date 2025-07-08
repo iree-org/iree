@@ -995,26 +995,21 @@ struct DistributeMultiReduction final
   NestedLayoutAttr
   getLayoutForReductionFromBuffer(NestedLayoutAttr srcLayout,
                                   ArrayRef<int64_t> reductionDims) const {
-    auto ceilToPowerOf2 = [](uint32_t x) {
-      return llvm::isPowerOf2_32(x) ? x : llvm::NextPowerOf2(x);
-    };
     // Create new layout where the elements of a subgroup are
     // distributed to every threads.
     IREE::VectorExt::NestedLayoutAttr bufferReduceLayout;
-    SmallVector<int64_t> subgroupTileLens =
-        llvm::to_vector(srcLayout.getSubgroupTile());
-    SmallVector<int64_t> batchTileLens =
-        llvm::to_vector(srcLayout.getBatchTile());
-    SmallVector<int64_t> outerTileLens =
-        llvm::to_vector(srcLayout.getOuterTile());
-    SmallVector<int64_t> threadTileLens =
-        llvm::to_vector(srcLayout.getThreadTile());
-    SmallVector<int64_t> elementTileLens =
-        llvm::to_vector(srcLayout.getElementTile());
-    SmallVector<int64_t> subgroupStrides =
-        llvm::to_vector(srcLayout.getSubgroupStrides());
-    SmallVector<int64_t> threadStrides =
-        llvm::to_vector(srcLayout.getThreadStrides());
+    auto subgroupTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupTile());
+    auto batchTileLens = llvm::to_vector_of<int64_t>(srcLayout.getBatchTile());
+    auto outerTileLens = llvm::to_vector_of<int64_t>(srcLayout.getOuterTile());
+    auto threadTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadTile());
+    auto elementTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getElementTile());
+    auto subgroupStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupStrides());
+    auto threadStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
 
     for (int64_t rDim : reductionDims) {
       batchTileLens[rDim] = 1;
@@ -1022,7 +1017,7 @@ struct DistributeMultiReduction final
       elementTileLens[rDim] = 1;
       threadStrides[rDim] *= subgroupStrides[rDim];
       // The size or #lanes needs to be a power of 2.
-      threadTileLens[rDim] = ceilToPowerOf2(subgroupTileLens[rDim]);
+      threadTileLens[rDim] = llvm::PowerOf2Ceil(subgroupTileLens[rDim]);
       subgroupStrides[rDim] = 1;
       subgroupTileLens[rDim] = 1;
     }
@@ -1045,20 +1040,18 @@ struct DistributeMultiReduction final
         loc, valueToWrite, buffer, indices, inBounds);
     // Set layouts signature for write.
     // We need to set the layout on the srcVector/first operand.
-    SmallVector<int64_t> subgroupTileLens =
-        llvm::to_vector(srcLayout.getSubgroupTile());
-    SmallVector<int64_t> batchTileLens =
-        llvm::to_vector(srcLayout.getBatchTile());
-    SmallVector<int64_t> outerTileLens =
-        llvm::to_vector(srcLayout.getOuterTile());
-    SmallVector<int64_t> threadTileLens =
-        llvm::to_vector(srcLayout.getThreadTile());
-    SmallVector<int64_t> elementTileLens =
-        llvm::to_vector(srcLayout.getElementTile());
-    SmallVector<int64_t> subgroupStrides =
-        llvm::to_vector(srcLayout.getSubgroupStrides());
-    SmallVector<int64_t> threadStrides =
-        llvm::to_vector(srcLayout.getThreadStrides());
+    auto subgroupTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupTile());
+    auto batchTileLens = llvm::to_vector_of<int64_t>(srcLayout.getBatchTile());
+    auto outerTileLens = llvm::to_vector_of<int64_t>(srcLayout.getOuterTile());
+    auto threadTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadTile());
+    auto elementTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getElementTile());
+    auto subgroupStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupStrides());
+    auto threadStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
     // Replace the reduced tiles with unit dimension.
     for (int64_t rDim : reductionDims) {
       batchTileLens[rDim] = 1;
@@ -1079,8 +1072,8 @@ struct DistributeMultiReduction final
       NestedLayoutAttr writeLayout, NestedLayoutAttr srcLayout,
       VectorLayoutInterface resLayout, ArrayRef<int64_t> reductionDims,
       vector::CombiningKind kind, Value acc) const {
-    VectorType writeTy = VectorType::get(writeLayout.getUndistributedShape(),
-                                         getElementTypeOrSelf(buffer));
+    auto writeTy = VectorType::get(writeLayout.getUndistributedShape(),
+                                   getElementTypeOrSelf(buffer));
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> indices(writeLayout.getRank(), c0);
     SmallVector<bool> inBounds(writeLayout.getRank(), false);
@@ -1160,7 +1153,7 @@ struct DistributeMultiReduction final
       // tile.
       partialReductionShape[rDim] = preDistrShape[rDim];
     }
-    VectorType unDistributedType = VectorType::get(
+    auto unDistributedType = VectorType::get(
         partialReductionShape, srcVector.getType().getElementType());
     VectorValue valueToWrite = rewriter.create<IREE::VectorExt::ToSIMDOp>(
         loc, unDistributedType, isoRankThreadReduced);

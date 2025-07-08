@@ -209,9 +209,8 @@ void DistributionPattern::setSignatureForRedistribution(
     }
   }
 
-  ArrayAttr inputArrayAttr = ArrayAttr::get(rewriter.getContext(), inputAttrs);
-  ArrayAttr outputArrayAttr =
-      ArrayAttr::get(rewriter.getContext(), outputAttrs);
+  auto inputArrayAttr = ArrayAttr::get(rewriter.getContext(), inputAttrs);
+  auto outputArrayAttr = ArrayAttr::get(rewriter.getContext(), outputAttrs);
 
   Attribute signature[] = {inputArrayAttr, outputArrayAttr};
   rewriter.modifyOpInPlace(op, [&]() {
