@@ -100,14 +100,17 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
     }
   }
 
-  SmallVector<Value> newResults;
-  if (failed(linalg::vectorize(rewriter, genericOp, newResults))) {
+  FailureOr<linalg::VectorizationResult> result =
+      linalg::vectorize(rewriter, genericOp);
+  if (failed(result)) {
     return rewriter.notifyMatchFailure(mapScatterOp,
                                        "failed to generate index vector");
   }
 
-  auto indexWriteOp = newResults[0].getDefiningOp<vector::TransferWriteOp>();
-  auto maskWriteOp = newResults[1].getDefiningOp<vector::TransferWriteOp>();
+  auto indexWriteOp =
+      result->replacements[0].getDefiningOp<vector::TransferWriteOp>();
+  auto maskWriteOp =
+      result->replacements[1].getDefiningOp<vector::TransferWriteOp>();
   if (!indexWriteOp || !maskWriteOp) {
     return failure();
   }
