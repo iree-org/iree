@@ -570,66 +570,6 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
 }
 
 //===--------------------------------------------------------------------====//
-// Pattern to remove dead allocations
-//===--------------------------------------------------------------------====//
-
-namespace {
-
-static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
-                                              Operation *op) {
-  if (!op->use_empty()) {
-    return failure();
-  }
-  rewriter.eraseOp(op);
-  return success();
-}
-
-// Removes operations with Allocate MemoryEffects but no uses.
-struct RemoveDeadMemAllocs : RewritePattern {
-  RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
-      return failure();
-    }
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-// Removes hal.interface.binding.subspan ops with only assume_alignment uses.
-struct RemoveDeadInterfaceBindings
-    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  RemoveDeadInterfaceBindings(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp>(context,
-                                                               benefit) {}
-
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-struct RemoveDeadAssumeAlighment : OpRewritePattern<memref::AssumeAlignmentOp> {
-  RemoveDeadAssumeAlighment(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<memref::AssumeAlignmentOp>(context, benefit) {}
-
-  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-} // namespace
-
-void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
-  patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
-  patterns.insert<RemoveDeadInterfaceBindings, RemoveDeadAssumeAlighment>(
-      patterns.getContext());
-}
-
-//===--------------------------------------------------------------------====//
 // Pattern to reduce dependencies from memref::AssumeAlignmentOp
 //===--------------------------------------------------------------------====//
 

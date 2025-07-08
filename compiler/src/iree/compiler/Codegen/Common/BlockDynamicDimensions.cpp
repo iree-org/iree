@@ -385,7 +385,6 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // operations.
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         bubbleExpandShapePatterns);
-    populateRemoveDeadMemAllocPatterns(bubbleExpandShapePatterns);
     if (failed(applyPatternsGreedily(operation,
                                      std::move(bubbleExpandShapePatterns)))) {
       operation->emitOpError(
