@@ -122,7 +122,7 @@ func.func @test_store(%base : memref<2x16x16xf32>, %offset : index) -> () {
 // Note: the scf.for are purposely flipped (dim2 -> dim0 instead of dim0 -> dim2) to
 // make the ordering from the decompose of affine ops more obvious.
 // INTEGRATION: #[[$SINGLE_VALUE_MAP:.*]] = affine_map<()[s0] -> (s0)>
-// INTEGRATION: #[[$MUL_MAP:.*]] = affine_map<()[s0, s1] -> (s1 * s0)>
+// INTEGRATION: #[[$MUL_MAP:.*]] = affine_map<()[s0, s1] -> (s0 * s1)>
 // INTEGRATION: #[[$ADD_MAP:.*]] = affine_map<()[s0, s1] -> (s0 + s1)>
 // INTEGRATION-LABEL: func.func @testWithLoop(
 // INTEGRATION-SAME: %[[BASE:.*]]: memref<?x?x?xf32, strided<[?, ?, ?], offset: ?>>) -> f32 {

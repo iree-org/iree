@@ -153,7 +153,9 @@ func.func @transpose_mask() {
 //   CHECK-NOT:   vector.constant_mask [2, 4]
 //   CHECK-NOT:   vector.transpose
 //   CHECK-NOT:   vector.shuffle
-//       CHECK:   vector.constant_mask [4, 2] : vector<4x2xi1>
+//   CHECK-DAG:   %[[MASK:.+]] = arith.constant dense<true>
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan
+//       CHECK:   vector.store %[[MASK]], %[[OUTPUT]]
 
 // -----
 
