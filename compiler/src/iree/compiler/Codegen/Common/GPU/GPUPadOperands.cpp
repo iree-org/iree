@@ -53,7 +53,6 @@ static LogicalResult padLinalgOpToStaticSizes(RewriterBase &rewriter,
 struct GPUPadOperandsPass final
     : impl::GPUPadOperandsPassBase<GPUPadOperandsPass> {
   void runOnOperation() override {
-    llvm::errs() << "[DEBUG] - Muzasyed\n";
     FunctionOpInterface funcOp = getOperation();
 
     IRRewriter rewriter(funcOp);

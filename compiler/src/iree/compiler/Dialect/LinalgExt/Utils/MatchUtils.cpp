@@ -122,7 +122,6 @@ bool isScaledContractionBody(
     errs << "no terminator in the block";
     return false;
   }
-  errs << "\n" << block.getNumArguments() << "\n";
   if (block.getNumArguments() != 5) {
     errs << "expected block with 3 arguments";
     return false;
@@ -185,12 +184,6 @@ bool isScaledContractionBody(
 
   Value elementwiseLHS = getSourceSkipIrrelevant(elementwiseOp->getOperand(0));
   Value elementwiseRHS = getSourceSkipIrrelevant(elementwiseOp->getOperand(1));
-  errs << "Block args:\n";
-  errs << "\t" << block.getArgument(0) << "\n";
-  errs << "\t" << block.getArgument(1) << "\n";
-  errs << "Eltwise:\n";
-  errs << "\t" << elementwiseLHS << "\n";
-  errs << "\t" << elementwiseRHS << "\n";
   if ((elementwiseLHS == block.getArgument(0) &&
        elementwiseRHS == block.getArgument(1)) ||
       (elementwiseLHS == block.getArgument(1) &&
@@ -233,12 +226,6 @@ inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
       findPermutationsIndexingOperand(indexingMaps[1], iterators, par);
   llvm::SmallDenseSet<int64_t> c =
       findPermutationsIndexingOperand(indexingMaps[4], iterators, par);
-  llvm::errs () << "INDEXING MAPS\n";
-  llvm::errs () << "\t" << indexingMaps[0] << "\n";
-  llvm::errs () << "\t" << indexingMaps[1] << "\n";
-  llvm::errs () << "\t" << indexingMaps[2] << "\n";
-  llvm::errs () << "\t" << indexingMaps[3] << "\n";
-  llvm::errs () << "\t" << indexingMaps[4] << "\n";
   // A & C - B are the iterators involved in an outer-product along A (the LHS).
   llvm::SmallDenseSet<int64_t> ac = a;
   llvm::set_intersect(ac, c);

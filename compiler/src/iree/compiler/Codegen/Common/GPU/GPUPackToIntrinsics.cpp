@@ -50,9 +50,7 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
         return failure();
       }
       packedSizes[index.back()] = rewriter.getIndexAttr(dim);
-      llvm::errs() << rewriter.getIndexAttr(dim) << ", ";
     }
-    llvm::errs() << "\n";
     return packedSizes;
   };
 
@@ -60,7 +58,8 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
       IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (succeeded(scaledContrDims)) {
     auto [m, n, k, kB] = kind.getScaledMNKShape();
-    indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k, scaledContrDims->kB};
+    indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k,
+               scaledContrDims->kB};
     return createPackedSizes({m, n, k, kB}, indices);
   }
 

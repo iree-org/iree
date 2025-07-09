@@ -169,7 +169,6 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
       getTiledOps(funcOp, tilingLevel);
 
   IRRewriter rewriter(funcOp);
-  llvm::errs() << "[DEBUG] - DOES IT FAIL HERE?\n";
   for (TilingInterface op : targetOps) {
     // If some op does not get padded, that is fine for now.
     (void)applyPaddingLevel(rewriter, op, tilingLevel);
