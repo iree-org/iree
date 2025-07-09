@@ -20,6 +20,7 @@
 #include "mlir/Dialect/GPU/Utils/GPUUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1011,15 +1012,44 @@ struct DistributeMultiReduction final
     auto threadStrides =
         llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
 
+    // Check if we had enough threads on one of the reduction dimensions
+    // to use for a subgroup reduction. If not, do a serialized reduction.
+    // This usually works, because we would be distributing the reduction
+    // dimension on atleast more threads than number of subgroups, and if we
+    // aren't, it's probably best to do a serialized reduction anyway.
+    int64_t threadsRequired = 1;
+    for (int64_t rDim : reductionDims) {
+      // The size or #lanes needs to be a power of 2.
+      threadsRequired *= llvm::PowerOf2Ceil(subgroupTileLens[rDim]);
+    }
+    std::optional<int64_t> availableThreads;
+    int64_t threadStride = 0;
+    for (int64_t rDim : reductionDims) {
+      // TODO: We could merge two different dimension threads into one, but they
+      // can be disjoint.
+      if (threadTileLens[rDim] >= threadsRequired) {
+        availableThreads = threadTileLens[rDim];
+        threadStride = threadStrides[rDim];
+        break;
+      }
+    }
+
     for (int64_t rDim : reductionDims) {
       batchTileLens[rDim] = 1;
       outerTileLens[rDim] = 1;
       elementTileLens[rDim] = 1;
-      threadStrides[rDim] *= subgroupStrides[rDim];
-      // The size or #lanes needs to be a power of 2.
-      threadTileLens[rDim] = llvm::PowerOf2Ceil(subgroupTileLens[rDim]);
-      subgroupStrides[rDim] = 1;
+      if (availableThreads.has_value()) {
+        int64_t used = llvm::PowerOf2Ceil(subgroupTileLens[rDim]);
+        threadStrides[rDim] = threadStride;
+        threadTileLens[rDim] = used;
+        availableThreads.value() /= used;
+        threadStride *= used;
+      } else {
+        threadStrides[rDim] = 0;
+        threadTileLens[rDim] = 1;
+      }
       subgroupTileLens[rDim] = 1;
+      subgroupStrides[rDim] = 0;
     }
     bufferReduceLayout = IREE::VectorExt::NestedLayoutAttr::get(
         srcLayout.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
@@ -1027,15 +1057,14 @@ struct DistributeMultiReduction final
     return bufferReduceLayout;
   }
 
-  NestedLayoutAttr
-  writePartialResultToBuffer(RewriterBase &rewriter, Location loc,
-                             VectorValue valueToWrite, Value buffer,
-                             NestedLayoutAttr srcLayout,
-                             ArrayRef<int64_t> reductionDims) const {
+  void writePartialResultToBuffer(RewriterBase &rewriter, Location loc,
+                                  VectorValue valueToWrite, Value buffer,
+                                  NestedLayoutAttr srcLayout,
+                                  ArrayRef<int64_t> reductionDims) const {
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     VectorType unDistributedType = valueToWrite.getType();
     SmallVector<Value> indices(unDistributedType.getRank(), c0);
-    SmallVector<bool> inBounds(unDistributedType.getRank(), false);
+    SmallVector<bool> inBounds(unDistributedType.getRank(), true);
     auto write = rewriter.create<vector::TransferWriteOp>(
         loc, valueToWrite, buffer, indices, inBounds);
     // Set layouts signature for write.
@@ -1064,28 +1093,37 @@ struct DistributeMultiReduction final
         rewriter.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
         threadTileLens, elementTileLens, subgroupStrides, threadStrides);
     setSignatureForRedistribution(rewriter, write, {interSubGroupLayout}, {});
-    return interSubGroupLayout;
   }
 
-  Value doSubgroupReductionFromBuffer(
-      RewriterBase &rewriter, Location loc, Value buffer,
-      NestedLayoutAttr writeLayout, NestedLayoutAttr srcLayout,
-      VectorLayoutInterface resLayout, ArrayRef<int64_t> reductionDims,
-      vector::CombiningKind kind, Value acc) const {
-    auto writeTy = VectorType::get(writeLayout.getUndistributedShape(),
-                                   getElementTypeOrSelf(buffer));
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> indices(writeLayout.getRank(), c0);
-    SmallVector<bool> inBounds(writeLayout.getRank(), false);
-    auto read = rewriter.create<vector::TransferReadOp>(
-        loc, writeTy, buffer, indices, /*padding=*/
-        arith::getZeroConstant(rewriter, loc, writeTy.getElementType()),
-        inBounds);
-
-    NestedLayoutAttr subgroupToThreadsLayout =
+  Value doSubgroupReductionFromBuffer(RewriterBase &rewriter, Location loc,
+                                      Value buffer, NestedLayoutAttr srcLayout,
+                                      VectorLayoutInterface resLayout,
+                                      ArrayRef<int64_t> reductionDims,
+                                      vector::CombiningKind kind,
+                                      Value acc) const {
+    NestedLayoutAttr readLayout =
         getLayoutForReductionFromBuffer(srcLayout, reductionDims);
-    setSignatureForRedistribution(rewriter, read, {},
-                                  {subgroupToThreadsLayout});
+    Value padValue = getCombiningIdentityValue(loc, rewriter, kind,
+                                               getElementTypeOrSelf(buffer));
+    auto readTy = VectorType::get(readLayout.getUndistributedShape(),
+                                  getElementTypeOrSelf(buffer));
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto inBounds = rewriter.getBoolArrayAttr(
+        SmallVector<bool>(readLayout.getRank(), true));
+    auto mask = rewriter.create<vector::CreateMaskOp>(
+        loc, readTy.clone(rewriter.getI1Type()),
+        memref::getMixedSizes(rewriter, loc, buffer));
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc,
+        /*vectorType=*/readTy,
+        /*source=*/buffer,
+        /*indices=*/SmallVector<Value>(readLayout.getRank(), zero),
+        /*permMap=*/rewriter.getMultiDimIdentityMap(readLayout.getRank()),
+        /*padding=*/padValue,
+        /*mask=*/mask,
+        /*inBounds=*/inBounds);
+    setSignatureForRedistribution(rewriter, mask, {}, {readLayout});
+    setSignatureForRedistribution(rewriter, read, {readLayout}, {readLayout});
     // A newly created reduction to complete the reduction
     // that reduces the data that was otherwise was on
     // different subgroups.
@@ -1095,11 +1133,10 @@ struct DistributeMultiReduction final
         loc, kind, read, acc, reductionDims);
     if (resLayout) {
       setSignatureForRedistribution(rewriter, secondReduction,
-                                    {subgroupToThreadsLayout, resLayout},
-                                    {resLayout});
+                                    {readLayout, resLayout}, {resLayout});
     } else {
-      setSignatureForRedistribution(rewriter, secondReduction,
-                                    {subgroupToThreadsLayout}, {});
+      setSignatureForRedistribution(rewriter, secondReduction, {readLayout},
+                                    {});
     }
     return secondReduction.getResult();
   }
@@ -1165,13 +1202,12 @@ struct DistributeMultiReduction final
         AffineMap(), workgroupMemoryAddressSpace);
     auto alloc =
         getBufferForSubgroupReduction(rewriter, allocType, valueToWrite);
-    NestedLayoutAttr writeLayout = writePartialResultToBuffer(
-        rewriter, loc, valueToWrite, alloc, srcLayout, reductionDims);
+    writePartialResultToBuffer(rewriter, loc, valueToWrite, alloc, srcLayout,
+                               reductionDims);
     // Wait for writes to buffer to finish.
     rewriter.create<gpu::BarrierOp>(loc);
-    return doSubgroupReductionFromBuffer(rewriter, loc, alloc, writeLayout,
-                                         srcLayout, resLayout, reductionDims,
-                                         kind, acc);
+    return doSubgroupReductionFromBuffer(rewriter, loc, alloc, srcLayout,
+                                         resLayout, reductionDims, kind, acc);
   }
 
   int64_t subgroupSize;
