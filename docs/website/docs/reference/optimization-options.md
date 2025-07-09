@@ -104,7 +104,7 @@ functions, not free-standing operations in the program which may produce
 constant-derived results. See `--iree-opt-const-expr-hoisting` for options to
 optimize these.
 
-### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (off))
+### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (on))
 
 Identifies all trees of constant expressions in the program and uses a
 heuristic to determine which would be profitable to hoist into global
