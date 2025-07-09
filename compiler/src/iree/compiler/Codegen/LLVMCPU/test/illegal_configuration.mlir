@@ -12,18 +12,6 @@ func.func @illegal_empty_tiling(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: m
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8], [0, 0, 0]], native_vector_size = [0, 0, 4]>
-#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
-func.func @illegal_native_vector_size(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
-  translation_info = #translation
-} {
-  // expected-error @+1 {{native_vector_size must be empty}}
-  linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
-  return
-}
-
-// -----
-
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {

@@ -306,24 +306,19 @@ def IREECodegen_LoweringConfigAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tilingLevels
-      (`,` `native_vector_size` `=` `[` $nativeVectorSize^ `]`)? `>`
+    `<` `tile_sizes` `=` $tilingLevels `>`
   }];
 
   let parameters = (ins
     AttrParameter<"LoweringConfigTilingLevelsAttr",
-        "The lowering config at different levels">:$tilingLevels,
-    OptionalArrayRefParameter<"int64_t",
-        "The native vector size to use for the given operation">:$nativeVectorSize
+        "The lowering config at different levels">:$tilingLevels
   );
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
-        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
-        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>,
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange)>,
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
         "ScalableTileFlagsListTypeRef":$scalableTileFlags,
-        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
-        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange)>
   ];
   let extraClassDeclaration = [{
     // Returns the tile sizes for all levels set for the op.
@@ -344,11 +339,6 @@ def IREECodegen_LoweringConfigAttr :
     // Returns true if there are no tile interchange values (this means that
     // interchange can be ignored).
     bool isInterchangeEmpty();
-
-    // Returns the native vector size to use.
-    SmallVector<int64_t> getNativeVectorSizeVals() {
-      return SmallVector<int64_t>(getNativeVectorSize());
-    }
   }];
 
   let genVerifyDecl = 1;
