@@ -360,12 +360,14 @@ hal.executable private @attention_20x1x64x4096x64 {
 // CHECK:           vector.multi_reduction <maximumf>
 // CHECK-COUNT-1:   gpu.subgroup_reduce  maximumf
 
-// PV Matmul
+// Sum
 // CHECK:           vector.contract
 // CHECK-SAME:      vector<1x1x4xf32>, vector<1x1x4xf32> into f32
 // CHECK-COUNT-1:   gpu.subgroup_reduce  add
 
-// CHECK:           vector.multi_reduction <add>
+// PV Matmul
+// CHECK:           vector.contract
+// CHECK-SAME:      vector<1x1x4xf32>, vector<1x2x1x1x4x4xf32> into vector<2x1x4xf32>
 // CHECK-COUNT-8:   gpu.subgroup_reduce  add
 
 
@@ -573,7 +575,7 @@ hal.executable private @attention_4xDx1x32x128xf16 {
 
 //     CHECK-LABEL: func.func @attention_4xDx1x32x128xf16
 //           CHECK:   scf.forall ({{.*}}) in (4)
-//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1xf32>, vector<16x1x1x1x1x1x8x1x1xf32>) {
+//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1xf32>, vector<1x1x16x1x1x1x1x1x8xf32>) {
 //       CHECK-NOT:       gpu.subgroup_reduce
 //           CHECK:       scf.yield
 //
