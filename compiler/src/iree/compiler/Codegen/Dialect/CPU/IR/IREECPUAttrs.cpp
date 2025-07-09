@@ -4,20 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/Support/LLVM.h"
 
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.cpp.inc"
@@ -66,7 +58,9 @@ static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
   return SmallVector<int64_t>(attr.getSizes());
 }
 
-static bool useLoweringConfigTilingLevelAttr(StringRef key) {
+/// Returns true if the given entry `key` should use
+/// IREE::Codegen::LoweringConfigTilingLevelAttr as value type.
+static bool isLoweringConfigTilingLevelKey(StringRef key) {
   SmallVector<StringLiteral> allowList = {
       kDistributionConfigKey,         kCacheParallelConfigKey,
       kCacheReductionConfigKey,       kVectorReductionConfigKey,
@@ -78,7 +72,7 @@ LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            DictionaryAttr config) {
   for (NamedAttribute attr : config) {
-    if (useLoweringConfigTilingLevelAttr(attr.getName()) &&
+    if (isLoweringConfigTilingLevelKey(attr.getName()) &&
         !isa<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr.getValue())) {
       return emitError() << attr.getName()
                          << " is not LoweringConfigTilingLevelAttr: "
@@ -108,7 +102,7 @@ Attribute LoweringConfigAttr::parse(AsmParser &parser, Type type) {
     }
     StringAttr key = StringAttr::get(ctx, keyStr);
     Attribute value;
-    if (useLoweringConfigTilingLevelAttr(keyStr)) {
+    if (isLoweringConfigTilingLevelKey(keyStr)) {
       value = IREE::Codegen::LoweringConfigTilingLevelAttr::parse(parser, type);
       if (!value) {
         return {};
@@ -130,7 +124,7 @@ void LoweringConfigAttr::print(AsmPrinter &printer) const {
   llvm::interleaveComma(dictAttr, printer, [&](NamedAttribute attr) {
     // Use `.str()` to avoid wrapping the key string with `"`.
     printer << attr.getName().str() << " = ";
-    if (useLoweringConfigTilingLevelAttr(attr.getName())) {
+    if (isLoweringConfigTilingLevelKey(attr.getName())) {
       // Do not use `printAttribute` that avoids printing dialect namespace as
       // prefix.
       cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr.getValue())
