@@ -28,7 +28,7 @@ using SizesAndScalableFlags =
 ///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
 public:
-  TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc);
+  TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() const {

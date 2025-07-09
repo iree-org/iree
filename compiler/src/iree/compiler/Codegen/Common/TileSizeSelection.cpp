@@ -6,13 +6,12 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
 namespace mlir::iree_compiler {
 
-TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc)
+TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
     : loweringConfig(lc) {
   assert(lc && "Expected a valid lowering config");
 
