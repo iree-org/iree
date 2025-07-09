@@ -62,9 +62,9 @@ bool isScaledContractionBody(
     Block &block, function_ref<bool(Operation *, Operation *)> isaPair,
     llvm::raw_ostream &errs = mlir::thread_safe_nulls());
 
-detail::MatchContractionResult isScaledContractionImpl(
-    Operation *op,
-    ScaledContractionDimensions *dimensions = nullptr);
+detail::MatchContractionResult
+isScaledContractionImpl(Operation *op,
+                        ScaledContractionDimensions *dimensions = nullptr);
 
 } // namespace  mlir::iree_compiler::IREE::LinalgExt
 

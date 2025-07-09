@@ -548,7 +548,7 @@ std::optional<TargetDetails> getAppleTargetDetails() {
   // clang-format off
   static const WgpDetails wgp = {
       computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
-      /*mmaCount=*/0,     /*mmaOps=*/nullptr, /*scaledMmaCount=*/0,      
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr, /*scaledMmaCount=*/0,
       /*scaledMmaOps=*/nullptr,               {32, 32},
       {1024, 1024, 1024}, 1024,               32 * 1024,
       // Note: These values have not been checked and may be higher
