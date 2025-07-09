@@ -1389,9 +1389,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#constant-expression-hoisting-iree-opt-const-expr-hoisting-off" class="md-nav__link">
+  <a href="#constant-expression-hoisting-iree-opt-const-expr-hoisting-on" class="md-nav__link">
     <span class="md-ellipsis">
-      Constant expression hoisting (--iree-opt-const-expr-hoisting (off))
+      Constant expression hoisting (--iree-opt-const-expr-hoisting (on))
     </span>
   </a>
   
@@ -4703,9 +4703,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#constant-expression-hoisting-iree-opt-const-expr-hoisting-off" class="md-nav__link">
+  <a href="#constant-expression-hoisting-iree-opt-const-expr-hoisting-on" class="md-nav__link">
     <span class="md-ellipsis">
-      Constant expression hoisting (--iree-opt-const-expr-hoisting (off))
+      Constant expression hoisting (--iree-opt-const-expr-hoisting (on))
     </span>
   </a>
   
@@ -4860,7 +4860,7 @@ recursively compiles them, using the runtime to evaluate the results.</p>
 functions, not free-standing operations in the program which may produce
 constant-derived results. See <code>--iree-opt-const-expr-hoisting</code> for options to
 optimize these.</p>
-<h3 id="constant-expression-hoisting-iree-opt-const-expr-hoisting-off">Constant expression hoisting (<code>--iree-opt-const-expr-hoisting</code> (off))<a class="headerlink" href="#constant-expression-hoisting-iree-opt-const-expr-hoisting-off" title="Permanent link">link</a></h3>
+<h3 id="constant-expression-hoisting-iree-opt-const-expr-hoisting-on">Constant expression hoisting (<code>--iree-opt-const-expr-hoisting</code> (on))<a class="headerlink" href="#constant-expression-hoisting-iree-opt-const-expr-hoisting-on" title="Permanent link">link</a></h3>
 <p>Identifies all trees of constant expressions in the program and uses a
 heuristic to determine which would be profitable to hoist into global
 initializers for evaluation at module load. Together with

@@ -6226,8 +6226,7 @@ encoding details.</p>
 <p><em>Drive lowering of an operation within dispatch region.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_codegen.lowering_config&lt;
-  LoweringConfigTilingLevelsAttr,   # tilingLevels
-  ::llvm::ArrayRef&lt;int64_t&gt;   # nativeVectorSize
+  LoweringConfigTilingLevelsAttr   # tilingLevels
 &gt;
 </code></pre></div>
 <p>Default implementation of a lowering configuration attribute. It includes
@@ -6253,11 +6252,6 @@ the pipeline.</p>
 <td style="text-align: center;">tilingLevels</td>
 <td style="text-align: center;"><code>LoweringConfigTilingLevelsAttr</code></td>
 <td>The lowering config at different levels</td>
-</tr>
-<tr>
-<td style="text-align: center;">nativeVectorSize</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>The native vector size to use for the given operation</td>
 </tr>
 </tbody>
 </table>
