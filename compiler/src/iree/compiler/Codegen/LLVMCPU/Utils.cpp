@@ -19,12 +19,6 @@ static llvm::cl::opt<int32_t> clMaxAllowedNumberOfNativeVectors(
     llvm::cl::desc("ratio used to compute the max allowed vector size"),
     llvm::cl::init(512));
 
-static llvm::cl::opt<bool> clEnableScalableVectorization(
-    "iree-llvmcpu-enable-scalable-vectorization",
-    llvm::cl::desc("Enable scalable vectorization if it is supported by the "
-                   "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
-    llvm::cl::init(false));
-
 bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto intrinsicsAttr =
       getConfigBoolAttr(targetAttr, "prefer_intrinsics_over_asm");
@@ -137,7 +131,5 @@ int64_t getMaxVectorSizeForLargeVectorCheck(
   maxVectorSizeInBytes *= clMaxAllowedNumberOfNativeVectors;
   return maxVectorSizeInBytes;
 }
-
-bool isScalableVectorizationEnabled() { return clEnableScalableVectorization; }
 
 } // namespace mlir::iree_compiler
