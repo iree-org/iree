@@ -66,9 +66,9 @@ hal.executable private @matmul_tensors {
 //      CHECK:    hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
 //      CHECK: func.func @matmul_tensors()
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//  CHECK-DAG:   %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
+//  CHECK-DAG:   %[[N:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1
+//  CHECK-DAG:   %[[K:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2
 //  CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //  CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-DAG:   %[[INIT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
@@ -321,10 +321,10 @@ hal.executable private @add_distribute4D {
 //      CHECK:    hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK:    func.func @add_distribute4D()
 // CHECK-SAME:    translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:      %[[D0:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
-//  CHECK-DAG:      %[[D1:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
-//  CHECK-DAG:      %[[D2:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
-//  CHECK-DAG:      %[[D3:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(3) : index
+//  CHECK-DAG:      %[[D0:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
+//  CHECK-DAG:      %[[D1:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1
+//  CHECK-DAG:      %[[D2:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2
+//  CHECK-DAG:      %[[D3:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 3
 //  CHECK-DAG:      %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
 //  CHECK-DAG:      %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
 //  CHECK-DAG:      %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(32) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
@@ -632,16 +632,16 @@ hal.executable public @copy_op {
 //      CHECK:   hal.return %[[D1]], %[[D0]], %[[C1]]
 //      CHECK: func.func @copy_op()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[SOURCE_SIZE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
-//  CHECK-DAG:   %[[SOURCE_SIZE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
-//  CHECK-DAG:   %[[DEST_SIZE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
-//  CHECK-DAG:   %[[DEST_SIZE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(3) : index
-//  CHECK-DAG:   %[[SOURCE_OFFSET_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(4) : index
-//  CHECK-DAG:   %[[SOURCE_OFFSET_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(5) : index
-//  CHECK-DAG:   %[[DEST_OFFSET_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(6) : index
-//  CHECK-DAG:   %[[DEST_OFFSET_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(7) : index
-//  CHECK-DAG:   %[[SLICE_SIZE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(8) : index
-//  CHECK-DAG:   %[[SLICE_SIZE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(9) : index
+//  CHECK-DAG:   %[[SOURCE_SIZE_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0 : index
+//  CHECK-DAG:   %[[SOURCE_SIZE_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
+//  CHECK-DAG:   %[[DEST_SIZE_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2 : index
+//  CHECK-DAG:   %[[DEST_SIZE_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 3 : index
+//  CHECK-DAG:   %[[SOURCE_OFFSET_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 4 : index
+//  CHECK-DAG:   %[[SOURCE_OFFSET_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 5 : index
+//  CHECK-DAG:   %[[DEST_OFFSET_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 6 : index
+//  CHECK-DAG:   %[[DEST_OFFSET_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 7 : index
+//  CHECK-DAG:   %[[SLICE_SIZE_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 8 : index
+//  CHECK-DAG:   %[[SLICE_SIZE_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 9 : index
 //  CHECK-DAG:   %[[SOURCE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //  CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-DAG:   %[[SOURCE:.+]] = memref.subview %[[SOURCE_BINDING]][%[[SOURCE_OFFSET_Y]], %[[SOURCE_OFFSET_X]]]
@@ -1300,7 +1300,7 @@ hal.executable private @gemm_unit_N {
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func.func @gemm_unit_N()
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
+//  CHECK-DAG:   %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
 //  CHECK-DAG:   %[[LB:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
@@ -1677,8 +1677,8 @@ hal.executable private @matmul_interchange {
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: func.func @matmul_interchange()
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-//  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+//  CHECK-DAG:   %[[D0:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0 : index
+//  CHECK-DAG:   %[[D1:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
 //      CHECK:   scf.for %{{.+}} = %{{.+}} to %[[D1]] step %{{.+}} {
 //      CHECK:     scf.for %{{.+}} = %{{.+}} to %[[D0]] step %{{.+}} {
 

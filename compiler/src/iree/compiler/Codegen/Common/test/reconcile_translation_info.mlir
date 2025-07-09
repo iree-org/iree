@@ -732,7 +732,7 @@ hal.executable private @split_reduction_executable {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1, s2] -> (d0 * ((-s0 + s1) ceildiv s2))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s0 mod (((-s2 + s3) ceildiv s4) floordiv s1))>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-// CHECK-LABEL: @split_reduction_variant
+//       CHECK: @split_reduction_variant
 //       CHECK:   hal.executable.export
 //  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG2:[a-zA-Z0-9_]+]]: index
