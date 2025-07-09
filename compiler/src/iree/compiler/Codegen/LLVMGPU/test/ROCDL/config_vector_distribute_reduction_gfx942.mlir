@@ -327,3 +327,55 @@ func.func @split_reduction_config(%arg0 : tensor<?x131072xf32>,
 //      CHECK: func @split_reduction_config
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
+
+// -----
+
+#map = affine_map<()[s0] -> (s0 floordiv 4)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @test_store_to_buffer(%arg0: index, %arg1: index) {
+  %cst = arith.constant 1.000000e+00 : f32
+  %c2_i64 = arith.constant 2 : i64
+  %c0 = arith.constant 0 : index
+  %0:2 = util.assume.int
+      %arg0<umin = 0, umax = 36028797018963964, udiv = 4>,
+      %arg1<udiv = 4>
+    : index, index
+  %1 = iree_tensor_ext.dispatch.workload.ordinal %0#0, 0 : index
+  %2 = iree_tensor_ext.dispatch.workload.ordinal %0#1, 1 : index
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<?x4096xbf16, #hal.descriptor_type<storage_buffer>>{%1}
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(Indirect) : memref<?xf32, #hal.descriptor_type<storage_buffer>>{%2}
+  %5 = affine.apply #map()[%2]
+  %6 = tensor.empty(%5) : tensor<?x4x4096xf32>
+  %7 = affine.apply #map()[%1]
+  %expand_shape = memref.expand_shape %4 [[0, 1]] output_shape [%7, 4] : memref<?xf32, #hal.descriptor_type<storage_buffer>> into memref<?x4xf32, #hal.descriptor_type<storage_buffer>>
+  %expand_shape_0 = memref.expand_shape %3 [[0, 1], [2]] output_shape [%7, 4, 4096] : memref<?x4096xbf16, #hal.descriptor_type<storage_buffer>> into memref<?x4x4096xbf16, #hal.descriptor_type<storage_buffer>>
+  %8 = iree_codegen.load_from_buffer %expand_shape_0 : memref<?x4x4096xbf16, #hal.descriptor_type<storage_buffer>> -> tensor<?x4x4096xbf16>
+  %9 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8 : tensor<?x4x4096xbf16>) outs(%6 : tensor<?x4x4096xf32>) {
+  ^bb0(%in: bf16, %out: f32):
+    %13 = arith.extf %in : bf16 to f32
+    linalg.yield %13 : f32
+  } -> tensor<?x4x4096xf32>
+  %10 = tensor.empty(%7) : tensor<?x4xf32>
+  %11 = linalg.fill ins(%cst : f32) outs(%10 : tensor<?x4xf32>) -> tensor<?x4xf32>
+  %12 = linalg.generic {indexing_maps = [#map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%9 : tensor<?x4x4096xf32>) outs(%11 : tensor<?x4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %13 = math.fpowi %in, %c2_i64 : f32, i64
+    %14 = arith.addf %13, %out : f32
+    linalg.yield %14 : f32
+  } -> tensor<?x4xf32>
+  iree_codegen.store_to_buffer %12, %expand_shape : tensor<?x4xf32> into memref<?x4xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+// CHECK-LABEL: @test_store_to_buffer
+//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//   CHECK-NOT:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//       CHECK:   linalg.generic
+//  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 4096],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 16], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 4], thread_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+//  CHECK-SAME:               workgroup = [1, 1, 0]
