@@ -149,7 +149,7 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C721:.+]] = arith.constant 721 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//          CHECK:   scf.forall ({{.*}}) in (17, 1, 81) {
+//          CHECK:   scf.forall ({{.*}}) in (17, 81) {
 //          CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C721]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
 //          CHECK:       gpu.barrier
 //      CHECK-DAG:       %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<4xf16>
@@ -159,4 +159,4 @@ hal.executable private @main {
 //          CHECK:     vector.transfer_write %[[LOOP_T]]
 // Note there is a writeback loop here that is skipped to simplify the test.
 //       CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
-//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
