@@ -131,6 +131,8 @@ void LoweringConfigAttr::print(AsmPrinter &printer) const {
     // Use `.str()` to avoid wrapping the key string with `"`.
     printer << attr.getName().str() << " = ";
     if (useLoweringConfigTilingLevelAttr(attr.getName())) {
+      // Do not use `printAttribute` that avoids printing dialect namespace as
+      // prefix.
       cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr.getValue())
           .print(printer);
     } else {
