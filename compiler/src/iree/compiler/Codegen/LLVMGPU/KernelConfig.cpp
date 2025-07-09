@@ -13,6 +13,7 @@
 #include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -595,12 +596,16 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
 /// Check if the dispatch has a single store operation.
 /// If the dispatch meets the criterion, it returns the set of
 /// compute ops.
-template <typename StoreOpTy>
+template <typename... StoreOpTy>
 static FailureOr<SetVector<linalg::LinalgOp>>
 checkDispatchForVectorDistribution(Operation *parentOp) {
   SmallVector<Operation *> storeOps;
 
-  parentOp->walk([&](StoreOpTy op) { storeOps.push_back(op.getOperation()); });
+  parentOp->walk([&](Operation *op) {
+    if (isa<StoreOpTy...>(op)) {
+      storeOps.push_back(op);
+    }
+  });
 
   if (storeOps.empty()) {
     return failure();
@@ -747,8 +752,9 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   FailureOr<SetVector<linalg::LinalgOp>> computeOps =
-      checkDispatchForVectorDistribution<
-          IREE::TensorExt::DispatchTensorStoreOp>(entryPoint);
+      checkDispatchForVectorDistribution<IREE::TensorExt::DispatchTensorStoreOp,
+                                         IREE::Codegen::StoreToBufferOp>(
+          entryPoint);
 
   if (failed(computeOps)) {
     return failure();
