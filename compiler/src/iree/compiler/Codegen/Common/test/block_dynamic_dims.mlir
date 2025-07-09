@@ -428,3 +428,21 @@ func.func @block_dims_with_map_scatter(%size: index) -> tensor<?xf32> {
 //  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x16xf32>)
 //       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
 //       CHECK:   return %[[MAP_SCATTER]]
+
+// -----
+
+func.func @reshape_propagation_before_blocking_test(%arg0: index, %arg1: index, %arg2: tensor<?xbf16>) -> tensor<?x4096xf8E4M3FNUZ> {
+  %0 = util.assume.int %arg1<umin = 128, umax = 524160, udiv = 128> : index
+  %1 = tensor.empty(%0) : tensor<?xf8E4M3FNUZ>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg2 : tensor<?xbf16>) outs(%1 : tensor<?xf8E4M3FNUZ>) {
+  ^bb0(%in: bf16, %out: f8E4M3FNUZ):
+    %3 = arith.truncf %in : bf16 to f8E4M3FNUZ
+    linalg.yield %3 : f8E4M3FNUZ
+  } -> tensor<?xf8E4M3FNUZ>
+  %expanded = tensor.expand_shape %2 [[0, 1]] output_shape [%0, 4096] : tensor<?xf8E4M3FNUZ> into tensor<?x4096xf8E4M3FNUZ>
+  return %expanded : tensor<?x4096xf8E4M3FNUZ>
+}
+// CHECK-LABEL: func @reshape_propagation_before_blocking_test(
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty{{.*}} tensor<?x128x4096xf8E4M3FNUZ>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x128x4096xf8E4M3FNUZ>)
