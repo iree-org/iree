@@ -307,6 +307,40 @@ def IREETensorExt_DispatchWorkgroupCountFromSliceOp :
   }];
 }
 
+def IREETensorExt_DispatchWorkgroupCountSplitReductionModifierOp :
+    IREETensorExt_PureOp<"dispatch.workgroup_count_split_reduction_modifier"> {
+  let summary = [{
+    Modifies the workgroup count calculation to account for split reductions.
+  }];
+  let description = [{
+    A split reduction dispatch contains an `scf.forall` within which the
+    partial reduction computation is done. The `scf.forall` represents parallel
+    partial reduction computations. `workgroup_x`, `workgroup_y`, and
+    `workgroup_z` represent the workgroups needed to execute the inner compute
+    ops. This is combined with `workload` to determine the total number of
+    workgroups required to run the computation after accounting for the
+    `scf.forall`.
+  }];
+  let arguments = (ins
+    Index:$workgroup_x,
+    Index:$workgroup_y,
+    Index:$workgroup_z,
+    Variadic<Index>:$workload
+  );
+  let results = (outs Index:$result_x, Index:$result_y, Index:$result_z);
+
+  let assemblyFormat = [{
+    attr-dict `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `,` ($workload^)?
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$workgroups,
+      "ValueRange":$workload
+    )>,
+  ];
+}
+
 def IREETensorExt_DispatchWorkloadOrdinalOp :
     IREETensorExt_PureOp<"dispatch.workload.ordinal", [
       DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface>,
