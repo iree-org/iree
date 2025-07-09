@@ -271,15 +271,15 @@ def IREECodegen_LoweringConfigAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the number of tiling levels of the configuration. Returns -1 if
-        it is unknown.
+        Returns the number of tiling levels of the configuration. Returns
+        std::nullopt if it is unknown.
       }],
-      /*retTy=*/"int64_t",
+      /*retTy=*/"std::optional<unsigned>",
       /*methodName=*/"getNumTilingLevels",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return -1;
+        return std::nullopt;
       }]
     >,
     InterfaceMethod<

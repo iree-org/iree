@@ -30,7 +30,7 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //   5. [[distribution], [cache-parallel], [cache-reduction],
   //       [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
-  int numTileLevels = getNumTilingLevels();
+  unsigned numTileLevels = getNumTilingLevels();
   switch (numTileLevels) {
   case 4:
     tilingLevelToActualLevelMap[VectorInnerParallelTiles] = 3;
@@ -91,7 +91,7 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<bool> scalableFlags(numDims, false);
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> tilingLevels;
-  for (int i = 0, e = getNumTilingLevels(); i < e; ++i) {
+  for (unsigned i = 0, e = getNumTilingLevels(); i < e; ++i) {
     tilingLevels.push_back(cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
         loweringConfig.getTilingLevelAttr(i)));
   }

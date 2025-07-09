@@ -32,7 +32,10 @@ public:
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() const {
-    return loweringConfig.getNumTilingLevels();
+    std::optional<unsigned> maybeResult = loweringConfig.getNumTilingLevels();
+    assert(maybeResult.has_value() &&
+           "invalid loweringConfig that fails to get number of tiling levels");
+    return maybeResult.value();
   };
 
   /// Returns the number of dimensions of the configuration. All the tiling
@@ -57,7 +60,7 @@ public:
   /// Returns all the tile sizes of all the levels of the configuration.
   TileSizesListType getTileSizes() const {
     TileSizesListType result;
-    for (int i = 0, e = getNumTilingLevels(); i < e; ++i) {
+    for (unsigned i = 0, e = getNumTilingLevels(); i < e; ++i) {
       result.push_back(
           loweringConfig.getStaticTilingLevelSizes(i, /*target=*/nullptr));
     }

@@ -304,7 +304,7 @@ SmallVector<int64_t> LoweringConfigAttr::getWorkgroupInterchange() const {
   return getTileInterchangeVals(0);
 }
 
-int64_t LoweringConfigAttr::getNumTilingLevels() const {
+std::optional<unsigned> LoweringConfigAttr::getNumTilingLevels() const {
   return getTilingLevels().size();
 }
 
