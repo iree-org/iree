@@ -201,12 +201,18 @@ static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
 
 static bool countsMatchTileTypes(ArrayRef<int64_t> innerElemCounts,
                                  ArrayRef<VectorType> tileTypes) {
+  llvm::errs() << "inner elem counts\n\t";
   for (auto a : innerElemCounts) {
-    llvm::errs() << a << "\n";
+    llvm::errs() << a << ", ";
   }
+  llvm::errs() << "\n";
+  llvm::errs() << "prethread tile types\n\t";
   for (auto a : tileTypes) {
-    llvm::errs() << a << "\n";
+    llvm::errs() << a << ", ";
+    llvm::errs() << a.getNumElements() << ", ";
   }
+  llvm::errs() << "\n";
+  
   return llvm::all_of_zip(
       innerElemCounts, tileTypes,
       [](int64_t ec, VectorType tt) { return ec == tt.getNumElements(); });
@@ -335,6 +341,14 @@ LogicalResult InnerTiledOp::verify() {
       countsMatchTileTypes(innerElemCounts, preThreadTypes);
   bool hasDistributedSemantics =
       countsMatchTileTypes(innerElemCounts, threadTypes);
+  llvm::errs() << "distributed \n";
+  for (auto a : preThreadTypes)
+    llvm::errs() << a << ", ";
+  llvm::errs() << "\n";
+  llvm::errs() << "undistributed \n";
+  for (auto a : threadTypes)
+    llvm::errs() << a << ", ";
+  llvm::errs() << "\n";
   if (!hasUndistributedSemantics && !hasDistributedSemantics) {
     return emitOpError("operation parallel semantics can't be inferred as "
                        "either distributed or undistributed");

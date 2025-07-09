@@ -233,7 +233,12 @@ inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
       findPermutationsIndexingOperand(indexingMaps[1], iterators, par);
   llvm::SmallDenseSet<int64_t> c =
       findPermutationsIndexingOperand(indexingMaps[4], iterators, par);
-
+  llvm::errs () << "INDEXING MAPS\n";
+  llvm::errs () << "\t" << indexingMaps[0] << "\n";
+  llvm::errs () << "\t" << indexingMaps[1] << "\n";
+  llvm::errs () << "\t" << indexingMaps[2] << "\n";
+  llvm::errs () << "\t" << indexingMaps[3] << "\n";
+  llvm::errs () << "\t" << indexingMaps[4] << "\n";
   // A & C - B are the iterators involved in an outer-product along A (the LHS).
   llvm::SmallDenseSet<int64_t> ac = a;
   llvm::set_intersect(ac, c);

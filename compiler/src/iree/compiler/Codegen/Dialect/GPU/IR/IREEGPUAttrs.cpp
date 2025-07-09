@@ -1498,9 +1498,9 @@ void ScaledMMAAttr::getUndistributedTileTypes(
   Type accType = getAccElemType();
   Type scaleType = Float8E8M0FNUType::get(getContext());
 
-  results.push_back(VectorType::get({m, kScale, blockSize}, lhsType));
+  results.push_back(VectorType::get({m, blockSize, kScale}, lhsType));
   results.push_back(VectorType::get({m, kScale}, scaleType));
-  results.push_back(VectorType::get({kScale, blockSize, n}, rhsType));
+  results.push_back(VectorType::get({blockSize, kScale, n}, rhsType));
   results.push_back(VectorType::get({kScale, n}, scaleType));
   results.push_back(VectorType::get({m, n}, accType));
 }
