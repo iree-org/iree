@@ -124,6 +124,7 @@ void buildVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
 
   buildVectorVMVXTransformPassPipeline(variantPassManager);
 
+  variantPassManager.addPass(createReconcileTranslationInfoPass());
   // ---------------------------------------------------------------------------
   // Standard/Vector/HAL/etc -> VMVX conversion
   // ---------------------------------------------------------------------------
