@@ -89,9 +89,10 @@ Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@ir
 
 Date | Title | Recording | Slides
 ---- | ----- | --------- | ------
+2025-06-10 | Data-Tiling in IREE: Achieving High Performance Through Compiler Design (AsiaLLVM) | [recording](https://www.youtube.com/watch?v=iANJWUL_SOo) | [slides](https://llvm.org/devmtg/2025-06/slides/technical-talk/wang-data-tilling.pdf)
 2025-05-17 | Introduction to GPU architecture and IREE's GPU CodeGen Pipeline | [recording](https://www.youtube.com/watch?v=9Fy2jxj0ARE) | [slides](https://drive.google.com/file/d/1xbABUy3kQxxBzOUb3WjBOFCSY_sQYdGo/view)
 2025-02-12 | The Long Tail of AI: SPIR-V in IREE and MLIR (Vulkanised) | [recording](https://youtu.be/0zwfc6UkxeE) | [slides](https://www.vulkan.org/user/pages/09.events/vulkanised-2025/T12-Jakub-Kuderski-AMD-IREE-MLIR.pdf)
-2024-10-01 | Unveiling the Inner Workings of IREE: An MLIR-Based Compiler for Diverse H/W | [recording](https://www.youtube.com/watch?v=a3T74I9gGH8) |
+2024-10-01 | Unveiling the Inner Workings of IREE: An MLIR-Based Compiler for Diverse Hardware | [recording](https://www.youtube.com/watch?v=a3T74I9gGH8) |
 2021-06-09 | IREE Runtime Design Tech Talk | [recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) | [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing)
 2020-08-20 | IREE CodeGen (MLIR Open Design Meeting) | [recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing) | [slides](https://docs.google.com/presentation/d/1NetHjKAOYg49KixY5tELqFp6Zr2v8_ujGzWZ_3xvqC8/edit)
 2020-03-18 | Interactive HAL IR Walkthrough | [recording](https://drive.google.com/file/d/1_sWDgAPDfrGQZdxAapSA90AD1jVfhp-f/view?usp=sharing) |
