@@ -31,6 +31,67 @@ struct GPUPackToIntrinsicsPass final
 };
 } // namespace
 
+linalg::LinalgOp removeUnitExtentDimsfromMaps(linalg::LinalgOp baseLinalgOp,
+                                              RewriterBase &rewriter) {
+  auto linalgOp = cast<linalg::GenericOp>(baseLinalgOp);
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  if (indexingMaps.empty())
+    return baseLinalgOp;
+
+  // 1. Check if any of the iteration dimensions are unit-trip count. They will
+  //    end up being unit-trip count if they are used to index into a unit-dim
+  //    tensor/memref.
+  AffineMap invertedMap =
+      inversePermutation(concatAffineMaps(indexingMaps, rewriter.getContext()));
+  auto iteratorTypes = linalgOp.getIteratorTypesArray();
+  if (!invertedMap) {
+    return baseLinalgOp;
+  }
+
+  SmallVector<int64_t> allShapesSizes;
+  for (OpOperand &opOperand : linalgOp->getOpOperands())
+    llvm::append_range(allShapesSizes, linalgOp.getShape(&opOperand));
+
+  llvm::SmallDenseSet<unsigned> unitDims;
+  for (const auto &expr : enumerate(invertedMap.getResults())) {
+    if (AffineDimExpr dimExpr = dyn_cast<AffineDimExpr>(expr.value())) {
+      if (allShapesSizes[dimExpr.getPosition()] == 1 &&
+          iteratorTypes[expr.index()] == utils::IteratorType::reduction)
+        unitDims.insert(expr.index());
+    }
+  }
+
+  SmallVector<AffineMap> newIndexingMaps;
+  for (auto indexingMap : indexingMaps) {
+    SmallVector<AffineExpr> newExprs;
+    for (auto [idx, e] : llvm::enumerate(indexingMap.getResults())) {
+      AffineExpr newExpr = e;
+      if (auto binaryExpr = llvm::dyn_cast<AffineBinaryOpExpr>(e)) {
+        for (auto s : unitDims) {
+          if (binaryExpr.getLHS().isFunctionOfDim(s)) {
+            newExpr = binaryExpr.getRHS();
+          }
+          if (binaryExpr.getRHS().isFunctionOfDim(s)) {
+            newExpr = binaryExpr.getLHS();
+          }
+        }
+      }
+      newExprs.push_back(newExpr);
+    }
+    newIndexingMaps.push_back(AffineMap::get(indexingMap.getNumDims(), 0,
+                                             newExprs, rewriter.getContext()));
+  }
+  auto newOp = rewriter.create<linalg::GenericOp>(
+      linalgOp.getLoc(), linalgOp.getDpsInits().getType(),
+      linalgOp.getDpsInputs(), linalgOp.getDpsInits(), newIndexingMaps,
+      iteratorTypes, /*bodyBuild=*/nullptr,
+      linalg::getPrunedAttributeList(linalgOp));
+  rewriter.inlineRegionBefore(linalgOp.getRegion(), newOp.getRegion(),
+                              newOp.getRegion().begin());
+  rewriter.replaceOp(linalgOp, newOp.getResults());
+  return newOp;
+}
+
 LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
                               RewriterBase &rewriter) {
   auto loweringConfig =
@@ -110,7 +171,10 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
 
   for (auto candidate : packingCandidates) {
     rewriter.setInsertionPoint(candidate);
-    if (failed(packToIntrinsic(candidate, rewriter))) {
+    linalg::LinalgOp lianlgOp =
+        removeUnitExtentDimsfromMaps(candidate, rewriter);
+    rewriter.setInsertionPoint(lianlgOp);
+    if (failed(packToIntrinsic(lianlgOp, rewriter))) {
       funcOp.emitError() << "failed to pack operation marked with intrinsic\n";
       return signalPassFailure();
     }

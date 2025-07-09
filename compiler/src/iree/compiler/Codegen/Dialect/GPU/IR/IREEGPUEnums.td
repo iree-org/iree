@@ -358,9 +358,10 @@ def IREEGPU_ScaledMMAIntrinsic : IREEGPU_I32Enum<"ScaledMMAIntrinsic",
 def Workgroup : I32EnumAttrCase<"Workgroup", 0>;
 def Reduction : I32EnumAttrCase<"Reduction", 1>;
 def PartialReduction : I32EnumAttrCase<"PartialReduction", 2>;
-def Thread : I32EnumAttrCase<"Thread", 3>;
-def Subgroup : I32EnumAttrCase<"Subgroup", 4>;
-def Lane : I32EnumAttrCase<"Lane", 5>;
+def ConvReduction : I32EnumAttrCase<"ConvReduction", 3>;
+def Thread : I32EnumAttrCase<"Thread", 4>;
+def Subgroup : I32EnumAttrCase<"Subgroup", 5>;
+def Lane : I32EnumAttrCase<"Lane", 6>;
 
 /// Enum descriptor for the set of tiling levels for GPU pass pipelines.
 /// Note that `Thread` tiling is mutually exclusive with `Subgroup` and
@@ -371,6 +372,7 @@ def IREEGPU_TilingLevel : IREEGPU_I32EnumAttr<"TilingLevel",
       Workgroup,
       Reduction,
       PartialReduction,
+      ConvReduction,
       Thread,
       Subgroup,
       Lane

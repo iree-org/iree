@@ -961,6 +961,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> subgroupTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> convTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
   for (int64_t batch : convolutionDims->batch) {
     workgroupTileSizes[batch] = 1;
@@ -978,24 +980,28 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
       schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
+  subgroupTileSizes[mDim] = schedule->mTileSizes[0];
   workgroupTileSizes[nDim] =
       schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  subgroupTileSizes[nDim] = schedule->nTileSizes[0];
 
   reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
-    reductionTileSizes[filterDim] = 1;
+    convTileSizes[filterDim] = 1;
   }
 
   Builder b(context);
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
-      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
+      NamedAttribute("conv_reduction", b.getI64ArrayAttr(convTileSizes)),
+      NamedAttribute("subgroup", b.getI64ArrayAttr(subgroupTileSizes))};
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
-  IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
+  // IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
+  // IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -1016,7 +1022,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 

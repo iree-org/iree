@@ -322,7 +322,9 @@ def GPUApplyTilingLevelPass :
               clEnumValN(IREE::GPU::TilingLevel::Thread, "thread",
                          "Tile and fuse all annotated ops to threads"),
               clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
-                         "Tile and fuse all annotated ops to threads")
+                         "Tile and fuse all annotated ops to threads"),
+              clEnumValN(IREE::GPU::TilingLevel::ConvReduction, "conv_reduction",
+                         "Tile and fuse all annotated ops to serial loops")
            )}]>,
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
            /*default=*/"true",

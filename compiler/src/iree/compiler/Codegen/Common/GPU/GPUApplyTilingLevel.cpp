@@ -153,7 +153,8 @@ static LogicalResult applyTileAndFuseToEachRoot(
       Operation *owner = originalProducer.getOwner();
       if (tilingLevel == IREE::GPU::TilingLevel::Reduction ||
           tilingLevel == IREE::GPU::TilingLevel::PartialReduction ||
-          tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
+          tilingLevel == IREE::GPU::TilingLevel::Subgroup ||
+          tilingLevel == IREE::GPU::TilingLevel::ConvReduction) {
         // Do not fuse pad in reduction and subgroup tiling. We instead fuse
         // pad without zero slice guard as a cleanup pattern.
         if (isa<tensor::PadOp>(owner)) {
@@ -163,7 +164,7 @@ static LogicalResult applyTileAndFuseToEachRoot(
       bool yieldProducerReplacement = false;
       // We dont want this for reduction tiling as it can lead to large tensors
       // being yielded.
-      if (tilingLevel != IREE::GPU::TilingLevel::Reduction &&
+      if (tilingLevel != IREE::GPU::TilingLevel::Reduction && tilingLevel != IREE::GPU::TilingLevel::ConvReduction && 
           tilingLevel != IREE::GPU::TilingLevel::PartialReduction)
         yieldProducerReplacement = yieldReplacementsFor.contains(owner);
       bool shouldFuse = false;
@@ -172,7 +173,7 @@ static LogicalResult applyTileAndFuseToEachRoot(
       }
       // Do not fuse destination operands for reduction tiling.
       if (isDestinationOperand &&
-          (tilingLevel == IREE::GPU::TilingLevel::Reduction ||
+          (tilingLevel == IREE::GPU::TilingLevel::Reduction || tilingLevel == IREE::GPU::TilingLevel::ConvReduction || 
            tilingLevel == IREE::GPU::TilingLevel::PartialReduction)) {
         shouldFuse = false;
       }
@@ -270,7 +271,8 @@ void GPUApplyTilingLevelPass::runOnOperation() {
   if (tilingLevel != IREE::GPU::TilingLevel::Reduction &&
       tilingLevel != IREE::GPU::TilingLevel::Thread &&
       tilingLevel != IREE::GPU::TilingLevel::Subgroup &&
-      tilingLevel != IREE::GPU::TilingLevel::PartialReduction) {
+      tilingLevel != IREE::GPU::TilingLevel::PartialReduction &&
+      tilingLevel != IREE::GPU::TilingLevel::ConvReduction) {
     funcOp.emitError() << "unsupported tiling level: "
                        << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
     return signalPassFailure();

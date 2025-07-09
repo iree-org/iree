@@ -1657,6 +1657,7 @@ constexpr StringLiteral kReductionLevelName = "reduction";
 constexpr StringLiteral kThreadLevelName = "thread";
 constexpr StringLiteral kSubgroupLevelName = "subgroup";
 constexpr StringLiteral kLaneLevelName = "lane";
+constexpr StringLiteral kConvReductionLevelName = "conv_reduction";
 
 StringRef getTilingLevelName(GPU::TilingLevel level) {
   switch (level) {
@@ -1672,6 +1673,8 @@ StringRef getTilingLevelName(GPU::TilingLevel level) {
     return kSubgroupLevelName;
   case GPU::TilingLevel::Lane:
     return kLaneLevelName;
+  case GPU::TilingLevel::ConvReduction:
+    return kConvReductionLevelName;
   }
   assert(false && "Unknown tiling level");
   return StringRef();
