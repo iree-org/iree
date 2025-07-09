@@ -17,6 +17,7 @@ iree_cc_library(
     "FusionUtils.h"
     "Passes.h"
   SRCS
+    "BitcastUnsupportedElementTypes.cpp"
     "BubbleUpExpandShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
