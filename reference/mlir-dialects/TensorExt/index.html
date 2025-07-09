@@ -1898,6 +1898,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.dispatch.workload.ordinal (TensorExt::DispatchWorkloadOrdinalOp)
@@ -4692,6 +4701,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.dispatch.workload.ordinal (TensorExt::DispatchWorkloadOrdinalOp)
@@ -4784,6 +4802,7 @@ beyond what is currently available in the Tensor Dialect.</p>
 <li><a href="#iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop">iree_tensor_ext.dispatch.tensor.store (TensorExt::DispatchTensorStoreOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop">iree_tensor_ext.dispatch.workgroup_count_from_dag_root (TensorExt::DispatchWorkgroupCountFromDagRootOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop">iree_tensor_ext.dispatch.workgroup_count_from_slice (TensorExt::DispatchWorkgroupCountFromSliceOp)</a></li>
+<li><a href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop">iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop">iree_tensor_ext.dispatch.workload.ordinal (TensorExt::DispatchWorkloadOrdinalOp)</a></li>
 </ul>
 </li>
@@ -5043,6 +5062,71 @@ workload could be more than just values of index types.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop"><code>iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier</code> (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop" title="Permanent link">link</a></h3>
+<p><em>Modifies the workgroup count calculation to account for split reductions.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier` attr-dict `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `,` ($workload^)?
+</code></pre></div>
+<p>A split reduction dispatch contains an <code>scf.forall</code> within which the
+partial reduction computation is done. The <code>scf.forall</code> represents parallel
+partial reduction computations. <code>workgroup_x</code>, <code>workgroup_y</code>, and
+<code>workgroup_z</code> represent the workgroups needed to execute the inner compute
+ops. This is combined with <code>workload</code> to determine the total number of
+workgroups required to run the computation after accounting for the
+<code>scf.forall</code>.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>workgroup_x</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>workgroup_y</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>workgroup_z</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>workload</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result_x</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_y</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_z</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop"><code>iree_tensor_ext.dispatch.workload.ordinal</code> (TensorExt::DispatchWorkloadOrdinalOp)<a class="headerlink" href="#iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop" title="Permanent link">link</a></h3>
 <p><em>Annotates the values captured as workload within the body of
     <code>flow.dispatch.workgroups</code> op.</em></p>
@@ -5068,7 +5152,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5083,7 +5167,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
