@@ -337,6 +337,33 @@ blockDynamicDimensions(RewriterBase &rewriter,
 void BlockDynamicDimensionsPass::runOnOperation() {
   Operation *operation = getOperation();
   MLIRContext *context = &getContext();
+
+  {
+    // Bubble up/down reshape operations before blocking to avoid creating
+    // chains of reshape operations after blocking as much as possible.
+    RewritePatternSet patterns(context);
+    linalg::ControlFusionFn controlFusionFn = [](OpOperand *opOperand) {
+      return true;
+    };
+    linalg::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                      controlFusionFn);
+    IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                               controlFusionFn);
+    // Add patterns to fold `tensor.empty` operations with its consumers.
+    tensor::populateFoldTensorEmptyPatterns(patterns);
+    // Add some additional patterns that can simplify the IR.
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "After initial reshape propagation:\n";
+    operation->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n";
+  });
+
   TensorDynamicDimAnalysis dynamicDimAnalysis(operation);
   if (failed(dynamicDimAnalysis.run())) {
     return signalPassFailure();
