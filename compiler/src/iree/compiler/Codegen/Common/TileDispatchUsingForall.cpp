@@ -25,6 +25,8 @@
 
 namespace mlir::iree_compiler {
 
+#define CEILDIV(a, b) ((a + b - 1) / b)
+
 #define GEN_PASS_DEF_TILEANDDISTRIBUTETOWORKGROUPSUSINGFORALLOPPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
@@ -118,18 +120,10 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
     OpFoldResult zero = rewriter.getIndexAttr(0);
     SmallVector<int64_t> tileSizesInt = tilableOpConfig.getWorkgroupTileSizes();
-    int numNonZero = tileSizesInt.size() - llvm::count(tileSizesInt, 0);
-    for (auto loopId :
-         llvm::reverse(llvm::seq<unsigned>(0, tileSizesInt.size()))) {
-      // Do not set all sizes to 0, or else the distribution loop will not be
-      // created.
-      if (numNonZero <= 1) {
-        break;
-      }
+    for (auto loopId : llvm::seq<unsigned>(0, tileSizesInt.size())) {
       if (loopId < staticLoopSizes.size() &&
           staticLoopSizes[loopId] == tileSizesInt[loopId]) {
         tileSizes[loopId] = zero;
-        --numNonZero;
       }
     }
   }
@@ -166,6 +160,64 @@ static SmallVector<Attribute> getMapping(MLIRContext *context,
 // Post tiling cleanup patterns
 //===---------------------------------------------------------------------===//
 
+/// Prune the values corresponding to the dropped loops.
+static SmallVector<OpFoldResult>
+pruneDroppedLoops(ArrayRef<OpFoldResult> inputs,
+                  const llvm::SmallDenseSet<int> &droppedLoops) {
+  SmallVector<OpFoldResult> prunedInputs;
+  for (auto [index, input] : llvm::enumerate(inputs)) {
+    if (droppedLoops.contains(index)) {
+      continue;
+    }
+    prunedInputs.push_back(input);
+  }
+  return prunedInputs;
+}
+
+/// Prune the mapping attributes corresponding to the dropped loops.
+/// Note that we cant just drop them. We need to rebalance the
+/// attributes so that the workgroup attributes are perfectly ordered.
+/// For example, if the attribute list is
+///
+/// ```
+/// [workgroup_mapping<x>, workgroup_mapping<z:1>,
+///  workgroup_mapping<z>, workgroup_mapping<y>,
+///  workgroup_mapping<z:3>, workgroup_mapping<z:2>]
+/// ```
+///
+/// and the droppedloops are `{1, 3}`, then the new mapping should be
+///
+/// ```
+/// [workgroup_mapping<x>, workgroup_mapping<y>,
+///  workgroup_mapping<z:1>, workgroup_mapping<z>]
+/// ```
+SmallVector<Attribute>
+pruneDroppedLoops(ArrayRef<Attribute> inputs,
+                  const llvm::SmallDenseSet<int> &droppedLoops) {
+  SmallVector<IREE::Codegen::WorkgroupMappingAttr> droppedMappings;
+  SmallVector<Attribute> prunedAttrs;
+  for (auto [index, input] : llvm::enumerate(inputs)) {
+    if (droppedLoops.contains(index)) {
+      droppedMappings.push_back(
+          cast<IREE::Codegen::WorkgroupMappingAttr>(input));
+    } else {
+      prunedAttrs.push_back(input);
+    }
+  }
+  for (auto droppedMapping : droppedMappings) {
+    for (auto [index, prunedAttr] : llvm::enumerate(prunedAttrs)) {
+      auto prunedMappingAttr =
+          cast<IREE::Codegen::WorkgroupMappingAttr>(prunedAttr);
+      if (droppedMapping < prunedMappingAttr) {
+        prunedAttrs[index] =
+            IREE::Codegen::WorkgroupMappingAttr::getAttributeFromMappingId(
+                prunedAttr.getContext(), prunedMappingAttr.getMappingId() - 1);
+      }
+    }
+  }
+  return prunedAttrs;
+}
+
 /// Checks whether we have static dimension for all the loop bounds and steps.
 /// This is a requirement if the reordering strategy is set to `transpose`.
 static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
@@ -183,6 +235,77 @@ static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
     }
   }
   return true;
+}
+
+/// Find dimensions of the loop that are unit-trip count and drop them from the
+/// distributed dimensions.
+static FailureOr<scf::ForallOp>
+dropUnitDistributedDims(RewriterBase &rewriter, scf::ForallOp forallOp) {
+  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
+
+  // Find the index of loops to be dropped.
+  llvm::SmallDenseSet<int> droppedLoops;
+  for (auto [index, lb, ub, step] :
+       llvm::enumerate(mixedLbs, mixedUbs, mixedSteps)) {
+
+    std::optional<int64_t> lbVal = getConstantIntValue(lb);
+    std::optional<int64_t> ubVal = getConstantIntValue(ub);
+    std::optional<int64_t> stepVal = getConstantIntValue(step);
+
+    if (!(lbVal && ubVal && stepVal)) {
+      continue;
+    }
+
+    if (CEILDIV(ubVal.value() - lbVal.value(), stepVal.value()) == 1) {
+      droppedLoops.insert(index);
+    }
+  }
+  if (droppedLoops.empty()) {
+    return forallOp;
+  }
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(forallOp);
+  SmallVector<OpFoldResult> newLbs =
+      pruneDroppedLoops(ArrayRef<OpFoldResult>(mixedLbs), droppedLoops);
+  SmallVector<OpFoldResult> newUbs =
+      pruneDroppedLoops(ArrayRef<OpFoldResult>(mixedUbs), droppedLoops);
+  SmallVector<OpFoldResult> newSteps =
+      pruneDroppedLoops(ArrayRef<OpFoldResult>(mixedSteps), droppedLoops);
+  std::optional<ArrayAttr> newMapping;
+  if (auto currMapping = forallOp.getMapping()) {
+    SmallVector<Attribute> newMappingAttrs =
+        pruneDroppedLoops(currMapping.value().getValue(), droppedLoops);
+    newMapping = rewriter.getArrayAttr(newMappingAttrs);
+  }
+
+  Value zero = rewriter.create<arith::ConstantIndexOp>(forallOp.getLoc(), 0);
+  auto newForallOp = rewriter.create<scf::ForallOp>(
+      forallOp.getLoc(), newLbs, newUbs, newSteps, forallOp.getInits(),
+      newMapping, [](OpBuilder &, Location, ValueRange) {});
+
+  SmallVector<Value> argReplacements;
+  int newLoopBlockArgNum = 0;
+  auto newLoopBodyArgs = newForallOp.getInductionVars();
+  for (auto [index, oldBlockArg] :
+       llvm::enumerate(forallOp.getInductionVars())) {
+    if (droppedLoops.contains(index)) {
+      argReplacements.push_back(zero);
+    } else {
+      argReplacements.push_back(newLoopBodyArgs[newLoopBlockArgNum++]);
+    }
+  }
+  argReplacements.append(newForallOp.getRegionIterArgs().begin(),
+                         newForallOp.getRegionIterArgs().end());
+
+  Block *oldLoopBody = forallOp.getBody();
+  Block *newLoopBody = newForallOp.getBody();
+  rewriter.mergeBlocks(oldLoopBody, newLoopBody, argReplacements);
+
+  rewriter.replaceOp(forallOp, newForallOp.getResults());
+  return newForallOp;
 }
 
 //===---------------------------------------------------------------------===//
@@ -321,17 +444,24 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       return signalPassFailure();
     }
 
+    auto forallOp =
+        dropUnitDistributedDims(rewriter, cast<scf::ForallOp>(tilingLoops[0]));
+    if (failed(forallOp)) {
+      tilingLoops[0]->emitOpError("failed to drop unit dimensions");
+      return signalPassFailure();
+    }
+
     // Reorder the workgroups if the strategy is set to `transpose`.
     // This just transposes the first two dimensions of the workgroup i.e., the
     // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
     // Only reorders if the loop bounds are static.
-    auto forallOp = cast<scf::ForallOp>(tilingLoops[0]);
     if (transposeWorkgroup) {
-      SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
+      SmallVector<Attribute> mappingAttrs(
+          forallOp->getMappingAttr().getValue());
       int64_t mappingSize = mappingAttrs.size();
-      if (areAllStaticLoopBounds(forallOp) && mappingSize >= 2) {
+      if (areAllStaticLoopBounds(*forallOp) && mappingSize >= 2) {
         std::swap(mappingAttrs[mappingSize - 1], mappingAttrs[mappingSize - 2]);
-        forallOp.setMappingAttr(ArrayAttr::get(context, mappingAttrs));
+        forallOp->setMappingAttr(ArrayAttr::get(context, mappingAttrs));
       }
     }
   }
