@@ -19,9 +19,21 @@
 
 namespace mlir::iree_compiler::IREE::CPU {
 
-//===----------------------------------------------------------------------===//
-// Utilities.
-//===----------------------------------------------------------------------===//
+/// Representation for all the supported tiling levels. All or just a subset of
+/// them may be available in a valid configuration.
+enum TilingLevel : unsigned {
+  DistributionTiles = 0,
+  CacheParallelTiles = 1,
+  CacheReductionTiles = 2,
+  VectorCommonParallelTiles = 3,
+  VectorReductionTiles = 4,
+  VectorInnerParallelTiles = 5,
+  MaxNumTileLevels = 6,
+  InvalidLevel = 7,
+};
+
+/// Returns the corresponding key string for `level`.
+StringRef getTilingLevelName(TilingLevel level);
 
 } // namespace mlir::iree_compiler::IREE::CPU
 
