@@ -4,22 +4,160 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/Support/LLVM.h"
 
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.cpp.inc"
 
 namespace mlir::iree_compiler::IREE::CPU {
+
+//===----------------------------------------------------------------------===//
+// CPU Specific Lowering Config Attributes
+//===----------------------------------------------------------------------===//
+
+constexpr StringLiteral kDistributionConfigKey = "distribution";
+constexpr StringLiteral kCacheParallelConfigKey = "cache_parallel";
+constexpr StringLiteral kCacheReductionConfigKey = "cache_reduction";
+constexpr StringLiteral kVectorCommonParallelConfigKey =
+    "vector_common_parallel";
+constexpr StringLiteral kVectorReductionConfigKey = "vector_reduction";
+constexpr StringLiteral kVectorInnerParallelConfigKey = "vector_inner_parallel";
+
+/// Returns the entry key for the config in IREE::CPU::LoweringConfigAttr.
+/// Returns null if `level` is invalid.
+StringRef getTilingLevelName(TilingLevel level) {
+  switch (level) {
+  case DistributionTiles:
+    return kDistributionConfigKey;
+  case CacheParallelTiles:
+    return kCacheParallelConfigKey;
+  case CacheReductionTiles:
+    return kCacheReductionConfigKey;
+  case VectorCommonParallelTiles:
+    return kVectorCommonParallelConfigKey;
+  case VectorReductionTiles:
+    return kVectorReductionConfigKey;
+  case VectorInnerParallelTiles:
+    return kVectorInnerParallelConfigKey;
+  case MaxNumTileLevels:
+  case InvalidLevel:
+  default:
+    return StringRef();
+  }
+}
+
+static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
+                                         TilingLevel level) {
+  auto attr = config.getAs<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+      getTilingLevelName(level));
+  return SmallVector<int64_t>(attr.getSizes());
+}
+
+/// Returns true if the given entry `key` should use
+/// IREE::Codegen::LoweringConfigTilingLevelAttr as value type.
+static bool isLoweringConfigTilingLevelKey(StringRef key) {
+  SmallVector<StringLiteral> allowList = {
+      kDistributionConfigKey,         kCacheParallelConfigKey,
+      kCacheReductionConfigKey,       kVectorReductionConfigKey,
+      kVectorCommonParallelConfigKey, kVectorInnerParallelConfigKey};
+  return llvm::is_contained(allowList, key);
+}
+
+LogicalResult
+LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                           DictionaryAttr config) {
+  for (NamedAttribute attr : config) {
+    if (isLoweringConfigTilingLevelKey(attr.getName()) &&
+        !isa<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr.getValue())) {
+      return emitError() << attr.getName()
+                         << " is not LoweringConfigTilingLevelAttr: "
+                         << attr.getValue();
+    }
+  }
+  return success();
+}
+
+Attribute LoweringConfigAttr::parse(AsmParser &parser, Type type) {
+  if (parser.parseLess()) {
+    return {};
+  }
+
+  MLIRContext *ctx = parser.getContext();
+  SmallVector<NamedAttribute> dictItems;
+  bool first = true;
+  while (parser.parseOptionalGreater()) {
+    if (!first && parser.parseComma()) {
+      return {};
+    }
+    first = false;
+
+    std::string keyStr;
+    if (parser.parseKeywordOrString(&keyStr) || parser.parseEqual()) {
+      return {};
+    }
+    StringAttr key = StringAttr::get(ctx, keyStr);
+    Attribute value;
+    if (isLoweringConfigTilingLevelKey(keyStr)) {
+      value = IREE::Codegen::LoweringConfigTilingLevelAttr::parse(parser, type);
+      if (!value) {
+        return {};
+      }
+    } else {
+      if (parser.parseAttribute(value)) {
+        return {};
+      }
+    }
+    dictItems.emplace_back(key, value);
+  }
+  auto dictAttr = DictionaryAttr::get(ctx, dictItems);
+  return parser.getChecked<LoweringConfigAttr>(ctx, dictAttr);
+}
+
+void LoweringConfigAttr::print(AsmPrinter &printer) const {
+  printer << "<";
+  auto dictAttr = getConfig();
+  llvm::interleaveComma(dictAttr, printer, [&](NamedAttribute attr) {
+    // Use `.str()` to avoid wrapping the key string with `"`.
+    printer << attr.getName().str() << " = ";
+    if (isLoweringConfigTilingLevelKey(attr.getName())) {
+      // Do not use `printAttribute` that avoids printing dialect namespace as
+      // prefix.
+      cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr.getValue())
+          .print(printer);
+    } else {
+      printer.printAttribute(attr.getValue());
+    }
+  });
+  printer << ">";
+}
+
+SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
+  return getTileSizes(getConfig(), DistributionTiles);
+}
+
+SmallVector<OpFoldResult>
+LoweringConfigAttr::getTilingLevelSizes(OpBuilder &builder, unsigned level,
+                                        Operation *op) const {
+  assert(level < llvm::to_underlying(TilingLevel::MaxNumTileLevels) &&
+         "invalid level");
+  return llvm::map_to_vector(
+      getTileSizes(getConfig(), static_cast<TilingLevel>(level)),
+      [&](int64_t t) -> OpFoldResult { return builder.getIndexAttr(t); });
+}
+
+bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
+  return getConfig().contains(
+      getTilingLevelName(static_cast<TilingLevel>(level)));
+}
+
+bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
+  return !getWorkgroupTileSizes().empty();
+}
 
 //===----------------------------------------------------------------------===//
 // Attribute Registration
