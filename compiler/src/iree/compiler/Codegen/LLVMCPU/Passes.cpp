@@ -226,12 +226,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
              << level;
     }
   }
-
-  // Verify that native vector size is empty.
-  SmallVector<int64_t> nativeVectorSize = tilingConfig.getNativeVectorSizes();
-  if (!nativeVectorSize.empty()) {
-    return op->emitOpError("native_vector_size must be empty");
-  }
   return success();
 }
 
