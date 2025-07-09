@@ -129,9 +129,6 @@ public:
   SmallVector<int64_t> getTileInterchangeSizes(unsigned level) {
     return loweringConfig.getTileInterchangeVals(level);
   }
-  SmallVector<int64_t> getNativeVectorSizes() {
-    return loweringConfig.getNativeVectorSizeVals();
-  }
 
 private:
   SizesAndScalableFlags getVectorSizesForLevel(unsigned level) {

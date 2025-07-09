@@ -37,8 +37,7 @@ protected:
     auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
         &ctx, newTilingLevelsList);
     loweringConfig =
-        IREE::Codegen::LoweringConfigAttr::get(&ctx, newTilingLevels,
-                                               /*nativeVectorSize=*/4);
+        IREE::Codegen::LoweringConfigAttr::get(&ctx, newTilingLevels);
   }
 
   ~TileSizeSelection() override {}

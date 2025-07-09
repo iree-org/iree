@@ -153,8 +153,7 @@ TilingConfig::getLoweringConfigWithNewVectorSizes(
   // Create a new `lowering_config` attribute.
   auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
       context, newTilingLevelsList);
-  return IREE::Codegen::LoweringConfigAttr::get(
-      context, newTilingLevels, loweringConfig.getNativeVectorSize());
+  return IREE::Codegen::LoweringConfigAttr::get(context, newTilingLevels);
 }
 
 /// Returns a list with the tiling levels that can be fused for this
