@@ -10,6 +10,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.cpp.inc"
@@ -136,6 +137,19 @@ void LoweringConfigAttr::print(AsmPrinter &printer) const {
   printer << ">";
 }
 
+Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
+                                                 ArrayRef<int64_t> tileSizes) {
+  return IREE::Codegen::LoweringConfigTilingLevelAttr::get(
+      ctx, tileSizes, /*interchange=*/{}, /*scalableFlags=*/{});
+}
+
+Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
+                                                 ArrayRef<int64_t> tileSizes,
+                                                 ArrayRef<bool> scalableFlags) {
+  return IREE::Codegen::LoweringConfigTilingLevelAttr::get(
+      ctx, tileSizes, /*interchange=*/{}, scalableFlags);
+}
+
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
   return getTileSizes(getConfig(), DistributionTiles);
 }
@@ -157,6 +171,31 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
 
 bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
   return !getWorkgroupTileSizes().empty();
+}
+
+std::optional<unsigned> LoweringConfigAttr::getNumTilingLevels() const {
+  return llvm::count_if(getConfig(), [](NamedAttribute attr) {
+    return isLoweringConfigTilingLevelKey(attr.getName());
+  });
+}
+
+SmallVector<int64_t>
+LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
+                                              Operation *) const {
+  assert(level < llvm::to_underlying(TilingLevel::MaxNumTileLevels) &&
+         "invalid level");
+  return getTileSizes(getConfig(), static_cast<TilingLevel>(level));
+}
+
+Attribute LoweringConfigAttr::getTilingLevelAttr(unsigned level) const {
+  assert(level < llvm::to_underlying(TilingLevel::MaxNumTileLevels) &&
+         "invalid level");
+  StringRef key = getTilingLevelName(static_cast<TilingLevel>(level));
+  DictionaryAttr config = getConfig();
+  if (!config || config.contains(key)) {
+    return {};
+  }
+  return config.get(key);
 }
 
 //===----------------------------------------------------------------------===//
