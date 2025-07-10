@@ -70,7 +70,7 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     return failure();
   }
   auto [m, n, k] = kind.getMNKShape();
-  indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k};
+  indices = {contractionDims->m, contractionDims->n, contractionDims->k};
   return createPackedSizes({m, n, k}, indices);
 }
 
