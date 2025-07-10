@@ -49,6 +49,10 @@ def IREETensorExt_BitCastOp : IREETensorExt_PureOp<"bitcast", [
 
     produces a tensor of shape [1, %0, 2, %1, 3] and element type `!eltype`.
     Note that the source and result tensors must serialized to the same size.
+
+    Different from the flow.bitcast op, the op is allowed to be cloned into
+    dispatch regions and supports transformations required by executable
+    translation such as bufferization.
   }];
 
   let arguments = (ins
