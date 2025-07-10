@@ -284,7 +284,9 @@ def IREECodegen_LoweringConfigAttr :
       DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
         "getWorkgroupTileSizes",
         "getWorkgroupInterchange",
+        "getNumTilingLevels",
         "getStaticTilingLevelSizes",
+        "getTilingLevelAttr",
         "getTilingLevelSizes",
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
