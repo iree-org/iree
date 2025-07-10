@@ -623,15 +623,13 @@ LogicalResult emulateNarrowType(
   }
 
   if (failed(applyPartialConversion(root, target, std::move(patterns)))) {
-    root->emitOpError("failed to emulate bit width");
-    return failure();
+    return root->emitOpError("failed to emulate bit width");
   }
 
   RewritePatternSet sinkBroadcast(ctx);
   vector::populateSinkVectorOpsPatterns(sinkBroadcast);
   if (failed(applyPatternsGreedily(root, std::move(sinkBroadcast)))) {
-    root->emitOpError("failed in sinking of broadcasts");
-    return failure();
+    return root->emitOpError("failed in sinking of broadcasts");
   }
 
   // Also do the `bitcast -> extui/extsi` rewrite.
