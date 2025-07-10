@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/EmulateNarrowType.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -576,61 +577,68 @@ struct EmulateNarrowTypePass final
   }
 
   void runOnOperation() override {
-    // The number of bits used in a load/store op.
-    constexpr unsigned kLoadStoreEmulateBitwidth = 8;
-    static_assert(
-        llvm::isPowerOf2_32(kLoadStoreEmulateBitwidth) &&
-        "only power of 2 is supported for narrow type load/store emulation");
-
-    MLIRContext *ctx = &getContext();
-
-    arith::NarrowTypeEmulationConverter typeConverter(
-        kLoadStoreEmulateBitwidth);
-    memref::populateMemRefNarrowTypeEmulationConversions(typeConverter);
-
-    ConversionTarget target(*ctx);
-    target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](Operation *op) {
-      return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
-    });
-    auto opLegalCallback = [&typeConverter](Operation *op) {
-      return typeConverter.isLegal(op);
-    };
-    target.addDynamicallyLegalOp<func::CallOp, func::ReturnOp>(opLegalCallback);
-    target.addDynamicallyLegalDialect<
-        arith::ArithDialect, vector::VectorDialect, memref::MemRefDialect,
-        affine::AffineDialect, IREE::HAL::HALDialect>(opLegalCallback);
-
-    RewritePatternSet patterns(ctx);
-    patterns.insert<IREEConvertVectorStore>(ctx, /*disableAtomicRMW=*/false,
-                                            /*benefit=*/100);
-    arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
-    memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns);
-    populateIREEResolveExtractStridedMetadataPatterns(patterns);
-    vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns);
-    populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
-
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns)))) {
-      getOperation()->emitOpError("failed to emulate bit width");
-      return signalPassFailure();
-    }
-
-    RewritePatternSet sinkBroadcast(ctx);
-    vector::populateSinkVectorOpsPatterns(sinkBroadcast);
-    if (failed(
-            applyPatternsGreedily(getOperation(), std::move(sinkBroadcast)))) {
-      getOperation()->emitOpError("failed in sinking of broadcasts");
-      return signalPassFailure();
-    }
-
-    // Also do the `bitcast -> extui/extsi` rewrite.
-    RewritePatternSet foldExtPatterns(ctx);
-    vector::populateVectorNarrowTypeRewritePatterns(foldExtPatterns);
-    if (failed(applyPatternsGreedily(getOperation(),
-                                     std::move(foldExtPatterns)))) {
+    if (failed(emulateNarrowType(getOperation()))) {
       return signalPassFailure();
     }
   }
 };
 } // namespace
+
+LogicalResult emulateNarrowType(
+    Operation *root,
+    std::optional<NarrowTypeConversionPopulationFn> populateCallback) {
+  // The number of bits used in a load/store op.
+  constexpr unsigned kLoadStoreEmulateBitwidth = 8;
+  static_assert(
+      llvm::isPowerOf2_32(kLoadStoreEmulateBitwidth) &&
+      "only power of 2 is supported for narrow type load/store emulation");
+
+  MLIRContext *ctx = root->getContext();
+
+  arith::NarrowTypeEmulationConverter typeConverter(kLoadStoreEmulateBitwidth);
+  memref::populateMemRefNarrowTypeEmulationConversions(typeConverter);
+
+  ConversionTarget target(*ctx);
+  target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](Operation *op) {
+    return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
+  });
+  auto opLegalCallback = [&typeConverter](Operation *op) {
+    return typeConverter.isLegal(op);
+  };
+  target.addDynamicallyLegalOp<func::CallOp, func::ReturnOp>(opLegalCallback);
+  target.addDynamicallyLegalDialect<
+      arith::ArithDialect, vector::VectorDialect, memref::MemRefDialect,
+      affine::AffineDialect, IREE::HAL::HALDialect>(opLegalCallback);
+
+  RewritePatternSet patterns(ctx);
+  patterns.insert<IREEConvertVectorStore>(ctx, /*disableAtomicRMW=*/false,
+                                          /*benefit=*/100);
+  arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
+  memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns);
+  populateIREEResolveExtractStridedMetadataPatterns(patterns);
+  vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns);
+  populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
+  if (populateCallback) {
+    populateCallback.value()(typeConverter, patterns, target);
+  }
+
+  if (failed(applyPartialConversion(root, target, std::move(patterns)))) {
+    return root->emitOpError("failed to emulate bit width");
+  }
+
+  RewritePatternSet sinkBroadcast(ctx);
+  vector::populateSinkVectorOpsPatterns(sinkBroadcast);
+  if (failed(applyPatternsGreedily(root, std::move(sinkBroadcast)))) {
+    return root->emitOpError("failed in sinking of broadcasts");
+  }
+
+  // Also do the `bitcast -> extui/extsi` rewrite.
+  RewritePatternSet foldExtPatterns(ctx);
+  vector::populateVectorNarrowTypeRewritePatterns(foldExtPatterns);
+  if (failed(applyPatternsGreedily(root, std::move(foldExtPatterns)))) {
+    return failure();
+  }
+  return success();
+}
+
 } // namespace mlir::iree_compiler

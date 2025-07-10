@@ -70,6 +70,7 @@ iree_cc_library(
     "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
+    "AMDGPUEmulateNarrowType.cpp"
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
