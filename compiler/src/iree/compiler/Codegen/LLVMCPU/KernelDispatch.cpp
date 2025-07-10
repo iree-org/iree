@@ -1700,15 +1700,15 @@ static SmallVector<NamedAttribute> getMmt4dTileSizes(linalg::LinalgOp op) {
   SmallVector<NamedAttribute> config;
   config.emplace_back(
       IREE::CPU::getTilingLevelName(IREE::CPU::TilingLevel::DistributionTiles),
-      IREE::CPU::LoweringConfigAttr::getTilingAttr(ctx, distTileSizes));
-  config.emplace_back(
-      IREE::CPU::getTilingLevelName(
-          IREE::CPU::TilingLevel::VectorCommonParallelTiles),
-      IREE::CPU::LoweringConfigAttr::getTilingAttr(ctx, parallelTileSizes));
-  config.emplace_back(
-      IREE::CPU::getTilingLevelName(
-          IREE::CPU::TilingLevel::VectorReductionTiles),
-      IREE::CPU::LoweringConfigAttr::getTilingAttr(ctx, reductionTileSizes));
+      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(ctx, distTileSizes));
+  config.emplace_back(IREE::CPU::getTilingLevelName(
+                          IREE::CPU::TilingLevel::VectorCommonParallelTiles),
+                      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+                          ctx, parallelTileSizes));
+  config.emplace_back(IREE::CPU::getTilingLevelName(
+                          IREE::CPU::TilingLevel::VectorReductionTiles),
+                      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+                          ctx, reductionTileSizes));
   return config;
 }
 
