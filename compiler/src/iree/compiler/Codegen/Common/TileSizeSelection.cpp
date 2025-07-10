@@ -132,7 +132,7 @@ TilingConfig::getLoweringConfigWithNewVectorSizes(
 
   MLIRContext *context = loweringConfig.getContext();
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> tilingLevels;
-  for (int i = 0, e = getNumTilingLevels(); i < e; ++i) {
+  for (unsinged i = 0, e = getNumTilingLevels(); i < e; ++i) {
     tilingLevels.push_back(cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
         loweringConfig.getTilingLevelAttr(i)));
   }
