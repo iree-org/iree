@@ -70,6 +70,7 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "CombineLayoutTransformation.h"
+    "EmulateNarrowType.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "FastMathPatterns.h"
