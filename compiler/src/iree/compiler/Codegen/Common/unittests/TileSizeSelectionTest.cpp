@@ -8,7 +8,10 @@
 #include <gtest/gtest.h>
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler {
 
@@ -47,6 +50,37 @@ protected:
   IREE::Codegen::LoweringConfigAttr loweringConfig;
 };
 
+class CPUTileSizeSelection : public ::testing::Test {
+protected:
+  CPUTileSizeSelection() {
+    reg.insert<IREE::CPU::IREECPUDialect>();
+    ctx.appendDialectRegistry(reg);
+    ctx.loadAllAvailableDialects();
+  }
+
+  // Initialize `loweringConfig` to contain the config for `targets`. The actual
+  // tile sizes are not set in each target, i.e., they are empty lists.
+  void initLoweringConfig(SmallVector<IREE::CPU::TilingLevel> targets) {
+    SmallVector<NamedAttribute> configItems;
+    for (auto level : targets) {
+      SmallVector<int64_t> sizes;
+      SmallVector<bool> scalableFlags;
+      configItems.emplace_back(
+          IREE::CPU::getTilingLevelName(level),
+          IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(&ctx, sizes,
+                                                            scalableFlags));
+    }
+    loweringConfig = IREE::CPU::LoweringConfigAttr::get(
+        &ctx, DictionaryAttr::get(&ctx, configItems));
+  }
+
+  ~CPUTileSizeSelection() override {}
+
+  MLIRContext ctx;
+  DialectRegistry reg;
+  IREE::CPU::LoweringConfigAttr loweringConfig;
+};
+
 TEST_F(TileSizeSelection, NumTilingLevels) {
   const unsigned kMaxNumTilingLevels = 7;
 
@@ -56,6 +90,36 @@ TEST_F(TileSizeSelection, NumTilingLevels) {
   // 2. Create TilingConfig and check if the number of tiling levels match.
   TilingConfig tilingConfig(loweringConfig);
   EXPECT_EQ(tilingConfig.getNumTilingLevels(), kMaxNumTilingLevels);
+}
+
+TEST_F(CPUTileSizeSelection, WithAllFields) {
+  // Initialize Lowering Config
+  SmallVector<IREE::CPU::TilingLevel> targets = {
+      IREE::CPU::TilingLevel::DistributionTiles,
+      IREE::CPU::CacheParallelTiles,
+      IREE::CPU::CacheReductionTiles,
+      IREE::CPU::VectorCommonParallelTiles,
+      IREE::CPU::VectorReductionTiles,
+      IREE::CPU::VectorInnerParallelTiles};
+  initLoweringConfig(targets);
+
+  // Create TilingConfig and check if the number of tiling levels match.
+  TilingConfig tilingConfig(loweringConfig);
+
+  // There are no re-mapping between the TilingConfig and the original config.
+  EXPECT_EQ(tilingConfig.getNumTilingLevels(), targets.size());
+  EXPECT_EQ(tilingConfig.getDistributionLevel(),
+            IREE::CPU::TilingLevel::DistributionTiles);
+  EXPECT_EQ(tilingConfig.getCacheParallelLevel(),
+            IREE::CPU::CacheParallelTiles);
+  EXPECT_EQ(tilingConfig.getCacheReductionLevel(),
+            IREE::CPU::CacheReductionTiles);
+  EXPECT_EQ(tilingConfig.getVectorCommonParallelLevel(),
+            IREE::CPU::VectorCommonParallelTiles);
+  EXPECT_EQ(tilingConfig.getVectorReductionLevel(),
+            IREE::CPU::VectorReductionTiles);
+  EXPECT_EQ(tilingConfig.getVectorInnerParallelLevel(),
+            IREE::CPU::VectorInnerParallelTiles);
 }
 
 TEST_F(TileSizeSelection, getLevel_4_levels) {
