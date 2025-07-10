@@ -2354,12 +2354,12 @@ func.func @online_attention_partial_reduction(%query: tensor<192x?x64xf32>, %key
 // CHECK-DAG:  %[[MAX:.+]] = linalg.fill ins(%[[MAX_INIT]] : f32) outs(%[[RED_E]] : tensor<192x?xf32>) -> tensor<192x?xf32>
 // CHECK-DAG:  %[[SUM:.+]] = linalg.fill ins(%[[SUM_INIT]] : f32) outs(%[[RED_E]] : tensor<192x?xf32>) -> tensor<192x?xf32>
 
-// CHECK-DAG:  %[[OUT_PART_E:.+]] = tensor.empty(%[[M]]) : tensor<192x?x64x32xf32>
-// CHECK-DAG:  %[[RED_PART_E:.+]] = tensor.empty(%[[M]]) : tensor<192x?x32xf32>
+// CHECK-DAG:  %[[OUT_PART_E:.+]] = tensor.empty(%[[M]]) : tensor<32x192x?x64xf32>
+// CHECK-DAG:  %[[RED_PART_E:.+]] = tensor.empty(%[[M]]) : tensor<32x192x?xf32>
 
-// CHECK-DAG:  %[[OUT_PART:.+]] = linalg.fill ins(%[[SUM_INIT]] : f32) outs(%[[OUT_PART_E]] : tensor<192x?x64x32xf32>) -> tensor<192x?x64x32xf32>
-// CHECK-DAG:  %[[MAX_PART:.+]] = linalg.fill ins(%[[MAX_INIT]] : f32) outs(%[[RED_PART_E]] : tensor<192x?x32xf32>) -> tensor<192x?x32xf32>
-// CHECK-DAG:  %[[SUM_PART:.+]] = linalg.fill ins(%[[SUM_INIT]] : f32) outs(%[[RED_PART_E]] : tensor<192x?x32xf32>) -> tensor<192x?x32xf32>
+// CHECK-DAG:  %[[OUT_PART:.+]] = linalg.fill ins(%[[SUM_INIT]] : f32) outs(%[[OUT_PART_E]] : tensor<32x192x?x64xf32>) -> tensor<32x192x?x64xf32>
+// CHECK-DAG:  %[[MAX_PART:.+]] = linalg.fill ins(%[[MAX_INIT]] : f32) outs(%[[RED_PART_E]] : tensor<32x192x?xf32>) -> tensor<32x192x?xf32>
+// CHECK-DAG:  %[[SUM_PART:.+]] = linalg.fill ins(%[[SUM_INIT]] : f32) outs(%[[RED_PART_E]] : tensor<32x192x?xf32>) -> tensor<32x192x?xf32>
 
 // CHECK:      %[[ITER:.+]]:3 = scf.for %[[IV:.+]] = %c0 to %[[K2]] step %c32
 // CHECK-SAME: iter_args(%[[OUT_ITER:.+]] = %[[OUT_PART]], %[[MAX_ITER:.+]] = %[[MAX_PART]], %[[SUM_ITER:.+]] = %[[SUM_PART]])
@@ -2368,22 +2368,22 @@ func.func @online_attention_partial_reduction(%query: tensor<192x?x64xf32>, %key
 // CHECK:         %[[K_SLICE:.+]] = tensor.extract_slice %[[K]][0, %[[IV]], 0] [192, %[[MIN]], 64] [1, 1, 1] : tensor<192x?x64xf32> to tensor<192x?x64xf32>
 // CHECK:         %[[V_SLICE:.+]] = tensor.extract_slice %[[V]][0, %[[IV]], 0] [192, %[[MIN]], 64] [1, 1, 1] : tensor<192x?x64xf32> to tensor<192x?x64xf32>
 
-// CHECK:         %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUT_ITER]][0, 0, 0, 0] [192, %[[M]], 64, %[[MIN]]] [1, 1, 1, 1] : tensor<192x?x64x32xf32> to tensor<192x?x64x?xf32>
-// CHECK:         %[[MAX_SLICE:.+]] = tensor.extract_slice %[[MAX_ITER]][0, 0, 0] [192, %[[M]], %[[MIN]]] [1, 1, 1] : tensor<192x?x32xf32> to tensor<192x?x?xf32>
-// CHECK:         %[[SUM_SLICE:.+]] = tensor.extract_slice %[[SUM_ITER]][0, 0, 0] [192, %[[M]], %[[MIN]]] [1, 1, 1] : tensor<192x?x32xf32> to tensor<192x?x?xf32>
+// CHECK:         %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUT_ITER]][0, 0, 0, 0] [%[[MIN]], 192, %[[M]], 64] [1, 1, 1, 1] : tensor<32x192x?x64xf32> to tensor<?x192x?x64xf32>
+// CHECK:         %[[MAX_SLICE:.+]] = tensor.extract_slice %[[MAX_ITER]][0, 0, 0] [%[[MIN]], 192, %[[M]]] [1, 1, 1] : tensor<32x192x?xf32> to tensor<?x192x?xf32>
+// CHECK:         %[[SUM_SLICE:.+]] = tensor.extract_slice %[[SUM_ITER]][0, 0, 0] [%[[MIN]], 192, %[[M]]] [1, 1, 1] : tensor<32x192x?xf32> to tensor<?x192x?xf32>
 
 // CHECK:         %[[OATT:.+]]:3 = iree_linalg_ext.online_attention
 // CHECK-SAME:    ins(%[[Q_SLICE]], %[[K_SLICE]], %[[V_SLICE]]
 // CHECK-SAME:    outs(%[[OUT_SLICE]], %[[MAX_SLICE]], %[[SUM_SLICE]]
 
-// CHECK:         %[[OUT_NEXT:.+]] = tensor.insert_slice %[[OATT]]#0 into %[[OUT_ITER]][0, 0, 0, 0] [192, %[[M]], 64, %[[MIN]]] [1, 1, 1, 1] : tensor<192x?x64x?xf32> into tensor<192x?x64x32xf32>
-// CHECK:         %[[MAX_NEXT:.+]] = tensor.insert_slice %[[OATT]]#1 into %[[MAX_ITER]][0, 0, 0] [192, %[[M]], %[[MIN]]] [1, 1, 1] : tensor<192x?x?xf32> into tensor<192x?x32xf32>
-// CHECK:         %[[SUM_NEXT:.+]] = tensor.insert_slice %[[OATT]]#2 into %[[SUM_ITER]][0, 0, 0] [192, %[[M]], %[[MIN]]] [1, 1, 1] : tensor<192x?x?xf32> into tensor<192x?x32xf32>
+// CHECK:         %[[OUT_NEXT:.+]] = tensor.insert_slice %[[OATT]]#0 into %[[OUT_ITER]][0, 0, 0, 0] [%[[MIN]], 192, %[[M]], 64] [1, 1, 1, 1] : tensor<?x192x?x64xf32> into tensor<32x192x?x64xf32>
+// CHECK:         %[[MAX_NEXT:.+]] = tensor.insert_slice %[[OATT]]#1 into %[[MAX_ITER]][0, 0, 0] [%[[MIN]], 192, %[[M]]] [1, 1, 1] : tensor<?x192x?xf32> into tensor<32x192x?xf32>
+// CHECK:         %[[SUM_NEXT:.+]] = tensor.insert_slice %[[OATT]]#2 into %[[SUM_ITER]][0, 0, 0] [%[[MIN]], 192, %[[M]]] [1, 1, 1] : tensor<?x192x?xf32> into tensor<32x192x?xf32>
 
 // CHECK:         scf.yield %[[OUT_NEXT]], %[[MAX_NEXT]], %[[SUM_NEXT]]
 
 // CHECK: %[[MAX_RED:.+]] = linalg.reduce ins(%[[ITER]]#1
-// CHECK-SAME: dimensions = [2]
+// CHECK-SAME: dimensions = [0]
 // CHECK:     arith.maximumf
 // CHECK:     linalg.yield
 
@@ -2399,7 +2399,7 @@ func.func @online_attention_partial_reduction(%query: tensor<192x?x64xf32>, %key
 // CHECK:     linalg.yield
 
 // CHECK: %[[SUM_RED:.+]] = linalg.reduce ins(%[[NORM_SUM]]
-// CHECK-SAME: dimensions = [2]
+// CHECK-SAME: dimensions = [0]
 // CHECK:      arith.addf
 // CHECK:      linalg.yield
 
@@ -2410,7 +2410,7 @@ func.func @online_attention_partial_reduction(%query: tensor<192x?x64xf32>, %key
 // CHECK:     linalg.yield
 
 // CHECK: %[[ACC_RED:.+]] = linalg.reduce ins(%[[NORM_ACC]]
-// CHECK-SAME: dimensions = [3]
+// CHECK-SAME: dimensions = [0]
 // CHECK:      arith.addf
 // CHECK:      linalg.yield
 
