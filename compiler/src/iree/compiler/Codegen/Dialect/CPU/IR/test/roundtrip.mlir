@@ -46,6 +46,7 @@ func.func @test_full_lowering_config_with_scalable_vector() attributes {
     >} {
   return
 }
+// Order matters because it is sorted.
 // CHECK:       #[[$CONFIG:.+]] = #iree_cpu.lowering_config<
 // CHECK-SAME{LITERAL}:      cache_parallel = [64, 64, 0]
 // CHECK-SAME{LITERAL}:      cache_reduction = [0, 0, 16]
@@ -53,7 +54,6 @@ func.func @test_full_lowering_config_with_scalable_vector() attributes {
 // CHECK-SAME{LITERAL}:      vector_common_parallel = [[4], [4], 0]
 // CHECK-SAME{LITERAL}:      vector_inner_parallel = [0, 0, 0]
 // CHECK-SAME{LITERAL}:      vector_reduction = [0, 0, [4]]
-// Order matters because it is sorted.
 // CHECK-LABEL:         @test_full_lowering_config_with_scalable_vector()
 // CHECK-SAME:    lowering_config = #[[$CONFIG]]
 
