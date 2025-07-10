@@ -32,6 +32,12 @@ enum TilingLevel : unsigned {
   InvalidLevel = 7,
 };
 
+struct LoweringConfigLevelInfo {
+  IREE::CPU::TilingLevel level;
+  SmallVector<int64_t> sizes;
+  SmallVector<bool> scalableFlags;
+};
+
 /// Returns the corresponding key string for `level`.
 StringRef getTilingLevelName(TilingLevel level);
 

@@ -192,7 +192,7 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(unsigned level) const {
          "invalid level");
   StringRef key = getTilingLevelName(static_cast<TilingLevel>(level));
   DictionaryAttr config = getConfig();
-  if (!config || config.contains(key)) {
+  if (!config || !config.contains(key)) {
     return {};
   }
   return config.get(key);
