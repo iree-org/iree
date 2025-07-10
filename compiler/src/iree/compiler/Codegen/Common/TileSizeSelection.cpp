@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
@@ -29,7 +30,7 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //   5. [[distribution], [cache-parallel], [cache-reduction],
   //       [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
-  int numTileLevels = loweringConfig.getTilingLevels().size();
+  unsigned numTileLevels = getNumTilingLevels();
   switch (numTileLevels) {
   case 4:
     tilingLevelToActualLevelMap[VectorInnerParallelTiles] = 3;
@@ -61,11 +62,11 @@ TilingConfig::getTilingLevelForVectorDimPosition(unsigned dimPos) const {
                                           VectorReductionTiles,
                                           VectorInnerParallelTiles};
   std::optional<unsigned> foundLevel;
-  auto tilingLevels = loweringConfig.getTilingLevels();
+  auto tilingLevels = getTileSizes();
   for (TilingLevel level : vectorTilingLevels) {
     auto tilingLevelIndex = tilingLevelToActualLevelMap[level];
     if (tilingLevelIndex != InvalidLevel &&
-        tilingLevels[tilingLevelIndex].getSizes()[dimPos] != 0) {
+        tilingLevels[tilingLevelIndex][dimPos] != 0) {
       assert(!foundLevel.has_value() &&
              "expected at most one tile size to be non-zero");
       foundLevel = tilingLevelIndex;
@@ -89,7 +90,11 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<bool> scalableFlags(numDims, false);
-  auto tilingLevels = loweringConfig.getTilingLevels();
+  SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> tilingLevels;
+  for (unsigned i = 0, e = getNumTilingLevels(); i < e; ++i) {
+    tilingLevels.push_back(cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        loweringConfig.getTilingLevelAttr(i)));
+  }
   for (int dimPos = 0; dimPos < numDims; ++dimPos) {
     auto dimTilingLevel = getTilingLevelForVectorDimPosition(dimPos);
     if (!dimTilingLevel.has_value())
@@ -126,7 +131,11 @@ TilingConfig::getLoweringConfigWithNewVectorSizes(
   }
 
   MLIRContext *context = loweringConfig.getContext();
-  auto tilingLevels = loweringConfig.getTilingLevels();
+  SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> tilingLevels;
+  for (unsigned i = 0, e = getNumTilingLevels(); i < e; ++i) {
+    tilingLevels.push_back(cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        loweringConfig.getTilingLevelAttr(i)));
+  }
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList(
       tilingLevels.begin(), tilingLevels.end());
 
