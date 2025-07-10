@@ -16,9 +16,11 @@ iree_cc_test(
   SRCS
     "TileSizeSelectionTest.cpp"
   DEPS
+    MLIRIR
     gmock
     gtest
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::testing::gtest_main
 )

@@ -22,6 +22,9 @@ def IREECPU_LoweringConfigAttr :
         "getTilingLevelSizes",
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
+        "getNumTilingLevels",
+        "getStaticTilingLevelSizes",
+        "getTilingLevelAttr",
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -50,6 +53,14 @@ def IREECPU_LoweringConfigAttr :
     AttrParameter<"DictionaryAttr",
         "The configured fields, including tiling levels.">:$config
   );
+  let extraClassDeclaration = [{
+    /// Returns the attribute that indicates the tiling sizes.
+    static Attribute getTilingLevelAttr(MLIRContext *ctx,
+                                   ArrayRef<int64_t> tileSizes);
+    static Attribute getTilingLevelAttr(MLIRContext *ctx,
+                                   ArrayRef<int64_t> tileSizes,
+                                   ArrayRef<bool> scalableFlags);
+  }];
   let hasCustomAssemblyFormat = 1;
   let genVerifyDecl = 1;
 }

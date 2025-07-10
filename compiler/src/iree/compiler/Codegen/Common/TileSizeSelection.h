@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
 namespace mlir::iree_compiler {
@@ -28,7 +29,12 @@ using SizesAndScalableFlags =
 ///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
 public:
+  /// Internal representation for all the supported tiling levels. All or just
+  /// a subset of them may be available in a valid configuration.
+  using TilingLevel = IREE::CPU::TilingLevel;
+
   TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
+  TilingConfig(IREE::CPU::LoweringConfigAttr lc);
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() const {
@@ -68,21 +74,23 @@ public:
   }
 
   /// Returns the tiling level for cache parallel dimensions.
-  unsigned getDistributionLevel() { return getActualLevel(DistributionTiles); }
+  unsigned getDistributionLevel() {
+    return getActualLevel(TilingLevel::DistributionTiles);
+  }
 
   /// Returns the tiling level for cache parallel dimensions.
   unsigned getCacheParallelLevel() {
-    return getActualLevel(CacheParallelTiles);
+    return getActualLevel(TilingLevel::CacheParallelTiles);
   }
 
   /// Returns the tiling level for cache reduction dimensions.
   unsigned getCacheReductionLevel() {
-    return getActualLevel(CacheReductionTiles);
+    return getActualLevel(TilingLevel::CacheReductionTiles);
   }
 
   /// Returns the tiling level for vector common parallel dimensions.
   unsigned getVectorCommonParallelLevel() {
-    return getActualLevel(VectorCommonParallelTiles);
+    return getActualLevel(TilingLevel::VectorCommonParallelTiles);
   }
 
   /// Returns true if the tiling configuration has vector inner parallel
@@ -91,17 +99,17 @@ public:
 
   /// Returns the tiling level for vector inner parallel dimensions.
   unsigned getVectorInnerParallelLevel() {
-    return getActualLevel(VectorInnerParallelTiles);
+    return getActualLevel(TilingLevel::VectorInnerParallelTiles);
   }
 
   /// Returns the tiling level for vector parallel dimensions.
   unsigned getVectorReductionLevel() {
-    return getActualLevel(VectorReductionTiles);
+    return getActualLevel(TilingLevel::VectorReductionTiles);
   }
 
   /// Returns the distribution tile sizes of the configuration.
   SmallVector<int64_t> getDistributionTileSizes() {
-    return getTileSizesForLevel(getActualLevel(DistributionTiles));
+    return getTileSizesForLevel(getActualLevel(TilingLevel::DistributionTiles));
   }
 
   SmallVector<int64_t> getCacheReductionSizes() {
@@ -158,19 +166,6 @@ private:
   /// is an index into the result of `getVectorTileSizes()`).
   std::optional<unsigned>
   getTilingLevelForVectorDimPosition(unsigned dimPos) const;
-
-  /// Internal representation for all the supported tiling levels. All or just
-  /// a subset of them may be available in a valid configuration.
-  enum TilingLevel : unsigned {
-    DistributionTiles = 0,
-    CacheParallelTiles = 1,
-    CacheReductionTiles = 2,
-    VectorCommonParallelTiles = 3,
-    VectorReductionTiles = 4,
-    VectorInnerParallelTiles = 5,
-    MaxNumTileLevels = 6,
-    InvalidLevel = 7,
-  };
 
   /// Returns the actual level in the configuration for this level of tiling.
   unsigned getActualLevel(TilingLevel level);
