@@ -97,6 +97,7 @@ iree_cc_library(
     "ROCDLLowerExecutableTarget.cpp"
     "ROCDLPrefetching.cpp"
     "ROCDLSelectLoweringStrategy.cpp"
+    "ROCDLUseBufferInstructions.cpp"
     "TestLLVMGPUQueryMMAPass.cpp"
     "Verifiers.cpp"
   DEPS
