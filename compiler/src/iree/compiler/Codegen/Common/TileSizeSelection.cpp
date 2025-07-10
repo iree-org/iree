@@ -63,7 +63,7 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
 TilingConfig::TilingConfig(IREE::CPU::LoweringConfigAttr lc)
     : loweringConfig(lc) {
   assert(lc && "Expected a valid lowering config");
-  for (int i = 0, e = tilingLevelToActualLevelMap.size(); i < e; ++i) {
+  for (size_t i = 0, e = tilingLevelToActualLevelMap.size(); i < e; ++i) {
     tilingLevelToActualLevelMap[i] = i;
   }
 };
