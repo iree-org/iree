@@ -304,10 +304,18 @@ SmallVector<int64_t> LoweringConfigAttr::getWorkgroupInterchange() const {
   return getTileInterchangeVals(0);
 }
 
+std::optional<unsigned> LoweringConfigAttr::getNumTilingLevels() const {
+  return getTilingLevels().size();
+}
+
 SmallVector<int64_t>
 LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
                                               Operation *) const {
   return getTileSizeVals(level);
+}
+
+Attribute LoweringConfigAttr::getTilingLevelAttr(unsigned level) const {
+  return getTilingLevels()[level];
 }
 
 SmallVector<OpFoldResult>
