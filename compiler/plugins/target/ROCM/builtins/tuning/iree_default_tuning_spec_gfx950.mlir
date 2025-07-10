@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-// This is just an initial tuning spec for gfx942 and is not intended for
+// This is just an initial tuning spec for gfx950 and is not intended for
 // production use.
 // TODO(https://github.com/iree-org/iree/issues/19214): Add missing
 // configurations to this spec.
@@ -63,7 +63,7 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 
-module @iree_default_tuning_spec_gfx942 attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
+module @iree_default_tuning_spec_gfx950 attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
 
 // ============================================================
 // * Handwritten Codegen Schedules *
@@ -1844,7 +1844,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -1942,7 +1942,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -1984,7 +1984,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -2103,7 +2103,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -2233,7 +2233,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -2376,7 +2376,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -2448,7 +2448,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -2549,7 +2549,7 @@ transform.named_sequence
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
       // This strategy uses the maximum amount of possible shared memory on
-      // all gfx942 architectures so shared memory padding to reduce bank
+      // all gfx950 architectures so shared memory padding to reduce bank
       // conflicts must be disabled. Also prefetching is done manually in the
       // above and is disabled here as well.
       {gpu_pipeline_options =
@@ -2659,7 +2659,7 @@ transform.named_sequence
   transform.iree.match.dim_is_multiple_of  %value[3], 64 : !transform.any_value
 
   // `amdgpu-waves-per-eu`:
-  // The gfx942 GPU attention implementation uses a high number of registers.
+  // The gfx950 GPU attention implementation uses a high number of registers.
   // Setting this flag instructs the compiler to be less conservative in register allocation,
   // leading to better performance.
 
