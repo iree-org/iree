@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorUtils
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 

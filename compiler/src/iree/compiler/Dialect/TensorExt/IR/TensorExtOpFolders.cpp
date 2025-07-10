@@ -5,10 +5,49 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.bitcast
+//===----------------------------------------------------------------------===//
+
+struct ReplaceBitCastIfTensorOperandEmpty : public OpRewritePattern<BitCastOp> {
+  using OpRewritePattern<BitCastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(BitCastOp op,
+                                PatternRewriter &rewriter) const override {
+    auto emptyOp =
+        dyn_cast_or_null<tensor::EmptyOp>(op.getSource().getDefiningOp());
+    if (!emptyOp)
+      return failure();
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op.getResult().getType(),
+                                                 op.getResultDims());
+    return success();
+  }
+};
+
+OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
+  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
+  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  if (sourceType.getElementType() != resultType.getElementType()) {
+    // Element type mismatch, this is a bitcast.
+    return {};
+  }
+  if (compareShapesEqual(sourceType, getSourceDims(), resultType,
+                         getResultDims())) {
+    // Shapes match and this is a no-op so just fold to the source.
+    return getSource();
+  }
+  return {};
+}
+
+void BitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                            MLIRContext *context) {
+  results.insert<ReplaceBitCastIfTensorOperandEmpty>(context);
+}
 
 //===----------------------------------------------------------------------===//
 // iree_tensor_ext.dispatch.tensor.load
