@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -30,6 +31,8 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -1628,7 +1631,7 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
                              scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
 
-static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
+static SmallVector<NamedAttribute> getMmt4dTileSizes(linalg::LinalgOp op) {
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
   distConfig.minTileSizes.resize(op.getNumLoops(), 0);
@@ -1682,14 +1685,7 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
-  // Cache-level sizes are set to the distribution tile sizes for now. This will
-  // allow us to change distribution tile sizes while still preserving the
-  // existing cache behavior to some extent.
   unsigned numLoops = op.getNumLoops();
-  SmallVector<int64_t> cacheParallelTileSizes(distTileSizes.begin(),
-                                              distTileSizes.end());
-  SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
-
   SmallVector<int64_t> vecTileSizes(numLoops, 1);
   assert(vecTileSizes.size() == mmt4dDimBase + 6);
   vecTileSizes[mmt4dDimBase + 3] = M0;
@@ -1700,16 +1696,32 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
 
-  return {distTileSizes, parallelTileSizes, reductionTileSizes};
+  MLIRContext *ctx = op->getContext();
+  SmallVector<NamedAttribute> config;
+  config.emplace_back(
+      IREE::CPU::getTilingLevelName(IREE::CPU::TilingLevel::DistributionTiles),
+      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(ctx, distTileSizes));
+  config.emplace_back(IREE::CPU::getTilingLevelName(
+                          IREE::CPU::TilingLevel::VectorCommonParallelTiles),
+                      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+                          ctx, parallelTileSizes));
+  config.emplace_back(IREE::CPU::getTilingLevelName(
+                          IREE::CPU::TilingLevel::VectorReductionTiles),
+                      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+                          ctx, reductionTileSizes));
+  return config;
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d
 /// root op
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                   linalg::Mmt4DOp Mmt4dOp) {
-  assert(!getLoweringConfig(Mmt4dOp) && "expected lowering_config is not set");
+                                   linalg::Mmt4DOp mmt4dOp) {
+  assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
+  MLIRContext *ctx = entryPointFn.getContext();
+  SmallVector<NamedAttribute> config = getMmt4dTileSizes(mmt4dOp);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, Mmt4dOp, getMmt4dTileSizes(Mmt4dOp),
+      entryPointFn, mmt4dOp,
+      IREE::CPU::LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, config)),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
@@ -1719,8 +1731,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    linalg::BatchMmt4DOp batchMmt4dOp) {
   assert(!getLoweringConfig(batchMmt4dOp) &&
          "expected lowering_config is not set");
+  MLIRContext *ctx = entryPointFn.getContext();
+  SmallVector<NamedAttribute> config = getMmt4dTileSizes(batchMmt4dOp);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, batchMmt4dOp, getMmt4dTileSizes(batchMmt4dOp),
+      entryPointFn, batchMmt4dOp,
+      IREE::CPU::LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, config)),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
