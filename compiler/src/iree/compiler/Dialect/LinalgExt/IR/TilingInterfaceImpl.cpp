@@ -2559,10 +2559,9 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
 }
 
 static AffineMap getPartialResultMap(AffineMap map, AttentionOpDetail &opInfo) {
-  // Append K2 dimensions at end.
-  for (int dim : opInfo.getK2Dims()) {
-    map = map.insertResult(getAffineDimExpr(dim, map.getContext()),
-                           map.getNumResults());
+  // Append K2 dimensions at start.
+  for (auto [idx, dim] : llvm::enumerate(opInfo.getK2Dims())) {
+    map = map.insertResult(getAffineDimExpr(dim, map.getContext()), idx);
   }
   return map;
 }
