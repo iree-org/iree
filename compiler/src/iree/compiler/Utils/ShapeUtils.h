@@ -13,6 +13,11 @@
 namespace mlir::iree_compiler {
 
 /// Helper to compare shapes of two shaped types by SSA equivalence.
+/// Requires that all sizes are statically equal with no extra analysis.
+/// Dynamic dimensions with soft or provable equality will still return false.
+///
+/// This is in contrast with cast compatible comparison which allows static and
+/// dynamic sizes to compare positively.
 bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                         ShapedType rhsType, ValueRange rhsDynamicDims);
 

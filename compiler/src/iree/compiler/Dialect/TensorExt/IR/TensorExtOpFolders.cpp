@@ -15,7 +15,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 // iree_tensor_ext.bitcast
 //===----------------------------------------------------------------------===//
 
-struct ReplaceIfTensorOperandEmpty : public OpRewritePattern<BitCastOp> {
+struct ReplaceBitCastIfTensorOperandEmpty : public OpRewritePattern<BitCastOp> {
   using OpRewritePattern<BitCastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -46,7 +46,7 @@ OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
 
 void BitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
-  results.insert<ReplaceIfTensorOperandEmpty>(context);
+  results.insert<ReplaceBitCastIfTensorOperandEmpty>(context);
 }
 
 //===----------------------------------------------------------------------===//
