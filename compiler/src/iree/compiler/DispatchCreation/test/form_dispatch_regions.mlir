@@ -1334,7 +1334,6 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
 
 // -----
 
-
 // Avoid fusing consumer when the producer/consumer has the following structure
 //
 // ```mlir
@@ -1393,3 +1392,37 @@ util.func public @avoid_illegal_consumer_fusion(%arg0: tensor<75600x5120xf32>) -
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[EXPAND_SHAPE]], %[[DISPATCH]]#0 :
 //       CHECK:   util.return %[[GENERIC2]]
+
+// -----
+
+util.func @interchange_producer(%update : tensor<2x2xi32>, %indices : tensor<2x2x2xi32>, %original : tensor<2x2xi32>) -> tensor<2x2xi32> {
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d1, d0)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%update : tensor<2x2xi32>)
+      outs(%update : tensor<2x2xi32>){
+      ^bb0(%b0 : i32, %out : i32):
+        linalg.yield %b0 : i32
+  } -> tensor<2x2xi32>
+  %result = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
+                          ins(%0, %indices : tensor<2x2xi32>, tensor<2x2x2xi32>)
+                          outs(%original : tensor<2x2xi32>) {
+                    ^bb0(%arg0: i32, %arg1: i32):
+                      iree_linalg_ext.yield %arg0 : i32
+  } -> tensor<2x2xi32>
+  util.return %result : tensor<2x2xi32>
+}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-LABEL: func public @interchange_producer
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x2xi32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<2x2x2xi32>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<2x2xi32>
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[TPOS:.+]] = linalg.generic
+//  CHECK-SANE:       indexing_maps = [#[[MAP1]], #[[MAP0]]]
+//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:       ins(%[[TPOS]]
+//       CHECK:     flow.return %[[SCATTER]]
+//       CHECK:   util.return %[[DISPATCH]]

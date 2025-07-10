@@ -457,6 +457,53 @@ static bool makeConsumerFusableViaInterchange(
   return true;
 }
 
+static bool makeProducerFusableViaInterchange(
+    OpOperand &fusableOperand,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
+  auto producer = fusableOperand.get().getDefiningOp<linalg::GenericOp>();
+  if (!producer) {
+    return false;
+  }
+
+  auto consumer = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(
+      fusableOperand.getOwner());
+  if (!consumer) {
+    return false;
+  }
+
+  if (!linalg::isElementwise(producer) || producer.getNumResults() != 1) {
+    return false;
+  }
+
+  AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
+      cast<OpResult>(fusableOperand.get()));
+  producerIndexingMap = getProjectedMap(
+      producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
+  AffineMap consumerIndexingMap =
+      consumer.getMatchingIndexingMap(&fusableOperand);
+  if (!consumerIndexingMap.isPermutation() ||
+      producerIndexingMap == consumerIndexingMap) {
+    return false;
+  }
+
+  // Make the input map match the consumer map by applying a permutation map
+  AffineMap invProducerIndexingMap = inversePermutation(producerIndexingMap);
+  AffineMap permutationMap =
+      consumerIndexingMap.compose(invProducerIndexingMap);
+  auto perm = llvm::map_to_vector(permutationMap.getResults(),
+                                  [](AffineExpr e) -> unsigned {
+                                    return cast<AffineDimExpr>(e).getPosition();
+                                  });
+  IRRewriter rewriter(consumer->getContext());
+  FailureOr<linalg::GenericOp> interchangedOp =
+      linalg::interchangeGenericOp(rewriter, producer, perm);
+  (void)interchangedOp;
+  assert(succeeded(interchangedOp) && "expected interchange to succeed");
+  assert(interchangedOp.value() == producer &&
+         "expected interchange to happen in place");
+  return true;
+}
+
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation
 /// must be able to reuse the buffer for the result of the elementwise
@@ -754,7 +801,14 @@ isFusableWithProducer(OpOperand &operand,
     }
   }
 
-  return areOpsFusable(producer, consumer, rootOuterParallelLoops);
+  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
+    if (!makeProducerFusableViaInterchange(operand, rootOuterParallelLoops)) {
+      return false;
+    }
+  }
+
+  assert(areOpsFusable(producer, consumer, rootOuterParallelLoops));
+  return true;
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
