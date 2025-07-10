@@ -38,7 +38,6 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTransformUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
-    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUEnums
   PUBLIC
 )
 
