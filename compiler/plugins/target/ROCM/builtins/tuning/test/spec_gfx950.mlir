@@ -29,7 +29,6 @@ hal.executable public @main {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx950::@__kernel_config}}
       func.func @mmt_2048x1280x5120_f16_f16_f32() {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
@@ -80,7 +79,6 @@ hal.executable public @main {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx950::@__kernel_config}}
       func.func @attention_2x10x4096x64x64x64_f16(
         %query: tensor<2x10x4096x64xf16>,
         %key: tensor<2x10x64x64xf16>,
@@ -136,7 +134,6 @@ hal.executable public @main {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx950::@__kernel_config}}
       func.func @attention_3x10x4096x64x64x32_f16(
         %query: tensor<3x10x4096x64xf16>,
         %key: tensor<3x10x32x64xf16>,
