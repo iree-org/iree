@@ -355,7 +355,7 @@ func.func @mmt4d_384x384x512_4x1x4_dispatch_0() attributes {hal.executable.targe
   iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0], sizes = [96, 128, 4, 4], strides = [1, 1, 1, 1] : tensor<96x128x4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<96x128x4x4xf32>>
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 0, 0, 0, 0], [1, 1, 0, 4, 4, 0], [0, 0, 1, 0, 0, 1]]
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [16, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 4, 4, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 //       CHECK: func.func @mmt4d_384x384x512_4x1x4_dispatch_0()
 //       CHECK:   linalg.mmt4d
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
