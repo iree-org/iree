@@ -55,9 +55,9 @@ def IREECPU_LoweringConfigAttr :
   );
   let extraClassDeclaration = [{
     /// Returns the attribute that indicates the tiling sizes.
-    static Attribute getTilingAttr(MLIRContext *ctx,
+    static Attribute getTilingLevelAttr(MLIRContext *ctx,
                                    ArrayRef<int64_t> tileSizes);
-    static Attribute getTilingAttr(MLIRContext *ctx,
+    static Attribute getTilingLevelAttr(MLIRContext *ctx,
                                    ArrayRef<int64_t> tileSizes,
                                    ArrayRef<bool> scalableFlags);
   }];

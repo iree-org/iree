@@ -65,9 +65,10 @@ protected:
     for (auto level : targets) {
       SmallVector<int64_t> sizes;
       SmallVector<bool> scalableFlags;
-      configItems.emplace_back(IREE::CPU::getTilingLevelName(level),
-                               IREE::CPU::LoweringConfigAttr::getTilingAttr(
-                                   &ctx, sizes, scalableFlags));
+      configItems.emplace_back(
+          IREE::CPU::getTilingLevelName(level),
+          IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(&ctx, sizes,
+                                                            scalableFlags));
     }
     loweringConfig = IREE::CPU::LoweringConfigAttr::get(
         &ctx, DictionaryAttr::get(&ctx, configItems));

@@ -137,15 +137,15 @@ void LoweringConfigAttr::print(AsmPrinter &printer) const {
   printer << ">";
 }
 
-Attribute LoweringConfigAttr::getTilingAttr(MLIRContext *ctx,
-                                            ArrayRef<int64_t> tileSizes) {
+Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
+                                                 ArrayRef<int64_t> tileSizes) {
   return IREE::Codegen::LoweringConfigTilingLevelAttr::get(
       ctx, tileSizes, /*interchange=*/{}, /*scalableFlags=*/{});
 }
 
-Attribute LoweringConfigAttr::getTilingAttr(MLIRContext *ctx,
-                                            ArrayRef<int64_t> tileSizes,
-                                            ArrayRef<bool> scalableFlags) {
+Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
+                                                 ArrayRef<int64_t> tileSizes,
+                                                 ArrayRef<bool> scalableFlags) {
   return IREE::Codegen::LoweringConfigTilingLevelAttr::get(
       ctx, tileSizes, /*interchange=*/{}, scalableFlags);
 }
