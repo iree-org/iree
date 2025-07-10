@@ -13,6 +13,11 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
+def AMDGPUEmulateNarrowTypePass :
+    Pass<"iree-amdgpu-emulate-narrow-type", ""> {
+  let summary = "Emulate narrow integer operations including amdgpu operations";
+}
+
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVMPass :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {
