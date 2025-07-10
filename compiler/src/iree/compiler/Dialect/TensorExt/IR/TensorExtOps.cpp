@@ -87,6 +87,36 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
 }
 
 //===----------------------------------------------------------------------===//
+// iree_tensor_ext.bitcast
+//===----------------------------------------------------------------------===//
+
+LogicalResult BitCastOp::verify() {
+  // The element types don't need to match, we can just check the requisite
+  // number of dynamic dims.
+  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
+                                 getSourceDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 {getResultDims()}))) {
+    return failure();
+  }
+
+  return success();
+}
+
+Value BitCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+BitCastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> BitCastOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+//===----------------------------------------------------------------------===//
 // iree_tensor_ext.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 

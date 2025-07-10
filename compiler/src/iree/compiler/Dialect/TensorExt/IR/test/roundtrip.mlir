@@ -19,3 +19,21 @@ util.func public @workgroup_count_splitk(%arg0: index, %arg1: index, %arg2: inde
 //       CHECK:   %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice
 //       CHECK:   %[[X0:.+]], %[[Y0:.+]], %[[Z0:.+]] = iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier
 //  CHECK-SAME:   (%[[X]], %[[Y]], %[[Z]]), %[[ARG0]], %[[ARG1]], %[[ARG2]]
+
+// -----
+
+// CHECK-LABEL: @tensorBitCast
+util.func public @tensorBitCast(%arg0: tensor<16xi32>) -> tensor<4x8xi16> {
+  // CHECK-NEXT: %0 = iree_tensor_ext.bitcast %arg0 : tensor<16xi32> -> tensor<4x8xi16>
+  %0 = iree_tensor_ext.bitcast %arg0 : tensor<16xi32> -> tensor<4x8xi16>
+  util.return %0 : tensor<4x8xi16>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorBitCastDynamic
+util.func public @tensorBitCastDynamic(%arg0: tensor<?x16xi32>, %arg1: index, %arg2: index, %arg3:index) -> tensor<?x?x4x8xi16> {
+  // CHECK-NEXT: %0 = iree_tensor_ext.bitcast %arg0 : tensor<?x16xi32>{%arg1} -> tensor<?x?x4x8xi16>{%arg2, %arg3}
+  %0 = iree_tensor_ext.bitcast %arg0 : tensor<?x16xi32>{%arg1} -> tensor<?x?x4x8xi16>{%arg2, %arg3}
+  util.return %0 : tensor<?x?x4x8xi16>
+}
