@@ -56,6 +56,9 @@ static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
                                          TilingLevel level) {
   auto attr = config.getAs<IREE::Codegen::LoweringConfigTilingLevelAttr>(
       getTilingLevelName(level));
+  if (!attr) {
+    return {};
+  }
   return SmallVector<int64_t>(attr.getSizes());
 }
 
