@@ -53,6 +53,9 @@ def IREECPU_LoweringConfigAttr :
     AttrParameter<"DictionaryAttr",
         "The configured fields, including tiling levels.">:$config
   );
+  let builders = [
+    AttrBuilder<(ins "llvm::SmallVector<mlir::NamedAttribute>":$items)>,
+  ];
   let extraClassDeclaration = [{
     /// Returns the attribute that indicates the tiling sizes.
     static Attribute getTilingLevelAttr(MLIRContext *ctx,
