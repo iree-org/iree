@@ -60,6 +60,17 @@ def DecomposeIm2colPass :
   ];
 }
 
+def DecomposeMapScatterPass :
+    InterfacePass<"iree-linalg-ext-decompose-map-scatter", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes vectorized map_scatter ops into vector ops";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
+}
+
 def DecomposeWinogradTransformPass :
     InterfacePass<"iree-linalg-ext-decompose-winograd", "mlir::FunctionOpInterface"> {
   let summary =
