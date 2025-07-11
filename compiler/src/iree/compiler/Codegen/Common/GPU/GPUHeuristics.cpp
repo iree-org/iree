@@ -285,17 +285,10 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   // For the problem described above {M:[4, 16], N:[2, 32], K[3, 128]} with a
   // 16x16x16 intrinsic, then:
   //  - kTotalTileCounts would be 3 * (128/16) = 24
-  unsigned minSize = std::min(problem.kSizes.size(), intrinsic.kSizes.size());
-  assert(intrinsic.kSizes.size() == minSize &&
-         "expect intrinsic reduction dims to not be greater in count than "
-         "problem reduction dims");
   SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
-  // kTotalTileCounts.back() =
-  //     llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
-  for (unsigned i = 0; i < minSize; ++i) {
-    kTotalTileCounts[i] =
-        llvm::divideCeil(problem.kSizes[i], intrinsic.kSizes[i]);
-  }
+  kTotalTileCounts.back() =
+      llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
+
   // Compute the ideal number of intrinsics along K per subgroup based on the
   // seed.
   int64_t bestKTileCountPerSubgroup =
