@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRIR
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

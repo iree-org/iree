@@ -9,7 +9,7 @@ func.func @forward(%arg0: !torch.vtensor<[1,1,8],f16>) -> !torch.vtensor<[1,1,8]
   %bit_width = torch.constant.int 4
   %group_size = torch.constant.int 2
   // CHECK: %[[TOBUILTIN:.*]] = torch_c.to_builtin_tensor %[[C0]] : !torch.vtensor<[8,4],ui8> -> tensor<8x4xui8>
-  // CHECK: %[[BITCAST:.*]] = flow.tensor.bitcast %[[TOBUILTIN]] : tensor<8x4xui8> -> tensor<8x8xi4>
+  // CHECK: %[[BITCAST:.*]] = iree_tensor_ext.bitcast %[[TOBUILTIN]] : tensor<8x4xui8> -> tensor<8x8xi4>
   // CHECK: %[[TOTORCH:.*]] = torch_c.from_builtin_tensor %[[BITCAST]] : tensor<8x8xi4> -> !torch.vtensor<[8,8],ui4>
   %output = torch.operator "quant.matmul_rhs_group_quant"(%arg0, %q_rhs, %scales, %zps, %bit_width, %group_size) : (!torch.vtensor<[1,1,8],f16>, !torch.vtensor<[8,4],ui8>, !torch.vtensor<[8,4,1],f16>, !torch.vtensor<[8,4,1],f16>, !torch.int, !torch.int) -> !torch.vtensor<[1,1,8],f16>
   return %output : !torch.vtensor<[1,1,8],f16>
@@ -20,7 +20,7 @@ func.func @forward(%arg0: !torch.vtensor<[1,1,8],f16>) -> !torch.vtensor<[1,1,8]
 // CHECK-LABEL: @view_type0
 func.func @view_type0(%arg0 : !torch.vtensor<[295501824],ui8>) -> !torch.vtensor<[147750912],si16> {
   %int4 = torch.constant.int 4
-  // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<295501824xi8> -> tensor<147750912xi16>
+  // CHECK: iree_tensor_ext.bitcast %[[IN:.+]] : tensor<295501824xi8> -> tensor<147750912xi16>
   %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[295501824],ui8>, !torch.int -> !torch.vtensor<[147750912],si16>
   return %0 : !torch.vtensor<[147750912],si16>
 }
@@ -34,7 +34,7 @@ func.func @view_type1(%arg0 : !torch.vtensor<[?],ui8>) -> !torch.vtensor<[?],si1
   //  CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
   //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?xi8>
   //      CHECK: %[[OUT:.+]] = arith.muli %[[DIM]], %[[C2]]
-  //      CHECK: flow.tensor.bitcast %[[IN]] :
+  //      CHECK: iree_tensor_ext.bitcast %[[IN]] :
   // CHECK-SAME:   tensor<?xi8>{%[[DIM]]} -> tensor<?xi16>{%[[OUT]]}
   %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?],ui8>, !torch.int -> !torch.vtensor<[?],si16>
   return %0 : !torch.vtensor<[?],si16>
@@ -49,7 +49,7 @@ func.func @view_type2(%arg0 : !torch.vtensor<[?],f64>) -> !torch.vtensor<[?],f16
   //  CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
   //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?xf64>
   //      CHECK: %[[OUT:.+]] = arith.divsi %[[DIM]], %[[C4]] : index
-  //      CHECK: flow.tensor.bitcast %[[IN]] :
+  //      CHECK: iree_tensor_ext.bitcast %[[IN]] :
   // CHECK-SAME:   tensor<?xf64>{%[[DIM]]} -> tensor<?xf16>{%[[OUT]]}
   %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?],f64>, !torch.int -> !torch.vtensor<[?],f16>
   return %0 : !torch.vtensor<[?],f16>
@@ -62,7 +62,7 @@ func.func @view_type3(%arg0 : !torch.vtensor<[?,295501824],ui8>) -> !torch.vtens
   %int4 = torch.constant.int 4
   //      CHECK: %[[C0:.+]] = arith.constant 0 : index
   //      CHECK: %[[DIM:.+]] = tensor.dim %[[IN:.+]], %[[C0]] : tensor<?x295501824xi8>
-  //      CHECK: flow.tensor.bitcast %[[IN]] :
+  //      CHECK: iree_tensor_ext.bitcast %[[IN]] :
   // CHECK-SAME:   tensor<?x295501824xi8>{%[[DIM]]} -> tensor<?x147750912xi16>{%[[DIM]]}
   %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[?,295501824],ui8>, !torch.int -> !torch.vtensor<[?,147750912],si16>
   return %0 : !torch.vtensor<[?,147750912],si16>
@@ -72,7 +72,7 @@ func.func @view_type3(%arg0 : !torch.vtensor<[?,295501824],ui8>) -> !torch.vtens
 
 // CHECK-LABEL: @view_as_complex
 func.func @view_as_complex(%arg0 : !torch.vtensor<[128,2],f32>) -> !torch.vtensor<[128], complex<f32>> {
-  // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<128x2xf32> -> tensor<128xcomplex<f32>>
+  // CHECK: iree_tensor_ext.bitcast %[[IN:.+]] : tensor<128x2xf32> -> tensor<128xcomplex<f32>>
   %0 = torch.aten.view_as_complex %arg0 : !torch.vtensor<[128,2],f32> -> !torch.vtensor<[128],complex<f32>>
   return %0 : !torch.vtensor<[128],complex<f32>>
 }
@@ -81,7 +81,7 @@ func.func @view_as_complex(%arg0 : !torch.vtensor<[128,2],f32>) -> !torch.vtenso
 
 // CHECK-LABEL: @view_as_real
 func.func @view_as_real(%arg0 : !torch.vtensor<[128], complex<f32>>) -> !torch.vtensor<[128,2],f32> {
-  // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<128xcomplex<f32>> -> tensor<128x2xf32>
+  // CHECK: iree_tensor_ext.bitcast %[[IN:.+]] : tensor<128xcomplex<f32>> -> tensor<128x2xf32>
   %0 = torch.aten.view_as_real %arg0 : !torch.vtensor<[128],complex<f32>> -> !torch.vtensor<[128,2],f32>
   return %0 : !torch.vtensor<[128,2],f32>
 }
