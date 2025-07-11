@@ -183,3 +183,75 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[INS1:.+]] = vector.insert %[[RED1]], %[[INS0]] [1] : f32 into vector<2xf32>
 // CHECK-DAG: %[[CAST:.+]] = vector.shape_cast %[[INS1]] : vector<2xf32> to vector<2x1x1xf32>
 // CHECK-DAG: arith.maximumf %[[CAST]], %[[ACC]] : vector<2x1x1xf32>
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 3],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+  subgroup_strides = [2, 1],
+  thread_strides = [1, 16]
+>
+
+func.func @subgroup_reduction_masked_tail_thread(%arg0: vector<16x48xf16>, %arg1: vector<16xf16>) -> vector<16xf16> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<16x48xf16>
+  %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [1] : vector<16x48xf16> to vector<16xf16>
+  return %0 : vector<16xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: subgroup_reduction_masked_tail_thread
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: vector.transfer_write
+// CHECK: gpu.barrier
+// The read will be masked, because we have 4 threads doing a subgroup reduce
+// on 3 elements.
+// CHECK: %[[MASK:.+]] = vector.create_mask %[[C1]], %{{.*}} : vector<1x1xi1>
+// CHECK: vector.transfer_read
+// CHECK-SAME: %[[MASK]]
+// CHECK: gpu.subgroup_reduce
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 2],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [16, 1],
+  element_tile = [1, 4],
+  subgroup_strides = [2, 1],
+  thread_strides = [1, 0]
+>
+
+func.func @subgroup_reduction_serial_tail(%arg0: vector<16x8xf16>, %arg1: vector<16xf16>) -> vector<16xf16> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<16x8xf16>
+  %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [1] : vector<16x8xf16> to vector<16xf16>
+  return %0 : vector<16xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: subgroup_reduction_serial_tail
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: vector.transfer_write
+// CHECK: gpu.barrier
+// We should be doing a serialized reduction, because we don't know if we have
+// enough threads on the reduction dimension to do a subgroup reduce.
+// CHECK: vector.transfer_read %{{.*}}[%{{.*}}, %[[C0]]]
+// CHECK-NOT: gpu.subgroup_reduce
