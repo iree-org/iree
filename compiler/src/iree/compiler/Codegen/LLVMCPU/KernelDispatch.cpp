@@ -1672,6 +1672,17 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
                              scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
 
+/// Appends the attribute to `items`, which is constructed with `level`,
+/// `tileSizes`, and `scalableFlags`.
+static void appendCPULoweringConfigLevelAttr(
+    MLIRContext *ctx, SmallVectorImpl<NamedAttribute> &items,
+    IREE::CPU::TilingLevel level, ArrayRef<int64_t> tileSizes,
+    ArrayRef<bool> scalableFlags = {}) {
+  items.emplace_back(IREE::CPU::getTilingLevelName(level),
+                     IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+                         ctx, tileSizes, scalableFlags));
+}
+
 static SmallVector<NamedAttribute> getMmt4dTileSizes(linalg::LinalgOp op) {
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
@@ -1739,17 +1750,14 @@ static SmallVector<NamedAttribute> getMmt4dTileSizes(linalg::LinalgOp op) {
 
   MLIRContext *ctx = op->getContext();
   SmallVector<NamedAttribute> config;
-  config.emplace_back(
-      IREE::CPU::getTilingLevelName(IREE::CPU::TilingLevel::DistributionTiles),
-      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(ctx, distTileSizes));
-  config.emplace_back(IREE::CPU::getTilingLevelName(
-                          IREE::CPU::TilingLevel::VectorCommonParallelTiles),
-                      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
-                          ctx, parallelTileSizes));
-  config.emplace_back(IREE::CPU::getTilingLevelName(
-                          IREE::CPU::TilingLevel::VectorReductionTiles),
-                      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
-                          ctx, reductionTileSizes));
+  appendCPULoweringConfigLevelAttr(
+      ctx, config, IREE::CPU::TilingLevel::DistributionTiles, distTileSizes);
+  appendCPULoweringConfigLevelAttr(
+      ctx, config, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+      parallelTileSizes);
+  appendCPULoweringConfigLevelAttr(ctx, config,
+                                   IREE::CPU::TilingLevel::VectorReductionTiles,
+                                   reductionTileSizes);
   return config;
 }
 
@@ -2021,11 +2029,20 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG(
       "Vectorization/unrolling tile sizes (reduction): " << reductionTileSizes);
 
-  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
-                                 reductionTileSizes};
-
+  MLIRContext *ctx = attnOp.getContext();
+  SmallVector<NamedAttribute> items;
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::DistributionTiles, distTileSizes);
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+      parallelTileSizes);
+  appendCPULoweringConfigLevelAttr(ctx, items,
+                                   IREE::CPU::TilingLevel::VectorReductionTiles,
+                                   reductionTileSizes);
+  auto loweringConfig =
+      IREE::CPU::LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, items));
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, attnOp, tileSizes,
+      entryPointFn, attnOp, loweringConfig,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
@@ -2047,9 +2064,22 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       return fftOp.emitOpError("non-constant stage might not work for fft op");
     }
   }
-  TileSizesListType tileSizes = {distTileSizes};
+  // Append vector level tiling sizes using zero values, which means no tiling
+  // in the pipeline.
+  SmallVector<int64_t> zeros(rank, 0);
+  MLIRContext *ctx = fftOp.getContext();
+  SmallVector<NamedAttribute> items;
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::DistributionTiles, distTileSizes);
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::VectorCommonParallelTiles, zeros);
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::VectorReductionTiles, zeros);
+  auto loweringConfig =
+      IREE::CPU::LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, items));
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
+      entryPointFn, fftOp, loweringConfig,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
 /// Sets the lowering configuration for dispatch region for winograd ops:
@@ -2077,15 +2107,22 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   distConfig.vectorSizeHints = vecSizeHints;
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(winogradOp, distConfig);
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
-  tileSizes.push_back(vecTileSizes);
-  // Dummy tiling config for reduction level.
   SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
-  tileSizes.push_back(reductionTileSizes);
+  MLIRContext *ctx = winogradOp.getContext();
+  SmallVector<NamedAttribute> items;
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::DistributionTiles, distTileSizes);
+  appendCPULoweringConfigLevelAttr(
+      ctx, items, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+      vecTileSizes);
+  appendCPULoweringConfigLevelAttr(ctx, items,
+                                   IREE::CPU::TilingLevel::VectorReductionTiles,
+                                   reductionTileSizes);
+  auto loweringConfig =
+      IREE::CPU::LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, items));
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, winogradOp, tileSizes,
+      entryPointFn, winogradOp, loweringConfig,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
