@@ -315,12 +315,16 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
     return rewriter.notifyMatchFailure(
         laneForallOp, "expected warp forall op to be the lane forall's parent");
   }
-  // Check that there are no tileable ops inside the warp forall. If there
-  // are, then we want to fuse them into the lane forall before combining
-  // the forall loops.
-  if (!warpForallOp.getBody()->getOps<TilingInterface>().empty()) {
-    return rewriter.notifyMatchFailure(
-        warpForallOp, "TilingInterface ops found inside warp forall");
+  // Only allow arith/affine ops and tensor.extract_slice. We would want other
+  // ops to be fused into the lane forall before this transformation happens.
+  for (Operation &op : warpForallOp.getBody()->getOperations()) {
+    if (!isa_and_nonnull<arith::ArithDialect, affine::AffineDialect>(
+            op.getDialect()) &&
+        !isa<tensor::ExtractSliceOp, scf::ForallOp, scf::InParallelOp>(op)) {
+      return rewriter.notifyMatchFailure(
+          warpForallOp,
+          "Warp forall body has non arith, affine, or extract_slice ops");
+    }
   }
   if (!warpForallOp.isNormalized() || !laneForallOp.isNormalized()) {
     return rewriter.notifyMatchFailure(warpForallOp,
@@ -331,7 +335,7 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
         laneForallOp,
         "lane and warp foralls have a different number of results");
   }
-  auto hasSingleNonStridedParallelInsert = [](scf::ForallOp forall) {
+  auto hasSingleNonStridedFullRankParallelInsert = [](scf::ForallOp forall) {
     for (BlockArgument initArg : forall.getRegionOutArgs()) {
       SmallVector<Operation *> combiningOps = forall.getCombiningOps(initArg);
       if (combiningOps.size() != 1) {
@@ -343,11 +347,15 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
           !areAllConstantIntValue(parallelInsertOp.getMixedStrides(), 1)) {
         return false;
       }
+      if (parallelInsertOp.getSourceType().getRank() !=
+          parallelInsertOp.getDestType().getRank()) {
+        return false;
+      }
     }
     return true;
   };
-  if (!hasSingleNonStridedParallelInsert(warpForallOp) ||
-      !hasSingleNonStridedParallelInsert(laneForallOp)) {
+  if (!hasSingleNonStridedFullRankParallelInsert(warpForallOp) ||
+      !hasSingleNonStridedFullRankParallelInsert(laneForallOp)) {
     return rewriter.notifyMatchFailure(warpForallOp,
                                        "forall op has strided combining op");
   }
@@ -366,15 +374,6 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
     if (warpInsertOp.getSource() != laneResult) {
       return rewriter.notifyMatchFailure(
           warpForallOp, "combining op source is not inner lane forall result");
-    }
-    BlockArgument laneInitArg = laneForallOp.getTiedBlockArgument(
-        &laneForallOp.getOutputsMutable()[resultIdx]);
-    auto laneInsertOp = cast<tensor::ParallelInsertSliceOp>(
-        laneForallOp.getCombiningOps(laneInitArg)[0]);
-    if (laneInsertOp.getStaticOffsets().size() !=
-        warpInsertOp.getStaticOffsets().size()) {
-      return rewriter.notifyMatchFailure(
-          laneForallOp, "warp insert rank does not match lane insert rank");
     }
   }
 

@@ -59,16 +59,19 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
 
 /// Function to combine nested warp and lane mapped scf.forall ops into a single
 /// thread mapped scf.forall op. The lane and warp foralls must be normalized,
-/// and there should no TilingInterface ops inside of the warp forall, but not
-/// in the lane forall. The results of the lane mapped forall must be directly
-/// consumed by the combining ops of the warp forall, because in the resulting
-/// IR, the thread forall's terminator will be directly inserting into the
-/// output argument of the original warp forall. The resulting thread forall
-/// will have the combined rank of the warp and lane foralls, with descending
-/// linear dim mapping IDs. For example:
+/// and there should only be arith/affine and tensor.extract_slice ops (and the
+/// nested lane forall) inside of the warp forall. The results of the lane
+/// mapped forall must be directly consumed by the combining ops of the warp
+/// forall, because in the resulting IR, the thread forall's terminator will be
+/// directly inserting into the output argument of the original warp forall. The
+/// resulting thread forall will have the combined rank of the warp and lane
+/// foralls, with descending linear dim mapping IDs. For example:
+///
 /// `[#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]`
 /// `[#iree_gpu.lane_id<0>]`
+///
 /// Will become:
+///
 /// `[#gpu.thread<linear_dim_2>,
 ///   #gpu.thread<linear_dim_1>,
 ///   #gpu.thread<linear_dim_0>]`
