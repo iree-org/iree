@@ -361,9 +361,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     return llvm::map_to_vector(dims, [&](int64_t dim) { return bounds[dim]; });
   };
 
-  if (operands.size() == 3) {
-    return failure();
-  }
+  assert(operands.size() == 3 && "expected 3 operands");
 
   Value lhs = operands[0];
   Value rhs = operands[1];
