@@ -2847,9 +2847,8 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
       tilingConfig.getTilingLevelInfo();
-  for (auto &[level, tileSizes, scalableFlags] : tilingInfo) {
-    (void)level;
-    (void)scalableFlags;
+  for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
+    SmallVector<int64_t> &tileSizes = info.sizes;
     for (auto idx : llvm::seq<int64_t>(0, tileSizes.size())) {
       if (tileSizes[idx] == 0)
         continue;
@@ -3181,8 +3180,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                 ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
                 ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
                 auto outerDimsPerm = packOp.getOuterDimsPerm();
-                for (auto &[level, tileSizes, scalableFlags] : newTilingInfo) {
-                  (void)level;
+                for (IREE::CPU::LoweringConfigLevelInfo &info : newTilingInfo) {
+                  SmallVector<int64_t> &tileSizes = info.sizes;
                   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
                     if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
                       continue;
