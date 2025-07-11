@@ -1,4 +1,4 @@
-// RUN: iree-opt --transform-interpreter %s --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: iree-opt --transform-interpreter %s --split-input-file | FileCheck %s
 
 module @my_module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {

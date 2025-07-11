@@ -1,5 +1,5 @@
 // RUN: iree-opt --iree-stablehlo-to-stablehlo-preprocessing \
-// RUN:   --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN:   --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @batch_norm_inference
 // CHECK-SAME: %[[X:[^:[:space:]]+]]

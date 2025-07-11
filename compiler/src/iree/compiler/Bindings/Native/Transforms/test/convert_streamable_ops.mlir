@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-abi-convert-streamable-ops --cse --split-input-file %s --verify-diagnostics | FileCheck %s
+// RUN: iree-opt --iree-abi-convert-streamable-ops --cse --split-input-file %s | FileCheck %s
 
 // Tests using a shape computation function for computing result dimensions.
 
