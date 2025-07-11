@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
 
 // Test case reduced by running the pass --iree-util-hoist-into-globals on the
 // following (and then change the check to a return):

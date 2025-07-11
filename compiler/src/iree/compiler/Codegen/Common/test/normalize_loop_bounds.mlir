@@ -1,5 +1,5 @@
 
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-normalize-loop-bounds, cse)" --allow-unregistered-dialect --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-normalize-loop-bounds, cse)" --allow-unregistered-dialect %s | FileCheck %s
 module {
   func.func @for_normalize_step() {
     %c0 = arith.constant 0 : index
