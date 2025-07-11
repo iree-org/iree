@@ -113,8 +113,7 @@ func.func @depthwise_conv() attributes {hal.executable.target = #executable_targ
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 1, 1, 4], strides = [1, 1, 1, 1] : tensor<1x1x1x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x1x4xf32>>
   return
 }
-
-//   CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 1, 0, 0], [1, 1, 1, 1, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 0, 1, 0, 0], vector_common_parallel = [1, 1, 1, 1, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 4]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @depthwise_conv()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
