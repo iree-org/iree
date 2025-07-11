@@ -290,6 +290,8 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
          "expect intrinsic reduction dims to not be greater in count than "
          "problem reduction dims");
   SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
+  // kTotalTileCounts.back() =
+  //     llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
   for (unsigned i = 0; i < minSize; ++i) {
     kTotalTileCounts[i] =
         llvm::divideCeil(problem.kSizes[i], intrinsic.kSizes[i]);

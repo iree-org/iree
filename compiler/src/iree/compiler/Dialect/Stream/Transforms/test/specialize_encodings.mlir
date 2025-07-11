@@ -131,6 +131,7 @@ util.func public @with_pad_encoding_using_pad_attr(%arg0: index, %arg1: index) {
                                             subgroup =  none,
                                             dot =  none,
                                             mma = [<MFMA_F32_16x16x4_F32>],
+                                            scaled_mma = [],
                                             subgroup_size_choices = [64],
                                             max_workgroup_sizes = [1024, 1024, 1024],
                                             max_thread_count_per_workgroup = 1024,

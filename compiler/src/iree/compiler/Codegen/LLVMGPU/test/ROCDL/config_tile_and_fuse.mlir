@@ -83,7 +83,7 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 4, 1]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [2, 2, 1, 1, 0, 0]
 //  CHECK-SAME:     workgroup = [2, 2, 32, 32, 0, 0]
 
