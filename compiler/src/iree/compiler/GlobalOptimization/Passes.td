@@ -81,11 +81,6 @@ def FuseDequantizationMatmulPass:
   let summary = "Fuses dequantization and matmul linalg.generic ops.";
 }
 
-def FuseSiluHorizontalMatmulPass:
-    InterfacePass<"iree-global-opt-fuse-silu-horizontal-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "Fuses matmul ops and silu linalg.generic op.";
-}
-
 def GeneralizeLinalgNamedOpsPass :
     InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert some Linalg named ops into linalg.generics.";
