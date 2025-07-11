@@ -73,15 +73,10 @@ getTilingConfigForPipeline(FunctionOpInterface funcOp) {
     return failure();
   }
   auto config = iree_compiler::getLoweringConfig(rootOp.value());
-  if (auto cpuLoweringConfig =
-          dyn_cast_if_present<IREE::CPU::LoweringConfigAttr>(config)) {
-    return TilingConfig(cpuLoweringConfig);
-  } else if (auto loweringConfig =
-                 dyn_cast_if_present<IREE::Codegen::LoweringConfigAttr>(
-                     config)) {
-    return TilingConfig(loweringConfig);
+  if (!config) {
+    return failure();
   }
-  return failure();
+  return TilingConfig(config);
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {

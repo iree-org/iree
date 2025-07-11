@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -33,8 +34,7 @@ public:
   /// a subset of them may be available in a valid configuration.
   using TilingLevel = IREE::CPU::TilingLevel;
 
-  TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
-  TilingConfig(IREE::CPU::LoweringConfigAttr lc);
+  explicit TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc);
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() const {
@@ -66,9 +66,31 @@ public:
   /// Returns all the tile sizes of all the levels of the configuration.
   TileSizesListType getTileSizes() const {
     TileSizesListType result;
-    for (unsigned i = 0, e = getNumTilingLevels(); i < e; ++i) {
-      result.push_back(
-          loweringConfig.getStaticTilingLevelSizes(i, /*target=*/nullptr));
+    for (auto i : tilingLevelToActualLevelMap) {
+      if (i == TilingLevel::InvalidLevel) {
+        continue;
+      }
+      Attribute attr = loweringConfig.getTilingLevelAttr(i);
+      assert(attr && "failed to get tiling level attribute");
+      result.emplace_back(
+          cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr).getSizes());
+    }
+    return result;
+  }
+
+  /// Returns a list that contains all the scalable tile flags in TilingLevel
+  /// order.
+  ScalableTileFlagsListType getScalableTileFlags() const {
+    ScalableTileFlagsListType result;
+    for (auto i : tilingLevelToActualLevelMap) {
+      if (i == TilingLevel::InvalidLevel) {
+        continue;
+      }
+      Attribute attr = loweringConfig.getTilingLevelAttr(i);
+      assert(attr && "failed to get tiling level attribute");
+      result.emplace_back(
+          cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr)
+              .getScalableFlags());
     }
     return result;
   }
@@ -151,6 +173,11 @@ public:
   }
 
 private:
+  // Initialize the TilingConfig with given LoweringConfigAttr attribute
+  // details.
+  void initFromCodegenLoweringConfig(IREE::Codegen::LoweringConfigAttr lc);
+  void initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc);
+
   SizesAndScalableFlags getVectorSizesForLevel(unsigned level) {
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
         loweringConfig.getTilingLevelAttr(level));
