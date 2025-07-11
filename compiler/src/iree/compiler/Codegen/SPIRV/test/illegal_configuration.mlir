@@ -227,7 +227,7 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
-    mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
+    mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>], scaled_mma = [],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
