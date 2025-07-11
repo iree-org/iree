@@ -3106,7 +3106,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       bool setUpOK =
           TypeSwitch<Operation *, bool>(op)
               .Case<linalg::PackOp>([&](auto packOp) {
-                for (ScalableTileFlagsListTypeRef flags :
+                for (ArrayRef<bool> flags :
                      tilingConfig.getScalableTileFlags()) {
                   // TODO: Handle scalable flags
                   if (llvm::any_of(flags, [&](bool flag) { return flag; }))
