@@ -79,10 +79,10 @@ struct StripAttentionOpCompilationInfo final
                    attr.getName() !=
                        IREE::LinalgExt::AttentionOp::getPVAttrStr();
           }));
-      if (!newConfig.empty()) {
-        attentionOp.setDecompositionConfigAttr(newConfig);
-      } else {
+      if (newConfig.empty()) {
         attentionOp.removeDecompositionConfigAttr();
+      } else {
+        attentionOp.setDecompositionConfigAttr(newConfig);
       }
     }
     return success();
