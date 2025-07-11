@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "tiling-config"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
@@ -17,10 +19,20 @@ using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
 namespace mlir::iree_compiler {
 
-TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
+TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc)
     : loweringConfig(lc) {
   assert(lc && "Expected a valid lowering config");
+  if (auto codegenLc = dyn_cast<IREE::Codegen::LoweringConfigAttr>(lc)) {
+    initFromCodegenLoweringConfig(codegenLc);
+  } else if (auto cpuLc = dyn_cast<IREE::CPU::LoweringConfigAttr>(lc)) {
+    initFromCPULoweringConfig(cpuLc);
+  } else {
+    assert(false && "unknown lowering config is not supported");
+  }
+}
 
+void TilingConfig::initFromCodegenLoweringConfig(
+    IREE::Codegen::LoweringConfigAttr lc) {
   // Initialize indices to invalid.
   std::fill(tilingLevelToActualLevelMap.begin(),
             tilingLevelToActualLevelMap.end(), TilingLevel::InvalidLevel);
@@ -58,15 +70,20 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   default:
     break;
   }
-};
+}
 
-TilingConfig::TilingConfig(IREE::CPU::LoweringConfigAttr lc)
-    : loweringConfig(lc) {
-  assert(lc && "Expected a valid lowering config");
+void TilingConfig::initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc) {
+  std::fill(tilingLevelToActualLevelMap.begin(),
+            tilingLevelToActualLevelMap.end(), TilingLevel::InvalidLevel);
+  DictionaryAttr dictAttr = lc.getConfig();
   for (size_t i = 0, e = tilingLevelToActualLevelMap.size(); i < e; ++i) {
+    if (!dictAttr || !dictAttr.contains(IREE::CPU::getTilingLevelName(
+                         static_cast<IREE::CPU::TilingLevel>(i)))) {
+      continue;
+    }
     tilingLevelToActualLevelMap[i] = i;
   }
-};
+}
 
 /// Returns the tiling level that contains the vector dim at `dimPos` (which is
 /// an index into the result of `getVectorTileSizes()`).

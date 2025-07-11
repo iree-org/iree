@@ -9,11 +9,13 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler {
+namespace {
 
 class TileSizeSelection : public ::testing::Test {
 protected:
@@ -60,15 +62,14 @@ protected:
 
   // Initialize `loweringConfig` to contain the config for `targets`. The actual
   // tile sizes are not set in each target, i.e., they are empty lists.
-  void initLoweringConfig(SmallVector<IREE::CPU::TilingLevel> targets) {
+  void
+  initLoweringConfig(SmallVector<IREE::CPU::LoweringConfigLevelInfo> configs) {
     SmallVector<NamedAttribute> configItems;
-    for (auto level : targets) {
-      SmallVector<int64_t> sizes;
-      SmallVector<bool> scalableFlags;
+    for (auto info : configs) {
       configItems.emplace_back(
-          IREE::CPU::getTilingLevelName(level),
-          IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(&ctx, sizes,
-                                                            scalableFlags));
+          IREE::CPU::getTilingLevelName(info.level),
+          IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+              &ctx, info.sizes, info.scalableFlags));
     }
     loweringConfig = IREE::CPU::LoweringConfigAttr::get(
         &ctx, DictionaryAttr::get(&ctx, configItems));
@@ -93,21 +94,36 @@ TEST_F(TileSizeSelection, NumTilingLevels) {
 }
 
 TEST_F(CPUTileSizeSelection, WithAllFields) {
-  // Initialize Lowering Config
-  SmallVector<IREE::CPU::TilingLevel> targets = {
+  SmallVector<IREE::CPU::LoweringConfigLevelInfo> configs;
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
       IREE::CPU::TilingLevel::DistributionTiles,
+      /*sizes=*/{128, 128, 0},
+      /*scalableFlags=*/{false, false, false}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
       IREE::CPU::CacheParallelTiles,
+      /*sizes=*/{0, 0, 0},
+      /*scalableFlags=*/{false, false, false}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
       IREE::CPU::CacheReductionTiles,
+      /*sizes=*/{0, 0, 0},
+      /*scalableFlags=*/{false, false, false}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
       IREE::CPU::VectorCommonParallelTiles,
+      /*sizes=*/{4, 8, 0},
+      /*scalableFlags=*/{true, false, false}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
       IREE::CPU::VectorReductionTiles,
-      IREE::CPU::VectorInnerParallelTiles};
-  initLoweringConfig(targets);
-
-  // Create TilingConfig and check if the number of tiling levels match.
+      /*sizes=*/{0, 0, 16},
+      /*scalableFlags=*/{false, false, true}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
+      IREE::CPU::VectorInnerParallelTiles,
+      /*sizes=*/{0, 0, 0},
+      /*scalableFlags=*/{false, false, false}});
+  initLoweringConfig(configs);
   TilingConfig tilingConfig(loweringConfig);
 
   // There are no re-mapping between the TilingConfig and the original config.
-  EXPECT_EQ(tilingConfig.getNumTilingLevels(), targets.size());
+  EXPECT_EQ(tilingConfig.getNumTilingLevels(), configs.size());
   EXPECT_EQ(tilingConfig.getDistributionLevel(),
             IREE::CPU::TilingLevel::DistributionTiles);
   EXPECT_EQ(tilingConfig.getCacheParallelLevel(),
@@ -120,6 +136,47 @@ TEST_F(CPUTileSizeSelection, WithAllFields) {
             IREE::CPU::VectorReductionTiles);
   EXPECT_EQ(tilingConfig.getVectorInnerParallelLevel(),
             IREE::CPU::VectorInnerParallelTiles);
+
+  TileSizesListType allTileSizes =
+      llvm::map_to_vector(configs, [](auto info) { return info.sizes; });
+  EXPECT_EQ(tilingConfig.getTileSizes(), allTileSizes);
+  ScalableTileFlagsListType allScalableFlags = llvm::map_to_vector(
+      configs, [](auto info) { return info.scalableFlags; });
+  EXPECT_EQ(tilingConfig.getScalableTileFlags(), allScalableFlags);
+}
+
+TEST_F(CPUTileSizeSelection, WithDistributionAndVectorTiling) {
+  SmallVector<IREE::CPU::LoweringConfigLevelInfo> configs;
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
+      IREE::CPU::TilingLevel::DistributionTiles,
+      /*sizes=*/{128, 128, 0},
+      /*scalableFlags=*/{false, false, false}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
+      IREE::CPU::VectorCommonParallelTiles,
+      /*sizes=*/{4, 8, 0},
+      /*scalableFlags=*/{true, false, false}});
+  configs.push_back(IREE::CPU::LoweringConfigLevelInfo{
+      IREE::CPU::VectorReductionTiles,
+      /*sizes=*/{0, 0, 16},
+      /*scalableFlags=*/{false, false, true}});
+  initLoweringConfig(configs);
+  TilingConfig tilingConfig(loweringConfig);
+
+  // There are no re-mapping between the TilingConfig and the original config.
+  EXPECT_EQ(tilingConfig.getNumTilingLevels(), configs.size());
+  EXPECT_EQ(tilingConfig.getDistributionLevel(),
+            IREE::CPU::TilingLevel::DistributionTiles);
+  EXPECT_EQ(tilingConfig.getVectorCommonParallelLevel(),
+            IREE::CPU::VectorCommonParallelTiles);
+  EXPECT_EQ(tilingConfig.getVectorReductionLevel(),
+            IREE::CPU::VectorReductionTiles);
+
+  TileSizesListType allTileSizes =
+      llvm::map_to_vector(configs, [](auto info) { return info.sizes; });
+  EXPECT_EQ(tilingConfig.getTileSizes(), allTileSizes);
+  ScalableTileFlagsListType allScalableFlags = llvm::map_to_vector(
+      configs, [](auto info) { return info.scalableFlags; });
+  EXPECT_EQ(tilingConfig.getScalableTileFlags(), allScalableFlags);
 }
 
 TEST_F(TileSizeSelection, getLevel_4_levels) {
@@ -160,4 +217,5 @@ TEST_F(TileSizeSelectionDeathTest, getLevel_out_of_bounds) {
 }
 
 #endif
+} // namespace
 } // namespace mlir::iree_compiler
