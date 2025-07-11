@@ -28,10 +28,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
                                          RewriterBase &rewriter) {
   auto inputType = cast<VectorType>(mapScatterOp.getInputType());
-  if (!inputType.hasStaticShape()) {
-    return rewriter.notifyMatchFailure(mapScatterOp,
-                                       "expected static input shape");
-  }
+  assert(!inputType.hasStaticShape() && "expected vector type to be static");
   SmallVector<ReassociationIndices> reassociations;
   auto outputType = cast<MemRefType>(mapScatterOp.getOutputType());
   reassociations.push_back(
