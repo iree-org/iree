@@ -24,11 +24,6 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
-static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
-    "iree-global-opt-enable-fuse-silu-horizontal-matmul",
-    llvm::cl::desc(
-        "Enables fusing specifically structured matmuls (experimental)."),
-    llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -158,8 +153,6 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
-      .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
-                         createFuseSiluHorizontalMatmulPass)
       .addPass([&]() {
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);
