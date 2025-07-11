@@ -1605,12 +1605,13 @@ func.func @mmt4d_with_large_reduction() attributes {hal.executable.target = #exe
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 2, 16, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 0, 2], vector_inner_parallel = [0, 0, 0, 0], vector_reduction = [0, 0, 0, 0]>
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 2, 16, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 //      CHECK: func.func @mmt4d_with_large_reduction()
 //      CHECK:   linalg.fill
-//  CHECK-NOT:     lowering_config
-//      CHECK:   linalg.mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
+//      CHECK:   linalg.mmt4d
+// CHECK-SAME:     lowering_config = #[[CONFIG1]]
 
 // -----
 

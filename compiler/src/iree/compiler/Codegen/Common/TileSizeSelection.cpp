@@ -85,6 +85,24 @@ void TilingConfig::initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc) {
   }
 }
 
+SmallVector<IREE::CPU::LoweringConfigLevelInfo>
+TilingConfig::getTilingLevelInfo() {
+  SmallVector<IREE::CPU::LoweringConfigLevelInfo> result;
+  TileSizesListType tileSizesList = getTileSizes();
+  ScalableTileFlagsListType scalableFlagsList = getScalableTileFlags();
+  int64_t mappedIdx = 0;
+  for (auto [idx, actualLevel] : llvm::enumerate(tilingLevelToActualLevelMap)) {
+    if (actualLevel == IREE::CPU::TilingLevel::InvalidLevel) {
+      continue;
+    }
+    result.push_back(IREE::CPU::LoweringConfigLevelInfo{
+        static_cast<IREE::CPU::TilingLevel>(idx), tileSizesList[mappedIdx],
+        scalableFlagsList[mappedIdx]});
+    mappedIdx++;
+  }
+  return result;
+}
+
 /// Returns the tiling level that contains the vector dim at `dimPos` (which is
 /// an index into the result of `getVectorTileSizes()`).
 std::optional<unsigned>
