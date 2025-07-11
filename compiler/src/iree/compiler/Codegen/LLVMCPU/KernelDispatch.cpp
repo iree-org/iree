@@ -2810,7 +2810,9 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp)
     return success();
-  TilingConfig tilingConfig(getLoweringConfig(linalgOp));
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+      getLoweringConfig(linalgOp);
+  TilingConfig tilingConfig(loweringConfig);
   TileSizesListType tileSizesList = tilingConfig.getTileSizes();
 
   bool foundUnPackOp = false;
