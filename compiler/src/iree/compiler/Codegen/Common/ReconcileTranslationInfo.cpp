@@ -171,6 +171,9 @@ getProcIdsAndNprocs(
   return std::make_pair(procId, nprocs);
 }
 
+/// Resolve the `forallOp` by mapping the loop induction variables to
+/// processor IDs. Expected `procIds` and `nProcs` to match the number
+/// of induction variables of the loop.
 static LogicalResult resolveForAll(RewriterBase &rewriter,
                                    scf::ForallOp forallOp,
                                    ArrayRef<OpFoldResult> procIds,
@@ -328,13 +331,12 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
 
   SmallVector<scf::ForallOp> workgroupForAllOps;
   funcOp.walk([&workgroupForAllOps](scf::ForallOp forAllOp) {
-    auto mapping = forAllOp.getMapping();
+    std::optional<ArrayAttr> mapping = forAllOp.getMapping();
     if (!mapping) {
       return;
     }
-    if (!llvm::all_of(mapping.value(), [](Attribute attr) {
-          return isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
-        })) {
+    if (!llvm::all_of(mapping.value(),
+                      llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
       return;
     }
     workgroupForAllOps.push_back(forAllOp);
@@ -374,6 +376,11 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   return success();
 }
 
+/// If the dispatch was formed by splitting long running reductions, the
+/// workgroup count needs to be modified to account for the parallel partial
+/// reductions to be done. This typically means multiplying the number of
+/// workgroups currently used by the number of tiles used for the split
+/// reduction.
 static LogicalResult
 lowerSplitReductionModifierOp(RewriterBase &rewriter,
                               FunctionOpInterface entryPointFn,
@@ -435,10 +442,8 @@ lowerSplitReductionModifierOp(RewriterBase &rewriter,
 /// is distribute along grid axis `k`.
 ///
 /// ```mlir
-/// func.func(...) {
-///   scf.forall (%iv) = %lb to %ub step %s {
-///     ... = hal.interface.workgroup.id[k]
-//    }
+/// scf.forall (%iv) = %lb to %ub step %s {
+///   ... = hal.interface.workgroup.id[k]
 /// }
 /// ```
 ///
@@ -451,9 +456,9 @@ lowerSplitReductionModifierOp(RewriterBase &rewriter,
 ///   `%orig_numworkgroups` is the number of workgroups along `k` that were used
 ///   before the resolution of the split reduction `scf.forall`. This is same as
 ///   `hal.interface.workgroup.count[k] / %nsplit`.
-/// - All uses of `%iv` is replaced by `hal.interface.workgroup.id[k] / %nsplit`
+/// - All uses of `%iv` is replaced by `hal.interface.workgroup.id[k] /
+///   %nsplit`.
 /// ```
-///
 static LogicalResult
 resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
                          IREE::Codegen::WorkgroupId delinearizeFrom) {
@@ -535,15 +540,15 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   auto walkResult = funcOp.walk(
       [&](IREE::HAL::InterfaceWorkgroupIDOp workgroupIdOp) -> WalkResult {
         if (workgroupIdOp.getDimension().getZExtValue() !=
-            static_cast<uint64_t>(delinearizeFrom)) {
+            llvm::to_underlying(delinearizeFrom)) {
           return WalkResult::advance();
         }
         if (workgroupIdOp == procIdOp) {
           return WalkResult::advance();
         }
         for (Operation *user : workgroupIdOp->getUsers()) {
-          auto parerntForallOp = user->getParentOfType<scf::ForallOp>();
-          if (parerntForallOp != forallOp) {
+          auto parentForallOp = user->getParentOfType<scf::ForallOp>();
+          if (parentForallOp != forallOp) {
             return user->emitOpError("expected all users of `workgroup.id` to "
                                      "be within split reduction scf.forall op");
           }
@@ -639,7 +644,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    // Resolve split reduction distribution
+    // Resolve split reduction distribution.
     if (failed(
             resolveSplitReduceForAll(rewriter, rootFuncOp, distributeAlong))) {
       variantOp.emitOpError("failed to resolve split reduction forall ops");

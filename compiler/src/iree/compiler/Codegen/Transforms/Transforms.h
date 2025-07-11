@@ -119,6 +119,12 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
 
+/// Materialize the backward slice starting at the values in `workgroupCount`
+/// at the current insertion point of the `rewriter`. The leaves of the slice
+/// are expected to be `iree_tensor_ext.workload.ordinal` ops that
+/// are replaced with the corresponding `workloadVals`. Returns the
+/// values corresponding to `workgroupCount` materialized at the insertion
+/// point.
 FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals);
