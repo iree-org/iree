@@ -1017,24 +1017,17 @@ setVectorSizesForDynamicShapes(linalg::LinalgOp op,
   return;
 }
 
-/// A helper classes to record different level tiling sizes and generate
+/// A helper class to record different level tiling sizes and generate
 /// corresponding IREE::CPU::LoweringConfigAttr. Only vector level supports
 /// scalable tile sizes for now.
 class LoweringConfigGenerator {
 public:
-  explicit LoweringConfigGenerator(Operation *op,
-                                   bool emitVectorInnerParallelTiles = false)
-      : ctx(op->getContext()), rootOp(op),
-        emitVectorInnerParallelTiles(emitVectorInnerParallelTiles) {}
+  explicit LoweringConfigGenerator(Operation *op)
+      : ctx(op->getContext()), rootOp(op) {}
 
   void setDistributionTileSizes(ArrayRef<int64_t> tileSizes) {
     assert(distTileSizes.empty() && "expected to set only once");
     distTileSizes.assign(tileSizes.begin(), tileSizes.end());
-  }
-
-  void setCacheTileSizes(ArrayRef<int64_t> tileSizes) {
-    assert(cacheTileSizes.empty() && "expected to set only once");
-    cacheTileSizes.assign(tileSizes.begin(), tileSizes.end());
   }
 
   void setVectorTileSizes(ArrayRef<int64_t> tileSizes,
@@ -1058,16 +1051,6 @@ public:
       appendLoweringConfigLevelAttr(items, TilingLevel::DistributionTiles,
                                     SmallVector<int64_t>(numTilingDims, 0));
     }
-    if (!cacheTileSizes.empty()) {
-      SmallVector<int64_t> parallelTileSizes;
-      SmallVector<int64_t> reductionTileSizes;
-      splitParallelAndReductionTiles(rootOp, parallelTileSizes,
-                                     reductionTileSizes);
-      appendLoweringConfigLevelAttr(items, TilingLevel::CacheParallelTiles,
-                                    parallelTileSizes);
-      appendLoweringConfigLevelAttr(items, TilingLevel::CacheReductionTiles,
-                                    reductionTileSizes);
-    }
     if (!vectorTileSizes.empty()) {
       SmallVector<int64_t> parallelTileSizes = vectorTileSizes;
       SmallVector<int64_t> reductionTileSizes;
@@ -1082,12 +1065,6 @@ public:
                                     parallelTileSizes, parallelScalableFlags);
       appendLoweringConfigLevelAttr(items, TilingLevel::VectorReductionTiles,
                                     reductionTileSizes, reductionScalableFlags);
-      if (emitVectorInnerParallelTiles) {
-        size_t size = parallelTileSizes.size();
-        appendLoweringConfigLevelAttr(
-            items, TilingLevel::VectorInnerParallelTiles,
-            SmallVector<int64_t>(size, 0), SmallVector<bool>(size, false));
-      }
     }
     return IREE::CPU::LoweringConfigAttr::get(ctx, items);
   }
@@ -1105,12 +1082,11 @@ private:
   MLIRContext *ctx;
   Operation *rootOp;
 
-  // TODO(hanchung): Remove the field once all the pipelines switch to CPU
-  // lowering_config. It is alive for legacy setup.
-  bool emitVectorInnerParallelTiles = false;
-
+  // The tile sizes for distribution from the `rootOp`'s perspective.
   SmallVector<int64_t> distTileSizes;
-  SmallVector<int64_t> cacheTileSizes;
+
+  // The tile sizes and scalable flags for vector level tiling from the
+  // `rootOp`'s perspective.
   SmallVector<int64_t> vectorTileSizes;
   SmallVector<bool> vectorScalableFlags;
 };
