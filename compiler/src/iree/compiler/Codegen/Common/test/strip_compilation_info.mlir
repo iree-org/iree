@@ -120,3 +120,34 @@ func.func @attention_1(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>
 // CHECK-NOT:   translation_info =
 // CHECK-NOT:   lowering_config =
 // CHECK-NOT:   decomposition_config =
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map5 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map6 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>
+#config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
+#translation = #iree_codegen.translation_info<pipeline = None workgroup_size = [16, 8, 1] subgroup_size = 64>
+#compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
+func.func @attention_2(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, %arg2 : tensor<2x10x4x4xf16>, %arg3 : f16) -> tensor<2x10x6x4xf16> attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
+  %init = tensor.empty() : tensor<2x10x6x4xf16>
+  %result = iree_linalg_ext.attention {decomposition_config = {pv_attrs = {x}, qk_attrs = {y}}, indexing_maps = [#map, #map1, #map2, #map3, #map4], compilation_info = #compilation} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
+        ^bb0(%arg: f32):
+          iree_linalg_ext.yield %arg : f32
+        } -> tensor<2x10x6x4xf16>
+  return %result : tensor<2x10x6x4xf16>
+}
+
+// CHECK-LABEL: func.func @attention_2
+// CHECK:       iree_linalg_ext.attention
+// CHECK-NOT:   iree_codegen.compilation_info
+// CHECK-NOT:   iree_codegen.lowering_config
+// CHECK-NOT:   iree_codegen.translation_info
+// CHECK-NOT:   compilation_info =
+// CHECK-NOT:   translation_info =
+// CHECK-NOT:   lowering_config =
+// CHECK-NOT:   decomposition_config =
