@@ -818,6 +818,10 @@ void DataTiledMMAAttr::getDistributedTileTypes(
                  VectorType::get(getShape(MMAFragment::Acc), C)});
 }
 
+int64_t DataTiledMMAAttr::getBlockSize() const {
+  return IREE::GPU::getBlockSize(getIntrinsic());
+}
+
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
@@ -1407,7 +1411,7 @@ int64_t ScaledMMAAttr::getBlockSize() const {
     return 32;
   }
   assert(false &&
-         "all cases should'vee been handled in ScaledMMA::getBlockSize()");
+         "all cases should've been handled in ScaledMMA::getBlockSize()");
   return 0;
 }
 
@@ -1434,6 +1438,16 @@ int64_t ScaledMMAAttr::getSubgroupSize() const {
   assert(false &&
          "all cases should'vee been handled in ScaledMMA::getBlockSize()");
   return 0;
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
+  return {Float8E8M0FNUType::get(ctx),  Float8E5M2Type::get(ctx),
+          Float8E5M2FNUZType::get(ctx), Float8E4M3FNType::get(ctx),
+          Float8E4M3FNUZType::get(ctx), Float4E2M1FNType::get(ctx)};
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedOutputTypes(MLIRContext *ctx) {
+  return {Float32Type::get(ctx)};
 }
 
 LogicalResult
@@ -1484,9 +1498,9 @@ void ScaledMMAAttr::getUndistributedTileTypes(
   Type accType = getAccElemType();
   Type scaleType = Float8E8M0FNUType::get(getContext());
 
-  results.push_back(VectorType::get({m, kScale, blockSize}, lhsType));
+  results.push_back(VectorType::get({m, blockSize, kScale}, lhsType));
   results.push_back(VectorType::get({m, kScale}, scaleType));
-  results.push_back(VectorType::get({kScale, blockSize, n}, rhsType));
+  results.push_back(VectorType::get({blockSize, kScale, n}, rhsType));
   results.push_back(VectorType::get({kScale, n}, scaleType));
   results.push_back(VectorType::get({m, n}, accType));
 }

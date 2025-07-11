@@ -272,6 +272,8 @@ struct ConvertToROCDLPass final
           patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
+      arith::populateExpandF8E8M0Patterns(patterns);
+      arith::populateExpandF4E2M1Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
