@@ -70,7 +70,7 @@ public:
       if (i == TilingLevel::InvalidLevel) {
         continue;
       }
-      auto attr = loweringConfig.getTilingLevelAttr(i);
+      Attribute attr = loweringConfig.getTilingLevelAttr(i);
       assert(attr && "failed to get tiling level attribute");
       result.emplace_back(
           cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr).getSizes());
@@ -86,7 +86,7 @@ public:
       if (i == TilingLevel::InvalidLevel) {
         continue;
       }
-      auto attr = loweringConfig.getTilingLevelAttr(i);
+      Attribute attr = loweringConfig.getTilingLevelAttr(i);
       assert(attr && "failed to get tiling level attribute");
       result.emplace_back(
           cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(attr)
@@ -175,8 +175,8 @@ public:
 private:
   // Initialize the TilingConfig with given LoweringConfigAttr attribute
   // details.
-  void initAsCodegenLoweringConfig(IREE::Codegen::LoweringConfigAttr lc);
-  void initAsCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc);
+  void initFromCodegenLoweringConfig(IREE::Codegen::LoweringConfigAttr lc);
+  void initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc);
 
   SizesAndScalableFlags getVectorSizesForLevel(unsigned level) {
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(

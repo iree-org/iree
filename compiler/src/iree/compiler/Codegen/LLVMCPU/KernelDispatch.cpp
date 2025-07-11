@@ -2770,8 +2770,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp)
     return success();
-  auto loweringConfig = getLoweringConfig(linalgOp);
-  TilingConfig tilingConfig(loweringConfig);
+  TilingConfig tilingConfig(getLoweringConfig(linalgOp));
   TileSizesListType tileSizesList = tilingConfig.getTileSizes();
 
   bool foundUnPackOp = false;
@@ -2940,7 +2939,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   }
 
   auto ctx = entryPointFn.getContext();
-  auto rootLoweringConfig = getLoweringConfig(rootOperation);
+  IREE::Codegen::LoweringConfigAttrInterface rootLoweringConfig =
+      getLoweringConfig(rootOperation);
   TilingConfig tilingConfig(rootLoweringConfig);
   SmallVector<int64_t> distTileSizes, parallelVecTileSizes;
   SmallVector<bool> distScalableTileSizes, parallelVecScalableTileSizes;
@@ -3106,7 +3106,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       bool setUpOK =
           TypeSwitch<Operation *, bool>(op)
               .Case<linalg::PackOp>([&](auto packOp) {
-                for (auto flags : tilingConfig.getScalableTileFlags()) {
+                for (ScalableTileFlagsListTypeRef flags :
+                     tilingConfig.getScalableTileFlags()) {
                   // TODO: Handle scalable flags
                   if (llvm::any_of(flags, [&](bool flag) { return flag; }))
                     return false;

@@ -23,15 +23,15 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc)
     : loweringConfig(lc) {
   assert(lc && "Expected a valid lowering config");
   if (auto codegenLc = dyn_cast<IREE::Codegen::LoweringConfigAttr>(lc)) {
-    initAsCodegenLoweringConfig(codegenLc);
+    initFromCodegenLoweringConfig(codegenLc);
   } else if (auto cpuLc = dyn_cast<IREE::CPU::LoweringConfigAttr>(lc)) {
-    initAsCPULoweringConfig(cpuLc);
+    initFromCPULoweringConfig(cpuLc);
   } else {
     assert(false && "unknown lowering config is not supported");
   }
 }
 
-void TilingConfig::initAsCodegenLoweringConfig(
+void TilingConfig::initFromCodegenLoweringConfig(
     IREE::Codegen::LoweringConfigAttr lc) {
   // Initialize indices to invalid.
   std::fill(tilingLevelToActualLevelMap.begin(),
@@ -72,7 +72,7 @@ void TilingConfig::initAsCodegenLoweringConfig(
   }
 }
 
-void TilingConfig::initAsCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc) {
+void TilingConfig::initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc) {
   std::fill(tilingLevelToActualLevelMap.begin(),
             tilingLevelToActualLevelMap.end(), TilingLevel::InvalidLevel);
   DictionaryAttr dictAttr = lc.getConfig();
