@@ -13,11 +13,13 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -285,6 +287,175 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
 
   rewriter.replaceOp(producer, barrierOp);
   return success();
+}
+
+FailureOr<scf::ForallOp>
+fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
+                             scf::ForallOp laneForallOp) {
+  // Verify mappings.
+  if (!warpForallOp.getMapping() ||
+      !llvm::all_of(*warpForallOp.getMapping(), [](Attribute mappingAttr) {
+        return isa<gpu::GPUWarpMappingAttr>(mappingAttr);
+      })) {
+    return rewriter.notifyMatchFailure(warpForallOp, "not a warp forall op");
+  }
+  if (!laneForallOp.getMapping() || laneForallOp.getMapping()->size() != 1 ||
+      !isa<IREE::GPU::LaneIdAttr>(laneForallOp.getMapping()->getValue()[0])) {
+    return rewriter.notifyMatchFailure(
+        laneForallOp, "inner forall op is not mapped to a single lane id");
+  }
+  // Verify the lane forall is the only nested forall op.
+  SmallVector<scf::ForallOp> innerForallOps(
+      warpForallOp.getBody()->getOps<scf::ForallOp>());
+  if (innerForallOps.size() != 1) {
+    return rewriter.notifyMatchFailure(warpForallOp,
+                                       "expected a single inner forall op");
+  }
+  if (warpForallOp.getOperation() != laneForallOp->getParentOp()) {
+    return rewriter.notifyMatchFailure(
+        laneForallOp, "expected warp forall op to be the lane forall's parent");
+  }
+  // Only allow arith/affine ops and tensor.extract_slice. We would want other
+  // ops to be fused into the lane forall before this transformation happens.
+  for (Operation &op : warpForallOp.getBody()->getOperations()) {
+    if (!isa_and_nonnull<arith::ArithDialect, affine::AffineDialect>(
+            op.getDialect()) &&
+        !isa<tensor::ExtractSliceOp, scf::ForallOp, scf::InParallelOp>(op)) {
+      return rewriter.notifyMatchFailure(
+          warpForallOp,
+          "Warp forall body has non arith, affine, or extract_slice ops");
+    }
+  }
+  if (!warpForallOp.isNormalized() || !laneForallOp.isNormalized()) {
+    return rewriter.notifyMatchFailure(warpForallOp,
+                                       "forall ops are not normalized");
+  }
+  if (laneForallOp.getNumResults() != warpForallOp.getNumResults()) {
+    return rewriter.notifyMatchFailure(
+        laneForallOp,
+        "lane and warp foralls have a different number of results");
+  }
+  auto hasSingleNonStridedFullRankParallelInsert = [](scf::ForallOp forall) {
+    for (BlockArgument initArg : forall.getRegionOutArgs()) {
+      SmallVector<Operation *> combiningOps = forall.getCombiningOps(initArg);
+      if (combiningOps.size() != 1) {
+        return false;
+      }
+      auto parallelInsertOp =
+          dyn_cast<tensor::ParallelInsertSliceOp>(combiningOps[0]);
+      if (!parallelInsertOp ||
+          !areAllConstantIntValue(parallelInsertOp.getMixedStrides(), 1)) {
+        return false;
+      }
+      if (parallelInsertOp.getSourceType().getRank() !=
+          parallelInsertOp.getDestType().getRank()) {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (!hasSingleNonStridedFullRankParallelInsert(warpForallOp) ||
+      !hasSingleNonStridedFullRankParallelInsert(laneForallOp)) {
+    return rewriter.notifyMatchFailure(warpForallOp,
+                                       "forall op has strided combining op");
+  }
+  // Verify that the source of all combining ops of the warpForallOp are
+  // produced by the laneForallOp, and that the laneForallOp combining ops
+  // have the same rank as the corresponding combining op in the warpForallOp.
+  // This is the requirement for composing the combining ops into a single
+  // thread distributed combining op.
+  for (auto [warpResult, laneResult] :
+       llvm::zip_equal(warpForallOp.getResults(), laneForallOp.getResults())) {
+    unsigned int resultIdx = warpResult.getResultNumber();
+    BlockArgument warpInitArg = warpForallOp.getTiedBlockArgument(
+        &warpForallOp.getOutputsMutable()[resultIdx]);
+    auto warpInsertOp = cast<tensor::ParallelInsertSliceOp>(
+        warpForallOp.getCombiningOps(warpInitArg)[0]);
+    if (warpInsertOp.getSource() != laneResult) {
+      return rewriter.notifyMatchFailure(
+          warpForallOp, "combining op source is not inner lane forall result");
+    }
+  }
+
+  // Create the thread mapped forall to replace the nested foralls.
+  SmallVector<Attribute> threadMappings = llvm::map_to_vector(
+      llvm::seq<unsigned>(warpForallOp.getRank() + laneForallOp.getRank()),
+      [&](unsigned mappingDim) -> Attribute {
+        unsigned mappingId =
+            static_cast<unsigned>(gpu::MappingId::LinearDim0) + mappingDim;
+        return gpu::GPUThreadMappingAttr::get(
+            rewriter.getContext(), static_cast<gpu::MappingId>(mappingId));
+      });
+  std::reverse(threadMappings.begin(), threadMappings.end());
+  SmallVector<OpFoldResult> lbs(threadMappings.size(),
+                                rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> steps(threadMappings.size(),
+                                  rewriter.getIndexAttr(1));
+  SmallVector<OpFoldResult> ubs = llvm::to_vector(llvm::concat<OpFoldResult>(
+      warpForallOp.getMixedUpperBound(), laneForallOp.getMixedUpperBound()));
+  scf::ForallOp threadForallOp = rewriter.create<scf::ForallOp>(
+      warpForallOp.getLoc(), lbs, ubs, steps, warpForallOp.getOutputs(),
+      ArrayAttr::get(rewriter.getContext(), threadMappings));
+
+  // Collect pairs of combining ops to compose after inlining everything.
+  SmallVector<
+      std::pair<tensor::ParallelInsertSliceOp, tensor::ParallelInsertSliceOp>>
+      insertPairs;
+  for (auto [warpArg, laneArg] : llvm::zip_equal(
+           warpForallOp.getRegionOutArgs(), laneForallOp.getRegionOutArgs())) {
+    auto warpInsert = cast<tensor::ParallelInsertSliceOp>(
+        warpForallOp.getCombiningOps(warpArg)[0]);
+    auto laneInsert = cast<tensor::ParallelInsertSliceOp>(
+        laneForallOp.getCombiningOps(laneArg)[0]);
+    insertPairs.push_back({warpInsert, laneInsert});
+  }
+  // The lane forall's terminator also needs to be erased after inlining.
+  Operation *laneForallTerminator = laneForallOp.getBody()->getTerminator();
+  // Inline the warp and lane forall bodies into the thread forall, and remap
+  // the induction variables.
+  // The terminator will be replaced with the terminator of the inlined block.
+  rewriter.eraseOp(threadForallOp.getTerminator());
+  SmallVector<Value> replacementArgs(threadForallOp.getInductionVars());
+  replacementArgs.pop_back();
+  replacementArgs.append(threadForallOp.getRegionOutArgs().begin(),
+                         threadForallOp.getRegionOutArgs().end());
+  rewriter.mergeBlocks(warpForallOp.getBody(), threadForallOp.getBody(),
+                       replacementArgs);
+  SmallVector<Value> innerReplacementArgs(laneForallOp.getOutputs());
+  innerReplacementArgs.insert(innerReplacementArgs.begin(),
+                              threadForallOp.getInductionVars().back());
+  rewriter.inlineBlockBefore(laneForallOp.getBody(), laneForallOp,
+                             innerReplacementArgs);
+  for (auto [warpInsert, laneInsert] : insertPairs) {
+    SmallVector<OpFoldResult> composedOffsets;
+    for (auto [warpOffset, laneOffset] : llvm::zip_equal(
+             warpInsert.getMixedOffsets(), laneInsert.getMixedOffsets())) {
+      SmallVector<Value> offsets;
+      if (auto warpOffsetVal = dyn_cast<Value>(warpOffset)) {
+        offsets.push_back(warpOffsetVal);
+      }
+      if (auto laneOffsetVal = dyn_cast<Value>(laneOffset)) {
+        offsets.push_back(laneOffsetVal);
+      }
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(warpInsert);
+      if (!offsets.empty()) {
+        (void)setInsertionPointAfterLastValue(rewriter, offsets);
+      }
+      composedOffsets.push_back(IREE::LinalgExt::addOfrs(
+          rewriter, laneInsert.getLoc(), warpOffset, laneOffset));
+    }
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(warpInsert);
+    rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+        warpInsert, laneInsert.getSource(), warpInsert.getDest(),
+        composedOffsets, laneInsert.getMixedSizes(),
+        laneInsert.getMixedStrides());
+    rewriter.eraseOp(laneInsert);
+  }
+  rewriter.eraseOp(laneForallTerminator);
+  rewriter.eraseOp(laneForallOp);
+  return threadForallOp;
 }
 
 /// Return whether a parallel insert slice operation can be collapsed with

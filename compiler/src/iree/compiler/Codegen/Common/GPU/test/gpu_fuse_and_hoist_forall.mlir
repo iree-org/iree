@@ -659,3 +659,129 @@ func.func @fuse_collapse_shape(%arg0: tensor<?x?x8xf32>, %arg1 : index, %arg2 : 
 //       CHECK:     }
 //       CHECK:   } {mapping = [#gpu.thread<x>, #gpu.thread<y>]}
 //       CHECK:   return %[[FORALL_RESULT]]
+
+// -----
+
+func.func @fuse_warp_and_lane_foralls(%2: tensor<2x2x64xf32>) -> tensor<2x2x64xf32> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<2x2x64xf32>
+  %9 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %empty) -> (tensor<2x2x64xf32>) {
+    %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %10 = scf.forall (%arg5) in (64) shared_outs(%arg6 = %extracted_slice) -> (tensor<1x1x64xf32>) {
+      %extracted_slice_1 = tensor.extract_slice %2[%arg2, %arg3, %arg5] [1, 1, 1] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x1xf32>
+      %extracted_slice_2 = tensor.extract_slice %arg6[0, 0, %arg5] [1, 1, 1] [1, 1, 1] : tensor<1x1x64xf32> to tensor<1x1x1xf32>
+      %16 = linalg.copy ins(%extracted_slice_1 : tensor<1x1x1xf32>) outs(%extracted_slice_2 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %16 into %arg6[0, 0, %arg5] [1, 1, 1] [1, 1, 1] : tensor<1x1x1xf32> into tensor<1x1x64xf32>
+      }
+    } {mapping = [#iree_gpu.lane_id<0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+    }
+  } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  return %9 : tensor<2x2x64xf32>
+}
+
+// CHECK-LABEL: func @fuse_warp_and_lane_foralls
+//  CHECK-SAME:   %[[INPUT:.+]]: tensor<2x2x64xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x64xf32>
+//       CHECK:   %[[THREAD_FORALL:.+]] = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
+//  CHECK-SAME:       shared_outs(%[[INIT_ARG:.+]] = %[[EMPTY]])
+//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[INPUT]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//   CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]]{{.*}} outs(%[[OUT_SLICE]]
+//       CHECK:     scf.forall.in_parallel {
+//   CHECK-DAG:       tensor.parallel_insert_slice %[[COPY]] into %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+//       CHECK:   return %[[THREAD_FORALL]]
+
+// -----
+
+func.func @warp_and_lane_foralls_with_fusions(%2: tensor<2x2x64xf32>) -> tensor<2x2x64xf32> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<2x2x64xf32>
+  %producer = linalg.copy ins(%2 : tensor<2x2x64xf32>) outs(%empty : tensor<2x2x64xf32>) -> tensor<2x2x64xf32>
+  %9 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %empty) -> (tensor<2x2x64xf32>) {
+    %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %10 = scf.forall (%arg5) in (64) shared_outs(%arg6 = %extracted_slice) -> (tensor<1x1x64xf32>) {
+      %extracted_slice_1 = tensor.extract_slice %producer[%arg2, %arg3, %arg5] [1, 1, 1] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x1xf32>
+      %extracted_slice_2 = tensor.extract_slice %arg6[0, 0, %arg5] [1, 1, 1] [1, 1, 1] : tensor<1x1x64xf32> to tensor<1x1x1xf32>
+      %16 = linalg.copy ins(%extracted_slice_1 : tensor<1x1x1xf32>) outs(%extracted_slice_2 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %16 into %arg6[0, 0, %arg5] [1, 1, 1] [1, 1, 1] : tensor<1x1x1xf32> into tensor<1x1x64xf32>
+      }
+    } {mapping = [#iree_gpu.lane_id<0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+    }
+  } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  %consumer = linalg.copy ins(%9 : tensor<2x2x64xf32>) outs(%empty : tensor<2x2x64xf32>) -> tensor<2x2x64xf32>
+  return %consumer : tensor<2x2x64xf32>
+}
+
+//   CHECK-LABEL: func @warp_and_lane_foralls_with_fusions
+//    CHECK-SAME:   %[[INPUT:.+]]: tensor<2x2x64xf32>
+//         CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x64xf32>
+//         CHECK:   %[[THREAD_FORALL:.+]] = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
+//    CHECK-SAME:       shared_outs(%[[INIT_ARG:.+]] = %[[EMPTY]])
+//     CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[INPUT]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//     CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//     CHECK-DAG:     %[[PRODUCER:.+]] = linalg.copy ins(%[[IN_SLICE]]{{.*}}
+//     CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[PRODUCER]]{{.*}}
+//     CHECK-DAG:     %[[CONSUMER:.+]] = linalg.copy ins(%[[COPY]]{{.*}} outs(%[[OUT_SLICE]]
+//         CHECK:     scf.forall.in_parallel {
+//     CHECK-DAG:       tensor.parallel_insert_slice %[[CONSUMER]] into %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//         CHECK:     }
+//         CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+//         CHECK:   return %[[THREAD_FORALL]]
+
+// -----
+
+func.func @fuse_warp_and_lane_foralls_multi_result(%2: tensor<2x2x64xf32>) -> (tensor<2x2x64xf32>, tensor<2x2x64xf32>) {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<2x2x64xf32>
+  %9:2 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %empty, %arg5 = %empty) -> (tensor<2x2x64xf32>, tensor<2x2x64xf32>) {
+    %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg5[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %10:2 = scf.forall (%arg6) in (64) shared_outs(%arg7 = %extracted_slice, %arg8 = %extracted_slice_1) -> (tensor<1x1x64xf32>, tensor<1x1x64xf32>) {
+      %extracted_slice_2 = tensor.extract_slice %2[%arg2, %arg3, %arg6] [1, 1, 1] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x1xf32>
+      %extracted_slice_3 = tensor.extract_slice %arg7[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x64xf32> to tensor<1x1x1xf32>
+      %extracted_slice_4 = tensor.extract_slice %arg8[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x64xf32> to tensor<1x1x1xf32>
+      %16 = linalg.copy ins(%extracted_slice_2 : tensor<1x1x1xf32>) outs(%extracted_slice_3 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+      %17 = linalg.add ins(%extracted_slice_2, %extracted_slice_2 : tensor<1x1x1xf32>, tensor<1x1x1xf32>) outs(%extracted_slice_4 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %16 into %arg7[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x1xf32> into tensor<1x1x64xf32>
+        tensor.parallel_insert_slice %17 into %arg8[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x1xf32> into tensor<1x1x64xf32>
+      }
+    } {mapping = [#iree_gpu.lane_id<0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %10#0 into %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+      tensor.parallel_insert_slice %10#1 into %arg5[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+    }
+  } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  return %9#0, %9#1 : tensor<2x2x64xf32>, tensor<2x2x64xf32>
+}
+
+// CHECK-LABEL: func @fuse_warp_and_lane_foralls_multi_result
+//  CHECK-SAME:   %[[INPUT:.+]]: tensor<2x2x64xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x64xf32>
+//       CHECK:   %[[THREAD_FORALL:.+]]:2 = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
+//  CHECK-SAME:       shared_outs(%[[INIT_ARG0:.+]] = %[[EMPTY]], %[[INIT_ARG1:.+]] = %[[EMPTY]])
+//   CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[INPUT]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//   CHECK-DAG:     %[[OUT_SLICE0:.+]] = tensor.extract_slice %[[INIT_ARG0]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//   CHECK-DAG:     %[[OUT_SLICE1:.+]] = tensor.extract_slice %[[INIT_ARG1]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]]{{.*}} outs(%[[OUT_SLICE0]]
+//       CHECK:     %[[ADD:.+]] = linalg.add ins(%[[IN_SLICE]], %[[IN_SLICE]]{{.*}} outs(%[[OUT_SLICE1]]
+//       CHECK:     scf.forall.in_parallel {
+//   CHECK-DAG:       tensor.parallel_insert_slice %[[COPY]] into %[[INIT_ARG0]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//   CHECK-DAG:       tensor.parallel_insert_slice %[[ADD]] into %[[INIT_ARG1]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+//       CHECK:   return %[[THREAD_FORALL]]#0, %[[THREAD_FORALL]]#1
