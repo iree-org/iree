@@ -140,6 +140,11 @@ void LoweringConfigAttr::print(AsmPrinter &printer) const {
   printer << ">";
 }
 
+LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *ctx,
+                                           SmallVector<NamedAttribute> items) {
+  return Base::get(ctx, DictionaryAttr::get(ctx, items));
+}
+
 Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
                                                  ArrayRef<int64_t> tileSizes) {
   return IREE::Codegen::LoweringConfigTilingLevelAttr::get(
