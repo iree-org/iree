@@ -956,64 +956,40 @@ static void splitParallelAndReductionTiles(
 }
 
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
-                                    SmallVectorImpl<int64_t> &parallelSizes,
-                                    SmallVectorImpl<int64_t> &reductionSizes) {
+                                    SmallVectorImpl<int64_t> &vecTileSizes) {
   SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
-  for (auto [index, valuePair] : llvm::enumerate(
-           llvm::zip_equal(staticLoopRanges, op.getIteratorTypesArray()))) {
-    auto [size, iterType] = valuePair;
+  for (auto [index, size, iterType] :
+       llvm::enumerate(staticLoopRanges, op.getIteratorTypesArray())) {
     if (!ShapedType::isDynamic(size))
       continue;
-    if (iterType == utils::IteratorType::parallel) {
-      parallelSizes[index] = 1;
-    } else {
-      reductionSizes[index] = 1;
-    }
+    vecTileSizes[index] = 1;
   }
-
-  LDBG("Set always-vectorize parallel sizes: " << parallelSizes);
-  LDBG("Set always-vectorize reduction sizes: " << reductionSizes);
+  LDBG("Set always-vectorize sizes: " << vecTileSizes);
 }
 
 static void
 setVectorSizesForDynamicShapes(linalg::LinalgOp op,
                                VectorPreProcStrategy vecPreProcStrategy,
-                               SmallVectorImpl<int64_t> &parallelSizes,
-                               SmallVectorImpl<int64_t> &reductionSizes) {
+                               SmallVectorImpl<int64_t> &vecTileSizes) {
   // Masking doesn't need any dim set to 1.
   if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
     return;
   }
 
-  SmallVector<int64_t> origParallelSizes(parallelSizes.begin(),
-                                         parallelSizes.end());
-  SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
-                                          reductionSizes.end());
-  setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
-
-  if (llvm::all_of(parallelSizes, [](int64_t size) { return size <= 1; })) {
-    // Make sure we vectorize at least the first innermost parallel dim with a
+  SmallVector<int64_t> origVecTileSizes(vecTileSizes.begin(),
+                                        vecTileSizes.end());
+  setAlwaysVectorizeSizes(op, vecTileSizes);
+  if (llvm::all_of(vecTileSizes, [](int64_t size) { return size <= 1; })) {
+    // Make sure we vectorize at least the first innermost vecTile dim with a
     // vector size greater than one.
-    for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
-      if (origParallelSizes[i] > 1) {
-        parallelSizes[i] = origParallelSizes[i];
-        break;
-      }
-    }
-  } else if (llvm::all_of(reductionSizes,
-                          [](int64_t size) { return size <= 1; })) {
-    // Make sure we vectorize at least the first innermost reduction dim with a
-    // vector size greater than one.
-    for (int i = origReductionSizes.size() - 1; i >= 0; --i) {
-      if (origReductionSizes[i] > 1) {
-        reductionSizes[i] = origReductionSizes[i];
+    for (int i = origVecTileSizes.size() - 1; i >= 0; --i) {
+      if (origVecTileSizes[i] > 1) {
+        vecTileSizes[i] = origVecTileSizes[i];
         break;
       }
     }
   }
-
-  LDBG("Parallel sizes for dynamic sizes: " << parallelSizes);
-  LDBG("Reduction sizes for dynamic sizes: " << reductionSizes);
+  LDBG("Vector tile sizes for dynamic sizes: " << vecTileSizes);
   return;
 }
 
@@ -1192,18 +1168,16 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
     parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
   limitVectorTileSizes(cast<linalg::LinalgOp>(op.getOperation()), vecTileSizes);
+  if (vecPreProcStrategy == VectorPreProcStrategy::None) {
+    setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
+                                   vecPreProcStrategy, vecTileSizes);
+  }
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes,
                                  &parallelScalableFlags,
                                  &reductionScalableFlags);
-
-  if (vecPreProcStrategy == VectorPreProcStrategy::None) {
-    setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
-                                   vecPreProcStrategy, parallelTileSizes,
-                                   reductionTileSizes);
-  }
 
   // Ensure there's no zero scalable dims.
   int64_t numTilingDims = parallelTileSizes.size();
@@ -2189,12 +2163,11 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                                                  targetMLTransInfo),
                      distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
   limitVectorTileSizes(genericOp, vecTileSizes);
+  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
-                                 parallelTileSizes, reductionTileSizes);
 
   LDBG("Vectorization/unrolling tile sizes (parallel): " << parallelTileSizes);
   LDBG(
@@ -2558,10 +2531,10 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
     }
   }
   limitVectorTileSizes(convOp, vecTileSizes);
+  setAlwaysVectorizeSizes(convOp, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
-  setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
                                  reductionTileSizes};
@@ -2957,11 +2930,10 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
   limitVectorTileSizes(genericOp, vecTileSizes);
+  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes);
   splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
                                  &parallelScalableFlags,
                                  &reductionScalableFlags);
-  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes,
-                                 reductionTileSizes);
   for (auto [pos, tileSize] : llvm::enumerate(vecTileSizes)) {
     // Generic op vector parallel tile size is low priority. Only use if no
     // other op has set the tile size.
