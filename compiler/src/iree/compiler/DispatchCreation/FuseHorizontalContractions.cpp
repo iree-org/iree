@@ -191,6 +191,15 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
     }
   }
 
+  // DO NOT SUBMIT: hack to evade codegen failure for LLVMGPUDistribute.
+  unsigned mDimsSize = 1;
+  for (unsigned dim : aContractionDims.value().m) {
+    mDimsSize *= aStaticDims[dim];
+  }
+  if (mDimsSize < 16) {
+    return false;
+  }
+
   auto checkSameRankAndElementType = [](Value aVal, Value bVal) {
     auto aType = dyn_cast<ShapedType>(aVal.getType());
     auto bType = dyn_cast<ShapedType>(bVal.getType());
