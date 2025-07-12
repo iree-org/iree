@@ -74,9 +74,22 @@ public:
           if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
             return type.dropEncoding();
           }
+          // If we have scalable tiles that are represented with static inner
+          // tile sizes + scalable tile flags rather than just dynamic inner
+          // tile sizes. Hence, we mark them as dynamic for shape inference.
+          SmallVector<int64_t> innerTileSizesVector =
+              llvm::to_vector(encodingInfo.innerTileSizes);
+          if (encodingInfo.scalableTiles.has_value()) {
+            for (auto [index, value] :
+                 llvm::enumerate(encodingInfo.scalableTiles.value())) {
+              if (value) {
+                innerTileSizesVector[index] = ShapedType::kDynamic;
+              }
+            }
+          }
           auto packedType =
               cast<RankedTensorType>(linalg::PackOp::inferPackedType(
-                  type, encodingInfo.innerTileSizes, encodingInfo.innerDimsPos,
+                  type, innerTileSizesVector, encodingInfo.innerDimsPos,
                   encodingInfo.outerDimsPerm));
 
           // There is no swizzle, we are already done. Typically the case on

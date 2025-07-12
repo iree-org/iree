@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
@@ -216,6 +217,10 @@ DictionaryAttr serializeEncodingInfo(MLIRContext *ctx,
     items.emplace_back(b.getStringAttr("swizzle"),
                        serializeTileSwizzle(ctx, info.swizzle.value()));
   }
+  if (info.scalableTiles) {
+    items.emplace_back(b.getStringAttr("scalableTiles"),
+                       b.getBoolArrayAttr(info.scalableTiles.value()));
+  }
 
   return b.getDictionaryAttr(items);
 }
@@ -248,6 +253,16 @@ deserializeEncodingInfo(DictionaryAttr attr) {
     if (!info.swizzle) {
       return std::nullopt;
     }
+  }
+  if (attr.contains("scalableTiles")) {
+    auto value = attr.getNamed("scalableTiles");
+    if (!value || !isa<ArrayAttr>(value->getValue()))
+      return std::nullopt;
+    ScalableTileFlags res = llvm::to_vector(
+        llvm::map_range(cast<ArrayAttr>(value->getValue()), [](Attribute a) {
+          return cast<BoolAttr>(a).getValue();
+        }));
+    info.scalableTiles = std::move(res);
   }
 
   return info;
