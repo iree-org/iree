@@ -50,7 +50,7 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
     }
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (!loweringConfig)
+    if (!loweringConfig || !loweringConfig.hasWorkgroupTilingLevel())
       return WalkResult::advance();
     TilingConfig tilingConfig(loweringConfig);
     return verificationFn(op, tilingConfig, translationInfo,
