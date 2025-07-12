@@ -1746,17 +1746,6 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
                              scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
 
-/// Appends the attribute to `items`, which is constructed with `level`,
-/// `tileSizes`, and `scalableFlags`.
-static void appendCPULoweringConfigLevelAttr(
-    MLIRContext *ctx, SmallVectorImpl<NamedAttribute> &items,
-    IREE::CPU::TilingLevel level, ArrayRef<int64_t> tileSizes,
-    ArrayRef<bool> scalableFlags = {}) {
-  items.emplace_back(IREE::CPU::getTilingLevelName(level),
-                     IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
-                         ctx, tileSizes, scalableFlags));
-}
-
 static IREE::Codegen::LoweringConfigAttrInterface
 getMmt4dLoweringConfig(linalg::LinalgOp op) {
   DistributionHeuristicConfig distConfig;
