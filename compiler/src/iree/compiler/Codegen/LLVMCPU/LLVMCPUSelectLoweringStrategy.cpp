@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -47,8 +48,8 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
     if (isa<IREE::LinalgExt::CustomOp>(op)) {
       return WalkResult::advance();
     }
-    auto loweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+        getLoweringConfig(op);
     if (!loweringConfig)
       return WalkResult::advance();
     TilingConfig tilingConfig(loweringConfig);

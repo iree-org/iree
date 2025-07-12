@@ -2553,35 +2553,17 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   limitVectorTileSizes(convOp, vecTileSizes);
   setAlwaysVectorizeSizes(convOp, vecTileSizes);
-  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
-  SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
 
-  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
-                                 reductionTileSizes};
-  // No need for tiling inner parallel dims.
-  int64_t numTilingDims = parallelTileSizes.size();
-  tileSizes.emplace_back(numTilingDims, 0);
-
-  // Set "scalable" flags
-  ScalableTileFlagsListType scalableTileFlags;
+  // Set "scalable" flags.
+  int64_t numTilingDims = vecTileSizes.size();
+  SmallVector<bool> vecScalableFlags(numTilingDims, false);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
       clEnableScalableVectorization &&
       isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
-
     auto dims = linalg::inferConvolutionDims(convOp);
-    // Level 1: Distribution
-    scalableTileFlags.emplace_back(numTilingDims, false);
-    // Level 2: Parallel
-    SmallVector<bool> parallelScalableFlags(numTilingDims, false);
     // Make the channel dim scalable
-    parallelScalableFlags[dims->depth[0]] = true;
-    scalableTileFlags.emplace_back(parallelScalableFlags);
-    // Level 3: Reduction
-    scalableTileFlags.emplace_back(numTilingDims, false);
-    // Level 4: Inner parallel
-    scalableTileFlags.emplace_back(numTilingDims, false);
+    vecScalableFlags[dims->depth[0]] = true;
   }
 
   DictionaryAttr pipelineConfig;
@@ -2589,8 +2571,13 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
     pipelineConfig = getPipelineConfWithPeelingAttr(convOp.getContext());
   }
 
+  LoweringConfigGenerator generator(convOp);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, convOp, tileSizes, scalableTileFlags,
+      entryPointFn, convOp, loweringConfig,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert,
       /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
 }
