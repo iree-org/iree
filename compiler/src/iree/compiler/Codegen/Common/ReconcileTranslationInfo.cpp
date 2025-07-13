@@ -171,39 +171,17 @@ getProcIdsAndNprocs(
   return std::make_pair(procId, nprocs);
 }
 
-/// Resolve scf.forall operation by using the workgroup ID and counts.
-static LogicalResult
-resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
-                       IREE::Codegen::WorkgroupId deLinearizeFrom,
-                       bool generateLoopNest) {
-  if (forallOp->getNumResults() != 0) {
-    return forallOp.emitOpError(
-        "cannot resolve for all ops with return values");
-  }
-  SmallVector<OpFoldResult> mixedLowerBound = forallOp.getMixedLowerBound();
+/// Resolve the `forallOp` by mapping the loop induction variables to
+/// processor IDs. Expected `procIds` and `nProcs` to match the number
+/// of induction variables of the loop.
+static LogicalResult resolveForAll(RewriterBase &rewriter,
+                                   scf::ForallOp forallOp,
+                                   ArrayRef<OpFoldResult> procIds,
+                                   ArrayRef<OpFoldResult> nProcs,
+                                   bool generateLoopNest) {
   SmallVector<OpFoldResult> mixedUpperBound = forallOp.getMixedUpperBound();
   SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
-  FailureOr<SmallVector<IREE::Codegen::WorkgroupMappingAttr>> workgroupMapping =
-      verifyWorkgroupMappingAttrArray(forallOp);
-  if (failed(workgroupMapping)) {
-    return failure();
-  }
-  if (workgroupMapping->size() != mixedLowerBound.size()) {
-    return forallOp.emitOpError(
-        "expected as many workgroup mapping attributes as number of loops");
-  }
-
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(forallOp);
   Location loc = forallOp.getLoc();
-
-  // Get process IDs and counts by querying hal.interface.workgroup.id/count ops
-  // and delinearizing any dimensions of the forall beyond `deLinearizeFrom`.
-  SmallVector<OpFoldResult> procIds, nProcs;
-  std::tie(procIds, nProcs) = getProcIdsAndNprocs(
-      forallOp, rewriter, loc, workgroupMapping.value(), mixedLowerBound,
-      mixedUpperBound, mixedStep, deLinearizeFrom);
-
   // Scale the process IDs and counts to account for the forall op steps. These
   // are the forall offsets for each process, and the bounds of these offsets.
   SmallVector<Value> procOffsets, procOffsetBounds;
@@ -241,6 +219,42 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
                              /*argValues=*/loopNestIvs);
   rewriter.eraseOp(forallOp);
   return success();
+}
+
+/// Resolve scf.forall operation by using the workgroup ID and counts.
+static LogicalResult
+resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
+                       IREE::Codegen::WorkgroupId deLinearizeFrom,
+                       bool generateLoopNest) {
+  if (forallOp->getNumResults() != 0) {
+    return forallOp.emitOpError(
+        "cannot resolve for all ops with return values");
+  }
+  SmallVector<OpFoldResult> mixedLowerBound = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> mixedUpperBound = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
+  FailureOr<SmallVector<IREE::Codegen::WorkgroupMappingAttr>> workgroupMapping =
+      verifyWorkgroupMappingAttrArray(forallOp);
+  if (failed(workgroupMapping)) {
+    return failure();
+  }
+  if (workgroupMapping->size() != mixedLowerBound.size()) {
+    return forallOp.emitOpError(
+        "expected as many workgroup mapping attributes as number of loops");
+  }
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(forallOp);
+  Location loc = forallOp.getLoc();
+
+  // Get process IDs and counts by querying hal.interface.workgroup.id/count ops
+  // and delinearizing any dimensions of the forall beyond `deLinearizeFrom`.
+  SmallVector<OpFoldResult> procIds, nProcs;
+  std::tie(procIds, nProcs) = getProcIdsAndNprocs(
+      forallOp, rewriter, loc, workgroupMapping.value(), mixedLowerBound,
+      mixedUpperBound, mixedStep, deLinearizeFrom);
+
+  return resolveForAll(rewriter, forallOp, procIds, nProcs, generateLoopNest);
 }
 
 /// Resolve the workgroup counts for the function based on the extents of the
@@ -315,20 +329,18 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     return success();
   }
 
-  auto forAllOps = body.getOps<scf::ForallOp>();
-  SmallVector<scf::ForallOp> workgroupForAllOps =
-      llvm::filter_to_vector(forAllOps, [&](scf::ForallOp forAllOp) {
-        auto mapping = forAllOp.getMapping();
-        if (!mapping) {
-          return false;
-        }
-        if (!llvm::all_of(mapping.value(), [](Attribute attr) {
-              return isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
-            })) {
-          return false;
-        }
-        return true;
-      });
+  SmallVector<scf::ForallOp> workgroupForAllOps;
+  funcOp.walk([&workgroupForAllOps](scf::ForallOp forAllOp) {
+    std::optional<ArrayAttr> mapping = forAllOp.getMapping();
+    if (!mapping) {
+      return;
+    }
+    if (!llvm::all_of(mapping.value(),
+                      llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
+      return;
+    }
+    workgroupForAllOps.push_back(forAllOp);
+  });
 
   if (workgroupForAllOps.empty()) {
     // If there are no workgroup distribution loops, set the default
@@ -362,6 +374,195 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     }
   }
   return success();
+}
+
+/// If the dispatch was formed by splitting long running reductions, the
+/// workgroup count needs to be modified to account for the parallel partial
+/// reductions to be done. This typically means multiplying the number of
+/// workgroups currently used by the number of tiles used for the split
+/// reduction.
+static LogicalResult
+lowerSplitReductionModifierOp(RewriterBase &rewriter,
+                              FunctionOpInterface entryPointFn,
+                              IREE::Codegen::WorkgroupId delinearizeFrom,
+                              OpFoldResult splitReductionFactor) {
+  std::optional<IREE::HAL::ExecutableExportOp> exportOp =
+      getEntryPoint(entryPointFn);
+  if (!exportOp) {
+    // not entry point.
+    return success();
+  }
+  Block *body = exportOp->getWorkgroupCountBody();
+  if (!body) {
+    return success();
+  }
+  auto splitReduceModifiers = body->getOps<
+      IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>();
+  if (splitReduceModifiers.empty()) {
+    // Nothing to do.
+    return success();
+  }
+  if (!llvm::hasSingleElement(splitReduceModifiers)) {
+    return exportOp->emitOpError(
+        "unexpected multiple "
+        "iree_tensor_ext.dispatch.workgroup.splitk_modifier");
+  }
+  IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp
+      splitReduceModifier = *splitReduceModifiers.begin();
+  Location loc = splitReduceModifier->getLoc();
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(splitReduceModifier);
+  FailureOr<SmallVector<OpFoldResult>> materializedWorkgroupCount =
+      materializeWorkgroupCountComputation(rewriter, entryPointFn,
+                                           splitReductionFactor,
+                                           splitReduceModifier.getWorkload());
+  if (failed(materializedWorkgroupCount)) {
+    return splitReduceModifier->emitOpError(
+        "failed to materialize workgroup count computation in the entry point");
+  }
+
+  SmallVector<OpFoldResult> replacement =
+      llvm::map_to_vector(splitReduceModifier.getSourceWorkgroupCount(),
+                          [](Value v) -> OpFoldResult { return v; });
+  replacement[static_cast<uint64_t>(delinearizeFrom)] =
+      IREE::LinalgExt::mulOfrs(
+          rewriter, splitReduceModifier.getLoc(),
+          replacement[static_cast<uint64_t>(delinearizeFrom)],
+          materializedWorkgroupCount->front());
+
+  SmallVector<Value> replacementVals =
+      getValueOrCreateConstantIndexOp(rewriter, loc, replacement);
+  rewriter.replaceOp(splitReduceModifier, replacementVals);
+  return success();
+}
+
+/// Resolve scf.forall introduced by split reductions. The expectation is that
+/// there is a single such loop and its the "outermost" `scf.forall`, and this
+/// is distribute along grid axis `k`.
+///
+/// ```mlir
+/// scf.forall (%iv) = %lb to %ub step %s {
+///   ... = hal.interface.workgroup.id[k]
+/// }
+/// ```
+///
+/// `k` is assumed to be the "highest" dimension of the grid used (so has to be
+/// <= 3). To resolve the `scf.forall` the number of workgroups along `k` is
+/// increased by a factor of `%nsplit = ceildiv(%ub - %lb, %s)`. In addition
+///
+/// - All uses of `hal.interface.workgroup.id[k]` within `scf.forall` is
+///   replaced by `hal.interface.workgroup.id[k] % %orig_numworkgroups`, where
+///   `%orig_numworkgroups` is the number of workgroups along `k` that were used
+///   before the resolution of the split reduction `scf.forall`. This is same as
+///   `hal.interface.workgroup.count[k] / %nsplit`.
+/// - All uses of `%iv` is replaced by `hal.interface.workgroup.id[k] /
+///   %nsplit`.
+/// ```
+static LogicalResult
+resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
+                         IREE::Codegen::WorkgroupId delinearizeFrom) {
+  Region &body = funcOp.getFunctionBody();
+  if (body.empty()) {
+    return success();
+  }
+
+  SmallVector<scf::ForallOp> splitReductionForAllOps;
+  funcOp.walk([&splitReductionForAllOps](scf::ForallOp forAllOp) {
+    auto mapping = forAllOp.getMapping();
+    if (!mapping || mapping->size() != 1 ||
+        !isa<IREE::LinalgExt::SplitReductionMappingAttr>(
+            mapping->getValue().front())) {
+      return;
+    }
+    splitReductionForAllOps.push_back(forAllOp);
+  });
+
+  if (splitReductionForAllOps.empty()) {
+    return lowerSplitReductionModifierOp(rewriter, funcOp, delinearizeFrom,
+                                         rewriter.getIndexAttr(1));
+  }
+
+  // For now support only a single split-reduction forall.
+  if (splitReductionForAllOps.size() != 1) {
+    return funcOp->emitOpError(
+        "failed to resolve multiple split-reduction loops");
+  }
+
+  scf::ForallOp forallOp = splitReductionForAllOps.front();
+  if (forallOp->getNumResults() != 0) {
+    return forallOp.emitOpError(
+        "cannot resolve for all ops with return values");
+  }
+
+  assert(forallOp.getMapping() && forallOp.getMapping()->size() == 1 &&
+         "expected forall op to have mapping of "
+         "`[#iree_codegen.split_reduction_mapping]`");
+  // Currently only support single induction variable.
+  if (forallOp.getRank() != 1) {
+    return forallOp->emitOpError("unsupported split-reduction resolution of "
+                                 "`scf.forall` op of rank greater than 1");
+  }
+
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(forallOp);
+  Location loc = forallOp.getLoc();
+
+  OpFoldResult lb = forallOp.getMixedLowerBound().front();
+  OpFoldResult ub = forallOp.getMixedUpperBound().front();
+  OpFoldResult step = forallOp.getMixedStep().front();
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  OpFoldResult nSplitProcs = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, (s1 - s0).ceilDiv(s2), {lb, ub, step});
+
+  // Lower the splitk-modifier op in the entry point.
+  if (failed(lowerSplitReductionModifierOp(rewriter, funcOp, delinearizeFrom,
+                                           nSplitProcs))) {
+    return forallOp->emitOpError("failed to lower split reduction modifier op");
+  }
+
+  auto procIdOp = rewriter.create<IREE::HAL::InterfaceWorkgroupIDOp>(
+      loc, static_cast<uint>(delinearizeFrom));
+  auto nTotalProcsOp = rewriter.create<IREE::HAL::InterfaceWorkgroupCountOp>(
+      loc, static_cast<uint>(delinearizeFrom));
+  OpFoldResult nTotalProcs = nTotalProcsOp.getResult();
+  auto origNProcs = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, s0.floorDiv(s1), {nTotalProcs, nSplitProcs});
+  auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, procIdOp.getResult(),
+      ArrayRef<OpFoldResult>{nSplitProcs, origNProcs});
+
+  Value workgroupIdReplacement = delinearizeOp.getResult(1);
+
+  // Check that all uses of `hal.interface.workgroup.id[delinearizeFrom]` are
+  // within the `scf.forall` operation.
+  auto walkResult = funcOp.walk(
+      [&](IREE::HAL::InterfaceWorkgroupIDOp workgroupIdOp) -> WalkResult {
+        if (workgroupIdOp.getDimension().getZExtValue() !=
+            llvm::to_underlying(delinearizeFrom)) {
+          return WalkResult::advance();
+        }
+        if (workgroupIdOp == procIdOp) {
+          return WalkResult::advance();
+        }
+        for (Operation *user : workgroupIdOp->getUsers()) {
+          auto parentForallOp = user->getParentOfType<scf::ForallOp>();
+          if (parentForallOp != forallOp) {
+            return user->emitOpError("expected all users of `workgroup.id` to "
+                                     "be within split reduction scf.forall op");
+          }
+        }
+        rewriter.replaceAllUsesWith(workgroupIdOp, workgroupIdReplacement);
+        return WalkResult::advance();
+      });
+  if (walkResult.wasInterrupted()) {
+    return failure();
+  }
+
+  return resolveForAll(rewriter, forallOp,
+                       OpFoldResult(delinearizeOp.getResult(0)), nSplitProcs,
+                       /*generateLoopNest = */ false);
 }
 
 //===---------------------------------------------------------------------===//
@@ -440,8 +641,14 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     // Resolve workgroup distribution related `scf.forall` ops.
     if (failed(resolveWorkgroupForAll(rewriter, rootFuncOp, distributeAlong))) {
       variantOp.emitOpError(
-          "failed in iree-codegen-reconcile-translation-info pass");
+          "failed to resolve workgroup distribution forall ops");
       return signalPassFailure();
+    }
+
+    // Resolve split reduction distribution.
+    if (failed(
+            resolveSplitReduceForAll(rewriter, rootFuncOp, distributeAlong))) {
+      variantOp.emitOpError("failed to resolve split reduction forall ops");
     }
 
     std::queue<FunctionOpInterface> nodeQueue;
@@ -526,12 +733,22 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
   // Erase all the lowering configs and translation infos after we have finished
   // processing all exported functions.
-  innerModuleOp->walk([](Operation *op) {
+  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinalOps;
+  innerModuleOp->walk([&ordinalOps](Operation *op) {
     if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
       eraseTranslationInfo(funcOp);
     }
     eraseLoweringConfig(op);
+    if (auto ordinalOp =
+            dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
+      ordinalOps.push_back(ordinalOp);
+    }
   });
+
+  // Discard all ordinal ops.
+  for (auto ordinalOp : ordinalOps) {
+    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
+  }
 }
 
 } // namespace mlir::iree_compiler
