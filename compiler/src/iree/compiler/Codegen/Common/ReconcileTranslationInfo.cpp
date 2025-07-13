@@ -524,16 +524,16 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
 
   auto procIdOp = rewriter.create<IREE::HAL::InterfaceWorkgroupIDOp>(
       loc, static_cast<uint>(delinearizeFrom));
-  OpFoldResult procId = procIdOp.getResult();
   auto nTotalProcsOp = rewriter.create<IREE::HAL::InterfaceWorkgroupCountOp>(
       loc, static_cast<uint>(delinearizeFrom));
   OpFoldResult nTotalProcs = nTotalProcsOp.getResult();
   auto origNProcs = affine::makeComposedFoldedAffineApply(
-      rewriter, loc, s1.floorDiv(s0), {nTotalProcs, nSplitProcs});
-  OpFoldResult workgroupIdReplacement = affine::makeComposedFoldedAffineApply(
-      rewriter, loc, s0 % s1, {procId, origNProcs});
-  Value workgroupIdReplacementVal =
-      getValueOrCreateConstantIndexOp(rewriter, loc, workgroupIdReplacement);
+      rewriter, loc, s0.floorDiv(s1), {nTotalProcs, nSplitProcs});
+  auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, procIdOp.getResult(),
+      ArrayRef<OpFoldResult>{nSplitProcs, origNProcs});
+
+  Value workgroupIdReplacement = delinearizeOp.getResult(1);
 
   // Check that all uses of `hal.interface.workgroup.id[delinearizeFrom]` are
   // within the `scf.forall` operation.
@@ -553,14 +553,15 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
                                      "be within split reduction scf.forall op");
           }
         }
-        rewriter.replaceAllUsesWith(workgroupIdOp, workgroupIdReplacementVal);
+        rewriter.replaceAllUsesWith(workgroupIdOp, workgroupIdReplacement);
         return WalkResult::advance();
       });
   if (walkResult.wasInterrupted()) {
     return failure();
   }
 
-  return resolveForAll(rewriter, forallOp, procId, nSplitProcs,
+  return resolveForAll(rewriter, forallOp,
+                       OpFoldResult(delinearizeOp.getResult(0)), nSplitProcs,
                        /*generateLoopNest = */ false);
 }
 
