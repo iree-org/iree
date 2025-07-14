@@ -967,32 +967,6 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
   LDBG("Set always-vectorize sizes: " << vecTileSizes);
 }
 
-static void
-setVectorSizesForDynamicShapes(linalg::LinalgOp op,
-                               VectorPreProcStrategy vecPreProcStrategy,
-                               SmallVectorImpl<int64_t> &vecTileSizes) {
-  // Masking doesn't need any dim set to 1.
-  if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
-    return;
-  }
-
-  SmallVector<int64_t> origVecTileSizes(vecTileSizes.begin(),
-                                        vecTileSizes.end());
-  setAlwaysVectorizeSizes(op, vecTileSizes);
-  if (llvm::all_of(vecTileSizes, [](int64_t size) { return size <= 1; })) {
-    // Make sure we vectorize at least the first innermost vecTile dim with a
-    // vector size greater than one.
-    for (int i = origVecTileSizes.size() - 1; i >= 0; --i) {
-      if (origVecTileSizes[i] > 1) {
-        vecTileSizes[i] = origVecTileSizes[i];
-        break;
-      }
-    }
-  }
-  LDBG("Vector tile sizes for dynamic sizes: " << vecTileSizes);
-  return;
-}
-
 /// Returns the same lowering_config attribute with the updated tile sizes and
 /// scalable tile flags. The `setDistrubtionConfig` flag is only available when
 /// `origLoweringConfig is a IREE::CPU::LoweringConfigAttr. The distribution
@@ -1168,10 +1142,6 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
     parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
   limitVectorTileSizes(cast<linalg::LinalgOp>(op.getOperation()), vecTileSizes);
-  if (vecPreProcStrategy == VectorPreProcStrategy::None) {
-    setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
-                                   vecPreProcStrategy, vecTileSizes);
-  }
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
@@ -2163,7 +2133,6 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                                                  targetMLTransInfo),
                      distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
   limitVectorTileSizes(genericOp, vecTileSizes);
-  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
@@ -2930,7 +2899,6 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
   limitVectorTileSizes(genericOp, vecTileSizes);
-  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes);
   splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
                                  &parallelScalableFlags,
                                  &reductionScalableFlags);
