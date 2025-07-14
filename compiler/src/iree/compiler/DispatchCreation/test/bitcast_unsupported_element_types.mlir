@@ -181,3 +181,26 @@ util.func private @unsupported_other_user(%arg0: tensor<960xf6E3M2FN>) -> tensor
   }
   util.return %0 : tensor<960xi8>
 }
+
+// -----
+
+util.func private @unimplemented_complex(%arg0: tensor<960xcomplex<f32>>) -> tensor<960xcomplex<f32>> {
+  %0 = flow.dispatch.workgroups(%arg0)
+    : (tensor<960xcomplex<f32>>) -> tensor<960xcomplex<f32>> = (
+        %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<960xcomplex<f32>>>,
+        %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960xcomplex<f32>>>
+      ) {
+    %1 = iree_tensor_ext.dispatch.tensor.load %arg1, offsets = [0], sizes = [960], strides = [1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<960xcomplex<f32>>> -> tensor<960xcomplex<f32>>
+    %2 = "dispatch0.body"(%1) : (tensor<960xcomplex<f32>>) -> (tensor<960xcomplex<f32>>)
+    iree_tensor_ext.dispatch.tensor.store %2, %arg2, offsets = [0], sizes = [960], strides = [1]
+      : tensor<960xcomplex<f32>> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960xcomplex<f32>>>
+    flow.return
+  }
+  util.return %0 : tensor<960xcomplex<f32>>
+}
+
+// CHECK-LABEL: @unimplemented_complex
+// CHECK-SAME:    %[[ARG0:[A-Za-z0-9]+]]: tensor<960xcomplex<f32>>
+// CHECK:         %[[D0:.+]] = flow.dispatch.workgroups(%[[ARG0]])
+// CHECK:         util.return %[[D0]]
