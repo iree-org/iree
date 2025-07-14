@@ -1181,9 +1181,12 @@ distributeInnerTiledOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(
         tiledOp, "tiledOp must have vector and subgroup for distribution.");
   }
+
   RewriterBase::InsertionGuard g(rewriter);
+
   Location loc = tiledOp.getLoc();
   MLIRContext *context = rewriter.getContext();
+
   OpFoldResult zero = rewriter.getIndexAttr(0);
   OpFoldResult one = rewriter.getIndexAttr(1);
 
@@ -1213,6 +1216,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   SmallVector<tensor::ExtractSliceOp> initSliceOps;
   std::optional<ArrayAttr> maybePerms = tiledOp.getPermutations();
   int64_t firstOutIdx = tiledOp.getNumInputs();
+
   for (auto [opIndex, operand] : llvm::enumerate(tiledOp.getOperands())) {
     int64_t outerRank = tiledOp.getOperandOuterRank(opIndex);
     SmallVector<OpFoldResult> offsets(outerRank, zero);

@@ -405,6 +405,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
 
   SmallVector<int64_t> kTileSizes =
       getBestKTileSizes(problem, intrinsic, seeds);
+
   return GPUMMASchedule{
       intrinsic.mmaKind,   intrinsic.mSizes[0], intrinsic.nSizes[0],
       intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,

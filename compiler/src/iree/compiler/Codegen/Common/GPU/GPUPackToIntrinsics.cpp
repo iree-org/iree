@@ -115,6 +115,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
+
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> packingCandidates;

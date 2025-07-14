@@ -194,10 +194,12 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   if (intrinsics.empty())
     return std::nullopt;
   sortMMAIntrinsics(problem, intrinsics);
+
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
+
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/iree-org/iree/issues/16341 for details.
@@ -411,6 +413,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: " << schedule);
+
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
   SmallVector<int64_t> subgroupTileSizes(bounds.size(), 0);
