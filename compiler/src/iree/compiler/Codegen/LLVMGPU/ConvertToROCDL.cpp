@@ -272,8 +272,6 @@ struct ConvertToROCDLPass final
           patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
-      arith::populateExpandF8E8M0Patterns(patterns);
-      arith::populateExpandF4E2M1Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -337,6 +335,8 @@ struct ConvertToROCDLPass final
       configureGpuToROCDLConversionLegality(target);
       populateMathToROCDLConversionPatterns(converter, llvmPatterns);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
+      arith::populateExpandF8E8M0Patterns(llvmPatterns);
+      arith::populateExpandF4E2M1Patterns(llvmPatterns);
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
