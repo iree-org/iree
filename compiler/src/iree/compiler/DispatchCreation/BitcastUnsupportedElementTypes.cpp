@@ -138,7 +138,9 @@ bitcastWorkgroupsInputs(RewriterBase &rewriter,
     operand.assign(inputBitcast);
 
     blockArg.setType(castedDispatchType);
-    for (auto user : blockArg.getUsers()) {
+    // Copy the list of users since they will be updated while bitcasting.
+    SmallVector<Operation *> users(blockArg.getUsers());
+    for (auto user : users) {
       if (failed(bitcastBlockArgUser(rewriter, workgroupsOp, user, blockArg,
                                      tensorType, castedTensorType))) {
         return failure();
@@ -207,7 +209,8 @@ bitcastWorkgroupsOutputs(RewriterBase &rewriter,
 
     // Update the type of the block argument and bitcast all load/store users.
     blockArg.setType(castedDispatchType);
-    for (auto user : blockArg.getUsers()) {
+    SmallVector<Operation *> users(blockArg.getUsers());
+    for (auto user : users) {
       if (failed(bitcastBlockArgUser(rewriter, workgroupsOp, user, blockArg,
                                      tensorType, castedTensorType))) {
         return failure();
