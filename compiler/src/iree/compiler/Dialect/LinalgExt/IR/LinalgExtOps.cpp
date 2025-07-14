@@ -533,6 +533,36 @@ void MapScatterOp::insertTransformationAtStart(
   transformBody.eraseArguments(0, oldSourceIndices.size());
 }
 
+void MapScatterOp::inlineMapScatterBody(
+    OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  Block &transformBlock = getTransformationRegion().front();
+  IRMapping mapping;
+  // Map the induction variables of the loop nest to the block arguments of the
+  // transformation body. The induction variables are the indices looping over
+  // the elements of input operand.
+  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
+    mapping.map(arg, transformBodyIndices[idx]);
+  }
+  // Clone the operations within the transformation body to the current
+  // insertion point, and map their results to the new cloned operations'
+  // results.
+  for (Operation &op : transformBlock.without_terminator()) {
+    Operation *clonedOp = b.clone(op, mapping);
+    for (auto [result, clonedResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapping.map(result, clonedResult);
+    }
+  }
+
+  // Get the cloned values that were yielded by the transformation body to pass
+  // to the bodyBuilder.
+  SmallVector<Value> mappedYieldedValues = llvm::map_to_vector(
+      transformBlock.getTerminator()->getOperands(),
+      [&](Value operand) -> Value { return mapping.lookupOrDefault(operand); });
+  bodyBuilder(b, loc, mappedYieldedValues);
+}
+
 bool MapScatterOp::isIdentity() {
   if (getInputType() != getOutputType()) {
     return false;
