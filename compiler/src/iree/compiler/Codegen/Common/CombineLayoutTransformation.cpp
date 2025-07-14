@@ -383,23 +383,30 @@ combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
   }
 }
 
-static MapScatterOp
-insertIdentityMapScatter(RewriterBase &rewriter,
-                         IREE::Codegen::StoreToBufferOp storeOp) {
-  Location loc = storeOp->getLoc();
+// Insert identity map_scatter op for parallel_insert_slice op and store op.
+static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
+                                             Operation *op) {
+  Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(storeOp);
-  auto mapScatterDest =
+  assert((isa<IREE::Codegen::StoreToBufferOp, tensor::ParallelInsertSliceOp>(
+             op)) &&
+         "expected store_to_buffer or parallel_insert_slice op");
+  if (isa<IREE::Codegen::StoreToBufferOp>(op)) {
+    rewriter.setInsertionPoint(op);
+  } else {
+    rewriter.setInsertionPoint(op->getParentOp());
+  }
+  auto destType = cast<RankedTensorType>(op->getOperand(0).getType());
+  Value mapScatterDest =
       rewriter
           .create<tensor::EmptyOp>(
-              loc, memref::getMixedSizes(rewriter, loc, storeOp.getBuffer()),
-              storeOp.getTensor().getType().getElementType())
+              loc, tensor::getMixedSizes(rewriter, loc, op->getOperand(0)),
+              destType.getElementType())
           .getResult();
   auto mapScatterOp = MapScatterOp::createIdentityMapScatter(
-      rewriter, loc, storeOp.getTensor(), mapScatterDest);
-  rewriter.modifyOpInPlace(storeOp, [&]() {
-    storeOp.getTensorMutable().assign(mapScatterOp.getResult(0));
-  });
+      rewriter, loc, op->getOperand(0), mapScatterDest);
+  rewriter.modifyOpInPlace(
+      op, [&]() { op->setOperand(0, mapScatterOp.getResult(0)); });
   LDBG("Created identity map_scatter:\n" << mapScatterOp);
   return mapScatterOp;
 }
@@ -475,6 +482,31 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);
   }
 
+  // Insert identity map_scatter op for each region arg on finding a
+  // parallel_insert_slice op within a scf.forall op with workgroup mapping.
+  SmallVector<scf::ForallOp> forallOps(
+      funcOp.getFunctionBody().getOps<scf::ForallOp>());
+  for (scf::ForallOp forallOp : forallOps) {
+    bool hasWorkgroupMapping =
+        llvm::all_of(forallOp.getMapping().value(),
+                     llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>);
+    if (!hasWorkgroupMapping) {
+      continue;
+    }
+    for (BlockArgument bbArg : forallOp.getRegionIterArgs()) {
+      SmallVector<Operation *> parallelInsertOps =
+          forallOp.getCombiningOps(bbArg);
+      if (parallelInsertOps.size() != 1) {
+        return rewriter.notifyMatchFailure(
+            forallOp, "Expected a single parallel_insert_slice");
+      }
+      MapScatterOp mapScatterOp =
+          insertIdentityMapScatter(rewriter, parallelInsertOps.front());
+      if (mapScatterOp)
+        combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);
+    }
+  }
+
   // Cleanup any tensor.dim ops that may be present after relayout
   // combination.
   RewritePatternSet cleanupPatterns(ctx);
@@ -524,6 +556,18 @@ struct CombineLayoutTransformationPass final
             &getContext(), getOperation(),
             defaultPadWorkgroupDistributionConfigFn))) {
       return signalPassFailure();
+    }
+
+    MLIRContext *context = &getContext();
+
+    FunctionOpInterface funcOp = getOperation();
+    {
+      RewritePatternSet patterns(context);
+
+      populateFuseTilableForallConsumersPattern(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };
