@@ -22,9 +22,13 @@ namespace mlir::iree_compiler::DispatchCreation {
 static FailureOr<RankedTensorType>
 getBitcastRequiredType(Builder &b, Operation *root,
                        RankedTensorType tensorType) {
-  // All integer and byte aligned types are legal. DispatchTensorType
-  // only allows int and float element types so this check is safe.
   Type elementType = tensorType.getElementType();
+  // TODO: Support bitcasting non-floats (complex/structs/tuples).
+  if (!elementType.isIntOrFloat()) {
+    return RankedTensorType();
+  }
+
+  // All integer and byte aligned types are legal.
   int64_t bitwidth = elementType.getIntOrFloatBitWidth();
   if (elementType.isInteger() || bitwidth % 8 == 0) {
     return RankedTensorType();
