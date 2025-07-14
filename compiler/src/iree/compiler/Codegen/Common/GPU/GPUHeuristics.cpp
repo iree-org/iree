@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 
-#include <algorithm>
 #include <cstdint>
 
 #include "llvm/ADT/APInt.h"
@@ -286,8 +285,11 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   // 16x16x16 intrinsic, then:
   //  - kTotalTileCounts would be 3 * (128/16) = 24
   SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
-  kTotalTileCounts.back() =
-      llvm::divideCeil(problem.kSizes.back(), intrinsic.kSizes[0]);
+  for (int i = intrinsic.kSizes.size() - 1, e = problem.kSizes.size() - 1;
+       i >= 0; --i, --e) {
+    kTotalTileCounts[e] =
+        llvm::divideCeil(problem.kSizes[e], intrinsic.kSizes[i]);
+  }
 
   // Compute the ideal number of intrinsics along K per subgroup based on the
   // seed.

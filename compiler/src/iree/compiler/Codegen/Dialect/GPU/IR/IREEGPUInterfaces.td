@@ -33,14 +33,6 @@ def IREEGPU_MmaInterfaceAttr
       /*methodName=*/"getSubgroupSize",
       /*args=*/(ins)
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the block size of elements sharing a scale in this kind of multi-MMA.
-      }],
-      /*retType=*/"int64_t",
-      /*methodName=*/"getBlockSize",
-      /*args=*/(ins)
-    >,
   ];
 
   // Methods included to preserve interfaces from beforet he InnerTileDescAttrInterface
@@ -61,19 +53,13 @@ def IREEGPU_MmaInterfaceAttr
       return {accShape[0], accShape[1], lhsShape[1]};
     }
 
-    /// Returns the shape of the scaled MMA operation:
-    /// ```
-    ///   C += A * B
-    /// ```
-    /// Where, up to some transpositions, `A` has shape `<M, K>`, `B` has shape
-    /// `<K, N>`, and `C` has shape `<M, N>`.
-    ::std::tuple<int64_t, int64_t, int64_t, int64_t>
-    getScaledMNKShape() const {
+    static ::std::tuple<int64_t, int64_t, int64_t>
+    getMNKShape(::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface in) {
       ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
-      $_attr.getUndistributedTileTypes(preThreadTypes);
-      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
+      in.getUndistributedTileTypes(preThreadTypes);
+      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[2].getShape();
       ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
-      return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
+      return {accShape[0], accShape[1], lhsShape[1]};
     }
 
     /// Returns the element types of the operands to the MMA operation:
@@ -84,6 +70,17 @@ def IREEGPU_MmaInterfaceAttr
     getABCElementTypes() const {
       ::llvm::SmallVector<::mlir::Type> elementTypes;
       $_attr.getElementTypes(elementTypes);
+      return {elementTypes[0], elementTypes[1], elementTypes[2]};
+    }
+
+    /// Returns the element types of the operands to the MMA operation:
+    /// ```
+    ///   C += A * B
+    /// ```
+    static ::std::tuple<::mlir::Type, ::mlir::Type, ::mlir::Type>
+    getABCElementTypes(::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface in) {
+      ::llvm::SmallVector<::mlir::Type> elementTypes;
+      in.getElementTypes(elementTypes);
       return {elementTypes[0], elementTypes[1], elementTypes[2]};
     }
 

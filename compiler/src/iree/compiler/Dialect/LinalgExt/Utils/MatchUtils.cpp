@@ -209,8 +209,8 @@ static bool isScaledContractionBody(Block &block) {
 ///      (i.e. it is a permutation on RES and LHS and does not appear in RHS).
 ///   2. The n dimension is involved in an outer-product along RHS
 ///      (i.e. it is a permutation on RES and RHS and does not appear in LHS).
-///   3. The k dimension appears as a permutation on LHS and RHS.
-///   4. The k_B dimension appears as a permutation on LHS and RHS in scales
+///   3. The k dimension appears as a permutation on LHS, RHS and their scales.
+///   4. The k_B dimension appears as a permutation on LHS and RHS.
 ///   4. m, n, k, k_B appear only once in any given indexing.
 ///   5. Optional batch dimensions that appear in all operands are captured.
 /// This allows e.g. detecting that some contraction is embedded within
@@ -237,14 +237,14 @@ inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
   llvm::set_intersect(batches, b);
   llvm::set_intersect(batches, c);
 
-  // Scale A & Scale B is k_b reduction dimension.
+  // Scale A & Scale B is k reduction dimension.
   llvm::SmallDenseSet<int64_t> sa =
       findPermutationsIndexingOperand(indexingMaps[2], iterators, red);
   llvm::SmallDenseSet<int64_t> sb =
       findPermutationsIndexingOperand(indexingMaps[3], iterators, red);
   llvm::set_intersect(sa, sb);
 
-  // A red & B red - Scale A & Scale B is k reduction dimension.
+  // A red & B red - Scale A & Scale B is k_b reduction dimension.
   llvm::SmallDenseSet<int64_t> ra =
       findPermutationsIndexingOperand(indexingMaps[0], iterators, red);
   llvm::SmallDenseSet<int64_t> rb =
@@ -257,8 +257,8 @@ inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
       SmallVector<unsigned, 2>(batches.begin(), batches.end()),
       SmallVector<unsigned, 2>(ac.begin(), ac.end()),
       SmallVector<unsigned, 2>(bc.begin(), bc.end()),
-      SmallVector<unsigned, 2>(ra.begin(), ra.end()),
-      SmallVector<unsigned, 2>(sa.begin(), sa.end())};
+      SmallVector<unsigned, 2>(sa.begin(), sa.end()),
+      SmallVector<unsigned, 2>(ra.begin(), ra.end())};
   llvm::sort(dimensions.batch.begin(), dimensions.batch.end());
   llvm::sort(dimensions.m.begin(), dimensions.m.end());
   llvm::sort(dimensions.n.begin(), dimensions.n.end());

@@ -34,7 +34,7 @@ struct GPUPackToIntrinsicsPass final
 
 FailureOr<SmallVector<OpFoldResult>>
 getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
-               IREE::GPU::MmaInterfaceAttr kind) {
+               IREE::Codegen::InnerTileDescAttrInterface kind) {
   SmallVector<int64_t> dims;
   SmallVector<SmallVector<unsigned, 2>> indices;
   auto createPackedSizes =
@@ -57,7 +57,7 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
   FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledContrDims =
       IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (succeeded(scaledContrDims)) {
-    auto [m, n, k, kB] = kind.getScaledMNKShape();
+    auto [m, n, k, kB] = IREE::GPU::ScaledMMAAttr::getScaledMNKShape(kind);
     indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k,
                scaledContrDims->kB};
     return createPackedSizes({m, n, k, kB}, indices);
@@ -69,7 +69,7 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     linalgOp.emitError() << "failed to infer contraction dims\n";
     return failure();
   }
-  auto [m, n, k] = kind.getMNKShape();
+  auto [m, n, k] = IREE::GPU::MmaInterfaceAttr::getMNKShape(kind);
   indices = {contractionDims->m, contractionDims->n, contractionDims->k};
   return createPackedSizes({m, n, k}, indices);
 }
@@ -79,7 +79,7 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
   auto loweringConfig =
       getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
   assert(loweringConfig && "Packing unconfigured op");
-  IREE::GPU::MmaInterfaceAttr kind = getMmaKind(loweringConfig);
+  IREE::Codegen::InnerTileDescAttrInterface kind = getMmaKind(loweringConfig);
   assert(kind && "Packing op without mma kind");
   FailureOr<SmallVector<OpFoldResult>> packedSizes =
       getPackedSizes(linalgOp, rewriter, kind);
@@ -101,11 +101,12 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!loweringConfig) {
       return failure();
     }
-    IREE::GPU::MmaInterfaceAttr kind = getMmaKind(loweringConfig);
+    IREE::Codegen::InnerTileDescAttrInterface kind = getMmaKind(loweringConfig);
     if (!kind) {
       return failure();
     }
-    if (failed(convertContractionToInnerTiledMma(rewriter, linalgOp, kind))) {
+    if (failed(IREE::GPU::convertContractionToInnerTiledMma(rewriter, linalgOp,
+                                                            kind))) {
       return failure();
     }
     return success();

@@ -491,17 +491,19 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
   return o;
 }
 
-MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
-                                                MMAFragment fragment) {
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
+                        MMAFragment fragment) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
     // |colMajor| indicates that the accumulator layout should be returned
     // column major.
-    return getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
-                                   fragment == MMAFragment::Acc &&
-                                       mmaAttr.getColMajor());
+    return IREE::GPU::getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
+                                              fragment == MMAFragment::Acc &&
+                                                  mmaAttr.getColMajor());
   }
   if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return getSingleSubgroupLayout(vmmaAttr.getIntrinsic(), fragment);
+    return IREE::GPU::getSingleSubgroupLayout(vmmaAttr.getIntrinsic(),
+                                              fragment);
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
@@ -1498,9 +1500,9 @@ void ScaledMMAAttr::getUndistributedTileTypes(
   Type accType = getAccElemType();
   Type scaleType = Float8E8M0FNUType::get(getContext());
 
-  results.push_back(VectorType::get({m, blockSize, kScale}, lhsType));
+  results.push_back(VectorType::get({m, kScale, blockSize}, lhsType));
   results.push_back(VectorType::get({m, kScale}, scaleType));
-  results.push_back(VectorType::get({blockSize, kScale, n}, rhsType));
+  results.push_back(VectorType::get({kScale, blockSize, n}, rhsType));
   results.push_back(VectorType::get({kScale, n}, scaleType));
   results.push_back(VectorType::get({m, n}, accType));
 }

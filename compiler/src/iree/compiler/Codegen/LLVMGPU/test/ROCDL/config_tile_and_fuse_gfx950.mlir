@@ -30,6 +30,6 @@ func.func @scaled_matmul(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 4, 8]
+//  CHECK-SAME:     reduction = [0, 0, 8, 1]
 //  CHECK-SAME:     subgroup = [4, 4, 0, 0]
 //  CHECK-SAME:     workgroup = [128, 128, 0, 0]

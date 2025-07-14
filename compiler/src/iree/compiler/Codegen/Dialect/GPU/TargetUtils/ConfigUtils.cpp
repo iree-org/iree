@@ -199,7 +199,7 @@ static std::optional<GPUMMASchedule> getScaledMmaScheduleFromProblemAndTarget(
     auto [m, n, k, kB] = smma.getScaledMNKShape();
     SmallVector<Type> elementTypes;
     smma.getElementTypes(elementTypes);
-    intrinsics.emplace_back(GPUIntrinsicType({m}, {n}, {kB, k}, {},
+    intrinsics.emplace_back(GPUIntrinsicType({m}, {n}, {k, kB}, {},
                                              elementTypes[0], elementTypes[2],
                                              elementTypes[4], smma));
   }
@@ -410,7 +410,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind = schedule->mmaKind;
+  IREE::Codegen::InnerTileDescAttrInterface mmaKind = schedule->mmaKind;
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = lhs.getContext();
@@ -442,7 +442,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     }
 
     int64_t innerKDim = contractionDims->k.back();
-    int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
+    int64_t kPackFactor = std::get<2>(MmaInterfaceAttr::getMNKShape(mmaKind));
     paddingTileSizes[innerKDim] *= kPackFactor;
 
     attrs.emplace_back(StringAttr::get(context, "padding"),
@@ -516,19 +516,19 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     }
     nDims.push_back(nDim);
   }
-  for (int64_t kBDim : contractionKB) {
-    if (ShapedType::isDynamic(bounds[kBDim])) {
-      canSupportUnaligned = false;
-      continue;
-    }
-    kDims.push_back(kBDim);
-  }
   for (int64_t kDim : contractionK) {
     if (ShapedType::isDynamic(bounds[kDim])) {
       canSupportUnaligned = false;
       continue;
     }
     kDims.push_back(kDim);
+  }
+  for (int64_t kBDim : contractionKB) {
+    if (ShapedType::isDynamic(bounds[kBDim])) {
+      canSupportUnaligned = false;
+      continue;
+    }
+    kDims.push_back(kBDim);
   }
   for (int64_t batchDim : contractionB) {
     if (ShapedType::isDynamic(bounds[batchDim])) {
@@ -637,7 +637,7 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind = schedule->mmaKind;
+  IREE::Codegen::InnerTileDescAttrInterface mmaKind = schedule->mmaKind;
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
@@ -672,7 +672,8 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     int64_t innerKDim = contractionK.back();
     int64_t innerKBDim = contractionKB.back();
     int64_t blockSize = mmaKind.getBlockSize();
-    int64_t kPackFactor = std::get<2>(mmaKind.getScaledMNKShape()) / blockSize;
+    int64_t kPackFactor =
+        std::get<2>(ScaledMMAAttr::getScaledMNKShape(mmaKind)) / blockSize;
     paddingTileSizes[innerKDim] *= kPackFactor;
     paddingTileSizes[innerKBDim] = blockSize;
     attrs.emplace_back(StringAttr::get(context, "padding"),

@@ -203,6 +203,7 @@ struct ConvertToROCDLPass final
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(use32BitIndices ? 32 : 64);
     LLVMTypeConverter converter(m.getContext(), options);
+    LLVMConversionTarget target(getContext());
     populateGpuMemorySpaceAttributeConversions(
         converter, [](gpu::AddressSpace space) {
           switch (space) {
@@ -242,7 +243,6 @@ struct ConvertToROCDLPass final
       if (allTypesValid.wasInterrupted()) {
         return signalPassFailure();
       }
-
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
@@ -341,13 +341,10 @@ struct ConvertToROCDLPass final
                                                      /*maxTransferRank=*/1);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown, chipset);
-      LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
       populateMathToROCDLConversionPatterns(converter, llvmPatterns);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
-      arith::populateExpandF8E8M0Patterns(llvmPatterns);
-      arith::populateExpandF4E2M1Patterns(llvmPatterns);
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         return signalPassFailure();

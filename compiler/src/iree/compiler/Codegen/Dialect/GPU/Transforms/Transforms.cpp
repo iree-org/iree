@@ -14,8 +14,8 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -1054,10 +1054,9 @@ getInnerDims(linalg::LinalgOp linalgOp) {
                       maybeContractionDims->k});
 }
 
-FailureOr<IREE::Codegen::InnerTiledOp>
-convertScaledContractionToInnerTiledMma(RewriterBase &rewriter,
-                                        linalg::LinalgOp linalgOp,
-                                        IREE::GPU::MmaInterfaceAttr mmaKind) {
+FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Codegen::InnerTileDescAttrInterface mmaKind) {
   FailureOr<IREE::LinalgExt::ScaledContractionDimensions> contractionDims =
       IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (failed(contractionDims)) {
@@ -1110,13 +1109,13 @@ convertScaledContractionToInnerTiledMma(RewriterBase &rewriter,
 
   // TODO: Enable batched intrinsics and get the appropriate sub-map here.
   SmallVector<int64_t> lhsInnerPerm = getNormalizedPermutation(
-      lhsMap.getMinorSubMap(3), {mExpr, kBExpr, kExpr});
+      lhsMap.getMinorSubMap(3), {mExpr, kExpr, kBExpr});
   SmallVector<int64_t> sc1InnerPerm =
-      getNormalizedPermutation(sc1Map.getMinorSubMap(2), {mExpr, kBExpr});
+      getNormalizedPermutation(sc1Map.getMinorSubMap(2), {mExpr, kExpr});
   SmallVector<int64_t> rhsInnerPerm = getNormalizedPermutation(
-      rhsMap.getMinorSubMap(3), {kBExpr, kExpr, nExpr});
+      rhsMap.getMinorSubMap(3), {kExpr, kBExpr, nExpr});
   SmallVector<int64_t> sc2InnerPerm =
-      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {nExpr, kBExpr});
+      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {nExpr, kExpr});
   SmallVector<int64_t> accInnerPerm =
       getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
   if (lhsInnerPerm.empty() || sc1InnerPerm.empty() || rhsInnerPerm.empty() ||
@@ -1126,7 +1125,7 @@ convertScaledContractionToInnerTiledMma(RewriterBase &rewriter,
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   auto [intrinsicM, intrinsicN, intrinsicK, intrinsicKB] =
-      mmaKind.getScaledMNKShape();
+      ScaledMMAAttr::getScaledMNKShape(mmaKind);
   if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
       intrinsicK != bounds[innerK]) {
     return failure();
@@ -1203,10 +1202,9 @@ convertScaledContractionToInnerTiledMma(RewriterBase &rewriter,
 
 // Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
 // op with a MMA-like intrinsic descriptor.
-FailureOr<IREE::Codegen::InnerTiledOp>
-convertContractionToInnerTiledMma(RewriterBase &rewriter,
-                                  linalg::LinalgOp linalgOp,
-                                  IREE::GPU::MmaInterfaceAttr mmaKind) {
+FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Codegen::InnerTileDescAttrInterface mmaKind) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -1278,7 +1276,8 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
 
-  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
+  auto [intrinsicM, intrinsicN, intrinsicK] =
+      MmaInterfaceAttr::getMNKShape(mmaKind);
   if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
       intrinsicK != bounds[innerK]) {
     return failure();
@@ -1286,7 +1285,7 @@ convertContractionToInnerTiledMma(RewriterBase &rewriter,
 
   SmallVector<Value> inputs = linalgOp->getOperands();
   auto [lhsElementType, rhsElementType, accElementType] =
-      mmaKind.getABCElementTypes();
+      MmaInterfaceAttr::getABCElementTypes(mmaKind);
   if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
           lhsElementType ||
       cast<RankedTensorType>(inputs[1].getType()).getElementType() !=

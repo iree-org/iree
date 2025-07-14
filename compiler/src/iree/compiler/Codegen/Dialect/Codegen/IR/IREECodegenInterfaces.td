@@ -13,7 +13,7 @@ def IREECodegen_InnerTileDescAttrInterface :
   AttrInterface<"InnerTileDescAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   let description = [{
-    Attribute interface used to descripe an inner tiled operation, such as
+    Attribute interface used to describe an inner tiled operation, such as
     a (sequence of) matrix multiplications that are performed using
     intrinsics which have their own inherent tiling.
 
@@ -198,6 +198,14 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*defaultImplementation=*/[{
         return failure();
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the block size of elements sharing a scale in this kind of multi-MMA.
+      }],
+      /*retType=*/"int64_t",
+      /*methodName=*/"getBlockSize",
+      /*args=*/(ins)
     >,
   ];
 

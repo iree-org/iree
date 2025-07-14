@@ -943,10 +943,11 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   // Helper fn to store mma information.
-  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
+  auto storeMmaInfo = [](IREE::Codegen::InnerTileDescAttrInterface mma,
                          SmallVector<GPUIntrinsicType> &intrinsics) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
+    auto [mSize, nSize, kSize] = IREE::GPU::MmaInterfaceAttr::getMNKShape(mma);
+    auto [aType, bType, cType] =
+        IREE::GPU::MmaInterfaceAttr::getABCElementTypes(mma);
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   };
 
@@ -1162,10 +1163,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       lhsElemType,    rhsElemType,    initElemType};
 
   // Helper fn to store mma information.
-  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
+  auto storeMmaInfo = [](IREE::Codegen::InnerTileDescAttrInterface mma,
                          SmallVector<GPUIntrinsicType> &intrinsics) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
+    auto [mSize, nSize, kSize] = IREE::GPU::MmaInterfaceAttr::getMNKShape(mma);
+    auto [aType, bType, cType] =
+        IREE::GPU::MmaInterfaceAttr::getABCElementTypes(mma);
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   };
 
@@ -1363,10 +1365,11 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Value vMatrix = op.getValue();
 
   // Helper fn to store mma information.
-  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
+  auto storeMmaInfo = [](IREE::Codegen::InnerTileDescAttrInterface mma,
                          SmallVector<GPUIntrinsicType> &intrinsics) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
+    auto [mSize, nSize, kSize] = IREE::GPU::MmaInterfaceAttr::getMNKShape(mma);
+    auto [aType, bType, cType] =
+        IREE::GPU::MmaInterfaceAttr::getABCElementTypes(mma);
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   };
 
