@@ -291,66 +291,6 @@ struct FuseTilableSliceProducers final
   }
 };
 
-struct FuseTilableForallConsumers final
-    : OpInterfaceRewritePattern<TilingInterface> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  LogicalResult matchAndRewrite(TilingInterface tilableOp,
-                                PatternRewriter &rewriter) const override {
-    // Currently consumer fusion requires DPS, and we don't want to fuse through
-    // inits anyway.
-    auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*tilableOp);
-    if (!dpsOp) {
-      return failure();
-    }
-
-    tensor::ParallelInsertSliceOp producerSlice;
-    LoopLikeOpInterface sliceOwner;
-    Value fusionOperand;
-    for (auto operand : dpsOp.getDpsInputs()) {
-      auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
-      if (!forallProducer) {
-        continue;
-      }
-      Value iterArg = forallProducer.getTiedBlockArgument(
-          forallProducer.getTiedOpOperand(cast<OpResult>(operand)));
-
-      for (auto user : iterArg.getUsers()) {
-        auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(user);
-        if (sliceOp && sliceOp.getDest() == iterArg) {
-          producerSlice = sliceOp;
-          sliceOwner = forallProducer;
-          fusionOperand = operand;
-          break;
-        }
-      }
-      if (producerSlice) {
-        break;
-      }
-    }
-
-    if (!producerSlice) {
-      return rewriter.notifyMatchFailure(tilableOp,
-                                         "no scf.forall producer to fuse into");
-    }
-
-    for (auto operand : tilableOp->getOperands()) {
-      if (operand != fusionOperand && operand.getDefiningOp() == sliceOwner) {
-        return rewriter.notifyMatchFailure(tilableOp,
-                                           "unimplemented: Cannot fuse op with "
-                                           "multiple uses of producer loop");
-      }
-    }
-
-    FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlices(rewriter, producerSlice.getOperation(),
-                                         {sliceOwner});
-    if (failed(fuseConsumerResults)) {
-      return failure();
-    }
-    return success();
-  }
-};
-
 struct FuseCollapseShapeConsumers final
     : OpRewritePattern<tensor::CollapseShapeOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -416,7 +356,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
       patterns.add<FuseForalls>(context, *maybeFlatWorkgroupSize,
                                 /*benefit=*/1);
     }
-    patterns.add<FuseTilableForallConsumers>(context);
+    populateFuseTilableForallConsumersPattern(patterns);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     patterns.add<FuseNestedLaneAndWarpForalls>(context);
     populateForallLoopHoistingPattern(patterns);
@@ -435,7 +375,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     RewritePatternSet patterns(context);
     patterns.add<FuseTilableDestinationProducers>(context);
     patterns.add<FuseUnitLoopDestination>(context);
-    patterns.add<FuseTilableForallConsumers>(context);
+    populateFuseTilableForallConsumersPattern(patterns);
     patterns.add<FuseCollapseShapeConsumers>(context);
     patterns.add<FuseExtractSliceConsumers>(context);
     populateSwapExtractWithExpandPattern(patterns);
