@@ -78,6 +78,172 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns,
   }
 }
 
+static LLVM::LLVMFuncOp getOrDefineFunction(ModuleOp moduleOp, Location loc,
+                                            OpBuilder &b, StringRef name,
+                                            LLVM::LLVMFunctionType type) {
+  if (auto ret = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(name)) {
+    return ret;
+  }
+  OpBuilder::InsertionGuard guard(b);
+  b.setInsertionPointToStart(moduleOp.getBody());
+  return b.create<LLVM::LLVMFuncOp>(loc, name, type, LLVM::Linkage::External);
+}
+
+static SmallString<16> getUniqueSymbolName(ModuleOp moduleOp,
+                                           StringRef prefix) {
+  // Get a unique global name.
+  unsigned stringNumber = 0;
+  SmallString<16> stringConstName;
+  do {
+    stringConstName.clear();
+    (prefix + Twine(stringNumber++)).toStringRef(stringConstName);
+  } while (moduleOp.lookupSymbol(stringConstName));
+  return stringConstName;
+}
+
+static LLVM::GlobalOp getOrCreateStringConstant(OpBuilder &b, Location loc,
+                                                ModuleOp moduleOp, Type llvmI8,
+                                                StringRef namePrefix,
+                                                StringRef str) {
+  llvm::SmallString<20> nullTermStr(str);
+  uint64_t alignment = 0;
+  unsigned addrSpace = 0;
+  if (nullTermStr.empty() || nullTermStr.back() != '\0') {
+    nullTermStr.push_back('\0'); // Null terminated for C
+  }
+  auto globalType =
+      LLVM::LLVMArrayType::get(llvmI8, nullTermStr.size_in_bytes());
+  StringAttr attr = b.getStringAttr(nullTermStr);
+
+  // Try to find existing global.
+  for (auto globalOp : moduleOp.getOps<LLVM::GlobalOp>()) {
+    if (globalOp.getGlobalType() == globalType && globalOp.getConstant() &&
+        globalOp.getValueAttr() == attr &&
+        globalOp.getAlignment().value_or(0) == alignment &&
+        globalOp.getAddrSpace() == addrSpace) {
+      return globalOp;
+    }
+  }
+
+  // Not found: create new global.
+  OpBuilder::InsertionGuard guard(b);
+  b.setInsertionPointToStart(moduleOp.getBody());
+  SmallString<16> name = getUniqueSymbolName(moduleOp, namePrefix);
+  return b.create<LLVM::GlobalOp>(loc, globalType,
+                                  /*isConstant=*/true, LLVM::Linkage::Internal,
+                                  name, attr, alignment, addrSpace);
+}
+
+// The logic here was copied from upstream's GPUPrintfOpToHIPLowering pattern.
+struct ConvertGPUPrintfOpForHIPRuntime final
+    : ConvertOpToLLVMPattern<gpu::PrintfOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(gpu::PrintfOp gpuPrintfOp, gpu::PrintfOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Location loc = gpuPrintfOp->getLoc();
+
+    Type llvmI8 = typeConverter->convertType(rewriter.getI8Type());
+    auto ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    Type llvmI32 = typeConverter->convertType(rewriter.getI32Type());
+    Type llvmI64 = typeConverter->convertType(rewriter.getI64Type());
+    auto moduleOp = gpuPrintfOp->getParentOfType<ModuleOp>();
+
+    LLVM::LLVMFuncOp ocklBegin =
+        getOrDefineFunction(moduleOp, loc, rewriter, "__ockl_printf_begin",
+                            LLVM::LLVMFunctionType::get(llvmI64, {llvmI64}));
+    LLVM::LLVMFuncOp ocklAppendArgs;
+    if (!adaptor.getArgs().empty()) {
+      ocklAppendArgs = getOrDefineFunction(
+          moduleOp, loc, rewriter, "__ockl_printf_append_args",
+          LLVM::LLVMFunctionType::get(llvmI64,
+                                      {llvmI64, /*numArgs*/ llvmI32, llvmI64,
+                                       llvmI64, llvmI64, llvmI64, llvmI64,
+                                       llvmI64, llvmI64, /*isLast*/ llvmI32}));
+    }
+    LLVM::LLVMFuncOp ocklAppendStringN = getOrDefineFunction(
+        moduleOp, loc, rewriter, "__ockl_printf_append_string_n",
+        LLVM::LLVMFunctionType::get(llvmI64, {llvmI64, ptrType,
+                                              /*length (bytes)*/ llvmI64,
+                                              /*isLast*/ llvmI32}));
+
+    // Start the printf hostcall.
+    Value zeroI64 = rewriter.create<LLVM::ConstantOp>(loc, llvmI64, 0);
+    auto printfBeginCall =
+        rewriter.create<LLVM::CallOp>(loc, ocklBegin, zeroI64);
+    Value printfDesc = printfBeginCall.getResult();
+
+    // Create the global op or find an existing one.
+    LLVM::GlobalOp global = getOrCreateStringConstant(
+        rewriter, loc, moduleOp, llvmI8, "printfFormat_", adaptor.getFormat());
+
+    // Get a pointer to the format string's first element and pass it to
+    // printf().
+    Value globalPtr = rewriter.create<LLVM::AddressOfOp>(
+        loc,
+        LLVM::LLVMPointerType::get(rewriter.getContext(),
+                                   global.getAddrSpace()),
+        global.getSymNameAttr());
+    Value stringStart =
+        rewriter.create<LLVM::GEPOp>(loc, ptrType, global.getGlobalType(),
+                                     globalPtr, ArrayRef<LLVM::GEPArg>{0, 0});
+    Value stringLen = rewriter.create<LLVM::ConstantOp>(
+        loc, llvmI64, cast<StringAttr>(global.getValueAttr()).size());
+
+    Value oneI32 = rewriter.create<LLVM::ConstantOp>(loc, llvmI32, 1);
+    Value zeroI32 = rewriter.create<LLVM::ConstantOp>(loc, llvmI32, 0);
+
+    auto appendFormatCall = rewriter.create<LLVM::CallOp>(
+        loc, ocklAppendStringN,
+        ValueRange{printfDesc, stringStart, stringLen,
+                   adaptor.getArgs().empty() ? oneI32 : zeroI32});
+    printfDesc = appendFormatCall.getResult();
+
+    // __ockl_printf_append_args takes 7 values per append call
+    constexpr size_t argsPerAppend = 7;
+    size_t nArgs = adaptor.getArgs().size();
+    for (size_t group = 0; group < nArgs; group += argsPerAppend) {
+      size_t bound = std::min(group + argsPerAppend, nArgs);
+      size_t numArgsThisCall = bound - group;
+
+      SmallVector<Value, 2 + argsPerAppend + 1> arguments;
+      arguments.push_back(printfDesc);
+      arguments.push_back(
+          rewriter.create<LLVM::ConstantOp>(loc, llvmI32, numArgsThisCall));
+      for (Value arg : adaptor.getArgs()) {
+        if (auto floatType = dyn_cast<FloatType>(arg.getType())) {
+          if (!floatType.isF64())
+            arg = rewriter.create<LLVM::FPExtOp>(
+                loc, typeConverter->convertType(rewriter.getF64Type()), arg);
+          arg = rewriter.create<LLVM::BitcastOp>(loc, llvmI64, arg);
+        }
+        if (arg.getType().getIntOrFloatBitWidth() != 64)
+          arg = rewriter.create<LLVM::ZExtOp>(loc, llvmI64, arg);
+
+        arguments.push_back(arg);
+      }
+      // Pad out to 7 arguments since the hostcall always needs 7
+      for (size_t extra = numArgsThisCall; extra < argsPerAppend; ++extra) {
+        arguments.push_back(zeroI64);
+      }
+
+      Value isLast = (bound == nArgs) ? oneI32 : zeroI32;
+      arguments.push_back(isLast);
+      auto call = rewriter.create<LLVM::CallOp>(loc, ocklAppendArgs, arguments);
+      printfDesc = call.getResult();
+    }
+    rewriter.eraseOp(gpuPrintfOp);
+    return success();
+  }
+};
+
+static void
+populateConvertGPUPrintfOpForHIPRuntime(RewritePatternSet &patterns,
+                                        LLVMTypeConverter &converter) {
+  patterns.add<ConvertGPUPrintfOpForHIPRuntime>(converter);
+}
+
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
 /// This is needed for ping-pong scheduling patterns to prevent off
 /// waves from interrupting the MFMA region of the high priority wave.
@@ -343,8 +509,46 @@ struct ConvertToROCDLPass final
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
-      populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
-                                           gpu::amd::Runtime::Unknown, chipset);
+      gpu::amd::Runtime runtime = gpu::amd::Runtime::Unknown;
+      mlir::ModuleOp topLevelModule = nullptr;
+
+      // Case 1: m is already the top level module (has stream.affinity.default)
+      if (auto defaultAffinity =
+              m->getAttrOfType<IREE::HAL::DeviceAffinityAttr>(
+                  "stream.affinity.default")) {
+        topLevelModule = m;
+      }
+      // Case 2: m is the inner builtin.module - find top level module
+      else {
+        if (auto variantOp =
+                m->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+          if (auto executableOp =
+                  variantOp->getParentOfType<IREE::HAL::ExecutableOp>()) {
+            topLevelModule = executableOp->getParentOfType<mlir::ModuleOp>();
+          }
+        }
+      }
+
+      if (topLevelModule) {
+        if (auto defaultAffinity =
+                topLevelModule->getAttrOfType<IREE::HAL::DeviceAffinityAttr>(
+                    "stream.affinity.default")) {
+          llvm::StringRef deviceSymbol =
+              defaultAffinity.getDevice().getLeafReference();
+          if (auto globalOp = topLevelModule.lookupSymbol<IREE::Util::GlobalOp>(
+                  deviceSymbol)) {
+            if (auto deviceTarget = dyn_cast<IREE::HAL::DeviceTargetAttr>(
+                    globalOp.getInitialValueAttr())) {
+              if (deviceTarget.getDeviceID() == "hip") {
+                populateConvertGPUPrintfOpForHIPRuntime(llvmPatterns,
+                                                        converter);
+              }
+            }
+          }
+        }
+      }
+      populateGpuToROCDLConversionPatterns(converter, llvmPatterns, runtime,
+                                           chipset);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
