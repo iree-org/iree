@@ -13,6 +13,76 @@
 
 namespace mlir::iree_compiler {
 
+/// Fuse consumers of forall ops into it after checking that they are tilable.
+
+namespace {
+
+struct FuseTilableForallConsumers final
+    : OpInterfaceRewritePattern<TilingInterface> {
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+  LogicalResult matchAndRewrite(TilingInterface tilableOp,
+                                PatternRewriter &rewriter) const override {
+    // Currently consumer fusion requires DPS, and we don't want to fuse through
+    // inits anyway.
+    auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*tilableOp);
+    if (!dpsOp) {
+      return failure();
+    }
+
+    tensor::ParallelInsertSliceOp producerSlice;
+    LoopLikeOpInterface sliceOwner;
+    Value fusionOperand;
+    for (auto operand : dpsOp.getDpsInputs()) {
+      auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
+      if (!forallProducer) {
+        continue;
+      }
+      Value iterArg = forallProducer.getTiedBlockArgument(
+          forallProducer.getTiedOpOperand(cast<OpResult>(operand)));
+
+      for (auto user : iterArg.getUsers()) {
+        auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(user);
+        if (sliceOp && sliceOp.getDest() == iterArg) {
+          producerSlice = sliceOp;
+          sliceOwner = forallProducer;
+          fusionOperand = operand;
+          break;
+        }
+      }
+      if (producerSlice) {
+        break;
+      }
+    }
+
+    if (!producerSlice) {
+      return rewriter.notifyMatchFailure(tilableOp,
+                                         "no scf.forall producer to fuse into");
+    }
+
+    for (auto operand : tilableOp->getOperands()) {
+      if (operand != fusionOperand && operand.getDefiningOp() == sliceOwner) {
+        return rewriter.notifyMatchFailure(tilableOp,
+                                           "unimplemented: Cannot fuse op with "
+                                           "multiple uses of producer loop");
+      }
+    }
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
+        scf::tileAndFuseConsumerOfSlices(rewriter, producerSlice.getOperation(),
+                                         {sliceOwner});
+    if (failed(fuseConsumerResults)) {
+      return failure();
+    }
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns) {
+  patterns.add<FuseTilableForallConsumers>(patterns.getContext());
+}
+
 //===----------------------------------------------------------------------===//
 // Combining Layout Transformation Ops
 //===----------------------------------------------------------------------===//
