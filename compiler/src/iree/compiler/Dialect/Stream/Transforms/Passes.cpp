@@ -116,18 +116,6 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Run inlining after having baked out affinities.
   passManager.addPass(mlir::createInlinerPass());
 
-  // Elide any redundant transfers now that affinities are baked out and we know
-  // where resources are located.
-  //
-  // TODO(benvanik): enable this pass after updating usage refinement: today
-  // the clones are not handled correctly and will result in usage analysis
-  // failing. This seems to be caused by transfers having some non-trivial logic
-  // during analysis that clone does not have and just applying the same logic
-  // to clones results in other errors around lifetime changes. The resource
-  // analysis and refinement logic likely needs a larger reworking.
-  //
-  // passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
-
   // Cleanup globals that were created during conversion.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
@@ -180,6 +168,8 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Everything must now be in stream.async.* form but we don't yet have
   // lifetime assigned.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
+
+  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides

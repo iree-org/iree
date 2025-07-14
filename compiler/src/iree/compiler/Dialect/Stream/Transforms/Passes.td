@@ -207,10 +207,10 @@ def ElideAsyncCopiesPass :
 
 def ElideAsyncTransfersPass :
     Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
-  let summary = "Elides transfers when they are not performing meaningful work.";
+  let summary = "Elides transfer ops when they the topology allows";
   let description = [{
-    Performs whole-program analysis to identify transfers that are not required
-    for program correctness (transfers to/from the same device, etc).
+    Elides all transfer ops that are between device links that do not
+    require tansfers and do not change the lifetime of the resource.
   }];
   let dependentDialects = [
     "IREE::Stream::StreamDialect",

@@ -1101,7 +1101,7 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
   if (auto deviceAffinityAttr =
           dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    return deviceAffinityAttr.getDevice();
+    return deviceAffinityAttr.getDevice().getLeafReference();
   } else if (auto devicePromiseAttr =
                  dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
     return devicePromiseAttr.getDevice();
@@ -1123,8 +1123,8 @@ bool DeviceTopologyAttr::requiresTransfer(
   // Search for a matching link and check if it has transparent access
   // or unified memory.
   for (DeviceLinkAttr link : getLinks()) {
-    if ((sourceDevice == link.getSourceDevice() &&
-         targetDevice == link.getTargetDevice())) {
+    if ((sourceDevice == link.getSourceDevice().getLeafReference() &&
+         targetDevice == link.getTargetDevice().getLeafReference())) {
       return !link.getTransparentAccess() && !link.getUnifiedMemory();
     }
   }
