@@ -23,6 +23,15 @@ include "mlir/Pass/PassBase.td"
 // - Reshape propagation passes
 //===---------------------------------------------------------------------===//
 
+def BitcastUnsupportedElementTypesPass :
+    Pass<"iree-dispatch-creation-bitcast-unsupported-element-types"> {
+  let summary = "Bitcasts tensor element types unsupported by the HAL";
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
 def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
