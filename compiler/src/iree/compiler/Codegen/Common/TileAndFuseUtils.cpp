@@ -146,8 +146,7 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
         mlir::scf::tileAndFuseConsumerOfSlices(rewriter, candidateSlices,
                                                loops);
     if (failed(fusedResult)) {
-      return candidateSlices.front()->emitOpError(
-          "failed to fuse consumer of slice");
+      return failure();
     }
 
     // Replace the original consumer operation with the tiled implementation.
