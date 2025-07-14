@@ -103,6 +103,14 @@ public:
   visitNonControlFlowArguments(Operation *op, const RegionSuccessor &successor,
                                ArrayRef<ThreadUniformLattice *> argLattices,
                                unsigned firstIndex) override;
+
+  /// Override the default handling, this is necessary as control-flow with
+  /// `scf.forall` / `scf.in_parallel` is broken, and the fix is large. TODO:
+  /// Remove this once the ops have been fixed.
+  void visitRegionSuccessors(
+      ProgramPoint *point, RegionBranchOpInterface branch,
+      RegionBranchPoint successor,
+      ArrayRef<dataflow::AbstractSparseLattice *> lattices) override;
 };
 
 //===----------------------------------------------------------------------===//
@@ -260,6 +268,86 @@ void ThreadUniformAnalysis::visitNonControlFlowArguments(
        llvm::zip(argLattices.drop_front(iV->size()), inits)) {
     join(lattice, *getLatticeElement(operand));
     propagateIfChanged(lattice, lattice->join(value));
+  }
+}
+
+// This method was copied verbatim from `AbstractSparseForwardDataFlowAnalysis`
+// and modified to provide partial support for `scf.forall`. TODO: remove this
+// method.
+void ThreadUniformAnalysis::visitRegionSuccessors(
+    ProgramPoint *point, RegionBranchOpInterface branch,
+    RegionBranchPoint successor,
+    ArrayRef<dataflow::AbstractSparseLattice *> latticesRaw) {
+  const auto *predecessors =
+      getOrCreateFor<dataflow::PredecessorState>(point, point);
+  assert(predecessors->allPredecessorsKnown() &&
+         "unexpected unresolved region successors");
+
+  ArrayRef<ThreadUniformLattice *> lattices(
+      reinterpret_cast<ThreadUniformLattice *const *>(latticesRaw.begin()),
+      latticesRaw.size());
+
+  for (Operation *op : predecessors->getKnownPredecessors()) {
+    // Get the incoming successor operands.
+    std::optional<OperandRange> operands;
+
+    // Check if the predecessor is the parent op.
+    if (op == branch) {
+      operands = branch.getEntrySuccessorOperands(successor);
+      // Otherwise, try to deduce the operands from a region return-like op.
+    } else if (auto regionTerminator =
+                   dyn_cast<RegionBranchTerminatorOpInterface>(op)) {
+      operands = regionTerminator.getSuccessorOperands(successor);
+    } else if (isa<scf::InParallelOp>(op)) {
+      // This is a hack until upstream fixes control-flow semantics.
+      operands = op->getOperands();
+      // Be pessimistic about the inits as we cannot reason about them.
+      auto forallOp = cast<scf::ForallOp>(op->getParentOp());
+      if (lattices.size() >= forallOp.getNumDpsInits() &&
+          forallOp.getNumDpsInits() > 0) {
+        ArrayRef<ThreadUniformLattice *> initLattices =
+            lattices.take_back(forallOp.getNumDpsInits());
+        assert(
+            (initLattices.front()->getAnchor() ==
+                 forallOp.getTiedBlockArgument(forallOp.getDpsInitOperand(0)) ||
+             initLattices.front()->getAnchor() == forallOp.getResult(0)) &&
+            "ill-formed forall");
+        setAllToEntryStates(initLattices);
+      }
+    }
+
+    if (!operands) {
+      // We can't reason about the data-flow.
+      return setAllToEntryStates(lattices);
+    }
+
+    ValueRange inputs = predecessors->getSuccessorInputs(op);
+    assert(inputs.size() == operands->size() &&
+           "expected the same number of successor inputs as operands");
+
+    unsigned firstIndex = 0;
+    if (inputs.size() != lattices.size()) {
+      if (!point->isBlockStart()) {
+        if (!inputs.empty())
+          firstIndex = cast<OpResult>(inputs.front()).getResultNumber();
+        visitNonControlFlowArguments(branch,
+                                     RegionSuccessor(branch->getResults().slice(
+                                         firstIndex, inputs.size())),
+                                     lattices, firstIndex);
+      } else {
+        if (!inputs.empty())
+          firstIndex = cast<BlockArgument>(inputs.front()).getArgNumber();
+        Region *region = point->getBlock()->getParent();
+        visitNonControlFlowArguments(
+            branch,
+            RegionSuccessor(region, region->getArguments().slice(
+                                        firstIndex, inputs.size())),
+            lattices, firstIndex);
+      }
+    }
+
+    for (auto it : llvm::zip(*operands, lattices.drop_front(firstIndex)))
+      join(std::get<1>(it), *getLatticeElementFor(point, std::get<0>(it)));
   }
 }
 
