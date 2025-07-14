@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -68,22 +69,17 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
     }
   }
 
-  SmallVector<OpFoldResult> tileSizes =
-      getLoweringConfig(rootOp).getTilingLevelSizes(rewriter, tilingLevel,
-                                                    rootOp);
-
-  // Pad the tile sizes with zero.
-  auto zero = rewriter.getIndexAttr(0);
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
-  if (tileSizes.size() > numLoops) {
-    LDBG("tile sizes size " << tileSizes.size()
-                            << " exceeds the number of loops " << numLoops);
-    return failure();
-  }
-  tileSizes.resize(numLoops, zero);
+  auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+      getLoweringConfig(rootOp).getTilingLevelAttr(tilingLevel));
+  SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
+  SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
+  tileSizes.resize(numLoops, 0);
+  tileScalableFlags.resize(numLoops, false);
 
   scf::SCFTilingOptions tilingOptions;
-  tilingOptions.setTileSizes(tileSizes);
+  setSCFTileSizes(tilingOptions, rootOp, std::move(tileSizes),
+                  std::move(tileScalableFlags));
 
   // onlyFuseProducerInputOperands implies reduction tiling.
   if (!onlyFuseProducerInputOperands) {
@@ -152,8 +148,8 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
                                 });
 
     if (failed(newFusionOpportunities)) {
-      rootTiledOp.value()->emitOpError("failed to fuse consumers");
-      return failure();
+      LDBG("failed to fuse consumers, skip");
+      return tiledResults->tiledAndFusedOps.front();
     }
 
     // Because we restrict to at most a single tilable consumer for yielding
@@ -183,7 +179,7 @@ struct LLVMCPUTileRootAndFuseProducerConsumer
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
+                    tensor::TensorDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -192,12 +188,10 @@ struct LLVMCPUTileRootAndFuseProducerConsumer
 void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-
   if (failed(rootOp) || !rootOp.value()) {
     LDBG("unable to find the root operation");
     return;
@@ -205,7 +199,6 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 
   IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
       getLoweringConfig(rootOp.value());
-
   if (!loweringConfig) {
     LDBG("unable to find the attached lowering config");
     return;
