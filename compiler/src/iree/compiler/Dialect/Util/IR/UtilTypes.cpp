@@ -210,6 +210,10 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
     // Recursively try to move each operand.
     // TODO(benvanik): change to a worklist to avoid potential stack explosion.
     for (auto operand : producerOp->getOperands()) {
+      // Can't move `producerOp` if it is defined by `consumerOp`.
+      if (operand.getDefiningOp() == consumerOp) {
+        return false;
+      }
       if (!tryMoveProducerBefore(operand, consumerOp)) {
         return false;
       }
