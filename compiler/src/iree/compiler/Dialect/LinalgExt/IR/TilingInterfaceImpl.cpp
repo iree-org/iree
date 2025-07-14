@@ -527,44 +527,27 @@ LogicalResult MapScatterOp::generateScalarImplementation(OpBuilder &b,
                                                          ValueRange ivs) {
   // The scalar implementation is currently only implemented for buffer
   // semantics, because we need to conditionally write values based on the
-  // mask.
-  if (!hasPureBufferSemantics()) {
+  // mask. Vectorized map_scatter ops should be decomposed, not tiled to loops,
+  // so vector types are not allowed.
+  if (!hasPureBufferSemantics() || isa<VectorType>(getInputType())) {
     return failure();
   }
-  Block &transformBlock = getTransformationRegion().front();
-  IRMapping mapping;
-  // Map the induction variables of the loop nest to the block arguments of the
-  // transformation body. The induction variables are the indices looping over
-  // the elements of input operand.
-  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
-    mapping.map(arg, ivs[idx]);
-  }
-  // Clone the operations within the transformation body to the current
-  // insertion point, and map their results to the new cloned operations'
-  // results.
-  for (Operation &op : transformBlock.without_terminator()) {
-    Operation *clonedOp = b.clone(op, mapping);
-    for (auto [result, clonedResult] :
-         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
-      mapping.map(result, clonedResult);
-    }
-  }
-
-  // Get the cloned values that were yielded by the transformation body to use
-  // as the indices for the store into the output.
-  SmallVector<Value> storeIndexValues = llvm::map_to_vector(
-      transformBlock.getTerminator()->getOperands(),
-      [&](Value operand) { return mapping.lookupOrDefault(operand); });
-  // The last yielded Value is the mask, so use it as the if condition instead
-  // of the store indices.
-  Value ifCond = storeIndexValues.pop_back_val();
-  auto thenBuilder = [&](OpBuilder &nestedBuilder, Location nestedLoc) {
-    Value input = nestedBuilder.create<memref::LoadOp>(loc, getInput(), ivs);
-    nestedBuilder.create<memref::StoreOp>(nestedLoc, input, getOutput(),
-                                          storeIndexValues);
-    nestedBuilder.create<scf::YieldOp>(nestedLoc);
+  auto bodyBuilder = [&](OpBuilder nestedBuilder, Location nestedLoc,
+                         ArrayRef<Value> yieldedValues) {
+    // The last yielded Value is the mask, so use it as the if condition instead
+    // of the store indices.
+    Value ifCond = yieldedValues.back();
+    ArrayRef<Value> storeIndices = yieldedValues.drop_back();
+    auto thenBuilder = [&](OpBuilder &ifBuilder, Location ifLoc) {
+      SmallVector<OpFoldResult> ivsOfr(ivs);
+      Value input = ifBuilder.create<memref::LoadOp>(ifLoc, getInput(), ivs);
+      ifBuilder.create<memref::StoreOp>(ifLoc, input, getOutput(),
+                                        storeIndices);
+      ifBuilder.create<scf::YieldOp>(ifLoc);
+    };
+    nestedBuilder.create<scf::IfOp>(nestedLoc, ifCond, thenBuilder);
   };
-  b.create<scf::IfOp>(loc, ifCond, thenBuilder);
+  inlineMapScatterBody(b, loc, ivs, bodyBuilder);
   return success();
 }
 
