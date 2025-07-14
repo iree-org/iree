@@ -199,7 +199,7 @@ struct LLVMGPUVectorLoweringPass final
     // Cleanup canonicalization for masking and other basic vector operations.
     {
       RewritePatternSet patterns(ctx);
-      vector::MaskOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::CreateMaskOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ConstantMaskOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
       vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
