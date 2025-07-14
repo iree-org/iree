@@ -337,7 +337,6 @@ struct ConvertToROCDLPass final
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateExpandF8E8M0Patterns(llvmPatterns);
       arith::populateExpandF4E2M1Patterns(llvmPatterns);
-
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
     }
