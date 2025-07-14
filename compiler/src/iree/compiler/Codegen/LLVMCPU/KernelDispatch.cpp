@@ -1038,7 +1038,7 @@ public:
   }
 
   /// Returns a `IREE::CPU::LoweringConfigAttr` that is constructed by the
-  /// existing values. By default, it will always contain distrubtion tile
+  /// existing values. By default, it will always contain distribution tile
   /// sizes, unless the rootOp does not implement TilingInterface.
   IREE::CPU::LoweringConfigAttr generateCPULoweringConfig() {
     using TilingLevel = IREE::CPU::TilingLevel;
