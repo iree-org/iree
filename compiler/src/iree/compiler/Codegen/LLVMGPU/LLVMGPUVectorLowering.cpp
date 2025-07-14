@@ -92,29 +92,32 @@ struct PromoteContractOperands final
 /// Ideally, this would be a canonicalization pattern on arith::SelectOp, but
 /// we cannot have arith depending on vector. Also, it would implicitly force
 /// users only using arith and vector dialect to use vector dialect. Since
-/// upstream is not willing to have this pattern anywhere, we manually add it
-/// where it is needed.
-struct FoldI1SelectToBroadcast : public OpRewritePattern<arith::SelectOp> {
+/// upstream does not have a mechanism of registering canonicalization without
+/// adding dependencies like this, we manually add it where it is needed.
+struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(arith::SelectOp selectOp,
                                 PatternRewriter &rewriter) const override {
     auto vecType = dyn_cast<VectorType>(selectOp.getType());
-    if (!vecType || !vecType.getElementType().isInteger(1))
+    if (!vecType || !vecType.getElementType().isInteger(1)) {
       return failure();
+    }
 
     // Vector conditionals do not need broadcast and are already handled by
     // the arith.select folder.
     Value pred = selectOp.getCondition();
-    if (isa<VectorType>(pred.getType()))
+    if (isa<VectorType>(pred.getType())) {
       return failure();
+    }
 
     std::optional<int64_t> trueInt =
         getConstantIntValue(selectOp.getTrueValue());
     std::optional<int64_t> falseInt =
         getConstantIntValue(selectOp.getFalseValue());
-    if (!trueInt || !falseInt)
+    if (!trueInt || !falseInt) {
       return failure();
+    }
 
     // Redundant selects are already handled by arith.select canonicalizations.
     if (trueInt.value() == falseInt.value()) {
@@ -128,17 +131,14 @@ struct FoldI1SelectToBroadcast : public OpRewritePattern<arith::SelectOp> {
 
     // select(pred, false, true) -> select(not(pred), true, false)
     if (trueInt.value() == 0) {
-      Value one = rewriter.create<arith::ConstantIntOp>(
-          selectOp.getLoc(), /*value=*/1, /*width=*/1);
-      pred = rewriter.create<arith::XOrIOp>(selectOp.getLoc(), pred, one);
+      // TODO: flip the condition here to handle through the existing path.
+      return failure();
     }
 
     /// select(pred, true, false) -> broadcast(pred)
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
         selectOp, vecType.clone(rewriter.getI1Type()), pred);
     return success();
-
-    return failure();
   }
 };
 
