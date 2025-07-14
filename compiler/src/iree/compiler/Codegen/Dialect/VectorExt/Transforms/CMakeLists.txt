@@ -47,6 +47,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRVectorUtils
