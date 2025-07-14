@@ -392,6 +392,15 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
             transformationBuilder,
         int64_t numSourceIndices);
 
+    // Inline the transformation region of the map_scatter op without its
+    // terminator, replacing the block arguments with the passed
+    // `transformBodyIndices`. The `bodyBuilder` function is called with the
+    // cloned index `Value`s that would have been yielded by the terminator of
+    // the inlined transformation body.
+    void inlineMapScatterBody(
+      OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+      function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
+
     // Return true if the mapScatterOp is an identity transformation, meaning
     // it is just doing a copy from input to output. This is true if the mask
     // always evaluates to true, and the mapping from input to output index is
