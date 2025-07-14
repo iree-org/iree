@@ -1188,7 +1188,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
       // Barrier elimination before we reach unstructured control flow.
-      .addPass(createGpuEliminateBarriers);
+      .addPass(createGpuEliminateBarriers)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass);
 
   if (forROCDL) {
     funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
