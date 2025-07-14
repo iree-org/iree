@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -133,6 +134,27 @@ struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
 
 private:
   int64_t flatWorkgroupSize;
+};
+
+struct FuseNestedLaneAndWarpForalls final : OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForallOp warpForallOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<scf::ForallOp> innerForallOps(
+        warpForallOp.getBody()->getOps<scf::ForallOp>());
+    if (innerForallOps.size() != 1) {
+      return failure();
+    }
+    scf::ForallOp laneForallOp = innerForallOps[0];
+    FailureOr<scf::ForallOp> threadForallOp =
+        fuseNestedLaneAndWarpForalls(rewriter, warpForallOp, laneForallOp);
+    if (failed(threadForallOp)) {
+      return failure();
+    }
+    rewriter.replaceOp(warpForallOp, *threadForallOp);
+    return success();
+  }
 };
 
 struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
@@ -395,6 +417,8 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
                                 /*benefit=*/1);
     }
     patterns.add<FuseTilableForallConsumers>(context);
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+    patterns.add<FuseNestedLaneAndWarpForalls>(context);
     populateForallLoopHoistingPattern(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
