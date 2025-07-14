@@ -87,7 +87,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
       !(linalgConsumerOp.getNumLoops() ==
             linalgConsumerOp.getNumParallelLoops() &&
         linalgConsumerOp.getNumDpsInputs() == 1)) {
-    return false;
+    return IREE::LinalgExt::isBitTruncateOp(consumerOp);
   }
 
   // If the producer has a single use (this op), only fuse if
