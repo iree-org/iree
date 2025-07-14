@@ -12,8 +12,7 @@ util.func public @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<c
   // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
-  // CHECK-DAG: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-  // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}Dispatch{{.+}}"> : i32
+  // CHECK-DAG: %[[MEMORY_TYPE:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties for(#hal.device.affinity<@device>) lifetime(constant)
   // CHECK: %[[BUFFERS:.+]]:2 = io_parameters.load<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
   // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
@@ -39,8 +38,7 @@ util.func public @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.res
   // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
-  // CHECK-DAG: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
-  // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Transfer{{.+}}Dispatch{{.+}}"> : i32
+  // CHECK-DAG: %[[MEMORY_TYPE:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties for(#hal.device.affinity<@device>) lifetime(constant)
   // CHECK: %[[BUFFER:.+]] = io_parameters.load<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
   // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
