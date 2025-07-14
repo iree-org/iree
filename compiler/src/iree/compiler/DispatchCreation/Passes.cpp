@@ -335,6 +335,10 @@ void buildDispatchCreationPassPipeline(
       ///   to map the captured operand to the position in the workload list.
       .addPass(
           DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass)
+      /// Bitcasts away all unsupported element types. We rely on folders to
+      /// elide cancelling bitcasts on the host side dropping all such types.
+      /// This only handles the dispatch boundary.
+      .addPass(DispatchCreation::createBitcastUnsupportedElementTypesPass)
       .addPass(createCSEPass)
       .addPass(IREE::Flow::createCanonicalizePass);
 }
