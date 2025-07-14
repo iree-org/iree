@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info, canonicalize, cse)))" %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z}, canonicalize, cse)))" %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
