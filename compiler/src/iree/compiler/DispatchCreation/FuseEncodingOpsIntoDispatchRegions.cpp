@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -83,16 +84,18 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
     for (IREE::Encoding::SetEncodingOp encodingOp : encodingOps) {
       OpOperand &operand = encodingOp.getSourceMutable();
-      auto producerDispatch =
-          operand.get().getDefiningOp<IREE::Flow::DispatchRegionOp>();
+      std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+          producerChain = getProducerDispatchValueAndOpChain(operand.get());
       // Nothing to fuse with, so wrap the `encodingOp` in its own dispatch.
-      if (!producerDispatch) {
+      if (!producerChain) {
         continue;
       }
 
       // Find producer operation inside of the dispatch region to determine if
       // fusion is possible.
-      auto result = cast<OpResult>(operand.get());
+      OpResult result = producerChain->first;
+      auto producerDispatch =
+          result.getDefiningOp<IREE::Flow::DispatchRegionOp>();
       auto dispatchReturnOp = cast<IREE::Flow::ReturnOp>(
           producerDispatch.getBody().front().getTerminator());
       auto producerInRegion = dyn_cast<OpResult>(
@@ -107,10 +110,18 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
           !isFusableWithSetEncoding(producerInRegion.getOwner())) {
         continue;
       }
-      // Fuse the `encodingOp` into the producer dispatch region.
-      if (failed(moveFollowingOpIntoDispatchRegion(rewriter, encodingOp,
-                                                   producerDispatch))) {
-        return signalPassFailure();
+      // Fuse the `encodingOp` and the producer chain into the dispatch.
+      SmallVector<Operation *> dispatchConsumers(
+          llvm::reverse(producerChain->second));
+      dispatchConsumers.push_back(encodingOp);
+      for (Operation *consumer : dispatchConsumers) {
+        FailureOr<IREE::Flow::DispatchRegionOp> fusedDispatch =
+            moveFollowingOpIntoDispatchRegion(rewriter, consumer,
+                                              producerDispatch);
+        if (failed(fusedDispatch)) {
+          return signalPassFailure();
+        }
+        producerDispatch = fusedDispatch.value();
       }
     }
 
