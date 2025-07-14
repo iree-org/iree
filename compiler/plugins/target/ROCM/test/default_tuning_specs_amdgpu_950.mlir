@@ -96,7 +96,23 @@ module attributes {
     iree_codegen.default_tuning_spec = #rocm.builtin.tuning_module<"iree_default_tuning_spec_gfx950.mlir">
   }>
 } {
-  func.func @main_0() {
-    return
+  func.func @matmul_f16_to_f32(%lhs: tensor<1024x1024xf16>, %rhs: tensor<1024x1024xf16>, %empty: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
+    %cst = arith.constant 0.0 : f32
+    %out = linalg.fill ins(%cst : f32) outs(%empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+    %result = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                         affine_map<(d0, d1, d2) -> (d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel", "reduction"]}
+        ins(%lhs, %rhs : tensor<1024x1024xf16>, tensor<1024x1024xf16>)
+        outs(%out : tensor<1024x1024xf32>) {
+      ^bb0(%in: f16, %in_0: f16, %acc: f32):
+        %0 = arith.extf %in : f16 to f32
+        %1 = arith.extf %in_0 : f16 to f32
+        %2 = arith.mulf %0, %1 : f32
+        %3 = arith.addf %acc, %2 : f32
+        linalg.yield %3 : f32
+    } -> tensor<1024x1024xf32>
+    return %result : tensor<1024x1024xf32>
   }
 }
