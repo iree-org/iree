@@ -1426,3 +1426,34 @@ util.func @interchange_producer(%update : tensor<2x2xi32>, %indices : tensor<2x2
 //  CHECK-SAME:       ins(%[[TPOS]]
 //       CHECK:     flow.return %[[SCATTER]]
 //       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// Check that the null indexing map is handled without a crash.
+util.func @no_interchange_producer_crash(%update : tensor<2x2xi32>, %indices : tensor<2x2x2xi32>, %original : tensor<2x2xi32>) -> tensor<2x2xi32> {
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d1, d0)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%original : tensor<2x2xi32>)
+      outs(%original : tensor<2x2xi32>){
+      ^bb0(%b0 : i32, %out : i32):
+        linalg.yield %b0 : i32
+  } -> tensor<2x2xi32>
+  %result = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
+                          ins(%update, %indices : tensor<2x2xi32>, tensor<2x2x2xi32>)
+                          outs(%0 : tensor<2x2xi32>) {
+                    ^bb0(%arg0: i32, %arg1: i32):
+                      iree_linalg_ext.yield %arg0 : i32
+  } -> tensor<2x2xi32>
+  util.return %result : tensor<2x2xi32>
+}
+// CHECK-LABEL: func public @no_interchange_producer_crash
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[TPOS:.+]] = linalg.generic
+//       CHECK:     flow.return %[[TPOS]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:       outs(%[[DISPATCH0]]
+//       CHECK:     flow.return %[[SCATTER]]
+//       CHECK:   util.return %[[DISPATCH1]]
