@@ -808,7 +808,6 @@ isFusableWithProducer(OpOperand &operand,
     if (!makeProducerFusableViaInterchange(operand, rootOuterParallelLoops)) {
       return false;
     }
-    return areOpsFusable(producer, consumer, rootOuterParallelLoops);
   }
   return true;
 }
