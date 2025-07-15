@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
@@ -235,14 +236,16 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel) {
+createLLVMCPUTileRootAndFuseProducerConsumerPass(
+    IREE::CPU::TilingLevel tilingLevel) {
   LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = false;
   return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseInputOperands(int64_t tilingLevel) {
+createLLVMCPUTileRootAndFuseInputOperandsPass(
+    IREE::CPU::TilingLevel tilingLevel) {
   LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = true;
