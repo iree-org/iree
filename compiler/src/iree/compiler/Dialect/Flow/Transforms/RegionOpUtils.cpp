@@ -294,6 +294,15 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
     return success();
   }
 
+  // Case 6: Value corresponds to a dps init. Reify the dimensions of the
+  // operand.
+  if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op)) {
+    return reifyDynamicResultDimsImpl(
+        b, dpsOp.getDpsInitOperand(opResult.getResultNumber())->get(),
+        dynamicDims,
+        /*createTensorDimOps=*/true);
+  }
+
   if (!createTensorDimOps)
     return failure();
 
