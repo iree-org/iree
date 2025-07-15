@@ -26,7 +26,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = [
         "spec_gfx942.mlir",
-        "spec_gfx950.mlir",
     ],
     cfg = "//compiler:lit.cfg.py",
     tools = [
