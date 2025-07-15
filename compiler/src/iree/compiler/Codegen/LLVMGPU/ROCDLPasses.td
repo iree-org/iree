@@ -50,6 +50,27 @@ def ROCDLConfigureBufferInstructionsPass :
   let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
 }
 
+def ROCDLUseBufferInstructionsPass :
+    InterfacePass<"iree-rocdl-use-buffer-instructions", "mlir::FunctionOpInterface"> {
+  let summary = "Determine which buffers can be implemneted with buffer fat pointers";
+  let description = [{
+    Analyze tensors to determine whether:
+    whether
+    - The size of the tensor itself, taken as a region of memory, is under 2 GB
+     (the limit for indexing a buffer descriptor is uint32_t max, but a lot of
+     intermediate code assumes indices are signed, se this limit is conservative) and
+    - That the offset argument to the tensor op is workgroup-uniform, since it will
+     be folded into the base offset of the descriptor.
+
+    If it's determined that buffer ops can be safely used, then this pass will add
+    `iree_gpu.buffer_resource_cast` operations to the buffers.
+    Note: This pass must run before bufferization.
+
+    This pass is a no-op on non-ROCDL targets.
+  }];
+  let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
+}
+
 def ROCDLLowerExecutableTargetPass : InterfacePass<
     "iree-rocdl-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Lower an IREE hal.executable.variant op using a suitable "

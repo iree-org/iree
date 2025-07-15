@@ -867,6 +867,7 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
 
 static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(createROCDLUseBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
