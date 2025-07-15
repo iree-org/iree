@@ -243,7 +243,6 @@ util.func public @hoist_convertable_slice_op(%input: tensor<1024x320xf32>) -> te
 
 #encoding = #iree_encoding.padding<[0, ?]>
 util.func public @dont_hoist_pad_encoding() -> tensor<640x320xf32, #encoding> {
-  %cst = arith.constant dense<1.0> : tensor<640x320xf32>
   %0 = flow.dispatch.region -> (tensor<640x320xf32, #encoding>) {
     %1 = tensor.empty() : tensor<640x320xf32>
     %2 = iree_encoding.set_encoding %1 : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
@@ -255,4 +254,25 @@ util.func public @dont_hoist_pad_encoding() -> tensor<640x320xf32, #encoding> {
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
 //       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
 //       CHECK:     flow.return %[[SET_ENCODING]]
+//       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+// Avoid hoisting `set_encoding` operations on scalar tensors.
+
+#encoding = #iree_encoding.testing<>
+util.func private @get_tensor(tensor<f32, #encoding>) -> tensor<f32>
+util.func public @dont_hoist_encoding_on_scalar_tensor(%arg0: tensor<f32>) -> tensor<f32> {
+  %0 = flow.dispatch.region -> (tensor<f32>) {
+    %1 = iree_encoding.set_encoding %arg0 : tensor<f32> -> tensor<f32, #encoding>
+    %2 = util.call @get_tensor(%1) : (tensor<f32, #encoding>) -> tensor<f32>
+    flow.return %2 : tensor<f32>
+  }
+  util.return %0 : tensor<f32>
+}
+// CHECK-LABEL: @dont_hoist_encoding_on_scalar_tensor
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+//       CHECK:     %[[CALL:.+]] = util.call @get_tensor(%[[SET_ENCODING]])
+//       CHECK:     flow.return %[[CALL]]
 //       CHECK:   return %[[DISPATCH]]
