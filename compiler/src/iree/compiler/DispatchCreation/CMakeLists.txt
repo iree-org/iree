@@ -28,6 +28,7 @@ iree_cc_library(
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
+    "FormSplitReductionDispatches.cpp"
     "FuseEncodingOpsIntoDispatchRegions.cpp"
     "FuseHorizontalContractions.cpp"
     "FuseMultiUseElementwiseProducer.cpp"

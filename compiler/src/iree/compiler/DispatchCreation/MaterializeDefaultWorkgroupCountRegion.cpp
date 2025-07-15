@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -42,12 +43,12 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// - To correlate back to the captured workload,
 /// `iree_tensor_ext.dispatch.workload.ordinal`
 ///   to map the captured operand to the position in the workload list.
-static void createDefaultWorkgroupCountRegion(
+static LogicalResult createDefaultWorkgroupCountRegion(
     RewriterBase &rewriter, IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
   Region &workgroupCountBody = workgroupsOp.getWorkgroupCount();
   if (!workgroupCountBody.empty()) {
     // Preserve pre-existing workgroup count region.
-    return;
+    return success();
   }
 
   // Compute the `workload`. For now all `IndexType` are treated as workload.
@@ -70,10 +71,31 @@ static void createDefaultWorkgroupCountRegion(
   Location loc = workgroupsOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
-  auto defaultCountOp =
+  Operation *defaultCountOp =
       rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
           loc, block->getArguments());
-  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp.getResults());
+
+  // Check for presence of `scf.forall` operations created by partial reduction
+  // tiling.
+  auto forallOps = workgroupsOp.getClosureBodyRegion().getOps<scf::ForallOp>();
+  if (!forallOps.empty()) {
+    if (!llvm::hasSingleElement(forallOps)) {
+      return workgroupsOp->emitOpError(
+          "unhandled multiple scf.forall ops in a dispatch");
+    }
+    std::optional<ArrayAttr> mapping = (*forallOps.begin()).getMapping();
+    if (!mapping || mapping->size() != 1 ||
+        !isa<IREE::LinalgExt::SplitReductionMappingAttr>(
+            mapping->getValue().front())) {
+      return workgroupsOp->emitOpError(
+          "unhandled scf.forall op that doesnt have a mapping of "
+          "`[#iree_linalg_ext.split_reduction_mapping]`");
+    }
+    defaultCountOp = rewriter.create<
+        IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>(
+        loc, defaultCountOp->getResults(), block->getArguments());
+  }
+  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp->getResults());
 
   // Update the `workgroupsOp` region.
   rewriter.modifyOpInPlace(workgroupsOp, [&]() {
@@ -98,6 +120,7 @@ static void createDefaultWorkgroupCountRegion(
       rewriter.replaceAllUsesExcept(arg, ordinalOp, ordinalOp);
     }
   });
+  return success();
 }
 
 namespace {
@@ -116,9 +139,16 @@ void MaterializeDefaultWorkgroupCountRegionPass::runOnOperation() {
 
   // Populate the workgroup_count region of flow.dispatch.workgroups operation
   // that dont already have a region
-  funcOp.walk([&](IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
-    createDefaultWorkgroupCountRegion(rewriter, workgroupsOp);
-  });
+  auto walkResult = funcOp.walk(
+      [&](IREE::Flow::DispatchWorkgroupsOp workgroupsOp) -> WalkResult {
+        if (failed(createDefaultWorkgroupCountRegion(rewriter, workgroupsOp))) {
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+  if (walkResult.wasInterrupted()) {
+    return signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation
