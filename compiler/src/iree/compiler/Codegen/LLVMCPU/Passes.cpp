@@ -241,8 +241,8 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     return success();
   }
 
-  if (tilingConfig.getNumTilingLevels() != 4) {
-    return op->emitOpError("expected four tiling levels, got ")
+  if (tilingConfig.getNumTilingLevels() != 3) {
+    return op->emitOpError("expected three tiling levels, got ")
            << tilingConfig.getNumTilingLevels();
   }
 
@@ -468,24 +468,19 @@ void addConvTileAndDecomposeExpertPassPipeline(
     LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
-  // ops. At this stage, we do not apply vectorization. The reduction dim won't
-  // get tiled if the case is conv + generic op. In this case, we have to tile
-  // along reduction dim again, which needs them to be Linalg ops form.
-
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumer(
       tilingConfig.getVectorCommonParallelLevel()));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
       tilingConfig.getVectorReductionLevel()));
-  funcPassManager.addPass(
-      createLLVMCPUTileAndFusePass(tilingConfig.getVectorInnerParallelLevel()));
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
-
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
+
+  // Convert forall to for before vectorization preparation.
+  funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   if (pipelineOpt.enablePeeling) {
     funcPassManager.addPass(createLLVMCPUPeelPass());
