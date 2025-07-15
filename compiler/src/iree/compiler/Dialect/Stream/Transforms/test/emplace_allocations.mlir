@@ -280,3 +280,23 @@ util.func public @emplaceDependentDispatchSequence(
   // CHECK-NEXT: util.return %[[TARGET1]]
   util.return %target1 : !stream.resource<*>
 }
+
+// -----
+
+// CHECK-LABEL: @emplaceMultiResultDependentDispatchSequence
+util.func public @emplaceMultiResultDependentDispatchSequence(
+    // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
+    %input: !stream.resource<*>, %input_size: index,
+    // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
+    %update_size: index, %target_size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c49152 = arith.constant 49152 : index
+  // CHECK: %[[UPDATE0:.+]]:2 = stream.async.dispatch @ex::@dispatch0
+  %update0:2 = stream.async.dispatch @ex::@dispatch0(%input[%c0 to %input_size for %input_size]) : (!stream.resource<*>{%input_size}) -> (!stream.resource<*>{%update_size}, !stream.resource<*>{%update_size})
+  // CHECK-NEXT: %[[UPDATE1:.+]] = stream.async.dispatch @ex::@dispatch1
+  %update1 = stream.async.dispatch @ex::@dispatch1(%update0#1[%c0 to %update_size for %input_size]) : (!stream.resource<*>{%update_size}) -> !stream.resource<*>{%update_size}
+  // CHECK: %[[TARGET1:.+]] = stream.async.update %[[UPDATE0]]#0, %[[UPDATE1]]
+  %target0 = stream.async.update %update0#0, %update1[%c0 to %c49152] : !stream.resource<*>{%update_size} -> %update1_origin as !stream.resource<*>{%target_size}
+  // CHECK-NEXT: util.return %[[TARGET1]]
+  util.return %target0 : !stream.resource<*>
+}
