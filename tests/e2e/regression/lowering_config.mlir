@@ -24,11 +24,11 @@ func.func @lowering_config_test() {
 // Conv dims: N, OH, OW, OC, KH, KW, (IC)
 // Remove H
 #conv_compilation0 = #iree_codegen.compilation_info<
-    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [1, 1, 7, 4, 0, 0, 0], [0, 0, 0, 0, 1, 3, 4], [0, 0, 0, 0, 0, 0, 0]]>,
+    lowering_config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [1, 1, 7, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3, 4]>,
     translation_info = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>>
 // Remove W
 #conv_compilation1 = #iree_codegen.compilation_info<
-    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [1, 7, 1, 4, 0, 0, 0], [0, 0, 0, 0, 3, 1, 4], [0, 0, 0, 0, 0, 0, 0]]>,
+    lowering_config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [1, 7, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 3, 1, 4]>,
     translation_info = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>>
 func.func @conv() {
   %input = util.unfoldable_constant dense<1.0> : tensor<36x7x7x512xf32>
