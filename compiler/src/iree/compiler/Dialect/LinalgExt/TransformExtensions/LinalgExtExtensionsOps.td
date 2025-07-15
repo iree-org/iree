@@ -32,10 +32,6 @@ def DecomposeAggregateOp : Op<Transform_Dialect, "iree.decompose_aggregate_op",
   let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-
   let assemblyFormat = [{
     $target attr-dict `:` functional-type(operands, results)
   }];
