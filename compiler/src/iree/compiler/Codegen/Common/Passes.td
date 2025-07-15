@@ -277,7 +277,7 @@ def ReconcileTranslationInfoPass
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
-           /*default=*/"IREE::Codegen::WorkgroupId::IdZ",
+           /*default=*/"IREE::Codegen::WorkgroupId::IdX",
            "Constrain the workgroup distribution along grid dimensions.",
            [{
            ::llvm::cl::values(

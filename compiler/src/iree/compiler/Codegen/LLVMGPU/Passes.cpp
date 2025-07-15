@@ -102,7 +102,7 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
                          clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
                                     "Constrain the workgroup distribution to "
                                     "use only workgroups along x, y and z.")),
-        llvm::cl::init(IREE::Codegen::WorkgroupId::IdZ)
+        llvm::cl::init(IREE::Codegen::WorkgroupId::IdX)
 
     );
 
