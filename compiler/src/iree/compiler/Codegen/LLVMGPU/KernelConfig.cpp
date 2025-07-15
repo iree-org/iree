@@ -422,7 +422,7 @@ getVectorDistributeReductionConfig(
     ArrayAttr threadBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
-    SmallVector<NamedAttribute, 4> configAttrs = {
+    NamedAttribute configAttrs[] = {
         NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
         NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
