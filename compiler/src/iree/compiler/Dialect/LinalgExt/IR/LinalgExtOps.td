@@ -563,11 +563,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
                        BoolAttr:$inclusive
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "0">:$dimension, CArg<"bool", "true">:$inclusive)>
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let hasFolder = 1;
@@ -1564,12 +1559,6 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
                        DenseI64ArrayAttr:$image_dimensions
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
   let assemblyFormat = [{
@@ -1674,12 +1663,6 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$kernel_dimensions
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
@@ -1794,12 +1777,6 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$image_dimensions
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
