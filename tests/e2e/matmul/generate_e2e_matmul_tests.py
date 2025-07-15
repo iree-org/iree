@@ -43,6 +43,30 @@ class ShapesId(enum.Enum):
     SMALL = "small"
     LARGE = "large"
     EASY_LARGE_STATIC = "easy_large_static"
+    CUSTOM_MNK = "custom_mnk"  # Used for custom shapes specified by --mnk= flag.
+
+    @classmethod
+    def set_custom_mnk(cls, shapes_id, mnk_string):
+        """Parse and set custom MNK values from command line argument."""
+        if shapes_id != cls.CUSTOM_MNK:
+            if mnk_string:
+                raise ValueError("--mnk can only be used with --shapes=custom_mnk")
+            return
+
+        # shapes_id is CUSTOM_MNK
+        if not mnk_string:
+            raise ValueError("--mnk must be specified when using --shapes=custom_mnk")
+        try:
+            mnk_parts = mnk_string.split(",")
+            if len(mnk_parts) != 3:
+                raise ValueError("--mnk must have exactly 3 values: m,n,k")
+            cls.custom_mnk_values = tuple(int(x) for x in mnk_parts)
+        except ValueError as e:
+            raise ValueError(f"Invalid --mnk format: {e}")
+
+
+# Class attribute to store custom MNK values
+ShapesId.custom_mnk_values = None
 
 
 # Enumerates of the collections of compilation info that we can generate tests
@@ -252,6 +276,17 @@ def get_test_shapes(shapes_id: ShapesId):
         return [
             TestShape(m=512, k=128, n=512, accumulate=True),
             TestShape(m=512, k=128, n=512, accumulate=False),
+        ]
+    if shapes_id == ShapesId.CUSTOM_MNK:
+        # This is used for custom shapes specified by the --mnk= flag.
+        # It is expected that the caller will set the m, n, k values
+        # in the TestShape instances.
+        if ShapesId.custom_mnk_values is None:
+            raise ValueError("Custom MNK values not set. Use --mnk=m,n,k")
+        m, n, k = ShapesId.custom_mnk_values
+        return [
+            TestShape(m=m, k=k, n=n, accumulate=True),
+            TestShape(m=m, k=k, n=n, accumulate=False),
         ]
 
     raise ValueError(shapes_id)
@@ -968,6 +1003,12 @@ def parse_arguments():
         help="Target requirements for this module. Comma-separated. As in -iree-llvmcpu-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
         required=False,
     )
+    parser.add_argument(
+        "--mnk",
+        type=str,
+        help="Custom MNK values for CUSTOM_MNK shape. Format: m,n,k (e.g., --mnk=64,128,256)",
+        required=False,
+    )
     return parser.parse_args()
 
 
@@ -1019,6 +1060,9 @@ def main(args):
     acc_type = MatrixElemTypeId(args.acc_type)
     shapes_id = ShapesId(args.shapes)
     compilation_info_id = CompilationInfoId(args.compilation_info)
+
+    # Parse custom MNK values if provided
+    ShapesId.set_custom_mnk(shapes_id, args.mnk)
 
     (functions, calls) = generate(
         lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs, compilation_info_id
