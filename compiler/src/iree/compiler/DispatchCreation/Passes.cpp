@@ -54,6 +54,11 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<int> clEnableSplitKByTiling(
+    "iree-dispatch-creation-splitk-by-tiling-size",
+    llvm::cl::desc("SplitK tile size to use when tiling by reduction"),
+    llvm::cl::init(0));
+
 static llvm::cl::opt<bool>
     clEnableFuseMultiUse("iree-dispatch-creation-fuse-multi-use",
                          llvm::cl::desc("Fuse multi-use ops."),
@@ -174,6 +179,14 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       //     b. Split reduction operations into parallel and reduction, i.e
       //        .
       .addPass(DispatchCreation::createSplitReductionPass)
+      .addPredicatedPass(
+          clEnableSplitKByTiling != 0,
+          [&]() {
+            FormSplitReductionDispatchesPassOptions options;
+            options.splitSize = clEnableSplitKByTiling;
+            return DispatchCreation::createFormSplitReductionDispatchesPass(
+                options);
+          })
 
       //     c. Transpose generic ops to
       //        - help with dispatch region formation.

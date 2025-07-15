@@ -271,6 +271,22 @@ def FormScalarDispatchesPass :
   ];
 }
 
+def FormSplitReductionDispatchesPass :
+    InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
+  let summary = "Partially tile reduction operations and place into dispatches";
+  let options = [
+    Option<"splitSize", "split-size", "int",
+           /*default=*/"0", "Tile size for split reduction">
+  ];
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::scf::SCFDialect",
+  ];
+}
+
 def FuseEncodingOpsIntoDispatchRegionsPass :
     InterfacePass<"iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass", "mlir::FunctionOpInterface"> {
   let summary = "Fuses set_encoding ops into producer dispatch regions, or forms new dispatches around them.";
