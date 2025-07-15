@@ -138,6 +138,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRVectorUtils
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect

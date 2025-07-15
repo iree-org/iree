@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "bitcast_unsupported_element_types.mlir",
             "clone_producers_into_dispatch_regions.mlir",
             "collapse_dimensions.mlir",
             "collapse_linalg_generic_on_tensors.mlir",
@@ -35,10 +36,12 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
             "form_scalar_dispatches.mlir",
+            "form_split_reduction_dispatches.mlir",
             "fuse_encoding_ops_into_dispatch_regions.mlir",
             "fuse_horizontal_contractions.mlir",
             "fuse_multiuse_elementwise_producer.mlir",
             "fusion_preprocessing.mlir",
+            "materialize_default_workgroup_count_region.mlir",
             "pad_fusion_with_consumer.mlir",
             "pad_fusion_with_producer.mlir",
             "pipeline_tests.mlir",

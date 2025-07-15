@@ -160,3 +160,105 @@ hal.executable private @scf_forall_3D_tile_size {
 //   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0] -> (s0 * 6)>()[%[[IDY]]]
 //   DISTRIBUTEZ-DAG:     %[[IV2:.+]] = affine.apply affine_map<()[s0] -> (s0 * 5)>()[%[[IDX]]]
 //       DISTRIBUTEZ:     "use"(%[[IV0]], %[[IV1]], %[[IV2]])
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly">,
+    #hal.pipeline.binding<storage_buffer>]>
+hal.executable private @split_reduction_executable {
+  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "", {}>) {
+    hal.executable.export public @split_reduction layout(#pipeline_layout) count(
+        %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      %return_x, %return_y, %return_z =
+          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier(%x, %y, %z), %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      hal.return %return_x, %return_y, %return_z : index, index, index
+    }
+    builtin.module {
+      func.func @split_reduction() {
+        %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %cst3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
+        %cst4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : index
+        %cst5 = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
+        %3 = iree_tensor_ext.dispatch.workload.ordinal %cst3, 3 : index
+        %4 = iree_tensor_ext.dispatch.workload.ordinal %cst4, 4 : index
+        %5 = iree_tensor_ext.dispatch.workload.ordinal %cst5, 5 : index
+        scf.forall (%arg0) = (%0) to (%1) step (%2) {
+          "use1"(%arg0) : (index) -> ()
+          scf.forall (%arg1, %arg2, %arg3) in (%3, %4, %5) {
+            "use2"(%arg1, %arg2, %arg3) : (index, index, index) -> ()
+          } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+        } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+        return
+      }
+    }
+  }
+}
+//         CHECK-ALL: @split_reduction_variant
+//         CHECK-ALL:   hal.executable.export
+//    CHECK-ALL-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
+//    CHECK-ALL-SAME:       %[[ARG2:[a-zA-Z0-9_]+]]: index
+//    CHECK-ALL-SAME:       %[[ARG3:[a-zA-Z0-9_]+]]: index
+//    CHECK-ALL-SAME:       %[[ARG4:[a-zA-Z0-9_]+]]: index
+//    CHECK-ALL-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
+//    CHECK-ALL-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
+
+//   DISTRIBUTEX-DAG:     %[[C1:.+]] = arith.constant 1 : index
+//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((s1 * s2) * s0))>
+//  DISTRIBUTEX-SAME:         [%[[ARG4]], %[[ARG6]], %[[ARG5]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEX:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
+
+//   DISTRIBUTEY-DAG:     %[[C1:.+]] = arith.constant 1 : index
+//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> (((-s2 + s3) ceildiv s4) * (s0 * s1))>
+//  DISTRIBUTEY-SAME:         [%[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEY:     hal.return %[[ARG6]], %[[NUMWORKGROUPSY]], %[[C1]]
+
+//       DISTRIBUTEZ:     %[[NUMWORKGROUPSZ:.+]] = affine.apply affine_map<(d0)[s0, s1, s2] -> (d0 * ((-s0 + s1) ceildiv s2))>
+//  DISTRIBUTEZ-SAME:         (%[[ARG4]])[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEZ:     hal.return %[[ARG6]], %[[ARG5]], %[[NUMWORKGROUPSZ]]
+
+//         CHECK-ALL:   func @split_reduction
+//     CHECK-ALL-DAG:     %[[SPLIT_LB:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
+//     CHECK-ALL-DAG:     %[[SPLIT_UB:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
+//     CHECK-ALL-DAG:     %[[SPLIT_STEP:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
+
+//   DISTRIBUTEX-DAG:     %[[WG_BOUND_Z:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
+//   DISTRIBUTEX-DAG:     %[[WG_BOUND_Y:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
+//   DISTRIBUTEX-DAG:     %[[WG_BOUND_X:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
+
+//   DISTRIBUTEY-DAG:     %[[WG_BOUND_Z:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
+//   DISTRIBUTEY-DAG:     %[[WG_BOUND_Y:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
+
+//     CHECK-ALL-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+
+//   DISTRIBUTEX-DAG:     %[[DELINEARIZE_FROM_ID:.+]] = hal.interface.workgroup.id[0]
+//   DISTRIBUTEX-DAG:     %[[DELINEARIZE_FROM_COUNT:.+]] = hal.interface.workgroup.count[0]
+
+//   DISTRIBUTEY-DAG:     %[[DELINEARIZE_FROM_ID:.+]] = hal.interface.workgroup.id[1]
+//   DISTRIBUTEY-DAG:     %[[DELINEARIZE_FROM_COUNT:.+]] = hal.interface.workgroup.count[1]
+
+//   DISTRIBUTEZ-DAG:     %[[DELINEARIZE_FROM_ID:.+]] = hal.interface.workgroup.id[2]
+//   DISTRIBUTEZ-DAG:     %[[DELINEARIZE_FROM_COUNT:.+]] = hal.interface.workgroup.count[2]
+
+//         CHECK-ALL:     %[[ORIG_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
+//    CHECK-ALL-SAME:         ()[%[[DELINEARIZE_FROM_COUNT]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+//         CHECK-ALL:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[DELINEARIZE_FROM_ID]] into (%[[SPLIT_NPROCS]], %[[ORIG_NPROCS]])
+//         CHECK-ALL:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
+//         CHECK-ALL:     "use1"(%[[SPLITIVREPLACEMENT]])
+
+//       DISTRIBUTEX:     %[[DELINEARIZE2:.+]]:3 = affine.delinearize_index %[[DELINEARIZE]]#1 into (%[[WG_BOUND_Z]], %[[WG_BOUND_Y]], %[[WG_BOUND_X]])
+//       DISTRIBUTEX:     "use2"(%[[DELINEARIZE2]]#0, %[[DELINEARIZE2]]#1, %[[DELINEARIZE2]]#2)
+
+//   DISTRIBUTEY-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
+//   DISTRIBUTEY-DAG:     %[[DELINEARIZE2:.+]]:2 = affine.delinearize_index %[[DELINEARIZE]]#1 into (%[[WG_BOUND_Z]], %[[WG_BOUND_Y]])
+//       DISTRIBUTEY:     "use2"(%[[DELINEARIZE2]]#0, %[[DELINEARIZE2]]#1, %[[IDX]])
+
+//   DISTRIBUTEZ-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
+//   DISTRIBUTEZ-DAG:     %[[IDY:.+]] = hal.interface.workgroup.id[1]
+//       DISTRIBUTEZ:     "use2"(%[[DELINEARIZE]]#1, %[[IDY]], %[[IDX]])

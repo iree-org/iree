@@ -106,6 +106,13 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
 
     );
 
+static llvm::cl::opt<bool> clPatchFuncOps(
+    "iree-llvmgpu-debug-patch-func-ops",
+    llvm::cl::desc(
+        "Perform the patches on func ops for debugging purpose. It should be "
+        "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
+    llvm::cl::init(false), llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -515,6 +522,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
+  funcPassManager.addPass(createCombineLayoutTransformationPass());
   funcPassManager.addPass(createGPUGreedilyDistributeToThreadsPass());
   funcPassManager.addPass(createTileLargeTensorsPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -934,13 +942,18 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // be safely dropped. This additionally allows vectorization of convolution to
   // `vector.contract` as filter dimensions are expected to be tiled to 1 by
   // this point.
+  funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
   {
-    funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
+    IREE::LinalgExt::FoldUnitExtentDimsPassOptions options;
+    options.useReshapes = false;
+    funcPassManager.addPass(
+        IREE::LinalgExt::createFoldUnitExtentDimsPass(options));
+  }
+  funcPassManager.addPass(
+      IREE::VectorExt::createVectorExtFoldUnitExtentDimsPass());
+  {
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
-    funcPassManager.addPass(IREE::LinalgExt::createFoldUnitExtentDimsPass());
-    funcPassManager.addPass(
-        IREE::VectorExt::createVectorExtFoldUnitExtentDimsPass());
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -1176,7 +1189,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
       // Barrier elimination before we reach unstructured control flow.
-      .addPass(createGpuEliminateBarriers);
+      .addPass(createGpuEliminateBarriers)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass);
 
   if (forROCDL) {
     funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
@@ -1208,7 +1223,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         options.allowSubviewExpansion = true;
         return createIREEExpandStridedMetadataPass(options);
       })
-      .addPass(createEmulateNarrowTypePass)
+      .addPass(forROCDL ? createAMDGPUEmulateNarrowTypePass
+                        : createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);
 
@@ -1300,6 +1316,9 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
         .addPass(
             [&] { return createLLVMGPULowerExecutableTargetPass(options); })
         .addPass(createVerifyWorkgroupDistributionPass);
+    if (clPatchFuncOps) {
+      modulePassManager.addPass(createPatchFuncOpsPass());
+    }
   }
   {
     ReconcileTranslationInfoPassOptions options;

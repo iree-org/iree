@@ -83,7 +83,7 @@ def ConcretizePadResultShapePass :
 }
 
 def ConvertAccGEMMToGEMMPass :
-    Pass<"iree-convert-accgemm-to-gemm", ""> {
+    InterfacePass<"iree-convert-accgemm-to-gemm", "mlir::FunctionOpInterface"> {
   let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
 }
 
@@ -654,6 +654,21 @@ def OptimizeVectorTransferPass :
 def PadDynamicAllocPass :
     InterfacePass<"iree-codegen-pad-dynamic-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass to pad dynamic alloc into static one.";
+}
+
+def PatchFuncOpsPass : Pass<"iree-codegen-debug-patch-func-ops", ""> {
+  let summary = "A debugging pass for patching func ops with external func ops";
+  let description = [{
+    Pass to replace func ops if they matches the provided func op names. It is
+    useful when you know what the intermediate IR is, since you can patch the
+    func op without modifying any transformation code.
+
+    If the pass is not run at ModuleOp scope, it will track the parent chain to
+    find the first ModuleOp and apply patches.
+
+    NOTE: This is for debugging purpose. You should not rely on the pass in
+          default pipelines.
+  }];
 }
 
 def MathTransformPass :

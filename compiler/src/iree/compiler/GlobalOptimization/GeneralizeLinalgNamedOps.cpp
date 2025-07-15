@@ -93,8 +93,7 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
     }
     if (isa_and_nonnull<linalg::AbsOp, linalg::AddOp, linalg::BroadcastOp,
                         linalg::CeilOp, linalg::CopyOp, linalg::DivOp,
-                        linalg::DivUnsignedOp, linalg::ElemwiseBinaryOp,
-                        linalg::ElemwiseUnaryOp, linalg::ExpOp, linalg::FloorOp,
+                        linalg::DivUnsignedOp, linalg::ExpOp, linalg::FloorOp,
                         linalg::LogOp, linalg::MapOp, linalg::MaxOp,
                         linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
                         linalg::SubOp, linalg::TransposeOp>(

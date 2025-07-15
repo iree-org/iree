@@ -117,9 +117,7 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
   // 4. Create and return a new lowering config attribute.
   auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
       context, newTilingLevelsList);
-  return IREE::Codegen::LoweringConfigAttr::get(
-      context, newTilingLevels,
-      loweringConfigAttr.value().getNativeVectorSize());
+  return IREE::Codegen::LoweringConfigAttr::get(context, newTilingLevels);
 }
 
 class DecomposeConvolutionToLowerDimOpsPass final

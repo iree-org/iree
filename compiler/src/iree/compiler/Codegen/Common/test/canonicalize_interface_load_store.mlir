@@ -107,10 +107,8 @@ func.func @fold_dynamic_reshape() {
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-// CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 288)>
 // CHECK-LABEL: func.func @fold_reshape_slice_store
-func.func @fold_reshape_slice_store(%x: index) {
-  // CHECK-SAME: %[[X:[A-Za-z0-9]+]]: index
+func.func @fold_reshape_slice_store() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
@@ -119,12 +117,10 @@ func.func @fold_reshape_slice_store(%x: index) {
   // CHECK: %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<6x3x1x96xf32>>
   // CHECK: %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.*}}, {{.*}}
   %3 = iree_tensor_ext.dispatch.tensor.load %1, offsets=[0, 0, 0, 0], sizes =[3, 3, 1, 96], strides=[1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x1x96xf32>> -> tensor<3x3x1x96xf32>
-  //  CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[LOAD]] : tensor<3x3x1x96xf32>)
+  // CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[LOAD]] : tensor<3x3x1x96xf32>)
   %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<3x3x1x96xf32>) -> tensor<3x3x1x96xf32>
   %5 = tensor.collapse_shape %4 [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
-  //  CHECK: %[[XDIV:.+]] = affine.apply #[[$MAP]]()[%[[X]]]
-  //  CHECK: iree_tensor_ext.dispatch.tensor.store %[[FILL]], %[[OUT]], offsets = [%[[XDIV]], 0, 0, 0], sizes = [3, 3, 1, 96]
-  //  CHECK-SAME: tensor<3x3x1x96xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<6x3x1x96xf32>>
-  iree_tensor_ext.dispatch.tensor.store %5, %2, offsets = [%x], sizes = [864], strides = [1] : tensor<864xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1728xf32>>
+  // CHECK: iree_tensor_ext.dispatch.tensor.store %[[FILL]], %[[OUT]], offsets = [2, 0, 0, 0], sizes = [3, 3, 1, 96]
+  iree_tensor_ext.dispatch.tensor.store %5, %2, offsets = [576], sizes = [864], strides = [1] : tensor<864xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1728xf32>>
   return
 }

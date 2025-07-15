@@ -17,6 +17,7 @@ iree_cc_library(
     "FusionUtils.h"
     "Passes.h"
   SRCS
+    "BitcastUnsupportedElementTypes.cpp"
     "BubbleUpExpandShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
@@ -27,6 +28,7 @@ iree_cc_library(
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
+    "FormSplitReductionDispatches.cpp"
     "FuseEncodingOpsIntoDispatchRegions.cpp"
     "FuseHorizontalContractions.cpp"
     "FuseMultiUseElementwiseProducer.cpp"
@@ -92,6 +94,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

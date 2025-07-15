@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_UTILS_TYPEUTILS_H_
-#define IREE_COMPILER_UTILS_TYPEUTILS_H_
+#ifndef IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_
+#define IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -48,4 +48,4 @@ Value calculateStorageElementOffsetInBytes(Location loc,
 
 } // namespace mlir::iree_compiler
 
-#endif // IREE_COMPILER_UTILS_TYPEUTILS_H_
+#endif // IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_

@@ -181,10 +181,38 @@ DistributionPattern::getOpSignature(Operation *op) const {
 }
 
 void DistributionPattern::setSignatureForRedistribution(
-    PatternRewriter &rewriter, Operation *op, Attribute inputLayoutsAttr,
-    Attribute outputLayoutsAttr) const {
-  Attribute signature[] = {inputLayoutsAttr, outputLayoutsAttr};
+    RewriterBase &rewriter, Operation *op,
+    ArrayRef<VectorLayoutInterface> inputLayouts,
+    ArrayRef<VectorLayoutInterface> outputLayouts) const {
   auto unitAttr = UnitAttr::get(rewriter.getContext());
+  auto inputAttrs = SmallVector<Attribute>(op->getNumOperands(), unitAttr);
+  auto outputAttrs = SmallVector<Attribute>(op->getNumResults(), unitAttr);
+
+  auto isVectorType = [](Value x) { return isa<VectorType>(x.getType()); };
+  assert(llvm::count_if(op->getOperands(), isVectorType) ==
+         inputLayouts.size());
+  int64_t currVectorInput = 0;
+  for (auto [idx, operand] : llvm::enumerate(op->getOperands())) {
+    if (isVectorType(operand)) {
+      inputAttrs[idx] = inputLayouts[currVectorInput];
+      ++currVectorInput;
+    }
+  }
+
+  assert(llvm::count_if(op->getResults(), isVectorType) ==
+         outputLayouts.size());
+  int64_t currVectorOutput = 0;
+  for (auto [idx, result] : llvm::enumerate(op->getResults())) {
+    if (isVectorType(result)) {
+      outputAttrs[idx] = outputLayouts[currVectorOutput];
+      ++currVectorOutput;
+    }
+  }
+
+  auto inputArrayAttr = ArrayAttr::get(rewriter.getContext(), inputAttrs);
+  auto outputArrayAttr = ArrayAttr::get(rewriter.getContext(), outputAttrs);
+
+  Attribute signature[] = {inputArrayAttr, outputArrayAttr};
   rewriter.modifyOpInPlace(op, [&]() {
     op->setAttr(kVectorLayoutFetcherStorageAttrName,
                 ArrayAttr::get(rewriter.getContext(), signature));

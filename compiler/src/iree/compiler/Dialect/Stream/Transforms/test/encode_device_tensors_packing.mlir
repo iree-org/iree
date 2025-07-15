@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-encode-device-tensors --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-encode-device-tensors %s | FileCheck %s
 
 // Ensures that loading a non-power-of-two type (i3) is expanded to a full byte
 // because we don't currently do unaligned sub-byte packing.

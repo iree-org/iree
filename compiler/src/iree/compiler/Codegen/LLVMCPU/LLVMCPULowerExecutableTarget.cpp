@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -71,13 +72,11 @@ getTilingConfigForPipeline(FunctionOpInterface funcOp) {
   if (failed(rootOp) || !rootOp.value()) {
     return failure();
   }
-  auto rootLoweringConfig =
-      iree_compiler::getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
-          rootOp.value());
-  if (!rootLoweringConfig) {
+  auto config = iree_compiler::getLoweringConfig(rootOp.value());
+  if (!config) {
     return failure();
   }
-  return TilingConfig(rootLoweringConfig);
+  return TilingConfig(config);
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {

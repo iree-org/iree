@@ -229,8 +229,7 @@ LogicalResult LoweringConfigTilingLevelAttr::verify(
 LoweringConfigAttr
 LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
                         ScalableTileFlagsListTypeRef scalableTileFlags,
-                        TileSizesListTypeRef tileInterchange,
-                        ArrayRef<int64_t> nativeVectorSize) {
+                        TileSizesListTypeRef tileInterchange) {
   SmallVector<LoweringConfigTilingLevelAttr> tilinglevels;
   for (auto [level, sizes] : llvm::enumerate(tileSizes)) {
     ArrayRef<int64_t> interchange = level < tileInterchange.size()
@@ -243,16 +242,13 @@ LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
         context, sizes, interchange, scalableFlags));
   }
   return get(context,
-             LoweringConfigTilingLevelsAttr::get(context, tilinglevels),
-             nativeVectorSize);
+             LoweringConfigTilingLevelsAttr::get(context, tilinglevels));
 }
 
-LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
-                                           TileSizesListTypeRef tileSizes,
-                                           TileSizesListTypeRef tileInterchange,
-                                           ArrayRef<int64_t> nativeVectorSize) {
-
-  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
+LoweringConfigAttr
+LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
+                        TileSizesListTypeRef tileInterchange) {
+  return get(context, tileSizes, {}, tileInterchange);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() const {
@@ -308,10 +304,18 @@ SmallVector<int64_t> LoweringConfigAttr::getWorkgroupInterchange() const {
   return getTileInterchangeVals(0);
 }
 
+std::optional<unsigned> LoweringConfigAttr::getNumTilingLevels() const {
+  return getTilingLevels().size();
+}
+
 SmallVector<int64_t>
 LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
                                               Operation *) const {
   return getTileSizeVals(level);
+}
+
+Attribute LoweringConfigAttr::getTilingLevelAttr(unsigned level) const {
+  return getTilingLevels()[level];
 }
 
 SmallVector<OpFoldResult>
@@ -332,9 +336,7 @@ bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
 
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                           LoweringConfigTilingLevelsAttr levels,
-                           ArrayRef<int64_t> nativeVectorSizes) {
-  (void)nativeVectorSizes;
+                           LoweringConfigTilingLevelsAttr levels) {
   if (!levels)
     return emitError() << "missing lowering config levels";
   return success();
@@ -352,9 +354,8 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     return emitError() << "missing lowering config";
   }
   if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
-    if (failed(LoweringConfigAttr::verify(
-            emitError, defaultConfig.getTilingLevels(),
-            defaultConfig.getNativeVectorSize()))) {
+    if (failed(LoweringConfigAttr::verify(emitError,
+                                          defaultConfig.getTilingLevels()))) {
       return emitError() << "invalid lowering config: " << defaultConfig;
     }
   }

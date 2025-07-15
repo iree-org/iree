@@ -352,15 +352,19 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
 // Lowering `iree_tensor_ext.dispatch.workgroup_count_from_slice` operation.
 //===---------------------------------------------------------------------===//
 
-LogicalResult lowerWorkgroupCountFromSliceOp(
-    RewriterBase &rewriter,
-    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
-    mlir::FunctionOpInterface entryPointFn,
-    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals) {
   // Compute the backward slice of the workgroup count operations.
   BackwardSliceOptions options;
-  options.filter = [](Operation *op) {
-    return !isa<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op);
+  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> leaves;
+  options.filter = [&leaves](Operation *op) {
+    if (auto ordinalOp =
+            dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
+      leaves.push_back(ordinalOp);
+      return false;
+    }
+    return true;
   };
   options.inclusive = true;
   llvm::SetVector<Operation *> slice;
@@ -378,26 +382,19 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   // Insert the slice into workgroup count region with all `hal.constant.index`
   // operations replaced with arguments (drop the front argument since that is
   // `hal.device`).
-  auto workloadVals = workgroupCountOp.getOperands();
   IRMapping map;
-  // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
-  // the `flow.dispatch.workgroup_count_default` operation.
-  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinalOps;
-  entryPointFn.walk([&](IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp) {
-    ordinalOps.push_back(ordinalOp);
-  });
-  for (auto ordinalOp : ordinalOps) {
+  for (auto ordinalOp : leaves) {
+    // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
+    // the `flow.dispatch.workgroup_count_default` operation.
     int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
     if (ordinal >= workloadVals.size()) {
-      ordinalOp.emitOpError(
+      return ordinalOp.emitOpError(
           "ordinal number is higher than the number of workloads captured in "
           "the workgroup count region");
     }
     map.map(ordinalOp.getResult(),
             workloadVals[ordinalOp.getOrdinal().getSExtValue()]);
   }
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(workgroupCountOp);
   for (auto op : slice) {
     // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
     // computation. They should not. Some pre-processing at MaterializeEncoding
@@ -421,6 +418,28 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     } else {
       results.push_back(ofr);
     }
+  }
+  return results;
+}
+
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter,
+    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+
+  SmallVector<OpFoldResult> results;
+  {
+    FailureOr<SmallVector<OpFoldResult>> resultsOr =
+        materializeWorkgroupCountComputation(rewriter, entryPointFn,
+                                             workgroupCount,
+                                             workgroupCountOp.getOperands());
+    if (failed(resultsOr)) {
+      return failure();
+    }
+    std::swap(results, resultsOr.value());
   }
 
   // The `maxWorkgroupParallelDims` represents the maximum dimension number
@@ -452,10 +471,6 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   }
   rewriter.replaceOp(workgroupCountOp,
                      getValueOrCreateConstantIndexOp(rewriter, loc, results));
-  for (auto ordinalOp : ordinalOps) {
-    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
-  }
-
   return success();
 }
 
@@ -567,66 +582,6 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
         },
         [&](Operation *op, Region *) { op->moveBefore(genericOp); });
   });
-}
-
-//===--------------------------------------------------------------------====//
-// Pattern to remove dead allocations
-//===--------------------------------------------------------------------====//
-
-namespace {
-
-static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
-                                              Operation *op) {
-  if (!op->use_empty()) {
-    return failure();
-  }
-  rewriter.eraseOp(op);
-  return success();
-}
-
-// Removes operations with Allocate MemoryEffects but no uses.
-struct RemoveDeadMemAllocs : RewritePattern {
-  RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
-      return failure();
-    }
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-// Removes hal.interface.binding.subspan ops with only assume_alignment uses.
-struct RemoveDeadInterfaceBindings
-    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  RemoveDeadInterfaceBindings(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp>(context,
-                                                               benefit) {}
-
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-struct RemoveDeadAssumeAlighment : OpRewritePattern<memref::AssumeAlignmentOp> {
-  RemoveDeadAssumeAlighment(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<memref::AssumeAlignmentOp>(context, benefit) {}
-
-  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-} // namespace
-
-void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
-  patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
-  patterns.insert<RemoveDeadInterfaceBindings, RemoveDeadAssumeAlighment>(
-      patterns.getContext());
 }
 
 //===--------------------------------------------------------------------====//

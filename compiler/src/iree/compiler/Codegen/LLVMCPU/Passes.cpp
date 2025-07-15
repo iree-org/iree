@@ -112,6 +112,13 @@ static llvm::cl::opt<bool> clForceArmStreaming(
         "than SVE). Requires the +sme feature flag."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clPatchFuncOps(
+    "iree-llvmcpu-debug-patch-func-ops",
+    llvm::cl::desc(
+        "Perform the patches on func ops for debugging purpose. It should be "
+        "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
+    llvm::cl::init(false), llvm::cl::Hidden);
+
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   if (clTileDispatchUsingForall) {
@@ -218,12 +225,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
              << tileSizes.size() << ") to be set exactly once in interchange #"
              << level;
     }
-  }
-
-  // Verify that native vector size is empty.
-  SmallVector<int64_t> nativeVectorSize = tilingConfig.getNativeVectorSizes();
-  if (!nativeVectorSize.empty()) {
-    return op->emitOpError("native_vector_size must be empty");
   }
   return success();
 }
@@ -853,6 +854,9 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
     FunctionLikeNest(modulePassManager)
         .addPass(createLLVMCPULowerExecutableTargetPass)
         .addPass(createVerifyWorkgroupDistributionPass);
+    if (clPatchFuncOps) {
+      modulePassManager.addPass(createPatchFuncOpsPass());
+    }
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());

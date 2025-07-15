@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
@@ -49,8 +50,8 @@ struct VectorizeToLayoutOpPattern final
         VectorType::get(readShape, inputTy.getElementType());
     auto inBounds = rewriter.getBoolArrayAttr(
         SmallVector<bool>(vectorType.getRank(), true));
-    auto padValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(inputTy.getElementType()));
+    auto padValue =
+        rewriter.create<ub::PoisonOp>(loc, inputTy.getElementType());
     auto read = rewriter.create<vector::TransferReadOp>(
         loc,
         /*type=*/vectorType,
@@ -452,8 +453,7 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   }
 
   auto gatherTy = VectorType::get(canonicalVectorSizes, extractOp.getType());
-  Value padding = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(extractOp.getType()));
+  Value padding = rewriter.create<ub::PoisonOp>(loc, extractOp.getType());
   // tensor.extract always produces in-bounds accesses.
   SmallVector<Attribute> inBounds(gatherTy.getRank(),
                                   rewriter.getBoolAttr(true));
@@ -563,8 +563,7 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   auto indexedMaps = rewriter.getAffineMapArrayAttr(SmallVector<AffineMap>(
       1,
       rewriter.getMultiDimIdentityMap(sourceTy.getRank()).getMajorSubMap(1)));
-  Value padding = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(gatherTy.getElementType()));
+  Value padding = rewriter.create<ub::PoisonOp>(loc, gatherTy.getElementType());
   auto transferGatherOp = rewriter.create<IREE::VectorExt::TransferGatherOp>(
       loc, gatherVectorTy, gatherOp.getSource(), baseIndices,
       ValueRange{indicesVec}, rewriter.getBoolArrayAttr(indexed), indexedMaps,
