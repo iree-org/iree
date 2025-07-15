@@ -582,7 +582,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
                              /*rtol=*/iree_vm_value_make_f32(0.f)})),
       "Expected near equality of these values. Contents does not match to "
       "tolerance parameters atol=0.1, rtol=0. The first failure occurs at "
-      "index 3 as the lhs value 4 differs from the rhs value 42.\n"
+      "index 3 as the lhs value 4 differs from the rhs value 42 by "
+      "3.800e+01.\n"
       "  lhs:\n"
       "    2x2x2xf32=[[1 2][3 4]][[5 6][7 8]]\n"
       "  rhs:\n"

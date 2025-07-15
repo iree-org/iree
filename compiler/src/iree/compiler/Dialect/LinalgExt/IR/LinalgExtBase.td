@@ -79,5 +79,4 @@ def SplitReductionMappingAttr :
   }];
 }
 
-
 #endif // IREE_DIALECT_LINALGEXT_BASE

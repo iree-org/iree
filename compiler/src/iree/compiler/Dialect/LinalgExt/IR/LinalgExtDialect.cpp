@@ -86,3 +86,40 @@ bool SplitReductionMappingAttr::isLinearMapping() const { return false; }
 int64_t SplitReductionMappingAttr::getRelativeIndex() const {
   return getMappingId();
 }
+
+//===---------------------------------------------------------------------===//
+// These attributes represent user-hints for certain optimizations to kick in
+//===---------------------------------------------------------------------===//
+
+/// Split reduction setter/getter methods.
+static const char kSplitReductionAttribute[] =
+    "iree_linalg_ext.split_reduction";
+
+namespace mlir::iree_compiler::IREE::LinalgExt {
+
+void setSplitReductionAttribute(Operation *op, ArrayRef<int64_t> splitSize) {
+  MLIRContext *context = op->getContext();
+  auto indexType = IndexType::get(context);
+  auto attrVec = llvm::map_to_vector(splitSize, [&](int64_t v) -> Attribute {
+    return IntegerAttr::get(indexType, v);
+  });
+  op->setAttr(kSplitReductionAttribute, ArrayAttr::get(context, attrVec));
+}
+
+std::optional<SmallVector<int64_t>> getSplitReductionSizes(Operation *op) {
+  auto arrayAttr = op->getAttrOfType<ArrayAttr>(kSplitReductionAttribute);
+  if (!arrayAttr) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> tileSizes;
+  tileSizes.reserve(arrayAttr.size());
+  for (auto attr : arrayAttr) {
+    auto intAttr = dyn_cast<IntegerAttr>(attr);
+    if (!intAttr) {
+      return std::nullopt;
+    }
+    tileSizes.push_back(intAttr.getInt());
+  }
+  return tileSizes;
+}
+} // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -67,6 +67,7 @@ iree_check_single_backend_test_suite(
     "reduction_broadcast_elementwise.mlir"
     "scalar_computation.mlir"
     "softmax.mlir"
+    "split_reduction_using_tiling.mlir"
     "strided_slice.mlir"
     "transpose.mlir"
   TARGET_BACKEND
@@ -182,6 +183,25 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_hip
+  SRCS
+    "split_reduction_using_tiling.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+  COMPILER_FLAGS
+    "--iree-opt-level=O3"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-amd"
 )
 
 iree_check_single_backend_test_suite(
