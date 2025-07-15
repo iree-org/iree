@@ -523,9 +523,9 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   }
 
   auto procIdOp = rewriter.create<IREE::HAL::InterfaceWorkgroupIDOp>(
-      loc, static_cast<uint>(delinearizeFrom));
+      loc, static_cast<unsigned>(delinearizeFrom));
   auto nTotalProcsOp = rewriter.create<IREE::HAL::InterfaceWorkgroupCountOp>(
-      loc, static_cast<uint>(delinearizeFrom));
+      loc, static_cast<unsigned>(delinearizeFrom));
   OpFoldResult nTotalProcs = nTotalProcsOp.getResult();
   auto origNProcs = affine::makeComposedFoldedAffineApply(
       rewriter, loc, s0.floorDiv(s1), {nTotalProcs, nSplitProcs});
