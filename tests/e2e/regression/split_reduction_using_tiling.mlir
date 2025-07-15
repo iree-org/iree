@@ -1,4 +1,4 @@
-util.func @test() {
+func.func @simple_large_reduction_tiling_static() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
   %normalize = arith.constant 131200.0 : f32
@@ -39,5 +39,5 @@ util.func @test() {
       linalg.yield %0 : f32
   } -> tensor<128xf32>
   check.expect_almost_eq (%normal_reduce, %split_reduction, atol 0.1) : tensor<128xf32>
-  util.return
+  return
 }
