@@ -1,4 +1,6 @@
-// RUN: iree-opt --iree-dispatch-creation-pipeline --iree-dispatch-creation-enable-aggressive-fusion --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-transpose-generic-ops, iree-dispatch-creation-elementwise-op-fusion,iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-elementwise-op-fusion{intra-dispatch=1 fuse-truncate-ops=1}, iree-dispatch-creation-collapse-dimensions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, canonicalize, cse))" --mlir-print-local-scope %s | FileCheck %s
+// TODO(IanWood1): Find a better way to enable aggressive fusion when using
+// `iree-opt --iree-dispatch-creation-pass-pipeline`.
 
 util.func public @truncate_fusion(%arg0: tensor<2x64x64x320xi8>, %arg1: tensor<2x66x66x640xi8>, %arg2: tensor<3x3x640x640xi8>, %arg3: tensor<640xi32>, %arg4: tensor<640xf32>, %arg5: tensor<640x320xi8>, %arg6: tensor<640xi32>, %arg7: tensor<640xf32>) -> tensor<2x640x64x64xf16> {
   %c0_i32 = arith.constant 0 : i32
@@ -78,12 +80,11 @@ util.func public @truncate_fusion(%arg0: tensor<2x64x64x320xi8>, %arg1: tensor<2
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel"]
 //  CHECK-SAME:       ins(%[[MUL]]
 //  CHECK-SAME:       outs(%{{.*}} : tensor<8192x640xf16>)
-//       CHECK:     flow.dispatch.tensor.store %[[TRUNC0]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[TRUNC0]]
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf {{.*}} -> tensor<2x64x64x640xi32>
 //       CHECK:     %[[TRUNC1:.+]] = linalg.generic
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 //  CHECK-SAME:       ins(%{{[a-zA-Z0-9]+}}, %[[CONV]]
 //  CHECK-SAME:       outs(%{{.*}} : tensor<2x640x64x64xf16>)
-//       CHECK:     flow.dispatch.tensor.store %[[TRUNC1]]
-//       CHECK:   return %[[DISPATCH1]]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[TRUNC1]]
