@@ -403,6 +403,9 @@ static bool makeConsumerFusableViaInterchange(
   // indexing map in the producer, do nothing.
   AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
       cast<OpResult>(fusableOperand.get()));
+  if (!producerIndexingMap) {
+    return false;
+  }
   producerIndexingMap = getProjectedMap(
       producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
   AffineMap consumerIndexingMap =
@@ -481,7 +484,7 @@ static bool makeProducerFusableViaInterchange(
       producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
   AffineMap consumerIndexingMap =
       consumer.getMatchingIndexingMap(&fusableOperand);
-  if (!consumerIndexingMap.isPermutation() ||
+  if (!consumerIndexingMap || !consumerIndexingMap.isPermutation() ||
       producerIndexingMap == consumerIndexingMap) {
     return false;
   }
@@ -805,9 +808,8 @@ isFusableWithProducer(OpOperand &operand,
     if (!makeProducerFusableViaInterchange(operand, rootOuterParallelLoops)) {
       return false;
     }
+    return areOpsFusable(producer, consumer, rootOuterParallelLoops);
   }
-
-  assert(areOpsFusable(producer, consumer, rootOuterParallelLoops));
   return true;
 }
 
