@@ -187,8 +187,7 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       continue;
     }
 
-    auto maybeLoweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(genericOp);
+    auto maybeLoweringConfig = getLoweringConfig(genericOp);
     if (!maybeLoweringConfig) {
       LDBG("can't find lowering_config, skip SplitReduction");
       continue;
