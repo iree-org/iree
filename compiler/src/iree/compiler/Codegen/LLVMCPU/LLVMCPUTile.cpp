@@ -69,7 +69,8 @@ void LLVMCPUTilePass::runOnOperation() {
     if (isa<tensor::PadOp>(computeOp))
       continue;
 
-    auto maybeLoweringConfig = getLoweringConfig(op);
+    IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+        getLoweringConfig(op);
     if (!maybeLoweringConfig) {
       LDBG("can't find lowering_config, skip tiling");
       continue;
