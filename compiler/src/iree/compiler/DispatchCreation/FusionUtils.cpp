@@ -77,17 +77,23 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
-  // Do not fuse with bit-truncate-like operations with their consumers, unless
-  // the consumer has only one ins operand and is an elementwise operation. The
-  // elementwise oepration implies that the `outs` operand is not real usage
-  // (and is typically a `tensor.empty`), so the core condition is that there is
-  // only one "real" operand of the consumer.
   if (!options.fuseTruncateOps &&
-      IREE::LinalgExt::isBitTruncateOp(producerOp) &&
-      !(linalgConsumerOp.getNumLoops() ==
-            linalgConsumerOp.getNumParallelLoops() &&
-        linalgConsumerOp.getNumDpsInputs() == 1)) {
-    return IREE::LinalgExt::isBitTruncateOp(consumerOp);
+      IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    // Do not fuse with bit-truncate-like operations with their consumers
+    // unless:
+    //
+    // 1. The consumer has only one ins operand and is an elementwise
+    // operation. The elementwise operation implies that the `outs` operand is
+    // not real usage (and is typically a `tensor.empty`), so the core condition
+    // is that there is only one "real" operand of the consumer.
+    //
+    // 2. The consumer is also a truncate (e.g. trunc from f32 to f16 to f8).
+    bool isUnaryElementwise = linalgConsumerOp.getNumLoops() ==
+                                  linalgConsumerOp.getNumParallelLoops() &&
+                              linalgConsumerOp.getNumDpsInputs() == 1;
+    if (!IREE::LinalgExt::isBitTruncateOp(consumerOp) && !isUnaryElementwise) {
+      return false;
+    }
   }
 
   // If the producer has a single use (this op), only fuse if

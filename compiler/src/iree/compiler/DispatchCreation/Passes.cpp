@@ -378,12 +378,34 @@ void registerDispatchCreationPasses() {
 }
 
 void registerDispatchCreationPipelines() {
-  PassPipelineRegistration<TransformOptions> dispatchCreationPipeline(
-      "iree-dispatch-creation-pipeline",
-      "Flag used to run passes that form dispatch regions",
-      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
-        buildDispatchCreationPassPipeline(passManager, transformOptions);
-      });
+
+  /// Helper struct when registering pass pipeline options.
+  struct DispatchCreationPipelineOptions
+      : public PassPipelineOptions<DispatchCreationPipelineOptions> {
+    Option<bool> aggressiveFusion{
+        *this,
+        "aggressive-fusion",
+        llvm::cl::desc(
+            "Enable aggressive fusion for dispatch creation pipeline"),
+        llvm::cl::init(false),
+    };
+
+    TransformOptions toTransformOptions() const {
+      DispatchCreationOptions options;
+      options.enableAggressiveFusion = aggressiveFusion;
+      return TransformOptions{.options = options};
+    }
+  };
+
+  PassPipelineRegistration<DispatchCreationPipelineOptions>
+      dispatchCreationPipeline(
+          "iree-dispatch-creation-pipeline",
+          "Flag used to run passes that form dispatch regions",
+          [](OpPassManager &passManager,
+             const DispatchCreationPipelineOptions &options) {
+            buildDispatchCreationPassPipeline(passManager,
+                                              options.toTransformOptions());
+          });
 
   PassPipelineRegistration<> dispatchCreationPreprocessingPipeline(
       "iree-dispatch-creation-preprocessing-pipeline",
