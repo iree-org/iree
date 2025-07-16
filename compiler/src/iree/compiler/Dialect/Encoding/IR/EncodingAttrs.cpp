@@ -438,7 +438,7 @@ Attribute PaddingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 }
 
 bool PaddingAttr::isSerialized() const {
-  return !ShapedType::isDynamicShape(getPadding().asArrayRef());
+  return ShapedType::isStaticShape(getPadding().asArrayRef());
 }
 
 bool PaddingAttr::isIdentityLayout() const {
@@ -461,7 +461,7 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
 
   size_t dynamicDimIdx = 0;
   for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       staticProduct *= (dimSize + padValue);
       continue;
     }
@@ -510,7 +510,7 @@ Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
 
   size_t dynamicDimIdx = 0;
   for (int64_t dimSize : type.getShape()) {
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       staticProduct *= dimSize;
       continue;
     }
