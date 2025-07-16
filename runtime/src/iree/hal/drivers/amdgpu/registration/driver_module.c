@@ -34,6 +34,10 @@ IREE_FLAG(int64_t, amdgpu_device_block_pool_large_capacity, 0,
           "Initial large block pool block allocation count in blocks or 0 for "
           "the default.");
 
+IREE_FLAG(string, amdgpu_queue_placement, "any",
+          "Device queue placement: 'any' (best possible based on topology), "
+          "'host', or 'device'.");
+
 IREE_FLAG(bool, amdgpu_preallocate_pools, true,
           "Preallocates a reasonable number of resources in pools to reduce "
           "initial execution latency.");
@@ -104,6 +108,18 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   if (FLAG_amdgpu_device_block_pool_large_capacity) {
     device_options->device_block_pools.large.initial_capacity =
         FLAG_amdgpu_device_block_pool_large_capacity;
+  }
+
+  if (strcmp(FLAG_amdgpu_queue_placement, "any") == 0) {
+    device_options->queue_placement = IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY;
+  } else if (strcmp(FLAG_amdgpu_queue_placement, "host") == 0) {
+    device_options->queue_placement = IREE_HAL_AMDGPU_QUEUE_PLACEMENT_HOST;
+  } else if (strcmp(FLAG_amdgpu_queue_placement, "device") == 0) {
+    device_options->queue_placement = IREE_HAL_AMDGPU_QUEUE_PLACEMENT_DEVICE;
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized queue placement: '%s'",
+                            FLAG_amdgpu_queue_placement);
   }
 
   device_options->preallocate_pools = FLAG_amdgpu_preallocate_pools;
