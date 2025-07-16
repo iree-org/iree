@@ -138,7 +138,7 @@ def iree_runtime_cc_library(deps = [], **kwargs):
         **kwargs
     )
 
-def iree_runtime_cc_test(deps = [], **kwargs):
+def iree_runtime_cc_test(deps = [], group = None, **kwargs):
     """Used for cc_test targets within the //runtime tree.
 
     This is a pass-through to the native cc_test which adds specific

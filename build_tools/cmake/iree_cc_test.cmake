@@ -15,12 +15,13 @@
 #     Note: flag passing is only enforced through CTest, so manually running
 #     the test binaries (such as under a debugger) will _not_ pass any
 #     arguments without extra setup.
-# SRCS: List of source files for the binary
-# DATA: List of other targets and files required for this binary
-# DEPS: List of other libraries to be linked in to the binary targets
-# COPTS: List of private compile options
-# DEFINES: List of public defines
-# LINKOPTS: List of link options
+# SRCS: List of source files for the binary.
+# DATA: List of other targets and files required for this binary.
+# DEPS: List of other libraries to be linked in to the binary targets.
+# COPTS: List of private compile options.
+# DEFINES: List of public defines.
+# LINKOPTS: List of link options.
+# GROUP: Optional test group to add the target to.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 #
@@ -58,7 +59,7 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;TIMEOUT"
+    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;GROUP;TIMEOUT"
     ${ARGN}
   )
 
@@ -197,11 +198,21 @@ function(iree_cc_test)
 
   set_property(TEST ${_NAME_PATH} APPEND PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
 
-  if (NOT DEFINED _RULE_TIMEOUT)
+  if(NOT DEFINED _RULE_TIMEOUT)
     set(_RULE_TIMEOUT 60)
   endif()
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+
+  if(_RULE_GROUP)
+    if(NOT TARGET ${_RULE_GROUP})
+      add_custom_target(${_RULE_GROUP}
+        COMMENT
+          "Building IREE unit tests for ${_RULE_GROUP}"
+      )
+    endif()
+    add_dependencies(${_RULE_GROUP} "${_NAME}")
+  endif()
 endfunction()

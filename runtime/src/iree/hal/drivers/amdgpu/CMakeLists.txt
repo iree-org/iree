@@ -57,6 +57,8 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
+    iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::hal
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
@@ -124,6 +126,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -135,6 +139,8 @@ iree_cc_test(
     ::amdgpu
     ::headers
     iree::base
+    iree::hal
+    iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
@@ -143,6 +149,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -163,6 +171,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -182,6 +192,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

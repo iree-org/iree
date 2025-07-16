@@ -39,6 +39,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_test(
     name = "libhsa_test",
     srcs = ["libhsa_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
@@ -68,6 +69,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
@@ -121,6 +123,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_test(
     name = "bitmap_test",
     srcs = ["bitmap_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     deps = [
         ":util",
         "//runtime/src/iree/base",
@@ -132,6 +135,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "block_pool_test",
     srcs = ["block_pool_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
@@ -148,6 +152,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "device_library_test",
     srcs = ["device_library_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
@@ -164,6 +169,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "kfd_test",
     srcs = ["kfd_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
@@ -181,6 +187,7 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "vmem_test",
     srcs = ["vmem_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
