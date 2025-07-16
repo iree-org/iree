@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -191,8 +192,26 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   auto funcOp = getOperation();
   IRRewriter rewriter(funcOp);
 
+  // Returns true if the op has the lowering config and the lowering config has
+  // workgroup tiling level.
+  auto hasRootConfig = [](Operation *op) {
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+        getLoweringConfig(op);
+    return loweringConfig && loweringConfig.hasWorkgroupTilingLevel();
+  };
+
+  // TODO(#21297): Find the rootOp based on lowering configs directly. It is
+  // expected that at most one compute op has a workgroup tiling level after all
+  // pipelines switch to root op based tiling. The operation order may be
+  // changed by fusion order, which can lead to different result in
+  // `getRootOperation`.
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  FailureOr<Operation *> rootOp;
+  if (llvm::count_if(computeOps, hasRootConfig) != 1) {
+    rootOp = getRootOperation(computeOps);
+  } else {
+    rootOp = llvm::filter_to_vector(computeOps, hasRootConfig)[0];
+  }
   if (failed(rootOp) || !rootOp.value()) {
     LDBG("unable to find the root operation");
     return;
