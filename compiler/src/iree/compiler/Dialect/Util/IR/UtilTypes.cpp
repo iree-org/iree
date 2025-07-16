@@ -683,7 +683,7 @@ OpFoldResult findDim(Value workValue, int64_t dim) {
   int64_t rank = shapedType.getRank();
   assert(rank > dim && "querying out of range dim");
   int64_t staticSize = shapedType.getDimSize(dim);
-  if (!ShapedType::isDynamic(staticSize)) {
+  if (ShapedType::isStatic(staticSize)) {
     Builder b(workValue.getContext());
     return b.getIndexAttr(dim);
   }

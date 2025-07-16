@@ -297,7 +297,7 @@ struct MeshAllToAllToFlow
     }
 
     mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
-    assert(!ShapedType::isDynamicShape(mesh.getShape()));
+    assert(ShapedType::isStaticShape(mesh.getShape()));
     int64_t splitCount =
         mesh::collectiveProcessGroupSize(op.getMeshAxes(), mesh.getShape());
     // TODO: handle dynamic case.

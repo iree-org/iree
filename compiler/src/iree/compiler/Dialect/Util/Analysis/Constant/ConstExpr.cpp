@@ -416,7 +416,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
       for (int64_t dim : type.getShape()) {
         // Conservatively treat dynamic values as 1, to find a lower bound on
         // input size.
-        if (!ShapedType::isDynamic(dim)) {
+        if (ShapedType::isStatic(dim)) {
           elementCount *= dim;
         }
       }

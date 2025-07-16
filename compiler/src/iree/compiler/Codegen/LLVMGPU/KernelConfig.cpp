@@ -441,7 +441,7 @@ getVectorDistributeReductionConfig(
 
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(target) && !ShapedType::isDynamicShape(bounds) &&
+  if (isROCmBackend(target) && ShapedType::isStaticShape(bounds) &&
       isMatmulLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
@@ -1144,7 +1144,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> batchDims;
   for (int64_t batchDim : contractionDims->batch) {
-    if (!ShapedType::isDynamic(bounds[batchDim])) {
+    if (ShapedType::isStatic(bounds[batchDim])) {
       batchDims.push_back(batchDim);
     }
   }
@@ -1931,11 +1931,11 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
   for (auto mDim : contractionDims->m) {
     staticNonUnitParallelDimCount +=
-        bounds[mDim] != 1 && !ShapedType::isDynamic(bounds[mDim]);
+        bounds[mDim] != 1 && ShapedType::isStatic(bounds[mDim]);
   }
   for (auto nDim : contractionDims->n) {
     staticNonUnitParallelDimCount +=
-        bounds[nDim] != 1 && !ShapedType::isDynamic(bounds[nDim]);
+        bounds[nDim] != 1 && ShapedType::isStatic(bounds[nDim]);
   }
   if (staticNonUnitParallelDimCount <= 1)
     return failure();
@@ -2092,9 +2092,9 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       }
     }
   }
-  bool isStaticSize = !ShapedType::isDynamic(sizeM) &&
-                      !ShapedType::isDynamic(sizeN) &&
-                      !ShapedType::isDynamic(sizeK);
+  bool isStaticSize = ShapedType::isStatic(sizeM) &&
+                      ShapedType::isStatic(sizeN) &&
+                      ShapedType::isStatic(sizeK);
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(target, op)) {
@@ -2635,7 +2635,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(target) && !ShapedType::isDynamicShape(bounds) &&
+  if (isROCmBackend(target) && ShapedType::isStaticShape(bounds) &&
       isMatvecLike(op)) {
     int64_t parallelIdx = *llvm::find_if(
         parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });

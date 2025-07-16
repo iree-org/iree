@@ -527,7 +527,7 @@ SmallVector<unsigned> getOperandsToPad(Operation *op) {
       }
       continue;
     }
-    if (!ShapedType::isDynamic(parallelDimSize)) {
+    if (ShapedType::isStatic(parallelDimSize)) {
       if (ShapedType::isDynamic(dimSize)) {
         parallelDimSize = ShapedType::kDynamic;
         continue;
@@ -538,7 +538,7 @@ SmallVector<unsigned> getOperandsToPad(Operation *op) {
 
   // TODO(MaheshRavishankar): Make this command line controllable.
   static constexpr int64_t kSkinnyMatmulThreshold = 64;
-  if (!ShapedType::isDynamic(parallelDimSize) &&
+  if (ShapedType::isStatic(parallelDimSize) &&
       parallelDimSize < kSkinnyMatmulThreshold) {
     // This matmul is skinny, do not pad.
     return {};
