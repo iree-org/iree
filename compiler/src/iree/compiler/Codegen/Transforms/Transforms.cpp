@@ -193,7 +193,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
     int index = 0;
     for (auto dimSize : allocLikeType.getShape()) {
-      if (!ShapedType::isDynamic(dimSize)) {
+      if (ShapedType::isStatic(dimSize)) {
         auto dimSizeAttr = builder.getIndexAttr(dimSize);
         allocSizes.push_back(dimSizeAttr);
         subviewSizes.push_back(dimSizeAttr);

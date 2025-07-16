@@ -1193,7 +1193,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
 
   int64_t parallelSize = 1;
   for (int64_t dim : parallelDims) {
-    if (!ShapedType::isDynamic(bounds[dim]))
+    if (ShapedType::isStatic(bounds[dim]))
       parallelSize *= bounds[dim];
   }
   // Total parallel size that can fill the GPU with enough workgorups.
