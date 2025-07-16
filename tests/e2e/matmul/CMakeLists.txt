@@ -1534,6 +1534,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1563,6 +1564,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1592,6 +1594,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1618,9 +1621,11 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-opt-data-tiling"
+    "--iree-opt-data-tiling=false"
     "--iree-hip-enable-ukernels=multi_mma"
+    "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1650,6 +1655,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1679,6 +1685,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1708,6 +1715,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
@@ -1738,6 +1746,7 @@ iree_generated_e2e_runner_test(
     "--iree-dispatch-creation-experimental-data-tiling"
     "--iree-input-demote-f64-to-f32=false"
     "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
     "nomsan"
