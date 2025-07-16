@@ -138,7 +138,7 @@ static void updateTensorDimInfo(
   auto resultType = cast<RankedTensorType>(result.getType());
   int dimOperandIndex = 0;
   for (auto [index, shape] : llvm::enumerate(resultType.getShape())) {
-    if (!ShapedType::isDynamic(shape))
+    if (ShapedType::isStatic(shape))
       continue;
     updateTensorDimInfo(result, index, dimOperands[dimOperandIndex++], solver,
                         divisibilityInfo, rangeInfo);

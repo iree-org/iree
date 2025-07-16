@@ -62,10 +62,10 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   int64_t nSize = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
 
   MatmulNarrowDim narrowM, narrowN;
-  if (!ShapedType::isDynamic(mSize) && mSize < narrowThreshold) {
+  if (ShapedType::isStatic(mSize) && mSize < narrowThreshold) {
     narrowM = {/*dim=*/MatmulNarrowDim::Dim::M, /*size=*/mSize};
   }
-  if (!ShapedType::isDynamic(nSize) && nSize < narrowThreshold) {
+  if (ShapedType::isStatic(nSize) && nSize < narrowThreshold) {
     narrowN = {/*dim=*/MatmulNarrowDim::Dim::N, /*size=*/nSize};
   }
 

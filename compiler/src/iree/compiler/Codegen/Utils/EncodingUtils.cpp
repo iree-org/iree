@@ -52,7 +52,7 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo) {
   ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
-  if (!ShapedType::isDynamicShape(staticTileSizes)) {
+  if (ShapedType::isStaticShape(staticTileSizes)) {
     return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
   }
 

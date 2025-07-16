@@ -960,7 +960,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
   SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, size, iterType] :
        llvm::enumerate(staticLoopRanges, op.getIteratorTypesArray())) {
-    if (!ShapedType::isDynamic(size))
+    if (ShapedType::isStatic(size))
       continue;
     vecTileSizes[index] = 1;
   }
@@ -2652,7 +2652,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
   DistributionHeuristicConfig distConfig;
   distConfig.vectorSizeHints.append(numLoops, 1);
-  if (!ShapedType::isDynamic(ubs.back())) {
+  if (ShapedType::isStatic(ubs.back())) {
     distConfig.vectorSizeHints.back() = std::min(typeVectorSize, ubs.back());
   }
 

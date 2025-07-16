@@ -109,7 +109,7 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
       // TODO(#11633): Dynamic dimensions are currently assumed to be row-major.
       product_of_inner_sizes = ShapedType::kDynamic;
     } else {
-      if (!ShapedType::isDynamic(product_of_inner_sizes)) {
+      if (ShapedType::isStatic(product_of_inner_sizes)) {
         product_of_inner_sizes *= sizes[i];
       }
     }

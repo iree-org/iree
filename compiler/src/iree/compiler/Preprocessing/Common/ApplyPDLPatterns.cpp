@@ -323,7 +323,7 @@ createFlowDispatchOp(PatternRewriter &rewriter, SymbolRefAttr exportOp,
       continue;
 
     for (auto [index, shape] : llvm::enumerate(tensorType.getShape())) {
-      if (!ShapedType::isDynamic(shape))
+      if (ShapedType::isStatic(shape))
         continue;
 
       Value dim = rewriter.create<tensor::DimOp>(loc, operand, index);

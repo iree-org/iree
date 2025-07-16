@@ -178,7 +178,7 @@ static void specializeExportedFunction(
       int64_t valueUmin = 0;
       int64_t valueUmax = INT64_MAX;
       int64_t valueUdiv = 1;
-      if (!ShapedType::isDynamic(assumedSize.staticSize)) {
+      if (ShapedType::isStatic(assumedSize.staticSize)) {
         valueUmin = assumedSize.staticSize;
         valueUmax = assumedSize.staticSize;
         valueUdiv = assumedSize.staticSize;
@@ -292,7 +292,7 @@ static void specializeExportedFunction(
 
       for (auto [range, assumedSize] :
            llvm::zip(specializationRange, workloadMapping)) {
-        if (!ShapedType::isDynamic(assumedSize.staticSize)) {
+        if (ShapedType::isStatic(assumedSize.staticSize)) {
           continue;
         }
 

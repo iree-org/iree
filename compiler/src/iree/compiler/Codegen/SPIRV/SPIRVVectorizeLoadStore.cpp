@@ -580,7 +580,7 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   MemRefLayoutAttrInterface layout = {};
   if (auto stridedLayout = dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
-    if (!ShapedType::isDynamic(offset)) {
+    if (ShapedType::isStatic(offset)) {
       offset = offset / ratio;
     }
 
@@ -653,7 +653,7 @@ public:
 
     // This should be guaranteed by the analysis step. But just double check.
     assert(memrefType.getRank() > 0 &&
-           !ShapedType::isDynamic(memrefType.getShape().back()));
+           ShapedType::isStatic(memrefType.getShape().back()));
 
     auto vecMemRef = getVectorizedMemRefType(rewriter, subspanOp.getResult());
     if (!vecMemRef) {

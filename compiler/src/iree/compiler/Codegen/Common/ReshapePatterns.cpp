@@ -680,7 +680,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
       // In case of a single dynamic dimension, check that the subspan size is
       // dynamic as well.
       if (numDynamicDims == 1) {
-        if (!ShapedType::isDynamic(subspanSize)) {
+        if (ShapedType::isStatic(subspanSize)) {
           return rewriter.notifyMatchFailure(
               subspanOp, "collapsing and storing with dynamic dimension into a "
                          "static dimension is not supported");

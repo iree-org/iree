@@ -1694,7 +1694,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
                           .getShape()[firstOperandDim];
     bool dimScalable = false;
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       result.vectorSizes.push_back(dimSize);
       result.vectorScalableFlags.push_back(dimScalable);
       LDBG("Inferred iteration size '" << dimSize << "' for dimension '" << dim

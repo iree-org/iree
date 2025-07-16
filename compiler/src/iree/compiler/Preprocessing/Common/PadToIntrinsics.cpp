@@ -365,8 +365,8 @@ static void padContractionLikeOp(
   int64_t kSize = bounds[kDim];
 
   // Bail out on matvec-like/skinny matmul cases.
-  if ((!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
-      (!ShapedType::isDynamic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
+  if ((ShapedType::isStatic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
+      (ShapedType::isStatic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
     return;
   }
 

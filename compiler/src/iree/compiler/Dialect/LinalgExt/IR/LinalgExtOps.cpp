@@ -817,8 +817,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip_equal(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
+                     return ShapedType::isStatic(std::get<0>(s)) &&
+                            ShapedType::isStatic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/accumulator shapes");
@@ -832,8 +832,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
+                     return ShapedType::isStatic(std::get<0>(s)) &&
+                            ShapedType::isStatic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -1327,7 +1327,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   // use dispatchIndexOpFoldResults on the result, and rely on exact number of
   // dynamic dims returned by that.
   for (unsigned i = 0; i < resultDims.size(); ++i) {
-    if (!ShapedType::isDynamic(resultTypeShape[i])) {
+    if (ShapedType::isStatic(resultTypeShape[i])) {
       continue;
     }
     resultDims[i] =

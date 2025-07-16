@@ -206,7 +206,7 @@ struct PropagateConstantAddsThroughLinearize final
     // Repeat one more time if the basis has one fewer entry than number of
     // indices.
     if (indexCount != op.getStaticBasis().size() &&
-        !ShapedType::isDynamic(runningElementCount)) {
+        ShapedType::isStatic(runningElementCount)) {
       OpOperand &operand = op.getMultiIndexMutable()[0];
       matchConstantAndReplaceOperand(operand);
     }
@@ -260,8 +260,7 @@ struct FoldDivisibleConstantMulsIntoLinearize final
     // Iterate the static basis in reverse and accumulate the constant offset
     // to add.
     for (auto [i, size] : llvm::enumerate(llvm::reverse(op.getStaticBasis()))) {
-      assert(!ShapedType::isDynamic(size) &&
-             "unexpected dynamic basis element");
+      assert(ShapedType::isStatic(size) && "unexpected dynamic basis element");
       Value operand = op.getMultiIndex()[indexCount - i - 1];
       std::optional<int64_t> coefficient =
           getValueConstantRhs<arith::MulIOp>(operand, /*nsw=*/true);
