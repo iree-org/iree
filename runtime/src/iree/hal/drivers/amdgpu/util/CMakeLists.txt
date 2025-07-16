@@ -41,6 +41,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_library(
@@ -70,6 +72,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_library(
@@ -113,6 +117,8 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -129,6 +135,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -145,6 +153,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -162,6 +172,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -179,6 +191,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
