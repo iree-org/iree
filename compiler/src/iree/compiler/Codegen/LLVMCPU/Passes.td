@@ -132,9 +132,13 @@ def LLVMCPUSynchronizeSymbolVisibilityPass :
 def LLVMCPUTilePass :
     InterfacePass<"iree-llvmcpu-tile", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile TilingInterface operations.";
+  let description = [{
+    Walk through all the TilingInterface operations and apply the tiling, if the
+    given level is found in the operation's lowering config.
+  }];
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
+      "Tiling level used to retrieve the configuration from lowering_config">
   ];
 }
 

@@ -1855,9 +1855,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
 
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
-  TileSizesListType tileSizesList = {distTileSizes, vecTileSizes};
+  LoweringConfigGenerator generator(op);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizesList,
+      entryPointFn, op, loweringConfig,
       DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
       /*subgroupSize=*/{}, pipelineConfig);
 }
@@ -1878,9 +1882,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
   }
 
-  SmallVector<int64_t> tileSizes(op.getDestRank(), 1);
+  SmallVector<int64_t> vecTileSizes(op.getDestRank(), 1);
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
+    vecTileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
   }
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
@@ -1893,10 +1897,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
-
-  TileSizesListType tileSizesList = {distTileSizes, tileSizes};
+  LoweringConfigGenerator generator(op);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizesList,
+      entryPointFn, op, loweringConfig,
       DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
       /*subgroupSize=*/{}, pipelineConfig);
 }

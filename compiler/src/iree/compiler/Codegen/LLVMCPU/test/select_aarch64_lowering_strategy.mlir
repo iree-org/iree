@@ -259,7 +259,7 @@ func.func @pack() attributes {hal.executable.target = #executable_target_system_
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 48, 8, 1], strides = [1, 1, 1, 1] : tensor<4x48x8x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 16], vector_common_parallel = [1, 1], vector_reduction = [0, 0]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling, {enable_decomposition}>
 //       CHECK: func.func @pack()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -292,7 +292,7 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
   iree_tensor_ext.dispatch.tensor.store %unpack, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [32, 16]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [32, 16], vector_reduction = [0, 0]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling, {enable_decomposition}>
 //       CHECK: func.func @unpack_outer_dynamic()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -326,7 +326,7 @@ func.func @unpack_fully_dynamic() attributes {hal.executable.target = #executabl
   iree_tensor_ext.dispatch.tensor.store %unpack, %13, offsets = [0, 0], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xi32>>{%8, %9}
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 1]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [1, 1], vector_reduction = [0, 0]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling>
 //       CHECK: func.func @unpack_fully_dynamic()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]

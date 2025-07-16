@@ -57,13 +57,6 @@ void LLVMCPUTilePass::runOnOperation() {
   auto funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
-      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
-  if (failed(rootLoweringConfig)) {
-    LDBG("can't find lowering_config, skip tiling");
-    return;
-  }
-
   for (auto computeOp : computeOps) {
     auto op = dyn_cast<TilingInterface>(computeOp);
     if (!op || op.getLoopIteratorTypes().empty())
@@ -76,19 +69,21 @@ void LLVMCPUTilePass::runOnOperation() {
     if (isa<tensor::PadOp>(computeOp))
       continue;
 
-    LDBG("candidate: " << op);
-    SmallVector<int64_t> tileSizes;
-    SmallVector<bool> tileScalableFlags;
-    if (auto loweringConfig =
-            getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op)) {
-      tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
-      tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
-    } else {
-      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
-      tileScalableFlags =
-          rootLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
+    IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+        getLoweringConfig(op);
+    if (!maybeLoweringConfig) {
+      LDBG("can't find lowering_config, skip tiling");
+      continue;
     }
 
+    LDBG("candidate: " << op);
+    auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        getLoweringConfig(op).getTilingLevelAttr(tilingLevel));
+    SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
+    SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
+    scf::SCFTilingOptions tilingOptions;
+    setSCFTileSizes(tilingOptions, op, std::move(tileSizes),
+                    std::move(tileScalableFlags));
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
       LDBG("tiling sizes are all zeros, skip tiling");
       continue;
