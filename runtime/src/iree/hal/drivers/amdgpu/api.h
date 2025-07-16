@@ -22,6 +22,22 @@ extern "C" {
 // iree_hal_amdgpu_logical_device_t
 //===----------------------------------------------------------------------===//
 
+// Controls where the queue operates.
+typedef enum iree_hal_amdgpu_queue_placement_e {
+  // Automatically select where to place the queue based on whether the target
+  // CPU/GPU agent pair supports device placement requirements.
+  IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY = 0,
+  // Queue executes entirely on the host via iree_hal_amdgpu_host_queue_t.
+  // This introduces additional latency on all queue operations but can operate
+  // on systems without host/device atomics (PCIe atomics, xGMI, etc). It is
+  // also useful for debugging.
+  IREE_HAL_AMDGPU_QUEUE_PLACEMENT_HOST,
+  // Queue executes entirely on the device via iree_hal_amdgpu_device_queue_t.
+  // A scheduler kernel handles all queue entry processing without host
+  // involvement.
+  IREE_HAL_AMDGPU_QUEUE_PLACEMENT_DEVICE,
+} iree_hal_amdgpu_queue_placement_t;
+
 // Parameters configuring an iree_hal_amdgpu_logical_device_t.
 // Must be initialized with iree_hal_amdgpu_logical_device_options_initialize
 // prior to use.
@@ -53,6 +69,14 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
       iree_host_size_t initial_capacity;
     } large;
   } device_block_pools;
+
+  // Controls where queues are placed.
+  // Defaults to IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY and selects the optimal
+  // placement based on queried agent properties. If a placement is explicitly
+  // specified all physical devices will use that placement and if any do not
+  // support it initialization will fail (useful for forcing host placement
+  // during debugging/testing).
+  iree_hal_amdgpu_queue_placement_t queue_placement;
 
   // Preallocates a reasonable number of resources in pools to reduce initial
   // execution latency.

@@ -80,6 +80,7 @@ iree_cc_library(
     "bitmap.h"
     "block_pool.h"
     "device_library.h"
+    "error_callback.h"
     "info.h"
     "kfd.h"
     "vmem.h"
