@@ -9,7 +9,6 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/amdgpu/util/info.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 #ifdef __cplusplus

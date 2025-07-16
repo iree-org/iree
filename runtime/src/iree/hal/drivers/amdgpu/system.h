@@ -13,6 +13,10 @@
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_system_t
 //===----------------------------------------------------------------------===//
@@ -82,7 +86,8 @@ typedef struct iree_hal_amdgpu_system_t {
 
 // Allocates a system in |out_system| with the given |topology|.
 // The provided |libhsa| and |topology| will be copied and a reference to the
-// HSA library will be retained for the lifetime of the system.
+// HSA library will be retained for the lifetime of the system. Assumes that
+// |topology| has been verified as valid.
 iree_status_t iree_hal_amdgpu_system_allocate(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
@@ -91,5 +96,9 @@ iree_status_t iree_hal_amdgpu_system_allocate(
 
 // Frees |system| and releases any held resources.
 void iree_hal_amdgpu_system_free(iree_hal_amdgpu_system_t* system);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_SYSTEM_H_
