@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -41,6 +42,7 @@ iree_check_single_backend_test_suite(
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -70,6 +72,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "conv2d.mlir"
     "narrow_n_matmuls.mlir"
+    "softmax.mlir"
     "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
@@ -113,6 +116,7 @@ iree_check_single_backend_test_suite(
     "large_linalg_matmul.mlir"
     "narrow_n_matmuls.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -133,6 +137,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "unpack.mlir"
   TARGET_BACKEND
     "rocm"
