@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/amdgpu/host_service.h"
 
+#include <thread>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/device/host_client.h"
