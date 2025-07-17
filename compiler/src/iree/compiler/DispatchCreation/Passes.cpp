@@ -54,11 +54,6 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-    clEnableFuseMultiUse("iree-dispatch-creation-fuse-multi-use",
-                         llvm::cl::desc("Fuse multi-use ops."),
-                         llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-dispatch-creation-experimental-data-tiling",
     llvm::cl::desc("Enable data-tiling at flow level, i.e., it sets encodings "
@@ -116,7 +111,9 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
+static void addDispatchRegionCreationPreprocessingPasses(
+    OpPassManager &passManager,
+    const DispatchCreationOptions &dispatchOptions) {
   // 1. Do some simple elementwise op fusion. This could be skipped,
   //    but could reduce the surface area of ops to handle later.
   FunctionLikeNest(passManager)
@@ -161,7 +158,11 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       // 5. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
-      .addPass(DispatchCreation::createFuseMultiUseElementwiseProducerPass)
+      .addPredicatedPass(dispatchOptions.enableFuseMultiUse,
+                         [&]() {
+                           return DispatchCreation::
+                               createFuseMultiUseElementwiseProducerPass();
+                         })
 
       // 6. Some more "post elementwise fusion passes".
       //    a. Detensorize.
@@ -312,7 +313,8 @@ void buildDispatchCreationPassPipeline(
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
-  addDispatchRegionCreationPreprocessingPasses(passManager);
+  addDispatchRegionCreationPreprocessingPasses(passManager,
+                                               transformOptions.options);
   addDispatchRegionCreationPasses(passManager, transformOptions.options);
 
   FunctionLikeNest(passManager)
@@ -363,13 +365,16 @@ void registerDispatchCreationPipelines() {
         buildDispatchCreationPassPipeline(passManager, transformOptions);
       });
 
-  PassPipelineRegistration<> dispatchCreationPreprocessingPipeline(
-      "iree-dispatch-creation-preprocessing-pipeline",
-      "Flag used to run preprocessing passes that run passes before dispatch "
-      "region formation. Used only for testing",
-      [](OpPassManager &passManager) {
-        addDispatchRegionCreationPreprocessingPasses(passManager);
-      });
+  PassPipelineRegistration<TransformOptions>
+      dispatchCreationPreprocessingPipeline(
+          "iree-dispatch-creation-preprocessing-pipeline",
+          "Flag used to run preprocessing passes that run passes before "
+          "dispatch region formation. Used only for testing",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            addDispatchRegionCreationPreprocessingPasses(
+                passManager, transformOptions.options);
+          });
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation
