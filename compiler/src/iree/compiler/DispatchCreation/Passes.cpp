@@ -369,8 +369,7 @@ void registerDispatchCreationPipelines() {
       dispatchCreationPreprocessingPipeline(
           "iree-dispatch-creation-preprocessing-pipeline",
           "Flag used to run preprocessing passes that run passes before "
-          "dispatch "
-          "region formation. Used only for testing",
+          "dispatch region formation. Used only for testing",
           [](OpPassManager &passManager,
              const TransformOptions &transformOptions) {
             addDispatchRegionCreationPreprocessingPasses(
