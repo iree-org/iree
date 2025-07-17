@@ -282,16 +282,19 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
 
 // Helper method to check if a slice will be contiguous given the offset,
 // slice size. This checks that `inputSize` and `offset` are both evenly
-// divisible by `tileSize`.
+// divisible by `tileSize` when these sizes are static. For dynamic `inputSize`
+// or `offset`, the divisibility check is skipped if the slice is padded.
 static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
-                                  OpFoldResult offset) {
+                                  OpFoldResult offset, bool fusiblePad) {
   auto constInputSize = getConstantIntValue(inputSize);
+  auto constOffset = getConstantIntValue(offset);
+  if (fusiblePad && !(constInputSize.has_value() && constOffset.has_value()))
+    return true;
   auto constTileSize = getConstantIntValue(tileSize);
   if (!constTileSize.has_value() || !constInputSize.has_value() ||
       constInputSize.value() % constTileSize.value() != 0) {
     return false;
   }
-  auto constOffset = getConstantIntValue(offset);
   if (constOffset.has_value() &&
       constOffset.value() % constTileSize.value() == 0) {
     return true;
@@ -299,6 +302,14 @@ static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
   auto affineOp = cast<Value>(offset).getDefiningOp<affine::AffineApplyOp>();
   return affineOp &&
          affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
+}
+
+// Returns true if the the given `attrOrValue` is a constant zero.
+static bool isZero(OpFoldResult attrOrValue) {
+  if (std::optional<int64_t> val = getConstantIntValue(attrOrValue)) {
+    return val.value() == 0;
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -673,6 +684,49 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   OpFoldResult mOffset = linearizeIndex(getMixedMOffset(), getMixedMStrides());
   OpFoldResult kOffset = linearizeIndex(getMixedKOffset(), getMixedKStrides());
 
+  // Check if the im2col input tensor has the single batch dim at last.
+  int64_t inputRank = getInputRank();
+  int64_t outputRank = getOutputRank();
+  int64_t inputInnerDim = inputRank - 1;
+  int64_t outputInnerDim = outputRank - 1;
+  bool singleBatchDimInnermost =
+      getBatchPos().size() == 1 && getBatchPos().front() == inputInnerDim;
+
+  // Check if the im2col op is used by a tensor.pad op.
+  tensor::PadOp padOp;
+  for (OpOperand &use : getResults().getUses()) {
+    if (auto pad = dyn_cast<tensor::PadOp>(use.getOwner())) {
+      padOp = pad;
+      break;
+    }
+  }
+
+  // Check if there is padding along the contigous dimension, if so the pad op
+  // can be fused inside the loops.
+  bool fusiblePad = false;
+  SmallVector<int64_t> paddedShape;
+  OpFoldResult origHighPad;
+  if (padOp) {
+    auto paddedType = dyn_cast<RankedTensorType>(padOp.getResult().getType());
+    if (!paddedType || !paddedType.hasStaticShape()) {
+      return emitOpError("expected static result shape on the pad op");
+    }
+
+    paddedShape = llvm::to_vector(paddedType.getShape());
+    SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();
+    // When the `batch` dimension is contiguous, padding is along the first
+    // dimension of the im2col output.
+    int64_t idx = singleBatchDimInnermost ? 0 : outputInnerDim;
+
+    // Here the assumption is that the padding for the innermost dim is only on
+    // the high end based on the implementation of GPUPadOperandsPass.
+    if (!isZero(highPads[idx])) {
+      fusiblePad = true;
+      origHighPad = highPads[idx];
+    }
+  }
+
   // Step 1: Tile the im2col op to loops with contiguous slices in the
   // innermost loop.
   //
@@ -681,18 +735,21 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // larger contiguous slice. Note that if the im2col input tensor has the batch
   // dim at last, im2col output tensor has an implicit transpose to move the
   // batch dim in front, and tiling should be along the batch dim.
-  SmallVector<Range> iterationDomain(getIterationDomain(b));
-  unsigned innerDim = getInputRank() - 1;
   // Currently only a single batch dim is supported for tiling along batch dim.
   // TODO: generalize to support multi-batch dimensions.
-  bool singleBatchDimInnermost =
-      getBatchPos().size() == 1 && getBatchPos().front() == innerDim;
-  OpFoldResult innerInputTileSize = singleBatchDimInnermost
-                                        ? iterationDomain.front().size
-                                        : iterationDomain.back().size;
-  auto constTileSize = getConstantIntValue(innerInputTileSize);
-  if (constTileSize) {
-    innerInputTileSize = b.getIndexAttr(constTileSize.value());
+  SmallVector<Range> iterationDomain(getIterationDomain(b));
+  OpFoldResult innerInputTileSize;
+  if (fusiblePad) {
+    int64_t paddedSize =
+        singleBatchDimInnermost ? paddedShape.front() : paddedShape.back();
+    innerInputTileSize = b.getIndexAttr(paddedSize);
+  } else {
+    innerInputTileSize = singleBatchDimInnermost ? iterationDomain.front().size
+                                                 : iterationDomain.back().size;
+    auto constTileSize = getConstantIntValue(innerInputTileSize);
+    if (constTileSize) {
+      innerInputTileSize = b.getIndexAttr(constTileSize.value());
+    }
   }
 
   SmallVector<OpFoldResult> inputSizes =
@@ -719,18 +776,29 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
 
   // Check if the input slice is contiguous along the innermost dimension.
   bool contiguousAlongK =
-      getKPos().back() == innerDim &&
-      willBeContiguousSlice(innerSliceSize, innerInputTileSize, kOffset);
+      getKPos().back() == inputInnerDim &&
+      willBeContiguousSlice(innerSliceSize, innerInputTileSize, kOffset,
+                            fusiblePad);
   bool contiguousAlongB =
       singleBatchDimInnermost &&
       willBeContiguousSlice(innerSliceSize, innerInputTileSize,
-                            /*offset=*/b.getIndexAttr(0));
+                            /*offset=*/b.getIndexAttr(0), fusiblePad);
   if (contiguousAlongK) {
     iterationDomain.pop_back();
   } else if (contiguousAlongB) {
     iterationDomain.erase(iterationDomain.begin());
   } else {
     innerInputTileSize = b.getIndexAttr(1);
+  }
+
+  // For padding cases, use `paddedShape` as the static output for scf.for loop
+  // nest.
+  Value outputInitTensor = getOutput();
+  ShapedType outputType = getOutputType();
+  Type elementType = outputType.getElementType();
+  if (fusiblePad) {
+    outputInitTensor =
+        b.create<tensor::EmptyOp>(loc, paddedShape, elementType).getResult();
   }
 
   // Build loop nest.
@@ -741,7 +809,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     steps.push_back(getValueOrCreateConstantIndexOp(b, loc, range.stride));
   }
   scf::LoopNest loopNest = scf::buildLoopNest(
-      b, loc, lbs, ubs, steps, getOutput(),
+      b, loc, lbs, ubs, steps, outputInitTensor,
       [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
           ValueRange iterArgs) -> scf::ValueVector { return iterArgs; });
   SmallVector<Value> ivs;
@@ -895,6 +963,22 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     }
   }
 
+  // For padding cases, calculate the dynamic slice size.
+  if (fusiblePad) {
+    // Create `affine.min` between innerTileSize and (innerTileSize -
+    // origHighPad).
+    AffineExpr d0, d1;
+    bindDims(b.getContext(), d0, d1);
+    AffineMap map = AffineMap::get(/*dimCount=*/2, /*symbolCount=*/0,
+                                   {d0 - d1, d0}, b.getContext());
+    Value innerTileSizeVal =
+        getValueOrCreateConstantIndexOp(b, loc, innerInputTileSize);
+    Value origHighPadVal = getValueOrCreateConstantIndexOp(b, loc, origHighPad);
+    Value size = b.create<affine::AffineMinOp>(
+        loc, map, ValueRange{innerTileSizeVal, origHighPadVal});
+    sliceSizes[outputInnerDim] = size;
+  }
+
   // Step 3. Decompose the im2col op into:
   // ```
   // %extract = tensor.extract_slice %input
@@ -903,9 +987,6 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // ```
   //
   // Extract a slice from the input tensor.
-  ShapedType outputType = getOutputType();
-  int64_t inputRank = getInputRank();
-  int64_t outputRank = getOutputRank();
 
   // For now, only extract a 1D slice when the batch dimension corresponds to a
   // contiguous slice and produces a rank reduced/expanded result.
@@ -926,9 +1007,29 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   SmallVector<Value> tileSizeDynamic;
   dispatchIndexOpFoldResults(inputTileSizes, tileSizeDynamic, tileSizeStatic);
   auto extractType = cast<RankedTensorType>(outputType.clone(tileSizeStatic));
-  auto extract =
+  RankedTensorType newPaddedType = extractType;
+  if (fusiblePad) {
+    tileSizeStatic[outputInnerDim] = ShapedType::kDynamic;
+    extractType = RankedTensorType::get(tileSizeStatic, elementType);
+  }
+
+  Value extractSlice =
       b.create<tensor::ExtractSliceOp>(nestedLoc, extractType, inputSlice,
                                        sliceOffsets, sliceSizes, sliceStrides);
+
+  // Create new pad op based on the output of the `extractSlice`.
+  Value paddedSlice = extractSlice;
+  if (fusiblePad) {
+    SmallVector<OpFoldResult> newHighPads(inputRank, b.getIndexAttr(0));
+    newHighPads[outputInnerDim] = origHighPad;
+    auto newPadOp =
+        b.create<tensor::PadOp>(nestedLoc, newPaddedType, extractSlice,
+                                padOp.getMixedLowPad(), newHighPads);
+
+    IRMapping mapping;
+    padOp.getRegion().cloneInto(&newPadOp.getRegion(), mapping);
+    paddedSlice = newPadOp.getResult();
+  }
 
   // Insert the slice into the destination tensor.
   sliceOffsets = SmallVector<OpFoldResult>(outputRank, zero);
@@ -954,13 +1055,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     transposePerm.append(getBatchPos().begin(), getBatchPos().end());
     transposePerm.append(getMPos().begin(), getMPos().end());
     transposePerm.append(getKPos().begin(), getKPos().end());
-    ArrayRef<int64_t> extractShape = extractType.getShape();
+    ArrayRef<int64_t> extractShape = newPaddedType.getShape();
     SmallVector<int64_t> emptyShape =
         applyPermutation(extractShape, transposePerm);
-    auto empty = b.create<tensor::EmptyOp>(nestedLoc, emptyShape,
-                                           outputType.getElementType());
-    auto transposeOp =
-        b.create<linalg::TransposeOp>(nestedLoc, extract, empty, transposePerm);
+    auto empty = b.create<tensor::EmptyOp>(nestedLoc, emptyShape, elementType);
+    auto transposeOp = b.create<linalg::TransposeOp>(nestedLoc, paddedSlice,
+                                                     empty, transposePerm);
     inputForInsert = transposeOp->getResult(0);
   } else {
     // Insert a `linalg.copy` so there is something to vectorize in the
@@ -969,10 +1069,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     // This memref.copy could be vectorized after bufferization, but it is
     // probably better to vectorize during generic vectorization.
     Value copyDest = b.create<tensor::ExtractSliceOp>(
-        nestedLoc, extractType, loopNest.loops.back().getRegionIterArg(0),
+        nestedLoc, newPaddedType, loopNest.loops.back().getRegionIterArg(0),
         sliceOffsets, sliceSizes, sliceStrides);
     auto copiedSlice =
-        b.create<linalg::CopyOp>(nestedLoc, extract.getResult(), copyDest);
+        b.create<linalg::CopyOp>(nestedLoc, paddedSlice, copyDest);
     inputForInsert = copiedSlice.getResult(0);
   }
 
