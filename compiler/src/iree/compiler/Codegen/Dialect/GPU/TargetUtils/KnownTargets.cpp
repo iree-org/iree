@@ -379,16 +379,16 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // --- CDNA --- //
 
+  // "AMD CDNA 4 COMPUTE" in Page 5 of
+  // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-4-architecture-whitepaper.pdf
+  static const ChipDetails mi350xChip = {256, "mi350x"};
+
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
   static const ChipDetails mi300xChip = {304, "mi300x"};
   static const ChipDetails mi300aChip = {228, "mi300a"};
   static const ChipDetails mi308xChip = {80, "mi308x"};
   static const ChipDetails mi325xChip = {304, "mi325x"};
-
-  // "AMD CDNA 4 COMPUTE" in Page 5 of
-  // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-4-architecture-whitepaper.pdf
-  static const ChipDetails mi350xChip = {256, "mi350x"};
 
   // "AMD Instinct MI200 Series Accelerator Product Offerings" in Page 14 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna2-white-paper.pdf
