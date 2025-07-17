@@ -117,8 +117,7 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   });
 
   for (TilingInterface tilingOp : computeOps) {
-    auto loweringConfigAttr =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(tilingOp);
+    auto loweringConfigAttr = getLoweringConfig(tilingOp);
     if (!loweringConfigAttr)
       continue;
 

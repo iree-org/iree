@@ -30,19 +30,17 @@ func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_support
   iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x512xi32>>
   return
 }
-
 // CHECK-LABEL: func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_supported()
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             scf.for
-// CHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:                 arith.addi
-// CHECK:                 scf.yield %{{.*}} : vector<4xi32>
-// CHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
-// CHECK:             arith.addi %{{.+}}, %{{.+}} : vector<4xi32>
+// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:               arith.addi
+// CHECK:               scf.yield %{{.*}} : vector<4xi32>
+// CHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
+// CHECK:           arith.addi %{{.+}}, %{{.+}} : vector<4xi32>
 
 // -----
 
