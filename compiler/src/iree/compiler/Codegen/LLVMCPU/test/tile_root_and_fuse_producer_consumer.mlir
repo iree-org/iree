@@ -180,6 +180,68 @@ func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -
 
 // -----
 
+// The test case demonstrates that the rootOp can mismatch the result of
+// `getRootOperation()` method. It prioritizes the operation that has workgroup
+// tiling level, if only one op has such config.
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 4]>
+#config1 = #iree_cpu.lowering_config<vector_common_parallel = [1, 4, 0]>
+#config2 = #iree_cpu.lowering_config<distribution = [10, 32, 0], vector_common_parallel = [1, 4, 0]>
+#config3 = #iree_cpu.lowering_config<vector_common_parallel = [1, 4, 0]>
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @reordered_softmax(%arg0: tensor<1x8x4096xf32>, %arg1: tensor<1x8x4096xf32>, %arg2: tensor<1x8x4096xf32>, %arg3: tensor<1x8x4096xf32>, %arg4: tensor<1x8x4096xf32>) -> tensor<1x8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 0xFFC00000 : f32
+  %0 = tensor.empty() : tensor<1x8xf32>
+  %1 = linalg.fill {lowering_config = #config} ins(%cst_0 : f32) outs(%0 : tensor<1x8xf32>) -> tensor<1x8xf32>
+  %2 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg1 : tensor<1x8x4096xf32>) outs(%1 : tensor<1x8xf32>) attrs =  {lowering_config = #config1} {
+  ^bb0(%in: f32, %out: f32):
+    %7 = arith.maxnumf %in, %out : f32
+    linalg.yield %7 : f32
+  } -> tensor<1x8xf32>
+  %3 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%0 : tensor<1x8xf32>) -> tensor<1x8xf32>
+  %4 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %2 : tensor<1x8x4096xf32>, tensor<1x8xf32>) outs(%3 : tensor<1x8xf32>) attrs =  {lowering_config = #config2} {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %7 = arith.subf %in, %in_1 : f32
+    %8 = math.exp %7 : f32
+    %9 = arith.addf %8, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<1x8xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg2 : tensor<1x8x4096xf32>) outs(%1 : tensor<1x8xf32>) attrs =  {lowering_config = #config1} {
+  ^bb0(%in: f32, %out: f32):
+    %7 = arith.maxnumf %in, %out : f32
+    linalg.yield %7 : f32
+  } -> tensor<1x8xf32>
+  %6 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg3, %5, %4 : tensor<1x8x4096xf32>, tensor<1x8xf32>, tensor<1x8xf32>) outs(%arg4 : tensor<1x8x4096xf32>) attrs =  {lowering_config = #config3} {
+  ^bb0(%in: f32, %in_1: f32, %in_2: f32, %out: f32):
+    %7 = arith.subf %in, %in_1 : f32
+    %8 = math.exp %7 : f32
+    %9 = arith.divf %8, %in_2 : f32
+    linalg.yield %9 : f32
+  } -> tensor<1x8x4096xf32>
+  return %6 : tensor<1x8x4096xf32>
+}
+// CHECK-LABEL: func @reordered_softmax(
+//       CHECK:   %[[RESULT:.+]] = scf.forall
+//       CHECK:     %[[MAX:.+]] = linalg.generic
+//       CHECK:       arith.maxnumf
+//       CHECK:     %[[EXPSUM:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%{{.*}}, %[[MAX]]
+//       CHECK:       arith.subf
+//       CHECK:       math.exp
+//       CHECK:       arith.addf
+//       CHECK:     %[[MAX2:.+]] = linalg.generic
+//       CHECK:       arith.maxnumf
+//       CHECK:     %[[EXPDIV:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%{{.*}}, %[[MAX2]], %[[EXPSUM]]
+//       CHECK:       arith.subf
+//       CHECK:       math.exp
+//       CHECK:       arith.divf
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 #config = #iree_cpu.lowering_config<vector_common_parallel = [10, 20, 30]>
 func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
