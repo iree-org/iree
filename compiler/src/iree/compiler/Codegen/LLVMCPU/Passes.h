@@ -104,7 +104,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
 /// that is not specialized by any pipeline). Adds an additional level of tiling
 /// and converts to memrefs.
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               FailureOr<TilingConfig> &tilingConfig);
+                               std::unique_ptr<TilingConfig> &tilingConfig);
 
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
