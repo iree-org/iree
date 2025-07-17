@@ -161,7 +161,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       // 5. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
-      .addPass(DispatchCreation::createFuseMultiUseElementwiseProducerPass)
+      // .addPass(DispatchCreation::createFuseMultiUseElementwiseProducerPass)
 
       // 6. Some more "post elementwise fusion passes".
       //    a. Detensorize.
