@@ -24,7 +24,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-generic-vectorization"
-#define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -37,11 +38,11 @@ namespace {
 static std::optional<SizesAndScalableFlags>
 getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
-  auto loweringConfig =
-      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
-  if (useConfiguredVectorSizes && loweringConfig) {
-    TilingConfig tilingConfig(loweringConfig);
-    auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(getLoweringConfig(op));
+  if (useConfiguredVectorSizes && tilingConfig) {
+    LDBG("Use configured vector sizes from lowering config");
+    auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
     // Replace zeros in canonical vector shape to turn it into a valid shape.
     std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);
     return std::make_pair(vectorSizes, scalableFlags);

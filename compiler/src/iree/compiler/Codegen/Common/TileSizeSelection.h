@@ -20,7 +20,8 @@ using SizesAndScalableFlags =
 /// CPU lowering process, while abstracting the representation and verification
 /// details of such information in the IR.
 ///
-/// We currently support the following scenarios:
+/// We currently support the following scenarios, if
+/// IREE::Codegen::LoweringConfigAttr is used:
 ///   1. [[distribution]]
 ///   2. [[distribution], [vector-common-parallel]]
 ///   3. [[distribution], [vector-common-parallel], [vector-reduction]]
@@ -34,7 +35,10 @@ public:
   /// a subset of them may be available in a valid configuration.
   using TilingLevel = IREE::CPU::TilingLevel;
 
-  explicit TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc);
+  static std::unique_ptr<TilingConfig>
+  create(IREE::Codegen::LoweringConfigAttrInterface lc);
+  TilingConfig() = delete;
+  ~TilingConfig() {}
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() const {
@@ -47,10 +51,14 @@ public:
   /// Returns the number of dimensions of the configuration. All the tiling
   /// levels must have the same number of dimensions.
   unsigned getNumDimensions() {
-    return getNumTilingLevels() > 0
-               ? loweringConfig.getStaticTilingLevelSizes(0, /*target=*/nullptr)
-                     .size()
-               : 0;
+    for (unsigned level : tilingLevelToActualLevelMap) {
+      if (level == TilingLevel::InvalidLevel) {
+        continue;
+      }
+      return loweringConfig.getStaticTilingLevelSizes(level, /*target=*/nullptr)
+          .size();
+    }
+    return 0;
   }
 
   /// Returns the number of parallel dimensions to tile at vector level.
@@ -184,6 +192,7 @@ public:
 private:
   // Initialize the TilingConfig with given LoweringConfigAttr attribute
   // details.
+  explicit TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc);
   void initFromCodegenLoweringConfig(IREE::Codegen::LoweringConfigAttr lc);
   void initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc);
 

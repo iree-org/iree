@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <memory>
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -52,8 +53,11 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
         getLoweringConfig(op);
     if (!loweringConfig)
       return WalkResult::advance();
-    TilingConfig tilingConfig(loweringConfig);
-    return verificationFn(op, tilingConfig, translationInfo,
+    std::unique_ptr<TilingConfig> tilingConfig =
+        TilingConfig::create(loweringConfig);
+    if (!tilingConfig)
+      return WalkResult::interrupt();
+    return verificationFn(op, *tilingConfig, translationInfo,
                           ArrayRef<int64_t>{});
   });
   return failure(walkResult.wasInterrupted());

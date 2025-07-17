@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
@@ -18,6 +19,15 @@
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
 namespace mlir::iree_compiler {
+
+std::unique_ptr<TilingConfig>
+TilingConfig::create(IREE::Codegen::LoweringConfigAttrInterface lc) {
+  if (llvm::isa_and_present<IREE::Codegen::LoweringConfigAttr,
+                            IREE::CPU::LoweringConfigAttr>(lc)) {
+    return std::unique_ptr<TilingConfig>(new TilingConfig(lc));
+  }
+  return nullptr;
+}
 
 TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttrInterface lc)
     : loweringConfig(lc) {
@@ -111,11 +121,14 @@ TilingConfig::getTilingLevelForVectorDimPosition(unsigned dimPos) const {
       TilingLevel::VectorCommonParallelTiles, TilingLevel::VectorReductionTiles,
       TilingLevel::VectorInnerParallelTiles};
   std::optional<unsigned> foundLevel;
-  auto tilingLevels = getTileSizes();
   for (TilingLevel level : vectorTilingLevels) {
     auto tilingLevelIndex = tilingLevelToActualLevelMap[level];
-    if (tilingLevelIndex != TilingLevel::InvalidLevel &&
-        tilingLevels[tilingLevelIndex][dimPos] != 0) {
+    if (tilingLevelIndex == TilingLevel::InvalidLevel) {
+      continue;
+    }
+    auto tilingLevel = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        loweringConfig.getTilingLevelAttr(tilingLevelIndex));
+    if (tilingLevel.getSizes()[dimPos] != 0) {
       assert(!foundLevel.has_value() &&
              "expected at most one tile size to be non-zero");
       foundLevel = tilingLevelIndex;
@@ -139,18 +152,14 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<bool> scalableFlags(numDims, false);
-  SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> tilingLevels;
-  for (unsigned i = 0, e = getNumTilingLevels(); i < e; ++i) {
-    tilingLevels.push_back(cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        loweringConfig.getTilingLevelAttr(i)));
-  }
   for (int dimPos = 0; dimPos < numDims; ++dimPos) {
     auto dimTilingLevel = getTilingLevelForVectorDimPosition(dimPos);
     if (!dimTilingLevel.has_value())
       continue; // The size for this dim is zero in all vector tiling levels.
+    auto tilingLevel = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        loweringConfig.getTilingLevelAttr(dimTilingLevel.value()));
     std::tie(vectorSizes[dimPos], scalableFlags[dimPos]) = getTileSizeAtIndex(
-        tilingLevels[*dimTilingLevel].getSizes(),
-        tilingLevels[*dimTilingLevel].getScalableFlags(), dimPos);
+        tilingLevel.getSizes(), tilingLevel.getScalableFlags(), dimPos);
   }
   return std::make_pair(vectorSizes, scalableFlags);
 }

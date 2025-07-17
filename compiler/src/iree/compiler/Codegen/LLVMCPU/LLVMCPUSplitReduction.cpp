@@ -193,9 +193,10 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       LDBG("can't find lowering_config, skip SplitReduction");
       continue;
     }
-    TilingConfig tilingConfig(maybeLoweringConfig);
+    std::unique_ptr<TilingConfig> tilingConfig =
+        TilingConfig::create(maybeLoweringConfig);
     auto [reductionSizes, scalableDims] =
-        tilingConfig.getVectorReductionSizes();
+        tilingConfig->getVectorReductionSizes();
     if (scalableDims.back()) {
       LDBG("scalable reduction dimensions not yet supported, skip "
            "SplitReduction");

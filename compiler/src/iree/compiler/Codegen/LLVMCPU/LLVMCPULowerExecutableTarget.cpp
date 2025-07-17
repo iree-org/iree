@@ -65,18 +65,15 @@ public:
 };
 } // namespace
 
-static FailureOr<TilingConfig>
+static std::unique_ptr<TilingConfig>
 getTilingConfigForPipeline(FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
   if (failed(rootOp) || !rootOp.value()) {
-    return failure();
+    return nullptr;
   }
   auto config = iree_compiler::getLoweringConfig(rootOp.value());
-  if (!config) {
-    return failure();
-  }
-  return TilingConfig(config);
+  return TilingConfig::create(config);
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
@@ -120,7 +117,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUBufferOpsTileAndVectorize: {
     auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (failed(maybeTilingConfig)) {
+    if (!maybeTilingConfig) {
       funcOp.emitOpError("Tiling Config is necessary for "
                          "CPUBufferOpsTileAndVectorize pipeline.");
       return signalPassFailure();
@@ -131,7 +128,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
     auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (failed(maybeTilingConfig)) {
+    if (!maybeTilingConfig) {
       funcOp.emitOpError(
           "Tiling Config is necessary for CPUDoubleTilingExpert pipeline.");
       return signalPassFailure();
@@ -143,7 +140,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
     auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (failed(maybeTilingConfig)) {
+    if (!maybeTilingConfig) {
       funcOp.emitOpError("Tiling Config is necessary for "
                          "CPUConvTileAndDecomposeExpert pipeline.");
       return signalPassFailure();
@@ -154,7 +151,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
     auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (failed(maybeTilingConfig)) {
+    if (!maybeTilingConfig) {
       funcOp.emitOpError(
           "Tiling Config is necessary for Mmt4dTilingExpert pipeline.");
       return signalPassFailure();
@@ -165,7 +162,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
     auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (failed(maybeTilingConfig)) {
+    if (!maybeTilingConfig) {
       funcOp.emitOpError(
           "Tiling Config is necessary for CPUDataTiling pipeline.");
       return signalPassFailure();
@@ -176,7 +173,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPULinalgExtTileAndVectorize: {
     auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (failed(maybeTilingConfig)) {
+    if (!maybeTilingConfig) {
       funcOp.emitOpError("Tiling Config is necessary for "
                          "CPULinalgExtTileAndVectorize pipeline.");
       return signalPassFailure();
