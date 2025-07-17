@@ -392,44 +392,44 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
-
-  SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
-  // Apply tile and fuse to all the non-distribution fusable levels. Skip
-  // distribution level as that level has been fused already.
-  if (allFusableLevels.size() > 1) {
-    llvm::SmallSetVector<int64_t, 4> fusableLevels(allFusableLevels.begin(),
-                                                   allFusableLevels.end());
-    for (int i = 0; i < tilingConfig.getNumTilingLevels(); ++i) {
-      if (i == tilingConfig.getDistributionLevel())
-        continue;
-      if (fusableLevels.contains(i)) {
-        funcPassManager.addPass(
-            createLLVMCPUTileRootAndFuseProducerConsumerPass(
-                static_cast<IREE::CPU::TilingLevel>(i)));
-        funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
-        funcPassManager.addPass(createConcretizePadResultShapePass());
-        continue;
-      }
-
-      // TODO(#21297): How we pass TilingLevel is wrong, but it is tricky to fix
-      // if not all the lowering configs are IREE::CPU::LoweringConfigAttr. For
-      // now, leave it as it is for the transition period. They will be fixed
-      // when we close #21297.
-      if (i == tilingConfig.getVectorReductionLevel()) {
-        // Run SplitReductionPass before the final reduction Fuse pass, because
-        // SplitReductionPass takes care of banked-tiling.
-        funcPassManager.addPass(
-            createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
-        funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
-            static_cast<IREE::CPU::TilingLevel>(i)));
-        continue;
-      }
-      funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
-          static_cast<IREE::CPU::TilingLevel>(i)));
+  for (int i = 0, e = IREE::CPU::TilingLevel::MaxNumTileLevels; i < e; ++i) {
+    auto level = static_cast<IREE::CPU::TilingLevel>(i);
+    if (!tilingConfig.isValidLevel(level)) {
+      continue;
     }
-  }
-  funcPassManager.addPass(createForallToForPass());
 
+    switch (level) {
+    case IREE::CPU::TilingLevel::CacheParallelTiles:
+    case IREE::CPU::TilingLevel::VectorCommonParallelTiles:
+      funcPassManager.addPass(
+          createLLVMCPUTileRootAndFuseProducerConsumerPass(level));
+      break;
+    case IREE::CPU::TilingLevel::CacheReductionTiles:
+      funcPassManager.addPass(
+          createLLVMCPUTileRootAndFuseInputOperandsPass(level));
+      break;
+    case IREE::CPU::TilingLevel::VectorReductionTiles:
+      // Run SplitReductionPass before the final reduction Fuse pass, because
+      // SplitReductionPass takes care of banked-tiling.
+      funcPassManager.addPass(
+          createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
+      funcPassManager.addPass(
+          createLLVMCPUTileRootAndFuseInputOperandsPass(level));
+      break;
+    case IREE::CPU::TilingLevel::VectorInnerParallelTiles:
+      funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+          tilingConfig.getVectorInnerParallelLevel()));
+      break;
+    case IREE::CPU::TilingLevel::DistributionTiles:
+    case IREE::CPU::TilingLevel::MaxNumTileLevels:
+    case IREE::CPU::TilingLevel::InvalidLevel:
+      break;
+    };
+    funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
+    funcPassManager.addPass(createConcretizePadResultShapePass());
+  }
+
+  funcPassManager.addPass(createForallToForPass());
   if (pipelineOpt.enablePeeling) {
     funcPassManager.addPass(createLLVMCPUPeelPass());
   }
