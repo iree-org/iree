@@ -122,8 +122,9 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
     if (!loweringConfigAttr)
       continue;
 
-    TilingConfig tilingConfig(loweringConfigAttr);
-    auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
+    std::unique_ptr<TilingConfig> tilingConfig =
+        TilingConfig::create(loweringConfigAttr);
+    auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
     auto numScalableDims = llvm::count(scalableFlags, true);
 
     if (numScalableDims <= 1)
@@ -154,7 +155,7 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
       return failure();
 
     // 3. Update the lowering config of the new tiled operations.
-    auto newLoweringConfig = tilingConfig.getLoweringConfigWithNewVectorSizes(
+    auto newLoweringConfig = tilingConfig->getLoweringConfigWithNewVectorSizes(
         vectorSizes, newScalableFlags);
     for (auto *newOp : tilingResult->tiledOps) {
       if (isa<TilingInterface>(newOp))
