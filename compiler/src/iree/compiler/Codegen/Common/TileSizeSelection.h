@@ -51,7 +51,7 @@ public:
   /// Returns the number of dimensions of the configuration. All the tiling
   /// levels must have the same number of dimensions.
   unsigned getNumDimensions() {
-    for (auto level : tilingLevelToActualLevelMap) {
+    for (unsigned level : tilingLevelToActualLevelMap) {
       if (level == TilingLevel::InvalidLevel) {
         continue;
       }
