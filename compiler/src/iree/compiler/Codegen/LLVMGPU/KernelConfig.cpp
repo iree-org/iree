@@ -1585,15 +1585,18 @@ static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
   return projectedBasis;
 }
 
-static LogicalResult
-setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                     mlir::FunctionOpInterface entryPoint,
-                                     IREE::LinalgExt::AttentionOp op) {
-  // This configuration is not really smart right now. It just makes sure that
-  // attention always compiles and tries to distribute workload on threads,
-  // subgroups and workgroups as much as it can.
-  // TODO: Update this configuration with target information, like the
-  // WarpReduction pipeline does.
+struct AttentionReductionHeuristicSeeds {
+  int64_t numKeyVectors;
+  int64_t numValueVectors;
+  int64_t numSubgroups;
+  int64_t keyVectorSize;
+  int64_t valueVectorSize;
+};
+
+static LogicalResult setAttentionReductionConfig(
+    AttentionReductionHeuristicSeeds &seeds, IREE::GPU::TargetAttr target,
+    FunctionOpInterface entryPoint, IREE::LinalgExt::AttentionOp op) {
+
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
   // Get iteration domain bounds.
@@ -1613,11 +1616,12 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Distribute the 'available' resource to the basis on the given dimensions.
   // `currDim` tracks number of dims on which resources have already been
   // distributed (to keep track of order of dimension distribution).
+  // Dynamic dimensions are treated as inf (distribute everything).
   auto distributeDimensionsToBasisGreedily =
       [&bounds](int64_t available, ArrayRef<int64_t> dims,
                 IREE::GPU::Basis &basis, int64_t &currDim) {
         // Iterate over dimensions and try to distribute resources over them.
-        for (int64_t dim : dims) {
+        for (int64_t dim : llvm::reverse(dims)) {
           // We iterate over the basis in a reverse dimension to get smaller
           // strides for inner dimensions.
           int64_t rCurrDim = basis.counts.size() - currDim - 1;
@@ -1627,10 +1631,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
           // Try to distribute the resources over the dimensions greedily.
           int64_t dimSize = bounds[dim];
           if (ShapedType::isDynamic(dimSize)) {
-            // We do not distribute over dynamic dimensions yet. It's possible
-            // to do it since we have masking, it's just not clear what
-            // heuristic to use.
-            basis.counts[rCurrDim] = 1;
+            // Distribute remaining resources on the dynamic dim.
+            basis.counts[rCurrDim] = available;
+            available = 1;
             continue;
           }
           int64_t used = std::gcd(available, dimSize);
@@ -1653,53 +1656,29 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes[dim] = 1;
     bounds[dim] = 1;
   }
+  threadTileSizes[opInfo.getK1Dims().back()] = seeds.keyVectorSize;
+  bounds[opInfo.getK1Dims().back()] =
+      std::ceil(float(bounds[opInfo.getK1Dims().back()]) / seeds.keyVectorSize);
+  threadTileSizes[opInfo.getNDims().back()] = seeds.valueVectorSize;
+  bounds[opInfo.getNDims().back()] = std::ceil(
+      float(bounds[opInfo.getNDims().back()]) / seeds.valueVectorSize);
 
-  // For memory bound attention, per workgroup, we have input shapes:
-  //
-  // Q: 1x1 xK1
-  // K: 1xK2xK1
-  // V: 1xK2xN
-  // O: 1x1 xN
-  //
-  // We only care about our read/write bandwidth, Q and O are too small for us
-  // to care, so we focus most of our attention (pun not intended) on K and V.
-  // We want to get good global reads on K and V.
-  //
-  // Due to different transpose layouts, we can have different optimal
-  // distributions for K and V. Ideally, we would use something like data-tiling
-  // to ensure a good read layout, which would look something like:
-  //
-  // K: batch_k2 X batch_k1 X
-  //    subgroup_tile_K2 X
-  //    thread_tile_K1 X thread_tile_K2 X
-  //    vector_size_K1
-  // V: batch_k2 X batch_n X
-  //    subgroup_tile_K2 X
-  //    thread_tile_N X thread_tile_K2 X
-  //    vector_size_N
-  //
-  // but if we don't have that, for now, we assume a default layout (that will
-  // work well), that has it's inner dimensions as:
-  //
-  // K : ... X K2_inner x K1
-  // V : ... X K2_inner K N
+  // Select the thread split between K2 and K1/N dimensions. We select this
+  // based on the number of key vectors, and use the same split for value
+  // vectors.
+  auto getNumVectors = [&bounds](ArrayRef<int64_t> dims) {
+    int64_t numVectors = 1;
+    for (int64_t dim : dims) {
+      numVectors *= bounds[dim];
+    }
+    return numVectors;
+  };
+  int64_t numK1Vectors = getNumVectors(opInfo.getK1Dims());
+  int64_t numK1Tiles = std::ceil(float(numK1Vectors) / seeds.numKeyVectors);
 
-  // Make thread tile sizes for K1 and N read 128bits.
-  int64_t keyBitwidth =
-      IREE::Util::getTypeBitWidth(getElementTypeOrSelf(op.getKey().getType()));
-  int64_t valueBitwidth = IREE::Util::getTypeBitWidth(
-      getElementTypeOrSelf(op.getValue().getType()));
-
-  // TODO: Support more exotic bitwidths.
-  assert(128 % keyBitwidth == 0);
-  assert(128 % valueBitwidth == 0);
-
-  int64_t keyVectorSize = 128 / keyBitwidth;
-  int64_t valueVectorSize = 128 / valueBitwidth;
-  threadTileSizes[opInfo.getK1Dims().back()] = keyVectorSize;
-  bounds[opInfo.getK1Dims().back()] /= keyVectorSize;
-  threadTileSizes[opInfo.getNDims().back()] = valueVectorSize;
-  bounds[opInfo.getNDims().back()] /= valueVectorSize;
+  int64_t k1ThreadSplit =
+      std::min(int64_t(llvm::PowerOf2Ceil(numK1Tiles)), targetSubgroupSize);
+  int64_t k2ThreadSplit = targetSubgroupSize / k1ThreadSplit;
 
   IREE::GPU::Basis qkThreadBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
@@ -1708,50 +1687,69 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
       SmallVector<int64_t>(opInfo.getDomainRank())};
 
-  int64_t qkRemainingThreads = targetSubgroupSize;
+  {
+    int64_t k2RemainingThreads = k2ThreadSplit;
+    int64_t k1RemainingThreads = k1ThreadSplit;
+    int64_t nRemainingThreads = k1ThreadSplit;
 
-  // Distribute both basis on K2 equally.
-  int64_t qkCurrDim = 0;
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getK2Dims(), qkThreadBasis, qkCurrDim);
+    // Distribute both basis on K2 equally.
+    int64_t qkCurrDim = 0;
+    k2RemainingThreads = distributeDimensionsToBasisGreedily(
+        k2RemainingThreads, opInfo.getK2Dims(), qkThreadBasis, qkCurrDim);
 
-  pvThreadBasis = qkThreadBasis;
-  int64_t pvRemainingThreads = qkRemainingThreads;
-  int64_t pvCurrDim = qkCurrDim;
+    pvThreadBasis = qkThreadBasis;
+    int64_t pvCurrDim = qkCurrDim;
 
-  // If the target doesn't support subgroup shuffle, we should still be
-  // distributing on threads. It's the backends problem to not use shuffles, and
-  // instead use shared memory for reduction.
+    // If the target doesn't support subgroup shuffle, we should still be
+    // distributing on threads. It's the backends problem to not use shuffles,
+    // and instead use shared memory for reduction.
 
-  // Distribute K1 on QK basis and N on nothing.
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getK1Dims(), qkThreadBasis, qkCurrDim);
-  distributeDimensionsToBasisGreedily(1, opInfo.getNDims(), qkThreadBasis,
-                                      qkCurrDim);
-  // Distribute N on PV basis and K1 on nothing.
-  pvRemainingThreads = distributeDimensionsToBasisGreedily(
-      pvRemainingThreads, opInfo.getNDims(), pvThreadBasis, pvCurrDim);
-  distributeDimensionsToBasisGreedily(1, opInfo.getK1Dims(), pvThreadBasis,
-                                      pvCurrDim);
+    // Distribute K1 on QK basis and N on nothing.
+    k1RemainingThreads = distributeDimensionsToBasisGreedily(
+        k1RemainingThreads, opInfo.getK1Dims(), qkThreadBasis, qkCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getNDims(), qkThreadBasis,
+                                        qkCurrDim);
+    // Distribute N on PV basis and K1 on nothing.
+    nRemainingThreads = distributeDimensionsToBasisGreedily(
+        nRemainingThreads, opInfo.getNDims(), pvThreadBasis, pvCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getK1Dims(), pvThreadBasis,
+                                        pvCurrDim);
 
-  // We already tiled B/M on workgroups, so it doesn't really matter how we
-  // distribute them here.
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getBatchDims(), qkThreadBasis, qkCurrDim);
-  qkRemainingThreads = distributeDimensionsToBasisGreedily(
-      qkRemainingThreads, opInfo.getMDims(), qkThreadBasis, qkCurrDim);
+    // We already tiled B/M on workgroups, so it doesn't really matter how we
+    // distribute them here.
+    distributeDimensionsToBasisGreedily(1, opInfo.getBatchDims(), qkThreadBasis,
+                                        qkCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getMDims(), qkThreadBasis,
+                                        qkCurrDim);
 
-  pvRemainingThreads = distributeDimensionsToBasisGreedily(
-      pvRemainingThreads, opInfo.getBatchDims(), pvThreadBasis, pvCurrDim);
-  pvRemainingThreads = distributeDimensionsToBasisGreedily(
-      pvRemainingThreads, opInfo.getMDims(), pvThreadBasis, pvCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getBatchDims(), pvThreadBasis,
+                                        pvCurrDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getMDims(), pvThreadBasis,
+                                        pvCurrDim);
+  }
 
-  // Do not distribute on subgroups for now. We want to distribute the reduction
-  // dimension on subgroups, but until the masked reduction work lands, we do
-  // nothing.
+  // Distribute subgroups on K2 dimension only.
   IREE::GPU::Basis subgroupBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
-      llvm::to_vector(llvm::seq<int64_t>(opInfo.getDomainRank()))};
+      SmallVector<int64_t>(opInfo.getDomainRank())};
+
+  {
+    int64_t numRemainingSubgroups = seeds.numSubgroups;
+    // Distribute both basis on K2 equally.
+    int64_t currDim = 0;
+    numRemainingSubgroups = distributeDimensionsToBasisGreedily(
+        numRemainingSubgroups, opInfo.getK2Dims(), subgroupBasis, currDim);
+
+    // Distribute N, K1, M, B on nothing.
+    distributeDimensionsToBasisGreedily(1, opInfo.getNDims(), subgroupBasis,
+                                        currDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getK1Dims(), subgroupBasis,
+                                        currDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getMDims(), subgroupBasis,
+                                        currDim);
+    distributeDimensionsToBasisGreedily(1, opInfo.getBatchDims(), subgroupBasis,
+                                        currDim);
+  }
 
   LDBG("QK Basis");
   LDBG("Thread Basis");
@@ -1768,27 +1766,23 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG(llvm::interleaved(subgroupBasis.counts));
   LDBG(llvm::interleaved(subgroupBasis.mapping));
 
-  // Tile N parallel dimensions if they are to big to workgroups.
+  // Tile N parallel dimensions to value tile size fetched in a single
+  // iteration.
   for (int64_t dim : opInfo.getNDims()) {
-    if (ShapedType::isDynamic(dim)) {
-      workgroupTileSizes[dim] = 1;
+    int64_t threadCount = pvThreadBasis.counts[pvThreadBasis.mapping[dim]];
+    int64_t dimSize = threadCount;
+    if (dim == opInfo.getNDims().back()) {
+      dimSize *= seeds.numValueVectors * seeds.valueVectorSize;
     }
-    if (bounds[dim] >= 128) {
-      workgroupTileSizes[dim] = 128;
-    }
+    workgroupTileSizes[dim] = dimSize;
   }
 
   // Tile remaining reduction dimensions to serial loops.
   SmallVector<int64_t> reductionTileSizes(opInfo.getDomainRank(), 0);
   for (int64_t dim : opInfo.getK2Dims()) {
-    if (ShapedType::isDynamic(dim)) {
-      reductionTileSizes[dim] = 1;
-    }
-    if (bounds[dim] != 1) {
-      int64_t threadCount = qkThreadBasis.counts[qkThreadBasis.mapping[dim]];
-      int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
-      reductionTileSizes[dim] = threadCount * subgroupCount;
-    }
+    int64_t threadCount = qkThreadBasis.counts[qkThreadBasis.mapping[dim]];
+    int64_t subgroupCount = subgroupBasis.counts[subgroupBasis.mapping[dim]];
+    reductionTileSizes[dim] = threadCount * subgroupCount;
   }
 
   int64_t flatWorkgroupSize =
@@ -1866,6 +1860,69 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       workgroupSize, targetSubgroupSize);
 
   return success();
+}
+
+static LogicalResult
+setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
+                                     FunctionOpInterface entryPoint,
+                                     IREE::LinalgExt::AttentionOp op) {
+
+  // This configuration is not really smart right now. It just makes sure that
+  // attention always compiles and tries to distribute workload on threads,
+  // subgroups and workgroups as much as it can.
+  // TODO: Update this configuration with target information, like the
+  // WarpReduction pipeline does.
+
+  // For memory bound attention, per workgroup, we have input shapes:
+  //
+  // Q: 1x1 xK1
+  // K: 1xK2xK1
+  // V: 1xK2xN
+  // O: 1x1 xN
+  //
+  // We only care about our read/write bandwidth, Q and O are too small for us
+  // to care, so we focus most of our attention (pun not intended) on K and V.
+  // We want to get good global reads on K and V.
+  //
+  // Due to different transpose layouts, we can have different optimal
+  // distributions for K and V. Ideally, we would use something like data-tiling
+  // to ensure a good read layout, which would look something like:
+  //
+  // K: batch_k2 X batch_k1 X
+  //    subgroup_tile_K2 X
+  //    thread_tile_K1 X thread_tile_K2 X
+  //    vector_size_K1
+  // V: batch_k2 X batch_n X
+  //    subgroup_tile_K2 X
+  //    thread_tile_N X thread_tile_K2 X
+  //    vector_size_N
+  //
+  // but if we don't have that, for now, we assume a default layout (that will
+  // work well), that has it's inner dimensions as:
+  //
+  // K : ... X K2_inner x K1
+  // V : ... X K2_inner K N
+
+  // Make thread tile sizes for K1 and N read 128bits.
+  int64_t keyBitwidth =
+      IREE::Util::getTypeBitWidth(getElementTypeOrSelf(op.getKey().getType()));
+  int64_t valueBitwidth = IREE::Util::getTypeBitWidth(
+      getElementTypeOrSelf(op.getValue().getType()));
+
+  // TODO: Support more exotic bitwidths.
+  assert(128 % keyBitwidth == 0);
+  assert(128 % valueBitwidth == 0);
+
+  int64_t keyVectorSize = 128 / keyBitwidth;
+  int64_t valueVectorSize = 128 / valueBitwidth;
+
+  AttentionReductionHeuristicSeeds seeds{/*numKeyVectors=*/8,
+                                         /*numValueVectors=*/2,
+                                         /*numSubgroups=*/8,
+                                         /*keyVectorSize=*/keyVectorSize,
+                                         /*valueVectorSize=*/valueVectorSize};
+
+  return setAttentionReductionConfig(seeds, target, entryPoint, op);
 }
 
 static LogicalResult
