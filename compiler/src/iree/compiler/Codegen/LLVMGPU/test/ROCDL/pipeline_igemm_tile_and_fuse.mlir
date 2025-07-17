@@ -160,3 +160,76 @@ hal.executable private @main {
 // Note there is a writeback loop here that is skipped to simplify the test.
 //       CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly">,
+  #hal.pipeline.binding<storage_buffer, "ReadOnly">,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#translation = #iree_codegen.translation_info<pipeline =
+  LLVMGPUTileAndFuse
+  workgroup_size = [256, 1, 1]
+  subgroup_size = 64,
+  {
+     gpu_pipeline_options = #iree_gpu.pipeline_options<
+       prefetch_shared_memory = false,
+       no_reduce_shared_memory_bank_conflicts = false,
+       use_igemm_convolution = true>
+  }>
+#config = #iree_gpu.lowering_config<{
+  padding = [2, 32, 64, 64],
+  workgroup = [2, 32, 64, 0],
+  reduction = [0, 0, 0, 4],
+  subgroup = [2, 2, 1, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>,
+  promote_operands = [0, 1]
+}>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+hal.executable private @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @conv_2d_input_backward_16x1x21x192_nhwc ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @conv_2d_input_backward_16x1x21x192_nhwc() attributes {translation_info = #translation} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x21x384xbf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x192xbf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x21x192xbf16>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 21, 384], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x21x384xbf16>> -> tensor<16x21x384xbf16>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [384, 192], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x192xbf16>> -> tensor<384x192xbf16>
+        %5 = tensor.empty() : tensor<16x21x192xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<16x21x192xf32>) -> tensor<16x21x192xf32>
+        %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<16x21x384xbf16>, tensor<384x192xbf16>) outs(%6 : tensor<16x21x192xf32>) attrs =  {lowering_config = #config} {
+        ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+          %10 = arith.extf %in : bf16 to f32
+          %11 = arith.extf %in_0 : bf16 to f32
+          %12 = arith.mulf %10, %11 : f32
+          %13 = arith.addf %out, %12 : f32
+          linalg.yield %13 : f32
+        } -> tensor<16x21x192xf32>
+        %8 = tensor.empty() : tensor<16x21x192xbf16>
+        %9 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%7 : tensor<16x21x192xf32>) outs(%8 : tensor<16x21x192xbf16>) {
+        ^bb0(%in: f32, %out: bf16):
+          %10 = arith.truncf %in : f32 to bf16
+          linalg.yield %10 : bf16
+        } -> tensor<16x21x192xbf16>
+        iree_tensor_ext.dispatch.tensor.store %9, %2, offsets = [0, 0, 0], sizes = [16, 21, 192], strides = [1, 1, 1] : tensor<16x21x192xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x21x192xbf16>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @conv_2d_input_backward_16x1x21x192_nhwc
+// CHECK-DAG: memref.alloc() : memref<64x68xbf16, #gpu.address_space<workgroup>>
+// CHECK-DAG: memref.alloc() : memref<2x32x68xbf16, #gpu.address_space<workgroup>>
+// CHECK-DAG: memref.alloca() : memref<2x2x4x1x1xbf16, #gpu.address_space<private>>
+// CHECK-NOT: memref.alloca() : memref<2x2x16x4x16xbf16, #gpu.address_space<private>>
