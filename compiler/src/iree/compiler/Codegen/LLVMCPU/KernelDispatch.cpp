@@ -2112,19 +2112,13 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                                                  targetMLTransInfo),
                      distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
   limitVectorTileSizes(genericOp, vecTileSizes);
-  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
-  SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(genericOp, parallelTileSizes,
-                                 reductionTileSizes);
 
-  LDBG("Vectorization/unrolling tile sizes (parallel): " << parallelTileSizes);
-  LDBG(
-      "Vectorization/unrolling tile sizes (reduction): " << reductionTileSizes);
-
-  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
-                                 reductionTileSizes};
-  // No need for tiling inner parallel dims.
-  tileSizes.emplace_back(numLoops, 0);
+  LoweringConfigGenerator generator(genericOp, /*emitInnerParallelList=*/true);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Set lowering_config: " << loweringConfig);
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
@@ -2139,7 +2133,8 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes, passPipeline, /*workgroupSize=*/{},
+      entryPointFn, genericOp, loweringConfig, passPipeline,
+      /*workgroupSize=*/{},
       /*subgroupSize=*/{}, pipelineConfig);
 }
 
@@ -2271,25 +2266,17 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
-  SmallVector<int64_t> parallelTileSizes = distConfig.minTileSizes;
 
-  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes};
-  // No need for tiling reduction dims and inner parallel dims.
-  int64_t numTilingDims = parallelTileSizes.size();
-  tileSizes.emplace_back(numTilingDims, 0);
-  tileSizes.emplace_back(numTilingDims, 0);
+  LoweringConfigGenerator generator(genericOp, /*emitInnerParallelList=*/true);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecSizes, vecScalableDims);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Set lowering_config: " << loweringConfig);
 
-  ScalableTileFlagsListType scalableTileFlags;
-  scalableTileFlags.emplace_back(numTilingDims, false);
-  scalableTileFlags.emplace_back(vecScalableDims);
-
-  // For non-tensor based ops use the Buffer ops pipeline.
-  auto passPipeline =
-      genericOp.hasPureTensorSemantics()
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes, scalableTileFlags, passPipeline);
+  auto passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               loweringConfig, passPipeline);
 }
 
 /// Sets elementwise dispatches to use peeling approach. It scales the number of
@@ -2359,13 +2346,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
 
-  // Setting reduction tile sizes is a workaround to kick in peeling transform.
-  // The tiling won't happen because the sizes are zeros. Also, no need for
-  // further tiling inner parallel dims, so the 4-th list is also zeros.
-  SmallVector<int64_t> zeros(numLoops, 0);
-  TileSizesListType tileSizes = {distTileSizes, vecTileSizes, zeros, zeros};
-
-  LDBG("Final tile sizes for element-wise op: " << tileSizes);
+  LoweringConfigGenerator generator(genericOp, /*emitInnerParallelList=*/true);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Set lowering_config for element-wise op: " << loweringConfig);
 
   DispatchLoweringPassPipeline passPipeline;
   DictionaryAttr pipelineConfig;
@@ -2380,7 +2366,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   }
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes, passPipeline, /*workgroupSize=*/{},
+      entryPointFn, genericOp, loweringConfig, passPipeline,
+      /*workgroupSize=*/{},
       /*subgroupSize=*/{}, pipelineConfig);
 }
 
@@ -2616,12 +2603,15 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(padOp, distConfig);
-  // No further tiling for reduction and inner parallel loops.
-  SmallVector<int64_t> zeros(numLoops, 0);
-  TileSizesListType tileSizes = {distTileSizes, distConfig.vectorSizeHints,
-                                 zeros, zeros};
+  LoweringConfigGenerator generator(padOp, /*emitInnerParallelList=*/true);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(distConfig.vectorSizeHints);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Set lowering_config for tensor.pad op: " << loweringConfig);
+
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, padOp, tileSizes,
+      entryPointFn, padOp, loweringConfig,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
