@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s --check-prefix=VSCALE
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,NO-SVE
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s --check-prefixes=CHECK,WITH-SVE
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -72,62 +72,41 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
       -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
   return
 }
-//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-LABEL: func @matmul_lowering_f32f32f32_aarch64()
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
-//   CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//       CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_M]], %[[K]]}
-//       CHECK:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
-//       CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_N]], %[[K]]}
-//       CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xf32>>{%[[TILED_M]], %[[TILED_N]]}
-//       CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
-//       CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
-//       CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-//       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
-//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  CHECK-SAME:       outs(%[[OUTS]] :
-//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-
-//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-// VSCALE-LABEL: func @matmul_lowering_f32f32f32_aarch64()
-//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
-//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_M]], %[[K]]}
-//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
-//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
-//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
-//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%[[TILED_N]], %[[K]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], %[[C8_VSCALE]], 1], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
-//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  VSCALE-SAME:       outs(%[[OUTS]] :
-//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
-
+//     CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  WITH-SVE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+//   CHECK-LABEL: func @matmul_lowering_f32f32f32_aarch64()
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
+//     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
+//     CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//     CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_M]], %[[K]]}
+//        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+//      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
+//      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//      WITH-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
+//         CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_N]], %[[K]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%[[TILED_N]], %[[K]], %[[C8_VSCALE]]}
+//         CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xf32>>{%[[TILED_M]], %[[TILED_N]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//         CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//    CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
+//         CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], %[[C8_VSCALE]], 1], strides = [1, 1, 1, 1]
+//         CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//         CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+//    CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+//    CHECK-SAME:       outs(%[[OUTS]] :
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -259,61 +238,41 @@ func.func @matmul_lowering_f16f16f16_aarch64() attributes {
       -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf16, #encoding_result>>{%M, %N}
   return
 }
-//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-LABEL: func @matmul_lowering_f16f16f16_aarch64()
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1)
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(2)
-//   CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//       CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_M]], %[[K]]}
-//       CHECK:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
-//       CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_N]], %[[K]]}
-//       CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xf16>>{%[[TILED_M]], %[[TILED_N]]}
-//       CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
-//       CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
-//       CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-//       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
-//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  CHECK-SAME:       outs(%[[OUTS]] :
-//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-
-//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-// VSCALE-LABEL: func @matmul_lowering_f16f16f16_aarch64()
-//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
-//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1)
-//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(2)
-//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_M]], %[[K]]}
-//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
-//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
-//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
-//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf16>>{%[[TILED_N]], %[[K]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf16>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], %[[C8_VSCALE]], 1], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
-//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  VSCALE-SAME:       outs(%[[OUTS]] :
-//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//     CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  WITH-SVE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+//   CHECK-LABEL: func @matmul_lowering_f16f16f16_aarch64()
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
+//     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1)
+//     CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(2)
+//     CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_M]], %[[K]]}
+//        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+//      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
+//      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//      WITH-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
+//         CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_N]], %[[K]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf16>>{%[[TILED_N]], %[[K]], %[[C8_VSCALE]]}
+//         CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xf16>>{%[[TILED_M]], %[[TILED_N]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf16>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//         CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//    CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
+//         CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[K]], %[[C8_VSCALE]], 1], strides = [1, 1, 1, 1]
+//         CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//         CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+//    CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+//    CHECK-SAME:       outs(%[[OUTS]] :
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
 
 // -----
 
@@ -369,47 +328,41 @@ func.func @matmul_lowering_f32f16f16_aarch64() attributes {
       -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf16, #encoding_result>>{%M, %N}
   return
 }
-//   CHECK-DAG: #[[$MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   CHECK-DAG: #[[$MAP_IDENTITY_4D:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-LABEL: func.func @matmul_lowering_f32f16f16_aarch64()
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
-//   CHECK-DAG:   %[[M_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[M]]]
-//   CHECK-DAG:   %[[N_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[N]]]
-//   CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[M_CEILDIV_8]], %[[K]]}
-//   CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[N_CEILDIV_8]], %[[K]]}
-//   CHECK-DAG:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) {{.*}} : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xf16>>{%[[M_CEILDIV_8]], %[[N_CEILDIV_8]]}
-//       CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M_CEILDIV_8]], %[[K]], 8, 1], {{.*}} -> tensor<?x?x8x1xf32>
-//       CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[N_CEILDIV_8]], %[[K]], 8, 1], {{.*}} -> tensor<?x?x8x1xf16>
-//       CHECK:   %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M_CEILDIV_8]], %[[N_CEILDIV_8]], 8, 8], {{.*}} -> tensor<?x?x8x8xf16>
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[M_CEILDIV_8]], %[[K]]) : tensor<?x?x8x1xf16>
-//       CHECK:   %[[LHS_F16:.+]] = linalg.generic {indexing_maps = [#[[$MAP_IDENTITY_4D]], #[[$MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[LHS]] : tensor<?x?x8x1xf32>) outs(%[[EMPTY]] : tensor<?x?x8x1xf16>) {
-//       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_F16]], %[[RHS]] : tensor<?x?x8x1xf16>, tensor<?x?x8x1xf16>) outs(%[[OUT]] : tensor<?x?x8x8xf16>)
-//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
-
-//   VSCALE-DAG: #[[$MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   VSCALE-DAG: #[[$MAP_VSCALE:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-//   VSCALE-DAG: #[[$MAP_IDENTITY_4D:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// VSCALE-LABEL: func.func @matmul_lowering_f32f16f16_aarch64()
-//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
-//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
-//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
-//   VSCALE-DAG:   %[[M_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[M]]]
-//   VSCALE-DAG:   %[[VSCALE:.+]] = vector.vscale
-//   VSCALE-DAG:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
-//   VSCALE-DAG:   %[[N_CEILDIV_VSCALE:.+]] = affine.apply #[[$MAP_VSCALE]]()[%[[N]], %[[C8_VSCALE]]]
-//   VSCALE-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[M_CEILDIV_8]], %[[K]]}
-//   VSCALE-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.*}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf16>>{%[[N_CEILDIV_VSCALE]], %[[K]], %[[C8_VSCALE]]}
-//   VSCALE-DAG:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) {{.*}} : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf16>>{%[[M_CEILDIV_8]], %[[N_CEILDIV_VSCALE]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M_CEILDIV_8]], %[[K]], 8, 1], {{.*}} -> tensor<?x?x8x1xf32>
-//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[N_CEILDIV_VSCALE]], %[[K]], %[[C8_VSCALE]], 1], {{.*}} -> tensor<?x?x?x1xf16>
-//       VSCALE:   %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M_CEILDIV_8]], %[[N_CEILDIV_VSCALE]], 8, %[[C8_VSCALE]]], {{.*}} -> tensor<?x?x8x?xf16>
-//       VSCALE:   %[[EMPTY:.+]] = tensor.empty(%[[M_CEILDIV_8]], %[[K]]) : tensor<?x?x8x1xf16>
-//       VSCALE:   %[[LHS_F16:.+]] = linalg.generic {indexing_maps = [#[[$MAP_IDENTITY_4D]], #[[$MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[LHS]] : tensor<?x?x8x1xf32>) outs(%[[EMPTY]] : tensor<?x?x8x1xf16>) {
-//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_F16]], %[[RHS]] : tensor<?x?x8x1xf16>, tensor<?x?x?x1xf16>) outs(%[[OUT]] : tensor<?x?x8x?xf16>)
-//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
+//     CHECK-DAG: #[[$MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//     CHECK-DAG: #[[$MAP_IDENTITY_4D:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+//  WITH-SVE-DAG: #[[$MAP_VSCALE:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+//   CHECK-LABEL: func.func @matmul_lowering_f32f16f16_aarch64()
+//  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
+//     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
+//     CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
+//         CHECK:   %[[M_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[M]]]
+//         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[M_CEILDIV_8]], %[[K]]}
+//        NO-SVE:   %[[N_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[N]]]
+//      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
+//      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//      WITH-SVE:   %[[N_CEILDIV_VSCALE:.+]] = affine.apply #[[$MAP_VSCALE]]()[%[[N]], %[[C8_VSCALE]]]
+//         CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[N_CEILDIV_8]], %[[K]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf16>>{%[[N_CEILDIV_VSCALE]], %[[K]], %[[C8_VSCALE]]}
+//     CHECK-DAG:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xf16>>{%[[M_CEILDIV_8]], %[[N_CEILDIV_8]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf16>>{%[[M_CEILDIV_8]], %[[N_CEILDIV_VSCALE]], %[[C8_VSCALE]]}
+//         CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]], offsets = [0, 0, 0, 0],
+//    CHECK-SAME:       sizes = [%[[M_CEILDIV_8]], %[[K]], 8, 1], {{.*}} -> tensor<?x?x8x1xf32>
+//         CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0],
+//   NO-SVE-SAME:       sizes = [%[[N_CEILDIV_8]], %[[K]], 8, 1], {{.*}} -> tensor<?x?x8x1xf16>
+// WITH-SVE-SAME:       sizes = [%[[N_CEILDIV_VSCALE]], %[[K]], %[[C8_VSCALE]], 1], {{.*}} -> tensor<?x?x?x1xf16>
+//         CHECK:   %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0],
+//   NO-SVE-SAME:       sizes = [%[[M_CEILDIV_8]], %[[N_CEILDIV_8]], 8, 8], {{.*}} -> tensor<?x?x8x8xf16>
+// WITH-SVE-SAME:       sizes = [%[[M_CEILDIV_8]], %[[N_CEILDIV_VSCALE]], 8, %[[C8_VSCALE]]], {{.*}} -> tensor<?x?x8x?xf16>
+//         CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[M_CEILDIV_8]], %[[K]]) : tensor<?x?x8x1xf16>
+//         CHECK:   %[[LHS_F16:.+]] = linalg.generic {indexing_maps = [#[[$MAP_IDENTITY_4D]], #[[$MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[LHS]] : tensor<?x?x8x1xf32>) outs(%[[EMPTY]] : tensor<?x?x8x1xf16>) {
+//         CHECK:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_F16]], %[[RHS]] :
+//   NO-SVE-SAME:       tensor<?x?x8x1xf16>, tensor<?x?x8x1xf16>) outs(%[[OUT]] : tensor<?x?x8x8xf16>)
+// WITH-SVE-SAME:       tensor<?x?x8x1xf16>, tensor<?x?x?x1xf16>) outs(%[[OUT]] : tensor<?x?x8x?xf16>)
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
 
 // -----
 
@@ -524,65 +477,43 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
       -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
   return
 }
-//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_aarch64_dotprod()
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
-//   CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//   CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP1]]()[%[[K]]]
-//       CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_M]], %[[TILED_K]]}
-//       CHECK:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
-//       CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_N]], %[[TILED_K]]}
-//       CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xi32>>{%[[TILED_M]], %[[TILED_N]]}
-//       CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 4], strides = [1, 1, 1, 1]
-//       CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 8, 4], strides = [1, 1, 1, 1]
-//       CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-//       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
-//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  CHECK-SAME:       outs(%[[OUTS]] :
-//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-
-//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-//   VSCALE-DAG: #[[$MAP2:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-// VSCALE-LABEL: func @matmul_lowering_i8i8i32_aarch64_dotprod()
-//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
-//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//   VSCALE-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP1]]()[%[[K]]]
-//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_M]], %[[TILED_K]]}
-//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
-//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
-//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP2]]()[%[[N]], %[[C8_VSCALE]]]
-//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x4xi8>>{%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xi32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 4], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]], 4], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
-//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  VSCALE-SAME:       outs(%[[OUTS]] :
-//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//     CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//     CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//  WITH-SVE-DAG: #[[$MAP2:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+//   CHECK-LABEL: func @matmul_lowering_i8i8i32_aarch64_dotprod()
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
+//     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
+//     CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//     CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//     CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP1]]()[%[[K]]]
+//         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_M]], %[[TILED_K]]}
+//        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+//      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
+//      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//      WITH-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP2]]()[%[[N]], %[[C8_VSCALE]]]
+//         CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_N]], %[[TILED_K]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x4xi8>>{%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]]}
+//         CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xi32>>{%[[TILED_M]], %[[TILED_N]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xi32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//         CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//    CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 4], strides = [1, 1, 1, 1]
+//         CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 8, 4], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]], 4], strides = [1, 1, 1, 1]
+//         CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//         CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+//    CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+//    CHECK-SAME:       outs(%[[OUTS]] :
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
 
 // -----
 
@@ -629,63 +560,42 @@ func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
       -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
   return
 }
-//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_aarch64_i8mm()
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
-//   CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//   CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP0]]()[%[[K]]]
-//       CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_M]], %[[TILED_K]]}
-//       CHECK:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
-//       CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_N]], %[[TILED_K]]}
-//       CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xi32>>{%[[TILED_M]], %[[TILED_N]]}
-//       CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 8], strides = [1, 1, 1, 1]
-//       CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 8, 8], strides = [1, 1, 1, 1]
-//       CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-//       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
-//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  CHECK-SAME:       outs(%[[OUTS]] :
-//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
-
-//   VSCALE-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   VSCALE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-// VSCALE-LABEL: func @matmul_lowering_i8i8i32_aarch64_i8mm()
-//   VSCALE-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   VSCALE-DAG:   %[[C8:.+]] = arith.constant 8 : index
-//   VSCALE-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//   VSCALE-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//   VSCALE-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
-//   VSCALE-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//   VSCALE-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP0]]()[%[[K]]]
-//       VSCALE:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_M]], %[[TILED_K]]}
-//       VSCALE:   %[[VSCALE:.+]] = vector.vscale
-//       VSCALE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
-//       VSCALE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
-//       VSCALE:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x8xi8>>{%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  VSCALE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xi32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
-//       VSCALE:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 8], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]], 8], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
-//       VSCALE:   %[[MMT4D:.+]] = linalg.mmt4d
-//  VSCALE-SAME:       ins(%[[LHS]], %[[RHS]] :
-//  VSCALE-SAME:       outs(%[[OUTS]] :
-//       VSCALE:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
-//  VSCALE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//     CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  WITH-SVE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+//   CHECK-LABEL: func @matmul_lowering_i8i8i32_aarch64_i8mm()
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
+//     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
+//     CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//     CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
+//     CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP0]]()[%[[K]]]
+//         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_M]], %[[TILED_K]]}
+//        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+//      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
+//      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+//      WITH-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
+//         CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_N]], %[[TILED_K]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x8xi8>>{%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]]}
+//         CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   NO-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x8xi32>>{%[[TILED_M]], %[[TILED_N]]}
+// WITH-SVE-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xi32>>{%[[TILED_M]], %[[TILED_N]], %[[C8_VSCALE]]}
+//         CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+//    CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 8], strides = [1, 1, 1, 1]
+//         CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], %[[C8_VSCALE]], 8], strides = [1, 1, 1, 1]
+//         CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
+//         CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+//    CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+//    CHECK-SAME:       outs(%[[OUTS]] :
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+//   NO-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+// WITH-SVE-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, %[[C8_VSCALE]]], strides = [1, 1, 1, 1]
 
 // -----
 

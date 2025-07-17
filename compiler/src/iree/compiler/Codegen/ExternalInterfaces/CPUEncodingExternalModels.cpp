@@ -41,8 +41,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
@@ -51,6 +51,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-cpu-encoding-external-models"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::CPU {
 
@@ -69,8 +71,11 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
                      DictionaryAttr config) {
   // TODO(egebeysel): I think this isScalable*Enabled flag should be temporary
   // and the temporary SME flag should probably come next to it.
-  if (!isAArch64(config) || !isScalableVectorizationEnabled())
+  if (!isAArch64(config) || !isScalableVectorizationEnabled()) {
+    LDBG("Pre-conditions to enable scalable tiling are not met!");
     return failure();
+  }
+
   std::optional<unsigned> mDim =
       cDims.m.empty() ? std::nullopt
                       : encoding.mapDimToOperandIndex(cDims.m[0]);
@@ -79,19 +84,17 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
                       : encoding.mapDimToOperandIndex(cDims.n[0]);
   std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims.k[0]);
   IREE::Codegen::ScalableTileFlags scalableTiles;
-  // TODO(egebeysel): Choosing between SME
-  // & SVE should also probably reside around here. I guess we could also just
-  // choose SME and then have the fallback option implemented with
-  // 2DScalableTo1D pass and also even from 1D to non-scalable. Currently,
-  // hard-coded to pick SVE since SME with DT is not yet supported.
+  // TODO(egebeysel): Add logic for SME.
   if (mDim.has_value()) {
-    scalableTiles.push_back(/* dtWithSME */ false &&
-                            hasFeature(config, "+sme"));
+    if (hasFeature(config, "+sme")) {
+      LDBG("SME with data-tiling is not supported yet!");
+      return failure();
+    }
+    scalableTiles.push_back(false);
   }
   if (nDim.has_value()) {
-    scalableTiles.push_back(
-        /* dtWithSVE */ true &&
-        (hasFeature(config, "+sve") || hasFeature(config, "+sve2")));
+    scalableTiles.push_back(hasFeature(config, "+sve") ||
+                            hasFeature(config, "+sve2"));
   }
   if (kDim.has_value()) {
     scalableTiles.push_back(false);
@@ -260,10 +263,8 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
-    LLVM_DEBUG(llvm::dbgs()
-               << "candidate: "
-               << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
-               << " penalty:" << ratedTile.paddingPenalty << "\n");
+    LDBG("candidate: " << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
+                       << " penalty:" << ratedTile.paddingPenalty);
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -278,11 +279,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // Sanity check. This assert can only fail if there's a programming mistake
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
-  LLVM_DEBUG(
-      llvm::dbgs() << "bestRatedTile: "
-                   << llvm::interleaved(ArrayRef{
-                          bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
-                   << " penalty:" << bestRatedTile.paddingPenalty << "\n");
+  LDBG("bestRatedTile: " << llvm::interleaved(ArrayRef{bestRatedTile.M,
+                                                       bestRatedTile.N,
+                                                       bestRatedTile.K})
+                         << " penalty:" << bestRatedTile.paddingPenalty);
   return bestRatedTile;
 }
 
@@ -446,9 +446,8 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
                                                        DictionaryAttr config) {
-  // TODO(egebeysel): We currently enable SVE and the tile size selection should
-  // in theory be scalability-agnostic. Although we should back this up by
-  // emprical data.
+  // For SVE and scalable vectors, this methods selects base sizes that match
+  // the NEON fixed-width sizes.
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];

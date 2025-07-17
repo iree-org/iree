@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-specialize-encodings)' --verify-diagnostics %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-specialize-encodings)' --iree-llvmcpu-enable-scalable-vectorization=true --verify-diagnostics %s | FileCheck %s --check-prefix=VSCALE
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-specialize-encodings)' --iree-llvmcpu-enable-scalable-vectorization=true --verify-diagnostics %s | FileCheck %s --check-prefix=WITH-SVE
 
 //------------------------------------------------------------------------------
 // IREE::CPU encoding layout specialization tests.
@@ -33,10 +33,10 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index, index)
 // CHECK:         %[[D1_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING1]]>
 // CHECK:         return %[[D0_RES]], %[[D1_RES]]
 
-// VSCALE-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}], scalableTiles = [{{.+}}]}
-// VSCALE-LABEL: util.func public @tensor_sizeof
-// VSCALE:         %[[D0_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING0]]>
-// VSCALE:         return {{.+}}, %[[D0_RES]]
+// WITH-SVE-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}], scalableTiles = [{{.+}}]}
+// WITH-SVE-LABEL: util.func public @tensor_sizeof
+// WITH-SVE:         %[[D0_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING0]]>
+// WITH-SVE:         return {{.+}}, %[[D0_RES]]
 
 // -----
 

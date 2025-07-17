@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
@@ -61,11 +60,25 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
             << llvm::interleaved_array(swizzle.permutation) << "}";
 }
 
+static llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os, const ScalableTileFlags &scalableTileFlags) {
+  if (scalableTileFlags.empty())
+    return os;
+  os << "scalableTiles = [";
+  for (unsigned i = 0; i < scalableTileFlags.size(); ++i) {
+    os << (scalableTileFlags[i] ? "true" : "false");
+    if (i + 1 < scalableTileFlags.size())
+      os << ", ";
+  }
+  return os;
+}
+
 bool operator==(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs) {
   return lhs.innerDimsPos == rhs.innerDimsPos &&
          lhs.innerTileSizes == rhs.innerTileSizes &&
-         lhs.outerDimsPerm == rhs.outerDimsPerm && lhs.swizzle == rhs.swizzle;
+         lhs.outerDimsPerm == rhs.outerDimsPerm && lhs.swizzle == rhs.swizzle &&
+         lhs.scalableTiles == rhs.scalableTiles;
 }
 
 bool operator!=(const MaterializeEncodingInfo &lhs,
@@ -81,7 +94,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
      << llvm::interleaved(encodingInfo.outerDimsPerm);
 
   if (encodingInfo.swizzle) {
-    os << ", swizzle = " << encodingInfo.swizzle.value();
+    os << "], swizzle = " << encodingInfo.swizzle.value();
+  }
+  if (encodingInfo.scalableTiles) {
+    os << "], " << encodingInfo.scalableTiles.value();
   }
   os << "]}";
   return os;
@@ -269,11 +285,11 @@ deserializeEncodingInfo(DictionaryAttr attr) {
 }
 
 bool isIdentityLayout(const MaterializeEncodingInfo &info) {
-  // It is not an identity layout if swizzle is present. The swizzle is an
-  // optional variable. User should not set the field when they do not need
-  // swizzle.
+  // It is not an identity layout if swizzle is present. The swizzle and
+  // scalableTiles are optional variables. User should not set the fields when
+  // they do not need them.
   return info.innerDimsPos.empty() && info.innerTileSizes.empty() &&
-         info.outerDimsPerm.empty() && !info.swizzle;
+         info.outerDimsPerm.empty() && !info.swizzle && !info.scalableTiles;
 }
 
 SmallVector<int64_t>
