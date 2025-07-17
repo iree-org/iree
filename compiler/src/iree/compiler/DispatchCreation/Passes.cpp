@@ -33,6 +33,13 @@ static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
     llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableEarlyTruncFusion(
+    "iree-dispatch-creation-enable-early-trunc-fusion",
+    llvm::cl::desc(
+        "Enable element-wise fusion of bit-truncate operation with their "
+        "consumers before forming dispatch regions"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     "iree-dispatch-creation-enable-fuse-padding-into-linalg-consumer-ops",
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
@@ -130,7 +137,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             ElementwiseOpFusionPassOptions{
                 /*intraDispatch=*/false,
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
-                /*fuseTruncateOps=*/false});
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -149,7 +156,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             ElementwiseOpFusionPassOptions{
                 /*intraDispatch=*/false,
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
-                /*fuseTruncateOps=*/false});
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
