@@ -180,7 +180,7 @@ func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -
 
 // -----
 
-// The test case demonstrate that the rootOp can mismatch the result of
+// The test case demonstrates that the rootOp can mismatch the result of
 // `getRootOperation()` method. It prioritizes the operation that has workgroup
 // tiling level, if only one op has such config.
 
