@@ -113,7 +113,7 @@ util.func @mixed_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x32
   util.return %truncf : tensor<2x128x128x320xf16>
 }
 // CHECK-LABEL: func public @mixed_conv(
-//       CHECK:   flow.dispatch.workgroups
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[FILL:.+]] = linalg.fill
 //       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:         outs(%[[FILL]] :

@@ -162,6 +162,11 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   // producer-consumer fusion.
   passManager.addPass(DispatchCreation::createSinkReshapesPass());
   passManager.addPass(createMakeSingleDispatchForFunctionPass());
+  passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
+      DispatchCreation::ElementwiseOpFusionPassOptions{
+          /*intraDispatch=*/true,
+          /*fuseMultiReduction=*/false,
+          /*fuseTruncateOps=*/true}));
 }
 
 void registerPreprocessingPasses() {

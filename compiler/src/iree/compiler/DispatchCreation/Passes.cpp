@@ -33,6 +33,13 @@ static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
     llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableEarlyTruncFusion(
+    "iree-dispatch-creation-enable-early-trunc-fusion",
+    llvm::cl::desc(
+        "Enable element-wise fusion of bit-truncate operation with their "
+        "consumers before forming dispatch regions"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     "iree-dispatch-creation-enable-fuse-padding-into-linalg-consumer-ops",
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
@@ -120,7 +127,9 @@ static void addDispatchRegionCreationPreprocessingPasses(
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
-                clEnableElementWiseFuseMultiReduction});
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -137,7 +146,9 @@ static void addDispatchRegionCreationPreprocessingPasses(
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
-                clEnableElementWiseFuseMultiReduction});
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -217,7 +228,14 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
                 clEnableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
-      // Clone all producers into the dispatch region to prepare for being
+      // Elementwise fuse operations that are iside a dispatch if possible.
+      .addPass([&]() {
+        return DispatchCreation::createElementwiseOpFusionPass(
+            ElementwiseOpFusionPassOptions{/*intraDispatch=*/true,
+                                           /*fuseMultiReduction=*/false,
+                                           /*fuseTruncateOps=*/true});
+      })
+      // Clone all producers into the dispatch region to perpare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
@@ -358,12 +376,34 @@ void registerDispatchCreationPasses() {
 }
 
 void registerDispatchCreationPipelines() {
-  PassPipelineRegistration<TransformOptions> dispatchCreationPipeline(
-      "iree-dispatch-creation-pipeline",
-      "Flag used to run passes that form dispatch regions",
-      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
-        buildDispatchCreationPassPipeline(passManager, transformOptions);
-      });
+
+  /// Helper struct when registering pass pipeline options.
+  struct DispatchCreationPipelineOptions
+      : public PassPipelineOptions<DispatchCreationPipelineOptions> {
+    Option<bool> aggressiveFusion{
+        *this,
+        "aggressive-fusion",
+        llvm::cl::desc(
+            "Enable aggressive fusion for dispatch creation pipeline"),
+        llvm::cl::init(false),
+    };
+
+    TransformOptions toTransformOptions() const {
+      DispatchCreationOptions options;
+      options.enableAggressiveFusion = aggressiveFusion;
+      return TransformOptions{.options = options};
+    }
+  };
+
+  PassPipelineRegistration<DispatchCreationPipelineOptions>
+      dispatchCreationPipeline(
+          "iree-dispatch-creation-pipeline",
+          "Flag used to run passes that form dispatch regions",
+          [](OpPassManager &passManager,
+             const DispatchCreationPipelineOptions &options) {
+            buildDispatchCreationPassPipeline(passManager,
+                                              options.toTransformOptions());
+          });
 
   PassPipelineRegistration<TransformOptions>
       dispatchCreationPreprocessingPipeline(
