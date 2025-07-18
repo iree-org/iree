@@ -3,7 +3,8 @@
 	url = https://github.com/google/googletest.git
 [submodule "third_party/llvm-project"]
 	path = third_party/llvm-project
-	url = https://github.com/iree-org/llvm-project.git
+	url = https://github.com/aaronmondal/llvm-project.git
+	branch = add-bzlmod-support
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
@@ -31,6 +32,7 @@
 [submodule "third_party/stablehlo"]
 	path = third_party/stablehlo
 	url = https://github.com/iree-org/stablehlo.git
+    branch = main
 [submodule "third_party/torch-mlir"]
 	path = third_party/torch-mlir
 	url = https://github.com/iree-org/torch-mlir.git
