@@ -3,6 +3,7 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=partial_reduction}, canonicalize, cse))" %s | FileCheck %s --check-prefix=PARTRED
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{normalize-loops}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NORM-REDUCTION
 
 #config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -536,3 +537,67 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 //       PARTRED:   scf.yield
 //       PARTRED:   linalg.reduce ins(%[[OUT]] : tensor<?x8xf32>)
 //  PARTRED-SAME:                 outs(%[[FULL]] : tensor<?xf32>)
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 32]}>
+func.func @swap_collapse_shape_with_extract_slice(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x3x3x288xf32> into tensor<32x2592xf32>
+  %empty = tensor.empty() : tensor<32x2592xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x2592xf32>) outs(%empty : tensor<32x2592xf32>) -> tensor<32x2592xf32>
+  return %0: tensor<32x2592xf32>
+}
+
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice
+//   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   NORM-REDUCTION-DAG:   %[[C81:.+]] = arith.constant 81 : index
+//   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       NORM-REDUCTION:   scf.for %[[ARG1:.+]] = %[[C0]] to %[[C81]] step %[[C1]]
+//       NORM-REDUCTION:     %[[APPLY:.+]] = affine.apply affine_map<(d0) -> (d0 * 32)>(%[[ARG1]])
+//       NORM-REDUCTION:     %[[IDX:.+]]:3 = affine.delinearize_index %[[APPLY]] into (3, 3, 288) : index, index, index
+//       NORM-REDUCTION:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[0, %[[IDX]]#0, %[[IDX]]#1, %[[IDX]]#2] [32, 1, 1, 32] [1, 1, 1, 1] : tensor<32x3x3x288xf32> to tensor<32x1x1x32xf32>
+//       NORM-REDUCTION:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0], [1, 2, 3]] : tensor<32x1x1x32xf32> into tensor<32x32xf32>
+//       NORM-REDUCTION:     linalg.copy {{.*}} ins(%[[COLLAPSE]]
+
+// Without loop normalization, no swap would happen.
+//                CHECK:   tensor.collapse_shape
+//                CHECK:   scf.for
+//                CHECK:     tensor.extract_slice
+//            CHECK-NOT:     tensor.collapse_shape
+//                CHECK:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
+func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x3x3x288xf32> into tensor<32x2592xf32>
+  %empty = tensor.empty() : tensor<32x2592xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x2592xf32>) outs(%empty : tensor<32x2592xf32>) -> tensor<32x2592xf32>
+  return %0: tensor<32x2592xf32>
+}
+
+// No swap would happen when collapsed size is not divisible by offset multiplier.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+//       NORM-REDUCTION:   tensor.collapse_shape
+//       NORM-REDUCTION:   scf.for
+//       NORM-REDUCTION:     tensor.extract_slice
+//   NORM-REDUCTION-NOT:     tensor.collapse_shape
+//       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 32]}>
+func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf32>) -> tensor<32x64xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x2x2x16xf32> into tensor<32x64xf32>
+  %empty = tensor.empty() : tensor<32x64xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x64xf32>) outs(%empty : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %0: tensor<32x64xf32>
+}
+
+// No swap would happen when the last expanded size is not divisible by collapse size.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_2
+//       NORM-REDUCTION:   tensor.collapse_shape
+//       NORM-REDUCTION:   scf.for
+//       NORM-REDUCTION:     tensor.extract_slice
+//   NORM-REDUCTION-NOT:     tensor.collapse_shape
+//       NORM-REDUCTION:     linalg.copy
