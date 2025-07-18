@@ -142,13 +142,6 @@ void ElementwiseOpFusionPass::runOnOperation() {
           return false;
         }
 
-        // If `intraDispatch` is true, make sure that producer and consumer are
-        // inside dispatch.
-        if (intraDispatch &&
-            IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
-          return false;
-        }
-
         // If `intraDispatch` is false, make sure that the producer and consumer
         // are outside dispatch.
         if (!intraDispatch &&

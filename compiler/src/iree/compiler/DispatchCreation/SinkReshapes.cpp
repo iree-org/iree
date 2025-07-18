@@ -50,8 +50,7 @@ struct SinkReshapesPass final
 /// we just approximate it (and try to be optimistic)
 static bool isFusableUsingTileAndFuse(Operation *producer,
                                       Operation *consumer) {
-  return IREE::LinalgExt::isBitTruncateOp(producer) ||
-         llvm::isa_and_nonnull<IREE::LinalgExt::LinalgFusionOpInterface,
+  return llvm::isa_and_nonnull<IREE::LinalgExt::LinalgFusionOpInterface,
                                linalg::LinalgOp, linalg::UnPackOp,
                                IREE::Encoding::UnsetEncodingOp>(producer);
 }
