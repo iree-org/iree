@@ -46,29 +46,29 @@ struct PropagateEncodingsPass
 
 LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
     IREE::Encoding::SetEncodingOp encodingOp, PatternRewriter &rewriter) const {
-  Value target = encodingOp.getSource();
+  auto collapseOp =
+      encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+  if (!collapseOp) {
+    return rewriter.notifyMatchFailure(encodingOp,
+                                       "expected a collapse_shape producer");
+  }
+  auto target = cast<OpResult>(collapseOp.getResult());
   auto propagationAttrInterface =
       dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
           encodingOp.getResultType().getEncoding());
   if (!propagationAttrInterface ||
-      !propagationAttrInterface.isPropagable(target)) {
+      !propagationAttrInterface.isPropagableUp(target)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "the propagation attribute interface isn't defined or the "
                     "target isn't propagable");
   }
   // Get the encoding attributes for the operands and results of the operation.
   FailureOr<IREE::Encoding::PropagationEncoding> propagationEncodings =
-      propagationAttrInterface.generateEncodings(target);
+      propagationAttrInterface.generateBubblingEncodings(target);
   if (failed(propagationEncodings)) {
     return rewriter.notifyMatchFailure(encodingOp,
                                        "not able to determine propagation "
                                        "attributes for operands and results");
-  }
-  auto collapseOp =
-      encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
-  if (!collapseOp) {
-    return rewriter.notifyMatchFailure(encodingOp,
-                                       "expected a collapse_shape producer");
   }
   if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
       !IREE::Flow::isNonNullAndOutsideDispatch(collapseOp)) {
@@ -91,7 +91,7 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
     return rewriter.notifyMatchFailure(
         encodingOp, "not able to propagate encodings and find replacement");
   }
-  rewriter.replaceOp(encodingOp, maybeResult->replacement);
+  rewriter.replaceOp(encodingOp, maybeResult->replacements[0]);
   return success();
 }
 

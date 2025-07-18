@@ -70,9 +70,9 @@ struct PropagationResult {
   // the propagation.
   SmallVector<Operation *> generatedEncodingOps;
 
-  // The new corresponding result that is created by the propagation. It is
-  // returned to the caller for further transformation or replacement.
-  Value replacement;
+  // The new results created after propagating an encoding through an operation.
+  // It is returned to the caller for further transformation or replacement.
+  SmallVector<Value> replacements;
 };
 
 } // namespace mlir::iree_compiler::IREE::Encoding
