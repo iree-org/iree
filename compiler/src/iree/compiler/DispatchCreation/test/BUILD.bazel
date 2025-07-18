@@ -46,6 +46,7 @@ iree_lit_test_suite(
             "pad_fusion_with_producer.mlir",
             "pipeline_tests.mlir",
             "propagate_encodings.mlir",
+            "pipeline_tests_aggressive.mlir",
             "set_encoding.mlir",
             "set_encoding_padding.mlir",
             "set_encoding_pipeline.mlir",
