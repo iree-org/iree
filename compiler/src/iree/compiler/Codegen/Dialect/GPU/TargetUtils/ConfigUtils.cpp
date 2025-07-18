@@ -123,6 +123,54 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+/// Sort the MMA intrinsics by following precedence rules:
+///   1) k-alignment. We prefer intrinsics that can evenly divide the K
+///   dimension of the problem.
+///   2) M/N-alignment. We prefer intrinsics that can evenly divide the M and N
+///   dimensions of the problem.
+///   3) Intrinsic with larger gemm size.
+///   4) Intrinsic with larger K size.
+static void sortMMAIntrinsics(GPUMatmulShapeType problem,
+                              SmallVector<GPUIntrinsicType> &intrinsics) {
+  llvm::sort(intrinsics, [&](const GPUMatmulShapeType &lhs,
+                             const GPUMatmulShapeType &rhs) {
+    // Prefer K-aligned intrinsics.
+    int lhsKAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
+    int rhsKAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
+    if (lhsKAligned != rhsKAligned) {
+      return lhsKAligned > rhsKAligned;
+    }
+
+    // If K alignment is the same, prefer the intrinsic that aligns M and N.
+    int lhsMNAligned = (problem.mSizes.back() % lhs.mSizes.back() == 0 &&
+                        problem.nSizes.back() % lhs.nSizes.back() == 0)
+                           ? 1
+                           : 0;
+    int rhsMNAligned = (problem.mSizes.back() % rhs.mSizes.back() == 0 &&
+                        problem.nSizes.back() % rhs.nSizes.back() == 0)
+                           ? 1
+                           : 0;
+    if (lhsMNAligned != rhsMNAligned) {
+      return lhsMNAligned > rhsMNAligned;
+    }
+
+    auto intrinsicArea = [&](const GPUMatmulShapeType &intrinsic) {
+      return (ShapedType::getNumElements(intrinsic.mSizes) +
+              ShapedType::getNumElements(intrinsic.nSizes)) *
+             ShapedType::getNumElements(intrinsic.kSizes);
+    };
+    int64_t lhsArea = intrinsicArea(lhs);
+    int64_t rhsArea = intrinsicArea(rhs);
+    if (lhsArea != rhsArea) {
+      return lhsArea > rhsArea;
+    }
+
+    // Finally if everything else is the same, prefer large K size.
+    return ShapedType::getNumElements(lhs.kSizes) >
+           ShapedType::getNumElements(rhs.kSizes);
+  });
+}
+
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
@@ -130,7 +178,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
     bool doCPromotion = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUIntrinsicType> intrinsics;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     // Intrinsics that do not specify a distribution kind cannot be distributed.
     if (!mma.getDistributionMappingKind())
@@ -140,10 +188,11 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   }
   if (intrinsics.empty())
     return std::nullopt;
+  sortMMAIntrinsics(problem, intrinsics);
 
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
@@ -347,8 +396,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::GPU::MmaInterfaceAttr mmaKind =
-      target.getWgp().getMma()[schedule->index];
+  IREE::GPU::MmaInterfaceAttr mmaKind = schedule->mmaKind;
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
@@ -363,10 +411,12 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   if (mustBeAligned) {
-    bool directLoadArray[] = {true, true};
-    ArrayRef<bool> directLoadOperands =
-        useDirectLoad ? directLoadArray : ArrayRef<bool>{};
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, directLoadOperands);
+    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
+    ArrayRef<Attribute> promotionTypes =
+        useDirectLoad ? ArrayRef<Attribute>(promotionArray)
+                      : ArrayRef<Attribute>{};
+    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, promotionTypes);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
@@ -501,7 +551,7 @@ static bool isNonMatvecContraction(Operation *op) {
   if (!linalgOp) {
     return false;
   }
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
   if (failed(contractionDims)) {

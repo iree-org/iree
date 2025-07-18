@@ -313,9 +313,8 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
 /// amount of data read from global memory, per workgroup, respecting the
 /// heuristic seeds.
 static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
-                                            const GPUMatmulShapeType &intrinsic,
-                                            const GPUMMAHeuristicSeeds &seeds,
-                                            uint64_t intrinsicIndex) {
+                                            const GPUIntrinsicType &intrinsic,
+                                            const GPUMMAHeuristicSeeds &seeds) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() == 1 &&
          "expected intrinsic to have a single M, N, and K dimension.");
@@ -406,24 +405,23 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       getBestKTileSizes(problem, intrinsic, seeds);
 
   return GPUMMASchedule{
-      intrinsicIndex,      intrinsic.mSizes[0], intrinsic.nSizes[0],
+      intrinsic.mmaKind,   intrinsic.mSizes[0], intrinsic.nSizes[0],
       intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,
       mTileSizes,          nTileSizes,          kTileSizes};
 }
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
-    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
+    const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
     bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
-  for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
+  for (const GPUIntrinsicType &intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
     }
 
-    GPUMMASchedule schedule =
-        getOptimalMMASchedule(problem, intrinsic, seeds, index);
+    GPUMMASchedule schedule = getOptimalMMASchedule(problem, intrinsic, seeds);
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
@@ -431,12 +429,9 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     });
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
-      int64_t lhsBitwidth =
-          intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth =
-          intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
-      int64_t resultBitwidth =
-          intrinsics[schedule.index].cType.getIntOrFloatBitWidth();
+      int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
+      int64_t rhsBitwidth = intrinsic.bType.getIntOrFloatBitWidth();
+      int64_t resultBitwidth = intrinsic.cType.getIntOrFloatBitWidth();
       bool isAligned =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);
@@ -464,9 +459,10 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
 /// Choose an optimal attention PV schedule with the heuristic that minimized
 /// the total amount of data read from global memory, per workgroup, respecting
 /// the heuristic seeds.
-static GPUMMASchedule getOptimalAttentionPVSchedule(
-    const GPUMatmulShapeType &problem, const GPUMatmulShapeType &intrinsic,
-    const GPUMMAHeuristicSeeds &seeds, uint64_t intrinsicIndex) {
+static GPUMMASchedule
+getOptimalAttentionPVSchedule(const GPUMatmulShapeType &problem,
+                              const GPUIntrinsicType &intrinsic,
+                              const GPUMMAHeuristicSeeds &seeds) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() == 1 &&
          "expected intrinsic to have a single M, N, and K dimension.");
@@ -530,14 +526,14 @@ static GPUMMASchedule getOptimalAttentionPVSchedule(
       getBestKTileSizes(problem, intrinsic, seeds);
 
   return GPUMMASchedule{
-      intrinsicIndex,      intrinsic.mSizes[0], intrinsic.nSizes[0],
+      intrinsic.mmaKind,   intrinsic.mSizes[0], intrinsic.nSizes[0],
       intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,
       mTileSizes,          nTileSizes,          kTileSizes};
 }
 
 FailureOr<GPUMMASchedule> deduceAttentionSchedule(
     const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
-    ArrayRef<GPUMatmulShapeType> intrinsics,
+    ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &pvMatmulSeeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, bool transposedQ, bool transposedK, bool transposedV,
     bool canUpcastAcc, bool mustBeAligned) {
@@ -545,7 +541,7 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
          pvMatmul.kSizes.size() == 1 && qkMatmul.mSizes.size() == 1 &&
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
-  for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
+  for (const GPUIntrinsicType &intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
@@ -556,8 +552,8 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
       continue;
     }
 
-    GPUMMASchedule schedule = getOptimalAttentionPVSchedule(
-        pvMatmul, intrinsic, pvMatmulSeeds, index);
+    GPUMMASchedule schedule =
+        getOptimalAttentionPVSchedule(pvMatmul, intrinsic, pvMatmulSeeds);
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
@@ -570,7 +566,7 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
       // qkMatmul.M = pvMatmul.M
       // qkMatmul.N = pvMatmul.K
       // qkMatmul.K = problem.K
-      GPUMMASchedule qkSchedule{schedule.index,
+      GPUMMASchedule qkSchedule{schedule.mmaKind,
                                 schedule.mSize,
                                 schedule.kSize,
                                 intrinsicK,
@@ -589,10 +585,8 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
       bool isPVAligned = isValidMMASchedule(pvMatmul, schedule, mustBeAligned,
                                             subgroupSize, false, transposedV);
 
-      int64_t lhsBitwidth =
-          intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth =
-          intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
+      int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
+      int64_t rhsBitwidth = intrinsic.bType.getIntOrFloatBitWidth();
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
                                      qkSchedule, lhsBitwidth, rhsBitwidth) +
                                  calculateOperandsSharedMemoryUsedInBytes(

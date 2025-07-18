@@ -15,6 +15,11 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
+namespace mlir::iree_compiler::IREE::GPU {
+Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
+                           Attribute attr);
+} // namespace mlir::iree_compiler::IREE::GPU
+
 // clang-format off
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h.inc"

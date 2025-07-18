@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target, iree-llvmcpu-check-ir-before-llvm-conversion))' --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -340,10 +340,8 @@ func.func @dispatch() attributes {hal.executable.target = #executable_target_emb
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0], [1, 1, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]]>
-#config1 = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0, 0, 0], [1, 1, 0, 1, 128, 0], [0, 0, 1, 0, 0, 1]]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+fma,+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "all"}>
-func.func @unsupported_ukernel_fallback_to_vectorization() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_, translation_info = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>} {
+func.func @unsupported_ukernel_fallback_to_vectorization() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
   %c1024 = arith.constant 1024 : index
   %c132096 = arith.constant 132096 : index
@@ -354,8 +352,8 @@ func.func @unsupported_ukernel_fallback_to_vectorization() attributes {hal.execu
   %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 256, 1, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256x1x1xf32>> -> tensor<1x256x1x1xf32>
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [4, 256, 128, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x256x128x1xi8>> -> tensor<4x256x128x1xi8>
   %5 = tensor.empty() : tensor<1x4x1x128xf32>
-  %6 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%5 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
-  %7 = linalg.mmt4d {lowering_config = #config1} ins(%3, %4 : tensor<1x256x1x1xf32>, tensor<4x256x128x1xi8>) outs(%6 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
+  %7 = linalg.mmt4d ins(%3, %4 : tensor<1x256x1x1xf32>, tensor<4x256x128x1xi8>) outs(%6 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 4, 1, 128], strides = [1, 1, 1, 1] : tensor<1x4x1x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x4x1x128xf32>>
   return
 }
@@ -424,3 +422,104 @@ func.func @fuse_inputs_reduction() attributes {hal.executable.target = #executab
 //     CHECK:        vector.load
 // CHECK-NOT:        scf.for
 //     CHECK:        arith.addf
+
+// -----
+
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", max_stack_allocation_size = 32768 : i64, native_vector_size = 16 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "none"}>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+module {
+  func.func @mmt4d_bias_relu() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+    %c0 = arith.constant 0 : index
+    %c32_i64 = arith.constant 32 : i64
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+    %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+    %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
+    %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
+    %5 = arith.index_castui %0 : i32 to index
+    %6 = arith.index_castui %1 : i32 to index
+    %7 = arith.index_castui %2 : i32 to index
+    %8 = arith.index_castui %3 : i32 to index
+    %9 = arith.index_castui %4 : i32 to index
+    %36 = iree_tensor_ext.dispatch.workload.ordinal %5, 0 : index
+    %37 = iree_tensor_ext.dispatch.workload.ordinal %6, 1 : index
+    %38 = iree_tensor_ext.dispatch.workload.ordinal %7, 2 : index
+    %39 = iree_tensor_ext.dispatch.workload.ordinal %8, 3 : index
+    %40 = iree_tensor_ext.dispatch.workload.ordinal %9, 4 : index
+    %41 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%39, %36}
+    %42 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%37, %40}
+    %43 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x16xf32>>{%38}
+    %44 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x16x16xf32>>{%39, %40}
+    %45 = iree_tensor_ext.dispatch.tensor.load %41, offsets = [0, 0, 0, 0], sizes = [%39, %36, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%39, %36} -> tensor<?x?x16x1xf32>
+    %46 = iree_tensor_ext.dispatch.tensor.load %42, offsets = [0, 0, 0, 0], sizes = [%37, %40, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%37, %40} -> tensor<?x?x16x1xf32>
+    %47 = iree_tensor_ext.dispatch.tensor.load %43, offsets = [0, 0], sizes = [%38, 16], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x16xf32>>{%38} -> tensor<?x16xf32>
+    %48 = tensor.empty(%39, %40) : tensor<?x?x16x16xf32>
+    %49 = linalg.fill ins(%cst : f32) outs(%48 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32>
+    %50 = linalg.mmt4d ins(%45, %46 : tensor<?x?x16x1xf32>, tensor<?x?x16x1xf32>) outs(%49 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32>
+    %51 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%50, %47 : tensor<?x?x16x16xf32>, tensor<?x16xf32>) outs(%48 : tensor<?x?x16x16xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %52 = arith.addf %in, %in_0 : f32
+      %53 = arith.maximumf %52, %cst : f32
+      linalg.yield %53 : f32
+    } -> tensor<?x?x16x16xf32>
+    iree_tensor_ext.dispatch.tensor.store %51, %44, offsets = [0, 0, 0, 0], sizes = [%39, %40, 16, 16], strides = [1, 1, 1, 1] : tensor<?x?x16x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x16x16xf32>>{%39, %40}
+    return
+  }
+}
+// CHECK-LABEL: func.func @mmt4d_bias_relu
+// CHECK-NOT:     memref.alloc
+// CHECK:         scf.forall
+// CHECK:           scf.for
+// CHECK:             vector.fma
+// CHECK:             vector.insert
+// CHECK:           arith.addf
+
+// -----
+
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", native_vector_size = 64 : i64, ukernels = "none"}>
+func.func @mmt4d_unpack_elementwise() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
+  %4 = arith.index_castui %0 : i32 to index
+  %5 = arith.index_castui %1 : i32 to index
+  %6 = arith.index_castui %2 : i32 to index
+  %7 = arith.index_castui %3 : i32 to index
+  %8:4 = util.assume.int
+      %4<umin = 127552, umax = 480448>,
+      %5<umin = 32768, umax = 98304>,
+      %6[<umin = 557056, umax = 557056, udiv = 557056>, <umin = 994816, umax = 994816, udiv = 994816>, <umin = 1432576, umax = 1432576, udiv = 1432576>],
+      %7<umin = 32, umax = 96, udiv = 32>
+    : index, index, index, index
+  %9 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%8#2) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x23x16x1xf16>>
+  %10 = iree_tensor_ext.dispatch.workload.ordinal %8#3, 0 : index
+  %11 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%8#0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x23x1x1xf16>>{%10}
+  %12 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%8#1) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf16>>{%10}
+  %13 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x256xf16>>{%10}
+  %14 = iree_tensor_ext.dispatch.tensor.load %11, offsets = [0, 0, 0, 0], sizes = [%10, 23, 1, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x23x1x1xf16>>{%10} -> tensor<?x23x1x1xf16>
+  %15 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0, 0, 0, 0], sizes = [16, 23, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x23x16x1xf16>> -> tensor<16x23x16x1xf16>
+  %16 = iree_tensor_ext.dispatch.tensor.load %12, offsets = [0, 0], sizes = [%10, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf16>>{%10} -> tensor<?x256xf16>
+  %17 = tensor.empty(%10) : tensor<?x256xf16>
+  %18 = tensor.empty(%10) : tensor<?x16x1x16xf32>
+  %19 = linalg.fill ins(%cst : f32) outs(%18 : tensor<?x16x1x16xf32>) -> tensor<?x16x1x16xf32>
+  %20 = linalg.mmt4d ins(%14, %15 : tensor<?x23x1x1xf16>, tensor<16x23x16x1xf16>) outs(%19 : tensor<?x16x1x16xf32>) -> tensor<?x16x1x16xf32>
+  %21 = tensor.empty(%10) : tensor<?x256xf32>
+  %unpack = linalg.unpack %20 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 16] into %21 : tensor<?x16x1x16xf32> -> tensor<?x256xf32>
+  %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%16, %unpack : tensor<?x256xf16>, tensor<?x256xf32>) outs(%17 : tensor<?x256xf16>) {
+  ^bb0(%in: f16, %in_0: f32, %out: f16):
+    %23 = arith.truncf %in_0 : f32 to f16
+    %24 = arith.addf %in, %23 : f16
+    linalg.yield %24 : f16
+  } -> tensor<?x256xf16>
+  iree_tensor_ext.dispatch.tensor.store %22, %13, offsets = [0, 0], sizes = [%10, 256], strides = [1, 1] : tensor<?x256xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x256xf16>>{%10}
+  return
+}
+// Checks that the stack allocation is in bounds, which implies that the fusion
+// happens. Otherwise, it requires a large buffer for intermediate data.
+// CHECK-LABEL: func.func @mmt4d_unpack_elementwise

@@ -174,7 +174,8 @@ static bool isRootOp(Operation *op) {
     return !isa<linalg::FillOp>(op);
   }
   if (isa<TilingInterface>(op)) {
-    return !isa<IREE::LinalgExt::GatherOp, tensor::PadOp, linalg::PackOp>(op);
+    return !isa<IREE::LinalgExt::GatherOp, tensor::PadOp, tensor::ConcatOp,
+                linalg::PackOp>(op);
   }
   return isa<linalg::UnPackOp>(op);
 }
@@ -402,6 +403,9 @@ static bool makeConsumerFusableViaInterchange(
   // indexing map in the producer, do nothing.
   AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
       cast<OpResult>(fusableOperand.get()));
+  if (!producerIndexingMap) {
+    return false;
+  }
   producerIndexingMap = getProjectedMap(
       producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
   AffineMap consumerIndexingMap =
@@ -452,6 +456,53 @@ static bool makeConsumerFusableViaInterchange(
   (void)interchangedOp;
   assert(succeeded(interchangedOp) && "expected interchange to succeed");
   assert(interchangedOp.value() == consumer &&
+         "expected interchange to happen in place");
+  return true;
+}
+
+static bool makeProducerFusableViaInterchange(
+    OpOperand &fusableOperand,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
+  auto producer = fusableOperand.get().getDefiningOp<linalg::GenericOp>();
+  if (!producer) {
+    return false;
+  }
+
+  auto consumer = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(
+      fusableOperand.getOwner());
+  if (!consumer) {
+    return false;
+  }
+
+  if (!linalg::isElementwise(producer) || producer.getNumResults() != 1) {
+    return false;
+  }
+
+  AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
+      cast<OpResult>(fusableOperand.get()));
+  producerIndexingMap = getProjectedMap(
+      producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
+  AffineMap consumerIndexingMap =
+      consumer.getMatchingIndexingMap(&fusableOperand);
+  if (!consumerIndexingMap || !consumerIndexingMap.isPermutation() ||
+      producerIndexingMap == consumerIndexingMap) {
+    return false;
+  }
+
+  // Make the input map match the consumer map by applying a permutation map
+  AffineMap invProducerIndexingMap = inversePermutation(producerIndexingMap);
+  AffineMap permutationMap =
+      consumerIndexingMap.compose(invProducerIndexingMap);
+  auto perm = llvm::map_to_vector(permutationMap.getResults(),
+                                  [](AffineExpr e) -> unsigned {
+                                    return cast<AffineDimExpr>(e).getPosition();
+                                  });
+  IRRewriter rewriter(consumer->getContext());
+  FailureOr<linalg::GenericOp> interchangedOp =
+      linalg::interchangeGenericOp(rewriter, producer, perm);
+  (void)interchangedOp;
+  assert(succeeded(interchangedOp) && "expected interchange to succeed");
+  assert(interchangedOp.value() == producer &&
          "expected interchange to happen in place");
   return true;
 }
@@ -753,7 +804,12 @@ isFusableWithProducer(OpOperand &operand,
     }
   }
 
-  return areOpsFusable(producer, consumer, rootOuterParallelLoops);
+  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
+    if (!makeProducerFusableViaInterchange(operand, rootOuterParallelLoops)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -993,7 +1049,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       }
 
       if (failed(moveOperandDefs(rewriter, consumer, regionOp, dominanceInfo,
-                                 regionOp.getOperation()))) {
+                                 {}))) {
         continue;
       }
 

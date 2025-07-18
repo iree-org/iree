@@ -72,6 +72,8 @@ typedef uint64_t uintptr_t;
 #define IREE_AMDGPU_ATTRIBUTE_SINGLE_WORK_ITEM
 #define IREE_AMDGPU_ATTRIBUTE_PACKED __attribute__((__packed__))
 
+#define IREE_AMDGPU_ATTRIBUTE_MUSTTAIL [[clang::musttail]]
+
 #define IREE_AMDGPU_ATTRIBUTE_KERNEL \
   [[clang::amdgpu_kernel, gnu::visibility("protected")]]
 
@@ -132,6 +134,8 @@ static inline bool iree_amdgpu_has_alignment(size_t value, size_t alignment) {
 
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
+#define IREE_AMDGPU_OFFSETOF(type, field) __builtin_offsetof(type, field)
+
 // Returns the number of leading zeros in a 64-bit bitfield.
 // Returns -1 if no bits are set.
 // Commonly used in HIP as `__lastbit_u32_u64`.
@@ -144,6 +148,8 @@ static inline bool iree_amdgpu_has_alignment(size_t value, size_t alignment) {
 #define IREE_AMDGPU_LASTBIT_U64(v) ((v) == 0 ? -1 : __builtin_ctzl(v))
 
 #else
+
+#define IREE_AMDGPU_OFFSETOF(type, field) offsetof(type, field)
 
 #define IREE_AMDGPU_LASTBIT_U64(v) \
   ((v) == 0 ? -1 : iree_math_count_trailing_zeros_u64(v))

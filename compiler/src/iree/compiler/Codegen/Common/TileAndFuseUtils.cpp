@@ -5,8 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+
+#include <cassert>
 
 #define DEBUG_TYPE "iree-codegen-common-tile-and-fuse-utils"
 
@@ -46,36 +52,6 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
   }
 }
 
-bool warForConsumerFusionSSAViolation(
-    Operation *rootOp,
-    const llvm::SmallDenseSet<Operation *> &tiledAndFusedOps) {
-  auto linalgRootOp = dyn_cast<linalg::LinalgOp>(rootOp);
-  if (!linalgRootOp) {
-    return false;
-  }
-  SmallVector<utils::IteratorType> iteratorTypes =
-      linalgRootOp.getIteratorTypesArray();
-  for (AffineMap map :
-       llvm::map_range(linalgRootOp.getIndexingMaps(), [](Attribute attr) {
-         return cast<AffineMapAttr>(attr).getValue();
-       })) {
-    if (!compressUnusedDims(map).isIdentity()) {
-      return false;
-    }
-  }
-
-  for (OpOperand &use : linalgRootOp->getUses()) {
-    auto linalgUser = dyn_cast<linalg::LinalgOp>(use.getOwner());
-    if (!linalgUser) {
-      return false;
-    }
-    if (!linalgUser.getMatchingIndexingMap(&use).isIdentity()) {
-      return false;
-    }
-  }
-  return true;
-}
-
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result) {
   SmallVector<Operation *> worklist;
@@ -108,67 +84,80 @@ void collectTiledAndFusedOps(Operation *rootOp,
 FailureOr<std::queue<Operation *>>
 fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
                         MutableArrayRef<LoopLikeOpInterface> loops,
-                        bool useWARForConsumerFusionSSAViolation) {
-  auto addCandidateSlices =
-      [](Operation *fusedOp,
-         std::queue<tensor::ParallelInsertSliceOp> &candidates) {
-        for (auto *userOp : fusedOp->getResults().getUsers()) {
-          if (auto sliceOp =
-                  llvm::dyn_cast<tensor::ParallelInsertSliceOp>(userOp)) {
-            candidates.push(sliceOp);
-          }
-        }
-      };
-
+                        std::function<bool(Operation *)> filterFn) {
   // Collect the candidate slices which can be potential consumers that can be
   // fused.
-  std::queue<tensor::ParallelInsertSliceOp> candidates;
-  addCandidateSlices(tiledOp, candidates);
+  std::queue<SmallVector<Operation *>> candidates;
+  llvm::SmallDenseSet<tensor::ParallelInsertSliceOp> allCandidates;
+  auto addCandidateSlices = [&candidates, &allCandidates,
+                             &filterFn](Operation *fusedOp) {
+    for (auto *userOp : fusedOp->getResults().getUsers()) {
+      auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(userOp);
+      if (!sliceOp || allCandidates.contains(sliceOp)) {
+        continue;
+      }
+
+      auto currLoop =
+          cast<scf::ForallOp>(sliceOp->getParentOp()->getParentOp());
+      OpResult loopResult = currLoop.getTiedOpResult(
+          currLoop.getTiedOpOperand(cast<BlockArgument>(sliceOp.getDest())));
+      SmallVector<Operation *> users = llvm::to_vector(
+          llvm::make_filter_range(loopResult.getUsers(), filterFn));
+      if (users.empty()) {
+        continue;
+      }
+      mlir::computeTopologicalSorting(users);
+
+      Operation *fusableUser = users.front();
+      // Check all operands from the `scf.forall`
+      SmallVector<OpResult> loopResults;
+      for (OpOperand &opOperand : fusableUser->getOpOperands()) {
+        if (opOperand.get().getDefiningOp() == currLoop.getOperation()) {
+          loopResults.push_back(cast<OpResult>(opOperand.get()));
+        }
+      }
+
+      SmallVector<Operation *> fusedSlices;
+      for (OpResult result : loopResults) {
+        BlockArgument tiedBlockArg =
+            currLoop.getTiedBlockArgument(currLoop.getTiedOpOperand(result));
+        SmallVector<tensor::ParallelInsertSliceOp> slices = llvm::map_to_vector(
+            currLoop.getCombiningOps(tiedBlockArg), [](Operation *op) {
+              return cast<tensor::ParallelInsertSliceOp>(op);
+            });
+        llvm::append_range(fusedSlices, slices);
+        allCandidates.insert_range(slices);
+      }
+      if (!fusedSlices.empty()) {
+        candidates.emplace(std::move(fusedSlices));
+      }
+    }
+  };
+
+  addCandidateSlices(tiledOp);
 
   std::queue<Operation *> newFusionOpportunities;
   while (!candidates.empty()) {
-
     // Traverse the slices in BFS fashion.
-    tensor::ParallelInsertSliceOp candidateSliceOp = candidates.front();
+    SmallVector<Operation *> candidateSlices = candidates.front();
     candidates.pop();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp,
-                                              loops);
+        mlir::scf::tileAndFuseConsumerOfSlices(rewriter, candidateSlices,
+                                               loops);
     if (failed(fusedResult)) {
-      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
-                              << candidateSliceOp << "\n");
-      continue;
-    }
-
-    // Implement the WAR for consumer fusion SSA violation (as described below
-    // in the comments for `warForConsumerFusionSSAViolation`)
-    if (useWARForConsumerFusionSSAViolation) {
-      for (auto [tiledOpResult, loopResult] :
-           llvm::zip(tiledOp->getResults(), loops.back()->getResults())) {
-        for (OpOperand &use : loopResult.getUses()) {
-          Operation *user = use.getOwner();
-          if (user->getParentOp() != loops.back()) {
-            continue;
-          }
-          auto slice = dyn_cast<tensor::ExtractSliceOp>(user);
-          if (!slice) {
-            return failure();
-          }
-          rewriter.replaceAllOpUsesWith(slice, tiledOpResult);
-        }
-      }
+      return failure();
     }
 
     // Replace the original consumer operation with the tiled implementation.
-    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+    rewriter.replaceOp(fusedResult->origConsumerOperands.front()->getOwner(),
                        fusedResult->tiledOps.front());
 
     // The result of the fused consumers might themselves be slices of
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
-    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
-                       candidates);
+    addCandidateSlices(
+        fusedResult->tiledAndFusedConsumerOperands.front()->getOwner());
 
     // Add the list of new producer fusion opportunities.
     for (auto tiledOp : fusedResult.value().tiledOps) {
@@ -185,5 +174,4 @@ fuseConsumersIntoForall(RewriterBase &rewriter, Operation *tiledOp,
   }
   return newFusionOpportunities;
 }
-
 } // namespace mlir::iree_compiler

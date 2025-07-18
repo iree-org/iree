@@ -54,7 +54,8 @@ def IREEGPU_DerivedThreadConfig :
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
         "hasTilingLevel",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr>
     ]> {
   let mnemonic = "derived_thread_config";
   let summary = [{
@@ -77,7 +78,8 @@ def IREEGPU_UseGlobalLoadDma :
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
         "hasTilingLevel",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr>
     ]> {
   let mnemonic = "use_global_load_dma";
   let summary = [{
@@ -90,6 +92,41 @@ def IREEGPU_UseGlobalLoadDma :
   }];
   let assemblyFormat = "";
   let parameters = (ins);
+}
+
+def IREEGPU_PromoteWithCacheSwizzle :
+    AttrDef<IREEGPU_Dialect, "PromoteWithCacheSwizzle", [
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr, [
+        "promoteOperand",
+      ]>
+    ]> {
+  let mnemonic = "promote_with_cache_swizzle";
+  let summary = [{
+    Indicate promotion of an operand with setting a cache swizzle value.
+  }];
+  let description = [{
+    When promoting, this will create a `linalg.copy` on the input operand,
+    and then the primary producing dispatch input has a buffer cast with cache
+    swizzle inserted if possible. For example,
+
+    ```
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %1 = linalg.matmul ins(%0, ...)
+    ```
+
+    Becomes with `#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>`
+
+    ```
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
+    %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
+    %3 = linalg.matmul ins(%2, ...)
+    ```
+  }];
+  let assemblyFormat = "`<` $copy_config `>`";
+  let parameters = (ins
+    "Attribute":$copy_config
+  );
 }
 
 //===----------------------------------------------------------------------===//
@@ -145,6 +182,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
+    "getUndistributedTileDimExpansion",
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
@@ -251,9 +289,9 @@ def IREEGPU_VirtualMMAAttr :
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
-    "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -291,6 +329,56 @@ def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
 
+def IREEGPU_ScaledMMAAttr :
+    AttrDef<IREEGPU_Dialect, "ScaledMMA", [
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "getExpectedNumOutputs",
+    "verifyIndexingMaps",
+    "getUndistributedTileTypes",
+    "getDistributedTileTypes",
+    "getUndistributedTileDimExpansion",
+    "populateOperandOffsetsSizesStrides",
+    "getDistributionMappingKind",
+    "getDistributionWorkerCount",
+    "buildUnderlyingOperations",
+  ]>
+]> {
+  let mnemonic = "scaled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This attribute represents MMAs that operate on low-precision floating point
+    types (like fp4 or fp8) and apply _block scales_ to their inputs,
+    where each |blockSize| elements share a scale (which is currently
+    always a f32 exponent / f8E8M0).
+
+    The intrinsic is a ScaledMMAIntrinsic, and the element types are given
+    on the attribute, not in the intrinsic enum, since these scaled
+    operations allow arbitrary combinations of fp4/fp6/fp8 inputs.
+
+    This intrinsic takes its four parameters as (lhs, lhs_scale, rhs, rhs_scale).
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+    "::mlir::Type":$lhs_elem_type,
+    "::mlir::Type":$rhs_elem_type,
+    "::mlir::Type":$acc_elem_type,
+    DefaultValuedParameter<"bool", "false", "if this is a column-major scaled MFMA">:$col_major
+  );
+
+  let extraClassDeclaration = [{
+    // Return the number of elements per shared scale.
+    int64_t getBlockSize() const;
+
+    // Return the required subgroup size for this intrinsic.
+    int64_t getSubgroupSize() const;
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // MMA schedule
 //===----------------------------------------------------------------------===//
@@ -314,12 +402,12 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
-// iree_gpu.gpu_encoding_layout
+// iree_gpu.gpu_encoding_resolver
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_GPUEncodingLayoutAttr :
-    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout"> {
-  let mnemonic = "gpu_encoding_layout";
+def IREEGPU_GPUEncodingResolverAttr :
+    AttrDef<IREEGPU_Dialect, "GPUEncodingResolver"> {
+  let mnemonic = "gpu_encoding_resolver";
   let summary = [{The encoding layout attribute for GPU backend.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding
@@ -339,11 +427,11 @@ def IREEGPU_GPUEncodingLayoutAttr :
 }
 
 //===----------------------------------------------------------------------===//
-// iree_gpu.gpu_pad_layout
+// iree_gpu.gpu_padding_resolver
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
-  let mnemonic = "gpu_pad_layout";
+def IREEGPU_GPUPaddingResolverAttr : AttrDef<IREEGPU_Dialect, "GPUPaddingResolver"> {
+  let mnemonic = "gpu_padding_resolver";
   let summary = [{The padded encoding layout attribute for GPU targets.}];
   let assemblyFormat = "`<` struct(params) `>`";
 

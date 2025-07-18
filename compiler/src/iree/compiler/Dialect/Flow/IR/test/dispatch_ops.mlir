@@ -170,6 +170,26 @@ util.func public @regionDynamicShape(%arg0: tensor<?x?x16xf32>, %dim0: index, %d
 
 // -----
 
+util.func public @regionInvalidReturnCountMismatch() -> tensor<32xf16> {
+  %dispatch = flow.dispatch.region -> (tensor<32xf16>) {
+    // expected-error @+1 {{'flow.return' op number of results (1) does not match number of returned values (0)}}
+    flow.return
+  }
+  util.return %dispatch : tensor<32xf16>
+}
+
+// -----
+
+util.func public @regionInvalidReturnTypeMismatch(%arg0: tensor<1xf16>) -> tensor<32xf16> {
+  %dispatch = flow.dispatch.region -> (tensor<32xf16>) {
+    // expected-error @+1 {{'flow.return' op operand types do not match with parent results}}
+    flow.return %arg0 : tensor<1xf16>
+  }
+  util.return %dispatch : tensor<32xf16>
+}
+
+// -----
+
 // CHECK-LABEL: @complexWorkgroupsUsage
 util.func public @complexWorkgroupsUsage(
     // CHECK-SAME: %[[ARG0:.+]]: tensor<?x4xf32>

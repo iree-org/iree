@@ -153,6 +153,33 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        If the `dim`th _logical_ dimension of `operand` requires expansion before
+        distribution via a forall, return the shape that dimension should be expanded
+        to.
+
+        The reshape will only be applied when the inner tile is (a permuted form of)
+        the logical shape returned by `getUndistributedTileTypes`.
+
+        If no reshape is required, std::nullopt is returned.
+
+        Context: Some intrinsics require pre-distribution reshapes of the inner tile
+        so that distribution to threads works correctly. The motivating example is when
+        the data has the form [outer per-lane] x [distributed accross lanes] x [inner per-lane].
+        For instance, the i-th value in the M dimension of the matrix could be
+        located at vector index `[i / 8, i % 4]` of thread `32 * ((i / 8) % 2)`,
+        which means the length 32 M dimension has to be retiled to 4x8 so that the
+        length-8 dimension can be distributed to threads.
+      }],
+      /*retTy=*/"std::optional<::mlir::SmallVector<int64_t, 2>>",
+      /*methodName=*/"getUndistributedTileDimExpansion",
+      /*args=*/(ins "int64_t":$operandIndex, "int64_t":$logicalDim),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Given (distributed, if applicable) arguments whose types correspond
         to `getDistributedTileShapes()`, construct, if possible, the operations
         that implement this kind and place the results (which will be used to
@@ -244,6 +271,19 @@ def IREECodegen_LoweringConfigAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the number of tiling levels of the configuration. Returns
+        std::nullopt if it is unknown.
+      }],
+      /*retTy=*/"std::optional<unsigned>",
+      /*methodName=*/"getNumTilingLevels",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns true if the lowering config specifies tile sizes for the given
         tiling level.
       }],
@@ -274,8 +314,8 @@ def IREECodegen_LoweringConfigAttrInterface :
         interpretation of |level| is attribute and backend dependent. The
         |target| is the operation this lowering configuration annotates.
 
-        returns an empty list if sizes are not specified for this level. dynamic
-        sizes are specified with `shapedtype::kdynamicsize`.
+        Returns an empty list if sizes are not specified for this level. Dynamic
+        sizes are specified with `ShapedType::kDynamicSize`.
       }],
       /*retTy=*/"::llvm::SmallVector<int64_t>",
       /*methodName=*/"getStaticTilingLevelSizes",
@@ -286,6 +326,25 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return ::llvm::SmallVector<int64_t>();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the tile sizes in Attribute types for the specified tiling
+        level. The interpretation of |level| is attribute and backend dependent.
+        Different from `getStaticTilingLevelSizes`, it returns the whole
+        attribute, so users can parse the attribute with their backend specifics.
+
+        Returns NULL if the information is not specified for this level.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getTilingLevelAttr",
+      /*args=*/(ins
+        "unsigned":$level
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
       }]
     >,
     InterfaceMethod<

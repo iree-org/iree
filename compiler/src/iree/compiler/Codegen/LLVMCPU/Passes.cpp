@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -111,6 +112,13 @@ static llvm::cl::opt<bool> clForceArmStreaming(
         "contains supported scalable vector operations (i.e., use SSVE rather "
         "than SVE). Requires the +sme feature flag."),
     llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clPatchFuncOps(
+    "iree-llvmcpu-debug-patch-func-ops",
+    llvm::cl::desc(
+        "Perform the patches on func ops for debugging purpose. It should be "
+        "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
@@ -219,12 +227,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
              << level;
     }
   }
-
-  // Verify that native vector size is empty.
-  SmallVector<int64_t> nativeVectorSize = tilingConfig.getNativeVectorSizes();
-  if (!nativeVectorSize.empty()) {
-    return op->emitOpError("native_vector_size must be empty");
-  }
   return success();
 }
 
@@ -240,8 +242,8 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     return success();
   }
 
-  if (tilingConfig.getNumTilingLevels() != 4) {
-    return op->emitOpError("expected four tiling levels, got ")
+  if (tilingConfig.getNumTilingLevels() != 3) {
+    return op->emitOpError("expected three tiling levels, got ")
            << tilingConfig.getNumTilingLevels();
   }
 
@@ -403,16 +405,21 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
         continue;
       }
 
+      // TODO(#21297): How we pass TilingLevel is wrong, but it is tricky to fix
+      // if not all the lowering configs are IREE::CPU::LoweringConfigAttr. For
+      // now, leave it as it is for the transition period. They will be fixed
+      // when we close #21297.
       if (i == tilingConfig.getVectorReductionLevel()) {
         // Run SplitReductionPass before the final reduction Fuse pass, because
         // SplitReductionPass takes care of banked-tiling.
         funcPassManager.addPass(
             createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
-        funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(i));
+        funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
+            static_cast<IREE::CPU::TilingLevel>(i)));
         continue;
       }
-
-      funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(i));
+      funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
+          static_cast<IREE::CPU::TilingLevel>(i)));
     }
   }
 
@@ -467,24 +474,19 @@ void addConvTileAndDecomposeExpertPassPipeline(
     LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
-  // ops. At this stage, we do not apply vectorization. The reduction dim won't
-  // get tiled if the case is conv + generic op. In this case, we have to tile
-  // along reduction dim again, which needs them to be Linalg ops form.
-
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
-      tilingConfig.getVectorCommonParallelLevel()));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
-      tilingConfig.getVectorReductionLevel()));
-  funcPassManager.addPass(
-      createLLVMCPUTileAndFusePass(tilingConfig.getVectorInnerParallelLevel()));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
+      IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
-
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
+
+  // Convert forall to for before vectorization preparation.
+  funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   if (pipelineOpt.enablePeeling) {
     funcPassManager.addPass(createLLVMCPUPeelPass());
@@ -531,18 +533,20 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumer(
-      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   // The below two passes are nop if the "mmt4d" is explicitly excluded in the
   // ukernels attribute.
   funcPassManager.addPass(createCPUPrepareUkernelsPass());
   funcPassManager.addPass(
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
-      static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
+      IREE::CPU::TilingLevel::VectorReductionTiles));
+  funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   {
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
@@ -621,29 +625,16 @@ void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
-
-  {
-    LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
-    options.tilingLevel = tilingConfig.getVectorCommonParallelLevel();
-    options.onlyFuseProducerInputOperands = false;
-    funcPassManager.addPass(
-        createLLVMCPUTileRootAndFuseProducerConsumerPass(options));
-  }
-
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
-
-  {
-    LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
-    options.tilingLevel = tilingConfig.getVectorReductionLevel();
-    options.onlyFuseProducerInputOperands = true;
-    funcPassManager.addPass(
-        createLLVMCPUTileRootAndFuseProducerConsumerPass(options));
-  }
-
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
+      IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   {
     GenericVectorizationPassOptions options;
@@ -673,12 +664,11 @@ void addCPULinalgExtTileAndVectorizePipeline(
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               FailureOr<TilingConfig> &tilingConfig) {
-  if (succeeded(tilingConfig) &&
-      tilingConfig.value().getNumTilingLevels() > 1) {
+                               std::unique_ptr<TilingConfig> &tilingConfig) {
+  if (tilingConfig && tilingConfig->getNumTilingLevels() > 1) {
     addTileAndDistributePasses(funcPassManager);
     funcPassManager.addPass(createLLVMCPUTileAndFusePass(
-        tilingConfig.value().getVectorCommonParallelLevel()));
+        tilingConfig->getVectorCommonParallelLevel()));
   }
   addCPUBufferizePasses(funcPassManager);
 }
@@ -780,7 +770,6 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       // (HAL, IREE, Linalg, CF) -> LLVM
-      .addPass(memref::createExpandOpsPass)
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(arith::createArithExpandOpsPass)
@@ -851,6 +840,9 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
     FunctionLikeNest(modulePassManager)
         .addPass(createLLVMCPULowerExecutableTargetPass)
         .addPass(createVerifyWorkgroupDistributionPass);
+    if (clPatchFuncOps) {
+      modulePassManager.addPass(createPatchFuncOpsPass());
+    }
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());

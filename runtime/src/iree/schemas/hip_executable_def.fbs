@@ -38,7 +38,7 @@ table ExportDef {
   block_dims:BlockDims;
 
   // Size of dynamic shared memory per block.
-  block_shared_memory_size:uint32 (deprecated);
+  block_shared_memory_size:uint32;
 
   // Total number of 32-bit push constants used by the export.
   constant_count:uint32;

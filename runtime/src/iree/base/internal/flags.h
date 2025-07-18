@@ -40,7 +40,7 @@ extern "C" {
 
 // Maximum number of flags that can be registered in a single binary.
 #if !defined(IREE_FLAGS_CAPACITY)
-#define IREE_FLAGS_CAPACITY 64
+#define IREE_FLAGS_CAPACITY 256
 #endif  // !IREE_FLAGS_CAPACITY
 
 //===----------------------------------------------------------------------===//

@@ -147,7 +147,7 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
   }
 }
 
-static SmallVector<GPUMatmulShapeType>
+static SmallVector<GPUIntrinsicType>
 getIntrinsics(linalg::LinalgOp linalgOp,
               ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   IREE::GPU::TargetAttr target;
@@ -166,7 +166,7 @@ getIntrinsics(linalg::LinalgOp linalgOp,
   return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
+    return GPUIntrinsicType{mSize, nSize, kSize, aType, bType, cType, mma};
   });
 }
 
@@ -174,13 +174,13 @@ static void
 padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
           ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics =
+  SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
 
   // Check that conv has met conditions to go down mfma.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(linalgOp);
   assert(succeeded(convolutionDims) && "Could not infer contraction dims");
@@ -346,7 +346,7 @@ static void padContractionLikeOp(
   }
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics =
+  SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
@@ -359,14 +359,14 @@ static void padContractionLikeOp(
   int64_t kDim = contractionDims->k.back();
 
   // If none of the shape is dynamic, we'd fallback to using pad to intrinsics.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   int64_t mSize = bounds[mDim];
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];
 
   // Bail out on matvec-like/skinny matmul cases.
-  if ((!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
-      (!ShapedType::isDynamic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
+  if ((ShapedType::isStatic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
+      (ShapedType::isStatic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
     return;
   }
 

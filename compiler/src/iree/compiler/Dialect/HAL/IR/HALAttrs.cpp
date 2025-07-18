@@ -1101,7 +1101,7 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
   if (auto deviceAffinityAttr =
           dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    return deviceAffinityAttr.getDevice();
+    return deviceAffinityAttr.getDevice().getLeafReference();
   } else if (auto devicePromiseAttr =
                  dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
     return devicePromiseAttr.getDevice();
@@ -1251,6 +1251,7 @@ DeviceOptimalAttr::joinOR(IREE::Stream::AffinityAttr other) const {
         if (it == affinitySet.end()) {
           // New device entry.
           affinitySet.insert({otherDeviceAttr, affinityAttr});
+          return true;
         }
         // OR in with existing entry.
         auto joinedAttr = it->second.joinOR(other);

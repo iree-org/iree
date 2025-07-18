@@ -178,7 +178,7 @@ static void specializeExportedFunction(
       int64_t valueUmin = 0;
       int64_t valueUmax = INT64_MAX;
       int64_t valueUdiv = 1;
-      if (!ShapedType::isDynamic(assumedSize.staticSize)) {
+      if (ShapedType::isStatic(assumedSize.staticSize)) {
         valueUmin = assumedSize.staticSize;
         valueUmax = assumedSize.staticSize;
         valueUdiv = assumedSize.staticSize;
@@ -208,11 +208,15 @@ static void specializeExportedFunction(
         }
       }
 
-      // The range is unsatisfiable if there is no multiple of the LCM of
-      // the true divisor and the target divisor in the value's range.
+      // Any value that satisfied both ranges must be divisible by the LCM of
+      // the true value's divisibility and the requested divisibility. Find the
+      // smallest multiple of the LCM larger than the true umin. This must be
+      // smaller than both the requested maximum value and actual maximum value
+      // for the range to be satisfiable.
       int64_t divLCM = std::lcm(udiv, valueUdiv);
-      int64_t nearestUminCeil = (divLCM + valueUmin - 1) / divLCM;
-      if (umin > valueUmax || umax < valueUmin || nearestUminCeil > umax) {
+      int64_t nearestUminCeil = ((divLCM + valueUmin - 1) / divLCM) * divLCM;
+      if (umin > valueUmax || umax < valueUmin || nearestUminCeil > umax ||
+          nearestUminCeil > valueUmax) {
         neverApplies = true;
         break;
       }
@@ -284,11 +288,11 @@ static void specializeExportedFunction(
       builder.setInsertionPointToStart(newCondition);
 
       Value exportCondition =
-          builder.create<arith::ConstantIntOp>(loc, 1, builder.getI1Type());
+          builder.create<arith::ConstantIntOp>(loc, builder.getI1Type(), 1);
 
       for (auto [range, assumedSize] :
            llvm::zip(specializationRange, workloadMapping)) {
-        if (!ShapedType::isDynamic(assumedSize.staticSize)) {
+        if (ShapedType::isStatic(assumedSize.staticSize)) {
           continue;
         }
 

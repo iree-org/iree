@@ -111,29 +111,8 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   });
 }
 
-/// Inserts a `linalg.copy` directly before the given operation on the
-/// specified operand, for example with operand index = 1:
-///
-///   %2 = linalg.matmul ins(%0, %1)
-///
-/// becomes
-///
-///   %empty = tensor.empty()
-///   %copy = linalg.copy %1 to %empty {
-///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
-///   linalg.matmul ins(%0, %copy)
-///
-/// If the producer is already a tilable op, the producer is just annotated with
-/// #iree_gpu.derived_thread_config to indicate that it should be distributed
-/// to threads independently of the matmul.
-/// Additionally we can also promote results so in above example we will
-/// generate for index = 2 :
-///   %out_buffer = bufferization.alloc_tensor
-///   %copy1 = linalg.copy %2 to %out_buffer
-///   %copy2 = linalg.copy %copy1 to %empty {
-///     lowering_config = #iree_gpu.derived_thread_config}
 void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
-                    bool useDirectLoad) {
+                    IREE::GPU::PromotionAttr promotionAttr) {
   auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
   if (!dpsOp)
     return;
@@ -143,38 +122,12 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
     index -= dpsOp.getNumDpsInputs();
     assert(index < op->getNumResults() &&
            "trying to promote out of bound result index");
+    // TODO(qedawkins): Move result promotion to attribute interface.
     return promoteResult(builder, op, op->getResult(index));
   }
-  Value operand = op->getOperand(index);
+  OpOperand &operand = op->getOpOperand(index);
 
-  if (auto producer = operand.getDefiningOp<TilingInterface>()) {
-    // Skip promotion of fills.
-    if (isa<linalg::FillOp>(producer)) {
-      return;
-    }
-    if (auto generic = dyn_cast<linalg::GenericOp>(&*producer)) {
-      if (linalg::isaFillOpInterface(generic)) {
-        return;
-      }
-    }
-
-    // We only support thread tile size derivation of linalgOp and Im2colOp for
-    // now.
-    if (isa<linalg::LinalgOp, IREE::LinalgExt::Im2colOp>(
-            producer.getOperation())) {
-      setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
-                                      builder.getContext()));
-      return;
-    }
-  }
-
-  auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
-  if (!tensorType) {
-    return;
-  }
-
-  auto replacement =
-      promoteValue(builder, op->getLoc(), operand, useDirectLoad);
+  Value replacement = promotionAttr.promoteOperand(builder, operand);
   op->setOperand(index, replacement);
 }
 
@@ -186,32 +139,51 @@ struct GPUPromoteMatmulOperandsPass final
     FunctionOpInterface funcOp = getOperation();
 
     OpBuilder builder(funcOp);
-    funcOp.walk([&](Operation *op) {
+    WalkResult walkResult = funcOp.walk([&](Operation *op) {
       auto loweringConfig =
           getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
       if (!loweringConfig) {
-        return;
+        return WalkResult::advance();
       }
 
       std::optional<SmallVector<int64_t>> promotedOperands =
           getPromotedOperandList(loweringConfig);
       if (!promotedOperands) {
-        return;
+        return WalkResult::advance();
       }
 
-      SmallVector<bool> useDirectLoad =
-          getUseDirectLoad(loweringConfig)
-              .value_or(SmallVector<bool>(promotedOperands->size(), false));
+      std::optional<ArrayRef<Attribute>> maybePromotionTypes =
+          getPromotionTypesList(loweringConfig);
+      if (maybePromotionTypes &&
+          maybePromotionTypes->size() != promotedOperands->size()) {
+        op->emitOpError(
+            "promoted operand and promotion types lists size mismatch");
+        return WalkResult::interrupt();
+      }
+
+      Attribute derived =
+          IREE::GPU::DerivedThreadConfigAttr::get(op->getContext());
+      ArrayRef<Attribute> promotionTypes =
+          maybePromotionTypes.value_or(ArrayRef<Attribute>());
 
       builder.setInsertionPoint(op);
-      for (auto [operand, directLoadOperand] :
-           llvm::zip_equal(promotedOperands.value(), useDirectLoad)) {
-        // TODO: move switch `useDirectLoad` to the promotion attr list.
-        // Here using a command line option should be only a temporary
-        // solution.
-        promoteOperand(builder, op, operand, directLoadOperand);
+      for (auto [operand, maybePromotionType] :
+           llvm::zip_longest(promotedOperands.value(), promotionTypes)) {
+        auto promotionType = dyn_cast<IREE::GPU::PromotionAttr>(
+            maybePromotionType.value_or(derived));
+        if (!promotionType) {
+          op->emitOpError(
+              "promotion types does not implement promotion attr interface");
+          return WalkResult::interrupt();
+        }
+        promoteOperand(builder, op, operand.value(), promotionType);
       }
+      return WalkResult::advance();
     });
+
+    if (walkResult.wasInterrupted()) {
+      return signalPassFailure();
+    }
   }
 };
 

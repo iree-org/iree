@@ -179,6 +179,51 @@ the current build type is Debug and the compiler supports it.
 Enable [undefiend behavior sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
 if the current build type is Debug and the compiler supports it.
 
+### `IREE_ENABLE_RUNTIME_COVERAGE`
+
+* type: BOOL
+
+Enable LLVM code coverage for the runtime code. All runtime libraries and
+binaries will be compiled with instrumentation and CMake targets will be exposed
+for performing common coverage tasks.
+
+#### `iree-runtime-coverage-export`
+
+Merges and export coverage data to `coverage/runtime.lcov.info`.
+All of `coverage/runtime/*.profraw` files will be merged as if they had been
+produced in the same run, written to `coverage/runtime.profdata`, and then
+exported into LCOV format.
+
+#### `iree-runtime-coverage-clear-all`
+
+Erases all `coverage/runtime*` files (*.profraw/*.profdata/*.info).
+Invoke this to completely clear all collected coverage data.
+
+#### `iree-runtime-coverage-clear-artifacts`
+
+Erases only merged `coverage/runtime.*` files (*.profdata/*.info).
+Invoke this after adding more *.profraw files to update the coverage.
+
+#### VSCode Coverage Integration
+
+VSCode can be configured with these targets/artifacts to show coverage
+information by adding the following workspace configuration:
+
+```json
+"cmake.preRunCoverageTarget": "iree-runtime-coverage-clear-all",
+"cmake.postRunCoverageTarget": "iree-runtime-coverage-export",
+"cmake.coverageInfoFiles": [
+  "${command:cmake.buildDirectory}/coverage/runtime.lcov.info"
+],
+```
+
+Coverage runs with the Test Explorer will clear, accumulate coverage for each
+test selected, and then export an LCOV file that will be rendered in the
+coverage panel/overlay.
+
+See the [VSCode Testing Documentation](https://code.visualstudio.com/docs/debugtest/testing#_test-coverage)
+for more information.
+
 ## Cross-compilation
 
 When cross compiling (using a toolchain file like

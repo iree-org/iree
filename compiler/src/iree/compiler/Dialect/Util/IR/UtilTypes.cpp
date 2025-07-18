@@ -210,6 +210,10 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
     // Recursively try to move each operand.
     // TODO(benvanik): change to a worklist to avoid potential stack explosion.
     for (auto operand : producerOp->getOperands()) {
+      // Can't move `producerOp` if it is defined by `consumerOp`.
+      if (operand.getDefiningOp() == consumerOp) {
+        return false;
+      }
       if (!tryMoveProducerBefore(operand, consumerOp)) {
         return false;
       }
@@ -679,7 +683,7 @@ OpFoldResult findDim(Value workValue, int64_t dim) {
   int64_t rank = shapedType.getRank();
   assert(rank > dim && "querying out of range dim");
   int64_t staticSize = shapedType.getDimSize(dim);
-  if (!ShapedType::isDynamic(staticSize)) {
+  if (ShapedType::isStatic(staticSize)) {
     Builder b(workValue.getContext());
     return b.getIndexAttr(dim);
   }

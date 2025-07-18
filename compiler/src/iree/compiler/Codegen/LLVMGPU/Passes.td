@@ -13,6 +13,11 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
+def AMDGPUEmulateNarrowTypePass :
+    Pass<"iree-amdgpu-emulate-narrow-type", ""> {
+  let summary = "Emulate narrow integer operations including amdgpu operations";
+}
+
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVMPass :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {
@@ -86,9 +91,11 @@ def LLVMGPUPackSharedMemoryAllocPass :
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
 }
 
-def LLVMGPUPrefetchSharedMemoryPass :
+def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
-  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
+      let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"
+          "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.";
+  let dependentDialects = ["amdgpu::AMDGPUDialect"];
 }
 
 def LLVMGPUSelectLoweringStrategyPass :

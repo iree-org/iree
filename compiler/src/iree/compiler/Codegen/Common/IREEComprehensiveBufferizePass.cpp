@@ -78,7 +78,12 @@ class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tensor::TensorDialect>();
+    // BufferizationDialect is needed for using type interfaces, like
+    // TensorLikeType. Because the builtin types, e.g., RankedTensorType, etc.,
+    // implement the type interface in
+    // bufferization::BufferizationDialect::initialize().
+    registry
+        .insert<bufferization::BufferizationDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -148,16 +153,13 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
-  options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
+  options.unknownTypeConverterFn = [](TensorType tensorType,
+                                      Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = llvm::cast<TensorType>(value.getType());
-
-    // Special rule for ConstantOps: These always lower to some memref with a
-    // static identity layout.
-    if (value.getDefiningOp<arith::ConstantOp>())
+    if (tensorType.hasStaticShape()) {
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
-
+    }
     // Default case: Fully dynamic layout map for best compatibility.
     return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
                                                               memorySpace);
@@ -283,11 +285,8 @@ createIREEComprehensiveBufferizePass(
                                                           memCpyFn.value());
 }
 
-void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
-                                    bool injectAssumeAlignmentOp) {
-  if (injectAssumeAlignmentOp) {
-    funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
-  }
+void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -301,13 +300,12 @@ void addIREEPostBufferizationPasses(OpPassManager &funcPassManager,
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
-    bool injectAssumeAlignmentOp) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
-  addIREEPostBufferizationPasses(funcPassManager, injectAssumeAlignmentOp);
+  addIREEPostBufferizationPasses(funcPassManager);
 }
 
 } // namespace mlir::iree_compiler

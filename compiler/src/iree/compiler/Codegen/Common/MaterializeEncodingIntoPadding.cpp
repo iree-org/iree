@@ -40,8 +40,7 @@ namespace {
 
 // Returns the pad encoding layout, or nullptr if this is not the only layout or
 // if there's no encoding at all.
-static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
-                                          RankedTensorType type) {
+static PaddingAttr getPadLayout(Attribute layoutAttr, RankedTensorType type) {
   if (!type.getEncoding()) {
     return nullptr;
   }
@@ -52,7 +51,7 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
     if (layouts.size() != 1) {
       return nullptr;
     }
-    return dyn_cast<PadEncodingLayoutAttr>(*layouts.begin());
+    return dyn_cast<PaddingAttr>(*layouts.begin());
   }
   Attribute resolvedEncoding =
       cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr).getLayout(type);
@@ -61,14 +60,14 @@ static PadEncodingLayoutAttr getPadLayout(Attribute layoutAttr,
     llvm::dbgs() << "layoutAttr: " << layoutAttr << "\n";
     llvm::dbgs() << "Resolved into: " << resolvedEncoding << "\n";
   });
-  return dyn_cast<PadEncodingLayoutAttr>(resolvedEncoding);
+  return dyn_cast<PaddingAttr>(resolvedEncoding);
 }
 
 // Returns a padded tensor type (without encoding) for tensor types with the pad
 // encoding layout, or the same type for all other tensors.
 static RankedTensorType getPaddedType(Attribute layoutAttr,
                                       RankedTensorType type) {
-  PadEncodingLayoutAttr layout = getPadLayout(layoutAttr, type);
+  PaddingAttr layout = getPadLayout(layoutAttr, type);
   if (layout.isIdentityLayout()) {
     return type.dropEncoding();
   }
@@ -76,7 +75,7 @@ static RankedTensorType getPaddedType(Attribute layoutAttr,
   ArrayRef<int64_t> padding = layout.getPadding().asArrayRef();
   auto newShape = llvm::to_vector_of<int64_t>(type.getShape());
   for (auto [newDim, padValue] : llvm::zip_equal(newShape, padding)) {
-    assert((padValue == 0 || !ShapedType::isDynamic(newDim)) &&
+    assert((padValue == 0 || ShapedType::isStatic(newDim)) &&
            "Padding dynamic dims not supported");
     newDim += padValue;
   }
@@ -90,7 +89,7 @@ struct MaterializePadEncodingTypeConverter final
       IREE::Encoding::LayoutMaterializerAttr layoutAttr)
       : MaterializeEncodingTypeConverter(layoutAttr) {
     addConversion([](RankedTensorType type) -> std::optional<RankedTensorType> {
-      // The type converter is designed for `pad_encoding_layout` encoding
+      // The type converter is designed for `padding` encoding
       // attribute. By the definition, the final converted type is the same
       // tensor type without encodings.
       return type.dropEncoding();
@@ -101,7 +100,7 @@ struct MaterializePadEncodingTypeConverter final
       if (!type || !type.getEncoding()) {
         return dispatchTensorType;
       }
-      // The incoming bindings have the padded type, if `pad_encoding_layout` is
+      // The incoming bindings have the padded type, if `padding` is
       // present.
       if (getPadLayout(getLayoutAttr(), type)) {
         type = getPaddedType(getLayoutAttr(), type);
@@ -112,15 +111,13 @@ struct MaterializePadEncodingTypeConverter final
   }
 
   bool hasNonZeroPadding(RankedTensorType type) const {
-    PadEncodingLayoutAttr layout = getPadLayout(getLayoutAttr(), type);
+    PaddingAttr layout = getPadLayout(getLayoutAttr(), type);
     return layout && !layout.isIdentityLayout();
   }
 };
 
 /// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
-/// materializing the encoding. We extract a smaller tensor for the padded
-/// source. This way we do not create partial loads prematurely, which would be
-/// difficult to undo later on.
+/// materializing the encoding.
 struct MaterializeFlowDispatchTensorLoadOp final
     : OpConversionPattern<IREE::TensorExt::DispatchTensorLoadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -155,28 +152,17 @@ struct MaterializeFlowDispatchTensorLoadOp final
                                          rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
                                          rewriter.getIndexAttr(1));
-    SmallVector<int64_t> newStaticDims;
-    SmallVector<Value> newDynamicDims;
-    dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-
-    Location loc = loadOp.getLoc();
-    Value newLoad = rewriter.create<IREE::TensorExt::DispatchTensorLoadOp>(
-        loc, adaptor.getSource(), newDynamicDims, newOffsets, newMixedSizes,
-        newStrides);
-    auto extractType = RankedTensorType::get(boundTensorType.getShape(),
-                                             boundTensorType.getElementType());
     SmallVector<OpFoldResult> extractSizes = getMixedValues(
         boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        loadOp, extractType, newLoad, newOffsets, extractSizes, newStrides);
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
+        loadOp, adaptor.getSource(), loadOp.getSourceDims(), newOffsets,
+        extractSizes, newStrides);
     return success();
   }
 };
 
 /// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
-/// materializing the encoding. We create a larger empty tensor for the
-/// destination and insert the value into it. This way we do not create partial
-/// stores prematurely, which would be difficult to undo later on.
+/// materializing the encoding.
 struct MaterializeFlowDispatchTensorStoreOp final
     : OpConversionPattern<IREE::TensorExt::DispatchTensorStoreOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -206,28 +192,15 @@ struct MaterializeFlowDispatchTensorStoreOp final
     RankedTensorType paddedType = newTargetType.asRankedTensorType();
 
     Location loc = storeOp.getLoc();
-    SmallVector<Value> dynamicResultSizes{adaptor.getOperands()};
-    Value empty =
-        rewriter.create<tensor::EmptyOp>(loc, paddedType, dynamicResultSizes);
-
     SmallVector<OpFoldResult> offsets(paddedType.getRank(),
                                       rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> strides(paddedType.getRank(),
                                       rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
         tensor::getMixedSizes(rewriter, loc, adaptor.getValue());
-    Value insertOp = rewriter.create<tensor::InsertSliceOp>(
-        loc, adaptor.getValue(), empty, offsets, sizes, strides);
-
-    SmallVector<OpFoldResult> newMixedSizes = getMixedValues(
-        paddedType.getShape(), storeOp.getTargetDims(), rewriter);
-    SmallVector<int64_t> newStaticDims;
-    SmallVector<Value> newDynamicDims;
-    dispatchIndexOpFoldResults(newMixedSizes, newDynamicDims, newStaticDims);
-
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
-        storeOp, insertOp, adaptor.getTarget(), newDynamicDims, offsets,
-        newMixedSizes, strides);
+        storeOp, adaptor.getValue(), adaptor.getTarget(),
+        adaptor.getTargetDims(), offsets, sizes, strides);
     return success();
   }
 };

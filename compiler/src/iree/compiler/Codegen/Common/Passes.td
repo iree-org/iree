@@ -83,7 +83,7 @@ def ConcretizePadResultShapePass :
 }
 
 def ConvertAccGEMMToGEMMPass :
-    Pass<"iree-convert-accgemm-to-gemm", ""> {
+    InterfacePass<"iree-convert-accgemm-to-gemm", "mlir::FunctionOpInterface"> {
   let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
 }
 
@@ -277,7 +277,7 @@ def ReconcileTranslationInfoPass
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
-           /*default=*/"IREE::Codegen::WorkgroupId::IdZ",
+           /*default=*/"IREE::Codegen::WorkgroupId::IdX",
            "Constrain the workgroup distribution along grid dimensions.",
            [{
            ::llvm::cl::values(
@@ -377,6 +377,11 @@ def FoldAffineMinInDistributedLoopsPass :
   let summary = "Fold `affine.min` ops in distributed loops";
 }
 
+def FoldReshapeIntoInterfaceTensorPass :
+    Pass<"iree-codegen-fold-reshape-into-interface-tensor", ""> {
+  let summary = "Folds reshape operations into the interface bindings.";
+}
+
 def FoldTensorExtractOpPass :
   Pass<"iree-codegen-fold-tensor-extract-op", ""> {
   let summary = "Fold `tensor.extract` operations prior to lowering to LLVM";
@@ -434,6 +439,9 @@ def GenericVectorizationPass :
     Option<"maxVectorSize", "max-vector-size", "int64_t",
             /*default=*/"2147483647",
            "Max vector size allowed to avoid creating large vectors.">
+  ];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect"
   ];
 }
 
@@ -569,9 +577,9 @@ def MaterializeEncodingIntoNopPass :
 
 def MaterializeEncodingIntoPaddingPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
+  let summary = "Materialize `#iree_encoding.padding` attributes.";
   let description = [{
-    Handles padding introduced by `pad_encoding_layout` encoding layouts, which
+    Handles padding introduced by `padding` encoding layouts, which
     requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
     padding regions.
     Materializes any other encoding layouts into nop.
@@ -648,12 +656,36 @@ def PadDynamicAllocPass :
   let summary = "Pass to pad dynamic alloc into static one.";
 }
 
+def PatchFuncOpsPass : Pass<"iree-codegen-debug-patch-func-ops", ""> {
+  let summary = "A debugging pass for patching func ops with external func ops";
+  let description = [{
+    Pass to replace func ops if they matches the provided func op names. It is
+    useful when you know what the intermediate IR is, since you can patch the
+    func op without modifying any transformation code.
+
+    If the pass is not run at ModuleOp scope, it will track the parent chain to
+    find the first ModuleOp and apply patches.
+
+    NOTE: This is for debugging purpose. You should not rely on the pass in
+          default pipelines.
+  }];
+}
+
 def MathTransformPass :
     Pass<"iree-codegen-math-transform", ""> {
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
   let dependentDialects = [
     "mlir::scf::SCFDialect",
     "mlir::arith::ArithDialect"
+  ];
+}
+
+def PropagateConstantOffsetsPass :
+    InterfacePass<"iree-codegen-propagate-constant-offsets", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to push constant offsets towards loads/stores";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::arith::ArithDialect"
   ];
 }
 

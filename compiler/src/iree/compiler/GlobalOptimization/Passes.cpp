@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
@@ -23,11 +23,6 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
-    "iree-global-opt-enable-fuse-silu-horizontal-matmul",
-    llvm::cl::desc(
-        "Enables fusing specifically structured matmuls (experimental)."),
     llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
@@ -82,7 +77,7 @@ void buildGlobalOptExprHoistingPassPipeline(
   options.maxSizeIncreaseThreshold =
       transformOptions.options.constExprMaxSizeIncreaseThreshold;
   options.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
 }
@@ -158,8 +153,6 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
-      .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
-                         createFuseSiluHorizontalMatmulPass)
       .addPass([&]() {
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);

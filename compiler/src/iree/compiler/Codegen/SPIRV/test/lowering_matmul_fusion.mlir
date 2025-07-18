@@ -70,12 +70,15 @@ func.func @matmul_i4_quant_weight() {
 //           CHECK:   %[[A_ALLOC:.+]] = memref.alloc() : memref<32x1x36xf32, #gpu.address_space<workgroup>>
 //           CHECK:   %[[B_ALLOC:.+]] = memref.alloc() : memref<1x32x132xf32, #gpu.address_space<workgroup>>
 //           CHECK:   %[[WEIGHT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//           CHECK:   %[[WEIGHT_ALIGNED:.+]] = memref.assume_alignment %[[WEIGHT_BINDING]]
 //           CHECK:   %[[SCALE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//           CHECK:   %[[SCALE_ALIGNED:.+]] = memref.assume_alignment %[[SCALE_BINDING]]
 //           CHECK:   %[[ZP_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//           CHECK:   %[[ZP_ALIGNED:.+]] = memref.assume_alignment %[[ZP_BINDING]]
 //           CHECK:   scf.for %arg0 = %c0 to %c86 step %c1 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_BINDING]]
-//           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_BINDING]]
-//           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_BINDING]]
+//           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_ALIGNED]]
+//           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_ALIGNED]]
+//           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_ALIGNED]]
 //           CHECK:     %[[SLICE0:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
 //           CHECK:     %[[ZP_EXT0:.+]] = arith.extsi %[[SLICE0]] : vector<4xi4> to vector<4xi32>
 //           CHECK:     %[[SLICE1:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
@@ -83,7 +86,7 @@ func.func @matmul_i4_quant_weight() {
 
 //           CHECK:     scf.for %arg5 = %c0 to %c96 step %c32 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 
-//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       vector.transfer_read %[[WEIGHT_ALIGNED]]
 //   CHECK-COUNT-2:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT0]] : vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT1]] : vector<4xi32>
@@ -92,7 +95,7 @@ func.func @matmul_i4_quant_weight() {
 //           CHECK:       arith.mulf %{{.+}}, %[[SCALE1]] : vector<4xf32>
 //     CHECK-COUNT:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
 
-//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       vector.transfer_read %[[WEIGHT_ALIGNED]]
 //   CHECK-COUNT-2:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT0]] : vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT1]] : vector<4xi32>

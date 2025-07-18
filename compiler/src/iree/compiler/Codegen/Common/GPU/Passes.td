@@ -229,8 +229,17 @@ def GPUPipeliningPass :
 def GPUPromoteMatmulOperandsPass :
     InterfacePass<"iree-codegen-gpu-promote-matmul-operands",
                   "mlir::FunctionOpInterface"> {
-  let summary = "Pass to insert copies with a different thread configuration "
+  let summary = "Pass to insert copies with a different lowering configuration "
                 "on matmul operands";
+  let description = [{
+    Looks for all matmuls annotated with `promote_operands = I64Array` and
+    inserts copies on the specified operands with a thread lowering config
+    optimized for coalesced loads.
+
+    If the matmul is also annotated with `promotion_types = ArrayAttr`, the
+    logic for "promoting" an operand is deferred to an attribute interface
+    allowing for custom logic.
+  }];
   let dependentDialects = [
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",
@@ -318,6 +327,23 @@ def GPUApplyTilingLevelPass :
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
            /*default=*/"true",
            "Allow pad fusion to generate zero size slices">
+  ];
+}
+
+def GPUApplyPaddingLevelPass :
+    InterfacePass<"iree-codegen-gpu-apply-padding-level", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad based on tiling configs";
+  let dependentDialects = ["::mlir::tensor::TensorDialect"];
+  let options = [
+    Option<"tilingLevel", "tiling-level", "IREE::GPU::TilingLevel",
+           /*default=*/"IREE::GPU::TilingLevel::Reduction",
+           "Tiling level to tile. Supported levels are 'reduction' and 'thread'",
+           [{llvm::cl::values(
+              clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
+                         "Tile and fuse all annotated ops to serial loops"),
+              clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
+                         "Tile and fuse all annotated ops to partial reduuction loops")
+           )}]>
   ];
 }
 

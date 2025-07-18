@@ -2988,13 +2988,6 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
 
   let regions = (region AnyRegion:$body);
 
-  let builders = [
-    OpBuilder<(ins
-      "FunctionType":$type,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>,
-  ];
-
   let extraClassDeclaration = [{
     // CallableOpInterface:
     ::mlir::Region *getCallableRegion() { return &getBody(); }

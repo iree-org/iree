@@ -34,7 +34,7 @@ util.func @simple_test(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf32>,
 //  CHECK-SAME:     %[[N:[a-zA-Z0-9_]+]]: index
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
 //  CHECK-SAME:       [%[[M]], %[[K]]]
-//  CHECK-SAME:       -> (tensor<?x2048xf32, #iree_encoding.pad_encoding_layout<[0, ?]>>{%[[M]]})
+//  CHECK-SAME:       -> (tensor<?x2048xf32, #iree_encoding.padding<[0, ?]>>{%[[M]]})
 //       CHECK:     %[[OP0:.+]] = linalg.matmul
 //       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[OP0]]
 //       CHECK:     flow.return %[[SET_ENCODING]]
@@ -76,7 +76,7 @@ util.func @encoding_across_collapse(%lhs : tensor<?x2048xf32>, %rhs : tensor<204
 }
 // CHECK-LABEL: @encoding_across_collapse
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
-//  CHECK-SAME:       -> (tensor<?x2048xf32, #iree_encoding.pad_encoding_layout<[0, ?]>>
+//  CHECK-SAME:       -> (tensor<?x2048xf32, #iree_encoding.padding<[0, ?]>>
 //       CHECK:     %[[EMPTY:.+]] = tensor.empty
 //       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EMPTY]]
 //       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[COLLAPSE]]
@@ -118,7 +118,7 @@ util.func @encoding_across_collapse_expand(%lhs : tensor<?x2048xf32>, %rhs : ten
 }
 // CHECK-LABEL: @encoding_across_collapse_expand(
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//  CHECK-SAME:       #iree_encoding.pad_encoding_layout<[0, ?]>
+//  CHECK-SAME:       #iree_encoding.padding<[0, ?]>
 //       CHECK:     %[[EMPTY:.+]] = tensor.empty
 //       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[EMPTY]]
 //       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
@@ -159,7 +159,7 @@ util.func @no_pad_dynamic_reduction_dims(%lhs : tensor<?x?xf32>, %rhs0 : tensor<
   util.return %1 : tensor<?x?xf32>
 }
 // CHECK-LABEL: @no_pad_dynamic_reduction_dims
-//   CHECK-NOT: #iree_encoding.pad_encoding_layout
+//   CHECK-NOT: #iree_encoding.padding
 
 // -----
 
@@ -191,7 +191,7 @@ util.func @no_pad_skinny_matmuls(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf
   util.return %1 : tensor<8x4xf32>
 }
 // CHECK-LABEL: @no_pad_skinny_matmuls
-//   CHECK-NOT: #iree_encoding.pad_encoding_layout
+//   CHECK-NOT: #iree_encoding.padding
 
 // -----
 
@@ -224,7 +224,7 @@ util.func @check_padding_threshold(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048
 }
 // CHECK-LABEL: @check_padding_threshold(
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
-//  CHECK-SAME:       -> (tensor<8x2048xf32, #iree_encoding.pad_encoding_layout<[0, ?]>>)
+//  CHECK-SAME:       -> (tensor<8x2048xf32, #iree_encoding.padding<[0, ?]>>)
 //       CHECK:     %[[OP0:.+]] = linalg.matmul
 //       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[OP0]]
 //       CHECK:     flow.return %[[SET_ENCODING]]
@@ -234,3 +234,31 @@ util.func @check_padding_threshold(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048
 //       CHECK:     linalg.matmul
 //  CHECK-SAME:         ins(%[[UNSET_ENCODING]],
 //       CHECK:   return %[[DISPATCH1]]
+
+// -----
+
+// Check that a matmul with attention producer isn't padded.
+
+util.func public @no_attention_producer(%arg0: tensor<4x8x4x?x32x2x64xf32>, %arg1: tensor<4x?x32x8x2x64xf32>, %arg2: tensor<4x?x32x8x128xf32>, %arg3: tensor<?x32x?x32xf32>, %arg4: tensor<4096x8xf32>, %arg5: f32, %arg6: index) -> tensor<?x8xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %0 = flow.dispatch.region -> (tensor<4x8x4x?x32x128xf32>{%arg6}) {
+    %3 = tensor.empty(%arg6) : tensor<4x8x4x?x32x128xf32>
+    %4 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d1, d2, d3, d4, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d8, d9, d1, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d8, d9, d1, d5)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d3, d4, d8, d9)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg0, %arg1, %arg2, %arg5, %arg3 : tensor<4x8x4x?x32x2x64xf32>, tensor<4x?x32x8x2x64xf32>, tensor<4x?x32x8x128xf32>, f32, tensor<?x32x?x32xf32>) outs(%3 : tensor<4x8x4x?x32x128xf32>) {
+    ^bb0(%arg7: f32):
+      iree_linalg_ext.yield %arg7 : f32
+    } -> tensor<4x8x4x?x32x128xf32>
+    flow.return %4 : tensor<4x8x4x?x32x128xf32>
+  }
+  %1 = arith.muli %arg6, %c128 : index
+  %collapsed = tensor.collapse_shape %0 [[0, 1, 2, 3], [4, 5]] : tensor<4x8x4x?x32x128xf32> into tensor<?x4096xf32>
+  %2 = flow.dispatch.region -> (tensor<?x8xf32>{%1}) {
+    %3 = tensor.empty(%1) : tensor<?x8xf32>
+    %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<?x8xf32>) -> tensor<?x8xf32>
+    %5 = linalg.matmul ins(%collapsed, %arg4 : tensor<?x4096xf32>, tensor<4096x8xf32>) outs(%4 : tensor<?x8xf32>) -> tensor<?x8xf32>
+    flow.return %5 : tensor<?x8xf32>
+  }
+  util.return %2 : tensor<?x8xf32>
+}
+// CHECK-LABEL: @no_attention_producer(
+//   CHECK-NOT: #iree_encoding.pad_encoding_layout

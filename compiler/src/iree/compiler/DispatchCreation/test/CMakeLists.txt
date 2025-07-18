@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "bitcast_unsupported_element_types.mlir"
     "bubble_up_expand_shapes.mlir"
     "bubble_up_extract_slice.mlir"
     "clone_producers_into_dispatch_regions.mlir"
@@ -31,11 +32,14 @@ iree_lit_test_suite(
     "form_dispatch_regions.mlir"
     "form_dispatch_workgroups.mlir"
     "form_scalar_dispatches.mlir"
+    "form_split_reduction_dispatches.mlir"
     "fuse_encoding_ops_into_dispatch_regions.mlir"
     "fuse_horizontal_contractions.mlir"
     "fuse_multiuse_elementwise_producer.mlir"
     "fusion_preprocessing.mlir"
     "hoist_encoding_ops.mlir"
+    "hoist_uniform_scalar_compute.mlir"
+    "materialize_default_workgroup_count_region.mlir"
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"

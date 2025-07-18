@@ -59,3 +59,15 @@ util.func public @dont_fold_not_full_static_insert_into_empty(
 // CHECK-LABEL: util.func public @dont_fold_not_full_static_insert_into_empty
 //       CHECK:   %[[INSERT:.+]] = tensor.insert_slice
 //       CHECK:   util.return %[[INSERT]]
+
+// -----
+
+util.func public @expand_affine(%arg0: index) -> index {
+  %mul = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%arg0]
+  util.return %mul : index
+}
+
+// CHECK-LABEL: util.func public @expand_affine
+//  CHECK-SAME:   %[[ARG0:.+]]: index
+//       CHECK:   %[[MUL:.+]] = arith.muli %[[ARG0]], %c4 overflow<nsw>
+//       CHECK:   util.return %[[MUL]]

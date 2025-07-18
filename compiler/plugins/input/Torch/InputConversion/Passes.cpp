@@ -66,7 +66,6 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToArithPass());
   pm.addPass(torch::createConvertTorchConversionToMLProgramPass());
-  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
 
   // Clean up any non-canonical code introduced above..
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());

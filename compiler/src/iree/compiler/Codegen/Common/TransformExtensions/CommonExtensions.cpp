@@ -886,16 +886,13 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
-  options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
+  options.unknownTypeConverterFn = [](TensorType tensorType,
+                                      Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = llvm::cast<TensorType>(value.getType());
-
-    // Special rule for ConstantOps: These always lower to some memref with a
-    // static identity layout.
-    if (value.getDefiningOp<arith::ConstantOp>())
+    if (tensorType.hasStaticShape()) {
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
-
+    }
     // Default case: Fully dynamic layout map for best compatibility.
     return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
                                                               memorySpace);
@@ -1217,16 +1214,16 @@ applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
     rewriter.setInsertionPoint(target);
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, target, loops);
+        scf::tileAndFuseConsumerOfSlices(rewriter, target, loops);
 
     if (failed(fuseConsumerResults))
       return failure();
 
     // Report back the relevant handles to the transform op.
     originalConsumerOps.push_back(
-        fuseConsumerResults->origConsumerOperand->getOwner());
+        fuseConsumerResults->origConsumerOperands.front()->getOwner());
     fusedConsumerOps.push_back(
-        fuseConsumerResults->tiledAndFusedConsumerOperand->getOwner());
+        fuseConsumerResults->tiledAndFusedConsumerOperands.front()->getOwner());
   }
 
   transformResults.set(transformOp->getOpResult(0), originalConsumerOps);

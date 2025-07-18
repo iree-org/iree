@@ -49,6 +49,7 @@ iree_lit_test_suite(
     "flatten_memref_subspan.mlir"
     "fold_affine_min_in_distributed_loops.mlir"
     "fold_affine_min_of_block_id.mlir"
+    "fold_reshape_into_interface_tensor.mlir"
     "fold_tensor_extract_op.mlir"
     "forall_to_for.mlir"
     "forop_canonicalization.mlir"
@@ -82,6 +83,8 @@ iree_lit_test_suite(
     "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
+    "patch_func_ops.mlir"
+    "propagate_constant_offsets.mlir"
     "propagate_dispatch_size_bounds.mlir"
     "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
@@ -123,6 +126,7 @@ iree_lit_test_suite(
     batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
     external_strategy_spec.mlir
+    patch_func_ops_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
     tuning_spec.mlir

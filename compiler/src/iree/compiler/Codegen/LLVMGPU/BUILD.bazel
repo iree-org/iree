@@ -90,6 +90,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "LLVMGPU",
     srcs = [
+        "AMDGPUEmulateNarrowType.cpp",
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
@@ -102,7 +103,6 @@ iree_compiler_cc_library(
         "LLVMGPULinkExecutables.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPackSharedMemoryAlloc.cpp",
-        "LLVMGPUPrefetching.cpp",
         "LLVMGPUSelectLoweringStrategy.cpp",
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTensorPad.cpp",
@@ -116,7 +116,9 @@ iree_compiler_cc_library(
         "ROCDLConfigureBufferInstructions.cpp",
         "ROCDLKernelConfig.cpp",
         "ROCDLLowerExecutableTarget.cpp",
+        "ROCDLPrefetching.cpp",
         "ROCDLSelectLoweringStrategy.cpp",
+        "ROCDLUseBufferInstructions.cpp",
         "TestLLVMGPUQueryMMAPass.cpp",
         "Verifiers.cpp",
     ],
@@ -218,6 +220,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",

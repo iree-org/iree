@@ -131,6 +131,34 @@ static_assert(sizeof(iree_hal_amdgpu_device_workgroup_count_buffer_ref_t) == 16,
 #define iree_hal_amdgpu_device_workgroup_count_buffer_ref_length(buffer_ref) \
   (sizeof(uint32_t) * 3)
 
+// Describes a buffer binding that contains a single uint64_t value.
+// This is a size-optimized version of iree_hal_amdgpu_device_buffer_ref_t so
+// that it will fit in our tiny packets. We know the length is a constant 8 and
+// only need the offset, type, and value.
+typedef struct iree_hal_amdgpu_device_uint64_buffer_ref_t {
+  // Type of the buffer reference used to resolve the device pointer.
+  uint64_t type : 2;  // iree_hal_amdgpu_device_buffer_type_t
+  // Offset, in bytes, into the buffer that the binding starts at.
+  // This will be added to the offset specified on each usage of the slot.
+  uint64_t offset : 62;
+  union {
+    // IREE_HAL_AMDGPU_DEVICE_BUFFER_TYPE_PTR: raw device pointer.
+    void* ptr;
+    // IREE_HAL_AMDGPU_DEVICE_BUFFER_TYPE_HANDLE: queue-ordered allocation
+    // handle.
+    iree_hal_amdgpu_device_allocation_handle_t* handle;
+    // IREE_HAL_AMDGPU_DEVICE_BUFFER_TYPE_SLOT: binding table slot.
+    iree_hal_amdgpu_device_buffer_ordinal_t slot;
+    // Used for setting the value.
+    uint64_t bits;
+  } value;
+} iree_hal_amdgpu_device_uint64_buffer_ref_t;
+static_assert(sizeof(iree_hal_amdgpu_device_uint64_buffer_ref_t) == 16,
+              "binding table entries should be 8 byte aligned and tiny");
+
+#define iree_hal_amdgpu_device_uint64_buffer_ref_length(buffer_ref) \
+  sizeof(uint64_t)
+
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
 // Resolves a buffer reference to an absolute device pointer.
@@ -151,6 +179,16 @@ void* iree_hal_amdgpu_device_buffer_ref_resolve(
 // alignment.
 void* iree_hal_amdgpu_device_workgroup_count_buffer_ref_resolve(
     iree_hal_amdgpu_device_workgroup_count_buffer_ref_t buffer_ref,
+    IREE_AMDGPU_ALIGNAS(64)
+        const iree_hal_amdgpu_device_buffer_ref_t* IREE_AMDGPU_RESTRICT
+            binding_table);
+
+// Resolves a scalar uint64_t buffer reference to an absolute device pointer.
+// This is equivalent to iree_hal_amdgpu_device_buffer_ref_resolve but for a
+// fixed-size uint64_t value. The returned pointer should have 8-byte
+// alignment.
+void* iree_hal_amdgpu_device_uint64_buffer_ref_resolve(
+    iree_hal_amdgpu_device_uint64_buffer_ref_t buffer_ref,
     IREE_AMDGPU_ALIGNAS(64)
         const iree_hal_amdgpu_device_buffer_ref_t* IREE_AMDGPU_RESTRICT
             binding_table);

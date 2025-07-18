@@ -39,7 +39,7 @@
 // RUN:   --iree-hip-target=rx9070 %s | FileCheck %s --check-prefixes=GFX1201,RX9070
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=r9070 %s | FileCheck %s --check-prefixes=GFX1201,R9070
+// RUN:   --iree-hip-target=r9700 %s | FileCheck %s --check-prefixes=GFX1201,R9700
 
 // GFX942: target = #iree_gpu.target<arch = "gfx942",
 // GFX942-SAME: wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8,
@@ -78,7 +78,7 @@
 //
 // RX9070XT: chip = <wgp_count = 32, sku = "rx9070xt">>
 // RX9070:   chip = <wgp_count = 28, sku = "rx9070">>
-// R9070:    chip = <wgp_count = 32, sku = "r9070">>
+// R9700:    chip = <wgp_count = 32, sku = "r9700">>
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {

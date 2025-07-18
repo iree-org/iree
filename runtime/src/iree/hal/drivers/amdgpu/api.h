@@ -22,6 +22,22 @@ extern "C" {
 // iree_hal_amdgpu_logical_device_t
 //===----------------------------------------------------------------------===//
 
+// Controls where the queue operates.
+typedef enum iree_hal_amdgpu_queue_placement_e {
+  // Automatically select where to place the queue based on whether the target
+  // CPU/GPU agent pair supports device placement requirements.
+  IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY = 0,
+  // Queue executes entirely on the host via iree_hal_amdgpu_host_queue_t.
+  // This introduces additional latency on all queue operations but can operate
+  // on systems without host/device atomics (PCIe atomics, xGMI, etc). It is
+  // also useful for debugging.
+  IREE_HAL_AMDGPU_QUEUE_PLACEMENT_HOST,
+  // Queue executes entirely on the device via iree_hal_amdgpu_device_queue_t.
+  // A scheduler kernel handles all queue entry processing without host
+  // involvement.
+  IREE_HAL_AMDGPU_QUEUE_PLACEMENT_DEVICE,
+} iree_hal_amdgpu_queue_placement_t;
+
 // Parameters configuring an iree_hal_amdgpu_logical_device_t.
 // Must be initialized with iree_hal_amdgpu_logical_device_options_initialize
 // prior to use.
@@ -54,6 +70,14 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
     } large;
   } device_block_pools;
 
+  // Controls where queues are placed.
+  // Defaults to IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY and selects the optimal
+  // placement based on queried agent properties. If a placement is explicitly
+  // specified all physical devices will use that placement and if any do not
+  // support it initialization will fail (useful for forcing host placement
+  // during debugging/testing).
+  iree_hal_amdgpu_queue_placement_t queue_placement;
+
   // Preallocates a reasonable number of resources in pools to reduce initial
   // execution latency.
   uint64_t preallocate_pools : 1;
@@ -65,12 +89,10 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // aggressively scheduling queue entries out-of-order.
   uint64_t exclusive_execution : 1;
 
-  // Uses HSA_WAIT_STATE_ACTIVE for up to duration before switching to
+  // Uses HSA_WAIT_STATE_ACTIVE for up to the given duration before switching to
   // HSA_WAIT_STATE_BLOCKED. Above zero this will increase CPU usage in cases
   // where the waits are long and decrease latency in cases where the waits are
-  // short.
-  //
-  // TODO(benvanik): add as a value to device wait semaphores instead.
+  // short. When IREE_DURATION_INFINITE waits will use HSA_WAIT_STATE_ACTIVE.
   iree_duration_t wait_active_for_ns;
 } iree_hal_amdgpu_logical_device_options_t;
 

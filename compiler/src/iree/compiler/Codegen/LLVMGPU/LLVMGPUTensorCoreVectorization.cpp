@@ -43,7 +43,11 @@ static void vectorizeLinalgOps(mlir::FunctionOpInterface funcOp) {
             op)) {
       return WalkResult::advance();
     }
-    (void)linalg::vectorize(rewriter, op);
+    FailureOr<linalg::VectorizationResult> result =
+        linalg::vectorize(rewriter, op);
+    if (succeeded(result)) {
+      rewriter.replaceOp(op, result->replacements);
+    }
     return WalkResult::advance();
   });
 }

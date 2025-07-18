@@ -40,18 +40,56 @@ module {
 
 // -----
 
-module {
-  func.func @transfer_read_lowering(%arg0: memref<8x8xf32, #amdgpu.address_space<fat_raw_buffer>>, %idx : index, %mask: vector<4xi1>) -> vector<4xf32> {
-    %cst_0 = arith.constant 0.000000e+00 : f32
-    %v = vector.transfer_read %arg0[%idx, %idx], %cst_0, %mask {in_bounds = [true]} : memref<8x8xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
-    return %v : vector<4xf32>
-  }
+// Test to check if masked transfer reads masked on an outer dimension lowers
+// to:
+//  cond = dim >= id
+//  vector.maskedload mem[..., id, ...] broadcast(cond)
+func.func @partial_masked_transfer_read(%mem : memref<16x?x32xf16>) -> vector<1x2x16xf16> {
+  %cst = ub.poison : f16
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c16 = arith.constant 16 : index
+  %dim = memref.dim %mem, %c1 : memref<16x?x32xf16>
+  %mask = vector.create_mask %c1, %dim, %c16 : vector<1x2x16xi1>
+  %read = vector.transfer_read %mem[%c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true]} : memref<16x?x32xf16>, vector<1x2x16xf16>
+  return %read : vector<1x2x16xf16>
 }
 
-// CHECK-LABEL: func.func @transfer_read_lowering(
-// CHECK-SAME: %[[ARG0:.+]]: memref<8x8xf32, #amdgpu.address_space<fat_raw_buffer>>,
-// CHECK-SAME: %[[ARG1:.+]]: index,
-// CHECK-SAME: %[[MASK:.+]]: vector<4xi1>
-// CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00>
-// CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]][%[[ARG1]], %[[ARG1]]]
-// CHECK: %[[SELECT:.+]] = arith.select %[[MASK]], %[[LOAD]], %[[CST]]
+// CHECK-LABEL: func.func @partial_masked_transfer_read
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[DIM:.+]] = memref.dim
+// CHECK-DAG: %[[COND:.+]] = arith.cmpi sgt, %[[DIM]], %[[C0]] : index
+// CHECK-DAG: %[[COND1:.+]] = arith.cmpi sgt, %[[DIM]], %[[C1]] : index
+// CHECK-DAG: %[[MASK:.+]] = vector.broadcast %[[COND]] : i1 to vector<16xi1>
+// CHECK-DAG: %[[MASK1:.+]] = vector.broadcast %[[COND1]] : i1 to vector<16xi1>
+// CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C0]], %[[C0]]], %[[MASK]]
+// CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C1]], %[[C0]]], %[[MASK1]]
+
+// -----
+
+// Test to check if masked transfer reads masked on an outer dimension lowers
+// to:
+//  cond = dim >= id
+//  vector.maskedload mem[..., id, ...] broadcast(cond)
+func.func @partial_masked_transfer_read(%mem : memref<16x?x32xf16>) -> vector<1x2x16xf16> {
+  %cst = ub.poison : f16
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c16 = arith.constant 16 : index
+  %dim = memref.dim %mem, %c1 : memref<16x?x32xf16>
+  %mask = vector.create_mask %c1, %dim, %c16 : vector<1x2x16xi1>
+  %read = vector.transfer_read %mem[%c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true]} : memref<16x?x32xf16>, vector<1x2x16xf16>
+  return %read : vector<1x2x16xf16>
+}
+
+// CHECK-LABEL: func.func @partial_masked_transfer_read
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[DIM:.+]] = memref.dim
+// CHECK-DAG: %[[COND:.+]] = arith.cmpi sgt, %[[DIM]], %[[C0]] : index
+// CHECK-DAG: %[[COND1:.+]] = arith.cmpi sgt, %[[DIM]], %[[C1]] : index
+// CHECK-DAG: %[[MASK:.+]] = vector.broadcast %[[COND]] : i1 to vector<16xi1>
+// CHECK-DAG: %[[MASK1:.+]] = vector.broadcast %[[COND1]] : i1 to vector<16xi1>
+// CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C0]], %[[C0]]], %[[MASK]]
+// CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C1]], %[[C0]]], %[[MASK1]]

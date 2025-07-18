@@ -98,6 +98,11 @@ class IREEGPU_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cas
   let genSpecializedAttr = 0;
 }
 
+class IREEGPU_I32Enum<string name, string summary, list<EnumCase> cases>
+    : I32Enum<name, summary, cases> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
 // These enum values are loosely named to match the target intrinsics that they
 // lower to, with wiggle room. The general name format used here is, similar to
 // typical target intrinsics:
@@ -313,6 +318,38 @@ def IREEGPU_MMAFragment : IREEGPU_I32EnumAttr<"MMAFragment",
       MMA_LHS,
       MMA_RHS,
       MMA_ACC
+    ]>;
+
+// Enum for scaled mma intrinsic, loosely matching the MMAIntrinsic enum above
+// but not including the input types.
+//
+// The main variation from intrinsic names is that, after the K dimension, we
+// include the block size (that is, how many elements along the K dimension
+// the shared scale applies to), which is given as "_Bxx"
+//
+// Values: 0xABCD where:
+// * A = vendor:
+//   * 1 = AMD
+//   * 2 = NVIDIA
+// * B = architecture. When an intrinsic exists in multiple architectures, this
+//       should be the architecture it was introduced in, as long as it still
+//       has the same semantics. If a new architecture breaks an existing
+//       intrinsic's semantics, we can use that field for versioning.
+//   * For AMD:
+//     * 0 = CDNA4
+// * C = element type of output/accumulator matrix and scale block size:
+//   * 0 = IEEE 32-bit float output, 32 elems/scale
+// * D enumerates intrinsics that share the same 0xABC* bits.
+//
+
+// Introduced in CDNA4
+def MFMA_SCALE_F32_16x16x128_B32 : I32EnumCase<"MFMA_SCALE_F32_16x16x128_B32", 0x1000>;
+def MFMA_SCALE_F32_32x32x64_B32 : I32EnumCase<"MFMA_SCALE_F32_32x32x64_B32", 0x1001>;
+def IREEGPU_ScaledMMAIntrinsic : IREEGPU_I32Enum<"ScaledMMAIntrinsic",
+    "Descriptor for different scaled MMA intrinsics", [
+      // Introduced in CDNA4.
+      MFMA_SCALE_F32_16x16x128_B32,
+      MFMA_SCALE_F32_32x32x64_B32
     ]>;
 
 //===----------------------------------------------------------------------===//

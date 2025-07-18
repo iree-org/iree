@@ -310,6 +310,8 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
        init_at_opt(llvm::OptimizationLevel::O2, true)},
       llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
                      "since all backends dont support it yet"));
+  binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
+                   llvm::cl::desc("Fuse operations with multiple uses."));
 }
 
 } // namespace mlir::iree_compiler

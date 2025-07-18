@@ -36,6 +36,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*args=*/(ins "::llvm::ArrayRef<bool>":$droppedDims)
     >,
     InterfaceMethod<
+      /*description=*/"Apply the given AffineMap to the layout.",
+      /*retTy=*/"VectorLayoutInterface",
+      /*methodName=*/"apply",
+      /*args=*/(ins "::mlir::AffineMap":$map)
+    >,
+    InterfaceMethod<
       /*description=*/"Get the expected undistributed shape for the given vector type.",
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getUndistributedShape",

@@ -883,12 +883,12 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // just the first element.
   GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   }
 
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
@@ -1062,7 +1062,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   int64_t numParallelDims = op.getNumParallelLoops();
 
   // We should have reduction dimensions.
@@ -1193,7 +1193,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
 
   int64_t parallelSize = 1;
   for (int64_t dim : parallelDims) {
-    if (!ShapedType::isDynamic(bounds[dim]))
+    if (ShapedType::isStatic(bounds[dim]))
       parallelSize *= bounds[dim];
   }
   // Total parallel size that can fill the GPU with enough workgorups.

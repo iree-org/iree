@@ -530,9 +530,21 @@ if(IREE_ENABLE_CCACHE)
   endif()
 endif()
 
-set (CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
+set(CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
 
 option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
+
+option(IREE_ENABLE_RUNTIME_COVERAGE "Enable LLVM code coverage of the runtime" OFF)
+set(IREE_RUNTIME_COVERAGE_OBJECTS "" CACHE STRING "List of archives (.a), objects (.o), or binaries to use as coverage data sources.")
+set_property(GLOBAL PROPERTY IREE_RUNTIME_COVERAGE_TARGETS "")
+
+# Verify we are in debug mode (coverage doesn't work well without it).
+# Coverage is possible (though very inaccurate) in other configurations but
+# optimizations must be disabled to get anything useful (otherwise source lines
+# and instrumented execution don't line up enough).
+if(IREE_ENABLE_RUNTIME_COVERAGE AND NOT _UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+  message(FATAL_ERROR "IREE_ENABLE_*_COVERAGE requires building in Debug")
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE assertions
@@ -1111,6 +1123,99 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_create_ctest_customization()
 endif()
+
+#-------------------------------------------------------------------------------
+# Code coverage support
+#-------------------------------------------------------------------------------
+
+# LLVM coverage targets:
+#
+# - iree-runtime-coverage-export
+#   Merge and export coverage data to `coverage/runtime.lcov.info`.
+#   All of `coverage/runtime/*.profraw` files will be merged as if they had been
+#   produced in the same run, written to `coverage/runtime.profdata`, and then
+#   exported into LCOV format.
+#
+# - iree-runtime-coverage-clear-all
+#   Erases all `coverage/runtime*` files (*.profraw/*.profdata/*.info).
+#   Invoke this to completely clear all collected coverage data.
+#
+# - iree-runtime-coverage-clear-artifacts
+#   Erases only merged `coverage/runtime.*` files (*.profdata/*.info).
+#   Invoke this after adding more *.profraw files to update the coverage.
+#
+# To collect the source *.profraw files use the LLVM_PROFILE_FILE environment
+# variable on each invocation; tests run via ctest do this automatically:
+#  LLVM_PROFILE_FILE=coverage/runtime/binary_target_name[.whatever].profraw \
+#     my_binary_to_run --other --flags
+# The base name before the first `.` must be the target name for the tooling to
+# automatically detect the binaries used. Any additional `.foo` up to the
+# extension will be ignored and allow for multiple runs to be accumulated before
+# exporting. If the name is not target-name based then the
+# IREE_RUNTIME_COVERAGE_OBJECTS CMake variable must be populated with binaries,
+# archives (.a), or object files (.o).
+#
+# VSCode can be configured with these targets/artifacts to show coverage
+# information by adding the following workspace configuration:
+#   // Accumulate over multiple test runs:
+#   "cmake.preRunCoverageTarget": "iree-runtime-coverage-clear-artifacts",
+#   // Or only show coverage for the tests run in a single batch:
+#   "cmake.preRunCoverageTarget": "iree-runtime-coverage-clear-all",
+#   "cmake.postRunCoverageTarget": "iree-runtime-coverage-export",
+#   "cmake.coverageInfoFiles": [
+#     "${command:cmake.buildDirectory}/coverage/runtime.lcov.info"
+#  ],
+if(IREE_ENABLE_RUNTIME_COVERAGE)
+  set(_RUNTIME_COVERAGE_BASE "${IREE_BINARY_DIR}/coverage/runtime")
+  if(Python3_FOUND)
+    get_property(_RUNTIME_COVERAGE_TARGETS GLOBAL PROPERTY IREE_RUNTIME_COVERAGE_TARGETS)
+    file(GENERATE
+      OUTPUT
+        ${_RUNTIME_COVERAGE_BASE}.target.list
+      CONTENT
+        "${_RUNTIME_COVERAGE_TARGETS}"
+    )
+    add_custom_target(iree-runtime-coverage-export
+      COMMAND
+        ${Python3_EXECUTABLE}
+        ${IREE_ROOT_DIR}/build_tools/scripts/export_profdata_lcov.py
+        --base=${_RUNTIME_COVERAGE_BASE}
+        --objects=${IREE_RUNTIME_COVERAGE_OBJECTS}
+        --targets=${_RUNTIME_COVERAGE_BASE}.target.list
+        --output=${_RUNTIME_COVERAGE_BASE}.lcov.info
+        --llvm-profdata=${IREE_LLVM_PROFDATA_BINARY}
+        --llvm-cov=${IREE_LLVM_COV_BINARY}
+      BYPRODUCTS
+        ${_RUNTIME_COVERAGE_BASE}.lcov.info
+      DEPENDS
+        ${IREE_LLVM_COV_BINARY}
+        ${IREE_LLVM_PROFCOV_BINARY}
+      COMMENT
+        "Exporting runtime coverage data to ${_RUNTIME_COVERAGE_BASE}.lcov.info"
+    )
+  else()
+    message(WARNING "IREE_ENABLE_*_COVERAGE requires Python3 to export automatically via the iree-runtime-coverage-export target; coverage is still enabled but must be manually processed")
+  endif()
+  add_custom_target(iree-runtime-coverage-clear-all
+    COMMAND
+      ${CMAKE_COMMAND}
+      -E rm -f
+      "${_RUNTIME_COVERAGE_BASE}.profdata"
+      "${_RUNTIME_COVERAGE_BASE}.lcov.info"
+      "${_RUNTIME_COVERAGE_BASE}/*.profraw"
+    COMMENT
+      "Clearing ${_RUNTIME_COVERAGE_BASE}/* and related source coverage data"
+  )
+  add_custom_target(iree-runtime-coverage-clear-artifacts
+    COMMAND
+      ${CMAKE_COMMAND}
+      -E rm -f
+      "${_RUNTIME_COVERAGE_BASE}.profdata"
+      "${_RUNTIME_COVERAGE_BASE}.lcov.info"
+    COMMENT
+      "Clearing merged ${_RUNTIME_COVERAGE_BASE}.* files only"
+  )
+endif(IREE_ENABLE_RUNTIME_COVERAGE)
 
 #-------------------------------------------------------------------------------
 # Install/exports

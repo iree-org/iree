@@ -845,30 +845,15 @@ static void enforceLayoutToTransferReadOp(
     return;
   }
 
-  // Build a transposed layout.
-  SmallVector<unsigned> permutation;
-  AffineMap permMap = read.getPermutationMap();
-  bool isSupportedPerm =
-      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
-  VectorLayoutInterface layout = result->getLayout();
-  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
-  if (isSupportedPerm) {
-    layout = layout.permute(transposePerm);
-    AffineMap toMinorIdentity =
-        AffineMap::getPermutationMap(permutation, permMap.getContext());
-    AffineMap orderedMap = toMinorIdentity.compose(permMap);
-    SmallVector<bool> droppedDims(layout.getRank(), false);
-    for (unsigned bdim : orderedMap.getBroadcastDims()) {
-      droppedDims[bdim] = true;
-    }
-    layout = layout.project(droppedDims);
+  DistributionLayout *maskLattice = operandLattices[0];
 
-    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
-      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-          layout, getOpOperand(read, index));
-      update(operandLattice, changed);
-    }
-  }
+  VectorLayoutInterface layout = result->getLayout();
+  AffineMap maskMap =
+      inversePermutation(compressUnusedDims(read.getPermutationMap()));
+  VectorLayoutInterface maskLayout = layout.apply(maskMap);
+  ChangeResult changed = maskLattice->resolveWithPossibleConflict(
+      maskLayout, getOpOperand(read, 0));
+  update(maskLattice, changed);
 }
 
 static void enforceLayoutToTransferWriteOp(
@@ -890,22 +875,56 @@ static void enforceLayoutToTransferWriteOp(
     return;
   }
 
-  // Build a transposed layout.
-  SmallVector<unsigned> permutation;
-  AffineMap permMap = write.getPermutationMap();
-  bool isSupportedPerm =
-      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  DistributionLayout *maskLattice = operandLattices[1];
+
   VectorLayoutInterface layout = writeOperand->getLayout();
-  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
-  if (isSupportedPerm) {
-    layout = layout.permute(transposePerm);
+  AffineMap maskMap =
+      inversePermutation(compressUnusedDims(write.getPermutationMap()));
+  VectorLayoutInterface maskLayout = layout.apply(maskMap);
+  ChangeResult changed = maskLattice->resolveWithPossibleConflict(
+      maskLayout, getOpOperand(write, 1));
+  update(maskLattice, changed);
+}
+
+static void enforceLayoutToTransferGatherOp(
+    TransferGatherOp gather, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
   }
 
-  for (auto [index, operandLattice] :
-       llvm::enumerate(operandLattices.slice(1))) {
-    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-        layout, getOpOperand(write, index + 1));
-    update(operandLattice, changed);
+  // transfer_gather has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+  VectorLayoutInterface layout = result->getLayout();
+
+  ArrayRef<DistributionLayout *> indexVecLattices =
+      operandLattices.slice(0, gather.getIndexVecs().size());
+  AffineMap sourceMap =
+      inverseAndBroadcastProjectedPermutation(gather.getPermutationMap());
+  VectorLayoutInterface sourceLayout = layout.apply(sourceMap);
+  for (auto [i, lattice, operand] :
+       llvm::enumerate(indexVecLattices, gather.getIndexVecsMutable())) {
+    AffineMap indexVecMap = gather.getIndexedMapsArray()[i];
+    VectorLayoutInterface indexVecLayout = sourceLayout.apply(indexVecMap);
+    ChangeResult changed =
+        lattice->resolveWithPossibleConflict(indexVecLayout, operand);
+    update(lattice, changed);
+  }
+
+  if (gather.getMask()) {
+    DistributionLayout *maskLattice =
+        operandLattices[gather.getIndexVecs().size()];
+    AffineMap maskMap =
+        inversePermutation(compressUnusedDims(gather.getPermutationMap()));
+    VectorLayoutInterface maskLayout = layout.apply(maskMap);
+    ChangeResult changed = maskLattice->resolveWithPossibleConflict(
+        maskLayout, gather.getMaskMutable()[0]);
+    update(maskLattice, changed);
   }
 }
 
@@ -962,6 +981,12 @@ void enforcementTransferFunction(
   if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
     enforceLayoutToTransferWriteOp(write, operandLattices, resultLattices,
                                    update);
+    return;
+  }
+
+  if (auto gather = dyn_cast<TransferGatherOp>(op)) {
+    enforceLayoutToTransferGatherOp(gather, operandLattices, resultLattices,
+                                    update);
     return;
   }
 }

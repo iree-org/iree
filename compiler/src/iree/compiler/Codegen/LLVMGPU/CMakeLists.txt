@@ -70,6 +70,7 @@ iree_cc_library(
     "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
+    "AMDGPUEmulateNarrowType.cpp"
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
@@ -82,7 +83,6 @@ iree_cc_library(
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
-    "LLVMGPUPrefetching.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
@@ -96,7 +96,9 @@ iree_cc_library(
     "ROCDLConfigureBufferInstructions.cpp"
     "ROCDLKernelConfig.cpp"
     "ROCDLLowerExecutableTarget.cpp"
+    "ROCDLPrefetching.cpp"
     "ROCDLSelectLoweringStrategy.cpp"
+    "ROCDLUseBufferInstructions.cpp"
     "TestLLVMGPUQueryMMAPass.cpp"
     "Verifiers.cpp"
   DEPS
@@ -162,6 +164,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms

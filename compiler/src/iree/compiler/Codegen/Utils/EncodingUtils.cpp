@@ -52,12 +52,13 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo) {
   ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
-  if (!ShapedType::isDynamicShape(staticTileSizes)) {
+  if (ShapedType::isStaticShape(staticTileSizes)) {
     return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
   }
 
   // Only VMVX with ukernel config supports dynamic inner tile sizes.
-  auto vmvxLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingLayoutAttr>(layoutAttr);
+  auto vmvxLayoutAttr =
+      dyn_cast<IREE::CPU::VMVXEncodingResolverAttr>(layoutAttr);
   if (!vmvxLayoutAttr || !hasUkernel(vmvxLayoutAttr.getConfiguration())) {
     return failure();
   }

@@ -54,7 +54,7 @@ static void foldConstantBounds(
           int64_t size = staticWorkgroupCounts.size() > dim
                              ? staticWorkgroupCounts[dim]
                              : ShapedType::kDynamic;
-          if (!ShapedType::isDynamic(size)) {
+          if (ShapedType::isStatic(size)) {
             rewriteToConstant(wgCountOp, size);
           }
         })

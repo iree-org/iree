@@ -68,6 +68,36 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
                                subgroupStrides, threadStrides);
 }
 
+VectorLayoutInterface NestedLayoutAttr::apply(AffineMap map) const {
+  assert(map.getNumDims() == getRank() &&
+         "map domain size must match layout rank");
+
+  SmallVector<int64_t> subgroupCount(map.getNumResults(), 1);
+  SmallVector<int64_t> batchCount(map.getNumResults(), 1);
+  SmallVector<int64_t> outerCount(map.getNumResults(), 1);
+  SmallVector<int64_t> threadCount(map.getNumResults(), 1);
+  SmallVector<int64_t> elementCount(map.getNumResults(), 1);
+  SmallVector<int64_t> subgroupStrides(map.getNumResults(), 0);
+  SmallVector<int64_t> threadStrides(map.getNumResults(), 0);
+
+  for (auto [idx, expr] : llvm::enumerate(map.getResults())) {
+    if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+      int64_t pos = dim.getPosition();
+      subgroupCount[idx] = getSubgroupTile()[pos];
+      batchCount[idx] = getBatchTile()[pos];
+      outerCount[idx] = getOuterTile()[pos];
+      threadCount[idx] = getThreadTile()[pos];
+      elementCount[idx] = getElementTile()[pos];
+      subgroupStrides[idx] = getSubgroupStrides()[pos];
+      threadStrides[idx] = getThreadStrides()[pos];
+    }
+  }
+
+  return NestedLayoutAttr::get(getContext(), subgroupCount, batchCount,
+                               outerCount, threadCount, elementCount,
+                               subgroupStrides, threadStrides);
+}
+
 VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   SmallVector<int64_t> invPerm = invertPermutationVector(permutation);
@@ -171,7 +201,7 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
                             getOuterTile()[i] * getThreadTile()[i] *
                             getElementTile()[i];
-    if (!ShapedType::isDynamic(shape[i]) && expectedShape != shape[i]) {
+    if (ShapedType::isStatic(shape[i]) && expectedShape != shape[i]) {
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
       printStripped(layoutOs);

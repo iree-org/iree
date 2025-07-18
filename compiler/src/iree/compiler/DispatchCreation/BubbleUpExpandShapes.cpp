@@ -161,8 +161,8 @@ struct SwapExtractSliceOfFill final
 
 /// Bubbles a `tensor.expand_shape` op through a `tensor.extract_slice` op. This
 /// pattern only gets applied when the `extract_slice` doesn't modify dimensions
-/// that are expanded by the `expand_shape` and when the `extract_slice` is
-/// completely static.
+/// that are expanded by the `expand_shape` and none of the expanded dimensions
+/// are dynamic.
 /// TODO: move this upstream with other tensor bubbling patterns.
 struct BubbleExpandThroughExtract final
     : public OpRewritePattern<tensor::ExpandShapeOp> {
@@ -176,60 +176,201 @@ struct BubbleExpandThroughExtract final
       return failure();
     }
 
-    auto srcType = extractOp.getSourceType();
-    auto extractedType = extractOp.getType();
-    auto expandedType = expandOp.getType();
+    ArrayRef<int64_t> extractSrcShape = extractOp.getSourceType().getShape();
+    ArrayRef<int64_t> extractDstShape = extractOp.getResultType().getShape();
+    const uint64_t extractSrcRank = extractSrcShape.size();
 
-    if (srcType.getRank() != extractedType.getRank()) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "Rank reducing extract_slice not supported");
-    }
-
-    if (!srcType.hasStaticShape() || !extractedType.hasStaticShape() ||
-        !expandedType.hasStaticShape()) {
-      return failure();
-    }
-
-    auto reassoc = expandOp.getReassociationIndices();
-    for (auto i : llvm::seq<uint64_t>(0, extractedType.getRank())) {
-      if (reassoc[i].size() == 1) {
+    // Check that none of the expanded dimensions are dynamic or are sliced by
+    // the `extract_slice`.
+    const llvm::SmallBitVector droppedDims = extractOp.getDroppedDims();
+    const SmallVector<ReassociationIndices, 4> reassoc =
+        expandOp.getReassociationIndices();
+    int64_t droppedDimCount = 0;
+    for (uint64_t i = 0; i < extractSrcRank; ++i) {
+      if (droppedDims.test(i)) {
+        ++droppedDimCount;
         continue;
       }
-
-      if (srcType.getShape()[i] != extractedType.getShape()[i]) {
+      if (reassoc[i - droppedDimCount].size() == 1) {
+        continue;
+      }
+      if (ShapedType::isDynamic(extractSrcShape[i]) ||
+          extractSrcShape[i] != extractDstShape[i - droppedDimCount]) {
         return rewriter.notifyMatchFailure(
             extractOp, "Extract modifies the expanded dimension");
       }
     }
 
-    SmallVector<int64_t> newExpandShape;
-    SmallVector<int64_t> offsets;
-    SmallVector<int64_t> sizes;
-    SmallVector<int64_t> strides;
-    for (auto [inDim, outDims] : llvm::enumerate(reassoc)) {
-      if (outDims.size() == 1) {
-        newExpandShape.push_back(srcType.getShape()[inDim]);
-        offsets.push_back(extractOp.getStaticOffsets()[inDim]);
-        sizes.push_back(extractOp.getStaticSizes()[inDim]);
-        strides.push_back(extractOp.getStaticStrides()[inDim]);
+    // Construct a reassociation that expands `extract_slice`'s source by
+    // combining the reassociation from the `expand_shape` with the dropped dims
+    // from the `extract_slice`.
+    SmallVector<ReassociationIndices> newReassociation;
+    newReassociation.reserve(extractSrcRank);
+    int64_t count = 0;
+    uint64_t expandedIdx = 0;
+    for (uint64_t i = 0; i < extractSrcRank; ++i) {
+      if (droppedDims.test(i)) {
+        newReassociation.push_back(ReassociationIndices{count++});
       } else {
-        for (auto outDim : outDims) {
-          newExpandShape.push_back(expandedType.getShape()[outDim]);
-          offsets.push_back(0);
-          sizes.push_back(expandedType.getShape()[outDim]);
-          strides.push_back(1);
-        }
+        int64_t numExpanded = reassoc[expandedIdx++].size();
+        newReassociation.push_back(
+            llvm::to_vector(llvm::seq(count, count + numExpanded)));
+        count += numExpanded;
       }
     }
 
-    Type newExpandType =
+    const SmallVector<OpFoldResult> oldOffsets = extractOp.getMixedOffsets();
+    const SmallVector<OpFoldResult> oldSizes = extractOp.getMixedSizes();
+    const SmallVector<OpFoldResult> oldStrides = extractOp.getMixedStrides();
+
+    RankedTensorType expandedType = expandOp.getResultType();
+    ArrayRef<int64_t> expandedShape = expandedType.getShape();
+    auto zeroAttr = rewriter.getIndexAttr(0);
+    auto oneAttr = rewriter.getIndexAttr(1);
+
+    // Find the new offsets/sizes/strides for the `extract_slice `& new expanded
+    // shape for the `expand_shape`.
+    SmallVector<int64_t> newExpandShape;
+    SmallVector<OpFoldResult> newOffsets;
+    SmallVector<OpFoldResult> newSizes;
+    SmallVector<OpFoldResult> newStrides;
+    droppedDimCount = 0;
+    for (const auto &[inDim, outDims] : llvm::enumerate(newReassociation)) {
+      droppedDimCount += droppedDims.test(inDim);
+      if (outDims.size() == 1) {
+        newExpandShape.push_back(extractSrcShape[inDim]);
+        newOffsets.push_back(oldOffsets[inDim]);
+        newSizes.push_back(oldSizes[inDim]);
+        newStrides.push_back(oldStrides[inDim]);
+        continue;
+      }
+      for (auto outDim : outDims) {
+        int64_t expandedDim = expandedShape[outDim - droppedDimCount];
+        assert(ShapedType::isStatic(expandedDim));
+        newExpandShape.push_back(expandedDim);
+        newOffsets.push_back(zeroAttr);
+        newSizes.push_back(rewriter.getIndexAttr(expandedDim));
+        newStrides.push_back(oneAttr);
+      }
+    }
+
+    auto newExpandType =
         RankedTensorType::get(newExpandShape, expandedType.getElementType());
+    // The builder can't fail to infer the output_shape because none of
+    // the dynamic dimensions are expanded.
     auto newExpand = rewriter.create<tensor::ExpandShapeOp>(
-        expandOp.getLoc(), newExpandType, extractOp.getSource(), reassoc);
+        expandOp.getLoc(), newExpandType, extractOp.getSource(),
+        newReassociation);
 
     rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        expandOp, expandedType, newExpand, ValueRange{}, ValueRange{},
-        ValueRange{}, offsets, sizes, strides);
+        expandOp, expandedType, newExpand, newOffsets, newSizes, newStrides);
+    return success();
+  }
+};
+
+struct BubbleExpandThroughConcat final
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto concatOp = expandOp.getSrc().getDefiningOp<tensor::ConcatOp>();
+    if (!concatOp) {
+      return failure();
+    }
+
+    // Get concat dimension and input/result types.
+    int64_t concatDim = concatOp.getDim();
+    SmallVector<ReassociationIndices, 4> reassoc =
+        expandOp.getReassociationIndices();
+    RankedTensorType expandedType = expandOp.getResultType();
+    ArrayRef<int64_t> expandedShape = expandedType.getShape();
+
+    // Find the "new" concat dim and if it is part of an expansion dim
+    int64_t newConcatDim = 0;
+    for (int64_t i = 0; i < concatDim; ++i) {
+      newConcatDim += reassoc[i].size();
+    }
+    int64_t expandedDimCount = reassoc[concatDim].size();
+
+    SmallVector<int64_t> expandShapeProducts;
+    int64_t countExpandedDynamicDims = 0;
+    // Loop over all but the outermost expanded dims.
+    for (Value input : concatOp.getInputs()) {
+      int64_t expandShapeProduct = 1;
+      auto inputType = cast<RankedTensorType>(input.getType());
+      int64_t inputDim = inputType.getShape()[concatDim];
+      // if the input dim is dynamic, we rely on checking the divisibility of
+      // the other inputs. Example:
+      //   %0 = tensor.concat dim(0) %arg0, %arg1 : (tensor<100x100xf32>,
+      //   tensor<?x100xf32>) -> tensor<?x100xf32> %1 = tensor.expand_shape %0
+      //   [[0, 1], [2]] output_shape [?, 10, 100] : tensor<?x100xf32> into
+      //   tensor<?x10x100xf32>
+      // The propagation here legal because we know ? is divisible by 10
+      // because (? + 100) % 10 == 0.
+      if (ShapedType::isDynamic(inputDim) && expandedDimCount > 1) {
+        countExpandedDynamicDims++;
+        // (A+ B + 10) % 10 == 0 does not imply A % 10 == 0 and
+        // B % 10 == 0, so we cannot propagate.
+        if (countExpandedDynamicDims > 1) {
+          return rewriter.notifyMatchFailure(
+              expandOp, "More than one dynamic expanded dim");
+        }
+      }
+      // Check all static input shapes for divisibility.
+      for (int64_t j = 1; j < expandedDimCount; ++j) {
+        int64_t expDim = expandedShape[newConcatDim + j];
+        if (ShapedType::isDynamic(expDim)) {
+          // If expanded dim is dynamic and not outermost, we cannot propagate.
+          return rewriter.notifyMatchFailure(
+              expandOp, "Expanded dim is dynamic and not outermost");
+        }
+        // Calculate the product of static dims.
+        expandShapeProduct *= expDim;
+      }
+      if (ShapedType::isStatic(inputDim) &&
+          !(inputDim % expandShapeProduct == 0)) {
+        // ie concat(tensor<6xf32>, tensor<6xf32>) -> expand to
+        // tensor<3x2x2xf32> cannot be done because 6 % (2 * 2) != 0.
+        return rewriter.notifyMatchFailure(
+            expandOp,
+            "Input dim is not divisible by the product of inner expanded dims");
+      }
+      expandShapeProducts.push_back(expandShapeProduct);
+    } // else we can always propagate the expand_shape through the concat.
+
+    SmallVector<OpFoldResult> mixedOutputShape = expandOp.getMixedOutputShape();
+    SmallVector<int64_t> staticOutputShape =
+        llvm::to_vector(expandedType.getShape());
+    // Create new expand_shape ops for each input.
+    SmallVector<Value> newInputs;
+    for (auto [input, product] :
+         llvm::zip(concatOp.getInputs(), expandShapeProducts)) {
+      auto type = input.getType();
+      auto inputType = cast<RankedTensorType>(type);
+
+      AffineExpr concatDimExpr;
+      bindSymbols(rewriter.getContext(), concatDimExpr);
+      auto divMap = concatDimExpr.floorDiv(product);
+      OpFoldResult dimOfr =
+          tensor::getMixedSize(rewriter, expandOp.getLoc(), input, concatDim);
+      OpFoldResult concatDimValue = affine::makeComposedFoldedAffineApply(
+          rewriter, expandOp.getLoc(), divMap, ArrayRef<OpFoldResult>{dimOfr});
+      mixedOutputShape[newConcatDim] = concatDimValue;
+      staticOutputShape[newConcatDim] =
+          mlir::getConstantIntValue(concatDimValue)
+              .value_or(ShapedType::kDynamic);
+      auto newType =
+          RankedTensorType::get(staticOutputShape, inputType.getElementType());
+      Value newExpand;
+      newExpand = rewriter.create<tensor::ExpandShapeOp>(
+          expandOp.getLoc(), newType, input, reassoc, mixedOutputShape);
+      newInputs.push_back(newExpand);
+    }
+    // Create new concat op on expanded inputs.
+    auto newConcat = rewriter.create<tensor::ConcatOp>(concatOp.getLoc(),
+                                                       newConcatDim, newInputs);
+    rewriter.replaceOp(expandOp, newConcat.getResult());
     return success();
   }
 };
@@ -358,6 +499,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
+  bubbleExpandShapePatterns.insert<BubbleExpandThroughConcat>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(

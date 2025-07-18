@@ -9,6 +9,7 @@
 #include <cstdint>
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
+#include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -39,7 +40,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -84,10 +84,7 @@ struct ROCMOptions {
   bool slpVectorization = true;
   bool globalISel = false;
 
-  /// List of LLVM opt pass pluggins to be loaded during GPU code
-  /// generation. The pluggins are paths to dynamic libraries that
-  /// are added to the LLVM pass manager.
-  SmallVector<std::string> passPlugins;
+  bool specializeDispatches = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -148,19 +145,17 @@ struct ROCMOptions {
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
 
-    binder.list<std::string>(
-        "iree-hip-pass-plugin-path", passPlugins,
-        cl::desc("LLVM pass plugins are out of tree libraries that implement "
-                 "LLVM opt passes. The library paths passed in this flag are "
-                 "to be passed to the target backend compiler during HIP "
-                 "executable serialization"),
-        cl::ZeroOrMore, cl::cat(category));
-
     binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
     binder.opt<bool>("iree-hip-llvm-global-isel", globalISel, cl::cat(category),
                      cl::desc("Enable global instruction selection in llvm."));
+
+    binder.opt<bool>(
+        "iree-hip-specialize-dispatches", specializeDispatches,
+        cl::cat(category),
+        cl::desc(
+            "Enable runtime specialization of dynamically shaped dispatches."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -354,6 +349,21 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
+    if (options.specializeDispatches) {
+      if (auto attr = getGPUTargetAttr(targetAttr)) {
+        ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+        if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
+          if (StringAttr sku = chip.getSku()) {
+            options.targets.push_back(sku.str());
+          }
+        }
+        options.targets.push_back(attr.getArch().str());
+        OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+        FunctionLikeNest(modulePassManager).addPass([&]() {
+          return ROCM::createApplyBuiltinPDLPatternsPass(options);
+        });
+      }
+    }
     buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
@@ -371,7 +381,6 @@ public:
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine,
-                             ArrayRef<std::string> passPlugins,
                              bool slpVectorization,
                              std::string &outPassesString) {
     llvm::LoopAnalysisManager lam;
@@ -396,18 +405,6 @@ public:
     pb.registerFunctionAnalyses(fam);
     pb.registerLoopAnalyses(lam);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
-
-    for (const std::string &pluginFileName : passPlugins) {
-      llvm::Expected<llvm::PassPlugin> pp =
-          llvm::PassPlugin::Load(pluginFileName);
-      if (pp) {
-        pp->registerPassBuilderCallbacks(pb);
-      } else {
-        std::string error = "unable to load plugin " + pluginFileName + ": " +
-                            llvm::toString(pp.takeError());
-        llvm::report_fatal_error(error.c_str());
-      }
-    }
 
     llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
 
@@ -682,8 +679,8 @@ public:
 
       // Run LLVM optimization passes.
       std::string passesString;
-      optimizeModule(*llvmModule, *targetMachine, options.passPlugins,
-                     options.slpVectorization, passesString);
+      optimizeModule(*llvmModule, *targetMachine, options.slpVectorization,
+                     passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
 
         // Additional context on '-mcpu' flag in PR comments, see for example:
@@ -1018,6 +1015,7 @@ namespace {
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
+  static void registerPasses() { IREE::ROCM::registerROCMTargetPasses(); }
   void onRegisterDialects(DialectRegistry &registry) {
     registry.insert<IREE::ROCM::ROCMDialect>();
   }

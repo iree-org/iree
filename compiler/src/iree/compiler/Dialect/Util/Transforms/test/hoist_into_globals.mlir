@@ -101,8 +101,8 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 
 // Checks that the name of global op is readable when encoding is present.
 
-// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing_encoding<>
-#encoding = #iree_encoding.testing_encoding<>
+// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
 // CHECK-LABEL: @hoist_encoded_const_expr_with_simpler_name
 module @hoist_encoded_const_expr_with_simpler_name {
   // CHECK: util.global private @__hoisted_tensor_64xi8__encoded : tensor<64xi8, #[[$ENCODING]]>

@@ -468,6 +468,9 @@ LogicalResult MapScatterOp::verify() {
   if (getInputType().getElementType() != getOutputType().getElementType()) {
     return emitOpError("expected input and output element types to match");
   }
+  if (getInputType().getRank() == 0) {
+    return emitOpError("expected input type to have non-zero rank");
+  }
   Region &transformRegion = getTransformationRegion();
   Block &transformBody = transformRegion.getBlocks().front();
   if (transformBody.getNumArguments() != getInputRank()) {
@@ -528,6 +531,36 @@ void MapScatterOp::insertTransformationAtStart(
     }
   }
   transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
+void MapScatterOp::inlineMapScatterBody(
+    OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  Block &transformBlock = getTransformationRegion().front();
+  IRMapping mapping;
+  // Map the induction variables of the loop nest to the block arguments of the
+  // transformation body. The induction variables are the indices looping over
+  // the elements of input operand.
+  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
+    mapping.map(arg, transformBodyIndices[idx]);
+  }
+  // Clone the operations within the transformation body to the current
+  // insertion point, and map their results to the new cloned operations'
+  // results.
+  for (Operation &op : transformBlock.without_terminator()) {
+    Operation *clonedOp = b.clone(op, mapping);
+    for (auto [result, clonedResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapping.map(result, clonedResult);
+    }
+  }
+
+  // Get the cloned values that were yielded by the transformation body to pass
+  // to the bodyBuilder.
+  SmallVector<Value> mappedYieldedValues = llvm::map_to_vector(
+      transformBlock.getTerminator()->getOperands(),
+      [&](Value operand) -> Value { return mapping.lookupOrDefault(operand); });
+  bodyBuilder(b, loc, mappedYieldedValues);
 }
 
 bool MapScatterOp::isIdentity() {
@@ -784,8 +817,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip_equal(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
+                     return ShapedType::isStatic(std::get<0>(s)) &&
+                            ShapedType::isStatic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/accumulator shapes");
@@ -799,8 +832,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
+                     return ShapedType::isStatic(std::get<0>(s)) &&
+                            ShapedType::isStatic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -913,19 +946,21 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 // ArgmaxOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult ArgmaxOp::verify() {
+LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  if (getNumDpsInputs() != 1) {
+  unsigned numInputVals = llvm::size(getInputs());
+  if (numInputVals != 1) {
     return op->emitOpError(
-               "expected exactly one input operand (values), but got ")
-           << getNumDpsInputs();
+               "expected exactly one tensor input operand, but got ")
+           << numInputVals;
   }
 
-  if (getNumDpsInits() != 2) {
+  unsigned numOutputs = getNumDpsInits();
+  if (numOutputs != 2) {
     return op->emitOpError(
                "expected two output operands (value and index), but got ")
-           << getNumDpsInits();
+           << numOutputs;
   }
 
   uint64_t dim = getDimension();
@@ -954,7 +989,7 @@ LogicalResult ArgmaxOp::verify() {
   }
 
   SmallVector<int64_t> expectedShape;
-  for (int64_t i = 0; i < getInputRank(); ++i) {
+  for (int64_t i = 0; i < rank; ++i) {
     if (i != dim)
       expectedShape.push_back(inputType.getDimSize(i));
   }
@@ -966,12 +1001,43 @@ LogicalResult ArgmaxOp::verify() {
            << llvm::interleaved_array(outputValueType.getShape());
   }
 
+  Region &region = getRegion();
+  Block &block = region.front();
+  unsigned numArgs = block.getNumArguments();
+  if (numArgs != 2) {
+    return op->emitOpError("region block should have 2 arguments, but got ")
+           << numArgs;
+  }
+  Type inputElemType = inputType.getElementType();
+  Type arg0Type = block.getArgument(0).getType();
+  Type arg1Type = block.getArgument(1).getType();
+
+  if (arg0Type != inputElemType || arg1Type != inputElemType) {
+    return op->emitOpError(
+               "comparator region arguments must match input element type. ")
+           << "Expected: " << inputElemType << ", but got: " << arg0Type
+           << " and " << arg1Type;
+  }
+
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
+  unsigned numOperands = yieldOp->getNumOperands();
+  if (numOperands != 1) {
+    return op->emitOpError(
+               "expected linalg_ext.yield to return 1 operand, but got ")
+           << numOperands;
+  }
+
+  Type yieldType = yieldOp.getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return op->emitOpError(
+               "region block must end with a linalg_ext.yield i1, but got: ")
+           << yieldType;
+  }
   return success();
 }
 
-LogicalResult
-ArgmaxOp::reifyResultShapes(OpBuilder &b,
-                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult ArgCompareOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -1261,7 +1327,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   // use dispatchIndexOpFoldResults on the result, and rely on exact number of
   // dynamic dims returned by that.
   for (unsigned i = 0; i < resultDims.size(); ++i) {
-    if (!ShapedType::isDynamic(resultTypeShape[i])) {
+    if (ShapedType::isStatic(resultTypeShape[i])) {
       continue;
     }
     resultDims[i] =
@@ -2400,7 +2466,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
-DEFINE_OP_GET_EFFECTS(ArgmaxOp)
+DEFINE_OP_GET_EFFECTS(ArgCompareOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)

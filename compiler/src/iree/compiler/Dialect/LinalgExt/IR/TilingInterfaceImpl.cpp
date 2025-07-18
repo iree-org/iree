@@ -109,9 +109,6 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> updateStrides(updateRank, oneAttr);
   Operation *updateSlice =
       getSlice(builder, loc, getUpdates(), offsets, sizes, updateStrides);
-  if (!updateSlice) {
-    return emitOpError("failed to get updates slice");
-  }
   Value tiledUpdate = updateSlice->getResult(0);
   slices.push_back(updateSlice);
 
@@ -127,9 +124,6 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
                                      indicesSizes, indicesStrides);
-  if (!indicesSlice) {
-    return emitOpError("failed to get indices slices");
-  }
   Value tiledIndices = indicesSlice->getResult(0);
   slices.push_back(indicesSlice);
 
@@ -144,9 +138,6 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   Operation *originalSlice =
       getSlice(builder, loc, getOriginal(), originalOffsets, originalSizes,
                originalStrides);
-  if (!originalSlice) {
-    return emitOpError("failed to get original tensor slice");
-  }
   Value tiledOriginal = originalSlice->getResult(0);
   slices.push_back(originalSlice);
 
@@ -187,9 +178,10 @@ LogicalResult ScatterOp::getResultTilePosition(
 
 /// Method to return the position of the result tile computed by the tiled
 /// operation.
-LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
+LogicalResult ScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
     SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
     SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
   // Fusion with producers is not possible in general if `unique_indices` is not
@@ -199,9 +191,12 @@ LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
   }
   // TODO: Support fusion along the index operand. For the index operand, the
   // offset + size must be the full size for the inner most dim.
-  if (getInputs().getBeginOperandIndex() != operandNumber) {
+  if (operandNumbers.size() != 1 ||
+      getInputs().getBeginOperandIndex() != operandNumbers.front()) {
     return failure();
   }
+  ArrayRef<OpFoldResult> offsets(allOffsets[0]);
+  ArrayRef<OpFoldResult> sizes(allSizes[0]);
 
   // The iteration domain is defined in terms of the |input|, so simply
   // use the given offsets/sizes.
@@ -212,12 +207,14 @@ LogicalResult ScatterOp::getIterationDomainTileFromOperandTile(
 
 /// Method to generate the tiled implementation of an operation from the tile
 /// of the operand.
-FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes) {
   SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
-  if (failed(getIterationDomainTileFromOperandTile(
-          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+  if (failed(getIterationDomainTileFromOperandTiles(
+          b, operandNumbers, allOffsets, allSizes, mappedOffsets,
+          mappedSizes))) {
     return failure();
   }
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
@@ -314,9 +311,6 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> resultStrides(resultRank, oneAttr);
   Operation *resultSlice =
       getSlice(builder, loc, getOutput(), offsets, sizes, resultStrides);
-  if (!resultSlice) {
-    return emitOpError("failed to get result slice");
-  }
   Value tiledResult = resultSlice->getResult(0);
 
   // Slice of indices.
@@ -331,9 +325,6 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
                                      indicesSizes, indicesStrides);
-  if (!indicesSlice) {
-    return emitOpError("failed to get indices slices");
-  }
   Value tiledIndices = indicesSlice->getResult(0);
 
   // Slice of the source.
@@ -353,9 +344,6 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> sourceStrides(sourceRank, oneAttr);
   Operation *sourceSlice = getSlice(builder, loc, getSource(), sourceOffsets,
                                     sourceSizes, sourceStrides);
-  if (!sourceSlice) {
-    return emitOpError("failed to get source tensor slice");
-  }
   Value tiledSource = sourceSlice->getResult(0);
 
   slices.push_back(sourceSlice);
@@ -461,9 +449,6 @@ MapScatterOp::getTiledImplementation(OpBuilder &builder,
                                          builder.getI64IntegerAttr(1));
   Operation *inputSlice =
       getSlice(builder, loc, getInput(), offsets, sizes, inputStrides);
-  if (!inputSlice) {
-    return emitOpError("failed to get input slice");
-  }
 
   // Clone the operation with the slice of the input, and then compose the
   // tiling offsets with the index transformation of the map_scatter op,
@@ -500,14 +485,19 @@ LogicalResult MapScatterOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult MapScatterOp::getIterationDomainTileFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
+LogicalResult MapScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
     SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
     SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
-  if (operandNumber != getInputMutable().getOperandNumber()) {
+  if (operandNumbers.size() != 1 ||
+      operandNumbers.front() != getInputMutable().getOperandNumber()) {
     return failure();
   }
+  ArrayRef<OpFoldResult> offsets(allOffsets[0]);
+  ArrayRef<OpFoldResult> sizes(allSizes[0]);
+
   // The iteration domain is defined in terms of the `input`, so simply
   // use the given offsets/sizes.
   iterDomainOffsets.assign(offsets.begin(), offsets.end());
@@ -515,12 +505,14 @@ LogicalResult MapScatterOp::getIterationDomainTileFromOperandTile(
   return success();
 }
 
-FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTile(
-    OpBuilder &b, unsigned operandNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes) {
   SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
-  if (failed(getIterationDomainTileFromOperandTile(
-          b, operandNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+  if (failed(getIterationDomainTileFromOperandTiles(
+          b, operandNumbers, allOffsets, allSizes, mappedOffsets,
+          mappedSizes))) {
     return failure();
   }
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
@@ -535,44 +527,27 @@ LogicalResult MapScatterOp::generateScalarImplementation(OpBuilder &b,
                                                          ValueRange ivs) {
   // The scalar implementation is currently only implemented for buffer
   // semantics, because we need to conditionally write values based on the
-  // mask.
-  if (!hasPureBufferSemantics()) {
+  // mask. Vectorized map_scatter ops should be decomposed, not tiled to loops,
+  // so vector types are not allowed.
+  if (!hasPureBufferSemantics() || isa<VectorType>(getInputType())) {
     return failure();
   }
-  Block &transformBlock = getTransformationRegion().front();
-  IRMapping mapping;
-  // Map the induction variables of the loop nest to the block arguments of the
-  // transformation body. The induction variables are the indices looping over
-  // the elements of input operand.
-  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
-    mapping.map(arg, ivs[idx]);
-  }
-  // Clone the operations within the transformation body to the current
-  // insertion point, and map their results to the new cloned operations'
-  // results.
-  for (Operation &op : transformBlock.without_terminator()) {
-    Operation *clonedOp = b.clone(op, mapping);
-    for (auto [result, clonedResult] :
-         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
-      mapping.map(result, clonedResult);
-    }
-  }
-
-  // Get the cloned values that were yielded by the transformation body to use
-  // as the indices for the store into the output.
-  SmallVector<Value> storeIndexValues = llvm::map_to_vector(
-      transformBlock.getTerminator()->getOperands(),
-      [&](Value operand) { return mapping.lookupOrDefault(operand); });
-  // The last yielded Value is the mask, so use it as the if condition instead
-  // of the store indices.
-  Value ifCond = storeIndexValues.pop_back_val();
-  auto thenBuilder = [&](OpBuilder &nestedBuilder, Location nestedLoc) {
-    Value input = nestedBuilder.create<memref::LoadOp>(loc, getInput(), ivs);
-    nestedBuilder.create<memref::StoreOp>(nestedLoc, input, getOutput(),
-                                          storeIndexValues);
-    nestedBuilder.create<scf::YieldOp>(nestedLoc);
+  auto bodyBuilder = [&](OpBuilder nestedBuilder, Location nestedLoc,
+                         ArrayRef<Value> yieldedValues) {
+    // The last yielded Value is the mask, so use it as the if condition instead
+    // of the store indices.
+    Value ifCond = yieldedValues.back();
+    ArrayRef<Value> storeIndices = yieldedValues.drop_back();
+    auto thenBuilder = [&](OpBuilder &ifBuilder, Location ifLoc) {
+      SmallVector<OpFoldResult> ivsOfr(ivs);
+      Value input = ifBuilder.create<memref::LoadOp>(ifLoc, getInput(), ivs);
+      ifBuilder.create<memref::StoreOp>(ifLoc, input, getOutput(),
+                                        storeIndices);
+      ifBuilder.create<scf::YieldOp>(ifLoc);
+    };
+    nestedBuilder.create<scf::IfOp>(nestedLoc, ifCond, thenBuilder);
   };
-  b.create<scf::IfOp>(loc, ifCond, thenBuilder);
+  inlineMapScatterBody(b, loc, ivs, bodyBuilder);
   return success();
 }
 
@@ -617,9 +592,6 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   for (auto [idx, output] : llvm::enumerate(getOutputs())) {
     Operation *slice =
         getSlice(builder, getLoc(), output, offsets, sizes, strides);
-    if (!slice) {
-      return emitOpError("failed to get slice of operand ") << idx;
-    }
     tiledOperands[idx] = slice->getResult(0);
     slices.push_back(slice);
   }
@@ -764,7 +736,7 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
   // We will need exp(-2 * PI * j / m * I), compute "-2 * PI / m" for imag part
   // first.
   Value coeff = b.create<arith::ConstantFloatOp>(
-      loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
+      loc, f32Type, llvm::APFloat(static_cast<float>(-2 * acos(-1))));
   coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
   b.create<linalg::GenericOp>(
@@ -910,9 +882,6 @@ FftOp::getTiledImplementation(OpBuilder &builder,
   for (auto [index, out] : llvm::enumerate(getOutputs())) {
     Operation *slice =
         getSlice(builder, getLoc(), out, offsets, sizes, strides);
-    if (!slice) {
-      return emitOpError("failed to get slice of output ") << index;
-    }
     tiledOperands.push_back(slice->getResult(0));
     slices.push_back(slice);
     if (hasPureTensorSemantics()) {
@@ -1055,9 +1024,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *inputSlice =
         getSlice(builder, getLoc(), getInput(), offsets, sizes, strides);
-    if (!inputSlice) {
-      return emitOpError("failed to get input slice");
-    }
     tiledOperands.emplace_back(inputSlice->getResult(0));
     slices.push_back(inputSlice);
   }
@@ -1066,9 +1032,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *output0Slice =
         getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides);
-    if (!output0Slice) {
-      return emitOpError("failed to get slice of output 0");
-    }
     tiledOperands.emplace_back(output0Slice->getResult(0));
     slices.push_back(output0Slice);
   }
@@ -1082,9 +1045,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
     SmallVector<OpFoldResult> accumStrides(rank - 1, oneAttr);
     Operation *output1Slice = getSlice(builder, getLoc(), getOutputs()[1],
                                        accumOffsets, accumSizes, accumStrides);
-    if (!output1Slice) {
-      return emitOpError("failed to get output1 slice");
-    }
     tiledOperands.emplace_back(output1Slice->getResult(0));
     slices.push_back(output1Slice);
   } else {
@@ -1272,9 +1232,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *valuesSlice =
         getSlice(builder, loc, getValues(), offsets, sizes, strides);
-    if (!valuesSlice) {
-      return emitOpError("failed to get values slice");
-    }
     tiledOperands.emplace_back(valuesSlice->getResult(0));
     slices.push_back(valuesSlice);
   }
@@ -1282,9 +1239,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   if (getIndices()) {
     Operation *indicesSlice =
         getSlice(builder, loc, *getIndices(), offsets, sizes, strides);
-    if (!indicesSlice) {
-      return emitOpError("failed to get slices of indices");
-    }
     tiledOperands.emplace_back(indicesSlice->getResult(0));
     slices.push_back(indicesSlice);
   }
@@ -1298,9 +1252,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *output0Slice =
         getSlice(builder, loc, getOutputs()[0], offsets, outputSizes, strides);
-    if (!output0Slice) {
-      return emitOpError("failed to get output 0 slice");
-    }
     tiledOperands.emplace_back(output0Slice->getResult(0));
     slices.push_back(output0Slice);
   }
@@ -1309,9 +1260,6 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *output1Slice =
         getSlice(builder, loc, getOutputs()[1], offsets, outputSizes, strides);
-    if (!output1Slice) {
-      return emitOpError("failed to get output1 slice");
-    }
     tiledOperands.emplace_back(output1Slice->getResult(0));
     slices.push_back(output1Slice);
   }
@@ -1337,6 +1285,158 @@ LogicalResult TopkOp::getResultTilePosition(
   Value kSize = getDimValue(builder, getLoc(), getDpsInits()[resultNumber],
                             getDimension());
   resultSizes[getDimension()] = getAsOpFoldResult(kSize);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> ArgCompareOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  int64_t rank = getInputRank();
+  SmallVector<Range> ranges;
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    OpFoldResult ub = getDim(builder, loc, getInputValue(), dim);
+    ranges.push_back(Range{zero, ub, one});
+  }
+  return ranges;
+}
+
+SmallVector<utils::IteratorType> ArgCompareOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult>
+ArgCompareOp::getTiledImplementation(OpBuilder &builder,
+                                     ArrayRef<OpFoldResult> offsets,
+                                     ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         "Unexpected offsets size");
+  assert(sizes.size() == static_cast<size_t>(rank) && "Unexpected sizes size");
+
+  SmallVector<Operation *> slices;
+  SmallVector<Value> tiledOperands;
+
+  SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+  Operation *inputSlice =
+      getSlice(builder, loc, getInputValue(), offsets, sizes, strides);
+  tiledOperands.push_back(inputSlice->getResult(0));
+  slices.push_back(inputSlice);
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return emitOpError("failed to compute output tile position");
+  }
+
+  SmallVector<OpFoldResult> outputStrides(outputOffsets.size(),
+                                          builder.getIndexAttr(1));
+  Operation *outputValSlice = getSlice(
+      builder, loc, outputValue(), outputOffsets, outputSizes, outputStrides);
+  tiledOperands.push_back(outputValSlice->getResult(0));
+  slices.push_back(outputValSlice);
+
+  Operation *outputIdxSlice = getSlice(
+      builder, loc, outputIndex(), outputOffsets, outputSizes, outputStrides);
+  tiledOperands.push_back(outputIdxSlice->getResult(0));
+  slices.push_back(outputIdxSlice);
+
+  if (getIndexBase()) {
+    tiledOperands.push_back(getIndexBase());
+  }
+
+  SmallVector<Type> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValSlice->getResult(0).getType());
+    resultTypes.push_back(outputIdxSlice->getResult(0).getType());
+  }
+
+  Operation *tiledArgmaxOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{
+      {tiledArgmaxOp}, SmallVector<Value>(tiledArgmaxOp->getResults()), slices};
+}
+
+LogicalResult ArgCompareOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  int64_t dim = getDimension();
+  int64_t inputRank = getInputRank();
+
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i == dim) {
+      continue;
+    }
+    resultOffsets.push_back(offsets[i]);
+    resultSizes.push_back(sizes[i]);
+  }
+
+  return success();
+}
+
+FailureOr<TilingResult>
+ArgCompareOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                      ArrayRef<OpFoldResult> offsets,
+                                      ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
+                                                         Location loc,
+                                                         ValueRange ivs) {
+  uint64_t reductionDim = getDimension();
+  SmallVector<Value> parallelIndices;
+  for (size_t i = 0, rank = ivs.size(); i < rank; ++i) {
+    if (i == reductionDim)
+      continue;
+    parallelIndices.push_back(ivs[i]);
+  }
+
+  Value bestValueSoFar =
+      b.create<memref::LoadOp>(loc, outputValue(), parallelIndices);
+  Value bestIndexSoFar =
+      b.create<memref::LoadOp>(loc, outputIndex(), parallelIndices);
+
+  Value candidateValue = b.create<memref::LoadOp>(loc, getInputValue(), ivs);
+
+  auto &srcBlock = getRegion().front();
+  IRMapping regionMap;
+  regionMap.map(srcBlock.getArgument(0), candidateValue);
+  regionMap.map(srcBlock.getArgument(1), bestValueSoFar);
+  for (Operation &op : srcBlock.without_terminator()) {
+    b.clone(op, regionMap);
+  }
+
+  Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
+  Value selectedValue =
+      b.create<arith::SelectOp>(loc, cmpResult, candidateValue, bestValueSoFar);
+  Value indexOffset = ivs[reductionDim];
+  if (getIndexBase()) {
+    indexOffset = b.create<arith::AddIOp>(loc, getIndexBase(), indexOffset);
+  }
+  Value castedIndex = indexOffset;
+  if (castedIndex.getType() != bestIndexSoFar.getType()) {
+    castedIndex = b.create<arith::IndexCastOp>(loc, bestIndexSoFar.getType(),
+                                               castedIndex);
+  }
+
+  Value selectedIndex =
+      b.create<arith::SelectOp>(loc, cmpResult, castedIndex, bestIndexSoFar);
+  b.create<memref::StoreOp>(loc, selectedValue, outputValue(), parallelIndices);
+  b.create<memref::StoreOp>(loc, selectedIndex, outputIndex(), parallelIndices);
   return success();
 }
 
@@ -1620,16 +1720,10 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   // Input
   Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
                                    inputSizes, inputStrides);
-  if (!inputSlice) {
-    return emitOpError("failed to get slice of input");
-  }
 
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
   Operation *outputSlice =
       getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
-  if (!outputSlice) {
-    return emitOpError("failed to get outputSlice");
-  }
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1768,9 +1862,6 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
                                      inputSizes, inputStrides);
-    if (!inputSlice) {
-      return emitOpError("failed to get input slice");
-    }
     tiledOperands.emplace_back(inputSlice->getResult(0));
     slices.push_back(inputSlice);
   }
@@ -1779,9 +1870,6 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   {
     Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
                                       outputSizes, outputStrides);
-    if (!outputSlice) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSlice->getResult(0));
     slices.push_back(outputSlice);
   }
@@ -1884,9 +1972,6 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   {
     Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
                                      inputSizes, inputStrides);
-    if (!inputSlice) {
-      return emitOpError("failed to get input slice");
-    }
     tiledOperands.emplace_back(inputSlice->getResult(0));
     slices.push_back(inputSlice);
   }
@@ -1895,9 +1980,6 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   {
     Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
                                       outputSizes, outputStrides);
-    if (!outputSlice) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSlice->getResult(0));
     slices.push_back(outputSlice);
   }
@@ -2219,9 +2301,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Query
   {
     Operation *querySliceOp = getSlice(builder, loc, getQuery(), querySlice);
-    if (!querySliceOp) {
-      return emitOpError("failed to get query slice");
-    }
     tiledOperands.emplace_back(querySliceOp->getResult(0));
     slices.push_back(querySliceOp);
   }
@@ -2229,9 +2308,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Key
   {
     Operation *keySliceOp = getSlice(builder, loc, getKey(), keySlice);
-    if (!keySliceOp) {
-      return emitOpError("failed to get key slice");
-    }
     tiledOperands.emplace_back(keySliceOp->getResult(0));
     slices.push_back(keySliceOp);
   }
@@ -2239,9 +2315,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Value
   {
     Operation *valueSliceOp = getSlice(builder, loc, getValue(), valueSlice);
-    if (!valueSliceOp) {
-      return emitOpError("failed to get value slice");
-    }
     tiledOperands.emplace_back(valueSliceOp->getResult(0));
     slices.push_back(valueSliceOp);
   }
@@ -2262,9 +2335,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
-    if (!outputSliceOp) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
@@ -2378,9 +2448,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Query
   {
     Operation *querySliceOp = getSlice(builder, loc, getQuery(), querySlice);
-    if (!querySliceOp) {
-      return emitOpError("failed to get query slice");
-    }
     tiledOperands.emplace_back(querySliceOp->getResult(0));
     slices.push_back(querySliceOp);
   }
@@ -2388,9 +2455,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Key
   {
     Operation *keySliceOp = getSlice(builder, loc, getKey(), keySlice);
-    if (!keySliceOp) {
-      return emitOpError("failed to get key slice");
-    }
     tiledOperands.emplace_back(keySliceOp->getResult(0));
     slices.push_back(keySliceOp);
   }
@@ -2398,9 +2462,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Value
   {
     Operation *valueSliceOp = getSlice(builder, loc, getValue(), valueSlice);
-    if (!valueSliceOp) {
-      return emitOpError("failed to get value slice");
-    }
     tiledOperands.emplace_back(valueSliceOp->getResult(0));
     slices.push_back(valueSliceOp);
   }
@@ -2420,9 +2481,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
-    if (!outputSliceOp) {
-      return emitOpError("failed to get output slice");
-    }
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
@@ -2430,9 +2488,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Max
   {
     Operation *maxSliceOp = getSlice(builder, loc, getMax(), maxSlice);
-    if (!maxSliceOp) {
-      return emitOpError("failed to get max slice");
-    }
     tiledOperands.emplace_back(maxSliceOp->getResult(0));
     slices.push_back(maxSliceOp);
   }
@@ -2440,9 +2495,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   /// Sum
   {
     Operation *sumSliceOp = getSlice(builder, loc, getSum(), sumSlice);
-    if (!sumSliceOp) {
-      return emitOpError("failed to get sum slice");
-    }
     tiledOperands.emplace_back(sumSliceOp->getResult(0));
     slices.push_back(sumSliceOp);
   }
@@ -2490,10 +2542,9 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
 }
 
 static AffineMap getPartialResultMap(AffineMap map, AttentionOpDetail &opInfo) {
-  // Append K2 dimensions at end.
-  for (int dim : opInfo.getK2Dims()) {
-    map = map.insertResult(getAffineDimExpr(dim, map.getContext()),
-                           map.getNumResults());
+  // Append K2 dimensions at start.
+  for (auto [idx, dim] : llvm::enumerate(opInfo.getK2Dims())) {
+    map = map.insertResult(getAffineDimExpr(dim, map.getContext()), idx);
   }
   return map;
 }
@@ -2501,7 +2552,7 @@ static AffineMap getPartialResultMap(AffineMap map, AttentionOpDetail &opInfo) {
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::generateInitialTensorForPartialReduction(
     OpBuilder &b, Location loc, ArrayRef<OpFoldResult> sizes,
-    ArrayRef<int> reductionDim) {
+    const llvm::SetVector<unsigned> &reductionDims) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2555,8 +2606,11 @@ OnlineAttentionOp::generateInitialTensorForPartialReduction(
 }
 
 FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
-    OpBuilder &b, Location loc, ValueRange init, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, ArrayRef<int> reductionDims) {
+    OpBuilder &b, Location loc, ReductionTilingStrategy strategy,
+    ValueRange init, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2707,10 +2761,9 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
   return genericOp.getResult(0);
 }
 
-FailureOr<MergeResult>
-OnlineAttentionOp::mergeReductions(OpBuilder &b, Location loc,
-                                   ValueRange partialReduce,
-                                   ArrayRef<int> reductionDim) {
+FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
+    OpBuilder &b, Location loc, ValueRange partialReduce,
+    const llvm::SetVector<unsigned> &reductionDims) {
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
@@ -2752,9 +2805,12 @@ OnlineAttentionOp::mergeReductions(OpBuilder &b, Location loc,
 }
 
 LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
-    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
-    SmallVector<OpFoldResult> &resultSizes, ArrayRef<int> reductionDims) {
+    OpBuilder &b, unsigned resultNumber, ReductionTilingStrategy tilingStrategy,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs,
+    SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
@@ -3091,6 +3147,111 @@ LogicalResult CustomOp::getResultTilePosition(
   resultOffsets = sliceParams.offsets;
   resultSizes = sliceParams.sizes;
   return success();
+}
+
+//===---------------------------------------------------------------------===//
+// tensor::ConcatOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+struct ConcatOpTilingExternalModel
+    : public TilingInterface::ExternalModel<ConcatOpTilingExternalModel,
+                                            tensor::ConcatOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *op) const {
+    auto concatOp = cast<tensor::ConcatOp>(op);
+    SmallVector<utils::IteratorType> iteratorTypes(
+        concatOp.getResultType().getRank(), utils::IteratorType::parallel);
+    iteratorTypes[concatOp.getDim()] = utils::IteratorType::reduction;
+    return iteratorTypes;
+  }
+  SmallVector<Range> getIterationDomain(Operation *op,
+                                        OpBuilder &builder) const;
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &builder,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const;
+
+  FailureOr<TilingResult>
+  generateResultTileValue(Operation *op, OpBuilder &builder,
+                          unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+                          ArrayRef<OpFoldResult> sizes) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  LogicalResult
+  getResultTilePosition(Operation *op, OpBuilder &builder,
+                        unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+                        ArrayRef<OpFoldResult> sizes,
+                        SmallVector<OpFoldResult> &resultOffsets,
+                        SmallVector<OpFoldResult> &resultSizes) const {
+    resultOffsets.assign(offsets.begin(), offsets.end());
+    resultSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+};
+} // namespace
+
+SmallVector<Range>
+ConcatOpTilingExternalModel::getIterationDomain(Operation *op,
+                                                OpBuilder &builder) const {
+  auto concatOp = cast<tensor::ConcatOp>(op);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+
+  ReifiedRankedShapedTypeDims reifiedDims;
+  LogicalResult result = concatOp.reifyResultShapes(builder, reifiedDims);
+  (void)result;
+  assert(succeeded(result));
+
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, concatOp.getResultType().getRank())) {
+    ranges.push_back(Range{zero, reifiedDims[0][dim], one});
+    continue;
+  }
+
+  return ranges;
+}
+
+FailureOr<TilingResult> ConcatOpTilingExternalModel::getTiledImplementation(
+    Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) const {
+  auto concatOp = cast<tensor::ConcatOp>(op);
+  Location loc = concatOp.getLoc();
+  uint64_t dim = concatOp.getDim();
+  RankedTensorType resultType = concatOp.getResultType();
+
+  // Don't support tiling along the concated dimension.
+  std::optional<int64_t> concatDimSize = getConstantIntValue(sizes[dim]);
+  if (!concatDimSize || concatDimSize.value() != resultType.getDimSize(dim)) {
+    return failure();
+  }
+
+  // Collect slices of each operand.
+  SmallVector<OpFoldResult> strides(resultType.getRank(),
+                                    builder.getI64IntegerAttr(1));
+  SmallVector<OpFoldResult> operandSizes(sizes);
+  operandSizes[dim] = getDim(builder, loc, concatOp.getOperand(0), dim);
+  SmallVector<Operation *> slices =
+      llvm::map_to_vector(concatOp.getOperands(), [&](Value operand) {
+        return getSlice(builder, loc, operand, offsets, operandSizes, strides);
+      });
+  SmallVector<Value> sliceValues = llvm::map_to_vector(
+      slices, [](Operation *slice) -> Value { return slice->getResult(0); });
+
+  // Create tiled `tensor.concat`.
+  SmallVector<int64_t> resultStaticShape;
+  SmallVector<Value> resultDynamicShape;
+  dispatchIndexOpFoldResults(sizes, resultDynamicShape, resultStaticShape);
+  auto newResultType = resultType.clone(resultStaticShape);
+  Operation *tiledConcatOp =
+      mlir::clone(builder, concatOp.getOperation(), TypeRange{newResultType},
+                  ValueRange(sliceValues));
+  return TilingResult{
+      {tiledConcatOp}, SmallVector<Value>(tiledConcatOp->getResults()), slices};
+}
+
+void registerConcatOpTilingInterfaceExternalModel(MLIRContext *ctx) {
+  tensor::ConcatOp::attachInterface<ConcatOpTilingExternalModel>(*ctx);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

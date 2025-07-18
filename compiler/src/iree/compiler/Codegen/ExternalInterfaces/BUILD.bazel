@@ -40,6 +40,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:TensorDialect",

@@ -103,8 +103,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile"]>]> {
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
     Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
@@ -326,8 +326,8 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile",
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles",
          "generateScalarImplementation"]>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
   let summary = [{Scatter with a mapping from source indices to result indices.}];
@@ -348,7 +348,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
     the mask value is true, the input value will be written.
   }];
   let arguments = (ins
-      AnyRankedTensorOrMemRefType:$input,
+      AnyShaped:$input,
       AnyRankedTensorOrMemRefType:$output
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -374,6 +374,11 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
       return getOutputType().getRank();
     }
 
+    // Return true if the map_scatter op has vector semantics.
+    bool isVectorized() {
+      return isa<VectorType>(getInputType());
+    }
+
     // Helper to apply transformations to the source index block arguments of
     // the transformation body, and replace the uses of the previous source
     // indices with the values returned by `transformationBuilder`. The argument
@@ -386,6 +391,15 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
         function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
             transformationBuilder,
         int64_t numSourceIndices);
+
+    // Inline the transformation region of the map_scatter op without its
+    // terminator, replacing the block arguments with the passed
+    // `transformBodyIndices`. The `bodyBuilder` function is called with the
+    // cloned index `Value`s that would have been yielded by the terminator of
+    // the inlined transformation body.
+    void inlineMapScatterBody(
+      OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+      function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
     // Return true if the mapScatterOp is an identity transformation, meaning
     // it is just doing a copy from input to output. This is true if the mask
@@ -549,11 +563,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
                        BoolAttr:$inclusive
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "0">:$dimension, CArg<"bool", "true">:$inclusive)>
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let hasFolder = 1;
@@ -668,30 +677,86 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
-def IREELinalgExt_ArgmaxOp : IREELinalgExt_Op<"argmax", [
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+  ["generateScalarImplementation",
+   "getLoopIteratorTypes",
+   "getResultTilePosition",
+   "getTiledImplementation",
+   "generateResultTileValue",
+   "getIterationDomain"]
+  >
 ]> {
-  let summary = "Argmax reduction op.";
+  let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
-    An argmax op that reduces along a given dimension, returning the max value and its index.
+    The `arg_compare` op performs a reduction over a given dimension of a tensor,
+    returning both the selected value and its corresponding index. The selection
+    logic is defined by a user-specified comparator region.
+
+    The comparator region receives two candidate values and returns a single `i1`
+    result indicating whether the first argument should be preferred over the second.
+
+    This region defines the sorting rule, e.g., "greater than" for argmax or
+    "less than" for argmin. It allows for generalization beyond simple argmax-style
+    behavior.
+
+    Example (argmax over dim 1):
+    ```mlir
+    %input = memref<2x10xf32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : memref<2x10xf32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    Example with index_base = 5 (i.e., indices start counting from 5):
+    ```mlir
+    %input = memref<2x10xf32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    %base = arith.constant 5 : index
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : memref<2x10xf32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>)
+      index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    The `index_base` is optional. When specified, it is added to the selected index
+    in the result, which is useful when reducing over a tiled or sliced subregion.
   }];
 
   let arguments = (ins
     Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
+    Optional<Index>:$index_base,
     I64Attr:$dimension
   );
 
   let results = (outs
     Variadic<AnyRankedTensor>:$results
   );
-
-let assemblyFormat = [{
+  let regions = (region SizedRegion<1>:$region);
+  let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
-    (`:` type($results)^)?
+    (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+    $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
@@ -843,7 +908,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
-     DestinationStyleOpInterface, LinalgExtInterface,
+     DestinationStyleOpInterface,
+     IndexingMapOpInterface,
+     LinalgExtInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1492,12 +1559,6 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
                        DenseI64ArrayAttr:$image_dimensions
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
   let assemblyFormat = [{
@@ -1602,12 +1663,6 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$kernel_dimensions
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
@@ -1722,12 +1777,6 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$image_dimensions
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
