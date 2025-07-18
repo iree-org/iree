@@ -704,7 +704,8 @@ func.func @i4_dequant_matvec() {
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
 //  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
 //  CHECK-SAME:               partial_reduction = [0, 0, 256],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 2], [0, 1, 2]],
-//  CHECK-SAME:               thread = [0, 0, 4], thread_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 4],
 //  CHECK-SAME:               workgroup = [1, 1, 0]

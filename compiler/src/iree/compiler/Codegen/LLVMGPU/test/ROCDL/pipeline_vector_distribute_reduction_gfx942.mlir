@@ -7,7 +7,7 @@
                                       reduction = [0, 0, 128],
                                       thread = [0, 0, 8],
                                       subgroup_basis = [[1, 1, 1], [0, 1, 2]],
-                                      thread_basis   = [[1, 4, 16], [0, 1, 2]]}
+                                      lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
 #translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
                                                workgroup_size = [64, 1, 1]
@@ -64,7 +64,7 @@ hal.executable private @matvec_fp16 {
                                       reduction = [0, 0, 512],
                                       thread = [0, 0, 8],
                                       subgroup_basis = [[1, 4, 1], [0, 1, 2]],
-                                      thread_basis   = [[1, 1, 64], [0, 1, 2]]}
+                                      lane_basis = [[1, 1, 64], [0, 1, 2]]}
 >
 #translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
                                                workgroup_size = [256, 1, 1]
@@ -121,7 +121,7 @@ hal.executable private @matvec_fp16_parallel_subgroup {
                                       reduction = [0, 0, 512],
                                       thread = [0, 0, 8],
                                       subgroup_basis = [[1, 4, 1], [0, 1, 2]],
-                                      thread_basis   = [[1, 1, 64], [0, 1, 2]],
+                                      lane_basis = [[1, 1, 64], [0, 1, 2]],
                                       promote_operands = [1]}
 >
 #translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
@@ -193,12 +193,12 @@ hal.executable private @matvec_fp16_promote_rhs {
                                      promote_operands = [1, 2]}>
 
 #qk_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 2, 3]],
-                                        thread_basis   = [[1, 1, 2, 32, 1], [0, 1, 2, 3]],
+                                        lane_basis = [[1, 1, 2, 32, 1], [0, 1, 2, 3]],
                                         thread         = [0, 0, 32, 4],
                                         promote_operands = [1]}>
 
 #pv_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 3, 4]],
-                                        thread_basis   = [[1, 1, 2, 32, 1], [0, 1, 3, 4]],
+                                        lane_basis = [[1, 1, 2, 32, 1], [0, 1, 3, 4]],
                                         thread         = [0, 0, 4, 4],
                                         promote_operands = [1]}>
 
@@ -287,12 +287,12 @@ hal.executable private @attention_20x1x64x4096x64 {
                                      promote_operands = [1, 2]}>
 
 #qk_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 2, 3]],
-                                        thread_basis   = [[1, 1, 2, 32, 1], [0, 1, 2, 3]],
+                                        lane_basis = [[1, 1, 2, 32, 1], [0, 1, 2, 3]],
                                         thread         = [0, 0, 32, 4],
                                         promote_operands = [1]}>
 
 #pv_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 3, 4]],
-                                        thread_basis   = [[1, 1, 2, 32, 1], [0, 1, 3, 4]],
+                                        lane_basis = [[1, 1, 2, 32, 1], [0, 1, 3, 4]],
                                         thread         = [0, 0, 4, 4],
                                         promote_operands = [1]}>
 
@@ -377,7 +377,7 @@ hal.executable private @attention_20x1x64x4096x64 {
                                       reduction = [0, 0, 128],
                                       thread = [0, 0, 4],
                                       subgroup_basis = [[1, 1, 2], [0, 1, 2]],
-                                      thread_basis   = [[1, 4, 16], [0, 1, 2]]}
+                                      lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
 #translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
                                                workgroup_size = [64, 1, 1]
@@ -435,7 +435,7 @@ hal.executable private @matvec_fp16 {
                                       partial_reduction = [0, 0, 128],
                                       thread = [0, 0, 8],
                                       subgroup_basis = [[1, 1, 1], [0, 1, 2]],
-                                      thread_basis   = [[1, 4, 16], [0, 1, 2]]}
+                                      lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
 #translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
                                                workgroup_size = [64, 1, 1]
@@ -495,8 +495,8 @@ hal.executable private @matvec_fp16_unaligned {
 /// Paged attention reduction distribution to multiple subgroups.
 /// Distribute 8x32 reduction dims across 4 subbroups with 2x32 threads shape per subgroup.
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64>
-#pv_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], thread_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
-#qk_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], thread_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
+#pv_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], lane_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
+#qk_attrs_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]], thread = [0, 0, 0, 8, 0, 0], lane_basis = [[1, 1, 1, 1, 1, 2, 32], [2, 1, 0, 4, 5, 6]]}>
 #attention_lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 0, 0, 8, 0], workgroup = [1, 1, 1, 0, 0, 0, 0]}>
 
 hal.executable private @attention_4xDx1x32x128xf16 {
