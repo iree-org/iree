@@ -419,14 +419,14 @@ getVectorDistributeReductionConfig(
     ArrayAttr subgroupBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
 
-    ArrayAttr threadBasisAttr = b.getArrayAttr(
+    ArrayAttr laneBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
     NamedAttribute configAttrs[] = {
         NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
         NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
-        NamedAttribute("thread_basis", threadBasisAttr),
+        NamedAttribute("lane_basis", laneBasisAttr),
         NamedAttribute("subgroup_basis", subgroupBasisAttr)};
 
     auto configDict = b.getDictionaryAttr(configAttrs);
@@ -501,12 +501,12 @@ getVectorDistributeReductionConfig(
   ArrayAttr threadBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
-  SmallVector<NamedAttribute, 5> configAttrs = {
+  NamedAttribute configAttrs[] = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("partial_reduction",
                      b.getI64ArrayAttr(partialReductionTileSizes)),
       NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
-      NamedAttribute("thread_basis", threadBasisAttr),
+      NamedAttribute("lane_basis", threadBasisAttr),
       NamedAttribute("subgroup_basis", subgroupBasisAttr)};
 
   auto configDict = b.getDictionaryAttr(configAttrs);
