@@ -247,7 +247,7 @@ def FormDispatchRegionsPass :
            /*default=*/"false", "Enable fusing pad with consumer">,
     Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
            /*default=*/"false", "Enable fusion of pad with producers">,
-    Option<"fuseTruncWithConsumers", "fuse-trunc-with-producers", "bool",
+    Option<"fuseTruncWithConsumers", "fuse-trunc-with-consumers", "bool",
            /*default=*/"false", "Fuse truncate operations with their consumers">
   ];
   let description = [{
