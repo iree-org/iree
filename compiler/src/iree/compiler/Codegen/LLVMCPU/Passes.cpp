@@ -161,6 +161,8 @@ static bool isValidInterchange(ArrayRef<int64_t> interchange, int numLoops) {
   return true;
 }
 
+// TODO(hanchung): Refresh the verifier after all the pipelines use
+// IREE::CPU::LoweringConfigAttr.
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -223,14 +225,16 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
   }
 
-  // Verify interchange
-  auto tileSizesForLevel = tilingConfig.getTileSizes();
+  // Verify interchange.
   for (int level = 0; level < tilingConfig.getNumTilingLevels(); level++) {
-    auto interchange = tilingConfig.getTileInterchangeSizes(level);
-    auto &tileSizes = tileSizesForLevel[level];
-    if (!isValidInterchange(interchange, tileSizes.size())) {
+    IREE::Codegen::LoweringConfigTilingLevelAttr attr =
+        tilingConfig.getTilingLevelAttr(level);
+    ArrayRef<int64_t> interchange = attr.getInterchange();
+    size_t expectedSize = attr.getSizes().size();
+    if (!interchange.empty() &&
+        !isValidInterchange(interchange, expectedSize)) {
       return op->emitOpError("expected [0, ")
-             << tileSizes.size() << ") to be set exactly once in interchange #"
+             << expectedSize << ") to be set exactly once in interchange #"
              << level;
     }
   }
@@ -406,7 +410,9 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
       if (i == tilingConfig.getDistributionLevel())
         continue;
       if (fusableLevels.contains(i)) {
-        funcPassManager.addPass(createLLVMCPUTileAndFusePass(i));
+        funcPassManager.addPass(
+            createLLVMCPUTileRootAndFuseProducerConsumerPass(
+                static_cast<IREE::CPU::TilingLevel>(i)));
         funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
         funcPassManager.addPass(createConcretizePadResultShapePass());
         continue;
@@ -429,6 +435,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
           static_cast<IREE::CPU::TilingLevel>(i)));
     }
   }
+  funcPassManager.addPass(createForallToForPass());
 
   if (pipelineOpt.enablePeeling) {
     funcPassManager.addPass(createLLVMCPUPeelPass());
