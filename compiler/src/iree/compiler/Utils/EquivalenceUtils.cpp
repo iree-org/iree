@@ -107,15 +107,16 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   return true;
 }
 
-static bool isStructurallyEquivalentTo(
-    OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
-    IRMapping &parentMapping,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent =
-        nullptr);
+// static bool isStructurallyEquivalentTo(
+//     OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
+//     IRMapping &parentMapping,
+//     std::function<bool(SymbolRefAttr, SymbolRefAttr )>
+//     areAttributesEquivalent =
+//         nullptr);
 
 bool isStructurallyEquivalentTo(
     OperationEquivalenceCache &cache, Region &lhs, Region &rhs,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
+    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
   auto mapping = cache.acquireMapping();
   return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
                                     areAttributesEquivalent);
@@ -123,14 +124,14 @@ bool isStructurallyEquivalentTo(
 
 bool isStructurallyEquivalentTo(
     Region &lhs, Region &rhs,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
+    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
   OperationEquivalenceCache cache(lhs.getContext());
   return isStructurallyEquivalentTo(cache, lhs, rhs, areAttributesEquivalent);
 }
 
 bool isStructurallyEquivalentTo(
     Operation &lhs, Operation &rhs,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
+    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
   OperationEquivalenceCache cache(lhs.getContext());
   auto mapping = cache.acquireMapping();
   return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
@@ -139,7 +140,7 @@ bool isStructurallyEquivalentTo(
 
 bool isStructurallyEquivalentTo(
     OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
+    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
   auto mapping = cache.acquireMapping();
   return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
                                     areAttributesEquivalent);
@@ -168,7 +169,7 @@ bool isStructurallyEquivalentTo(
 bool isStructurallyEquivalentTo(
     OperationEquivalenceCache &cache, Region &lhs, Region &rhs,
     IRMapping &mapping,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
+    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
   auto &lhsRegionEntry = cache.getRegion(&lhs);
   auto &rhsRegionEntry = cache.getRegion(&rhs);
   if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size())
@@ -209,10 +210,10 @@ bool isStructurallyEquivalentTo(
   return true;
 }
 
-static bool isStructurallyEquivalentTo(
+bool isStructurallyEquivalentTo(
     OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
     IRMapping &parentMapping,
-    std::function<bool(Operation &, Operation &)> areAttributesEquivalent) {
+    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
   // Check operation metadata for early-exit opportunities.
   if (lhs.getName() != rhs.getName() ||
       lhs.getNumOperands() != rhs.getNumOperands() ||
@@ -232,9 +233,6 @@ static bool isStructurallyEquivalentTo(
   for (auto [lhsAttr, rhsAttr] :
        llvm::zip_equal(lhsEntry.attrs, rhsEntry.attrs)) {
     if (!cache.isSymbolAttrName(lhsAttr.getName())) {
-      if (areAttributesEquivalent && areAttributesEquivalent(lhs, rhs)) {
-        break;
-      }
       if (lhsAttr != rhsAttr)
         return false;
     }
