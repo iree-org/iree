@@ -274,10 +274,9 @@ deserializeEncodingInfo(DictionaryAttr attr) {
     auto value = attr.getNamed("scalableTiles");
     if (!value || !isa<ArrayAttr>(value->getValue()))
       return std::nullopt;
-    ScalableTileFlags res = llvm::to_vector(
-        llvm::map_range(cast<ArrayAttr>(value->getValue()), [](Attribute a) {
-          return cast<BoolAttr>(a).getValue();
-        }));
+    ScalableTileFlags res = llvm::map_to_vector(
+        cast<ArrayAttr>(value->getValue()),
+        [](Attribute a) { return cast<BoolAttr>(a).getValue(); });
     info.scalableTiles = std::move(res);
   }
 

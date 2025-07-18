@@ -166,9 +166,9 @@ TEST(MaterializeEncodingInfo, Serialization) {
   auto extractedOuterDimsPerm = extractFromIntegerArrayAttr<int64_t>(
       dictAttr.getNamed("outerDimsPerm")->getValue());
   EXPECT_EQ(extractedOuterDimsPerm, info.outerDimsPerm);
-  auto extractedScalableTiles = llvm::to_vector(llvm::map_range(
+  auto extractedScalableTiles = llvm::map_to_vector(
       cast<ArrayAttr>(dictAttr.getNamed("scalableTiles")->getValue()),
-      [](Attribute a) { return cast<BoolAttr>(a).getValue(); }));
+      [](Attribute a) { return cast<BoolAttr>(a).getValue(); });
   EXPECT_EQ(extractedScalableTiles, info.scalableTiles);
 
   std::optional<MaterializeEncodingInfo> deserializedInfo =

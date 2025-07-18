@@ -83,6 +83,11 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
 //     CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
 //         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[TILED_M]], %[[K]]}
+///
+/// Compute "tiled" N:
+///  *  N / 8 for fixed-width tiling,
+///  *  N / ( 8 * vscale) for scalable tiling
+///
 //        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
 //      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
 //      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
@@ -249,6 +254,9 @@ func.func @matmul_lowering_f16f16f16_aarch64() attributes {
 //     CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
 //         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf16>>{%[[TILED_M]], %[[K]]}
+///
+/// Compute "tiled" N for fixed-width and scalable tiling, see @matmul_lowering_f32f32f32_aarch64.
+///
 //        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
 //      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
 //      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
@@ -340,6 +348,9 @@ func.func @matmul_lowering_f32f16f16_aarch64() attributes {
 //         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%[[M_CEILDIV_8]], %[[K]]}
 //        NO-SVE:   %[[N_CEILDIV_8:.+]] = affine.apply #[[$MAP_CEILDIV_8]]()[%[[N]]]
+///
+/// Compute "tiled" N for fixed-width and scalable tiling, see @matmul_lowering_f32f32f32_aarch64.
+///
 //      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
 //      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
 //      WITH-SVE:   %[[N_CEILDIV_VSCALE:.+]] = affine.apply #[[$MAP_VSCALE]]()[%[[N]], %[[C8_VSCALE]]]
@@ -491,6 +502,9 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
 //         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4xi8>>{%[[TILED_M]], %[[TILED_K]]}
 //        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+///
+/// Compute "tiled" N for fixed-width and scalable tiling, see @matmul_lowering_f32f32f32_aarch64.
+///
 //      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
 //      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
 //      WITH-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP2]]()[%[[N]], %[[C8_VSCALE]]]
@@ -573,6 +587,9 @@ func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
 //         CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //    CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x8xi8>>{%[[TILED_M]], %[[TILED_K]]}
 //        NO-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+///
+/// Compute "tiled" N for fixed-width and scalable tiling, see @matmul_lowering_f32f32f32_aarch64.
+///
 //      WITH-SVE:   %[[VSCALE:.+]] = vector.vscale
 //      WITH-SVE:   %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
 //      WITH-SVE:   %[[TILED_N:.+]] = affine.apply #[[$MAP1]]()[%[[N]], %[[C8_VSCALE]]]
