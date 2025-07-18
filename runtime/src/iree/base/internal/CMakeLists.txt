@@ -124,42 +124,15 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    file_io
-  HDRS
-    "file_io.h"
-  SRCS
-    "file_io.c"
-  DEPS
-    iree::base
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    file_io_test
-  SRCS
-    "file_io_test.cc"
-  DEPS
-    ::file_io
-    iree::base
-    iree::base::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "requires-filesystem"
-)
-
-iree_cc_library(
-  NAME
     flags
   HDRS
     "flags.h"
   SRCS
     "flags.c"
   DEPS
-    ::file_io
     ::internal
     iree::base
+    iree::io::file_handle
   PUBLIC
 )
 
