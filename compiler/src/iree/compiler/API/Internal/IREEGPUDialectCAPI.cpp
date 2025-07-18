@@ -220,21 +220,34 @@ MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
 }
 
 ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUMMAAttr(attr) && "attr is not a MMAAttr");
-  auto mma = llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr));
-
+  assert(ireeAttributeIsAGPUMMAAttr(attr) ||
+         ireeAttributeIsAGPUVirtualMMAAttr(attr) &&
+             "Expected MMAAttr or VirtualMMAAttr");
   ireeGPUMMAInfo info = {};
-  auto [aType, bType, cType] = mma.getABCElementTypes();
-  info.aElementType = wrap(aType);
-  info.bElementType = wrap(bType);
-  info.cElementType = wrap(cType);
 
-  auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
-  info.aVectorType = wrap(aVecType);
-  info.bVectorType = wrap(bVecType);
-  info.cVectorType = wrap(cVecType);
+  auto setMMAInfo = [&](auto mma) {
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    info.aElementType = wrap(aType);
+    info.bElementType = wrap(bType);
+    info.cElementType = wrap(cType);
 
-  std::tie(info.mElements, info.nElements, info.kElements) = mma.getMNKShape();
+    auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
+    info.aVectorType = wrap(aVecType);
+    info.bVectorType = wrap(bVecType);
+    info.cVectorType = wrap(cVecType);
+
+    std::tie(info.mElements, info.nElements, info.kElements) =
+        mma.getMNKShape();
+  };
+
+  if (ireeAttributeIsAGPUMMAAttr(attr)) {
+    setMMAInfo(
+        llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr)));
+    return info;
+  }
+
+  setMMAInfo(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(unwrap(attr)));
   return info;
 }
 
@@ -252,27 +265,6 @@ MlirAttribute ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr) {
   mlir::MLIRContext *ctx = mma.getContext();
   mlir::Builder builder(ctx);
   return wrap(builder.getI64ArrayAttr(rawValues));
-}
-
-ireeGPUMMAInfo ireeGPUVirtualMMAAttrGetInfo(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUVirtualMMAAttr(attr) &&
-         "attr is not a VirtualMMAAttr");
-  auto mma =
-      llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(unwrap(attr));
-
-  ireeGPUMMAInfo info = {};
-  auto [aType, bType, cType] = mma.getABCElementTypes();
-  info.aElementType = wrap(aType);
-  info.bElementType = wrap(bType);
-  info.cElementType = wrap(cType);
-
-  auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
-  info.aVectorType = wrap(aVecType);
-  info.bVectorType = wrap(bVecType);
-  info.cVectorType = wrap(cVecType);
-
-  std::tie(info.mElements, info.nElements, info.kElements) = mma.getMNKShape();
-  return info;
 }
 
 bool ireeAttributeIsAGPULoweringConfigAttr(MlirAttribute attr) {

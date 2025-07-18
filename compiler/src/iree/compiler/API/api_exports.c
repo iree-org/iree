@@ -94,7 +94,6 @@ extern void ireeGPULoweringConfigAttrGetTypeID();
 extern void ireeGPUMMAAttrGet();
 extern void ireeGPUVirtualMMAAttrGet();
 extern void ireeGPUMMAAttrGetInfo();
-extern void ireeGPUVirtualMMAAttrGetInfo();
 extern void ireeGPUMMAAttrGetTypeID();
 extern void ireeGPUVirtualMMAAttrGetTypeID();
 extern void ireeGPUMMAIntrinsicAttrGet();
@@ -1008,7 +1007,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeGPUMMAAttrGet;
   x += (uintptr_t)&ireeGPUVirtualMMAAttrGet;
   x += (uintptr_t)&ireeGPUMMAAttrGetInfo;
-  x += (uintptr_t)&ireeGPUVirtualMMAAttrGetInfo;
   x += (uintptr_t)&ireeGPUMMAAttrGetTypeID;
   x += (uintptr_t)&ireeGPUVirtualMMAAttrGetTypeID;
   x += (uintptr_t)&ireeGPUMMAIntrinsicAttrGet;

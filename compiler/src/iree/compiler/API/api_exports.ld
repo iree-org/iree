@@ -85,7 +85,6 @@ VER_0 {
     ireeGPUMMAAttrGet;
     ireeGPUVirtualMMAAttrGet;
     ireeGPUMMAAttrGetInfo;
-    ireeGPUVirtualMMAAttrGetInfo;
     ireeGPUMMAAttrGetTypeID;
     ireeGPUVirtualMMAAttrGetTypeID;
     ireeGPUMMAIntrinsicAttrGet;

@@ -99,9 +99,6 @@ struct ireeGPUMMAInfo {
 
 MLIR_CAPI_EXPORTED ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr);
 
-MLIR_CAPI_EXPORTED ireeGPUMMAInfo
-ireeGPUVirtualMMAAttrGetInfo(MlirAttribute attr);
-
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr);
 

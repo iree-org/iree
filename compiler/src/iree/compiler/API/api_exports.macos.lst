@@ -83,7 +83,6 @@ _ireeGPULoweringConfigAttrGetTypeID
 _ireeGPUMMAAttrGet
 _ireeGPUVirtualMMAAttrGet
 _ireeGPUMMAAttrGetInfo
-_ireeGPUVirtualMMAAttrGetInfo
 _ireeGPUMMAAttrGetTypeID
 _ireeGPUVirtualMMAAttrGetTypeID
 _ireeGPUMMAIntrinsicAttrGet

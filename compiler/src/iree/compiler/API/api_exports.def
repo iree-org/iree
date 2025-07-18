@@ -84,7 +84,6 @@ EXPORTS
   ireeGPUMMAAttrGet
   ireeGPUVirtualMMAAttrGet
   ireeGPUMMAAttrGetInfo
-  ireeGPUVirtualMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
   ireeGPUVirtualMMAAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGet

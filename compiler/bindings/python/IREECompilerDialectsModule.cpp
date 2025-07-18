@@ -435,19 +435,19 @@ NB_MODULE(_ireeCompilerDialects, m) {
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
-            ireeGPUMMAInfo info = ireeGPUVirtualMMAAttrGetInfo(self);
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
             return py::make_tuple(info.aElementType, info.bElementType,
                                   info.cElementType);
           })
       .def_property_readonly(
           "abc_vector_types",
           [](MlirAttribute self) -> py::tuple {
-            ireeGPUMMAInfo info = ireeGPUVirtualMMAAttrGetInfo(self);
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
             return py::make_tuple(info.aVectorType, info.bVectorType,
                                   info.cVectorType);
           })
       .def_property_readonly("mnk_shape", [](MlirAttribute self) -> py::tuple {
-        ireeGPUMMAInfo info = ireeGPUVirtualMMAAttrGetInfo(self);
+        ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
         return py::make_tuple(info.mElements, info.nElements, info.kElements);
       });
 
