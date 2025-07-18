@@ -680,6 +680,10 @@ struct SetEncodingOpLoweringConversion
   LogicalResult
   matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    if (encodingOp.getSource().getType().getRank() == 0) {
+      rewriter.replaceOp(encodingOp, adaptor.getSource());
+      return success();
+    }
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
     auto packedValue = lowerSetEncodingOpToPackOp(
