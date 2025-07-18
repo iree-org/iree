@@ -5452,7 +5452,9 @@ Encoding ops outside flow.dispatch.region to Flow.</p>
 <h3 id="-iree-dispatch-creation-elementwise-op-fusion"><code>-iree-dispatch-creation-elementwise-op-fusion</code><a class="headerlink" href="#-iree-dispatch-creation-elementwise-op-fusion" title="Permanent link">link</a></h3>
 <p><em>Fuse elementwise operations.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-fuse-multi-reduction : Fuse ops that have multiple reduction iterators
+<div class="highlight"><pre><span></span><code>-intra-dispatch       : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
+-fuse-multi-reduction : Fuse ops that have multiple reduction iterators
+-fuse-truncate-ops    : Fuse producer truncate-like operations with consumers
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-fold-unit-extent-dims"><code>-iree-dispatch-creation-fold-unit-extent-dims</code><a class="headerlink" href="#-iree-dispatch-creation-fold-unit-extent-dims" title="Permanent link">link</a></h3>
 <p><em>Fold unit extent dimension of operations.</em></p>
