@@ -363,7 +363,15 @@ static iree_status_t iree_hal_parse_element_unsafe(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     uint8_t* out_data) {
   switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
+    case IREE_HAL_ELEMENT_TYPE_INT_8: {
+      int32_t temp = 0;
+      if (!iree_string_view_atoi_int32(data_str, &temp) || temp < INT8_MIN ||
+          temp > UINT8_MAX) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(int8_t*)out_data = (int8_t)temp;
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_SINT_8: {
       int32_t temp = 0;
       if (!iree_string_view_atoi_int32(data_str, &temp) || temp > INT8_MAX) {
@@ -380,7 +388,15 @@ static iree_status_t iree_hal_parse_element_unsafe(
       *(uint8_t*)out_data = (uint8_t)temp;
       return iree_ok_status();
     }
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
+    case IREE_HAL_ELEMENT_TYPE_INT_16: {
+      int32_t temp = 0;
+      if (!iree_string_view_atoi_int32(data_str, &temp) || temp < INT16_MIN ||
+          temp > UINT16_MAX) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(int16_t*)out_data = (int16_t)temp;
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_SINT_16: {
       int32_t temp = 0;
       if (!iree_string_view_atoi_int32(data_str, &temp) || temp > INT16_MAX) {
