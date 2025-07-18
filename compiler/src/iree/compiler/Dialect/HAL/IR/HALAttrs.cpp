@@ -1120,10 +1120,11 @@ bool DeviceTopologyAttr::hasTransparentAccess(
   if (sourceDevice == targetDevice)
     return true; // Same device has transparent access.
 
+
   // Search for a matching link and check if it has transparent access.
   for (DeviceLinkAttr link : getLinks()) {
-    if ((sourceDevice == link.getSourceDevice() &&
-         targetDevice == link.getTargetDevice())) {
+    if ((sourceDevice == link.getSourceDevice().getLeafReference() &&
+         targetDevice == link.getTargetDevice().getLeafReference())) {
       return link.getTransparentAccess();
     }
   }
@@ -1143,8 +1144,8 @@ bool DeviceTopologyAttr::hasUnifiedMemory(
 
   // Search for a matching link and check if it has unified memory.
   for (DeviceLinkAttr link : getLinks()) {
-    if ((sourceDevice == link.getSourceDevice() &&
-         targetDevice == link.getTargetDevice())) {
+    if ((sourceDevice == link.getSourceDevice().getLeafReference() &&
+         targetDevice == link.getTargetDevice().getLeafReference())) {
       return link.getUnifiedMemory();
     }
   }
