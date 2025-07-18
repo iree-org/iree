@@ -246,8 +246,13 @@ ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
     return info;
   }
 
-  setMMAInfo(
-      llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(unwrap(attr)));
+  llvm::TypeSwitch<mlir::Attribute, void>(unwrap(attr))
+      .Case<mlir::iree_compiler::IREE::GPU::MMAAttr,
+            mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(
+          [&](auto mma) { setMMAInfo(mma); })
+      .Default([&](mlir::Attribute) {
+        assert(false && "Expected MMAAttr or VirtualMMAAttr");
+      });
   return info;
 }
 
