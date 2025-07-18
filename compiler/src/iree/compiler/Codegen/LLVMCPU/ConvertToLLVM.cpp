@@ -1001,20 +1001,6 @@ void ConvertToLLVMPass::runOnOperation() {
     }
   }
 
-  // Expand potentially-unsupported floating-point types.
-  {
-    RewritePatternSet patterns(&getContext());
-    // TODO(krzysz00): Do we still need the bfloat expansion now that LLVM knows
-    // how to do it?
-    arith::populateExpandBFloat16Patterns(patterns);
-    arith::populateExpandScalingExtTruncPatterns(patterns);
-    arith::populateExpandF4E2M1Patterns(patterns);
-    arith::populateExpandF8E8M0Patterns(patterns);
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
-
   const auto &dataLayoutAnalysis = getAnalysis<DataLayoutAnalysis>();
   LowerToLLVMOptions options(&getContext(),
                              dataLayoutAnalysis.getAtOrAbove(module));
