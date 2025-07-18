@@ -22,6 +22,7 @@
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
 
@@ -470,9 +471,12 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   SmallVector<scf::ForallOp> splitReductionForAllOps;
   funcOp.walk([&splitReductionForAllOps](scf::ForallOp forAllOp) {
     auto mapping = forAllOp.getMapping();
-    if (!mapping || mapping->size() != 1 ||
-        !isa<IREE::LinalgExt::SplitReductionMappingAttr>(
-            mapping->getValue().front())) {
+    if (!mapping) {
+      return;
+    }
+    if (llvm::none_of(
+            mapping->getValue(),
+            llvm::IsaPred<IREE::LinalgExt::SplitReductionMappingAttr>)) {
       return;
     }
     splitReductionForAllOps.push_back(forAllOp);
@@ -619,6 +623,18 @@ getTargetFuncAttrs(IREE::Codegen::TranslationInfoAttr translationInfo) {
 void ReconcileTranslationInfoPass::runOnOperation() {
   auto variantOp = getOperation();
   auto innerModuleOp = variantOp.getInnerModule();
+  MLIRContext *context = &getContext();
+
+  if (foldSplitReductionLoopIntoWorkgroupMappingLoop) {
+    RewritePatternSet foldLoopPattern(context);
+    populateFoldSplitReductionAndWorkgroupMappingLoops(foldLoopPattern);
+    if (failed(
+            applyPatternsGreedily(innerModuleOp, std::move(foldLoopPattern)))) {
+      innerModuleOp.emitOpError(
+          "failed to fold split-reduction loop and workgroup mapping loop");
+      return signalPassFailure();
+    }
+  }
 
   // Get the symbol table of the inner module to lookup exported functions.
   SymbolTable symbolTable(innerModuleOp);
@@ -638,6 +654,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       // Skip external functions.
       continue;
     }
+
     // Resolve workgroup distribution related `scf.forall` ops.
     if (failed(resolveWorkgroupForAll(rewriter, rootFuncOp, distributeAlong))) {
       variantOp.emitOpError(
@@ -645,7 +662,6 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    // Resolve split reduction distribution.
     if (failed(
             resolveSplitReduceForAll(rewriter, rootFuncOp, distributeAlong))) {
       variantOp.emitOpError("failed to resolve split reduction forall ops");
