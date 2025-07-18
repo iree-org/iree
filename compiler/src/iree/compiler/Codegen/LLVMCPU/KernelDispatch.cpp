@@ -39,6 +39,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <numeric>
@@ -965,12 +966,19 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 /// scalable tile sizes for now.
 class LoweringConfigGenerator {
 public:
-  explicit LoweringConfigGenerator(Operation *op)
-      : ctx(op->getContext()), rootOp(op) {}
+  explicit LoweringConfigGenerator(Operation *op,
+                                   bool emitInnerParallelList = false)
+      : ctx(op->getContext()), rootOp(op),
+        emitInnerParallelList(emitInnerParallelList) {}
 
   void setDistributionTileSizes(ArrayRef<int64_t> tileSizes) {
     assert(distTileSizes.empty() && "expected to set only once");
     distTileSizes.assign(tileSizes.begin(), tileSizes.end());
+  }
+
+  void setCacheTileSizes(ArrayRef<int64_t> tileSizes) {
+    assert(cacheTileSizes.empty() && "expected to set only once");
+    cacheTileSizes.assign(tileSizes.begin(), tileSizes.end());
   }
 
   void setVectorTileSizes(ArrayRef<int64_t> tileSizes,
@@ -994,6 +1002,16 @@ public:
       appendLoweringConfigLevelAttr(items, TilingLevel::DistributionTiles,
                                     SmallVector<int64_t>(numTilingDims, 0));
     }
+    if (!cacheTileSizes.empty()) {
+      SmallVector<int64_t> parallelTileSizes = cacheTileSizes;
+      SmallVector<int64_t> reductionTileSizes;
+      splitParallelAndReductionTiles(rootOp, parallelTileSizes,
+                                     reductionTileSizes);
+      appendLoweringConfigLevelAttr(items, TilingLevel::CacheParallelTiles,
+                                    parallelTileSizes);
+      appendLoweringConfigLevelAttr(items, TilingLevel::CacheReductionTiles,
+                                    reductionTileSizes);
+    }
     if (!vectorTileSizes.empty()) {
       SmallVector<int64_t> parallelTileSizes = vectorTileSizes;
       SmallVector<int64_t> reductionTileSizes;
@@ -1008,6 +1026,12 @@ public:
                                     parallelTileSizes, parallelScalableFlags);
       appendLoweringConfigLevelAttr(items, TilingLevel::VectorReductionTiles,
                                     reductionTileSizes, reductionScalableFlags);
+      if (emitInnerParallelList) {
+        size_t size = parallelTileSizes.size();
+        appendLoweringConfigLevelAttr(
+            items, TilingLevel::VectorInnerParallelTiles,
+            SmallVector<int64_t>(size, 0), SmallVector<bool>(size, false));
+      }
     }
     return IREE::CPU::LoweringConfigAttr::get(ctx, items);
   }
@@ -1025,8 +1049,17 @@ private:
   MLIRContext *ctx;
   Operation *rootOp;
 
+  // Generates the `IREE::CPU::TilingLevel::VectorInnerParallelTiles` tile sizes
+  // in the lowering config. Usually, they are zero values.
+  // TODO(hanchung): Remove the field once all the pipelines switch to CPU
+  // lowering_config. It is alive for legacy setup.
+  bool emitInnerParallelList = false;
+
   // The tile sizes for distribution from the `rootOp`'s perspective.
   SmallVector<int64_t> distTileSizes;
+
+  // The tile sizes for cache level tiling from the `rootOp`'s perspective.
+  SmallVector<int64_t> cacheTileSizes;
 
   // The tile sizes and scalable flags for vector level tiling from the
   // `rootOp`'s perspective.
@@ -1118,80 +1151,45 @@ static LogicalResult setMatmulPeelingRootConfig(
                       /*predicate=*/inputVecScalableTileFlags[index]);
   }
 
-  // 1. Compute tile sizes for all tiling levels.
-  // The tiling for parallel dims (M and N) and reduction dim (K) should be
-  // separated, so we move K dim from parallel tile sizes to reduction tile
-  // sizes.
-  int64_t numTilingDims = vecTileSizes.size();
-  SmallVector<int64_t> cacheParallelTileSizes(cacheTileSizes.begin(),
-                                              cacheTileSizes.end());
-  SmallVector<int64_t> cacheReductionTileSizes(numTilingDims, 0);
-  std::swap(cacheParallelTileSizes.back(), cacheReductionTileSizes.back());
+  SmallVector<int64_t> vectorTileSizes(roundedVecTileSizes.begin(),
+                                       roundedVecTileSizes.end());
+  SmallVector<bool> vectorScalableFlags(inputVecScalableTileFlags.begin(),
+                                        inputVecScalableTileFlags.end());
+  vectorScalableFlags.back() = false;
 
-  SmallVector<int64_t> vectorParallelTileSizes(roundedVecTileSizes.begin(),
-                                               roundedVecTileSizes.end());
-  SmallVector<int64_t> vectorReductionTileSizes(numTilingDims, 0);
-  std::swap(vectorParallelTileSizes.back(), vectorReductionTileSizes.back());
-
-  TileSizesListType tileSizes = {
-      SmallVector<int64_t>(distTileSizes), cacheParallelTileSizes,
-      cacheReductionTileSizes, vectorParallelTileSizes,
-      vectorReductionTileSizes};
-  // No need for tiling inner parallel dims.
-  tileSizes.emplace_back(numTilingDims, 0);
-
-  // 2. Set scalable flags for all the tiling levels.
-  SmallVector<bool> parallelScalableFlags(inputVecScalableTileFlags.begin(),
-                                          inputVecScalableTileFlags.end());
-  SmallVector<bool> reductionScalableFlags(numTilingDims, false);
-  std::swap(parallelScalableFlags.back(), reductionScalableFlags.back());
-
-  ScalableTileFlagsListType newScalableTileFlags;
-  // No scalable:
-  // * distribution,
-  // * cache parallel, and
-  // * cache reduction
-  // tile sizes.
-  newScalableTileFlags.emplace_back(numTilingDims, false);
-  newScalableTileFlags.emplace_back(numTilingDims, false);
-  newScalableTileFlags.emplace_back(numTilingDims, false);
-
-  newScalableTileFlags.push_back(parallelScalableFlags);
-  newScalableTileFlags.push_back(reductionScalableFlags);
-
-  // No scalable inner parallel dims.
-  newScalableTileFlags.emplace_back(numTilingDims, false);
-
-  LDBG("Final tile sizes for contraction: " << tileSizes);
-  LDBG("Final tile scalable flags for contraction: " << newScalableTileFlags);
+  LoweringConfigGenerator generator(op, /*emitInnerParallelList=*/true);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setCacheTileSizes(cacheTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vectorScalableFlags);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Final tile sizes and scalable flags for contraction: "
+       << loweringConfig);
 
   DictionaryAttr pipelineConfig =
       getPipelineConfWithPeelingAttr(op.getContext());
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, newScalableTileFlags,
+      entryPointFn, op, loweringConfig,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
       /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
 }
 
-static LogicalResult
-setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
-                    linalg::ContractionOpInterface op,
-                    const TileSizesListTypeRef inputTileSizes,
-                    const ScalableTileFlagsListTypeRef inputScalableTileFlags,
-                    int vectorSize, VectorPreProcStrategy vecPreProcStrategy) {
+static LogicalResult setMatmulRootConfig(
+    mlir::FunctionOpInterface entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> distTileSizes, ArrayRef<bool> inputVecScalableDims,
+    ArrayRef<int64_t> inputVecTileSizes, int vectorSize,
+    VectorPreProcStrategy vecPreProcStrategy) {
+  assert(vecPreProcStrategy != VectorPreProcStrategy::Peeling &&
+         "peeling should go setMatmulPeelingRootConfig method");
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
-  // The tiling for parallel dims and reduction dims are separated.
-  const SmallVectorImpl<int64_t> &inputVecTileSizes = inputTileSizes.back();
-  const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
   SmallVector<int64_t> vecTileSizes;
-  SmallVector<bool> parallelScalableFlags;
-  int numScalableDims = llvm::count(vecScalableDims, true);
-
+  SmallVector<bool> vecScalableFlags;
+  int numScalableDims = llvm::count(inputVecScalableDims, true);
   for (auto [index, tileSize] : llvm::enumerate(inputVecTileSizes)) {
     int64_t sz = tileSize;
-    bool isScalable = vecScalableDims[index];
+    bool isScalable = inputVecScalableDims[index];
     // The backend struggles to legalize non-power-of-two scalable vectors.
     bool enforcePowerOfTwo = isScalable;
 
@@ -1206,56 +1204,21 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
     vecTileSizes.push_back(sz);
     // 1x scalable vectors e.g. vector<[1]xty> are also poorly supported, so
     // fallback to fixed vectorization if they occur:
-    parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
+    vecScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
   limitVectorTileSizes(cast<linalg::LinalgOp>(op.getOperation()), vecTileSizes);
-  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
-  SmallVector<int64_t> reductionTileSizes;
-  SmallVector<bool> reductionScalableFlags;
-  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes,
-                                 &parallelScalableFlags,
-                                 &reductionScalableFlags);
 
-  // Ensure there's no zero scalable dims.
-  int64_t numTilingDims = parallelTileSizes.size();
-  for (unsigned i = 0; i < numTilingDims; i++) {
-    if (reductionTileSizes[i] == 0)
-      reductionScalableFlags[i] = false;
-    if (parallelTileSizes[i] == 0)
-      parallelScalableFlags[i] = false;
-  }
-
-  TileSizesListType newTileSizes;
-  // Copy all the tile size levels except the vector tile sizes which are split
-  // into parallel and reduction.
-  std::copy(inputTileSizes.begin(), inputTileSizes.end() - 1,
-            std::back_inserter(newTileSizes));
-  newTileSizes.push_back(parallelTileSizes);
-  newTileSizes.push_back(reductionTileSizes);
-  // No need for tiling inner parallel dims.
-  newTileSizes.emplace_back(numTilingDims, 0);
-
-  // Mirror the same layout for the scalable dims.
-  ScalableTileFlagsListType newScalableTileFlags;
-  std::copy(inputScalableTileFlags.begin(), inputScalableTileFlags.end() - 1,
-            std::back_inserter(newScalableTileFlags));
-  newScalableTileFlags.push_back(parallelScalableFlags);
-  newScalableTileFlags.push_back(reductionScalableFlags);
-  // No scalable inner parallel dims.
-  newScalableTileFlags.emplace_back(numTilingDims, false);
-
-  LDBG("Final tile sizes for contraction: " << newTileSizes);
-  LDBG("Final tile scalable flags for contraction: " << newScalableTileFlags);
+  LoweringConfigGenerator generator(op, /*emitInnerParallelList=*/true);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Final tile sizes and scalable flags for contraction: "
+       << loweringConfig);
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  DictionaryAttr pipelineConfig;
-  if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
-    pipelineConfig = getPipelineConfWithPeelingAttr(op.getContext());
-  }
-
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, newTileSizes, newScalableTileFlags, pipeline,
-      /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, loweringConfig,
+                                               pipeline);
 }
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
@@ -1661,12 +1624,7 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // smaller than `minTileSizes`, so we have to adjust the cache sizes again.
   cacheTileSizes = distTileSizes;
 
-  SmallVector<bool> distScalableTileFlags(distTileSizes.size(), false);
-  ScalableTileFlagsListType scalableTileFlags = {distScalableTileFlags,
-                                                 vecScalableFlags};
-
   LDBG("Distribution tile sizes: " << distTileSizes);
-  LDBG("Distribution scalable tile sizes: " << distScalableTileFlags);
   LDBG("Cache tile sizes: " << cacheTileSizes);
   LDBG("Vector tile sizes: " << vecTileSizes);
   LDBG("Vector scalable tile flags: " << vecScalableFlags);
@@ -1678,9 +1636,9 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
         vecScalableFlags, vecTileSizes, vectorSize);
   }
 
-  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
-  return setMatmulRootConfig(entryPointFn, contractionOp, tileSizes,
-                             scalableTileFlags, vectorSize, vecPreProcStrategy);
+  return setMatmulRootConfig(entryPointFn, contractionOp, distTileSizes,
+                             vecScalableFlags, vecTileSizes, vectorSize,
+                             vecPreProcStrategy);
 }
 
 static IREE::Codegen::LoweringConfigAttrInterface
