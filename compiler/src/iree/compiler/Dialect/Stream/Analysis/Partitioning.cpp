@@ -23,14 +23,14 @@ void dumpPartition(Partition &partition, AsmState &asmState) {
     partition.affinity.dump();
     llvm::dbgs() << "\n";
   }
-  llvm::dbgs() << " INS:\n  ";
-  llvm::interleaveComma(partition.ins, llvm::dbgs(), [&](Value in) {
-    in.printAsOperand(llvm::dbgs(), asmState);
-  });
-  llvm::dbgs() << "\n OUTS:\n  ";
-  llvm::interleaveComma(partition.outs, llvm::dbgs(), [&](Value out) {
-    out.printAsOperand(llvm::dbgs(), asmState);
-  });
+  llvm::dbgs() << " INS:\n    ";
+  llvm::interleave(
+      partition.ins, llvm::dbgs(),
+      [&](Value in) { in.print(llvm::dbgs(), asmState); }, "\n    ");
+  llvm::dbgs() << "\n OUTS:\n    ";
+  llvm::interleave(
+      partition.outs, llvm::dbgs(),
+      [&](Value out) { out.print(llvm::dbgs(), asmState); }, "\n    ");
   llvm::dbgs() << "\n OPS:\n";
   for (auto *op : llvm::reverse(partition.ops)) {
     llvm::dbgs() << "  ";
