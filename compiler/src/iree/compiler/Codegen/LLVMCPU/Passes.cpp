@@ -772,7 +772,13 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       // (HAL, IREE, Linalg, CF) -> LLVM
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(arith::createArithExpandOpsPass)
+      .addPass([&]() {
+        arith::ArithExpandOpsPassOptions options;
+        options.includeBf16 = true;
+        options.includeF4E2M1 = true;
+        options.includeF8E8M0 = true;
+        return arith::createArithExpandOpsPass(options);
+      })
       .addPass(createEmulateNarrowTypePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
