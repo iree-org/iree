@@ -114,36 +114,27 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
 //     areAttributesEquivalent =
 //         nullptr);
 
-bool isStructurallyEquivalentTo(
-    OperationEquivalenceCache &cache, Region &lhs, Region &rhs,
-    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs) {
   auto mapping = cache.acquireMapping();
-  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
-                                    areAttributesEquivalent);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
 }
 
-bool isStructurallyEquivalentTo(
-    Region &lhs, Region &rhs,
-    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
+bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
   OperationEquivalenceCache cache(lhs.getContext());
-  return isStructurallyEquivalentTo(cache, lhs, rhs, areAttributesEquivalent);
+  return isStructurallyEquivalentTo(cache, lhs, rhs);
 }
 
-bool isStructurallyEquivalentTo(
-    Operation &lhs, Operation &rhs,
-    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
+bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs) {
   OperationEquivalenceCache cache(lhs.getContext());
   auto mapping = cache.acquireMapping();
-  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
-                                    areAttributesEquivalent);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
 }
 
-bool isStructurallyEquivalentTo(
-    OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
-    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
+                                Operation &lhs, Operation &rhs) {
   auto mapping = cache.acquireMapping();
-  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping,
-                                    areAttributesEquivalent);
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
 }
 
 // Recursively compares two regions for structural equivalence.
@@ -166,10 +157,8 @@ bool isStructurallyEquivalentTo(
 //
 // TODO(#3996): upstream into mlir::OperationEquivalence if this works.
 // TODO(#3996): add symbol ref comparison (add to IRMapping).
-bool isStructurallyEquivalentTo(
-    OperationEquivalenceCache &cache, Region &lhs, Region &rhs,
-    IRMapping &mapping,
-    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs, IRMapping &mapping) {
   auto &lhsRegionEntry = cache.getRegion(&lhs);
   auto &rhsRegionEntry = cache.getRegion(&rhs);
   if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size())
@@ -200,8 +189,7 @@ bool isStructurallyEquivalentTo(
 
     for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsBlock->getOperations(),
                                                rhsBlock->getOperations())) {
-      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping,
-                                      areAttributesEquivalent))
+      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping))
         return false;
     }
   }
@@ -210,10 +198,9 @@ bool isStructurallyEquivalentTo(
   return true;
 }
 
-bool isStructurallyEquivalentTo(
-    OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
-    IRMapping &parentMapping,
-    std::function<bool(SymbolRefAttr, SymbolRefAttr)> areAttributesEquivalent) {
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
+                                Operation &lhs, Operation &rhs,
+                                IRMapping &parentMapping) {
   // Check operation metadata for early-exit opportunities.
   if (lhs.getName() != rhs.getName() ||
       lhs.getNumOperands() != rhs.getNumOperands() ||
@@ -276,15 +263,13 @@ bool isStructurallyEquivalentTo(
     if (lhs.hasTrait<OpTrait::IsIsolatedFromAbove>()) {
       auto scopedRegionMapping = cache.acquireMapping();
       if (!isStructurallyEquivalentTo(cache, lhsRegion, rhsRegion,
-                                      *scopedRegionMapping,
-                                      areAttributesEquivalent)) {
+                                      *scopedRegionMapping)) {
         return false;
       }
     } else {
       IRMapping clonedParentMapping = parentMapping;
       if (!isStructurallyEquivalentTo(cache, lhsRegion, rhsRegion,
-                                      clonedParentMapping,
-                                      areAttributesEquivalent)) {
+                                      clonedParentMapping)) {
         return false;
       }
     }
