@@ -18,7 +18,7 @@
 namespace mlir::iree_compiler::DispatchCreation {
 
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
-                                bool fuseMultiReduction) {
+                                ElementwiseOpsFusabilityOptions options) {
   Operation *producerOp = fusedOperand->get().getDefiningOp();
   Operation *consumerOp = fusedOperand->getOwner();
   if (!producerOp)
@@ -76,6 +76,26 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   if (!linalgConsumerOp) {
     return false;
   }
+
+  if (!options.fuseTruncateOps &&
+      IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    // Do not fuse with bit-truncate-like operations with their consumers
+    // unless:
+    //
+    // 1. The consumer has only one ins operand and is an elementwise
+    // operation. The elementwise operation implies that the `outs` operand is
+    // not real usage (and is typically a `tensor.empty`), so the core condition
+    // is that there is only one "real" operand of the consumer.
+    //
+    // 2. The consumer is also a truncate (e.g. trunc from f32 to f16 to f8).
+    bool isUnaryElementwise = linalgConsumerOp.getNumLoops() ==
+                                  linalgConsumerOp.getNumParallelLoops() &&
+                              linalgConsumerOp.getNumDpsInputs() == 1;
+    if (!IREE::LinalgExt::isBitTruncateOp(consumerOp) && !isUnaryElementwise) {
+      return false;
+    }
+  }
+
   // If the producer has a single use (this op), only fuse if
   // - 1) The consumer op is all parallel loops. The parallelism of the consumer
   //      can be used as a way to amortize cost of redundant computation
@@ -89,7 +109,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
              .isPermutation()) {
       return false;
     }
-    if (!fuseMultiReduction && linalgConsumerOp.getNumReductionLoops() != 1) {
+    if (!options.fuseMultiReduction &&
+        linalgConsumerOp.getNumReductionLoops() != 1) {
       return false;
     }
     if (linalg::isaContractionOpInterface(linalgConsumerOp) ||

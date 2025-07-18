@@ -191,6 +191,16 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
     }
   }
 
+  // TODO(#20116): hack to prevent codegen failure for small horizontally fused
+  // matmuls that go down LLVMGPUDistribute.
+  unsigned mDimsSize = 1;
+  for (unsigned dim : aContractionDims.value().m) {
+    mDimsSize *= aStaticDims[dim];
+  }
+  if (mDimsSize < 16) {
+    return false;
+  }
+
   auto checkSameRankAndElementType = [](Value aVal, Value bVal) {
     auto aType = dyn_cast<ShapedType>(aVal.getType());
     auto bType = dyn_cast<ShapedType>(bVal.getType());

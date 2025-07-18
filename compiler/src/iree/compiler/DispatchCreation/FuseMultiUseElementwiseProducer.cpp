@@ -197,13 +197,19 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
             continue;
           }
 
-          // 7. Skip dequantization-like `producer` ops as we would rather fuse
+          // 7. Skip bit-extend-like `producer` ops as we would rather fuse
           //    by cloning the producer instead of multi-use fusion.
           if (IREE::LinalgExt::isBitExtendOp(producer)) {
             return;
           }
 
-          // 8. All uses from `producer` -> `consumer` need to be fusable.
+          // 8. Skip bit-truncate-like `producer` ops as we would rather fuse
+          //    these operations with their producers.
+          if (IREE::LinalgExt::isBitTruncateOp(producer)) {
+            return;
+          }
+
+          // 9. All uses from `producer` -> `consumer` need to be fusable.
           //    Without this the `producer` is still live, and there is no
           //    advantage to do the fusion.
           if (llvm::any_of(getAllUsesInConsumer(producer, genericOp),

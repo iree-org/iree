@@ -43,6 +43,7 @@ iree_lit_test_suite(
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"
+    "pipeline_tests_aggressive.mlir"
     "propagate_encodings.mlir"
     "set_encoding.mlir"
     "set_encoding_padding.mlir"
