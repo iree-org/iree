@@ -1314,3 +1314,24 @@ func.func @dequantization() {
 //       CHECK:     arith.subf
 //       CHECK:     arith.mulf
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[LHS_DEQUANT]], %[[RESULT_BINDING]], offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [2, 1, 4, 8, 4, 4, 4, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<2x1x4x8x4x4x4x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x1x4x8x4x4x4x4xf32>>
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32],
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1) -> ()>]]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @set_encoding_0D_tensor() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32, #encoding>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
+  %3 = iree_encoding.set_encoding %2 : tensor<f32> -> tensor<f32, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<f32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32,  #encoding>>
+  return
+}
+// CHECK-LABEL: func.func @set_encoding_0D_tensor()
+//       CHECK:   %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[INPUT]]
