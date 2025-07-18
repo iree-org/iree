@@ -394,17 +394,22 @@ func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
 #map2 = affine_map<(d0, d1) -> (d0, d1)>
-func.func @infusible_pack(%arg0: tensor<4xf32>) -> tensor<1x4x16x1xf32> {
-  %cst = arith.constant 0.000000e+00 : f32
-  %0 = tensor.empty() : tensor<1x4x16x1xf32>
-  %1 = tensor.empty() : tensor<4x4xf32>
-  %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg0 : tensor<4xf32>, tensor<4xf32>) outs(%1 : tensor<4x4xf32>) attrs =  {lowering_config = #config} {
-  ^bb0(%in: f32, %in_0: f32, %out: f32):
-    %3 = arith.addf %in, %in : f32
-    linalg.yield %3 : f32
-  } -> tensor<4x4xf32>
-  %pack = linalg.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %0 : tensor<4x4xf32> -> tensor<1x4x16x1xf32>
-  return %pack : tensor<1x4x16x1xf32>
+func.func @infusible_pack(%arg0 : tensor<30xf32>) -> tensor<5x6xf32> {
+  %empty = tensor.empty() : tensor<30xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<30xf32>) outs(%empty : tensor<30xf32>)
+      attrs = {lowering_config = #config} {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+  } -> tensor<30xf32>
+  %empty1 = tensor.empty() : tensor<5x6xf32>
+  %pack = linalg.pack %0 outer_dims_perm = [0]
+      inner_dims_pos = [0] inner_tiles = [6] into %empty1
+      : tensor<30xf32> -> tensor<5x6xf32>
+  return %pack : tensor<5x6xf32>
 }
 // CHECK-LABEL: func.func @infusible_pack
 // CHECK:         scf.forall
