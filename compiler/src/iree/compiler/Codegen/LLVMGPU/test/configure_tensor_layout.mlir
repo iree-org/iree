@@ -349,7 +349,7 @@ func.func @dynamic_infer_sizes(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128
 
 #lowering_config = #iree_gpu.lowering_config<{
     subgroup_basis = [[1, 1, 2, 2], [0, 1, 2, 3]],
-    thread_basis = [[1, 1, 8, 8], [0, 1, 2, 3]],
+    lane_basis = [[1, 1, 8, 8], [0, 1, 2, 3]],
     thread = [0, 0, 8, 8]
 }>
 
