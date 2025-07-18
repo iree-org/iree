@@ -199,14 +199,6 @@ def IREECodegen_InnerTileDescAttrInterface :
         return failure();
       }]
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the block size of elements sharing a scale in this kind of multi-MMA.
-      }],
-      /*retType=*/"int64_t",
-      /*methodName=*/"getBlockSize",
-      /*args=*/(ins)
-    >,
   ];
 
   let extraSharedClassDeclaration = [{

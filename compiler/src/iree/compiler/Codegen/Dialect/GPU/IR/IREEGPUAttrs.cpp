@@ -820,10 +820,6 @@ void DataTiledMMAAttr::getDistributedTileTypes(
                  VectorType::get(getShape(MMAFragment::Acc), C)});
 }
 
-int64_t DataTiledMMAAttr::getBlockSize() const {
-  return IREE::GPU::getBlockSize(getIntrinsic());
-}
-
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }

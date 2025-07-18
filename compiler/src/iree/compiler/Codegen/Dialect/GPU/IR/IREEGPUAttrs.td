@@ -225,6 +225,8 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   ];
 
   let extraClassDeclaration = [{
+    int64_t getBlockSize() const;
+
     SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
   }];
 }
@@ -313,6 +315,8 @@ def IREEGPU_VirtualMMAAttr :
   );
 
   let extraClassDeclaration = [{
+    int64_t getBlockSize() const;
+
     // Factor to unroll K from native MMA/intrinsic size to virtual size.
     // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
     // in this example, intrinsicsK = 32/16 = 2.
@@ -376,6 +380,9 @@ def IREEGPU_ScaledMMAAttr :
     static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
     static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
 
+    // Return the number of elements per shared scale.
+    int64_t getBlockSize() const;
+
     // Return preferred subgroup size
     int64_t getSubgroupSize() const;
 
@@ -393,16 +400,6 @@ def IREEGPU_ScaledMMAAttr :
       ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
       return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
     }
-
-    static ::std::tuple<int64_t, int64_t, int64_t, int64_t>
-    getScaledMNKShape(IREE::Codegen::InnerTileDescAttrInterface in) {
-      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
-      in.getUndistributedTileTypes(preThreadTypes);
-      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
-      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
-      return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
-    }
-
   }];
 }
 

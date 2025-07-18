@@ -203,7 +203,6 @@ struct ConvertToROCDLPass final
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(use32BitIndices ? 32 : 64);
     LLVMTypeConverter converter(m.getContext(), options);
-    LLVMConversionTarget target(getContext());
     populateGpuMemorySpaceAttributeConversions(
         converter, [](gpu::AddressSpace space) {
           switch (space) {
@@ -341,6 +340,7 @@ struct ConvertToROCDLPass final
                                                      /*maxTransferRank=*/1);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown, chipset);
+      LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
       populateMathToROCDLConversionPatterns(converter, llvmPatterns);

@@ -53,15 +53,6 @@ def IREEGPU_MmaInterfaceAttr
       return {accShape[0], accShape[1], lhsShape[1]};
     }
 
-    static ::std::tuple<int64_t, int64_t, int64_t>
-    getMNKShape(::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface in) {
-      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
-      in.getUndistributedTileTypes(preThreadTypes);
-      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[2].getShape();
-      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
-      return {accShape[0], accShape[1], lhsShape[1]};
-    }
-
     /// Returns the element types of the operands to the MMA operation:
     /// ```
     ///   C += A * B
@@ -70,17 +61,6 @@ def IREEGPU_MmaInterfaceAttr
     getABCElementTypes() const {
       ::llvm::SmallVector<::mlir::Type> elementTypes;
       $_attr.getElementTypes(elementTypes);
-      return {elementTypes[0], elementTypes[1], elementTypes[2]};
-    }
-
-    /// Returns the element types of the operands to the MMA operation:
-    /// ```
-    ///   C += A * B
-    /// ```
-    static ::std::tuple<::mlir::Type, ::mlir::Type, ::mlir::Type>
-    getABCElementTypes(::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface in) {
-      ::llvm::SmallVector<::mlir::Type> elementTypes;
-      in.getElementTypes(elementTypes);
       return {elementTypes[0], elementTypes[1], elementTypes[2]};
     }
 

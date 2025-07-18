@@ -20,6 +20,9 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
 
+// This is based on the upstream implementation of the
+// Linalg::ContractionOpInterface.
+
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 namespace {
@@ -50,8 +53,9 @@ static Value getSourceSkipUnary(Value value) {
   Operation *op = value.getDefiningOp();
   while (op && op->getNumOperands() == 1) {
     auto iface = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!iface || !iface.hasNoEffect())
+    if (!iface || !iface.hasNoEffect()) {
       break;
+    }
     value = op->getOperand(0);
     op = value.getDefiningOp();
   }
@@ -64,13 +68,15 @@ template <typename AddOpTy, typename MulOpTy, typename... Args>
 static bool isPairTemplateImpl(Operation *add, Operation *mul) {
   static_assert(sizeof...(Args) % 2 == 0,
                 "expected an even number of template arguments");
-  if (isa<AddOpTy>(add) && isa<MulOpTy>(mul))
+  if (isa<AddOpTy>(add) && isa<MulOpTy>(mul)) {
     return true;
+  }
 
-  if constexpr (sizeof...(Args) > 0)
+  if constexpr (sizeof...(Args) > 0) {
     return isPairTemplateImpl<Args...>(add, mul);
-  else
+  } else {
     return false;
+  }
 }
 
 /// Given an `indexingMap` and its corresponding `iterators`, returns
@@ -104,12 +110,15 @@ findPermutationsIndexingOperand(AffineMap indexingMap,
 /// are not present.
 static FailureOr<SmallVector<utils::IteratorType>>
 inferIteratorsFromOutMap(AffineMap map) {
-  if (!map.isProjectedPermutation())
+  if (!map.isProjectedPermutation()) {
     return failure();
+  }
   SmallVector<utils::IteratorType> iterators(map.getNumDims(), red);
-  for (auto expr : map.getResults())
-    if (auto dim = dyn_cast<AffineDimExpr>(expr))
+  for (auto expr : map.getResults()) {
+    if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
       iterators[dim.getPosition()] = par;
+    }
+  }
   return iterators;
 }
 
@@ -269,18 +278,21 @@ inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
 
 FailureOr<ScaledContractionDimensions>
 inferScaledContractionDims(ArrayRef<AffineMap> indexingMaps) {
-  if (indexingMaps.size() != 5)
+  if (indexingMaps.size() != 5) {
     return failure();
+  }
   auto iterators = inferIteratorsFromOutMap(indexingMaps[4]);
-  if (failed(iterators))
+  if (failed(iterators)) {
     return failure();
+  }
   return inferScaledContractionDimsImpl(indexingMaps, iterators.value());
 }
 
 FailureOr<ScaledContractionDimensions>
 inferScaledContractionDims(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumDpsInits() != 1 || linalgOp.getNumDpsInputs() != 4)
+  if (linalgOp.getNumDpsInits() != 1 || linalgOp.getNumDpsInputs() != 4) {
     return failure();
+  }
   return inferScaledContractionDimsImpl(linalgOp.getIndexingMapsArray(),
                                         linalgOp.getIteratorTypesArray());
 }
@@ -289,16 +301,20 @@ detail::MatchContractionResult
 isScaledContractionImpl(Operation *op,
                         ScaledContractionDimensions *dimensions) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp)
+  if (!linalgOp) {
     return detail::MatchContractionResult::NotLinalgOp;
-  if (linalgOp.getNumDpsInputs() != 4 || linalgOp.getNumDpsInits() != 1)
+  }
+  if (linalgOp.getNumDpsInputs() != 4 || linalgOp.getNumDpsInits() != 1) {
     return detail::MatchContractionResult::WrongNumOperands;
+  }
   auto mapRange = linalgOp.getIndexingMapsArray();
-  if (linalgOp.getNumReductionLoops() == 0)
+  if (linalgOp.getNumReductionLoops() == 0) {
     return detail::MatchContractionResult::NoReduction;
+  }
   if (llvm::any_of(mapRange,
-                   [](AffineMap m) { return !m.isProjectedPermutation(); }))
+                   [](AffineMap m) { return !m.isProjectedPermutation(); })) {
     return detail::MatchContractionResult::NotProjectedPermutations;
+  }
   // TODO: more fields than add/mul.
   // clang-format off
   if (!isScaledContractionBody<
@@ -320,8 +336,9 @@ isScaledContractionImpl(Operation *op,
 }
 
 bool isaScaledContractionOpInterface(linalg::LinalgOp linalgOp) {
-  if (!linalgOp)
+  if (!linalgOp) {
     return false;
+  }
   Operation *op = linalgOp.getOperation();
   return isScaledContractionImpl(op) == detail::MatchContractionResult::Success;
 }

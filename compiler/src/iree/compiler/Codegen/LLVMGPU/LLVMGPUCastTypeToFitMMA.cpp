@@ -53,8 +53,9 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "could not find iree.amdgpu.mma attribute on contract");
     }
+    auto mmaIntrisic = dyn_cast<IREE::GPU::MmaInterfaceAttr>(intrinsic);
     auto [dstAElemType, dstBElemType, dstCElemType] =
-        IREE::GPU::MmaInterfaceAttr::getABCElementTypes(intrinsic);
+        mmaIntrisic.getABCElementTypes();
 
     auto srcCElemFType = dyn_cast<FloatType>(srcCType.getElementType());
     auto dstCElemFType = dyn_cast<FloatType>(dstCElemType);

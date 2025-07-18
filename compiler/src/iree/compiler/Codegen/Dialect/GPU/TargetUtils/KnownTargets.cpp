@@ -5,9 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
-#include <sys/types.h>
 
-#include <cstdint>
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -106,13 +104,11 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
   SmallVector<ScaledMMAAttr, 8> scaledMmaAttrs;
   scaledMmaAttrs.reserve(wgp->scaledMmaCount);
   for (int i = 0; i < wgp->scaledMmaCount; ++i) {
-    SmallVector<Type> inTy = ScaledMMAAttr::getSupportedInputTypes(context);
-    for (int j = 0; j < inTy.size(); j++) {
-      SmallVector<Type> outTy = ScaledMMAAttr::getSupportedOutputTypes(context);
-      for (int k = 0; k < outTy.size(); k++) {
+    for (auto inTy : ScaledMMAAttr::getSupportedInputTypes(context)) {
+      for (auto outTy : ScaledMMAAttr::getSupportedOutputTypes(context)) {
         scaledMmaAttrs.push_back(
-            ScaledMMAAttr::get(context, wgp->scaledMmaOps[i], inTy[j], inTy[j],
-                               outTy[k], /*columnMajor=*/false));
+            ScaledMMAAttr::get(context, wgp->scaledMmaOps[i], inTy, inTy, outTy,
+                               /*columnMajor=*/false));
       }
     }
   }

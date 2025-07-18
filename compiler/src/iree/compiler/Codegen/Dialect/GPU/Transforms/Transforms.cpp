@@ -1056,7 +1056,8 @@ getInnerDims(linalg::LinalgOp linalgOp) {
 
 FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-    IREE::Codegen::InnerTileDescAttrInterface mmaKind) {
+    IREE::Codegen::InnerTileDescAttrInterface kind) {
+  auto smmaKind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind);
   FailureOr<IREE::LinalgExt::ScaledContractionDimensions> contractionDims =
       IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (failed(contractionDims)) {
@@ -1125,7 +1126,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   auto [intrinsicM, intrinsicN, intrinsicK, intrinsicKB] =
-      ScaledMMAAttr::getScaledMNKShape(mmaKind);
+      smmaKind.getScaledMNKShape();
   if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
       intrinsicK != bounds[innerK]) {
     return failure();
@@ -1144,7 +1145,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
   SmallVector<Value> inputs = reorderInputs(linalgOp->getOperands());
 
   SmallVector<Type> eltTypes;
-  mmaKind.getElementTypes(eltTypes);
+  smmaKind.getElementTypes(eltTypes);
   if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
           eltTypes[0] ||
       cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
@@ -1193,7 +1194,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
       /*inits=*/ValueRange{inputs}.back(),
       ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map,
                           outerAccMap},
-      iteratorTypes, mmaKind, perms);
+      iteratorTypes, smmaKind, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
   }
@@ -1204,7 +1205,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
 // op with a MMA-like intrinsic descriptor.
 FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-    IREE::Codegen::InnerTileDescAttrInterface mmaKind) {
+    IREE::Codegen::InnerTileDescAttrInterface kind) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
@@ -1212,9 +1213,11 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   FailureOr<IREE::LinalgExt::ScaledContractionDimensions> maybeScaledContrDims =
       IREE::LinalgExt::inferScaledContractionDims(linalgOp);
   if (succeeded(maybeScaledContrDims)) {
-    return convertScaledContractionToInnerTiledMma(rewriter, linalgOp, mmaKind);
+    return convertScaledContractionToInnerTiledMma(rewriter, linalgOp, kind);
   }
 
+  IREE::GPU::MmaInterfaceAttr mmaKind =
+      dyn_cast<IREE::GPU::MmaInterfaceAttr>(kind);
   FailureOr<linalg::ContractionDimensions> maybeContractionDims =
       linalg::inferContractionDims(linalgOp);
   if (failed(maybeContractionDims)) {
@@ -1276,8 +1279,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
 
-  auto [intrinsicM, intrinsicN, intrinsicK] =
-      MmaInterfaceAttr::getMNKShape(mmaKind);
+  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
   if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
       intrinsicK != bounds[innerK]) {
     return failure();
@@ -1285,7 +1287,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 
   SmallVector<Value> inputs = linalgOp->getOperands();
   auto [lhsElementType, rhsElementType, accElementType] =
-      MmaInterfaceAttr::getABCElementTypes(mmaKind);
+      mmaKind.getABCElementTypes();
   if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
           lhsElementType ||
       cast<RankedTensorType>(inputs[1].getType()).getElementType() !=

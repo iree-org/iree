@@ -181,8 +181,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   return schedule;
 }
 
-/// Given a target and a matmul problem, try to find an MMA schedule for the
-/// problem based on the available mma intrinsics.
+/// Given a target and a scaled matmul problem, try to find a scaled MMA
+/// schedule for the problem based on the available scaled mma intrinsics.
 static std::optional<GPUMMASchedule> getScaledMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
     bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
@@ -203,8 +203,10 @@ static std::optional<GPUMMASchedule> getScaledMmaScheduleFromProblemAndTarget(
                                              elementTypes[0], elementTypes[2],
                                              elementTypes[4], smma));
   }
-  if (intrinsics.empty())
+  if (intrinsics.empty()) {
     return std::nullopt;
+  }
+
   sortMMAIntrinsics(problem, intrinsics);
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
@@ -410,7 +412,9 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::Codegen::InnerTileDescAttrInterface mmaKind = schedule->mmaKind;
+  IREE::GPU::MmaInterfaceAttr mmaKind =
+      dyn_cast<IREE::GPU::MmaInterfaceAttr>(schedule->mmaKind);
+
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = lhs.getContext();
@@ -442,7 +446,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     }
 
     int64_t innerKDim = contractionDims->k.back();
-    int64_t kPackFactor = std::get<2>(MmaInterfaceAttr::getMNKShape(mmaKind));
+    int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
     paddingTileSizes[innerKDim] *= kPackFactor;
 
     attrs.emplace_back(StringAttr::get(context, "padding"),
@@ -637,7 +641,7 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
-  IREE::Codegen::InnerTileDescAttrInterface mmaKind = schedule->mmaKind;
+  auto smmaKind = dyn_cast<IREE::GPU::ScaledMMAAttr>(schedule->mmaKind);
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
@@ -650,7 +654,7 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
                      b.getI64ArrayAttr(reductionTileSizes));
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
+  attrs.emplace_back(StringAttr::get(context, "mma_kind"), smmaKind);
   if (mustBeAligned) {
     Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
@@ -671,9 +675,8 @@ getScaledMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
 
     int64_t innerKDim = contractionK.back();
     int64_t innerKBDim = contractionKB.back();
-    int64_t blockSize = mmaKind.getBlockSize();
-    int64_t kPackFactor =
-        std::get<2>(ScaledMMAAttr::getScaledMNKShape(mmaKind)) / blockSize;
+    int64_t blockSize = smmaKind.getBlockSize();
+    int64_t kPackFactor = std::get<2>(smmaKind.getScaledMNKShape()) / blockSize;
     paddingTileSizes[innerKDim] *= kPackFactor;
     paddingTileSizes[innerKBDim] = blockSize;
     attrs.emplace_back(StringAttr::get(context, "padding"),
@@ -764,6 +767,9 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
                                               useDirectLoad);
+
+  // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
+  // matmul lowering.
   if (failed(configAndWgSize)) {
     configAndWgSize = getScaledMatmulLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad);

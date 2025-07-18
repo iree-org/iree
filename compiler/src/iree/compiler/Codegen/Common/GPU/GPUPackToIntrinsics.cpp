@@ -35,8 +35,6 @@ struct GPUPackToIntrinsicsPass final
 FailureOr<SmallVector<OpFoldResult>>
 getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
                IREE::Codegen::InnerTileDescAttrInterface kind) {
-  SmallVector<int64_t> dims;
-  SmallVector<SmallVector<unsigned, 2>> indices;
   auto createPackedSizes =
       [&rewriter, &linalgOp](SmallVector<int64_t> dims,
                              SmallVector<SmallVector<unsigned, 2>> indices)
@@ -53,25 +51,35 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     }
     return packedSizes;
   };
-
-  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledContrDims =
-      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
-  if (succeeded(scaledContrDims)) {
-    auto [m, n, k, kB] = IREE::GPU::ScaledMMAAttr::getScaledMNKShape(kind);
-    indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k,
-               scaledContrDims->kB};
-    return createPackedSizes({m, n, k, kB}, indices);
+  
+  SmallVector<int64_t> dims;
+  SmallVector<SmallVector<unsigned, 2>> indices;
+  if (auto smma_kind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind)) {
+    FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledContrDims =
+        IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+    if (succeeded(scaledContrDims)) {
+      auto [m, n, k, kB] = smma_kind.getScaledMNKShape();
+      indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k,
+                 scaledContrDims->kB};
+      dims = {m, n, k, kB};
+    }
   }
 
-  FailureOr<linalg::ContractionDimensions> contractionDims =
-      linalg::inferContractionDims(linalgOp);
-  if (failed(contractionDims)) {
-    linalgOp.emitError() << "failed to infer contraction dims\n";
-    return failure();
+  if (auto mma_kind = dyn_cast<IREE::GPU::MMAAttr>(kind)) {
+    FailureOr<linalg::ContractionDimensions> contractionDims =
+        linalg::inferContractionDims(linalgOp);
+    if (succeeded(contractionDims)) {
+      auto [m, n, k] = mma_kind.getMNKShape();
+      indices = {contractionDims->m, contractionDims->n, contractionDims->k};
+      dims = {m, n, k};
+    }
   }
-  auto [m, n, k] = IREE::GPU::MmaInterfaceAttr::getMNKShape(kind);
-  indices = {contractionDims->m, contractionDims->n, contractionDims->k};
-  return createPackedSizes({m, n, k}, indices);
+
+  if (dims.empty() || indices.empty()) {
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "failed to infer contraction dims");
+  }
+  return createPackedSizes(dims, indices);
 }
 
 LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,

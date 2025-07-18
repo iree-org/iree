@@ -512,8 +512,8 @@ getContractionLayoutImpl(IREE::GPU::MMAScheduleAttr schedule,
   });
 
   int64_t rank = contractOp.getIteratorTypesArray().size();
-  auto mmaAttr = llvm::cast<IREE::Codegen::InnerTileDescAttrInterface>(
-      schedule.getIntrinsic());
+  auto mmaAttr =
+      llvm::dyn_cast<IREE::GPU::MmaInterfaceAttr>(schedule.getIntrinsic());
   MLIRContext *context = schedule.getContext();
 
   SmallVector<int64_t> bounds = contractOp.getStaticLoopRanges();
@@ -543,8 +543,7 @@ getContractionLayoutImpl(IREE::GPU::MMAScheduleAttr schedule,
   // logical warp+thread using the subgroup/thread basis, so the subgroup
   // basis should remain the same for all A/B/C matrix.
 
-  auto [intrinsicM, intrinsicN, intrinsicK] =
-      IREE::GPU::MmaInterfaceAttr::getMNKShape(mmaAttr);
+  auto [intrinsicM, intrinsicN, intrinsicK] = mmaAttr.getMNKShape();
 
   SmallVector<int64_t, 2> subgroupMBasis;
   SmallVector<int64_t, 2> batchMSizes;
