@@ -275,33 +275,48 @@ func.func @propagate_relayout_ops(%source : tensor<?x?x128x128xf32>,
 
 // -----
 
-func.func @insert_in_workgroup_forall(%2 : tensor<196608x35xbf16>, %3 : tensor<196608x35xbf16>, %9 : tensor<8x16x1x16xbf16>, %10 : tensor<8x16x1x16xbf16>) -> (tensor<196608x35xbf16>, tensor<196608x35xbf16>){
-  %6:2 = scf.forall (%arg0, %arg1) = (0, 0) to (196608, 35) step (128, 16) shared_outs(%arg2 = %2, %arg3 = %3) -> (tensor<196608x35xbf16>, tensor<196608x35xbf16>) {
-    %collapsed = tensor.collapse_shape %9 [[0, 1], [2, 3]] : tensor<8x16x1x16xbf16> into tensor<128x16xbf16>
-    %collapsed_1 = tensor.collapse_shape %10 [[0, 1], [2, 3]] : tensor<8x16x1x16xbf16> into tensor<128x16xbf16>
+func.func @insert_in_workgroup_forall(%2 : tensor<32xbf16>, %3 : tensor<32xbf16>, %9 : tensor<10xbf16>) -> (tensor<32xbf16>, tensor<32xbf16>) {
+  %6:2 = scf.forall (%arg0) = (0) to (32) step (8) shared_outs(%arg2 = %2, %arg3 = %3) -> (tensor<32xbf16>, tensor<32xbf16>) {
+    %extract = tensor.extract_slice %9 [0] [8] [1] : tensor<10xbf16> to tensor<8xbf16>
+    %extract_0 = tensor.extract_slice %9 [0] [7] [1] : tensor<10xbf16> to tensor<7xbf16>
     scf.forall.in_parallel {
-      tensor.parallel_insert_slice %collapsed into %arg2[%arg0, %arg1] [128, 16] [1, 1] : tensor<128x16xbf16> into tensor<196608x35xbf16>
-      tensor.parallel_insert_slice %collapsed_1 into %arg3[%arg0, %arg1] [128, 16] [1, 1] : tensor<128x16xbf16> into tensor<196608x35xbf16>
+      tensor.parallel_insert_slice %extract into %arg2[%arg0] [8] [1] : tensor<8xbf16> into tensor<32xbf16>
+      tensor.parallel_insert_slice %extract_0 into %arg3[%arg0] [7] [1] : tensor<7xbf16> into tensor<32xbf16>
     }
-  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-  return %6#0, %6#1  : tensor<196608x35xbf16>, tensor<196608x35xbf16>
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  return %6#0, %6#1 : tensor<32xbf16>, tensor<32xbf16>
 }
 
-// CHECK-LABEL: @insert_in_workgroup_forall
-//       CHECK:   %[[MAP_SCATTER1:.+]] = iree_linalg_ext.map_scatter
-//       CHECK:   %[[MAP_SCATTER2:.+]] = iree_linalg_ext.map_scatter
-//       CHECK:        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//   CHECK-LABEL: @insert_in_workgroup_forall
+//         CHECK:   scf.forall
+// CHECK-COUNT-2:     iree_linalg_ext.map_scatter
+//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
-func.func @no_insert_in_non_workgroup_forall(%2 : tensor<196608x35xbf16>, %9 : tensor<8x16x1x16xbf16>) -> tensor<196608x35xbf16>{
-  %6 = scf.forall (%arg0, %arg1) = (0, 0) to (196608, 35) step (128, 16) shared_outs(%arg2 = %2) -> (tensor<196608x35xbf16>) {
+func.func @no_insert_reshape_only(%2 : tensor<196608x35xbf16>, %9 : tensor<8x16x1x16xbf16>) -> tensor<196608x35xbf16> {
+  %6 = scf.forall (%arg0, %arg1) = (0, 0) to (196608, 35) step (128, 16) shared_outs(%arg2 = %2) -> tensor<196608x35xbf16> {
     %collapsed = tensor.collapse_shape %9 [[0, 1], [2, 3]] : tensor<8x16x1x16xbf16> into tensor<128x16xbf16>
     scf.forall.in_parallel {
       tensor.parallel_insert_slice %collapsed into %arg2[%arg0, %arg1] [128, 16] [1, 1] : tensor<128x16xbf16> into tensor<196608x35xbf16>
     }
-  } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-  return %6 : tensor<196608x35xbf16>
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  return %6  : tensor<196608x35xbf16>
+}
+
+// CHECK-LABEL: @no_insert_reshape_only
+//   CHECK-NOT:   iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @no_insert_in_non_workgroup_forall(%2 : tensor<32xbf16>, %9 : tensor<10xbf16>) -> tensor<32xbf16>{
+  %6 = scf.forall (%arg0) = (0) to (32) step (8) shared_outs(%arg2 = %2) -> (tensor<32xbf16>) {
+    %extract = tensor.extract_slice %9 [0] [8] [1] : tensor<10xbf16> to tensor<8xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %extract into %arg2[%arg0] [8] [1] : tensor<8xbf16> into tensor<32xbf16>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return %6 : tensor<32xbf16>
 }
 // CHECK-LABEL: @no_insert_in_non_workgroup_forall
 //   CHECK-NOT:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
