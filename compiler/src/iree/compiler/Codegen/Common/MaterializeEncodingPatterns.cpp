@@ -25,8 +25,12 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/OpDefinition.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
 
@@ -39,6 +43,27 @@ using IREE::Codegen::TileSwizzle;
 // Methods to convert `set_encoding` and `unset_encoding` operations
 // to `pack` and `unpack` operations respectively.
 //===---------------------------------------------------------------------===//
+
+/// Returns true if the pack op does not need a padding value. In the
+/// data-tiling context, we don't pad the dimension with extra padding space.
+/// I.e., there are no tiles that only be filled with the padding value.
+static bool paddingIsNeeded(Value source,
+                            const MaterializeEncodingInfo &encodingInfo) {
+  auto srcType = cast<RankedTensorType>(source.getType());
+  for (auto [pos, tileSize] : llvm::zip_equal(encodingInfo.innerDimsPos,
+                                              encodingInfo.innerTileSizes)) {
+    if (srcType.isDynamicDim(pos)) {
+      if (tileSize != 1) {
+        return true;
+      }
+      continue;
+    }
+    if (srcType.getDimSize(pos) % tileSize != 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 FailureOr<Value> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
@@ -61,8 +86,11 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  Value paddingValue = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(resultType.getElementType()));
+  Value paddingValue;
+  if (paddingIsNeeded(source, encodingInfo)) {
+    paddingValue = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(resultType.getElementType()));
+  }
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
   SmallVector<OpFoldResult> resultDims = linalg::PackOp::getResultShape(
