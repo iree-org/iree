@@ -287,11 +287,20 @@ void GPUApplyTilingLevelPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  if (normalizeLoops) {
+    funcOp->walk(
+        [&](scf::ForOp forOp) { (void)normalizeLoopBounds(rewriter, forOp); });
+    funcOp->walk([&](scf::ForallOp forallOp) {
+      (void)normalizeLoopBounds(rewriter, forallOp);
+    });
+  }
+
   MLIRContext *context = &getContext();
 
   // Apply cleanup patterns.
   {
     RewritePatternSet patterns(context);
+    populateSwapExtractWithCollapsePattern(patterns);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
     tensor::populateFoldTensorEmptyPatterns(patterns);
