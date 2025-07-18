@@ -246,7 +246,9 @@ def FormDispatchRegionsPass :
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
            /*default=*/"false", "Enable fusing pad with consumer">,
     Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
-           /*default=*/"false", "Enable fusion of pad with producers">
+           /*default=*/"false", "Enable fusion of pad with producers">,
+    Option<"fuseTruncWithConsumers", "fuse-trunc-with-producers", "bool",
+           /*default=*/"false", "Fuse truncate operations with their consumers">
   ];
   let description = [{
     Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
