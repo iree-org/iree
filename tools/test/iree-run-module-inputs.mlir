@@ -88,3 +88,26 @@ func.func @npy_round_trip(%arg0: tensor<2xi32>, %arg1: tensor<3xi32>) -> (tensor
   // INPUT-NUMPY-NEXT: 3xsi32=1 2 3
   return %arg0, %arg1 : tensor<2xi32>, tensor<3xi32>
 }
+
+// -----
+
+// Verify parsing of signless small integer types passes either signed or
+// unsigned range checks.
+
+// RUN: (iree-compile --iree-hal-target-device=local \
+// RUN:               --iree-hal-local-target-device-backends=vmvx %s | \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=- \
+// RUN:                  --function=small_buffers \
+// RUN:                  --input="2xi16=65535 -32767" \
+// RUN:                  --input="3xi8=-6 250 0xFF") | \
+// RUN: FileCheck --check-prefix=INPUT-SMALL-INTEGERS %s
+// INPUT-SMALL-INTEGERS-LABEL: EXEC @small_buffers
+func.func @small_buffers(%arg0: tensor<2xi16>, %arg1: tensor<3xi8>) -> (tensor<2xi16>, tensor<3xi8>) {
+  // Signedness of printing signless values is unspecified.
+  // INPUT-SMALL-INTEGERS: result[0]: hal.buffer_view
+  // INPUT-SMALL-INTEGERS-NEXT: 2xi16=-1 -32767
+  // INPUT-SMALL-INTEGERS: result[1]: hal.buffer_view
+  // INPUT-SMALL-INTEGERS-NEXT: 3xi8=-6 -6 -1
+  return %arg0, %arg1 : tensor<2xi16>, tensor<3xi8>
+}
