@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -391,11 +393,7 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
   assert((isa<IREE::Codegen::StoreToBufferOp, tensor::ParallelInsertSliceOp>(
              op)) &&
          "expected store_to_buffer or parallel_insert_slice op");
-  if (isa<IREE::Codegen::StoreToBufferOp>(op)) {
-    rewriter.setInsertionPoint(op);
-  } else {
-    rewriter.setInsertionPoint(op->getParentOp());
-  }
+  rewriter.setInsertionPointAfterValue(op->getOperand(0));
   auto destType = cast<RankedTensorType>(op->getOperand(0).getType());
   Value mapScatterDest =
       rewriter
@@ -497,8 +495,31 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
       SmallVector<Operation *> parallelInsertOps =
           forallOp.getCombiningOps(bbArg);
       if (parallelInsertOps.size() != 1) {
-        return rewriter.notifyMatchFailure(
-            forallOp, "Expected a single parallel_insert_slice");
+        continue;
+      }
+      auto parallelInsertOp =
+          dyn_cast<tensor::ParallelInsertSliceOp>(parallelInsertOps.front());
+      if (!parallelInsertOp) {
+        continue;
+      }
+      // If there are only reshape ops, then bufferization can usually handle
+      // it, so don't introduce map_scatter.
+      llvm::SetVector<Operation *> slice;
+      BackwardSliceOptions options;
+      options.filter =
+          llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp,
+                        linalg::TransposeOp, linalg::CopyOp,
+                        tensor::ExtractSliceOp, tensor::PadOp>;
+      options.inclusive = true;
+      LogicalResult result =
+          getBackwardSlice(parallelInsertOp.getSource(), &slice, options);
+      if (failed(result)) {
+        continue;
+      }
+      if (llvm::all_of(
+              slice,
+              llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>)) {
+        continue;
       }
       MapScatterOp mapScatterOp =
           insertIdentityMapScatter(rewriter, parallelInsertOps.front());
