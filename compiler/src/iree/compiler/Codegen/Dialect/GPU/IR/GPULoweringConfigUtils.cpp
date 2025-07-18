@@ -69,12 +69,14 @@ void setSubgroupNCount(MLIRContext *context,
 }
 
 const StringLiteral kSubgroupBasisName = "subgroup_basis";
-const StringLiteral kThreadBasisName = "thread_basis";
+const StringLiteral kLaneBasisName = "lane_basis";
 
 static StringLiteral getBasisLevelName(IREE::GPU::TilingLevel level) {
   switch (level) {
   case GPU::TilingLevel::Thread:
-    return kThreadBasisName;
+    // We use the term 'lane_basis' here in the context of thread distribution
+    // because of the strict nesting of 'lane_basis' within 'subgroup_basis'.
+    return kLaneBasisName;
   case GPU::TilingLevel::Subgroup:
     return kSubgroupBasisName;
   default:
