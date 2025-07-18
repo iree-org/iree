@@ -107,13 +107,6 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   return true;
 }
 
-// static bool isStructurallyEquivalentTo(
-//     OperationEquivalenceCache &cache, Operation &lhs, Operation &rhs,
-//     IRMapping &parentMapping,
-//     std::function<bool(SymbolRefAttr, SymbolRefAttr )>
-//     areAttributesEquivalent =
-//         nullptr);
-
 bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
                                 Region &rhs) {
   auto mapping = cache.acquireMapping();
