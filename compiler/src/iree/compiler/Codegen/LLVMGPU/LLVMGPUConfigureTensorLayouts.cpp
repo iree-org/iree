@@ -56,11 +56,11 @@ static SmallVector<bool> getPromotedOperands(Operation *op) {
   return promotedOperands;
 }
 
-static IREE::GPU::MmaInterfaceAttr getIntrinsic(Operation *op) {
+static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
   auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   assert(config && "Cannot find intrinsic from unconfigured op.");
 
-  IREE::GPU::MmaInterfaceAttr mmaIntrinsic = getMmaKind(config);
+  IREE::Codegen::InnerTileDescAttrInterface mmaIntrinsic = getMmaKind(config);
   assert(mmaIntrinsic && "Cannot find intrinsic in lowering config.");
   return mmaIntrinsic;
 }
@@ -393,10 +393,10 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   bool reuseIntrinsicOutput = false;
   bool transposeIntrinsic = false;
 
-  auto qkIntrinsic =
-      cast<IREE::GPU::MmaInterfaceAttr>(qkSchedule.getIntrinsic());
-  auto pvIntrinsic =
-      cast<IREE::GPU::MmaInterfaceAttr>(pvSchedule.getIntrinsic());
+  auto qkIntrinsic = cast<IREE::Codegen::InnerTileDescAttrInterface>(
+      qkSchedule.getIntrinsic());
+  auto pvIntrinsic = cast<IREE::Codegen::InnerTileDescAttrInterface>(
+      pvSchedule.getIntrinsic());
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
       getSingleSubgroupLayout(pvIntrinsic, IREE::GPU::MMAFragment::Lhs);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =

@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "buffer_instructions_optimization.mlir"
     "config_igemm_tile_and_fuse.mlir"
     "config_tile_and_fuse.mlir"
+    "config_tile_and_fuse_gfx950.mlir"
     "config_user_vector_distribute.mlir"
     "config_vector_distribute_gfx1100.mlir"
     "config_vector_distribute_gfx942.mlir"

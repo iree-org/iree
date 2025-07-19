@@ -222,6 +222,7 @@ struct ConvertToROCDLPass final
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      RewritePatternSet smallFloatEmulationPatterns(&getContext());
       auto options =
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct);
@@ -242,7 +243,8 @@ struct ConvertToROCDLPass final
       if (allTypesValid.wasInterrupted()) {
         return signalPassFailure();
       }
-
+      arith::populateExpandF8E8M0Patterns(smallFloatEmulationPatterns);
+      arith::populateExpandF4E2M1Patterns(smallFloatEmulationPatterns);
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
@@ -275,6 +277,7 @@ struct ConvertToROCDLPass final
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
+      (void)applyPatternsGreedily(m, std::move(smallFloatEmulationPatterns));
     }
 
     LDBG("After applying in-dialect conversions\n" << m);

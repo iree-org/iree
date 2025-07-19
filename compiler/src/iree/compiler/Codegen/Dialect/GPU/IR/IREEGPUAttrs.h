@@ -79,8 +79,9 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
-MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
-                                                MMAFragment fragment);
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
+                        MMAFragment fragment);
 
 /// Returns the name of the tilling `level`, as used in the `lowering_config`
 /// attribute.

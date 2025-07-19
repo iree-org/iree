@@ -12,9 +12,9 @@
 namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper to retrieve/set a target mma intrinsic.
-MmaInterfaceAttr getMmaKind(LoweringConfigAttr config);
+IREE::Codegen::InnerTileDescAttrInterface getMmaKind(LoweringConfigAttr config);
 void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-                MmaInterfaceAttr kind);
+                IREE::Codegen::InnerTileDescAttrInterface kind);
 
 // TODO: Merge subgroup counts functionality into subgroup tiling level
 //       lowering, when we have it implemented.

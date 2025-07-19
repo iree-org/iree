@@ -340,7 +340,8 @@ finalizeConfig(Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig,
                IREE::HAL::ExecutableObjectAttr bitcodeObject,
                IREE::GPU::TargetAttr gpuTarget) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
-    if (isa<IREE::GPU::MmaInterfaceAttr>(innerTiledOp.getKind())) {
+    if (isa<IREE::Codegen::InnerTileDescAttrInterface>(
+            innerTiledOp.getKind())) {
       return finalizeConfig(innerTiledOp, ukernelConfig, bitcodeObject,
                             gpuTarget);
     }

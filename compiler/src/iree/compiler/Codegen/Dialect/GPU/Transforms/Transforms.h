@@ -171,10 +171,9 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 
 // Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
 // op with a multi-MMA-like intrinsic descriptor.
-FailureOr<IREE::Codegen::InnerTiledOp>
-convertContractionToInnerTiledMma(RewriterBase &rewriter,
-                                  linalg::LinalgOp linalgOp,
-                                  IREE::GPU::MmaInterfaceAttr mmaKind);
+FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Codegen::InnerTileDescAttrInterface mmaKind);
 
 // Helper to distribute an inner_tiled op to lanes.
 FailureOr<Operation *>

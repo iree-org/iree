@@ -34,6 +34,7 @@ def IREEGPU_MmaInterfaceAttr
       /*args=*/(ins)
     >,
   ];
+
   // Methods included to preserve interfaces from beforet he InnerTileDescAttrInterface
   // refactoring.
   let extraSharedClassDeclaration = [{
