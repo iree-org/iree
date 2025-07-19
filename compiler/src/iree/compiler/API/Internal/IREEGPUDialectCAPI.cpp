@@ -133,8 +133,18 @@ bool ireeAttributeIsAGPUMMAIntrinsicAttr(MlirAttribute attr) {
       unwrap(attr));
 }
 
+bool ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
+      unwrap(attr));
+}
+
 MlirTypeID ireeGPUMMAIntrinsicAttrGetTypeID() {
   return wrap(mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::getTypeID());
+}
+
+MlirTypeID ireeGPUVirtualMMAIntrinsicAttrGetTypeID() {
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::getTypeID());
 }
 
 static_assert(
@@ -142,10 +152,24 @@ static_assert(
                                  mlir::iree_compiler::IREE::GPU::MMAIntrinsic>>,
     "Enum type changed");
 
+static_assert(
+    std::is_same_v<uint32_t,
+                   std::underlying_type_t<
+                       mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>>,
+    "Enum type changed");
+
 MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx, uint32_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(
       ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
+}
+
+MlirAttribute ireeGPUVirtualMMAIntrinsicAttrGet(MlirContext mlirCtx,
+                                                uint32_t value) {
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::get(
+      ctx,
+      static_cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>(value)));
 }
 
 uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
@@ -156,12 +180,30 @@ uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
           .getValue());
 }
 
+uint32_t ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr) &&
+         "attr is not a GPUVirtualMMAIntrinsicAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
+          unwrap(attr))
+          .getValue());
+}
+
 bool ireeAttributeIsAGPUMMAAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr));
 }
 
+bool ireeAttributeIsAGPUVirtualMMAAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(
+      unwrap(attr));
+}
+
 MlirTypeID ireeGPUMMAAttrGetTypeID() {
   return wrap(mlir::iree_compiler::IREE::GPU::MMAAttr::getTypeID());
+}
+
+MlirTypeID ireeGPUVirtualMMAAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAAttr::getTypeID());
 }
 
 MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
@@ -170,23 +212,53 @@ MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
       ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
 }
 
+MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAAttr::get(
+      ctx,
+      static_cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>(value)));
+}
+
 ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
+  return llvm::TypeSwitch<mlir::Attribute, ireeGPUMMAInfo>(unwrap(attr))
+      .Case<mlir::iree_compiler::IREE::GPU::MMAAttr,
+            mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>([](auto mma) {
+        ireeGPUMMAInfo info = {};
+        auto [aType, bType, cType] = mma.getABCElementTypes();
+        info.aElementType = wrap(aType);
+        info.bElementType = wrap(bType);
+        info.cElementType = wrap(cType);
+
+        auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
+        info.aVectorType = wrap(aVecType);
+        info.bVectorType = wrap(bVecType);
+        info.cVectorType = wrap(cVecType);
+
+        std::tie(info.mElements, info.nElements, info.kElements) =
+            mma.getMNKShape();
+
+        return info;
+      })
+      .Default([](mlir::Attribute) -> ireeGPUMMAInfo {
+        assert(false && "Unexpected attribute type for MMA info");
+        return {};
+      });
+}
+
+MlirAttribute ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr) {
   assert(ireeAttributeIsAGPUMMAAttr(attr) && "attr is not a MMAAttr");
   auto mma = llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr));
+  llvm::SmallVector<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>
+      virtualIntrinsics = mma.getVirtualIntrinsics();
 
-  ireeGPUMMAInfo info = {};
-  auto [aType, bType, cType] = mma.getABCElementTypes();
-  info.aElementType = wrap(aType);
-  info.bElementType = wrap(bType);
-  info.cElementType = wrap(cType);
+  llvm::SmallVector<int64_t> rawValues;
+  for (auto v : virtualIntrinsics) {
+    rawValues.push_back(static_cast<int64_t>(v));
+  }
 
-  auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
-  info.aVectorType = wrap(aVecType);
-  info.bVectorType = wrap(bVecType);
-  info.cVectorType = wrap(cVecType);
-
-  std::tie(info.mElements, info.nElements, info.kElements) = mma.getMNKShape();
-  return info;
+  mlir::MLIRContext *ctx = mma.getContext();
+  mlir::Builder builder(ctx);
+  return wrap(builder.getI64ArrayAttr(rawValues));
 }
 
 bool ireeAttributeIsAGPULoweringConfigAttr(MlirAttribute attr) {
