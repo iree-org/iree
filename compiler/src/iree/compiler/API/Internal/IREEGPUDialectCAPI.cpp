@@ -220,40 +220,34 @@ MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
 }
 
 ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUMMAAttr(attr) ||
-         ireeAttributeIsAGPUVirtualMMAAttr(attr) &&
-             "Expected MMAAttr or VirtualMMAAttr");
-  ireeGPUMMAInfo info = {};
+  assert((ireeAttributeIsAGPUMMAAttr(attr) ||
+          ireeAttributeIsAGPUVirtualMMAAttr(attr)) &&
+         "Expected MMAAttr or VirtualMMAAttr");
 
-  auto setMMAInfo = [&](auto mma) {
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    info.aElementType = wrap(aType);
-    info.bElementType = wrap(bType);
-    info.cElementType = wrap(cType);
-
-    auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
-    info.aVectorType = wrap(aVecType);
-    info.bVectorType = wrap(bVecType);
-    info.cVectorType = wrap(cVecType);
-
-    std::tie(info.mElements, info.nElements, info.kElements) =
-        mma.getMNKShape();
-  };
-
-  if (ireeAttributeIsAGPUMMAAttr(attr)) {
-    setMMAInfo(
-        llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr)));
-    return info;
-  }
-
-  llvm::TypeSwitch<mlir::Attribute, void>(unwrap(attr))
+  return llvm::TypeSwitch<mlir::Attribute, ireeGPUMMAInfo>(unwrap(attr))
       .Case<mlir::iree_compiler::IREE::GPU::MMAAttr,
             mlir::iree_compiler::IREE::GPU::VirtualMMAAttr>(
-          [&](auto mma) { setMMAInfo(mma); })
-      .Default([&](mlir::Attribute) {
-        assert(false && "Expected MMAAttr or VirtualMMAAttr");
+          [](auto mma) -> ireeGPUMMAInfo {
+            ireeGPUMMAInfo info = {};
+            auto [aType, bType, cType] = mma.getABCElementTypes();
+            info.aElementType = wrap(aType);
+            info.bElementType = wrap(bType);
+            info.cElementType = wrap(cType);
+
+            auto [aVecType, bVecType, cVecType] = mma.getABCVectorTypes();
+            info.aVectorType = wrap(aVecType);
+            info.bVectorType = wrap(bVecType);
+            info.cVectorType = wrap(cVecType);
+
+            std::tie(info.mElements, info.nElements, info.kElements) =
+                mma.getMNKShape();
+
+            return info;
+          })
+      .Default([](mlir::Attribute) -> ireeGPUMMAInfo {
+        assert(false && "Unexpected attribute type for MMA info");
+        return {};
       });
-  return info;
 }
 
 MlirAttribute ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr) {
