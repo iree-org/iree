@@ -123,6 +123,14 @@ TEST(MaterializeEncodingInfo, RelationalOperator) {
   // They match because they all have an empty swizzle.
   info2.swizzle = TileSwizzle();
   EXPECT_EQ(info1, info2);
+
+  // They mismatch if one has scalableTiles, but not the other.
+  info1.scalableTiles = ScalableTileFlags();
+  EXPECT_NE(info1, info2);
+
+  // They match because they all have empty scalableTiles.
+  info2.scalableTiles = ScalableTileFlags();
+  EXPECT_EQ(info1, info2);
 }
 
 TEST(MaterializeEncodingInfo, Serialization) {
@@ -138,10 +146,16 @@ TEST(MaterializeEncodingInfo, Serialization) {
   EXPECT_TRUE(dictAttr.contains("innerTileSizes"));
   EXPECT_TRUE(dictAttr.contains("outerDimsPerm"));
   EXPECT_FALSE(dictAttr.contains("swizzle"));
+  EXPECT_FALSE(dictAttr.contains("scalableTiles"));
+
+  info.scalableTiles = {true, false};
+  dictAttr = serializeEncodingInfo(&ctx, info);
+  EXPECT_TRUE(dictAttr.contains("scalableTiles"));
 
   EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("innerDimsPos")->getValue()));
   EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("innerTileSizes")->getValue()));
   EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("outerDimsPerm")->getValue()));
+  EXPECT_TRUE(isa<ArrayAttr>(dictAttr.getNamed("scalableTiles")->getValue()));
 
   auto extractedInnerDimsPos = extractFromIntegerArrayAttr<int64_t>(
       dictAttr.getNamed("innerDimsPos")->getValue());
@@ -152,6 +166,10 @@ TEST(MaterializeEncodingInfo, Serialization) {
   auto extractedOuterDimsPerm = extractFromIntegerArrayAttr<int64_t>(
       dictAttr.getNamed("outerDimsPerm")->getValue());
   EXPECT_EQ(extractedOuterDimsPerm, info.outerDimsPerm);
+  auto extractedScalableTiles = llvm::map_to_vector(
+      cast<ArrayAttr>(dictAttr.getNamed("scalableTiles")->getValue()),
+      [](Attribute a) { return cast<BoolAttr>(a).getValue(); });
+  EXPECT_EQ(extractedScalableTiles, info.scalableTiles);
 
   std::optional<MaterializeEncodingInfo> deserializedInfo =
       deserializeEncodingInfo(dictAttr);
@@ -184,6 +202,10 @@ TEST(MaterializeEncodingInfo, Deserialization) {
 
   TileSwizzle swizzle;
   items.back().setValue(serializeTileSwizzle(&ctx, swizzle));
+  EXPECT_TRUE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
+
+  items.emplace_back(b.getStringAttr("scalableTiles"),
+                     b.getBoolArrayAttr({true, false}));
   EXPECT_TRUE(deserializeEncodingInfo(b.getDictionaryAttr(items)).has_value());
 }
 
