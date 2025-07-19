@@ -357,6 +357,95 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return py::make_tuple(info.aVectorType, info.bVectorType,
                                   info.cVectorType);
           })
+      .def_property_readonly(
+          "mnk_shape",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.mElements, info.nElements,
+                                  info.kElements);
+          })
+      .def(
+          "get_virtual_intrinsics",
+          [](MlirAttribute self) {
+            MlirAttribute rawArrayAttr =
+                ireeGPUMMAAttrGetVirtualMMAIntrinsic(self);
+            if (mlirAttributeIsNull(rawArrayAttr)) {
+              return std::vector<py::object>{};
+            }
+
+            auto arrayAttr = mlir::cast<mlir::ArrayAttr>(unwrap(rawArrayAttr));
+            static py::object virtualEnum =
+                py::module_::import_(kGpuModuleImportPath)
+                    .attr("VirtualMMAIntrinsic");
+
+            std::vector<py::object> result;
+            for (mlir::Attribute attr : arrayAttr) {
+              auto intAttr = mlir::cast<mlir::IntegerAttr>(attr);
+              result.push_back(
+                  virtualEnum(static_cast<uint32_t>(intAttr.getInt())));
+            }
+
+            return result;
+          },
+          "Returns a list of virtual intrinsics  associated with this "
+          "MMAAttr.");
+
+  //===-------------------------------------------------------------------===//
+  // GPUVirtualMMAIntrinsicAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "VirtualMMAIntrinsicAttr",
+                          ireeAttributeIsAGPUVirtualMMAIntrinsicAttr,
+                          ireeGPUVirtualMMAIntrinsicAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUVirtualMMAIntrinsicAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.virtual_mma_intrinsic from parameters.")
+      .def_property_readonly("raw_value",
+                             ireeGPUVirtualMMAIntrinsicAttrGetValue)
+      .def_property_readonly("value",
+                             [](MlirAttribute self) -> py::object {
+                               uint32_t rawValue =
+                                   ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
+                               return py::module_::import_(kGpuModuleImportPath)
+                                   .attr("VirtualMMAIntrinsic")(rawValue);
+                             })
+      .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
+        uint32_t value = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
+        return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUVirtualMMAAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "VirtualMMAAttr",
+                          ireeAttributeIsAGPUVirtualMMAAttr,
+                          ireeGPUVirtualMMAAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUVirtualMMAAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.virtualmma from parameters.")
+      .def_property_readonly(
+          "abc_element_types",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.aElementType, info.bElementType,
+                                  info.cElementType);
+          })
+      .def_property_readonly(
+          "abc_vector_types",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.aVectorType, info.bVectorType,
+                                  info.cVectorType);
+          })
       .def_property_readonly("mnk_shape", [](MlirAttribute self) -> py::tuple {
         ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
         return py::make_tuple(info.mElements, info.nElements, info.kElements);

@@ -5,7 +5,9 @@ EXPORTS
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
+  ireeAttributeIsAGPUVirtualMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
+  ireeAttributeIsAGPUVirtualIntrinsicAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
   ireeCodegenCompilationInfoAttrGet
@@ -80,11 +82,17 @@ EXPORTS
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
+  ireeGPUVirtualMMAAttrGet
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
+  ireeGPUVirtualMMAAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGet
+  ireeGPUVirtualMMAIntrinsicAttrGet
   ireeGPUMMAIntrinsicAttrGetTypeID
+  ireeGPUVirtualMMAIntrinsicAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGetValue
+  ireeGPUVirtualMMAIntrinsicAttrGetValue
+  ireeGPUMMAAttrGetVirtualMMAIntrinsic
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory

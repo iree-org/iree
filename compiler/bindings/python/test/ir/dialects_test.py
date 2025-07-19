@@ -245,9 +245,11 @@ def mma_intrinsic_attr():
     assert c_type == f32
 
     vec_4xf16 = ir.VectorType.get((4,), f16)
-    a_vec_type, b_vec_type, _c_vec_type = mma_attr.abc_vector_types
+    vec_16xf32 = ir.VectorType.get((16,), f32)
+    a_vec_type, b_vec_type, c_vec_type = mma_attr.abc_vector_types
     assert a_vec_type == vec_4xf16
     assert b_vec_type == vec_4xf16
+    assert c_vec_type == vec_16xf32
 
     M, N, K = mma_attr.mnk_shape
     assert M == 32
@@ -255,6 +257,58 @@ def mma_intrinsic_attr():
     assert K == 8
 
     assert mma_intrinsic_attr.mma == mma_attr
+
+    virtual_mma_intrinsics = mma_attr.get_virtual_intrinsics()
+    assert isinstance(virtual_mma_intrinsics[0], iree_gpu.VirtualMMAIntrinsic)
+    assert (
+        virtual_mma_intrinsics[0] == iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_32x32x16_F16
+    )
+
+    mma_attr = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32)
+    virtual_mma_intrinsics = mma_attr.get_virtual_intrinsics()
+    assert virtual_mma_intrinsics == []
+
+
+@run
+def virtual_mma_intrinsic_attr():
+    virtual_mma_intrinsic_attr = iree_gpu.VirtualMMAIntrinsicAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
+    )
+    assert virtual_mma_intrinsic_attr is not None
+    assert (
+        str(virtual_mma_intrinsic_attr)
+        == "#iree_gpu<virtual_mma_intrinsic VMFMA_F32_16x16x32_F16>"
+    )
+
+    raw_value = virtual_mma_intrinsic_attr.raw_value
+    assert raw_value == iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
+    value = virtual_mma_intrinsic_attr.value
+    assert str(value) == "VMFMA_F32_16x16x32_F16"
+    assert int(value) == raw_value
+
+    virtual_mma_attr = iree_gpu.VirtualMMAAttr.get(raw_value)
+    assert virtual_mma_attr is not None
+
+    f16 = ir.F16Type.get()
+    f32 = ir.F32Type.get()
+    a_type, b_type, c_type = virtual_mma_attr.abc_element_types
+    assert a_type == f16
+    assert b_type == f16
+    assert c_type == f32
+
+    vec_4xf32 = ir.VectorType.get((4,), f32)
+    vec_8xf16 = ir.VectorType.get((8,), f16)
+    a_vec_type, b_vec_type, c_vec_type = virtual_mma_attr.abc_vector_types
+    assert a_vec_type == vec_8xf16
+    assert b_vec_type == vec_8xf16
+    assert c_vec_type == vec_4xf32
+
+    M, N, K = virtual_mma_attr.mnk_shape
+    assert M == 16
+    assert N == 16
+    assert K == 32
+
+    assert virtual_mma_intrinsic_attr.mma == virtual_mma_attr
 
 
 @run
