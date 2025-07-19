@@ -14,7 +14,6 @@
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
 #include "mlir/CAPI/IR.h"
-#include "mlir/IR/BuiltinAttributes.h"
 
 static const char *kCodegenModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
@@ -60,18 +59,6 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
   ireeCodegenGetTunerRootOps(module, &numOps, ops.data());
 
   return ops;
-}
-
-static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
-  mlir::Attribute Attr = unwrap(attr);
-  auto arrayAttr = mlir::dyn_cast_or_null<mlir::ArrayAttr>(Attr);
-  if (!arrayAttr)
-    return {};
-  std::vector<int64_t> values;
-  values.reserve(arrayAttr.size());
-  for (mlir::Attribute val : arrayAttr)
-    values.push_back(mlir::cast<mlir::IntegerAttr>(val).getInt());
-  return values;
 }
 
 NB_MODULE(_ireeCompilerDialects, m) {
@@ -373,16 +360,19 @@ NB_MODULE(_ireeCompilerDialects, m) {
               return std::vector<py::object>{};
             }
 
-            auto arrayAttr = mlir::cast<mlir::ArrayAttr>(unwrap(rawArrayAttr));
             static py::object virtualEnum =
                 py::module_::import_(kGpuModuleImportPath)
                     .attr("VirtualMMAIntrinsic");
 
             std::vector<py::object> result;
-            for (mlir::Attribute attr : arrayAttr) {
-              auto intAttr = mlir::cast<mlir::IntegerAttr>(attr);
-              result.push_back(
-                  virtualEnum(static_cast<uint32_t>(intAttr.getInt())));
+            size_t n = mlirArrayAttrGetNumElements(rawArrayAttr);
+            result.reserve(n);
+            for (size_t i = 0; i < n; ++i) {
+              MlirAttribute elem = mlirArrayAttrGetElement(rawArrayAttr, i);
+              if (!mlirAttributeIsAInteger(elem))
+                continue;
+              int64_t val = mlirIntegerAttrGetValueInt(elem);
+              result.push_back(virtualEnum(static_cast<uint32_t>(val)));
             }
 
             return result;
