@@ -165,6 +165,11 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 /// resolution.
 void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target);
 
+/// Populate the pattern to fold `scf.forall` created by split reduction
+/// and scf.forall created from workgroup mapping.
+void populateFoldSplitReductionAndWorkgroupMappingLoops(
+    RewritePatternSet &patterns);
+
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still
 // heavily relies on patterns that compose through filters.
