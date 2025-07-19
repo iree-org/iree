@@ -112,6 +112,9 @@ public:
     return result;
   }
 
+  /// Returns true if the `level` is available in TilingConfig.
+  bool isValidLevel(TilingLevel level);
+
   /// Returns the tiling level for cache parallel dimensions.
   unsigned getDistributionLevel() {
     return getActualLevel(TilingLevel::DistributionTiles);
@@ -151,6 +154,10 @@ public:
     return getTileSizesForLevel(getActualLevel(TilingLevel::DistributionTiles));
   }
 
+  SmallVector<int64_t> getCacheParallelSizes() {
+    return getTileSizesForLevel(getCacheParallelLevel());
+  }
+
   SmallVector<int64_t> getCacheReductionSizes() {
     return getTileSizesForLevel(getCacheReductionLevel());
   }
@@ -174,19 +181,26 @@ public:
   /// Returns a new `LoweringConfigAttr`, with the tile sizes of vector
   /// dimensions, set to `sizes`, and the corresponding scalability set to
   /// `scalableFlags`.
-  IREE::Codegen::LoweringConfigAttr
+  IREE::CPU::LoweringConfigAttr
   getLoweringConfigWithNewVectorSizes(ArrayRef<int64_t> sizes,
                                       ArrayRef<bool> scalableFlags = {});
 
-  /// Returns a list with the tiling levels that can be fused for this
-  /// configuration.
-  SmallVector<int64_t> getFusableLevels();
-
-  // TODO(dcaballe): Revisit if these features are ever used.
-  SmallVector<int64_t> getTileInterchangeSizes(unsigned level) {
-    auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        loweringConfig.getTilingLevelAttr(level));
-    return SmallVector<int64_t>(attr.getInterchange());
+  /// Returns the `level`-th valid tiling attribute. Returns an empty vector if
+  /// it does not exist.
+  IREE::Codegen::LoweringConfigTilingLevelAttr
+  getTilingLevelAttr(int64_t level) {
+    for (auto [idx, mappedLevel] :
+         llvm::enumerate(tilingLevelToActualLevelMap)) {
+      if (mappedLevel == TilingLevel::InvalidLevel) {
+        continue;
+      }
+      if (--level >= 0) {
+        continue;
+      }
+      return cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+          loweringConfig.getTilingLevelAttr(mappedLevel));
+    }
+    return {};
   }
 
 private:
