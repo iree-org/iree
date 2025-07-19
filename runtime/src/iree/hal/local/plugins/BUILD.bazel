@@ -28,10 +28,10 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local:executable_plugin_manager",
         "//runtime/src/iree/hal/local/elf:elf_module",
+        "//runtime/src/iree/io:file_handle",
     ],
 )
 

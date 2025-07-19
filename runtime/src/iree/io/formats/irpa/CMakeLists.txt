@@ -35,7 +35,6 @@ iree_cc_test(
     "irpa_parser_test.cc"
   DEPS
     ::irpa
-    iree::base::internal::file_io
     iree::io::formats::irpa::testdata::irpa_files
     iree::testing::gtest
     iree::testing::gtest_main

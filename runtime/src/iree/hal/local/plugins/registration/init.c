@@ -96,7 +96,7 @@ iree_status_t iree_hal_register_executable_plugin_from_spec(
   if (iree_string_view_consume_prefix(&path, IREE_SV("embedded:")) ||
       iree_string_view_ends_with(path, IREE_SV(".sos"))) {
     IREE_RETURN_IF_ERROR(iree_hal_embedded_elf_executable_plugin_load_from_file(
-        path.data, param_count, params, host_allocator, &plugin));
+        path, param_count, params, host_allocator, &plugin));
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_EMBEDDED_ELF_PLUGIN
 

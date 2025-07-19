@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
@@ -18,6 +17,7 @@
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/plugins/registration/init.h"
+#include "iree/io/file_contents.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(string, executable_format, "",
@@ -152,10 +152,10 @@ static iree_status_t iree_hal_executable_library_run(
       iree_make_cstring_view(FLAG_executable_format);
 
   // Load the executable data.
-  iree_file_contents_t* file_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_read_contents(FLAG_executable_file,
-                                               IREE_FILE_READ_FLAG_DEFAULT,
-                                               host_allocator, &file_contents));
+  iree_io_file_contents_t* file_contents = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_io_file_contents_read(iree_make_cstring_view(FLAG_executable_file),
+                                 host_allocator, &file_contents));
   executable_params.executable_data = file_contents->const_buffer;
 
   // Perform the load, which will fail if the executable cannot be loaded or
@@ -252,7 +252,7 @@ static iree_status_t iree_hal_executable_library_run(
   // Unload.
   iree_hal_executable_release(executable);
   iree_hal_executable_loader_release(executable_loader);
-  iree_file_contents_free(file_contents);
+  iree_io_file_contents_free(file_contents);
 
   return iree_ok_status();
 }

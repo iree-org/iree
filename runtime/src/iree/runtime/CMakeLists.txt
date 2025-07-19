@@ -35,9 +35,9 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::internal::file_io
     iree::hal
     iree::hal::drivers
+    iree::io::file_handle
     iree::modules::hal
     iree::vm
     iree::vm::bytecode::module

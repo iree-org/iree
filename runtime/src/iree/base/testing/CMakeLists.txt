@@ -39,7 +39,7 @@ iree_cc_test(
     ::dynamic_library_test_library
     iree::base
     iree::base::internal::dynamic_library
-    iree::base::internal::file_io
+    iree::io::file_handle
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

@@ -10,9 +10,9 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
+#include "iree/io/file_contents.h"
 #include "iree/modules/hal/types.h"
 #include "iree/testing/benchmark.h"
 #include "iree/tooling/device_util.h"
@@ -384,14 +384,14 @@ static iree_status_t iree_benchmark_executable_from_flags(
   // Load the executable data into memory.
   // In normal usage this would be mapped from the containing module file (which
   // itself may be mapped from disk).
-  iree_file_contents_t* file_contents = NULL;
+  iree_io_file_contents_t* file_contents = NULL;
   if (strcmp(FLAG_executable_file, "-") == 0) {
     IREE_RETURN_IF_ERROR(
-        iree_stdin_read_contents(host_allocator, &file_contents));
+        iree_io_file_contents_read_stdin(host_allocator, &file_contents));
   } else {
-    IREE_RETURN_IF_ERROR(iree_file_read_contents(
-        FLAG_executable_file, IREE_FILE_READ_FLAG_DEFAULT, host_allocator,
-        &file_contents));
+    IREE_RETURN_IF_ERROR(
+        iree_io_file_contents_read(iree_make_cstring_view(FLAG_executable_file),
+                                   host_allocator, &file_contents));
   }
   executable_params.executable_format =
       iree_make_cstring_view(FLAG_executable_format);
@@ -443,7 +443,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
 
   iree_vm_list_release(binding_list);
   iree_hal_executable_release(executable);
-  iree_file_contents_free(file_contents);
+  iree_io_file_contents_free(file_contents);
   iree_hal_executable_cache_release(executable_cache);
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);

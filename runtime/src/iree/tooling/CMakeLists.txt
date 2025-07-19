@@ -85,12 +85,12 @@ iree_cc_library(
     ::device_util
     ::parameter_util
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
     iree::hal
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration
+    iree::io::file_handle
     iree::modules::hal
     iree::modules::hal::inline
     iree::modules::hal::loader
@@ -223,9 +223,9 @@ iree_cc_library(
     "parameter_util.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::hal
+    iree::io::file_handle
     iree::io::formats::parser_registry
     iree::io::parameter_index
     iree::io::parameter_index_provider

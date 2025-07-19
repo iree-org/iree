@@ -12,7 +12,6 @@
 #include <utility>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
 #include "iree/modules/check/module.h"

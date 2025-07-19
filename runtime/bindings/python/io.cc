@@ -12,8 +12,9 @@
 
 #include "./buffer_interop.h"
 #include "./vm.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/path.h"
+#include "iree/io/file_contents.h"
+#include "iree/io/file_handle.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/io/formats/parser_registry.h"
 #include "iree/io/parameter_index_provider.h"
@@ -127,34 +128,47 @@ void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
     format.emplace(path_ext.data, path_ext.size);
   }
 
-  // Open file.
-  iree_file_read_flags_t read_flags = IREE_FILE_READ_FLAG_DEFAULT;
-  if (mmap) {
-    read_flags = IREE_FILE_READ_FLAG_MMAP;
-  } else {
-    read_flags = IREE_FILE_READ_FLAG_PRELOAD;
-  }
-  iree_file_contents_t *file_contents = nullptr;
-  CheckApiStatus(
-      iree_file_read_contents(file_path.c_str(), read_flags,
-                              iree_allocator_system(), &file_contents),
-      "Error opening parameter file");
-  iree_io_file_handle_release_callback_t release_callback = {
-      +[](void *user_data, iree_io_file_handle_primitive_t handle_primitive) {
-        iree_file_contents_t *file_contents = (iree_file_contents_t *)user_data;
-        iree_file_contents_free(file_contents);
-      },
-      file_contents,
-  };
+  // TODO: this behavior is wrong; the python code assumes that the file handle
+  // always ends up as a host allocation, but this is the
+  // slowest/least-efficient path in most cases. The fast-path is to use
+  // iree_io_file_handle_open and get a file descriptor-backed handle as the HAL
+  // is then able to perform optimized reads/writes sometimes zero-copy. By
+  // mapping the file explicitly all accesses go down the pathologically slow
+  // path where zero-copy is not supported and we rely on the OS to fault pages
+  // and bring them in on demand instead of being able to read/write them more
+  // efficiently. The tests (and likely user code) rely on the mapping, though,
+  // so for now this remains slow.
 
-  // Wrap contents.
+  // Open file.
   iree_io_file_handle_t *raw_file_handle = nullptr;
-  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-      IREE_IO_FILE_ACCESS_READ, file_contents->buffer, release_callback,
-      iree_allocator_system(), &raw_file_handle);
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(file_contents);
-    CheckApiStatus(status, "Error accessing parameter memory");
+  if (mmap) {
+    iree_io_file_contents_t *contents = NULL;
+    CheckApiStatus(
+        iree_io_file_contents_map(
+            iree_make_string_view(file_path.data(), file_path.size()),
+            IREE_IO_FILE_ACCESS_READ, iree_allocator_system(), &contents),
+        "Mapping parameter file");
+    iree_io_file_handle_release_callback_t release_callback = {
+        /*.fn=*/+[](void *user_data,
+                    iree_io_file_handle_primitive_t handle_primitive) {
+          iree_io_file_contents_t *contents =
+              (iree_io_file_contents_t *)user_data;
+          iree_io_file_contents_free(contents);
+        },
+        /*.user_data=*/contents,
+    };
+    CheckApiStatus(
+        iree_io_file_handle_wrap_host_allocation(
+            IREE_IO_FILE_MODE_READ, contents->buffer, release_callback,
+            iree_allocator_system(), &raw_file_handle),
+        "Error wrapping parameter file (mmap)");
+  } else {
+    CheckApiStatus(
+        iree_io_file_handle_preload(
+            IREE_IO_FILE_MODE_READ,
+            iree_make_string_view(file_path.data(), file_path.size()),
+            iree_allocator_system(), &raw_file_handle),
+        "Error opening parameter file (preload)");
   }
 
   // Parse.
@@ -479,27 +493,11 @@ void SetupIoBindings(py::module_ &m) {
                     iree_io_physical_size_t archive_length,
                     iree_io_file_handle_t **out_file_handle) -> iree_status_t {
               OpenParams *params = static_cast<OpenParams *>(user_data);
-              iree_file_contents_t *file_contents = NULL;
-              IREE_RETURN_IF_ERROR(iree_file_create_mapped(
-                  params->path, archive_offset + archive_length, archive_offset,
-                  (iree_host_size_t)archive_length, iree_allocator_system(),
-                  &file_contents));
-              iree_io_file_handle_release_callback_t release_callback;
-              memset(&release_callback, 0, sizeof(release_callback));
-              release_callback.fn =
-                  +[](void *user_data,
-                      iree_io_file_handle_primitive_t handle_primitive) {
-                    iree_file_contents_free(
-                        static_cast<iree_file_contents_t *>(user_data));
-                  };
-              release_callback.user_data = file_contents;
-              iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-                  IREE_IO_FILE_ACCESS_WRITE, file_contents->buffer,
-                  release_callback, iree_allocator_system(), out_file_handle);
-              if (!iree_status_is_ok(status)) {
-                iree_file_contents_free(file_contents);
-              }
-              return status;
+              return iree_io_file_handle_create(
+                  IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE,
+                  iree_make_cstring_view(params->path),
+                  archive_offset + archive_length, iree_allocator_system(),
+                  out_file_handle);
             };
 
             // Write the archive.

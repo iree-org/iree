@@ -7,14 +7,13 @@
 #include "iree/tooling/context_util.h"
 
 #include <memory.h>
-#include <stdio.h>
 #include <string.h>
 
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
+#include "iree/io/file_contents.h"
 #include "iree/modules/hal/inline/module.h"
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
@@ -51,29 +50,24 @@ static iree_status_t iree_tooling_load_bytecode_module(
   IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
 
   // Fetch the file contents into memory.
-  // We could map the memory here if we wanted to and were coming from a file
-  // on disk.
-  iree_file_contents_t* file_contents = NULL;
+  iree_io_file_contents_t* file_contents = NULL;
   if (iree_string_view_equal(path, IREE_SV("-"))) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_stdin_read_contents(host_allocator, &file_contents));
+        z0, iree_io_file_contents_read_stdin(host_allocator, &file_contents));
   } else {
-    char path_str[2048] = {0};
-    iree_string_view_to_cstring(path, path_str, sizeof(path_str));
-    iree_file_read_flags_t read_flags = 0;
     if (strcmp(FLAG_module_mode, "mmap") == 0) {
-      read_flags |= IREE_FILE_READ_FLAG_MMAP;
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_io_file_contents_map(path, IREE_IO_FILE_ACCESS_READ,
+                                        host_allocator, &file_contents));
     } else if (strcmp(FLAG_module_mode, "preload") == 0) {
-      read_flags |= IREE_FILE_READ_FLAG_PRELOAD;
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_io_file_contents_read(path, host_allocator, &file_contents));
     } else {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "unrecognized --module_mode= value '%s'",
                               FLAG_module_mode);
     }
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_file_read_contents(path_str, read_flags, host_allocator,
-                                    &file_contents));
   }
 
   // Try to load the module as bytecode (all we have today that we can use).
@@ -82,12 +76,13 @@ static iree_status_t iree_tooling_load_bytecode_module(
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
       instance, file_contents->const_buffer,
-      iree_file_contents_deallocator(file_contents), host_allocator, &module);
+      iree_io_file_contents_deallocator(file_contents), host_allocator,
+      &module);
 
   if (iree_status_is_ok(status)) {
     *out_module = module;
   } else {
-    iree_file_contents_free(file_contents);
+    iree_io_file_contents_free(file_contents);
   }
 
   IREE_TRACE_ZONE_END(z0);
