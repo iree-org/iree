@@ -187,3 +187,30 @@ util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: i
 // CHECK:         flow.return %[[SET_ENCODING]] :
 // CHECK:       }
 // CHECK:       util.return %[[DISPATCH]], %[[DISPATCH]]
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+util.func public @reshape_fusion(%arg0: tensor<32x32xf32>) -> tensor<16x64xf32, #encoding> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<32x32xf32>
+  %1 = flow.dispatch.region -> (tensor<32x32xf32>) {
+    %3 = linalg.add ins(%arg0, %arg0 : tensor<32x32xf32>, tensor<32x32xf32>)
+        outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
+    flow.return %3 : tensor<32x32xf32>
+  }
+  %collapsed = tensor.collapse_shape %1 [[0, 1]] : tensor<32x32xf32> into tensor<1024xf32>
+  %expanded = tensor.expand_shape %collapsed [[0, 1]] output_shape [16, 64] : tensor<1024xf32> into tensor<16x64xf32>
+  %2 = iree_encoding.set_encoding %expanded : tensor<16x64xf32> -> tensor<16x64xf32, #encoding>
+  util.return %2 : tensor<16x64xf32, #encoding>
+}
+// CHECK:       #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: @reshape_fusion
+// CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<16x64xf32, #[[$ENCODING]]>)
+// CHECK:         linalg.add
+// CHECK:         tensor.collapse_shape
+// CHECK:         tensor.expand_shape
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+// CHECK:         flow.return %[[SET_ENCODING]] :
+// CHECK:       }
+// CHECK:       util.return %[[DISPATCH0]] : tensor<16x64xf32, #[[$ENCODING]]>
