@@ -113,6 +113,11 @@ TilingConfig::getTilingLevelInfo() {
   return result;
 }
 
+bool TilingConfig::isValidLevel(IREE::CPU::TilingLevel level) {
+  return tilingLevelToActualLevelMap[static_cast<int64_t>(level)] !=
+         IREE::CPU::TilingLevel::InvalidLevel;
+}
+
 /// Returns the tiling level that contains the vector dim at `dimPos` (which is
 /// an index into the result of `getVectorTileSizes()`).
 std::optional<unsigned>
