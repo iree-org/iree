@@ -226,7 +226,8 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
             FormDispatchRegionsPassOptions{
                 options.enableAggressiveFusion,
                 clEnableFusePaddingIntoLinalgConsumerOps,
-                clEnableFusePaddingIntoLinalgProducerOps});
+                clEnableFusePaddingIntoLinalgProducerOps,
+                /*fuseTruncWithConsumers=*/!clEnableEarlyTruncFusion});
       })
       // Elementwise fuse operations that are iside a dispatch if possible.
       .addPass([&]() {

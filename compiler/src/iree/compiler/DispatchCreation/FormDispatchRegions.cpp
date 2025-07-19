@@ -753,6 +753,11 @@ isFusableWithProducer(OpOperand &operand,
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
+  if (!options.fuseTruncWithConsumers &&
+      IREE::LinalgExt::isBitTruncateOp(producer)) {
+    return false;
+  }
+
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
     if (options.fusePadWithProducers) {
       return isa<linalg::LinalgOp>(producer);
