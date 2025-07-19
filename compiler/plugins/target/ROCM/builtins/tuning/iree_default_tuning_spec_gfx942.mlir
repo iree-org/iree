@@ -2760,6 +2760,31 @@ transform.named_sequence
 }
 
 transform.named_sequence
+@match_matvec_4x6656x16384_f16_f16_f32(%matmul: !transform.any_op {transform.readonly})
+  -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
+  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul)
+    : (!transform.any_op) -> !transform.any_op
+  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
+  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
+  transform.iree.match.cast_compatible_type %lhs = tensor<4x6656xf16> : !transform.any_value
+  transform.iree.match.cast_compatible_type %rhs = tensor<16384x6656xf16> : !transform.any_value
+  %config = transform.param.constant #iree_codegen.compilation_info<
+    lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 512], 
+                                                 subgroup_basis = [[1, 1, 1], [0, 1, 2]], 
+                                                 thread = [0, 0, 8], 
+                                                 thread_basis = [[1, 1, 64], [0, 1, 2]], 
+                                                 workgroup = [4, 1, 0]
+                                                 }>,
+    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+      workgroup_size = [64, 1, 1] subgroup_size = 64,
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+  > -> !transform.any_param
+  transform.yield %matmul, %config : !transform.any_op, !transform.any_param
+}
+
+transform.named_sequence
 @__kernel_config(%variant_op: !transform.any_op {transform.consumed}) -> !transform.any_op
   attributes { iree_codegen.tuning_spec_entrypoint } {
   %res = transform.foreach_match in %variant_op
@@ -2780,7 +2805,8 @@ transform.named_sequence
     @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config,
 
     // Batched matvec variants: expected speedup: 1.2 - 1.3x
-    @match_matvec_4x16384x6656_f16_f16_f32 -> @apply_op_config
+    @match_matvec_4x16384x6656_f16_f16_f32 -> @apply_op_config,
+    @match_matvec_4x6656x16384_f16_f16_f32 -> @apply_op_config
     : (!transform.any_op) -> !transform.any_op
   transform.yield %res : !transform.any_op
 }
