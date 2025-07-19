@@ -515,19 +515,45 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   return newRegionOp.value();
 }
 
+/// Move SSA values used within an operation before the provided dispatch region
+/// so that the operation itself (or its replacement) can be moved inside.
+static LogicalResult
+moveOperationDependenciesBeforeRegion(RewriterBase &rewriter, Operation *op,
+                                      IREE::Flow::DispatchRegionOp regionOp) {
+  mlir::DominanceInfo dominance(regionOp);
+
+  // Find the backward slice of operation for each `Value` the operation
+  // depends on. Prune the slice to only include operations not already
+  // dominated by the `regionOp`.
+  BackwardSliceOptions options;
+  options.inclusive = false;
+  options.omitUsesFromAbove = false;
+  options.omitBlockArguments = true;
+  options.filter = [&](Operation *sliceBoundaryOp) {
+    return sliceBoundaryOp != regionOp.getOperation() &&
+           !dominance.properlyDominates(sliceBoundaryOp, regionOp);
+  };
+  llvm::SetVector<Operation *> slice;
+  [[maybe_unused]] LogicalResult result = getBackwardSlice(op, &slice, options);
+  assert(result.succeeded() && "expected a backward slice");
+
+  // We should move the slice in topological order, but `getBackwardSlice`
+  // already does that. So no need to sort again.
+  for (Operation *op : slice) {
+    rewriter.moveOpBefore(op, regionOp);
+  }
+  return success();
+}
+
 // Move a `target` op that is following the given dispatch region op into the
 // dispatch region.
 FailureOr<IREE::Flow::DispatchRegionOp>
 moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
                                   IREE::Flow::DispatchRegionOp regionOp) {
-  // Fail if any of the `target` operands do not dominate the dispatch region.
-  mlir::DominanceInfo dominanceInfo(regionOp);
-  for (Value operand : target->getOperands()) {
-    Operation *definingOp = operand.getDefiningOp();
-    if (definingOp && !dominanceInfo.dominates(definingOp, regionOp)) {
-      return rewriter.notifyMatchFailure(
-          target, "target operands do not dominate the dispatch region op.");
-    }
+  if (failed(
+          moveOperationDependenciesBeforeRegion(rewriter, target, regionOp))) {
+    return target->emitOpError(
+        "Could not move dependencies for upward motion.");
   }
 
   // Values replaced by moving the `target` into the dispatch region.
