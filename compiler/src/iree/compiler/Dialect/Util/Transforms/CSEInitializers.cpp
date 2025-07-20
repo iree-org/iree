@@ -90,6 +90,7 @@ public:
       if (failed(result)) {
         return signalPassFailure();
       }
+
       globalToSliceMap.push_back(std::make_pair(storeOp, std::move(slice)));
     }
 
@@ -145,10 +146,14 @@ public:
 
       mlir::OpBuilder builder(moduleOp.getContext());
       builder.setInsertionPoint(members.front());
+      auto &firstGlobal = globalTable.lookup(members.front().getGlobalName());
       for (int i = 1; i < members.size(); ++i) {
         builder.create<IREE::Util::GlobalStoreOp>(
             members.front().getLoc(), members.front().getStoredGlobalValue(),
             members[i].getGlobalName());
+
+        auto &currentGlobal = globalTable.lookup(members[i].getGlobalName());
+        currentGlobal.op->moveAfter(firstGlobal.op);
 
         members[i].erase();
       }
