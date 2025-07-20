@@ -388,10 +388,10 @@ void registerDispatchCreationPipelines() {
         llvm::cl::init(false),
     };
 
-    TransformOptions toTransformOptions() const {
-      DispatchCreationOptions options;
-      options.enableAggressiveFusion = aggressiveFusion;
-      return TransformOptions{.options = options};
+    std::unique_ptr<TransformOptions> toTransformOptions() const {
+      auto options = std::make_unique<TransformOptions>();
+      options->options.enableAggressiveFusion = aggressiveFusion;
+      return options;
     }
   };
 
@@ -402,7 +402,7 @@ void registerDispatchCreationPipelines() {
           [](OpPassManager &passManager,
              const DispatchCreationPipelineOptions &options) {
             buildDispatchCreationPassPipeline(passManager,
-                                              options.toTransformOptions());
+                                              *(options.toTransformOptions()));
           });
 
   PassPipelineRegistration<TransformOptions>
