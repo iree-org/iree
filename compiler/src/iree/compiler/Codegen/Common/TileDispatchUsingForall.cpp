@@ -302,17 +302,17 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
                                 [&tiledAndFusedOps](Operation *op) {
                                   return tiledAndFusedOps.contains(op);
                                 });
-    if (failed(newFusionOpportunities)) {
-      rootTiledOp->emitOpError("failed to fuse consumers");
-      return signalPassFailure();
-    }
+    if (succeeded(newFusionOpportunities)) {
+      // Because we restrict to at most a single tilable consumer for yielding
+      // a replacement, no new fusion opportunities will yield a replacement,
+      // meaning there is no need to run consumer fusion again afterwards.
+      // TODO: run producer and consumer fusion in one worklist.
+      fuseProducersOfSlices(rewriter, *newFusionOpportunities,
+                            tileAndFuseOptions, tilingLoops);
 
-    // Because we restrict to at most a single tilable consumer for yielding
-    // a replacement, no new fusion opportunities will yield a replacement,
-    // meaning there is no need to run consumer fusion again afterwards.
-    // TODO: run producer and consumer fusion in one worklist.
-    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
-                          tilingLoops);
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumers, skip\n");
+    }
   }
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {
