@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -154,11 +155,38 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     RewriterBase &rewriter, linalg::GenericOp genericOp,
     ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
     const MaterializeEncodingTypeConverter &typeConverter) {
+  if (genericOp.getNumResults() == 0) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "Must have at least 1 result");
+  }
   OpOperand *outputOperand = genericOp.getDpsInitOperand(0);
   AffineMap outputMap = genericOp.getMatchingIndexingMap(outputOperand);
+  for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
+    if (genericOp.getMatchingIndexingMap(&initOperand) != outputMap) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "Output maps are not all equivalent");
+    }
+  }
+  // The pattern expects a generic op with an identity map for all outputs. If
+  // this is not the case, then interchange the generic op before converting.
   if (!outputMap.isIdentity()) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "Output indexing map is not identity");
+    if (!outputMap.isPermutation()) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "Output map is not a permutation");
+    }
+    SmallVector<unsigned int> interchange = llvm::map_to_vector(
+        outputMap.getResults(), [](AffineExpr expr) -> unsigned int {
+          return cast<AffineDimExpr>(expr).getPosition();
+        });
+    FailureOr<linalg::GenericOp> interchangedGenericOp =
+        linalg::interchangeGenericOp(rewriter, genericOp, interchange);
+    if (failed(interchangedGenericOp)) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "Failed to interchange indexing maps");
+    }
+    genericOp = interchangedGenericOp.value();
+    outputOperand = genericOp.getDpsInitOperand(0);
+    outputMap = genericOp.getMatchingIndexingMap(outputOperand);
   }
   // Step 1: Retrieve the output encoding materialization information and
   // compute the new indexing maps for the packed and potentially swizzled
@@ -370,10 +398,17 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     packedIndexingMaps.push_back(packedInputMap);
   }
   // Create the new packed identity map for the output.
-  packedIndexingMaps.push_back(
+  packedIndexingMaps.append(
+      genericOp.getNumDpsInits(),
       rewriter.getMultiDimIdentityMap(convertedResultType.getRank()));
+  SmallVector<Type> convertedResultTypes =
+      llvm::map_to_vector(genericOp.getResultTypes(), [&](Type t) -> Type {
+        return RankedTensorType::get(
+            convertedResultType.getShape(),
+            cast<RankedTensorType>(t).getElementType());
+      });
   auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-      genericOp.getLoc(), convertedResultType, convertedInputOperands,
+      genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
       convertedOutputOperands, packedIndexingMaps, iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
   rewriter.inlineRegionBefore(genericOp.getRegion(),
@@ -399,9 +434,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   }
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
     return rewriter.notifyMatchFailure(linalgOp, "Loops are not all parallel");
-  }
-  if (linalgOp.getNumDpsInits() != 1) {
-    return rewriter.notifyMatchFailure(linalgOp, "Not only 1 init operand");
   }
 
   return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
