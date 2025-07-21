@@ -16,10 +16,10 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
+#include "iree/io/file_contents.h"
+#include "iree/io/stdio_util.h"
 #include "iree/vm/bytecode/archive.h"
-#include "iree/vm/bytecode/module.h"
 
 // NOTE: include order matters:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -30,14 +30,6 @@
 //===----------------------------------------------------------------------===//
 // IO utilities
 //===----------------------------------------------------------------------===//
-
-#if defined(IREE_PLATFORM_WINDOWS)
-#include <fcntl.h>
-#include <io.h>
-#define IREE_SET_BINARY_MODE(handle) _setmode(_fileno(handle), O_BINARY)
-#else
-#define IREE_SET_BINARY_MODE(handle) ((void)0)
-#endif  // IREE_PLATFORM_WINDOWS
 
 static void iree_tooling_print_indent(int indent) {
   fprintf(stdout, "%*s", indent, "");
@@ -511,7 +503,7 @@ static iree_status_t iree_tooling_dump_module_metadata(
 
 static iree_status_t iree_tooling_dump_module_flatbuffer_binary(
     iree_const_byte_span_t flatbuffer_contents) {
-  IREE_SET_BINARY_MODE(stdout);  // ensure binary output mode
+  IREE_IO_SET_BINARY_MODE(stdout);  // ensure binary output mode
   fwrite(flatbuffer_contents.data, 1, flatbuffer_contents.data_length, stdout);
   return iree_ok_status();
 }
@@ -566,9 +558,10 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  iree_file_contents_t* file_contents = NULL;
-  iree_status_t status = iree_file_read_contents(
-      argv[1], IREE_FILE_READ_FLAG_DEFAULT, host_allocator, &file_contents);
+  iree_io_file_contents_t* file_contents = NULL;
+  iree_status_t status = iree_io_file_contents_map(
+      iree_make_cstring_view(argv[1]), IREE_IO_FILE_ACCESS_READ, host_allocator,
+      &file_contents);
 
   iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
   iree_const_byte_span_t rodata_contents = iree_const_byte_span_empty();
@@ -604,7 +597,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  iree_file_contents_free(file_contents);
+  iree_io_file_contents_free(file_contents);
 
   fflush(stdout);
   if (!iree_status_is_ok(status)) {

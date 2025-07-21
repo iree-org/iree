@@ -14,11 +14,31 @@ package(
 
 iree_runtime_cc_library(
     name = "file_handle",
-    srcs = ["file_handle.c"],
-    hdrs = ["file_handle.h"],
+    srcs = [
+        "file_contents.c",
+        "file_handle.c",
+    ],
+    hdrs = [
+        "file_contents.h",
+        "file_handle.h",
+        "stdio_util.h",
+    ],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "file_contents_test",
+    srcs = ["file_contents_test.cc"],
+    tags = ["requires-filesystem"],
+    deps = [
+        ":file_handle",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

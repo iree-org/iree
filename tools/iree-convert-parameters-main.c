@@ -11,9 +11,9 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
+#include "iree/io/file_handle.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/io/parameter_index.h"
 #include "iree/io/scope_map.h"
@@ -164,11 +164,6 @@ IREE_FLAG(bool, quiet, false,
 
 IREE_FLAG(string, output, "", "Output .irpa file path.");
 
-static void iree_io_file_handle_release_mapping(
-    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
-  iree_file_contents_free((iree_file_contents_t*)user_data);
-}
-
 typedef struct {
   iree_allocator_t host_allocator;
   const char* path;
@@ -178,22 +173,10 @@ static iree_status_t iree_tooling_open_output_parameter_file(
     iree_io_physical_size_t archive_length,
     iree_io_file_handle_t** out_file_handle) {
   iree_tooling_open_params_t* params = (iree_tooling_open_params_t*)user_data;
-  iree_file_contents_t* file_contents = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_file_create_mapped(params->path, archive_offset + archive_length,
-                              archive_offset, (iree_host_size_t)archive_length,
-                              params->host_allocator, &file_contents));
-  iree_io_file_handle_release_callback_t release_callback = {
-      .fn = iree_io_file_handle_release_mapping,
-      .user_data = file_contents,
-  };
-  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-      IREE_IO_FILE_ACCESS_WRITE, file_contents->buffer, release_callback,
+  return iree_io_file_handle_create(
+      IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE,
+      iree_make_cstring_view(params->path), archive_offset + archive_length,
       params->host_allocator, out_file_handle);
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(file_contents);
-  }
-  return status;
 }
 
 int main(int argc, char** argv) {

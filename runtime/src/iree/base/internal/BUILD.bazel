@@ -130,35 +130,13 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "file_io",
-    srcs = ["file_io.c"],
-    hdrs = ["file_io.h"],
-    deps = [
-        "//runtime/src/iree/base",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "file_io_test",
-    srcs = ["file_io_test.cc"],
-    tags = ["requires-filesystem"],
-    deps = [
-        ":file_io",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "flags",
     srcs = ["flags.c"],
     hdrs = ["flags.h"],
     deps = [
-        ":file_io",
         ":internal",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/io:file_handle",
     ],
 )
 

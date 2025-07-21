@@ -21,10 +21,10 @@ iree_cc_library(
     "embedded_elf_plugin.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::hal
     iree::hal::local::elf::elf_module
     iree::hal::local::executable_plugin_manager
+    iree::io::file_handle
   DEFINES
     "IREE_HAVE_HAL_EXECUTABLE_EMBEDDED_ELF_PLUGIN=1"
   PUBLIC

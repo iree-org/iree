@@ -37,7 +37,6 @@ iree_runtime_cc_test(
     tags = ["requires-filesystem"],
     deps = [
         ":irpa",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/io/formats/irpa/testdata:irpa_files",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

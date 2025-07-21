@@ -10,8 +10,8 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/hal/api.h"
+#include "iree/io/file_contents.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/instance.h"
 #include "iree/vm/api.h"
@@ -238,18 +238,19 @@ iree_runtime_session_append_bytecode_module_from_file(
 
   // TODO(#3909): actually map the memory here. For now we just load the
   // contents.
-  iree_file_contents_t* flatbuffer_contents = NULL;
+  iree_io_file_contents_t* flatbuffer_contents = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_file_read_contents(file_path, IREE_FILE_READ_FLAG_DEFAULT,
-                                  iree_runtime_session_host_allocator(session),
-                                  &flatbuffer_contents));
+      z0,
+      iree_io_file_contents_read(iree_make_cstring_view(file_path),
+                                 iree_runtime_session_host_allocator(session),
+                                 &flatbuffer_contents));
 
   // Create the module from the file contents. The contents are consumed
   // regardless of whether the module can be loaded or not.
   iree_status_t status =
       iree_runtime_session_append_bytecode_module_from_memory(
           session, flatbuffer_contents->const_buffer,
-          iree_file_contents_deallocator(flatbuffer_contents));
+          iree_io_file_contents_deallocator(flatbuffer_contents));
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -261,17 +262,18 @@ iree_runtime_session_append_bytecode_module_from_stdin(
   IREE_ASSERT_ARGUMENT(session);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_file_contents_t* flatbuffer_contents = NULL;
+  iree_io_file_contents_t* flatbuffer_contents = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_stdin_read_contents(iree_runtime_session_host_allocator(session),
-                                   &flatbuffer_contents));
+      z0,
+      iree_io_file_contents_read_stdin(
+          iree_runtime_session_host_allocator(session), &flatbuffer_contents));
 
   // Create the module from the stream contents. The contents are consumed
   // regardless of whether the module can be loaded or not.
   iree_status_t status =
       iree_runtime_session_append_bytecode_module_from_memory(
           session, flatbuffer_contents->const_buffer,
-          iree_file_contents_deallocator(flatbuffer_contents));
+          iree_io_file_contents_deallocator(flatbuffer_contents));
 
   IREE_TRACE_ZONE_END(z0);
   return status;

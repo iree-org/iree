@@ -10,12 +10,10 @@
 #include <iostream>
 #include <ostream>
 #include <string>
-#include <type_traits>
-#include <utility>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/testing/dynamic_library_test_library_embed.h"
+#include "iree/io/file_contents.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -62,9 +60,11 @@ class DynamicLibraryTest : public ::testing::Test {
 
     const struct iree_file_toc_t* file_toc =
         dynamic_library_test_library_create();
-    IREE_ASSERT_OK(iree_file_write_contents(
-        library_temp_path_.c_str(),
-        iree_make_const_byte_span(file_toc->data, file_toc->size)));
+    IREE_ASSERT_OK(iree_io_file_contents_write(
+        iree_make_string_view(library_temp_path_.data(),
+                              library_temp_path_.size()),
+        iree_make_const_byte_span(file_toc->data, file_toc->size),
+        iree_allocator_system()));
 
     std::cout << "Embedded test library written to temp path: "
               << library_temp_path_ << "\n";

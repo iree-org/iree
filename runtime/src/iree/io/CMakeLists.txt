@@ -14,13 +14,31 @@ iree_cc_library(
   NAME
     file_handle
   HDRS
+    "file_contents.h"
     "file_handle.h"
+    "stdio_util.h"
   SRCS
+    "file_contents.c"
     "file_handle.c"
   DEPS
     iree::base
     iree::base::internal
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    file_contents_test
+  SRCS
+    "file_contents_test.cc"
+  DEPS
+    ::file_handle
+    iree::base
+    iree::base::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "requires-filesystem"
 )
 
 iree_cc_test(

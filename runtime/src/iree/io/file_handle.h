@@ -189,6 +189,8 @@ enum iree_io_file_mode_bits_t {
   // Allows subsequent operations to open the file for write access while the
   // file is open by the creator.
   IREE_IO_FILE_MODE_SHARE_WRITE = 1ull << 7,
+  // If the file exists during an open operation it is truncated for overwrite.
+  IREE_IO_FILE_MODE_OVERWRITE = 1ull << 8,
 };
 
 // Creates a new platform file at |path| for usage as defined by |mode|.
@@ -211,6 +213,14 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
 IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
     iree_io_file_mode_t mode, int fd, iree_allocator_t host_allocator,
     iree_io_file_handle_t** out_handle);
+
+// Opens an existing platform file at |path| and preloads the entire contents
+// into wired memory. This is equivalent to opening the file, mapping it for
+// read access, allocating a buffer of the entire file size, reading into it,
+// and then wrapping the buffer with iree_io_file_handle_wrap_host_allocation.
+IREE_API_EXPORT iree_status_t iree_io_file_handle_preload(
+    iree_io_file_mode_t mode, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle);
 
 //===----------------------------------------------------------------------===//
 // iree_io_file_mapping_t

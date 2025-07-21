@@ -6,7 +6,6 @@
 
 #include "iree/base/internal/flags.h"
 
-#include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
@@ -503,7 +502,7 @@ void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {
 
 #if IREE_FLAGS_ENABLE_FLAG_FILE == 1
 
-#include "iree/base/internal/file_io.h"
+#include "iree/io/file_contents.h"
 
 // Parses a newline-separated list of flags from a file.
 static iree_status_t iree_flags_parse_file(iree_string_view_t file_path) {
@@ -513,10 +512,9 @@ static iree_status_t iree_flags_parse_file(iree_string_view_t file_path) {
   // NOTE: safe to use file_path.data here as it will always have a NUL
   // terminator.
   iree_allocator_t allocator = iree_flags_leaky_allocator();
-  iree_file_contents_t* file_contents = NULL;
+  iree_io_file_contents_t* file_contents = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_file_read_contents(file_path.data, IREE_FILE_READ_FLAG_DEFAULT,
-                              allocator, &file_contents),
+      iree_io_file_contents_read(file_path, allocator, &file_contents),
       "while trying to parse flagfile");
 
   // Run through the file line-by-line.

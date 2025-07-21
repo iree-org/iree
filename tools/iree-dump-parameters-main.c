@@ -19,12 +19,12 @@
 // # Extract parameter binary contents from a file:
 // $ iree-dump-parameters ... --extract=scope::key0=file0.bin [--extract=...]
 
-#include <ctype.h>
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
+#include "iree/io/file_contents.h"
+#include "iree/io/file_handle.h"
 #include "iree/io/parameter_index.h"
 #include "iree/io/scope_map.h"
 #include "iree/tooling/parameter_util.h"
@@ -72,10 +72,7 @@ static iree_status_t iree_tooling_extract_parameter(
       iree_io_file_handle_value(entry->storage.file.handle).host_allocation;
   iree_const_byte_span_t entry_contents = iree_make_const_byte_span(
       file_contents.data + entry->storage.file.offset, entry->length);
-  char* path_str = (char*)iree_alloca(path.size + 1);
-  memcpy(path_str, path.data, path.size);
-  path_str[path.size] = 0;
-  return iree_file_write_contents(path_str, entry_contents);
+  return iree_io_file_contents_write(path, entry_contents, host_allocator);
 }
 
 static iree_status_t iree_tooling_extract_parameters(

@@ -29,9 +29,9 @@ iree_runtime_cc_binary(
     srcs = ["iree-benchmark-executable-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/testing:benchmark",
         "//runtime/src/iree/tooling:device_util",
@@ -62,7 +62,6 @@ iree_runtime_cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/check",
@@ -79,9 +78,9 @@ iree_runtime_cc_binary(
     srcs = ["iree-convert-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
         "//runtime/src/iree/io/formats/irpa",
@@ -104,9 +103,9 @@ iree_runtime_cc_binary(
     srcs = ["iree-create-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
         "//runtime/src/iree/io:stream",
@@ -119,8 +118,8 @@ iree_runtime_cc_binary(
     srcs = ["iree-dump-instruments-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/schemas/instruments",
         "//runtime/src/iree/schemas/instruments:dispatch_def_c_fbs",
     ],
@@ -131,10 +130,10 @@ iree_runtime_cc_binary(
     srcs = ["iree-dump-module-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal/flatcc:debugging",
         "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "//runtime/src/iree/vm/bytecode:module",
     ],
@@ -145,8 +144,8 @@ iree_runtime_cc_binary(
     srcs = ["iree-dump-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
         "//runtime/src/iree/tooling:parameter_util",
@@ -158,9 +157,9 @@ iree_runtime_cc_binary(
     srcs = ["iree-fatelf.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal/local/elf:elf_module",
+        "//runtime/src/iree/io:file_handle",
     ],
 )
 

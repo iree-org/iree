@@ -11,12 +11,9 @@
 // programs using the hardware abstraction layer (HAL). This simple sample just
 // uses base VM types.
 #include "iree/base/api.h"
+#include "iree/io/file_contents.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
-
-// HACK: this pokes in to private APIs for IO helpers while we expect
-// applications to bring their own IO.
-#include "iree/base/internal/file_io.h"
 
 // Custom native module used in the sample.
 // Modules may be linked in from native code or other bytecode modules loaded at
@@ -60,12 +57,13 @@ int main(int argc, char** argv) {
   // to avoid the bytecode entirely and have a fully static build (see
   // samples/emitc_modules/ for some examples).
   const char* module_path = argv[1];
-  iree_file_contents_t* module_contents = NULL;
+  iree_io_file_contents_t* module_contents = NULL;
   if (strcmp(module_path, "-") == 0) {
-    IREE_CHECK_OK(iree_stdin_read_contents(allocator, &module_contents));
+    IREE_CHECK_OK(
+        iree_io_file_contents_read_stdin(allocator, &module_contents));
   } else {
-    IREE_CHECK_OK(iree_file_read_contents(
-        module_path, IREE_FILE_READ_FLAG_DEFAULT, allocator, &module_contents));
+    IREE_CHECK_OK(iree_io_file_contents_read(
+        iree_make_cstring_view(module_path), allocator, &module_contents));
   }
 
   // Load the bytecode module from the vmfb.
@@ -74,7 +72,7 @@ int main(int argc, char** argv) {
   iree_vm_module_t* bytecode_module = NULL;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       instance, module_contents->const_buffer,
-      iree_file_contents_deallocator(module_contents), allocator,
+      iree_io_file_contents_deallocator(module_contents), allocator,
       &bytecode_module));
 
   // Create the context for this invocation reusing the loaded modules.

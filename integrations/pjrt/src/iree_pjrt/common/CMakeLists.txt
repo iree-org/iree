@@ -93,7 +93,6 @@ iree_cc_library(
     DEPS
       ::common
       ::debugging
-      iree::base::internal::file_io
       iree::base::internal::path
     PUBLIC
 )

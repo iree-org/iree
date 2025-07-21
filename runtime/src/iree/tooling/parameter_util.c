@@ -6,8 +6,8 @@
 
 #include "iree/tooling/parameter_util.h"
 
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
+#include "iree/io/file_handle.h"
 #include "iree/io/formats/parser_registry.h"
 #include "iree/io/parameter_index.h"
 #include "iree/io/parameter_index_provider.h"
@@ -18,56 +18,11 @@
 // Parameter file I/O
 //===----------------------------------------------------------------------===//
 
-#if IREE_FILE_IO_ENABLE
-#define FLAG_PARAMETER_MODE_DEFAULT "file"
-#else
-#define FLAG_PARAMETER_MODE_DEFAULT "mmap"
-#endif  // IREE_FILE_IO_ENABLE
-
 IREE_FLAG(
-    string, parameter_mode, FLAG_PARAMETER_MODE_DEFAULT,
-    "A parameter I/O mode of ['preload', 'mmap', 'file'].\n"
+    string, parameter_mode, "file",
+    "A parameter I/O mode of ['preload', 'file'].\n"
     "  preload: read entire parameter files into wired memory on startup.\n"
-    "  mmap: maps the parameter files into discardable memory - can increase\n"
-    "        warm-up time and variance as mapped pages are swapped\n"
-    "        by the OS.\n"
     "  file: uses platform file APIs to read/write the file as needed.");
-
-static void iree_file_contents_release_callback(
-    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
-  iree_file_contents_t* file_contents = (iree_file_contents_t*)user_data;
-  iree_file_contents_free(file_contents);
-}
-
-// Legacy parameter file open path. We should be able to replace this usage with
-// iree_io_file_handle_t-based logic.
-static iree_status_t iree_io_open_parameter_file_legacy(
-    iree_string_view_t path, iree_file_read_flags_t read_flags,
-    iree_allocator_t host_allocator, iree_io_file_handle_t** out_file_handle) {
-  IREE_ASSERT_ARGUMENT(out_file_handle);
-  *out_file_handle = NULL;
-
-  char path_str[2048] = {0};
-  iree_string_view_to_cstring(path, path_str, sizeof(path_str));
-
-  // Read (or map) the entire file into host memory.
-  iree_file_contents_t* file_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_read_contents(path_str, read_flags,
-                                               host_allocator, &file_contents));
-
-  // Wrap the loaded memory file in a file handle.
-  const iree_io_file_handle_release_callback_t release_callback = {
-      .fn = iree_file_contents_release_callback,
-      .user_data = file_contents,
-  };
-  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-      IREE_IO_FILE_ACCESS_READ, file_contents->buffer, release_callback,
-      host_allocator, out_file_handle);
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(file_contents);
-  }
-  return status;
-}
 
 // Opens the parameter file at |path| with the mode specified by the
 // --parameter_mode flag and returns its handle.
@@ -81,12 +36,9 @@ static iree_status_t iree_io_open_parameter_file(
 
   iree_status_t status = iree_ok_status();
   iree_io_file_handle_t* file_handle = NULL;
-  if (strcmp(FLAG_parameter_mode, "mmap") == 0) {
-    status = iree_io_open_parameter_file_legacy(path, IREE_FILE_READ_FLAG_MMAP,
-                                                host_allocator, &file_handle);
-  } else if (strcmp(FLAG_parameter_mode, "preload") == 0) {
-    status = iree_io_open_parameter_file_legacy(
-        path, IREE_FILE_READ_FLAG_PRELOAD, host_allocator, &file_handle);
+  if (strcmp(FLAG_parameter_mode, "preload") == 0) {
+    status = iree_io_file_handle_preload(IREE_IO_FILE_MODE_READ, path,
+                                         host_allocator, &file_handle);
   } else if (strcmp(FLAG_parameter_mode, "file") == 0) {
     status = iree_io_file_handle_open(IREE_IO_FILE_MODE_READ, path,
                                       host_allocator, &file_handle);

@@ -6,11 +6,14 @@
 
 #include "iree_pjrt/common/dylib_platform.h"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <array>
 #include <optional>
 #include <string>
 
-#include "iree/base/internal/file_io.h"
+#include "iree/base/api.h"
 #include "iree/base/internal/path.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/loader.h"
@@ -164,6 +167,25 @@ std::optional<std::string> DylibPlatform::GetHomeDir() {
     return *found;
   }
   return {};
+}
+
+// Checks if a file exists at the provided |path|.
+//
+// Returns an OK status if the file definitely exists. An OK status does not
+// indicate that attempts to read or write the file will succeed.
+// Returns IREE_STATUS_NOT_FOUND if the file does not exist.
+static iree_status_t iree_file_exists(const char* path) {
+  IREE_ASSERT_ARGUMENT(path);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  struct stat stat_buf;
+  iree_status_t status =
+      stat(path, &stat_buf) == 0
+          ? iree_ok_status()
+          : iree_make_status(IREE_STATUS_NOT_FOUND, "'%s'", path);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 std::optional<std::string> DylibPlatform::GetBinaryDir() {

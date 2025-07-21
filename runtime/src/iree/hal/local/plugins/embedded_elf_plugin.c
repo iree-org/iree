@@ -7,10 +7,7 @@
 #include "iree/hal/local/plugins/embedded_elf_plugin.h"
 
 #include "iree/hal/local/elf/elf_module.h"
-
-#if IREE_FILE_IO_ENABLE
-#include "iree/base/internal/file_io.h"
-#endif  // IREE_FILE_IO_ENABLE
+#include "iree/io/file_contents.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_memory_embedded_elf_executable_plugin_t
@@ -102,7 +99,7 @@ static const iree_hal_executable_plugin_vtable_t
 typedef struct iree_hal_file_embedded_elf_executable_plugin_t {
   iree_hal_executable_plugin_t base;
   iree_allocator_t host_allocator;
-  iree_file_contents_t* file_contents;
+  iree_io_file_contents_t* file_contents;
   iree_elf_module_t module;
 } iree_hal_file_embedded_elf_executable_plugin_t;
 
@@ -110,25 +107,23 @@ static const iree_hal_executable_plugin_vtable_t
     iree_hal_file_embedded_elf_executable_plugin_vtable;
 
 iree_status_t iree_hal_embedded_elf_executable_plugin_load_from_file(
-    const char* path, iree_host_size_t param_count,
+    iree_string_view_t path, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_executable_plugin_t** out_plugin) {
-  IREE_ASSERT_ARGUMENT(path);
   IREE_ASSERT_ARGUMENT(out_plugin);
   *out_plugin = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Try to load the file first, which is the most likely thing to fail.
-  iree_file_contents_t* file_contents = NULL;
+  iree_io_file_contents_t* file_contents = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_file_read_contents(path, IREE_FILE_READ_FLAG_DEFAULT,
-                                  host_allocator, &file_contents));
+      z0, iree_io_file_contents_read(path, host_allocator, &file_contents));
 
   iree_hal_file_embedded_elf_executable_plugin_t* plugin = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*plugin), (void**)&plugin);
   if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(file_contents);
+    iree_io_file_contents_free(file_contents);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -169,8 +164,8 @@ iree_status_t iree_hal_embedded_elf_executable_plugin_load_from_file(
     *out_plugin = (iree_hal_executable_plugin_t*)plugin;
   } else {
     iree_hal_executable_plugin_release((iree_hal_executable_plugin_t*)plugin);
-    status =
-        iree_status_annotate_f(status, "loading plugin from file '%s'", path);
+    status = iree_status_annotate_f(status, "loading plugin from file '%.*s'",
+                                    (int)path.size, path.data);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -183,7 +178,7 @@ static void iree_hal_file_embedded_elf_executable_plugin_destroy(
   iree_allocator_t host_allocator = plugin->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_elf_module_deinitialize(&plugin->module);
-  iree_file_contents_free(plugin->file_contents);
+  iree_io_file_contents_free(plugin->file_contents);
   iree_allocator_free(host_allocator, plugin);
   IREE_TRACE_ZONE_END(z0);
 }

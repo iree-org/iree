@@ -7,8 +7,12 @@
 #include "iree/io/file_handle.h"
 
 #include "iree/base/internal/atomics.h"
+#include "iree/io/file_contents.h"
 
 #if IREE_FILE_IO_ENABLE
+
+#include "iree/io/stdio_util.h"
+
 #if defined(IREE_PLATFORM_WINDOWS)
 
 #include <fcntl.h>   // _open_osfhandle constants
@@ -23,6 +27,7 @@
 #include <unistd.h>    // fsync
 
 #endif  // IREE_PLATFORM_WINDOWS
+
 #endif  // IREE_FILE_IO_ENABLE
 
 //===----------------------------------------------------------------------===//
@@ -170,8 +175,7 @@ iree_io_file_handle_flush(iree_io_file_handle_t* handle) {
 #if defined(IREE_PLATFORM_WINDOWS)
 
 static iree_status_t iree_io_file_handle_platform_open(
-    iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
-    uint64_t initial_size,
+    iree_io_file_mode_t mode, iree_string_view_t path, uint64_t initial_size,
     iree_io_file_handle_primitive_t* out_handle_primitive) {
   IREE_ASSERT_ARGUMENT(out_handle_primitive);
   memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
@@ -202,7 +206,9 @@ static iree_status_t iree_io_file_handle_platform_open(
     share_mode |= FILE_SHARE_WRITE;
   }
 
-  DWORD creation_disposition = open_existing ? OPEN_EXISTING : CREATE_ALWAYS;
+  DWORD creation_disposition =
+      iree_all_bits_set(mode, IREE_IO_FILE_MODE_OVERWRITE) ? CREATE_ALWAYS
+                                                           : OPEN_EXISTING;
 
   DWORD flags = FILE_ATTRIBUTE_NORMAL;
   if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_RANDOM_ACCESS)) {
@@ -225,7 +231,7 @@ static iree_status_t iree_io_file_handle_platform_open(
 
   // If we were provided an initialize size and are creating the file then
   // adjust the file length.
-  if (!open_existing) {
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_OVERWRITE)) {
     // Zeroish-extend the file up to the total file size specified by the
     // caller. This may be larger than the virtual address space can handle but
     // so long as the length requested for mapping is under the size_t limit
@@ -291,8 +297,7 @@ static void iree_io_file_handle_platform_close(
 #else
 
 static iree_status_t iree_io_file_handle_platform_open(
-    iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
-    uint64_t initial_size,
+    iree_io_file_mode_t mode, iree_string_view_t path, uint64_t initial_size,
     iree_io_file_handle_primitive_t* out_handle_primitive) {
   IREE_ASSERT_ARGUMENT(out_handle_primitive);
   memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
@@ -310,7 +315,7 @@ static iree_status_t iree_io_file_handle_platform_open(
   int flags = 0;
   // TODO(benvanik): add a flag for forking behavior.
   flags |= O_CLOEXEC;
-  if (!open_existing) {
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_OVERWRITE)) {
     // If the file exists open anyway and truncate as if it had been recreated.
     // This matches Win32 CREATE_ALWAYS behavior.
     flags |= O_CREAT | O_TRUNC;
@@ -347,7 +352,7 @@ static iree_status_t iree_io_file_handle_platform_open(
 
   // If we were provided an initialize size and are creating the file then
   // adjust the file length.
-  if (!open_existing) {
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_OVERWRITE)) {
     // Zero-extend the file up to the total file size specified by the
     // caller. Note that `ftruncate` extends too.
     if (ftruncate(fd, (off_t)initial_size) == -1) {
@@ -390,9 +395,8 @@ static void iree_io_file_handle_platform_close(
 #endif  // IREE_PLATFORM_WINDOWS
 
 static iree_status_t iree_io_file_handle_create_or_open(
-    iree_io_file_mode_t mode, iree_string_view_t path, bool open_existing,
-    uint64_t initial_size, iree_allocator_t host_allocator,
-    iree_io_file_handle_t** out_handle) {
+    iree_io_file_mode_t mode, iree_string_view_t path, uint64_t initial_size,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
   if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_RANDOM_ACCESS |
                                   IREE_IO_FILE_MODE_SEQUENTIAL_SCAN)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -401,7 +405,7 @@ static iree_status_t iree_io_file_handle_create_or_open(
 
   iree_io_file_handle_primitive_t handle_primitive = {0};
   IREE_RETURN_IF_ERROR(iree_io_file_handle_platform_open(
-      mode, path, open_existing, initial_size, &handle_primitive));
+      mode, path, initial_size, &handle_primitive));
 
   iree_io_file_access_t allowed_access = 0;
   if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_READ)) {
@@ -435,7 +439,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
   iree_status_t status = iree_io_file_handle_create_or_open(
-      mode, path, /*open_existing=*/false, initial_size, host_allocator,
+      mode | IREE_IO_FILE_MODE_OVERWRITE, path, initial_size, host_allocator,
       out_handle);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -449,7 +453,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
   iree_status_t status = iree_io_file_handle_create_or_open(
-      mode, path, /*open_existing=*/true, 0ull, host_allocator, out_handle);
+      mode, path, 0ull, host_allocator, out_handle);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -495,6 +499,46 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
   return status;
 }
 
+// Frees the file contents using the original buffer allocator.
+static void iree_io_file_contents_release_callback(
+    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
+  iree_io_file_contents_t* contents = (iree_io_file_contents_t*)user_data;
+  iree_io_file_contents_free(contents);
+}
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_preload(
+    iree_io_file_mode_t mode, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Read the entire file contents into memory.
+  iree_io_file_contents_t* contents = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_io_file_contents_read(path, host_allocator, &contents));
+
+  // Wrap the contents in a file handle.
+  // When the file handle is destroyed the release callback will free the
+  // loaded file contents.
+  iree_io_file_handle_t* handle = NULL;
+  const iree_io_file_handle_release_callback_t release_callback = {
+      .fn = iree_io_file_contents_release_callback,
+      .user_data = contents,
+  };
+  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
+      mode, contents->buffer, release_callback, host_allocator, &handle);
+
+  if (iree_status_is_ok(status)) {
+    *out_handle = handle;
+  } else {
+    iree_io_file_contents_free(contents);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 #else
 
 IREE_API_EXPORT iree_status_t iree_io_file_handle_create(
@@ -520,6 +564,16 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
 IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
     iree_io_file_mode_t mode, int fd, iree_allocator_t host_allocator,
     iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file support has been compiled out of this binary; "
+                          "set IREE_FILE_IO_ENABLE=1 to include it");
+}
+
+IREE_API_EXPORT iree_status_t iree_io_file_handle_preload(
+    iree_io_file_mode_t mode, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
   IREE_ASSERT_ARGUMENT(out_handle);
   *out_handle = NULL;
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -583,8 +637,9 @@ static iree_status_t iree_io_file_mapping_from_host_allocation(
   return iree_ok_status();
 }
 
-#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_IOS) || \
-    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
+#if IREE_FILE_IO_ENABLE &&                                           \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_IOS) || \
+     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS))
 
 static iree_status_t iree_io_file_handle_to_fd(
     iree_io_file_handle_primitive_t primitive, int* out_fd) {
@@ -686,7 +741,7 @@ static void iree_io_platform_unmap_file_view(iree_io_file_mapping_flags_t flags,
   }
 }
 
-#elif defined(IREE_PLATFORM_WINDOWS)
+#elif IREE_FILE_IO_ENABLE && defined(IREE_PLATFORM_WINDOWS)
 
 static iree_status_t iree_io_file_handle_to_win32_handle(
     iree_io_file_handle_primitive_t primitive, HANDLE* out_handle) {
@@ -852,7 +907,7 @@ static void iree_io_platform_unmap_file_view(iree_io_file_mapping_flags_t flags,
                                              void* impl,
                                              iree_byte_span_t contents) {}
 
-#endif  // IREE_PLATFORM_*
+#endif  // IREE_FILE_IO_ENABLE && IREE_PLATFORM_*
 
 //===----------------------------------------------------------------------===//
 // iree_io_file_mapping_t
