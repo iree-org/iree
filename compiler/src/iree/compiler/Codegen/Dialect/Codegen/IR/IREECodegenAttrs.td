@@ -466,4 +466,30 @@ def IREECodegen_RotateRowsAttr  :
   let genVerifyDecl = 1;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.subgroup_load_swizzle
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_SubgroupLoadSwizzleAttr  :
+    AttrDef<IREECodegen_Dialect, "SubgroupLoadSwizzle", [
+    DeclareAttrInterfaceMethods<IREECodegen_SwizzleAttrInterface, [
+        "swizzleOffset",
+        "getAccessElementCount"
+      ]>
+    ]> {
+  let mnemonic = "rotate_rows";
+  let summary = [{An attribute that describes a swizzling pattern for rotating rows.}];
+  let description = [{
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$row_width,
+    AttrParameter<"int64_t", "">:$access_width,
+    AttrParameter<"SmallVector<int64_t>", "">:$subgroup_size
+  );
+  let assemblyFormat = [{
+    `<` $row_width `,` $access_width `, $subgroup_size `>`
+  }];
+  let genVerifyDecl = 1;
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
