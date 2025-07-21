@@ -485,29 +485,7 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         AffineMap map = applyOp.getAffineMap();
         if (map.getNumInputs() != 1 || map.getNumResults() != 1) {
           return rewriter.notifyMatchFailure(
-              sliceOp, "affine.apply map is not of form (d0 * K)");
-        }
-
-        AffineExpr expr = map.getResult(0);
-        int64_t multiplier;
-        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-          multiplier = 1;
-        } else if (auto binOp = dyn_cast<AffineBinaryOpExpr>(expr)) {
-          if (!binOp || binOp.getKind() != AffineExprKind::Mul) {
-            return rewriter.notifyMatchFailure(
-                sliceOp, "affine.apply is not a multiplication");
-          }
-          auto constExpr = isa<AffineConstantExpr>(binOp.getLHS())
-                               ? dyn_cast<AffineConstantExpr>(binOp.getLHS())
-                               : dyn_cast<AffineConstantExpr>(binOp.getRHS());
-          if (!constExpr) {
-            return rewriter.notifyMatchFailure(
-                sliceOp, "affine.apply must multiply by a constant");
-          }
-          multiplier = constExpr.getValue();
-        } else {
-          return rewriter.notifyMatchFailure(sliceOp,
-                                             "unable to get the multiplier");
+              sliceOp, "affine.apply must have one input and one result");
         }
 
         auto maybeStaticSize = getConstantIntValue(collapsedSize);
@@ -515,10 +493,12 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
           return rewriter.notifyMatchFailure(sliceOp,
                                              "collapsed size must be static");
         }
-        if (maybeStaticSize.value() % multiplier != 0) {
+
+        if (!map.getResult(0).isMultipleOf(maybeStaticSize.value())) {
           return rewriter.notifyMatchFailure(
               sliceOp, "collapsed size is not divisible by offset multiplier");
         }
+
         unsigned lastReassocSize = srcShape[reassocIndices.back()];
         if (lastReassocSize % maybeStaticSize.value() != 0) {
           return rewriter.notifyMatchFailure(
@@ -536,10 +516,8 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         ValueRange offsets = delinearizeOp.getResults();
         expandedOffsets.append(offsets.begin(), offsets.end());
 
-        for (auto i = 0; i < reassocIndices.size() - 1; i++) {
-          expandedSizes.push_back(rewriter.getIndexAttr(1));
-        }
-        expandedSizes.push_back(collapsedSize);
+        expandedSizes.append(reassocIndices.size(), rewriter.getIndexAttr(1));
+        expandedSizes.back() = collapsedSize;
         continue;
       }
 
