@@ -5,9 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -251,26 +254,29 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   LDBG("tilingLevel: " << tilingLevel);
 
   // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
-  // fallback to find a lowering_config from other operations.
-  SmallVector<int64_t> tileSizes;
-  SmallVector<bool> tileScalableFlags;
-  if (auto loweringConfig =
-          getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(consumerOp)) {
-    tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
-    tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
-  } else {
-    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-        getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
-            getComputeOps(funcOp));
-    if (failed(maybeLoweringConfig)) {
-      LDBG("can't find lowering_config, skip TileAndFuse");
+  // fallback to find a lowering_config from the root operation.
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+      getLoweringConfig(consumerOp);
+  if (!loweringConfig) {
+    FailureOr<Operation *> rootOp = getRootOperation(getComputeOps(funcOp));
+    if (failed(rootOp)) {
+      LDBG("failed to find rootOp, skip TileAndFuse");
       return;
     }
-    tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
-    tileScalableFlags =
-        maybeLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
+    loweringConfig = getLoweringConfig(rootOp.value());
+  }
+  if (!loweringConfig) {
+    LDBG("can't find lowering_config, skip TileAndFuse");
+    return;
   }
 
+  SmallVector<int64_t> tileSizes;
+  SmallVector<bool> tileScalableFlags;
+  auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+      loweringConfig.getTilingLevelAttr(tilingLevel));
+  tileSizes.assign(attr.getSizes().begin(), attr.getSizes().end());
+  tileScalableFlags.assign(attr.getScalableFlags().begin(),
+                           attr.getScalableFlags().end());
   if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LDBG("----- skip, all zeros -----");
     return;
