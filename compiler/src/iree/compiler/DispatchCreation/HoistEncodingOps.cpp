@@ -199,6 +199,64 @@ struct BubbleUpSetEncodingOp
   }
 };
 
+/// Pattern to sink UnsetEncoding ops down through consumers.
+struct SinkUnsetEncodingOp
+    : public OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
+  using OpRewritePattern<IREE::Encoding::UnsetEncodingOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,
+                                PatternRewriter &rewriter) const override {
+    if (!encodingOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(encodingOp, "has multiple uses");
+    }
+    OpOperand *consumerOperand = &(*encodingOp->getUses().begin());
+    Operation *consumer = consumerOperand->getOwner();
+    if (IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
+        IREE::Flow::isNonNullAndOutsideDispatch(consumer)) {
+      return rewriter.notifyMatchFailure(
+          encodingOp, "expected that both operations are inside dispatch");
+    }
+
+    auto propagationAttrInterface =
+        dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
+            encodingOp.getSourceType().getEncoding());
+    if (!propagationAttrInterface ||
+        !propagationAttrInterface.isPropagableDown(consumerOperand)) {
+      return rewriter.notifyMatchFailure(
+          encodingOp,
+          "the propagation attribute interface isn't defined or the "
+          "target isn't propagable");
+    }
+    // Get the encoding attributes for the operands and results of the
+    // operation.
+    FailureOr<IREE::Encoding::PropagationEncoding> propagationEncodings =
+        propagationAttrInterface.generateSinkingEncodings(consumerOperand);
+    if (failed(propagationEncodings)) {
+      return rewriter.notifyMatchFailure(encodingOp,
+                                         "not able to determine propagation "
+                                         "attributes for operands and results");
+    }
+    auto propagationResult =
+        dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(consumer);
+    if (!propagationResult) {
+      return rewriter.notifyMatchFailure(
+          encodingOp, "encoding propagation op interface isn't defined");
+    }
+    // Propagate the set encoding and generate the new encoding operations.
+    rewriter.setInsertionPointAfter(encodingOp);
+    FailureOr<IREE::Encoding::PropagationResult> maybeResult =
+        propagationResult.propagateEncoding(
+            rewriter, *propagationEncodings,
+            cast<OpResult>(encodingOp.getResult()));
+    if (failed(maybeResult)) {
+      return rewriter.notifyMatchFailure(
+          encodingOp, "not able to propagate encodings and find replacement");
+    }
+    rewriter.replaceOp(consumer, maybeResult->replacements);
+    return success();
+  }
+};
+
 } // namespace
 
 /// Create dispatch.region Ops based on a fusion heuristic.
@@ -208,6 +266,7 @@ void HoistEncodingOpsPass::runOnOperation() {
 
   RewritePatternSet bubblingPatterns(ctx);
   bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
+  bubblingPatterns.insert<SinkUnsetEncodingOp>(ctx);
   GreedyRewriteConfig config;
   config.enableConstantCSE(false);
   if (failed(applyPatternsGreedily(moduleOp, std::move(bubblingPatterns),
