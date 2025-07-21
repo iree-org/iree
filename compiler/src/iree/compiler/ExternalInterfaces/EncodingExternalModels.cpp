@@ -18,9 +18,9 @@ namespace {
 struct ContractionAttrPropagationInterface
     : public IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
           ContractionAttrPropagationInterface, IREE::Encoding::MatmulKAttr> {
-  bool isPropagable(Attribute attr, Value target) const {
+  bool isPropagableUp(Attribute attr, OpResult target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
-    Operation *attachedToOperation = target.getDefiningOp();
+    Operation *attachedToOperation = target.getOwner();
     if (!attachedToOperation) {
       return false;
     }
@@ -42,11 +42,11 @@ struct ContractionAttrPropagationInterface
   }
 
   FailureOr<IREE::Encoding::PropagationEncoding>
-  generateEncodings(Attribute attr, Value target) const {
+  generateBubblingEncodings(Attribute attr, OpResult target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
     return TypeSwitch<Operation *,
                       FailureOr<IREE::Encoding::PropagationEncoding>>(
-               target.getDefiningOp())
+               target.getOwner())
         .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
           ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
           SmallVector<ReassociationIndices, 4> reassociationMaps =
@@ -98,7 +98,7 @@ struct ContractionOpPropagationInterface
               loc, resultEncodingType, newEncodingOp,
               collapseOp.getReassociationIndices());
           IREE::Encoding::PropagationResult result;
-          result.replacement = newCollapseOp;
+          result.replacements = {newCollapseOp};
           result.generatedEncodingOps.push_back(newEncodingOp.getDefiningOp());
           return result;
         })

@@ -26,6 +26,8 @@ iree_cc_library(
     "channel.h"
     "command_buffer.c"
     "command_buffer.h"
+    "device_queue.c"
+    "device_queue.h"
     "driver.c"
     "driver.h"
     "event.c"
@@ -34,6 +36,8 @@ iree_cc_library(
     "executable.h"
     "executable_cache.c"
     "executable_cache.h"
+    "host_queue.c"
+    "host_queue.h"
     "host_service.c"
     "host_service.h"
     "logical_device.c"
@@ -46,11 +50,15 @@ iree_cc_library(
     "semaphore_pool.h"
     "system.c"
     "system.h"
+    "virtual_queue.c"
+    "virtual_queue.h"
   DEPS
     iree::base
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
+    iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::hal
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
@@ -75,10 +83,12 @@ iree_cc_library(
     "buffer_pool.h"
     "channel.h"
     "command_buffer.h"
+    "device_queue.h"
     "driver.h"
     "event.h"
     "executable.h"
     "executable_cache.h"
+    "host_queue.h"
     "host_service.h"
     "logical_device.h"
     "physical_device.h"
@@ -116,6 +126,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -127,6 +139,8 @@ iree_cc_test(
     ::amdgpu
     ::headers
     iree::base
+    iree::hal
+    iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
@@ -135,6 +149,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -155,6 +171,29 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    system_test
+  SRCS
+    "system_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::topology
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

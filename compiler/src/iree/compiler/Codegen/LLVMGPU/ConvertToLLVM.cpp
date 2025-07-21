@@ -401,7 +401,7 @@ struct ConvertIREEBindingSubspanOp final
     auto [strides, offset] = memrefType.getStridesAndOffset();
     if (memrefType.hasStaticShape() &&
         !llvm::any_of(strides, ShapedType::isDynamic) &&
-        !ShapedType::isDynamic(offset)) {
+        ShapedType::isStatic(offset)) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
       rewriter.replaceOp(op, {desc});

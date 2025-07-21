@@ -50,8 +50,12 @@ def ElementwiseOpFusionPass :
     Pass<"iree-dispatch-creation-elementwise-op-fusion", ""> {
   let summary = "Fuse elementwise operations.";
   let options = [
+    Option<"intraDispatch", "intra-dispatch", "bool",
+           /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
-           /*default=*/"true", "Fuse ops that have multiple reduction iterators">
+           /*default=*/"true", "Fuse ops that have multiple reduction iterators">,
+    Option<"fuseTruncateOps", "fuse-truncate-ops", "bool",
+           /*default=*/"false", "Fuse producer truncate-like operations with consumers">,
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
@@ -275,8 +279,8 @@ def FormSplitReductionDispatchesPass :
     InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
   let summary = "Partially tile reduction operations and place into dispatches";
   let options = [
-    Option<"splitSize", "split-size", "int",
-           /*default=*/"0", "Tile size for split reduction">
+    ListOption<"splitSize", "split-size", "int",
+        "Tile sizes for split reduction (innermost first)">
   ];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",

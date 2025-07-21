@@ -75,7 +75,7 @@ static LogicalResult padAlloc(MLIRContext *context, AllocLikeOp allocOp,
   size_t dynamicDimIdx = 0;
 
   for (int64_t &dimSize : shape) {
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       sizes.push_back(rewriter.getIndexAttr(dimSize));
       continue;
     }

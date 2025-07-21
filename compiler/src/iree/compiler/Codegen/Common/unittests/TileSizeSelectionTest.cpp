@@ -89,8 +89,10 @@ TEST_F(TileSizeSelection, NumTilingLevels) {
   initLoweringConfig(kMaxNumTilingLevels);
 
   // 2. Create TilingConfig and check if the number of tiling levels match.
-  TilingConfig tilingConfig(loweringConfig);
-  EXPECT_EQ(tilingConfig.getNumTilingLevels(), kMaxNumTilingLevels);
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(loweringConfig);
+  EXPECT_THAT(tilingConfig, ::testing::NotNull());
+  EXPECT_EQ(tilingConfig->getNumTilingLevels(), kMaxNumTilingLevels);
 }
 
 TEST_F(CPUTileSizeSelection, WithAllFields) {
@@ -120,29 +122,37 @@ TEST_F(CPUTileSizeSelection, WithAllFields) {
       /*sizes=*/{0, 0, 0},
       /*scalableFlags=*/{false, false, false}});
   initLoweringConfig(configs);
-  TilingConfig tilingConfig(loweringConfig);
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(loweringConfig);
+  EXPECT_THAT(tilingConfig, ::testing::NotNull());
 
   // There are no re-mapping between the TilingConfig and the original config.
-  EXPECT_EQ(tilingConfig.getNumTilingLevels(), configs.size());
-  EXPECT_EQ(tilingConfig.getDistributionLevel(),
+  EXPECT_EQ(tilingConfig->getNumTilingLevels(), configs.size());
+  EXPECT_EQ(tilingConfig->getDistributionLevel(),
             IREE::CPU::TilingLevel::DistributionTiles);
-  EXPECT_EQ(tilingConfig.getCacheParallelLevel(),
+  EXPECT_EQ(tilingConfig->getCacheParallelLevel(),
             IREE::CPU::CacheParallelTiles);
-  EXPECT_EQ(tilingConfig.getCacheReductionLevel(),
+  EXPECT_EQ(tilingConfig->getCacheReductionLevel(),
             IREE::CPU::CacheReductionTiles);
-  EXPECT_EQ(tilingConfig.getVectorCommonParallelLevel(),
+  EXPECT_EQ(tilingConfig->getVectorCommonParallelLevel(),
             IREE::CPU::VectorCommonParallelTiles);
-  EXPECT_EQ(tilingConfig.getVectorReductionLevel(),
+  EXPECT_EQ(tilingConfig->getVectorReductionLevel(),
             IREE::CPU::VectorReductionTiles);
-  EXPECT_EQ(tilingConfig.getVectorInnerParallelLevel(),
+  EXPECT_EQ(tilingConfig->getVectorInnerParallelLevel(),
             IREE::CPU::VectorInnerParallelTiles);
+  SmallVector<int64_t> expectedVectorTileSizes = {4, 8, 16};
+  SmallVector<bool> expectedVectorScalableFlags = {true, false, true};
+  auto [vectorTileSizes, vectorScalableFlags] =
+      tilingConfig->getVectorTileSizes();
+  EXPECT_EQ(vectorTileSizes, expectedVectorTileSizes);
+  EXPECT_EQ(vectorScalableFlags, expectedVectorScalableFlags);
 
   TileSizesListType allTileSizes =
       llvm::map_to_vector(configs, [](auto info) { return info.sizes; });
-  EXPECT_EQ(tilingConfig.getTileSizes(), allTileSizes);
+  EXPECT_EQ(tilingConfig->getTileSizes(), allTileSizes);
   ScalableTileFlagsListType allScalableFlags = llvm::map_to_vector(
       configs, [](auto info) { return info.scalableFlags; });
-  EXPECT_EQ(tilingConfig.getScalableTileFlags(), allScalableFlags);
+  EXPECT_EQ(tilingConfig->getScalableTileFlags(), allScalableFlags);
 }
 
 TEST_F(CPUTileSizeSelection, WithDistributionAndVectorTiling) {
@@ -160,23 +170,31 @@ TEST_F(CPUTileSizeSelection, WithDistributionAndVectorTiling) {
       /*sizes=*/{0, 0, 16},
       /*scalableFlags=*/{false, false, true}});
   initLoweringConfig(configs);
-  TilingConfig tilingConfig(loweringConfig);
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(loweringConfig);
+  EXPECT_THAT(tilingConfig, ::testing::NotNull());
 
   // There are no re-mapping between the TilingConfig and the original config.
-  EXPECT_EQ(tilingConfig.getNumTilingLevels(), configs.size());
-  EXPECT_EQ(tilingConfig.getDistributionLevel(),
+  EXPECT_EQ(tilingConfig->getNumTilingLevels(), configs.size());
+  EXPECT_EQ(tilingConfig->getDistributionLevel(),
             IREE::CPU::TilingLevel::DistributionTiles);
-  EXPECT_EQ(tilingConfig.getVectorCommonParallelLevel(),
+  EXPECT_EQ(tilingConfig->getVectorCommonParallelLevel(),
             IREE::CPU::VectorCommonParallelTiles);
-  EXPECT_EQ(tilingConfig.getVectorReductionLevel(),
+  EXPECT_EQ(tilingConfig->getVectorReductionLevel(),
             IREE::CPU::VectorReductionTiles);
+  SmallVector<int64_t> expectedVectorTileSizes = {4, 8, 16};
+  SmallVector<bool> expectedVectorScalableFlags = {true, false, true};
+  auto [vectorTileSizes, vectorScalableFlags] =
+      tilingConfig->getVectorTileSizes();
+  EXPECT_EQ(vectorTileSizes, expectedVectorTileSizes);
+  EXPECT_EQ(vectorScalableFlags, expectedVectorScalableFlags);
 
   TileSizesListType allTileSizes =
       llvm::map_to_vector(configs, [](auto info) { return info.sizes; });
-  EXPECT_EQ(tilingConfig.getTileSizes(), allTileSizes);
+  EXPECT_EQ(tilingConfig->getTileSizes(), allTileSizes);
   ScalableTileFlagsListType allScalableFlags = llvm::map_to_vector(
       configs, [](auto info) { return info.scalableFlags; });
-  EXPECT_EQ(tilingConfig.getScalableTileFlags(), allScalableFlags);
+  EXPECT_EQ(tilingConfig->getScalableTileFlags(), allScalableFlags);
 }
 
 TEST_F(TileSizeSelection, getLevel_4_levels) {
@@ -184,11 +202,13 @@ TEST_F(TileSizeSelection, getLevel_4_levels) {
   initLoweringConfig(/*numTilingLevels=*/4);
 
   // 2. Create TilingConfig and verify the actual tiling level numbers.
-  TilingConfig tilingConfig(loweringConfig);
-  EXPECT_EQ(tilingConfig.getVectorInnerParallelLevel(), 3);
-  EXPECT_EQ(tilingConfig.getVectorReductionLevel(), 2);
-  EXPECT_EQ(tilingConfig.getVectorCommonParallelLevel(), 1);
-  EXPECT_EQ(tilingConfig.getDistributionLevel(), 0);
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(loweringConfig);
+  EXPECT_THAT(tilingConfig, ::testing::NotNull());
+  EXPECT_EQ(tilingConfig->getVectorInnerParallelLevel(), 3);
+  EXPECT_EQ(tilingConfig->getVectorReductionLevel(), 2);
+  EXPECT_EQ(tilingConfig->getVectorCommonParallelLevel(), 1);
+  EXPECT_EQ(tilingConfig->getDistributionLevel(), 0);
 }
 
 TEST_F(TileSizeSelection, getLevel_1_level) {
@@ -196,8 +216,10 @@ TEST_F(TileSizeSelection, getLevel_1_level) {
   initLoweringConfig(/*numTilingLevels=*/1);
 
   // 2. Create TilingConfig and verify the actual tiling level numbers.
-  TilingConfig tilingConfig(loweringConfig);
-  EXPECT_EQ(tilingConfig.getDistributionLevel(), 0);
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(loweringConfig);
+  EXPECT_THAT(tilingConfig, ::testing::NotNull());
+  EXPECT_EQ(tilingConfig->getDistributionLevel(), 0);
 }
 
 #if defined(GTEST_HAS_DEATH_TEST) && !defined(NDEBUG)
@@ -210,9 +232,11 @@ TEST_F(TileSizeSelectionDeathTest, getLevel_out_of_bounds) {
 
   // 2. Create TilingConfig and verify that the "vector-inner-parallel" tiling
   // level does not exist (it's out of bounds).
-  TilingConfig tilingConfig(loweringConfig);
+  std::unique_ptr<TilingConfig> tilingConfig =
+      TilingConfig::create(loweringConfig);
+  EXPECT_THAT(tilingConfig, ::testing::NotNull());
   ASSERT_DEATH_IF_SUPPORTED(
-      { tilingConfig.getVectorInnerParallelLevel(); },
+      { tilingConfig->getVectorInnerParallelLevel(); },
       "Searching for unavailable tiling level");
 }
 

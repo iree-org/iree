@@ -784,7 +784,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   auto [strides, offset] = memRefType.getStridesAndOffset();
   if (memRefType.hasStaticShape() &&
       !llvm::any_of(strides, ShapedType::isDynamic) &&
-      !ShapedType::isDynamic(offset)) {
+      ShapedType::isStatic(offset)) {
     return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
                                              memRefType, basePtrValue);
   } else {

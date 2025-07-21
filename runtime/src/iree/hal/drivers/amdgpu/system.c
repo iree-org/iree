@@ -200,12 +200,6 @@ static iree_status_t iree_hal_amdgpu_system_initialize(
 
   out_system->host_allocator = host_allocator;
 
-  // Verify the topology is valid for a logical device.
-  // This may have already been performed by the caller but this ensures all
-  // code paths must verify prior to creating a device.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_amdgpu_topology_verify(topology, libhsa));
-
   // Ensure all GPU agents in the topology support compatible ISAs. They should
   // all be the same today but in the future if we start allowing heterogeneous
   // (even if just lightly) we'll want to catch issues here.

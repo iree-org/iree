@@ -345,19 +345,20 @@ def IREEEncoding_PropagationAttrInterface :
   AttrInterface<"EncodingPropagationAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
   let description = [{
-    Interface used to query new encoding attributes that can be propagated to
-    the operands and result of the operation.
+    Interface used to query new encoding attributes resulting from propagation
+    to the operands and results of operations.
   }];
 
   let methods = [
     InterfaceMethod<
         [{
-          Returns true if the encodings can be propagated across the operation.
+          Returns true if the encoding can be propagated down through the
+          target's owner operation.
         }],
         /*retTy=*/"bool",
-        /*methodName=*/"isPropagable",
+        /*methodName=*/"isPropagableDown",
         /*args=*/(ins
-          "::mlir::Value":$target
+          "::mlir::OpOperand *":$target
         ),
         /*methodBody=*/"",
         /*defaultImplementation=*/[{
@@ -366,14 +367,47 @@ def IREEEncoding_PropagationAttrInterface :
     >,
     InterfaceMethod<
         [{
-          Returns the new encodings for operand and result types for the given
+          Returns true if the encoding can be propagated up through the
+          target's owner operation.
+        }],
+        /*retTy=*/"bool",
+        /*methodName=*/"isPropagableUp",
+        /*args=*/(ins
+          "::mlir::OpResult":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+            return false;
+        }]
+    >,
+    InterfaceMethod<
+        [{
+          Returns the new encodings for operand and result types for the
+          target's owner operation after propagating the encoding down through
+          the operation.
+        }],
+        /*retTy=*/
+        "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
+        /*methodName=*/"generateSinkingEncodings",
+        /*args=*/(ins
+          "::mlir::OpOperand *":$target
+        ),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+          return failure();
+      }]
+    >,
+    InterfaceMethod<
+        [{
+          Returns the new encodings for operand and result types for the
+          target's owner operation after propagating the encoding up through the
           operation.
         }],
         /*retTy=*/
         "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationEncoding>",
-        /*methodName=*/"generateEncodings",
+        /*methodName=*/"generateBubblingEncodings",
         /*args=*/(ins
-          "::mlir::Value":$target
+          "::mlir::OpResult":$target
         ),
         /*methodBody=*/"",
         /*defaultImplementation=*/[{

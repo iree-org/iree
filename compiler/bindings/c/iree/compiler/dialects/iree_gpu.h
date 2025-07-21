@@ -68,6 +68,23 @@ MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAAttrGetTypeID(void);
 MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx,
                                                    uint32_t value);
 
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAIntrinsicAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUVirtualMMAIntrinsicAttrGet(MlirContext mlirCtx, uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUVirtualMMAAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx,
+                                                          uint32_t value);
 struct ireeGPUMMAInfo {
   MlirType aElementType;
   MlirType bElementType;
@@ -81,6 +98,9 @@ struct ireeGPUMMAInfo {
 };
 
 MLIR_CAPI_EXPORTED ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED bool
 ireeAttributeIsAGPULoweringConfigAttr(MlirAttribute attr);

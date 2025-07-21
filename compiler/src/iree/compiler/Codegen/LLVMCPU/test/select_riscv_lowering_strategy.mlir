@@ -102,7 +102,7 @@ func.func @thin_depthwise_conv_static(%0: tensor<1x57x57x72xf32>, %1: tensor<3x3
     outs(%3 : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
   return %4 : tensor<1x28x28x72xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 28, 28, 8, 0, 0], [1, 1, 4, 4, 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 28, 28, 8, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 //      CHECK: func.func @thin_depthwise_conv_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

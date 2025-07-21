@@ -102,7 +102,7 @@ static llvm::cl::opt<IREE::Codegen::WorkgroupId>
                          clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
                                     "Constrain the workgroup distribution to "
                                     "use only workgroups along x, y and z.")),
-        llvm::cl::init(IREE::Codegen::WorkgroupId::IdZ)
+        llvm::cl::init(IREE::Codegen::WorkgroupId::IdX)
 
     );
 
@@ -867,6 +867,7 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
 
 static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass());
+  funcPassManager.addPass(createROCDLUseBufferInstructionsPass());
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);

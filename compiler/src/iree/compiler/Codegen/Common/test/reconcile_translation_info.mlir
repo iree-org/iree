@@ -213,24 +213,22 @@ hal.executable private @scf_forall_2D {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> ((s0 ceildiv 32) * (s1 ceildiv 64))>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //      CHECK: hal.executable.export public @scf_forall_2D layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
-//  CHECK-DAG:   %[[WG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]]]
+//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG1]]]
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK:   hal.return %[[WG_X]], %[[WG_Y]], %[[C1]]
+//      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
 //      CHECK: func @scf_forall_2D()
-//  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
+//  CHECK-DAG:   %[[WG_IDS:.+]]:2 = affine.delinearize_index %[[WG_ID_X]]
 //  CHECK-NOT:   scf.forall
-//      CHECK:   %[[I:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_Y]]]
-//      CHECK:   %[[J:.+]] = affine.apply #[[MAP3]]()[%[[WG_ID_X]]]
+//      CHECK:   %[[I:.+]] = affine.apply #[[MAP1]]()[%[[WG_IDS]]#0]
+//      CHECK:   %[[J:.+]] = affine.apply #[[MAP2]]()[%[[WG_IDS]]#1]
 //      CHECK:   "use"(%[[I]], %[[J]])
 
 // -----
@@ -262,25 +260,24 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3] -> ((s0 ceildiv s1) * (s2 ceildiv s3))>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: hal.executable.export public @scf_forall_2D_dynamic_tile_size layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG4:[a-zA-z0-9]+]]: index
-//  CHECK-DAG:   %[[WG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG3]]]
-//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG4]]]
+//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG4]], %[[ARG1]], %[[ARG3]]]
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK:   hal.return %[[WG_X]], %[[WG_Y]], %[[C1]]
+//      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
 //      CHECK: func @scf_forall_2D_dynamic_tile_size()
 //  CHECK-DAG:   %[[STEP_Y:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
 //  CHECK-DAG:   %[[STEP_X:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
-//  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
+//  CHECK-DAG:   %[[WG_IDS:.+]]:2 = affine.delinearize_index %[[WG_ID_X]]
 //  CHECK-NOT:   scf.forall
-//      CHECK:   %[[I:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_Y]], %[[STEP_Y]]]
-//      CHECK:   %[[J:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]], %[[STEP_X]]]
+//      CHECK:   %[[I:.+]] = affine.apply #[[MAP1]]()[%[[WG_IDS]]#0, %[[STEP_Y]]]
+//      CHECK:   %[[J:.+]] = affine.apply #[[MAP1]]()[%[[WG_IDS]]#1, %[[STEP_X]]]
 //      CHECK:   "use"(%[[I]], %[[J]])
 
 // -----
@@ -334,8 +331,8 @@ hal.executable private @scf_forall_4D {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s0 + s1) ceildiv s2) * ((-s3 + s4) ceildiv s5))>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] -> (((((-s0 + s1) ceildiv s2) * ((-s3 + s4) ceildiv s5)) * ((-s6 + s7) ceildiv s8)) * ((-s9 + s10) ceildiv s11))>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: hal.executable.export public @scf_forall_4D layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
@@ -350,30 +347,34 @@ hal.executable private @scf_forall_4D {
 // CHECK-SAME:     %[[ARG10:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG11:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG12:[a-zA-z0-9]+]]: index
-//  CHECK-DAG:   %[[WG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[ARG7]], %[[ARG11]]]
-//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG4]], %[[ARG8]], %[[ARG12]]]
-//  CHECK-DAG:   %[[WG_Z:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]], %[[ARG6]], %[[ARG10]], %[[ARG1]], %[[ARG5]], %[[ARG9]]]
-//      CHECK:   hal.return %[[WG_X]], %[[WG_Y]], %[[WG_Z]]
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG4]], %[[ARG8]], %[[ARG12]], %[[ARG3]], %[[ARG7]], %[[ARG11]], %[[ARG2]], %[[ARG6]], %[[ARG10]], %[[ARG1]], %[[ARG5]], %[[ARG9]]]
+//      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
 //      CHECK: func @scf_forall_4D()
 //  CHECK-DAG:   %[[LB0:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(0)
 //  CHECK-DAG:   %[[LB1:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(1)
+//  CHECK-DAG:   %[[LB2:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(2)
+//  CHECK-DAG:   %[[LB3:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(3)
 //  CHECK-DAG:   %[[UB0:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(4)
 //  CHECK-DAG:   %[[UB1:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(5)
+//  CHECK-DAG:   %[[UB2:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(6)
+//  CHECK-DAG:   %[[UB3:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(7)
 //  CHECK-DAG:   %[[STEP0:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(8)
 //  CHECK-DAG:   %[[STEP1:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(9)
 //  CHECK-DAG:   %[[STEP2:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(10)
 //  CHECK-DAG:   %[[STEP3:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(11)
+//  CHECK-DAG:   %[[NITERS0:.+]] = affine.apply #[[MAP1]]()[%[[LB0]], %[[UB0]], %[[STEP0]]]
+//  CHECK-DAG:   %[[NITERS1:.+]] = affine.apply #[[MAP1]]()[%[[LB1]], %[[UB1]], %[[STEP1]]]
+//  CHECK-DAG:   %[[NITERS2:.+]] = affine.apply #[[MAP1]]()[%[[LB2]], %[[UB2]], %[[STEP2]]]
+//  CHECK-DAG:   %[[NITERS3:.+]] = affine.apply #[[MAP1]]()[%[[LB3]], %[[UB3]], %[[STEP3]]]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
-//  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
-//  CHECK-DAG:   %[[NITERS1:.+]] = affine.apply #[[MAP0]]()[%[[LB1]], %[[UB1]], %[[STEP1]]]
-//  CHECK-DAG:   %[[NITERS0:.+]] = affine.apply #[[MAP0]]()[%[[LB0]], %[[UB0]], %[[STEP0]]]
-//  CHECK-DAG:   %[[WG_ID_Z:.+]] = hal.interface.workgroup.id[2]
 //  CHECK-NOT:   scf.forall
-//      CHECK:   %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[WG_ID_Z]] into (%[[NITERS0]], %[[NITERS1]])
-//      CHECK:   %[[I:.+]] = affine.apply #[[MAP2]]()[%[[DELINEARIZE]]#0, %[[STEP0]]]
-//      CHECK:   %[[J:.+]] = affine.apply #[[MAP2]]()[%[[DELINEARIZE]]#1, %[[STEP1]]]
-//      CHECK:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_Y]], %[[STEP2]]]
-//      CHECK:   %[[L:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_X]], %[[STEP3]]]
+//      CHECK:   %[[WG_IDS:.+]]:4 = affine.delinearize_index %[[WG_ID_X]]
+// CHECK-SAME:     into (%[[NITERS0]], %[[NITERS1]], %[[NITERS2]], %[[NITERS3]])
+//      CHECK:   %[[I:.+]] = affine.apply #[[MAP2]]()[%[[WG_IDS]]#0, %[[STEP0]]]
+//      CHECK:   %[[J:.+]] = affine.apply #[[MAP2]]()[%[[WG_IDS]]#1, %[[STEP1]]]
+//      CHECK:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[WG_IDS]]#2, %[[STEP2]]]
+//      CHECK:   %[[L:.+]] = affine.apply #[[MAP2]]()[%[[WG_IDS]]#3, %[[STEP3]]]
 //      CHECK:   "use"(%[[I]], %[[J]], %[[K]], %[[L]])
 
 // -----
@@ -406,21 +407,18 @@ hal.executable private @scf_forall_4D_static_interchange {
 //  CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //  CHECK-DAG:  #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 5)>
 //      CHECK: hal.executable.export public @scf_forall_4D_static_interchange layout
-//  CHECK-DAG:   %[[C6:.+]] = arith.constant 6 : index
-//  CHECK-DAG:   %[[C7:.+]] = arith.constant 7 : index
-//  CHECK-DAG:   %[[C160:.+]] = arith.constant 160 : index
-//      CHECK:   hal.return %[[C6]], %[[C7]], %[[C160]]
+//  CHECK-DAG:   %[[C6720:.+]] = arith.constant 6720 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//      CHECK:   hal.return %[[C6720]], %[[C1]], %[[C1]]
 //      CHECK: func @scf_forall_4D_static_interchange()
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
-//  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
-//  CHECK-DAG:   %[[WG_ID_Z:.+]] = hal.interface.workgroup.id[2]
 //  CHECK-NOT:   scf.forall
-//      CHECK:   %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[WG_ID_Z]] into (5, 8, 4)
-//      CHECK:   %[[I:.+]] = affine.apply #[[MAP0]]()[%[[DELINEARIZE]]#0]
-//      CHECK:   %[[J:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
-//      CHECK:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_Y]]]
-//      CHECK:   %[[L:.+]] = affine.apply #[[MAP3]]()[%[[DELINEARIZE]]#1]
-//      CHECK:   "use"(%[[DELINEARIZE]]#2, %[[I]], %[[J]], %[[K]], %[[L]])
+//  CHECK-DAG:   %[[WG_IDS:.+]]:5 = affine.delinearize_index %[[WG_ID_X]] into (5, 8, 4, 7, 6)
+//      CHECK:   %[[I:.+]] = affine.apply #[[MAP0]]()[%[[WG_IDS]]#0]
+//      CHECK:   %[[J:.+]] = affine.apply #[[MAP1]]()[%[[WG_IDS]]#4]
+//      CHECK:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[WG_IDS]]#3]
+//      CHECK:   %[[L:.+]] = affine.apply #[[MAP3]]()[%[[WG_IDS]]#1]
+//      CHECK:   "use"(%[[WG_IDS]]#2, %[[I]], %[[J]], %[[K]], %[[L]])
 
 // -----
 
@@ -514,32 +512,27 @@ hal.executable private @multi_export_scf_forall {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> ((s0 ceildiv 32) * (s1 ceildiv 64))>
 //      CHECK: hal.executable.export public @entry_point0 layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
-//  CHECK-DAG:   %[[WG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]]]
+//  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG1]]]
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
-//      CHECK:   hal.return %[[WG_X]], %[[WG_Y]], %[[C1]]
+//      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
 //      CHECK: hal.executable.export public @entry_point1 layout
 // CHECK-SAME:     %[[ARG1_1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2_1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3_1:[a-zA-z0-9]+]]: index
-//  CHECK-DAG:   %[[WG_Y_1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1_1]]]
-//  CHECK-DAG:   %[[WG_X_1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2_1]]]
+//  CHECK-DAG:   %[[WG_X_1:.+]] = affine.apply #[[MAP0]]()[%[[ARG2_1]], %[[ARG1_1]]]
 //  CHECK-DAG:   %[[C1_1:.+]] = arith.constant 1
-//      CHECK:   hal.return %[[WG_X_1]], %[[WG_Y_1]], %[[C1_1]]
+//      CHECK:   hal.return %[[WG_X_1]], %[[C1_1]], %[[C1_1]]
 
 //      CHECK: func @entry_point0()
-//  CHECK-DAG:   hal.interface.workgroup.id[1]
 //  CHECK-DAG:   hal.interface.workgroup.id[0]
 //  CHECK-NOT:   scf.forall
 //      CHECK:   "use0"
 //      CHECK: func @entry_point1()
-//  CHECK-DAG:   hal.interface.workgroup.id[1]
 //  CHECK-DAG:   hal.interface.workgroup.id[0]
 //  CHECK-NOT:   scf.forall
 //      CHECK:   "use1"
@@ -729,7 +722,7 @@ hal.executable private @split_reduction_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1, s2] -> (d0 * ((-s0 + s1) ceildiv s2))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((s1 * s2) * s0))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
 //   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
@@ -741,19 +734,23 @@ hal.executable private @split_reduction_executable {
 //  CHECK-SAME:       %[[ARG4:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
-//   CHECK-DAG:     %[[NUMWORKGROUPSZ:.+]] = affine.apply #[[MAP0]](%[[ARG4]])[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
-//       CHECK:     hal.return %[[ARG6]], %[[ARG5]], %[[NUMWORKGROUPSZ]]
+//   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG4]], %[[ARG6]], %[[ARG5]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction
 //   CHECK-DAG:     %[[SPLIT_LB:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
 //   CHECK-DAG:     %[[SPLIT_UB:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
 //   CHECK-DAG:     %[[SPLIT_STEP:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
-//       CHECK:     %[[SPLIT_NPROCS:.+]] = affine.apply #[[MAP1]]()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
-//   CHECK-DAG:     %[[IDZ:.+]] = hal.interface.workgroup.id[2]
-//   CHECK-DAG:     %[[COUNTZ:.+]] = hal.interface.workgroup.count[2]
-//       CHECK:     %[[ORIG_COUNTZ:.+]] = affine.apply #[[MAP2]]()[%[[COUNTZ]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
-//       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDZ]] into (%[[SPLIT_NPROCS]], %[[ORIG_COUNTZ]]
+//   CHECK-DAG:     %[[ORIG_UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
+//   CHECK-DAG:     %[[ORIG_UB1:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
+//   CHECK-DAG:     %[[ORIG_UB2:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
+//   CHECK-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply #[[MAP1]]()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+//   CHECK-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
+//   CHECK-DAG:     %[[COUNTX:.+]] = hal.interface.workgroup.count[0]
+//   CHECK-DAG:     %[[ORIG_COUNTZ:.+]] = affine.apply #[[MAP2]]()[%[[COUNTX]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+//       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIG_COUNTZ]]
 //       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP3]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
 //       CHECK:     "use1"(%[[SPLITIVREPLACEMENT]])
-//       CHECK:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
-//       CHECK:     %[[IDY:.+]] = hal.interface.workgroup.id[1]
-//       CHECK:     "use2"(%[[DELINEARIZE]]#1, %[[IDY]], %[[IDX]])
+//       CHECK:     %[[OTHERIVREPLACEMENTS:.+]]:3 = affine.delinearize_index %[[DELINEARIZE]]#1
+//  CHECK-SAME:       into (%[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]]
+//       CHECK:     "use2"(%[[OTHERIVREPLACEMENTS]]#0, %[[OTHERIVREPLACEMENTS]]#1, %[[OTHERIVREPLACEMENTS]]#2)

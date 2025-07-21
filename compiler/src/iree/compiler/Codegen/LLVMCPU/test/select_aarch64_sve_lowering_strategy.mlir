@@ -210,8 +210,7 @@ func.func @depthwise_conv() attributes {hal.executable.target = #executable_targ
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 28, 28, 72], strides = [1, 1, 1, 1] : tensor<1x28x28x72xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x28x28x72xf32>>
   return
 }
-
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 28, 28, 8, 0, 0], [1, 1, 4, [4], 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
+// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 28, 28, 8, 0, 0], vector_common_parallel = [1, 1, 4, [4], 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 // CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 // CHECK:      func.func @depthwise_conv
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -241,8 +240,7 @@ func.func @pooling_nchw_max(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:ten
   iree_tensor_ext.dispatch.tensor.store %6, %1, offsets = [0, 0, 0, 0], sizes = [1, 64, 56, 56], strides = [1, 1, 1, 1] : tensor<1x64x56x56xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
   return
 }
-
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32, 56, 8, 0, 0], [1, 2, 1, 8, 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
+// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 32, 56, 8, 0, 0], vector_common_parallel = [1, 2, 1, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 // CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
 // CHECK:      func.func @pooling_nchw_max
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

@@ -246,7 +246,7 @@ struct BubbleExpandThroughExtract final
       }
       for (auto outDim : outDims) {
         int64_t expandedDim = expandedShape[outDim - droppedDimCount];
-        assert(!ShapedType::isDynamic(expandedDim));
+        assert(ShapedType::isStatic(expandedDim));
         newExpandShape.push_back(expandedDim);
         newOffsets.push_back(zeroAttr);
         newSizes.push_back(rewriter.getIndexAttr(expandedDim));
@@ -328,7 +328,7 @@ struct BubbleExpandThroughConcat final
         // Calculate the product of static dims.
         expandShapeProduct *= expDim;
       }
-      if (!ShapedType::isDynamic(inputDim) &&
+      if (ShapedType::isStatic(inputDim) &&
           !(inputDim % expandShapeProduct == 0)) {
         // ie concat(tensor<6xf32>, tensor<6xf32>) -> expand to
         // tensor<3x2x2xf32> cannot be done because 6 % (2 * 2) != 0.
