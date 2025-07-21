@@ -320,13 +320,12 @@ struct ConvertBf16ToUInt16BuffersPass final
           vector::GatherOp, vector::ScatterOp, vector::ExpandLoadOp,
           vector::CompressStoreOp, vector::ShapeCastOp, vector::ConstantMaskOp,
           vector::CreateMaskOp, vector::MaskOp, vector::TransposeOp,
-          vector::FlatTransposeOp, vector::SplatOp, vector::YieldOp>(
-          [&typeConverter](Operation *op) {
-            bool legal = typeConverter.isLegal(op);
-            LLVM_DEBUG(if (!legal) llvm::dbgs()
-                       << "Bf16Emulation: illegal op: " << *op << "\n");
-            return legal;
-          });
+          vector::SplatOp, vector::YieldOp>([&typeConverter](Operation *op) {
+        bool legal = typeConverter.isLegal(op);
+        LLVM_DEBUG(if (!legal) llvm::dbgs()
+                   << "Bf16Emulation: illegal op: " << *op << "\n");
+        return legal;
+      });
 
       RewritePatternSet patterns(ctx);
       populateIreeBf16EmulationPatterns(patterns, typeConverter);
