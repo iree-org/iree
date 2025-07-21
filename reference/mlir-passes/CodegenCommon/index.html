@@ -3139,6 +3139,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-fold-split-reduction-and-workgroup-mapping-loops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-tensor-extract-op" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fold-tensor-extract-op
@@ -6020,6 +6029,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-fold-split-reduction-and-workgroup-mapping-loops
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-tensor-extract-op" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fold-tensor-extract-op
@@ -6907,6 +6925,8 @@ to backends that require linearized access.</p>
 <p><em>Fold <code>affine.min</code> ops in distributed loops</em></p>
 <h3 id="-iree-codegen-fold-reshape-into-interface-tensor"><code>-iree-codegen-fold-reshape-into-interface-tensor</code><a class="headerlink" href="#-iree-codegen-fold-reshape-into-interface-tensor" title="Permanent link">link</a></h3>
 <p><em>Folds reshape operations into the interface bindings.</em></p>
+<h3 id="-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops"><code>-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops</code><a class="headerlink" href="#-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops" title="Permanent link">link</a></h3>
+<p><em>Folds <code>scf.forall</code> loops created by split reduction and workgroup mapping.</em></p>
 <h3 id="-iree-codegen-fold-tensor-extract-op"><code>-iree-codegen-fold-tensor-extract-op</code><a class="headerlink" href="#-iree-codegen-fold-tensor-extract-op" title="Permanent link">link</a></h3>
 <p><em>Fold <code>tensor.extract</code> operations prior to lowering to LLVM</em></p>
 <p>After running the upstream TensorConstantBufferize pass, remove
@@ -7036,7 +7056,8 @@ lowering configurations.</p>
 <h3 id="-iree-codegen-reconcile-translation-info"><code>-iree-codegen-reconcile-translation-info</code><a class="headerlink" href="#-iree-codegen-reconcile-translation-info" title="Permanent link">link</a></h3>
 <p><em>Reconcile information (like workgroup_size, subgroup_size) across <code>TranslationInfo</code> set on each function in the dispatch and merge themand set them at the appropriate places in the surrounding HAL ops</em></p>
 <h4 id="options_14">Options<a class="headerlink" href="#options_14" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-distribute-along : Constrain the workgroup distribution along grid dimensions.
+<div class="highlight"><pre><span></span><code>-distribute-along                                      : Constrain the workgroup distribution along grid dimensions.
+-fold-split-reduction-loop-into-workgroup-mapping-loop : Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop
 </code></pre></div>
 <h3 id="-iree-codegen-rematerialize-parallel-ops"><code>-iree-codegen-rematerialize-parallel-ops</code><a class="headerlink" href="#-iree-codegen-rematerialize-parallel-ops" title="Permanent link">link</a></h3>
 <p><em>Pass to rematerialize and merge parallel ops into consumers.</em></p>
