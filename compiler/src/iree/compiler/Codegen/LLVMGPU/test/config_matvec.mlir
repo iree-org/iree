@@ -81,7 +81,7 @@ module {
 //  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               partial_reduction = [0, 0, 0, 8192],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
-//  CHECK-SAME:               thread = [0, 0, 0, 8], thread_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]],
+//  CHECK-SAME:               thread = [0, 0, 0, 8],
 //  CHECK-SAME:               workgroup = [1, 1, 1, 0]
 
 // CDNA3: LLVMGPUVectorDistribute
