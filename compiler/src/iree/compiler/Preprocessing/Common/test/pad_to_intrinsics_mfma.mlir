@@ -207,7 +207,8 @@ func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 // -----
 
-// We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
+// We want to skip padding skinny matmul cases, since WarpReduction is more performant for it.
+// TODO(newling) reconsider this, as WarpReduction is removed.
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 
@@ -226,7 +227,8 @@ func.func @skip_skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf
 
 // -----
 
-// We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
+// We want to skip padding skinny matmul cases, since WarpReduction is more performant for it.
+// TODO(newling) reconsider this, as WarpReduction is removed.
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 

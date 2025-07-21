@@ -26,41 +26,6 @@ namespace {
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 //===----------------------------------------------------------------------===//
-// Warp Reduction Configuration
-//===----------------------------------------------------------------------===//
-
-static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != 2)
-    return false;
-
-  if (linalgOp.getNumReductionLoops() != 1)
-    return false;
-
-  // TODO: Allow for matvec with fused dequantization.
-  FailureOr<linalg::ContractionDimensions> dims =
-      linalg::inferContractionDims(linalgOp);
-  if (failed(dims))
-    return false;
-
-  // TODO: Support batch matvec.
-  if (!dims->batch.empty())
-    return false;
-
-  for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
-    if (!llvm::hasSingleElement(indices))
-      return false;
-  }
-
-  // Check if the first parallel dimension has bound 1, indicating we found a
-  // vector shape.
-  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
-  if (bounds[dims->m.front()] != 1)
-    return false;
-
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 // Root Configuration
 //===----------------------------------------------------------------------===//
 
