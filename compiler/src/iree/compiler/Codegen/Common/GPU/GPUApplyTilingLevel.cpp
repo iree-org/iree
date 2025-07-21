@@ -287,20 +287,27 @@ void GPUApplyTilingLevelPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  MLIRContext *context = &getContext();
+
+  // Swap `collapse_shape` with `extract_slice` to enable more loop fusion
+  // opportunity. Currently this is only needed for convolution IGEMM path.
   if (normalizeLoops) {
     funcOp->walk(
         [&](scf::ForOp forOp) { (void)normalizeLoopBounds(rewriter, forOp); });
     funcOp->walk([&](scf::ForallOp forallOp) {
       (void)normalizeLoopBounds(rewriter, forallOp);
     });
-  }
 
-  MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
+    populateSwapExtractWithCollapsePattern(patterns);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 
   // Apply cleanup patterns.
   {
     RewritePatternSet patterns(context);
-    populateSwapExtractWithCollapsePattern(patterns);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
     tensor::populateFoldTensorEmptyPatterns(patterns);
