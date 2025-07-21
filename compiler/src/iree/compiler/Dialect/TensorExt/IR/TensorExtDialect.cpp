@@ -10,10 +10,37 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
+// Used to control inlining behavior.
+namespace {
+struct IREETensorExtInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    // Sure!
+    return true;
+  }
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       IRMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       IRMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+};
+
+} // namespace
+
 void IREETensorExtDialect::initialize() {
+  addInterfaces<IREETensorExtInlinerInterface>();
   addTypes<DispatchTensorType>();
 
 #define GET_OP_LIST
