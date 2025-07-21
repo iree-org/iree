@@ -1,5 +1,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse{tiling-level=0}))" --split-input-file %s | FileCheck %s
 
+// `tiling-level=0`, which is the testing value of the pass option, indicates
+// distribution level tiling.
+#config = #iree_cpu.lowering_config<distribution = [10, 20, 30]>
 func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -8,7 +11,7 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
+  %1 = linalg.matmul {lowering_config = #config}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.generic {
