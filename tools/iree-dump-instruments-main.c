@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
+#include "iree/io/file_contents.h"
 #include "iree/schemas/instruments/dispatch.h"
 
 // NOTE: include order matters:
@@ -281,15 +281,15 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  iree_file_contents_t* file_contents = NULL;
-  iree_status_t status =
-      iree_file_read_contents(argv[1], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &file_contents);
+  iree_io_file_contents_t* file_contents = NULL;
+  iree_status_t status = iree_io_file_contents_map(
+      iree_make_cstring_view(argv[1]), IREE_IO_FILE_ACCESS_READ,
+      iree_allocator_system(), &file_contents);
   if (iree_status_is_ok(status)) {
     status =
         iree_tooling_dump_instrument_file(file_contents->const_buffer, stdout);
   }
-  iree_file_contents_free(file_contents);
+  iree_io_file_contents_free(file_contents);
 
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
