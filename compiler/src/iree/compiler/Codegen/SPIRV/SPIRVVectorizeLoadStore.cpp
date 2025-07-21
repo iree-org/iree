@@ -828,7 +828,8 @@ struct ScalarizeVectorTransferRead final
 
       Value scalar = predicateMaybeMaskedScalarTransfer(
           rewriter, loc, maybeMaskBit, thenCond, elseCond);
-      rewriter.replaceOpWithNewOp<vector::SplatOp>(readOp, vectorType, scalar);
+      rewriter.replaceOpWithNewOp<vector::BroadcastOp>(readOp, vectorType,
+                                                       scalar);
       return success();
     }
 
@@ -889,7 +890,8 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
     if (vectorType.getRank() == 0) {
       Value scalar = rewriter.create<memref::LoadOp>(loc, loadOp.getBase(),
                                                      loadOp.getIndices());
-      rewriter.replaceOpWithNewOp<vector::SplatOp>(loadOp, vectorType, scalar);
+      rewriter.replaceOpWithNewOp<vector::BroadcastOp>(loadOp, vectorType,
+                                                       scalar);
       return success();
     }
 

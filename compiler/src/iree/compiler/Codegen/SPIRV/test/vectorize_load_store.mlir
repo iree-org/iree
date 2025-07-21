@@ -337,7 +337,7 @@ func.func @scalarize_0d_transfer_read(%memory: memref<4xf32>, %i: index) -> vect
 }
 
 // CHECK: %[[S:.+]] = memref.load %[[MEM]][%[[I]]] : memref<4xf32>
-// CHECK: %[[V:.+]] = vector.splat %[[S]] : vector<f32>
+// CHECK: %[[V:.+]] = vector.broadcast %[[S]] : f32 to vector<f32>
 // CHECK: return %[[V]]
 
 // -----
