@@ -1120,7 +1120,6 @@ bool DeviceTopologyAttr::hasTransparentAccess(
   if (sourceDevice == targetDevice)
     return true; // Same device has transparent access.
 
-
   // Search for a matching link and check if it has transparent access.
   for (DeviceLinkAttr link : getLinks()) {
     if ((sourceDevice == link.getSourceDevice().getLeafReference() &&

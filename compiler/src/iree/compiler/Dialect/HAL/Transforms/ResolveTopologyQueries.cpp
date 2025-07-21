@@ -165,7 +165,8 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
         builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
     op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
     op.erase();
-    LLVM_DEBUG(llvm::dbgs() << "  -> successfully resolved memory properties\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "  -> successfully resolved memory properties\n");
     return success();
   }
 

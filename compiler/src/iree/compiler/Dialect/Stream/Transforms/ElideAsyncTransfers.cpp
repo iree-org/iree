@@ -72,7 +72,7 @@ struct ElideCompatibleTransferPattern
     if (!topologyAttr.hasUnifiedMemory(sourceAffinityAttr,
                                        resultAffinityAttr) &&
         !topologyAttr.hasTransparentAccess(sourceAffinityAttr,
-                                          resultAffinityAttr)) {
+                                           resultAffinityAttr)) {
       return rewriter.notifyMatchFailure(
           transferOp, "not eliding, transfer required by topology");
     }
