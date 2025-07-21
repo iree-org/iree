@@ -3154,6 +3154,18 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       SmallVector<bool> falseVec(numLoops, 0);
       updateOrAddTilingLevelInfo(newTilingInfo, IREE::CPU::DistributionTiles,
                                  distTileSizes, falseVec);
+      // The cache level tiling sizes are not adjusted, so we use the
+      // config from the rootOp directly.
+      if (tilingConfig->isValidLevel(IREE::CPU::CacheParallelTiles)) {
+        updateOrAddTilingLevelInfo(newTilingInfo, IREE::CPU::CacheParallelTiles,
+                                   tilingConfig->getCacheParallelSizes(),
+                                   falseVec);
+      }
+      if (tilingConfig->isValidLevel(IREE::CPU::CacheReductionTiles)) {
+        updateOrAddTilingLevelInfo(
+            newTilingInfo, IREE::CPU::CacheReductionTiles,
+            tilingConfig->getCacheReductionSizes(), falseVec);
+      }
       updateOrAddTilingLevelInfo(
           newTilingInfo, IREE::CPU::VectorCommonParallelTiles,
           commonVecTileSizes, commonVecScalableTileFlags);
