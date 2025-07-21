@@ -345,8 +345,8 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     }
 
     // Materialize the padding with a constant.
-    auto padVal = rewriter.create<vector::SplatOp>(rPad.getLoc(),
-                                                   valToStore.getType(), rPad);
+    auto padVal = rewriter.create<vector::BroadcastOp>(
+        rPad.getLoc(), valToStore.getType(), rPad);
     rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
     return success();
   }

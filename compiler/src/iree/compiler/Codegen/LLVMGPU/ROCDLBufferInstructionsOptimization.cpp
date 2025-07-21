@@ -100,7 +100,7 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
 
     rewriter.setInsertionPoint(readOp);
     Value selectValue = createI1And(loc, ValuesToAnd, rewriter);
-    auto constantValue = rewriter.create<vector::SplatOp>(
+    auto constantValue = rewriter.create<vector::BroadcastOp>(
         loc, readOp.getVectorType(), readOp.getPadding());
 
     auto newReadOp = rewriter.create<vector::TransferReadOp>(
