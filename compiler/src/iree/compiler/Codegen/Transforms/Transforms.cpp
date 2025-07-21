@@ -530,6 +530,7 @@ getNextWorkgroupMapping(ArrayRef<Attribute> currentMappings) {
         lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdZ,
         lastAttr.getDelinearizedDim() + 1);
   }
+  llvm_unreachable("Unhandled WorkgroupId case");
 }
 
 // Pattern to fold the `scf.forall` produced by split reduction
