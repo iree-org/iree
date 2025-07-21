@@ -112,6 +112,9 @@ public:
     return result;
   }
 
+  /// Returns true if the `level` is available in TilingConfig.
+  bool isValidLevel(TilingLevel level);
+
   /// Returns the tiling level for cache parallel dimensions.
   unsigned getDistributionLevel() {
     return getActualLevel(TilingLevel::DistributionTiles);
@@ -149,6 +152,10 @@ public:
   /// Returns the distribution tile sizes of the configuration.
   SmallVector<int64_t> getDistributionTileSizes() {
     return getTileSizesForLevel(getActualLevel(TilingLevel::DistributionTiles));
+  }
+
+  SmallVector<int64_t> getCacheParallelSizes() {
+    return getTileSizesForLevel(getCacheParallelLevel());
   }
 
   SmallVector<int64_t> getCacheReductionSizes() {
