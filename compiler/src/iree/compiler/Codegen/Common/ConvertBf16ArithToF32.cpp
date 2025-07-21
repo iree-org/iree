@@ -285,8 +285,8 @@ struct ConvertBf16ArithToF32Pass final
     // Some arithmetic operations exist in the vector dialect.
     target.addDynamicallyLegalOp<vector::FMAOp, vector::ReductionOp,
                                  vector::MultiDimReductionOp, vector::MaskOp,
-                                 vector::MatmulOp, vector::OuterProductOp,
-                                 vector::YieldOp>(checkOp);
+                                 vector::OuterProductOp, vector::YieldOp>(
+        checkOp);
 
     // Some ops are always legal.
     target.addLegalOp<arith::BitcastOp>();
