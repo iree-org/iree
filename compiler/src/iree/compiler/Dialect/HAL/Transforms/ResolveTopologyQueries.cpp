@@ -18,7 +18,7 @@
 #define DEBUG_TYPE "iree-hal-resolve-topology-queries"
 
 static llvm::cl::opt<bool> clExternalResourcesMappable(
-    "iree-stream-external-resources-mappable",
+    "iree-hal-external-resources-mappable",
     llvm::cl::desc("Allocates external resources as host-visible and mappable. "
                    "This can degrade performance and introduce allocation "
                    "overhead and staging buffers for readback on the host "
@@ -37,7 +37,7 @@ namespace {
 // The bits set here represent the superset of required and allowed bits and
 // are useful for providing buffers back to users via the ABI that may need to
 // be used for more than just what the internal program requires.
-LogicalResult
+static LogicalResult
 deriveAllowedResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                 IREE::HAL::BufferUsageBitfield &bufferUsage) {
@@ -71,8 +71,8 @@ deriveAllowedResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
   return success();
 }
 
-// Checks if all affinities of the optimal attribute refer to the same device
-// ID.
+// Returns true if all affinities of the optimal attribute refer to the same
+// device ID.
 static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
                                  DeviceAnalysis &deviceAnalysis,
                                  Operation *fromOp) {
@@ -97,7 +97,7 @@ static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
 static bool hasTransparentAccessToAll(IREE::HAL::DeviceTopologyAttr topology,
                                       IREE::Stream::AffinityAttr source,
                                       DeviceOptimalAttr optimalAttr) {
-  LLVM_DEBUG(llvm::dbgs() << "[resolve_topology_queries] Checking if " << source
+  LLVM_DEBUG(llvm::dbgs() << "[resolve-topology-queries] checking if " << source
                           << " has transparent access to all " << optimalAttr
                           << "\n");
   if (!topology) {
@@ -141,7 +141,7 @@ static bool tryAddSharedUsageBits(IREE::HAL::DeviceTopologyAttr topology,
 static LogicalResult
 resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
                           DeviceAnalysis &deviceAnalysis) {
-  LLVM_DEBUG(llvm::dbgs() << "[resolve_topology_queries] Op: " << op << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[resolve-topology-queries] Op: " << op << "\n");
 
   OpBuilder builder(op);
   auto loc = op.getLoc();
@@ -165,6 +165,7 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
         builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
     op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
     op.erase();
+    LLVM_DEBUG(llvm::dbgs() << "  -> successfully resolved memory properties\n");
     return success();
   }
 
@@ -177,16 +178,16 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
   auto topologyAttr =
       moduleOp->getAttrOfType<IREE::HAL::DeviceTopologyAttr>("stream.topology");
 
-  LLVM_DEBUG(llvm::dbgs() << "  -> Topology attr: " << topologyAttr << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  -> topology attr: " << topologyAttr << "\n");
 
   // Try to resolve shared usage bits if possible.
   if (!tryAddSharedUsageBits(topologyAttr, optimalAttr, bufferUsage,
                              memoryTypes, deviceAnalysis, op.getOperation())) {
-    LLVM_DEBUG(llvm::dbgs() << "  -> Failed to add shared usage bits\n");
+    LLVM_DEBUG(llvm::dbgs() << "  -> failed to add shared usage bits\n");
     return failure();
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "  -> Successfully resolved memory properties "
+  LLVM_DEBUG(llvm::dbgs() << "  -> successfully resolved memory properties "
                              "with shared usage bits\n");
 
   // Create the resolved memory type and buffer usage ops.

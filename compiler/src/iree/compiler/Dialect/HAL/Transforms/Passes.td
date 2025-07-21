@@ -254,7 +254,7 @@ def ResolveTopologyQueriesPass :
   let summary = "Try to statically resolve ops using topology information.";
   let description = [{
     Attempts to statically resolve `hal.allocator.resolve_memory_properties` ops
-    that have the `device.optimal` attribute. This is either done by checking the
+    that have the `hal.device.optimal` attribute. This is either done by checking the
     topology information for transparent access between devices or by using the
     DeviceAnalysis to check if two affinities refer to the same device. Otherwise,
     the operation is left unmodified to be resolved at runtime.

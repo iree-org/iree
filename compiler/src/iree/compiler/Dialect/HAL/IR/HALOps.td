@@ -9,7 +9,6 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
-include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
@@ -700,7 +699,7 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
   }];
 
   let arguments = (ins
-    OptionalAttr<Stream_AffinityAttr>:$affinity,
+    OptionalAttr<AnyAttr>:$affinity,
     HAL_LifetimeAttr:$lifetime
   );
   let results = (outs

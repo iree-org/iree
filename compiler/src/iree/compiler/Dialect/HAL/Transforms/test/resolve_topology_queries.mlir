@@ -1,11 +1,11 @@
 // RUN: iree-opt --split-input-file --iree-hal-resolve-topology-queries %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-resolve-topology-queries --iree-hal-external-resources-mappable %s | FileCheck %s --check-prefix=EXTERNAL-MAPPABLE
 
 module attributes {
   stream.topology = #hal.device.topology<links = [
     (@device_a -> @device_b = {transparent_access = true})
   ]>
 } {
-
   util.global private @device_a : !hal.device = #hal.device.target<"device_a">
   util.global private @device_b : !hal.device = #hal.device.target<"device_b">
 
@@ -30,7 +30,6 @@ module attributes {
     (@device_a -> @device_c = {})
   ]>
 } {
-
   util.global private @device_a : !hal.device = #hal.device.target<"device_a">
   util.global private @device_b : !hal.device = #hal.device.target<"device_b">
   util.global private @device_c : !hal.device = #hal.device.target<"device_c">
@@ -157,14 +156,19 @@ util.func public @resolve_variable_lifetime() -> (i32, i32) {
 // -----
 
 // CHECK-LABEL: @resolve_external_lifetime
+// EXTERNAL-MAPPABLE-LABEL: @resolve_external_lifetime
 util.func public @resolve_external_lifetime() -> (i32, i32) {
   // CHECK-NOT: hal.allocator.resolve_memory_properties
   // CHECK-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
   // CHECK-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage"> : i32
+  // EXTERNAL-MAPPABLE-NOT: hal.allocator.resolve_memory_properties
+  // EXTERNAL-MAPPABLE-DAG: %[[MEMORY_TYPES:.+]] = hal.memory_type<"HostVisible|DeviceVisible|DeviceLocal"> : i32
+  // EXTERNAL-MAPPABLE-DAG: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|MappingScoped|MappingAccessRandom|Mapping"> : i32
   %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
       for(#hal.device.affinity<@device_a>)
       lifetime(external) : i32, i32
   // CHECK: util.return %[[MEMORY_TYPES]], %[[BUFFER_USAGE]]
+  // EXTERNAL-MAPPABLE: util.return %[[MEMORY_TYPES]], %[[BUFFER_USAGE]]
   util.return %memory_types, %buffer_usage : i32, i32
 }
 
