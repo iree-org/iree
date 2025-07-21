@@ -63,7 +63,7 @@ util.func @test_split_reduction_modified(%arg0 : index, %arg1 : index, %arg2 : i
         tensor.parallel_insert_slice %3 into %init[0, 0] [%arg0_capture, %arg1_capture] [1, 1]
             : tensor<?x?xf32> into tensor<?x?xf32>
       }
-    } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+    } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
     iree_tensor_ext.dispatch.tensor.store %2, %output,
         offsets = [0, 0], sizes = [%arg0_capture, %arg1_capture], strides = [1, 1]
         : tensor<?x?xf32> ->
