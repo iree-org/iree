@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstdint>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -501,6 +502,141 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
                                         entryPointFn, workgroupCount,
                                         maxWorkgroupParallelDims);
+}
+
+/// Pattern to fold `scf.forall` created from split reduction with an
+/// `scf.forall` created by workgroup distribution
+namespace {
+
+// Given a list of workgroup mappings, finds the highest workgroup mapping
+// in the list and returns the workgroup mapping "one more" than the highest.
+static IREE::Codegen::WorkgroupMappingAttr
+getNextWorkgroupMapping(ArrayRef<Attribute> currentMappings) {
+  auto currentMappingVec =
+      llvm::map_to_vector(currentMappings, [](Attribute attr) {
+        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
+      });
+  llvm::sort(currentMappingVec);
+  auto lastAttr = currentMappingVec.back();
+  switch (lastAttr.getId()) {
+  case IREE::Codegen::WorkgroupId::IdX:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdY);
+  case IREE::Codegen::WorkgroupId::IdY:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdZ);
+  case IREE::Codegen::WorkgroupId::IdZ:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdZ,
+        lastAttr.getDelinearizedDim() + 1);
+  }
+}
+
+// Pattern to fold the `scf.forall` produced by split reduction
+// and the one produced by workgroup distribution. The newly created
+// `scf.forall` has rank equal to the sum of the two `scf.forall`s merged,
+// with the higher dimensions corresponding to the split-reduction loop
+// and lower corresponding to the workgoup mapping. The newly created
+// loop also has workgroup mapping.
+struct FoldSplitReductionForallWithWorkgroupForall
+    : public OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const override {
+    if (forallOp.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "unhandled operation with return values");
+    }
+
+    // For now only support a single mapping of `split_reduction_mapping`.
+    // TODO(MaheshRavishankar): There is no real reason for this restriction.
+    // This is just something that is the state at the time of implementation.
+    // This restriction can be dropped after generalizing the
+    // `iree_codegen.split_reduction_mapping` to allow for specify multiple
+    // dimensions to partition along.
+    std::optional<ArrayAttr> mapping = forallOp.getMapping();
+    if (!mapping) {
+      return rewriter.notifyMatchFailure(forallOp,
+                                         "not split reduction scf.forall");
+    }
+    if (mapping->size() != 1 || forallOp.getRank() != 1) {
+      return rewriter.notifyMatchFailure(
+          forallOp,
+          "unsupported multi-dimensional mapping for split-reductions");
+    }
+    if (!isa<IREE::LinalgExt::SplitReductionMappingAttr>(
+            mapping->getValue().front())) {
+      return rewriter.notifyMatchFailure(forallOp, "not split reduction loop");
+    }
+
+    // Get all workgroup mapping loops. It is assumed that the workgroup mapping
+    // loop is nested within the split reduction loop.
+    auto nestedForallOps = forallOp.getOps<scf::ForallOp>();
+
+    // For now bail on more than one scf.forall ops.
+    if (!llvm::hasSingleElement(nestedForallOps)) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "unhandled multiple `scf.forall` ops nested within the "
+                    "split-reduction loop");
+    }
+    scf::ForallOp workgroupLoop = *nestedForallOps.begin();
+    if (workgroupLoop.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          workgroupLoop, "unhandled merging of workgourp mapping loop with "
+                         "results and split reduction mapped loop");
+    }
+    std::optional<ArrayAttr> workgroupMapping = workgroupLoop.getMapping();
+    if (!workgroupMapping ||
+        llvm::any_of(workgroupMapping->getValue(), [](Attribute attr) {
+          return !isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
+        })) {
+      return rewriter.notifyMatchFailure(
+          workgroupLoop, "nested loop is not a workgroup mapping loop");
+    }
+
+    SmallVector<OpFoldResult> newLbs, newUbs, newSteps;
+    newLbs = forallOp.getMixedLowerBound();
+    newUbs = forallOp.getMixedUpperBound();
+    newSteps = forallOp.getMixedStep();
+    llvm::append_range(newLbs, workgroupLoop.getMixedLowerBound());
+    llvm::append_range(newUbs, workgroupLoop.getMixedUpperBound());
+    llvm::append_range(newSteps, workgroupLoop.getMixedStep());
+
+    SmallVector<Attribute> newMapping = {
+        getNextWorkgroupMapping(workgroupMapping->getValue())};
+    llvm::append_range(newMapping, workgroupMapping->getValue());
+
+    auto newMappingAttr = rewriter.getArrayAttr(newMapping);
+    auto newForallOp = rewriter.create<scf::ForallOp>(
+        forallOp.getLoc(), newLbs, newUbs, newSteps, /*outputs=*/ValueRange{},
+        newMappingAttr, [](OpBuilder &, Location, ValueRange) {});
+    Block *oldBlock = forallOp.getBody();
+    Block *newForallBody = newForallOp.getBody();
+    SmallVector<Value> newInductionVars = newForallOp.getInductionVars();
+    ArrayRef<Value> newInductionVarsRef(newInductionVars);
+
+    rewriter.mergeBlocks(oldBlock, newForallBody,
+                         newInductionVarsRef.take_front(forallOp.getRank()));
+    rewriter.eraseOp(forallOp);
+
+    Block *workgroupLoopBody = workgroupLoop.getBody();
+    rewriter.eraseOp(workgroupLoopBody->getTerminator());
+    rewriter.inlineBlockBefore(
+        workgroupLoopBody, workgroupLoop,
+        newInductionVarsRef.take_back(workgroupLoop.getRank()));
+    rewriter.eraseOp(workgroupLoop);
+
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldSplitReductionAndWorkgroupMappingLoops(
+    RewritePatternSet &patterns) {
+  patterns.insert<FoldSplitReductionForallWithWorkgroupForall>(
+      patterns.getContext());
 }
 
 //===---------------------------------------------------------------------===//

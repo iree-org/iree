@@ -286,7 +286,11 @@ def ReconcileTranslationInfoPass
             clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
               "Constrain the workgroup distribution to use only workgroups along x and y."),
             clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
-              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>
+              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>,
+    Option<"foldSplitReductionLoopIntoWorkgroupMappingLoop",
+           "fold-split-reduction-loop-into-workgroup-mapping-loop",
+           "bool", /*default=*/"true",
+           "Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop">
   ];
 }
 
@@ -380,6 +384,11 @@ def FoldAffineMinInDistributedLoopsPass :
 def FoldReshapeIntoInterfaceTensorPass :
     Pass<"iree-codegen-fold-reshape-into-interface-tensor", ""> {
   let summary = "Folds reshape operations into the interface bindings.";
+}
+
+def FoldSplitReductionAndWorkgroupMappingLoopsPass :
+    Pass<"iree-codegen-fold-split-reduction-and-workgroup-mapping-loops", ""> {
+  let summary  = "Folds `scf.forall` loops created by split reduction and workgroup mapping.";
 }
 
 def FoldTensorExtractOpPass :
