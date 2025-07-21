@@ -34,4 +34,11 @@ LogicalResult moveOperandDefs(RewriterBase &rewriter,
                               DominanceInfo &dominanceInfo,
                               ArrayRef<Operation *> ignoreOperations = {});
 
+/// Returns the closest producer dispatch region op result and the chain of
+/// operations being looked past during the traversal to find the producer
+/// dispatch. Returns std::nullopt if the dispatch or any ops in the chain have
+/// multiple uses.
+std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+getProducerDispatchValueAndOpChain(Value operand);
+
 } // namespace mlir::iree_compiler::DispatchCreation
