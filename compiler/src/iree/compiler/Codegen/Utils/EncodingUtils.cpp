@@ -11,7 +11,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace mlir::iree_compiler {
 
@@ -53,7 +55,27 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     const IREE::Codegen::MaterializeEncodingInfo &materializeEncodingInfo) {
   ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
   if (ShapedType::isStaticShape(staticTileSizes)) {
-    return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
+    if (!materializeEncodingInfo.scalableTiles ||
+        llvm::none_of(materializeEncodingInfo.scalableTiles.value(),
+                      [](bool scalable) { return scalable; }))
+      return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
+    // In this case, we have scalable tiles present and we have to generate the
+    // necessary vscale operation and the corresponding static_size * vscale
+    // values.
+    SmallVector<OpFoldResult> result(staticTileSizes.size());
+    auto vscale = rewriter.create<vector::VectorScaleOp>(loc);
+    for (size_t i = 0; i < result.size(); i++) {
+      if (materializeEncodingInfo.scalableTiles.value()[i]) {
+        auto staticTileSize =
+            rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i]);
+        auto scalableInnerTileSize =
+            rewriter.create<arith::MulIOp>(loc, staticTileSize, vscale);
+        result[i] = scalableInnerTileSize.getResult();
+      } else {
+        result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
+      }
+    }
+    return result;
   }
 
   // Only VMVX with ukernel config supports dynamic inner tile sizes.

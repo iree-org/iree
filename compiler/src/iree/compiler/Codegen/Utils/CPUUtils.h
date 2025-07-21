@@ -36,6 +36,9 @@ std::string getEnableLoopPeelingStr();
 /// part of to the translation info corresponding to this funciton.
 bool isOptEnabled(FunctionOpInterface funcOp, StringRef label);
 
+/// Returns if scalable vectorization is enabled or not.
+bool isScalableVectorizationEnabled();
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_
