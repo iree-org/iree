@@ -746,15 +746,13 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool
-isFusableWithProducer(OpOperand &operand,
-                      const llvm::SmallBitVector &rootOuterParallelLoops,
-                      FormDispatchRegionsPassOptions const &options) {
+static bool isFusableWithProducer(
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    FormDispatchRegionsPassOptions const &options, bool fuseWithTruncate) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
-  if (!options.fuseTruncWithConsumers &&
-      IREE::LinalgExt::isBitTruncateOp(producer)) {
+  if (!fuseWithTruncate && IREE::LinalgExt::isBitTruncateOp(producer)) {
     return false;
   }
 
@@ -822,7 +820,8 @@ isFusableWithProducer(OpOperand &operand,
 static void
 fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
                        DominanceInfo const &dominanceInfo,
-                       FormDispatchRegionsPassOptions const &options) {
+                       FormDispatchRegionsPassOptions const &options,
+                       bool fuseWithTruncate) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
@@ -839,7 +838,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
         continue;
       }
 
-      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options)) {
+      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options,
+                                 fuseWithTruncate)) {
         continue;
       }
 
@@ -893,11 +893,17 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options);
+      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
+                             /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
     fuseRootsWithConsumers(context, roots, dominanceInfo, options);
+    for (Operation *root : roots) {
+      int64_t rootNumber = getRootNumber(root);
+      fuseRootsWithProducers(context, root, rootNumber, dominanceInfo, options,
+                             /*fuseWithTruncate=*/true);
+    }
   }
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
@@ -933,11 +939,17 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options);
+      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
+                             /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
     fuseRootsWithConsumers(context, roots, dominanceInfo, options);
+    for (Operation *root : roots) {
+      int64_t rootNumber = getRootNumber(root);
+      fuseRootsWithProducers(context, root, rootNumber, dominanceInfo, options,
+                             /*fuseWithTruncate=*/true);
+    }
   }
 
   return numRootOps;

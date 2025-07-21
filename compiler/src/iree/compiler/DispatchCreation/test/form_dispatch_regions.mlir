@@ -1491,3 +1491,29 @@ util.func public @place_truncf_in_producer_dispatch(%arg0: tensor<75600x5120xf32
 //  CHECK-SAME:       ins(%[[DISPATCH0]]
 //       CHECK:     flow.return %[[SCATTER]]
 //       CHECK:   util.return %[[DISPATCH1]]
+
+// -----
+
+// If the truncate cannot be fused with a producer make sure it gets fused
+// with a consumer.
+util.func public @place_truncf_in_consumer_dispatch(%arg0: tensor<75600xf32>, %arg1: tensor<1xi64>, %arg2: tensor<100x75600xbf16>) -> tensor<100x75600xbf16> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %3 = tensor.empty() : tensor<75600xbf16>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg0 : tensor<75600xf32>) outs(%3 : tensor<75600xbf16>) {
+  ^bb0(%in: f32, %out: bf16):
+    %6 = arith.truncf %in : f32 to bf16
+    linalg.yield %6 : bf16
+  } -> tensor<75600xbf16>
+  %5 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%4, %arg1 : tensor<75600xbf16>, tensor<1xi64>) outs(%arg2 : tensor<100x75600xbf16>) {
+  ^bb0(%arg3: bf16, %arg4: bf16):
+    iree_linalg_ext.yield %arg3 : bf16
+  } -> tensor<100x75600xbf16>
+  util.return %5 : tensor<100x75600xbf16>
+}
+// CHECK-LABEL: func public @place_truncf_in_consumer_dispatch
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[TRUNCF:.+]] = linalg.generic
+//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:       ins(%[[TRUNCF]]
+//       CHECK:     flow.return %[[SCATTER]]
+//       CHECK:   util.return %[[DISPATCH0]]
