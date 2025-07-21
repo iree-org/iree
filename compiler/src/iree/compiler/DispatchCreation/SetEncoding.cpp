@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -310,59 +311,6 @@ struct FoldFillWithSetEncoding final
 //===---------------------------------------------------------------------===//
 // Set padding encodings
 //===---------------------------------------------------------------------===//
-
-// Utility to return the producer dispatch region op result and the chain of
-// operations being looked past during the traversal to find the producer
-// dispatch.
-static std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-getProducerDispatchValueAndOpChain(Value operand) {
-  auto operandType = dyn_cast<RankedTensorType>(operand.getType());
-  if (!operandType || operandType.getRank() == 0) {
-    return std::nullopt;
-  }
-
-  SmallVector<Operation *> opChain;
-  auto producerValue = dyn_cast<OpResult>(operand);
-  while (producerValue &&
-         !isa<IREE::Flow::DispatchRegionOp>(producerValue.getOwner())) {
-    if (!llvm::hasSingleElement(producerValue.getUses())) {
-      return std::nullopt;
-    }
-
-    // If it is an operation that we want to look past, add it to the chain
-    // and update the `producerValue`.
-    Operation *currOperation = producerValue.getOwner();
-    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(currOperation)) {
-      opChain.push_back(currOperation);
-      producerValue = dyn_cast<OpResult>(currOperation->getOperand(0));
-      continue;
-    }
-
-    // Conservative, bail out.
-    return std::nullopt;
-  }
-
-  if (!producerValue) {
-    return std::nullopt;
-  }
-
-  auto producerDispatch =
-      dyn_cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
-  // TODO(MaheshRavishankar): Multi-result producer dispatches can be supported.
-  // Will require to move the consumer dispatch immediately after the producer
-  // instead of what is done below and move other operands of the consumer
-  // dispatch before the producer dispatch.
-  if (!producerDispatch ||
-      !llvm::hasSingleElement(producerDispatch.getBody()) ||
-      producerDispatch->getNumResults() != 1) {
-    return std::nullopt;
-  }
-  if (!llvm::hasSingleElement(producerValue.getUses())) {
-    return std::nullopt;
-  }
-  return std::make_pair(producerValue, opChain);
-}
-
 struct PaddedValue {
   Value paddedValue;
   SmallVector<Value> dynamicDims;
