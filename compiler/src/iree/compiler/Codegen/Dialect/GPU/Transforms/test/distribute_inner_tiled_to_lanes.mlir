@@ -735,3 +735,27 @@ module {
 // Verify that already vectorized (assumed distributed) mma ops are pass through.
 // CHECK-LABEL: func @distributed_matmul
 //       CHECK:   iree_codegen.inner_tiled {{.*}} : vector<2x8x1x4xf16>, vector<8x2x1x4xf16> into vector<2x2x4x1xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @fuse_producer_slice(%arg1 : tensor<4x2x16x16xbf16>, %arg2 : tensor<1x2x16x16xbf16>, %arg3 : tensor<4x1x16x16xf32>) -> tensor<4x1x16x16xf32> {
+  %c0 = arith.constant 0 : index
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %0 = linalg.fill ins(%cst_0 : f32) outs(%arg3 : tensor<4x1x16x16xf32>) -> tensor<4x1x16x16xf32>
+  %result = iree_codegen.inner_tiled ins(%arg1, %arg2) outs(%0) {indexing_maps = [#map, #map1, #map2],
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
+    } : tensor<4x2x16x16xbf16>, tensor<1x2x16x16xbf16> into tensor<4x1x16x16xf32>
+  return %result : tensor<4x1x16x16xf32>
+}
+
+// CHECK-LABEL: func @fuse_producer_slice
+// CHECK      :   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<4x1x16x16xf32>)
+// CHECK      :     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]]
+// CHECK      :     %[[FILL:.+]] = linalg.fill ins(%cst : f32) outs(%[[ACC_SLICE]] : tensor<4x1x4x1xf32>) -> tensor<4x1x4x1xf32>
+// CHECK      :     iree_codegen.inner_tiled
+// CHECK-SAME :     outs(%[[FILL]])
+// CHECK      :     mapping = [#iree_gpu.lane_id<0>]
