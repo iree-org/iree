@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-specialize-encodings)' --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-specialize-encodings)' --iree-llvmcpu-enable-scalable-vectorization=true --verify-diagnostics %s | FileCheck %s --check-prefix=WITH-SVE
 
 //------------------------------------------------------------------------------
 // IREE::CPU encoding layout specialization tests.
@@ -10,16 +11,20 @@
 #map2 = affine_map<(m, n, k) -> (m, n)>
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_cpu.vmvx_encoding_resolver<>}>
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
+#executable_target_aarch64 = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple="aarch64-xyz-xyz", cpu_features="+sve"}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_x86_64]> : !hal.device
+#device_target_local_2_ = #hal.device.target<"local", {ordinal = 2 : index}, [#executable_target_aarch64]> : !hal.device
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2]>
 
 util.global private @device_a = #device_target_local_0_
 util.global private @device_b = #device_target_local_1_
-util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
+util.global private @device_c = #device_target_local_2_
+util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index, index) {
   %size0 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<?x?xf32, #encoding>{%d0, %d1} : index
   %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<?x?xf32, #encoding>{%d0, %d1} : index
-  util.return %size0, %size1 : index, index
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_c>) tensor<?x?xf32, #encoding>{%d0, %d1} : index
+  util.return %size0, %size1, %size2 : index, index, index
 }
 // CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.layout<[#iree_cpu.vmvx_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
 // CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}]}
@@ -27,6 +32,11 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index) {
 // CHECK:         %[[D0_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING0]]>
 // CHECK:         %[[D1_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING1]]>
 // CHECK:         return %[[D0_RES]], %[[D1_RES]]
+
+// WITH-SVE-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [{{.+}}], innerTileSizes = [{{.+}}], outerDimsPerm = [{{.+}}], scalableTiles = [{{.+}}]}
+// WITH-SVE-LABEL: util.func public @tensor_sizeof
+// WITH-SVE:         %[[D0_RES:.+]] = stream.tensor.sizeof {{.+}} tensor<?x?xf32, #[[$ENCODING0]]>
+// WITH-SVE:         return {{.+}}, %[[D0_RES]]
 
 // -----
 
