@@ -722,10 +722,9 @@ hal.executable private @split_reduction_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((s1 * s2) * s0))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((s1 * s2) * s0) * ((-s3 + s4) ceildiv s5))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
-//   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //       CHECK: @split_reduction_variant
 //       CHECK:   hal.executable.export
 //  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
@@ -746,11 +745,62 @@ hal.executable private @split_reduction_executable {
 //   CHECK-DAG:     %[[ORIG_UB2:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
 //   CHECK-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply #[[MAP1]]()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
 //   CHECK-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
-//   CHECK-DAG:     %[[COUNTX:.+]] = hal.interface.workgroup.count[0]
-//   CHECK-DAG:     %[[ORIG_COUNTZ:.+]] = affine.apply #[[MAP2]]()[%[[COUNTX]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
-//       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIG_COUNTZ]]
-//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP3]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
+//       CHECK:     %[[DELINEARIZE:.+]]:4 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]])
+//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP2]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
 //       CHECK:     "use1"(%[[SPLITIVREPLACEMENT]])
-//       CHECK:     %[[OTHERIVREPLACEMENTS:.+]]:3 = affine.delinearize_index %[[DELINEARIZE]]#1
-//  CHECK-SAME:       into (%[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]]
-//       CHECK:     "use2"(%[[OTHERIVREPLACEMENTS]]#0, %[[OTHERIVREPLACEMENTS]]#1, %[[OTHERIVREPLACEMENTS]]#2)
+//       CHECK:     "use2"(%[[DELINEARIZE]]#1, %[[DELINEARIZE]]#2, %[[DELINEARIZE]]#3)
+
+// -----
+
+// Check that having just the split reduction loop gets resolved.
+
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly">,
+    #hal.pipeline.binding<storage_buffer>]>
+hal.executable private @only_split_reduction_executable {
+  hal.executable.variant public @only_split_reduction_variant target(#hal.executable.target<"", "", {}>) {
+    hal.executable.export public @only_split_reduction layout(#pipeline_layout) count(
+        %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+      %return_x, %return_y, %return_z =
+          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier(%x, %y, %z), %arg1, %arg2, %arg3
+      hal.return %return_x, %return_y, %return_z : index, index, index
+    }
+    builtin.module {
+      func.func @only_split_reduction() {
+        %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
+        scf.forall (%arg0) = (%0) to (%1) step (%2) {
+          "use1"(%arg0) : (index) -> ()
+        } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+        return
+      }
+    }
+  }
+}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//       CHECK: @only_split_reduction_variant
+//       CHECK:   hal.executable.export
+//  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:       %[[ARG2:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:       %[[ARG3:[a-zA-Z0-9_]+]]: index
+//   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
+//       CHECK:   func @only_split_reduction
+//   CHECK-DAG:     %[[SPLIT_LB:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
+//   CHECK-DAG:     %[[SPLIT_UB:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
+//   CHECK-DAG:     %[[SPLIT_STEP:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
+//   CHECK-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply #[[MAP0]]()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+//   CHECK-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
+//   CHECK-DAG:     %[[COUNTX:.+]] = hal.interface.workgroup.count[0]
+//   CHECK-DAG:     %[[ORIGCOUNTX:.+]] = affine.apply #[[MAP1]]()[%[[COUNTX]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+//       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIGCOUNTX]])
+//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP2]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
+//       CHECK:     "use1"(%[[SPLITIVREPLACEMENT]])

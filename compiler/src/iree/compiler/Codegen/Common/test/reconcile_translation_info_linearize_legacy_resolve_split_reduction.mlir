@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
 
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
@@ -210,50 +210,54 @@ hal.executable private @split_reduction_executable {
 //    CHECK-ALL-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 
 //   DISTRIBUTEX-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> (((s1 * s2) * s0) * ((-s3 + s4) ceildiv s5))>
+//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((s1 * s2) * s0))>
 //  DISTRIBUTEX-SAME:         [%[[ARG4]], %[[ARG6]], %[[ARG5]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //       DISTRIBUTEX:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 
 //   DISTRIBUTEY-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> ((s0 * s1) * ((-s2 + s3) ceildiv s4))>
+//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> (((-s2 + s3) ceildiv s4) * (s0 * s1))>
 //  DISTRIBUTEY-SAME:         [%[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //       DISTRIBUTEY:     hal.return %[[ARG6]], %[[NUMWORKGROUPSY]], %[[C1]]
 
-//       DISTRIBUTEZ:     %[[NUMWORKGROUPSZ:.+]] = affine.apply affine_map<()[s0, s1, s2, s3] -> (s0 * ((-s1 + s2) ceildiv s3))>
-//  DISTRIBUTEZ-SAME:         ()[%[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEZ:     %[[NUMWORKGROUPSZ:.+]] = affine.apply affine_map<(d0)[s0, s1, s2] -> (d0 * ((-s0 + s1) ceildiv s2))>
+//  DISTRIBUTEZ-SAME:         (%[[ARG4]])[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //       DISTRIBUTEZ:     hal.return %[[ARG6]], %[[ARG5]], %[[NUMWORKGROUPSZ]]
 
 //         CHECK-ALL:   func @split_reduction
 //     CHECK-ALL-DAG:     %[[SPLIT_LB:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
 //     CHECK-ALL-DAG:     %[[SPLIT_UB:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
 //     CHECK-ALL-DAG:     %[[SPLIT_STEP:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
-
 //   DISTRIBUTEX-DAG:     %[[WG_BOUND_Z:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
 //   DISTRIBUTEX-DAG:     %[[WG_BOUND_Y:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
 //   DISTRIBUTEX-DAG:     %[[WG_BOUND_X:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
-//   DISTRIBUTEX-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
-//   DISTRIBUTEX-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
-//   DISTRIBUTEX-DAG:     %[[DELINEARIZE:.+]]:4 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[WG_BOUND_Z]], %[[WG_BOUND_Y]], %[[WG_BOUND_X]])
 
 //   DISTRIBUTEY-DAG:     %[[WG_BOUND_Z:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
 //   DISTRIBUTEY-DAG:     %[[WG_BOUND_Y:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
-//   DISTRIBUTEY-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
-//   DISTRIBUTEY-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
-//   DISTRIBUTEY-DAG:     %[[IDY:.+]] = hal.interface.workgroup.id[1]
-//   DISTRIBUTEY-DAG:     %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[IDY]] into (%[[SPLIT_NPROCS]], %[[WG_BOUND_Z]], %[[WG_BOUND_Y]])
 
-//   DISTRIBUTEZ-DAG:     %[[WG_BOUND_Z:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
-//   DISTRIBUTEZ-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
-//   DISTRIBUTEZ-DAG:     %[[IDY:.+]] = hal.interface.workgroup.id[1]
-//   DISTRIBUTEZ-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
-//   DISTRIBUTEZ-DAG:     %[[IDZ:.+]] = hal.interface.workgroup.id[2]
-//   DISTRIBUTEZ-DAG:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDZ]] into (%[[SPLIT_NPROCS]], %[[WG_BOUND_Z]])
+//     CHECK-ALL-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
 
+//   DISTRIBUTEX-DAG:     %[[DELINEARIZE_FROM_ID:.+]] = hal.interface.workgroup.id[0]
+//   DISTRIBUTEX-DAG:     %[[DELINEARIZE_FROM_COUNT:.+]] = hal.interface.workgroup.count[0]
+
+//   DISTRIBUTEY-DAG:     %[[DELINEARIZE_FROM_ID:.+]] = hal.interface.workgroup.id[1]
+//   DISTRIBUTEY-DAG:     %[[DELINEARIZE_FROM_COUNT:.+]] = hal.interface.workgroup.count[1]
+
+//   DISTRIBUTEZ-DAG:     %[[DELINEARIZE_FROM_ID:.+]] = hal.interface.workgroup.id[2]
+//   DISTRIBUTEZ-DAG:     %[[DELINEARIZE_FROM_COUNT:.+]] = hal.interface.workgroup.count[2]
+
+//         CHECK-ALL:     %[[ORIG_NPROCS:.+]] = affine.apply affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
+//    CHECK-ALL-SAME:         ()[%[[DELINEARIZE_FROM_COUNT]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
+//         CHECK-ALL:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[DELINEARIZE_FROM_ID]] into (%[[SPLIT_NPROCS]], %[[ORIG_NPROCS]])
 //         CHECK-ALL:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
 //         CHECK-ALL:     "use1"(%[[SPLITIVREPLACEMENT]])
 
-//       DISTRIBUTEX:     "use2"(%[[DELINEARIZE]]#1, %[[DELINEARIZE]]#2, %[[DELINEARIZE]]#3)
+//       DISTRIBUTEX:     %[[DELINEARIZE2:.+]]:3 = affine.delinearize_index %[[DELINEARIZE]]#1 into (%[[WG_BOUND_Z]], %[[WG_BOUND_Y]], %[[WG_BOUND_X]])
+//       DISTRIBUTEX:     "use2"(%[[DELINEARIZE2]]#0, %[[DELINEARIZE2]]#1, %[[DELINEARIZE2]]#2)
 
-//       DISTRIBUTEY:     "use2"(%[[DELINEARIZE]]#1, %[[DELINEARIZE]]#2, %[[IDX]])
+//   DISTRIBUTEY-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
+//   DISTRIBUTEY-DAG:     %[[DELINEARIZE2:.+]]:2 = affine.delinearize_index %[[DELINEARIZE]]#1 into (%[[WG_BOUND_Z]], %[[WG_BOUND_Y]])
+//       DISTRIBUTEY:     "use2"(%[[DELINEARIZE2]]#0, %[[DELINEARIZE2]]#1, %[[IDX]])
 
+//   DISTRIBUTEZ-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
+//   DISTRIBUTEZ-DAG:     %[[IDY:.+]] = hal.interface.workgroup.id[1]
 //       DISTRIBUTEZ:     "use2"(%[[DELINEARIZE]]#1, %[[IDY]], %[[IDX]])
