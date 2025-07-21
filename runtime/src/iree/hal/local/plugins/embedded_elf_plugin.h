@@ -37,7 +37,7 @@ iree_status_t iree_hal_embedded_elf_executable_plugin_load_from_memory(
 // file |path|. See iree_hal_embedded_elf_executable_plugin_load_from_memory
 // for more information.
 iree_status_t iree_hal_embedded_elf_executable_plugin_load_from_file(
-    const char* path, iree_host_size_t param_count,
+    iree_string_view_t path, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_executable_plugin_t** out_plugin);
 #endif  // IREE_FILE_IO_ENABLE
