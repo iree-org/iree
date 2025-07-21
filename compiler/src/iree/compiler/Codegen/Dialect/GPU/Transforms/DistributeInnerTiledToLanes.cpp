@@ -44,6 +44,12 @@ LogicalResult fuseProducersGreedily(RewriterBase &rewriter,
     if (producer && producer->getBlock() != laneForall.getBody()) {
       candidates.push_back(extractSliceOp);
     }
+
+    // Collect slices to fuse producers of loop destinations into lane foralls.
+    if (laneForall.getRegionIterArgs()[0] == extractSliceOp.getSource() &&
+        laneForall.getOutputs()[0].getDefiningOp<TilingInterface>()) {
+      candidates.push_back(extractSliceOp);
+    }
   });
 
   SmallVector<LoopLikeOpInterface> loops = {laneForall};
