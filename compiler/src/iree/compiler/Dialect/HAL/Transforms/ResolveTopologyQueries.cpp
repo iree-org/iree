@@ -93,7 +93,7 @@ static bool allReferToSameDevice(DeviceOptimalAttr optimalAttr,
   return true;
 }
 
-// Checks if the given device has transparent access to all other devices.
+// Returns true if the given device has transparent access to all other devices.
 static bool hasTransparentAccessToAll(IREE::HAL::DeviceTopologyAttr topology,
                                       IREE::Stream::AffinityAttr source,
                                       DeviceOptimalAttr optimalAttr) {
