@@ -287,9 +287,9 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
             target, entryPointFn, computeOp))) {
       return success();
     }
-    if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
-      return success();
-    }
+    // if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
+    //   return success();
+    // }
     // TODO: Add configurations for matmul here too.
     if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
                                                           computeOp))) {
