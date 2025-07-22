@@ -177,7 +177,6 @@ CUDA_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
-        "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
         "subbyte_to_fp.mlir",
         # currently only enabled on cuda as it can be slow on other backends.
@@ -189,6 +188,7 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294

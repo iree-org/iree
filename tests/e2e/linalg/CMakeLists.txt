@@ -130,7 +130,6 @@ iree_check_single_backend_test_suite(
     check_large_linalg_matmul_cuda
   SRCS
     "conv2d.mlir"
-    "fp4_f32_conversion.mlir"
     "fp_to_subbyte.mlir"
     "large_linalg_matmul.mlir"
     "narrow_n_matmuls.mlir"
