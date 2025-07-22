@@ -493,6 +493,15 @@ def IREEBufferizeConstantsPass :
   let summary = "Convert from arith.constant on tensors to buffers";
 }
 
+def IREECodegenCanonicalizerPass :
+    Pass<"iree-codegen-canonicalize", ""> {
+  let summary = "Codegen canonicalization pass with IREE specific patterns";
+  let options = [
+    Option<"testConvergence", "test-convergence", "bool",
+           /*default=*/"false", "Fails if the patterns fail to converge">
+  ];
+}
+
 def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
