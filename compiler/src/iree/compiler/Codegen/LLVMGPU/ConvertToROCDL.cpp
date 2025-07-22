@@ -283,6 +283,7 @@ struct ConvertToROCDLPass final
       arith::populateExpandF8E8M0Patterns(fallbackSmallFloatPatterns);
       if (failed(applyPatternsGreedily(
               m, std::move(fallbackSmallFloatPatterns)))) {
+        LDBG("Small float patterns failed\n" << m);
         return signalPassFailure();
       }
     }
@@ -346,8 +347,9 @@ struct ConvertToROCDLPass final
       populateMathToROCDLConversionPatterns(converter, llvmPatterns);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
 
-      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
-        signalPassFailure();
+      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LDBG("After converting to rocdl\n" << m);
