@@ -17,6 +17,7 @@ EXPORTS
   ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue
   ireeCodegenGetExecutableVariantOps
+  ireeGPUGetSingleSubgroupLayout
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
   ireeCodegenQueryMMAIntrinsics

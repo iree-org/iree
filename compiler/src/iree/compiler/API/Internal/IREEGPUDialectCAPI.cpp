@@ -350,3 +350,40 @@ MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
 
   return wrap(mma_attr);
 }
+
+ireeGPUMMASingleSubgroupLayout
+ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
+  assert(ireeAttributeIsAGPUMMAIntrinsicAttr(attr) ||
+         ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr) &&
+             "Expected MMA or VirtualMMA Intrinsic");
+
+  mlir::Attribute baseAttr = unwrap(attr);
+  mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout layout;
+  mlir::iree_compiler::IREE::GPU::MMAFragment frag =
+      static_cast<mlir::iree_compiler::IREE::GPU::MMAFragment>(fragment);
+
+  if (auto intrinsicAttr =
+          llvm::dyn_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
+              baseAttr)) {
+    layout = mlir::iree_compiler::IREE::GPU::getSingleSubgroupLayout(
+        intrinsicAttr.getValue(), frag);
+  } else if (auto virtualIntrinsicAttr = llvm::dyn_cast<
+                 mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
+                 baseAttr)) {
+    layout = mlir::iree_compiler::IREE::GPU::getSingleSubgroupLayout(
+        virtualIntrinsicAttr.getValue(), frag);
+  } else {
+    assert(false &&
+           "Unreachable: attribute must be MMA or VirtualMMA intrinsic");
+  }
+
+  mlir::MLIRContext *context = baseAttr.getContext();
+  mlir::Builder builder(context);
+
+  ireeGPUMMASingleSubgroupLayout result = {};
+  result.outer = wrap(builder.getI64ArrayAttr(layout.outer));
+  result.thread = wrap(builder.getI64ArrayAttr(layout.thread));
+  result.tstrides = wrap(builder.getI64ArrayAttr(layout.tstrides));
+  result.element = wrap(builder.getI64ArrayAttr(layout.element));
+  return result;
+}
