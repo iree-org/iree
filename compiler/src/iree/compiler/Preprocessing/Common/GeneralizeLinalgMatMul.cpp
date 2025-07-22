@@ -32,7 +32,8 @@ struct GeneralizeLinalgMatMulPass
       }
       if (isa_and_nonnull<linalg::MatmulOp, linalg::MatmulTransposeBOp,
                           linalg::BatchMatmulOp,
-                          linalg::BatchMatmulTransposeBOp>(linalgOp)) {
+                          linalg::BatchMatmulTransposeBOp>(
+              linalgOp.getOperation())) {
         namedOpCandidates.push_back(linalgOp);
       }
     });
