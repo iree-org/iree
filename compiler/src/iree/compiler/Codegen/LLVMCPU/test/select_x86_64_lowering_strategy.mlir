@@ -1052,11 +1052,11 @@ func.func @multi_root() attributes {hal.executable.target = #executable_target_e
 func.func @pack() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x40xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x48xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x48x16x1xf32>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 48], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x48xf32>> -> tensor<20x48xf32>
   %3 = tensor.empty() : tensor<2x48x16x1xf32>
-  %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf32> -> tensor<2x48x16x1xf32>
+  %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x48xf32> -> tensor<2x48x16x1xf32>
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 48, 16, 1], strides = [1, 1, 1, 1] : tensor<2x48x16x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x48x16x1xf32>>
   return
 }
@@ -1077,11 +1077,11 @@ func.func @pack() attributes {hal.executable.target = #executable_target_embedde
 func.func @pack_f16() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x40xf16>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x48xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x48x16x1xf16>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x40xf16>> -> tensor<20x40xf16>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 48], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x48xf16>> -> tensor<20x48xf16>
   %3 = tensor.empty() : tensor<2x48x16x1xf16>
-  %pack = linalg.pack %2 padding_value(%cst : f16) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf16> -> tensor<2x48x16x1xf16>
+  %pack = linalg.pack %2 padding_value(%cst : f16) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x48xf16> -> tensor<2x48x16x1xf16>
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 48, 16, 1], strides = [1, 1, 1, 1] : tensor<2x48x16x1xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x48x16x1xf16>>
   return
 }
