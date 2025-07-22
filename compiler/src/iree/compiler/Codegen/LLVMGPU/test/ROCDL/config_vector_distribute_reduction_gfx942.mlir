@@ -398,6 +398,9 @@ func.func @test_store_to_buffer(%arg0: index, %arg1: index) {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
+// Test that the thread vector size maximizes memory bandwidth of the largest tensor
+// operand (tensor<6656x16384xf16>). We want to emit dwordx4 load, so the vector size
+// should be 8xf16 ==> 16 bytes.
 func.func @batch_matvec_f16_f32() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
