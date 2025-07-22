@@ -816,6 +816,149 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
   }
 };
 
+/// Folds iree_tensor_ext.bitcast that only change the inner most dimension into
+/// the source hal.interface.binding.subspan
+struct FoldInnerBitcastIntoInterfaceTensorLoad
+    : OpRewritePattern<IREE::TensorExt::BitCastOp> {
+  using OpRewritePattern<IREE::TensorExt::BitCastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
+                                PatternRewriter &rewriter) const override {
+    Value bitcastSrc = bitcastOp.getSource();
+    auto loadOp =
+        bitcastSrc.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
+    if (!loadOp) {
+      return failure();
+    }
+
+    auto subspanOp = loadOp.getSource()
+                         .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!subspanOp) {
+      return failure();
+    }
+
+    auto bitcastSrcType = cast<RankedTensorType>(bitcastSrc.getType());
+    auto bitcastResType = cast<RankedTensorType>(bitcastOp.getType());
+
+    // Verify that only the inner most dimension is changed by the bitcast by
+    // comparing dynamic and static sizes for equality.
+    if (bitcastOp.getSourceDims() != bitcastOp.getResultDims() ||
+        bitcastSrcType.getShape().drop_back() !=
+            bitcastResType.getShape().drop_back() ||
+        ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
+      return failure();
+    }
+
+    // Fail if the inner most dim is sliced by the load or if this is an encoded
+    // tensor.
+    auto subspanType =
+        cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
+    auto subspanTensorType = cast<RankedTensorType>(subspanType.getBoundType());
+    if (subspanTensorType.getEncoding() ||
+        subspanTensorType.getShape().back() !=
+            bitcastSrcType.getShape().back()) {
+      return failure();
+    }
+
+    int64_t newInnerSize = bitcastResType.getShape().back();
+    SmallVector<int64_t> newSubspanShape(subspanType.getShape());
+    newSubspanShape.back() = newInnerSize;
+
+    auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
+        subspanType.getAccess(),
+        RankedTensorType::get(newSubspanShape,
+                              bitcastResType.getElementType()));
+
+    // Byte offset and byte alignment remain the same after folding the cast.
+    // Simply create a new binding with the new type.
+    rewriter.setInsertionPoint(subspanOp);
+    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(),
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
+
+    rewriter.setInsertionPoint(bitcastOp);
+    SmallVector<int64_t> newSizes(loadOp.getStaticSizes());
+    newSizes.back() = newInnerSize;
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
+        bitcastOp, bitcastResType, newSubspanOp, loadOp.getSourceDims(),
+        loadOp.getOffsets(), loadOp.getSizes(), loadOp.getStrides(),
+        loadOp.getStaticOffsets(), newSizes, loadOp.getStaticStrides());
+
+    return success();
+  }
+};
+
+struct FoldInnerBitcastIntoInterfaceTensorStore
+    : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
+  using OpRewritePattern<
+      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto bitcastOp =
+        storeOp.getValue().getDefiningOp<IREE::TensorExt::BitCastOp>();
+    if (!bitcastOp) {
+      return failure();
+    }
+
+    Value bitcastSrc = bitcastOp.getSource();
+    auto bitcastSrcType = cast<RankedTensorType>(bitcastSrc.getType());
+    auto bitcastResType = cast<RankedTensorType>(bitcastOp.getType());
+
+    // Verify that only the inner most dimension is changed by the bitcast by
+    // comparing dynamic and static sizes for equality.
+    if (bitcastOp.getSourceDims() != bitcastOp.getResultDims() ||
+        bitcastSrcType.getShape().drop_back() !=
+            bitcastResType.getShape().drop_back() ||
+        ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
+      return failure();
+    }
+
+    auto subspanOp =
+        storeOp.getTarget()
+            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!subspanOp) {
+      return failure();
+    }
+
+    auto subspanType =
+        llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
+    auto subspanTensorType = cast<RankedTensorType>(subspanType.getBoundType());
+    if (subspanTensorType.getEncoding() ||
+        subspanTensorType.getShape().back() !=
+            bitcastResType.getShape().back()) {
+      return failure();
+    }
+
+    int64_t newInnerSize = bitcastSrcType.getShape().back();
+    SmallVector<int64_t> newSubspanShape(subspanType.getShape());
+    newSubspanShape.back() = newInnerSize;
+
+    auto newSubspanTensorType =
+        RankedTensorType::get(newSubspanShape, bitcastSrcType.getElementType());
+    auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
+        subspanType.getAccess(), newSubspanTensorType);
+
+    rewriter.setInsertionPointAfter(subspanOp);
+    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(),
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
+
+    SmallVector<int64_t> newSizes(storeOp.getStaticSizes());
+    newSizes.back() = newInnerSize;
+    rewriter.setInsertionPoint(storeOp);
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
+        storeOp, TypeRange{}, bitcastSrc, newSubspanOp, storeOp.getTargetDims(),
+        storeOp.getOffsets(), storeOp.getSizes(), storeOp.getStrides(),
+        storeOp.getStaticOffsets(), newSizes, storeOp.getStaticStrides());
+    return success();
+  }
+};
+
 //===--------------------------------------------------------------------====//
 // Patterns to fold ops into iree_codegen.store_to/load_from_buffer
 //===--------------------------------------------------------------------====//
@@ -1002,6 +1145,7 @@ struct FoldReshapeIntoInterfaceTensorPass final
           FoldReshapeIntoInterfaceTensorPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
+    llvm::errs() << "[DEBUG] FoldReshapeIntoInterfaceTensorPass\n";
     populateReshapeToInterfaceTensorPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
@@ -1016,7 +1160,9 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
                   FoldCollapseShapeIntoInterfaceTensorStore,
                   FoldCollapseShapeIntoInterfaceTensorStoreFullSlice,
                   FoldExpandShapeIntoInterfaceTensorLoad,
-                  FoldExpandShapeIntoInterfaceTensorStore>(
+                  FoldExpandShapeIntoInterfaceTensorStore,
+                  FoldInnerBitcastIntoInterfaceTensorLoad,
+                  FoldInnerBitcastIntoInterfaceTensorStore>(
       patterns.getContext());
 }
 
