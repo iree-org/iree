@@ -2704,7 +2704,7 @@ func.func @rocdl_buffer_memory_space_elementwise_copy() {
 //   CHECK-DAG:   %[[arg0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
 //   CHECK-DAG:   %[[arg1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) offset(%{{.+}}) : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg0]] resetOffset : memref<256x256xf32, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
-//   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg1]] resetOffset : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+//   CHECK-DAG:   amdgpu.fat_raw_buffer_cast %[[arg1]] resetOffset : memref<256x256xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> to memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 //   CHECK-NOT:   hal.interface.binding.subspan
 //       CHECK:    return
 
