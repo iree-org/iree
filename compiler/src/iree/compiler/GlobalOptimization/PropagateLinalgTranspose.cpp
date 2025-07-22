@@ -892,7 +892,7 @@ public:
 
 namespace {
 
-template <typename OpTy, typename ReplTy, int64_t inputIdx>
+template <typename OpTy, int64_t inputIdx>
 class NamedOpConversion : public OpRewritePattern<OpTy> {
 public:
   using OpRewritePattern<OpTy>::OpRewritePattern;
@@ -920,8 +920,43 @@ public:
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
     SmallVector<Value> newInputs = namedOp.getInputs();
     newInputs[inputIdx] = transpose.getInput();
-    rewriter.replaceOpWithNewOp<ReplTy>(namedOp, newInputs,
-                                        namedOp.getDpsInits(), attrs);
+
+    Operation *op = namedOp.getOperation();
+    if (isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) {
+      rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
+      rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::MatmulOp>(op) &&
+               !isa<linalg::MatmulTransposeAOp>(op) &&
+               !isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 0) {
+      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeAOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::MatmulOp>(op) &&
+               !isa<linalg::MatmulTransposeAOp>(op) &&
+               !isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
+      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) {
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::BatchMatmulOp>(op) &&
+               !isa<linalg::BatchMatmulTransposeAOp>(op) &&
+               !isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 0) {
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeAOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else if (isa<linalg::BatchMatmulOp>(op) &&
+               !isa<linalg::BatchMatmulTransposeAOp>(op) &&
+               !isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    } else {
+      return failure();
+    }
     return success();
   }
 
@@ -957,46 +992,18 @@ struct PropagateLinalgTransposePass
 
 static void populateNamedOpSinkingPatterns(MLIRContext *context,
                                            RewritePatternSet &sinkingPatterns) {
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
-                                /*ReplacementType=*/linalg::MatmulTransposeBOp,
-                                /*inputIdx=*/1>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
-                                /*ReplacementType=*/linalg::MatmulTransposeAOp,
-                                /*inputIdx=*/0>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeBOp,
-                                /*ReplacementType=*/linalg::MatmulOp,
-                                /*inputIdx=*/1>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeAOp,
-                                /*ReplacementType=*/linalg::MatmulOp,
-                                /*inputIdx=*/0>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns.insert<
-      NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
-                        /*ReplacementType=*/linalg::BatchMatmulTransposeBOp,
-                        /*inputIdx=*/1>>(context,
-                                         SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns.insert<
-      NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
-                        /*ReplacementType=*/linalg::BatchMatmulTransposeAOp,
-                        /*inputIdx=*/0>>(context,
-                                         SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeBOp,
-                                /*ReplacementType=*/linalg::BatchMatmulOp,
-                                /*inputIdx=*/1>>(context,
-                                                 SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeAOp,
-                                /*ReplacementType=*/linalg::BatchMatmulOp,
-                                /*inputIdx=*/0>>(context,
-                                                 SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
+                                           /*inputIdx=*/1>>(
+      context, SmallVector<int64_t>{1, 0});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
+                                           /*inputIdx=*/0>>(
+      context, SmallVector<int64_t>{1, 0});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
+                                           /*inputIdx=*/1>>(
+      context, SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
+                                           /*inputIdx=*/0>>(
+      context, SmallVector<int64_t>{0, 2, 1});
 }
 
 static void
