@@ -288,12 +288,12 @@ createIREEComprehensiveBufferizePass(
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createIREECodegenCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   // There are redundant memcpy (with linalg.generic form) ops created, which
   // can be deleted by canonicalizer. We have to run it again because the
   // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createIREECodegenCanonicalizerPass());
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
 }
 
