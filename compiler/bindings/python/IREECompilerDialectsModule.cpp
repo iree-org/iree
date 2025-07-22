@@ -519,6 +519,36 @@ NB_MODULE(_ireeCompilerDialects, m) {
           });
 
   //===-------------------------------------------------------------------===//
+  // Binding to utility function getSingleSubgroupLayout
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeGPUMMASingleSubgroupLayout>(iree_gpu_module,
+                                             "GPUMMASingleSubgroupLayout")
+      .def_prop_ro(
+          "outer",
+          [](const ireeGPUMMASingleSubgroupLayout &self) { return self.outer; })
+      .def_prop_ro("thread",
+                   [](const ireeGPUMMASingleSubgroupLayout &self) {
+                     return self.thread;
+                   })
+      .def_prop_ro("tstrides",
+                   [](const ireeGPUMMASingleSubgroupLayout &self) {
+                     return self.tstrides;
+                   })
+      .def_prop_ro("element", [](const ireeGPUMMASingleSubgroupLayout &self) {
+        return self.element;
+      });
+
+  iree_gpu_module.def(
+      "get_single_subgroup_layout",
+      [](MlirAttribute attr, int fragment) {
+        return ireeGPUGetSingleSubgroupLayout(attr, fragment);
+      },
+      "Returns the single subgroup layout (element, thread, outer, "
+      "tstrides) "
+      "for a given MMA or VirtualMMA intrinsic and fragment.",
+      py::arg("attr"), py::arg("fragment"));
+
+  //===-------------------------------------------------------------------===//
   // Binding to utility function getExecutableVariantOps
   //===-------------------------------------------------------------------===//
 

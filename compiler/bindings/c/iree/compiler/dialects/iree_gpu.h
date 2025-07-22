@@ -132,6 +132,16 @@ ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
 
+struct ireeGPUMMASingleSubgroupLayout {
+  MlirAttribute outer;
+  MlirAttribute thread;
+  MlirAttribute tstrides;
+  MlirAttribute element;
+};
+
+MLIR_CAPI_EXPORTED ireeGPUMMASingleSubgroupLayout
+ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment);
+
 #ifdef __cplusplus
 }
 #endif
