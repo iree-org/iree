@@ -92,11 +92,11 @@ def attention_op_detail():
     result = iree_codegen.get_attention_op_detail(q_map, k_map, v_map, o_map)
 
     assert result.domain_rank == 5
-    assert [attr.value for attr in result.batch_dims] == [0]
-    assert [attr.value for attr in result.m_dims] == [1]
-    assert [attr.value for attr in result.k1_dims] == [2]
-    assert [attr.value for attr in result.k2_dims] == [3]
-    assert [attr.value for attr in result.n_dims] == [4]
+    assert result.batch_dims == [0]
+    assert result.m_dims == [1]
+    assert result.k1_dims == [2]
+    assert result.k2_dims == [3]
+    assert result.n_dims == [4]
 
     dim_exprs = [affine.AffineDimExpr.get(i) for i in range(4)]
 
@@ -108,11 +108,11 @@ def attention_op_detail():
 
     result = iree_codegen.get_attention_op_detail(q_map, k_map, v_map, o_map)
     assert result.domain_rank == 4
-    assert [attr.value for attr in result.batch_dims] == [0]
-    assert [attr.value for attr in result.m_dims] == [1]
-    assert [attr.value for attr in result.k1_dims] == []
-    assert [attr.value for attr in result.k2_dims] == [2]
-    assert [attr.value for attr in result.n_dims] == [3]
+    assert result.batch_dims == [0]
+    assert result.m_dims == [1]
+    assert result.k1_dims == []
+    assert result.k2_dims == [2]
+    assert result.n_dims == [3]
 
 
 @run

@@ -132,6 +132,8 @@ ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
 
+// Represents the subgroup-level layout of an MMA fragment.
+// Each field is an ArrayAttr of two i64 values.
 struct ireeGPUMMASingleSubgroupLayout {
   MlirAttribute outer;
   MlirAttribute thread;

@@ -234,10 +234,10 @@ def mma_intrinsic_attr():
         attr=mma_intrinsic_attr, fragment=fragment
     )
     assert isinstance(mma_single_subgroup_layout, iree_gpu.GPUMMASingleSubgroupLayout)
-    assert [attr.value for attr in mma_single_subgroup_layout.outer] == [1, 1]
-    assert [attr.value for attr in mma_single_subgroup_layout.thread] == [32, 2]
-    assert [attr.value for attr in mma_single_subgroup_layout.tstrides] == [1, 32]
-    assert [attr.value for attr in mma_single_subgroup_layout.element] == [1, 4]
+    assert mma_single_subgroup_layout.outer == [1, 1]
+    assert mma_single_subgroup_layout.thread == [32, 2]
+    assert mma_single_subgroup_layout.tstrides == [1, 32]
+    assert mma_single_subgroup_layout.element == [1, 4]
 
     raw_value = mma_intrinsic_attr.raw_value
     assert raw_value == iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16
@@ -299,13 +299,13 @@ def virtual_mma_intrinsic_attr():
     assert isinstance(
         virtual_mma_single_subgroup_layout, iree_gpu.GPUMMASingleSubgroupLayout
     )
-    assert [attr.value for attr in virtual_mma_single_subgroup_layout.outer] == [1, 1]
-    assert [attr.value for attr in virtual_mma_single_subgroup_layout.thread] == [16, 4]
-    assert [attr.value for attr in virtual_mma_single_subgroup_layout.tstrides] == [
+    assert virtual_mma_single_subgroup_layout.outer == [1, 1]
+    assert virtual_mma_single_subgroup_layout.thread == [16, 4]
+    assert virtual_mma_single_subgroup_layout.tstrides == [
         1,
         16,
     ]
-    assert [attr.value for attr in virtual_mma_single_subgroup_layout.element] == [1, 8]
+    assert virtual_mma_single_subgroup_layout.element == [1, 8]
 
     raw_value = virtual_mma_intrinsic_attr.raw_value
     assert raw_value == iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16

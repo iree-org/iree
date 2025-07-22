@@ -380,12 +380,10 @@ ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
   mlir::MLIRContext *context = baseAttr.getContext();
   mlir::Builder builder(context);
 
-  ireeGPUMMASingleSubgroupLayout result;
-
+  ireeGPUMMASingleSubgroupLayout result = {};
   result.outer = wrap(builder.getI64ArrayAttr(layout.outer));
   result.thread = wrap(builder.getI64ArrayAttr(layout.thread));
   result.tstrides = wrap(builder.getI64ArrayAttr(layout.tstrides));
   result.element = wrap(builder.getI64ArrayAttr(layout.element));
-
   return result;
 }
