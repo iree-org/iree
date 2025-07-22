@@ -251,12 +251,12 @@ func.func @matmul_aarch_i8_i8_i32_dynamic() attributes {hal.executable.target = 
 func.func @pack() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x40xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
-  %3 = tensor.empty() : tensor<4x48x8x1xf32>
-  %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x40xf32> -> tensor<4x48x8x1xf32>
-  iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 48, 8, 1], strides = [1, 1, 1, 1] : tensor<4x48x8x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x48xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x48x8x1xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 48], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x48xf32>> -> tensor<20x48xf32>
+  %3 = tensor.empty() : tensor<3x48x8x1xf32>
+  %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x48xf32> -> tensor<3x48x8x1xf32>
+  iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [3, 48, 8, 1], strides = [1, 1, 1, 1] : tensor<3x48x8x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x48x8x1xf32>>
   return
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 16], vector_common_parallel = [1, 1], vector_reduction = [0, 0]>
