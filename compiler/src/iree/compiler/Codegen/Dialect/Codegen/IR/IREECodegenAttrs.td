@@ -473,8 +473,7 @@ def IREECodegen_RotateRowsAttr  :
 def IREECodegen_SubgroupLoadAttr  :
     AttrDef<IREECodegen_Dialect, "SubgroupLoad", [
     DeclareAttrInterfaceMethods<IREECodegen_SwizzleAttrInterface, [
-        "swizzleOffset",
-        "getAccessElementCount"
+        "getSubgroupSize"
       ]>
     ]> {
   let mnemonic = "subgroup_load";

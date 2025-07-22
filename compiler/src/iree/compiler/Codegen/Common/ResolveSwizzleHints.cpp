@@ -6,9 +6,12 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -137,7 +140,70 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
 
 static void
 resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
-                                 IREE::Codegen::SwizzleHintOp hintOp) {}
+                                 IREE::Codegen::SwizzleHintOp hintOp) {
+  auto subgroupLoadAttr =
+      dyn_cast<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle());
+  int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
+
+  // get the memref size and element type
+  auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
+  int64_t elementSizeInBits = memrefType.getElementTypeBitWidth();
+  int64_t elementSizeInBytes = elementSizeInBits / 8;
+
+  SmallVector<memref::CopyOp> validCopyOps;
+  for (Operation *user : hintOp->getUsers()) {
+    if (auto copy = dyn_cast<memref::CopyOp>(user)) {
+      // Check if copying from global memory to LDS (shared memory).
+      auto sourceType = cast<MemRefType>(copy.getSource().getType());
+      auto targetType = cast<MemRefType>(copy.getTarget().getType());
+      if (!hasGlobalMemoryAddressSpace(sourceType) ||
+          !hasSharedMemoryAddressSpace(targetType)) {
+        continue;
+      }
+
+      // Check if target memref is static shape and contiguous row-major
+      if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
+        continue;
+      }
+
+      // Calculate total copy size in bytes
+      int64_t totalElements = targetType.getNumElements();
+      int64_t totalSizeInBytes = totalElements * elementSizeInBytes;
+
+      // Check if copy size can be divided by (subgroupSize * elementSize)
+      int64_t subgroupLoadSize = subgroupSize * elementSizeInBytes;
+      if (totalSizeInBytes % subgroupLoadSize != 0) {
+        continue;
+      }
+
+      validCopyOps.push_back(copy);
+    }
+  }
+
+  // Expand the CopyOp into subgroup loads.
+  for (auto &copy : validCopyOps) {
+    Location loc = copy.getLoc();
+    [[maybe_unused]]
+    auto sourceType = cast<MemRefType>(copy.getSource().getType());
+    auto targetType = cast<MemRefType>(copy.getTarget().getType());
+
+    // Calculate the number of subgroups and the size of each subgroup load.
+    int64_t totalElements = targetType.getNumElements();
+    [[maybe_unused]]
+    int64_t subgroupLoadSize = subgroupSize * elementSizeInBytes;
+    int64_t numSubgroups = totalElements / subgroupSize;
+
+    for (int64_t i = 0; i < numSubgroups; ++i) {
+      [[maybe_unused]]
+      Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
+
+      // TODO: implement this.
+    }
+
+    // Remove the original CopyOp
+    rewriter.eraseOp(copy);
+  }
+}
 
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
