@@ -530,6 +530,7 @@ getNextWorkgroupMapping(ArrayRef<Attribute> currentMappings) {
         lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdZ,
         lastAttr.getDelinearizedDim() + 1);
   }
+  return {};
 }
 
 // Pattern to fold the `scf.forall` produced by split reduction
