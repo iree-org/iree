@@ -467,29 +467,37 @@ def IREECodegen_RotateRowsAttr  :
 }
 
 //===---------------------------------------------------------------------===//
-// iree_codegen.subgroup_load_swizzle
+// iree_codegen.subgroup_load
 //===---------------------------------------------------------------------===//
 
-def IREECodegen_SubgroupLoadSwizzleAttr  :
-    AttrDef<IREECodegen_Dialect, "SubgroupLoadSwizzle", [
+def IREECodegen_SubgroupLoadAttr  :
+    AttrDef<IREECodegen_Dialect, "SubgroupLoad", [
     DeclareAttrInterfaceMethods<IREECodegen_SwizzleAttrInterface, [
         "swizzleOffset",
         "getAccessElementCount"
       ]>
     ]> {
-  let mnemonic = "rotate_rows";
-  let summary = [{An attribute that describes a swizzling pattern for rotating rows.}];
+  let mnemonic = "subgroup_load";
+  let summary = [{An attribute that describes a swizzling pattern that allows for doing subgroup loads.}];
   let description = [{
+    Hints codegen that when chained with:
+    * a load from global memory, and
+    * a store to LDS memory,
+    the load can be lowered to `amdgpu.gather_to_lds`.
+
+    The transformation will assume that the whole memref is going to be direct-loaded to LDS.
+
+    The `subgroup_size` parameter specifies the size of the subgroup.
   }];
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$row_width,
-    AttrParameter<"int64_t", "">:$access_width,
-    AttrParameter<"SmallVector<int64_t>", "">:$subgroup_size
+    //AttrParameter<"int64_t", "">:$row_width,
+    //AttrParameter<"int64_t", "">:$access_width,
+    AttrParameter<"int64_t", "">:$subgroup_size
   );
   let assemblyFormat = [{
-    `<` $row_width `,` $access_width `, $subgroup_size `>`
+    `<` $subgroup_size `>`
   }];
-  let genVerifyDecl = 1;
+  //let genVerifyDecl = 1;
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

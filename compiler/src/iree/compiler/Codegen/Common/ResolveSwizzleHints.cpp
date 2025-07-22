@@ -135,6 +135,10 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   rewriter.eraseOp(store);
 }
 
+static void
+resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
+                                 IREE::Codegen::SwizzleHintOp hintOp) {}
+
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
@@ -191,7 +195,11 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   // silently pass through for that hint.
   IRRewriter rewriter(funcOp->getContext());
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
-    resolveHintOp(rewriter, hintOp);
+    if (isa<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle())) {
+      resolveSubgroupLoadSwizzleHintOp(rewriter, hintOp);
+    } else {
+      resolveHintOp(rewriter, hintOp);
+    }
   }
 
   // Drop all hints.

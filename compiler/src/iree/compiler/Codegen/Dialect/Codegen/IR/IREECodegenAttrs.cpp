@@ -573,6 +573,14 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+OpFoldResult SubgroupLoadAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                             OpFoldResult offset,
+                                             Value src) const {
+  return {};
+}
+
+int64_t SubgroupLoadAttr::getAccessElementCount() const { return 0; }
+
 //===----------------------------------------------------------------------===//
 // Initialize attributes
 //===----------------------------------------------------------------------===//
