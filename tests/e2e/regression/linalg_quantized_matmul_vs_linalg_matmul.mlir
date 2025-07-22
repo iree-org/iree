@@ -181,23 +181,23 @@ func.func private @check_one_quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x
 func.func @test_quantized_matmul_as_matmul() {
   %lhs_3x4_1 = util.unfoldable_constant dense<[
       [1, 2, 3, 4],
-      [5, 6, 7, 8],
+      [5, 6, 7, 1],
       [9, 10, 11, 12]]> : tensor<3x4xi8>
   %rhs_4x5_1 = util.unfoldable_constant dense<[
       [5, 4, 3, 2, 9],
       [1, 0, -1, -2, 8],
-      [-3, -4, -5, -6, 7],
+      [-3, -4, 5, -6, 7],
       [2, 3, 5, 7, 11]]> : tensor<4x5xi8>
   // matrices with larger values including the interval bounds -128 and +127.
   %lhs_3x4_2 = util.unfoldable_constant dense<[
       [127, -128, 0, 51],
-      [-47, 101, -119, 0],
+      [-47, 101, -118, 0],
       [-128, 89, -63, 127]]> : tensor<3x4xi8>
   %rhs_4x5_2 = util.unfoldable_constant dense<[
       [123, -125, 127, -128, 91],
       [-70, 37, 0, -40, 57],
       [-128, 127, -121, -100, 99],
-      [127, 105, 83, 51, -128]]> : tensor<4x5xi8>
+      [127, 105, 38, 51, -128]]> : tensor<4x5xi8>
   %c_0 = arith.constant 0 : i32
   %c_minus2 = arith.constant -2 : i32
   %c_plus3 = arith.constant 3 : i32
