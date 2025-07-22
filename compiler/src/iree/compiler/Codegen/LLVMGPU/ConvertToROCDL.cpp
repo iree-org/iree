@@ -276,7 +276,7 @@ struct ConvertToROCDLPass final
         return signalPassFailure();
       }
 
-      // TODO: remove this once ArithToAMDGPU learns to take a PatternBenefit
+      // TODO: remove this once ArithToAMDGPU learns to take a PatternBenefit.
       RewritePatternSet fallbackSmallFloatPatterns(&getContext());
       arith::populateExpandScalingExtTruncPatterns(fallbackSmallFloatPatterns);
       arith::populateExpandF4E2M1Patterns(fallbackSmallFloatPatterns);
