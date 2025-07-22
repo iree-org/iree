@@ -121,6 +121,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // dims ops, and eliminate common sub-expressions.
   {
     RewritePatternSet patterns(ctx);
+    // NOTE: These patterns are currently load-bearing for sub-byte floats.
     populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldTensorEmptyPatterns(patterns);
