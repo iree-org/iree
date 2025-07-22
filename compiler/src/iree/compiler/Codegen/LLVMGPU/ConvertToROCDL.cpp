@@ -275,6 +275,16 @@ struct ConvertToROCDLPass final
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
+
+      // TODO: remove this once ArithToAMDGPU learns to take a PatternBenefit
+      RewritePatternSet fallbackSmallFloatPatterns(&getContext());
+      arith::populateExpandScalingExtTruncPatterns(fallbackSmallFloatPatterns);
+      arith::populateExpandF4E2M1Patterns(fallbackSmallFloatPatterns);
+      arith::populateExpandF8E8M0Patterns(fallbackSmallFloatPatterns);
+      if (failed(applyPatternsGreedily(
+              m, std::move(fallbackSmallFloatPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LDBG("After applying in-dialect conversions\n" << m);
