@@ -27,6 +27,7 @@ extern void ireeCodegenDispatchLoweringPassPipelineAttrGet();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
 extern void ireeCodegenGetExecutableVariantOps();
+extern void ireeGPUGetSingleSubgroupLayout();
 extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenGetAttentionOpDetail();
 extern void ireeCodegenQueryMMAIntrinsics();
@@ -940,6 +941,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
   x += (uintptr_t)&ireeCodegenGetExecutableVariantOps;
+  x += (uintptr_t)&ireeGPUGetSingleSubgroupLayout;
   x += (uintptr_t)&ireeCodegenGetTunerRootOps;
   x += (uintptr_t)&ireeCodegenGetAttentionOpDetail;
   x += (uintptr_t)&ireeCodegenQueryMMAIntrinsics;
