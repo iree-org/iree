@@ -51,7 +51,7 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     }
     return packedSizes;
   };
-  
+
   SmallVector<int64_t> dims;
   SmallVector<SmallVector<unsigned, 2>> indices;
   if (auto smma_kind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind)) {

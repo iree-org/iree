@@ -1076,9 +1076,6 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
   int64_t innerK = contractionDims->k.back();
   int64_t innerKb = contractionDims->kB.back();
 
-  AffineExpr d0, d1, d2;
-  bindDims(context, d0, d1, d2);
-  llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
   AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
   AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
   AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);

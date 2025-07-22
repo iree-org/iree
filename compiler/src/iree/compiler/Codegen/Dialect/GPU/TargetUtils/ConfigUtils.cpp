@@ -207,7 +207,6 @@ static std::optional<GPUMMASchedule> getScaledMmaScheduleFromProblemAndTarget(
     return std::nullopt;
   }
 
-  sortMMAIntrinsics(problem, intrinsics);
   GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
          "expected the same aType and bType.");
@@ -771,6 +770,9 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
   if (failed(configAndWgSize)) {
+    // TODO (muzasyed) : Perform padding appropriately for minimizing bank
+    // conflicts when dealing with scaled matmuls. For now it is disabled.
+    useDirectLoad = true;
     configAndWgSize = getScaledMatmulLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad);
   }
