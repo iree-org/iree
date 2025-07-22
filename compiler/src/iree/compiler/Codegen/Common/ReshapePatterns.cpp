@@ -1145,7 +1145,6 @@ struct FoldReshapeIntoInterfaceTensorPass final
           FoldReshapeIntoInterfaceTensorPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    llvm::errs() << "[DEBUG] FoldReshapeIntoInterfaceTensorPass\n";
     populateReshapeToInterfaceTensorPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
