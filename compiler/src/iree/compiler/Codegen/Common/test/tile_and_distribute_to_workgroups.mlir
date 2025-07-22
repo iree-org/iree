@@ -1883,15 +1883,15 @@ hal.executable private @pack_lowering {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<100x250xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
-            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
+            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<13x63x8x4xf32>>
         %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [100, 250], strides = [1, 1]
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<100x250xf32>> -> tensor<100x250xf32>
-        %3 = tensor.empty() : tensor<14x64x8x4xf32>
+        %3 = tensor.empty() : tensor<13x63x8x4xf32>
         %4 = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %3
             {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[12, 12]]>}
-            : tensor<100x250xf32> -> tensor<14x64x8x4xf32>
-        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [14, 64, 8, 4], strides = [1, 1, 1, 1]
-            : tensor<14x64x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
+            : tensor<100x250xf32> -> tensor<13x63x8x4xf32>
+        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [13, 63, 8, 4], strides = [1, 1, 1, 1]
+            : tensor<13x63x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<13x63x8x4xf32>>
         return
       }
     }
@@ -1923,15 +1923,15 @@ hal.executable private @pack_lowering {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<250x500xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c114688)
-            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
+            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<63x63x8x4xf32>>
         %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1]
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
-        %3 = tensor.empty() : tensor<64x64x8x4xf32>
+        %3 = tensor.empty() : tensor<63x63x8x4xf32>
         %4 = linalg.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 4] into %3
             {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[12, 14]]>}
-            : tensor<250x500xf32> -> tensor<64x64x8x4xf32>
-        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 4], strides = [1, 1, 1, 1]
-            : tensor<64x64x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
+            : tensor<250x500xf32> -> tensor<63x63x8x4xf32>
+        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [63, 63, 8, 4], strides = [1, 1, 1, 1]
+            : tensor<63x63x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<63x63x8x4xf32>>
         return
       }
     }
