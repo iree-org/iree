@@ -125,6 +125,7 @@ iree_cc_library(
     "GenericVectorization.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "HoistUnrolledVectorExtractInsertSlice.cpp"
+    "IREECodegenCanonicalizer.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
     "IREEInjectAssumeAlignment.cpp"
