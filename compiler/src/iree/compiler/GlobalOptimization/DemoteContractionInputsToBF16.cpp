@@ -78,7 +78,8 @@ struct DemoteContractionInputsToBF16Pattern
                     })
                 ->getResults()[0]);
       }
-      auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(linalgOp);
+      auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(
+          linalgOp.getOperation());
       rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
           linalgOp, demotedInputs, linalgOp.getDpsInits(),
           linalg::getPrunedAttributeList(namedOp));
@@ -102,13 +103,17 @@ struct DemoteContractionInputsToBF16Pattern
       replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::BatchVecmatOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchVecmatOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::MatmulTransposeAOp>(linalgOp)) {
+    } else if (demoteMatmul &&
+               isa<linalg::MatmulTransposeAOp>(linalgOp.getOperation())) {
       replaceOpInputs(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::MatmulTransposeBOp>(linalgOp)) {
+    } else if (demoteMatmul &&
+               isa<linalg::MatmulTransposeBOp>(linalgOp.getOperation())) {
       replaceOpInputs(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulTransposeAOp>(linalgOp)) {
+    } else if (demoteMatmul &&
+               isa<linalg::BatchMatmulTransposeAOp>(linalgOp.getOperation())) {
       replaceOpInputs(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulTransposeBOp>(linalgOp)) {
+    } else if (demoteMatmul &&
+               isa<linalg::BatchMatmulTransposeBOp>(linalgOp.getOperation())) {
       replaceOpInputs(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
     } else if (demoteConv && isa<linalg::Conv2DOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::Conv2DOp *>(nullptr));
