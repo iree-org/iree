@@ -309,9 +309,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // only cloning to a subset, we have to re-check our
     // partitions as they may generate cycles.
     if (streamableOp.preferCloneToConsumers()) {
-      auto temp_candidates = candidates;
-      temp_candidates &= consumers;
-      if (temp_candidates.count() != consumers.count()) {
+      auto tempCandidates = candidates;
+      tempCandidates &= consumers;
+      if (tempCandidates.count() != consumers.count()) {
         // Prune candidates that do not have a compatible affinity.
         for (auto ordinal : candidates.set_bits()) {
           if (!canAddOpToPartition(op, opInfo, ordinal, false)) {
