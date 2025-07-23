@@ -195,6 +195,16 @@ def GPUPackToIntrinsicsPass :
   ];
 }
 
+def GPUPadConvsPass :
+    InterfacePass<"iree-codegen-gpu-pad-convs",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad operands of a convolution with padding configuration provided.";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUPadOperandsPass :
     InterfacePass<"iree-codegen-gpu-pad-operands",
                   "mlir::FunctionOpInterface"> {
