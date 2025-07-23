@@ -146,13 +146,11 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
                                  IREE::Codegen::SwizzleHintOp hintOp) {
   auto subgroupLoadAttr =
       dyn_cast<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle());
-  int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
+  [[maybe_unused]] int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
 
   // Get the memref size and element type
   auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
-  int64_t elementSizeInBits = memrefType.getElementTypeBitWidth();
-
-  [[maybe_unused]] int64_t elementSizeInBytes = elementSizeInBits / 8;
+  int64_t elementSizeInBytes = memrefType.getElementTypeBitWidth() / 8;
 
   // find the use chain:
   // hintOp -> vector.load -> vector.store
@@ -188,8 +186,8 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
     // TODO: expand it to multiple subgroup loads if the size is larger than
     // the subgroup size.
     const int64_t kNumBitsPerCopy = 16;
-    int64_t totalCopySize = targetType.getNumElements() * elementSizeInBytes;
-    assert(totalCopySize == subgroupSize * kNumBitsPerCopy &&
+    assert(targetType.getNumElements() * elementSizeInBytes ==
+               subgroupSize * kNumBitsPerCopy &&
            "Total copy size is not equal to "
            "subgroup size times element size in bytes.");
 
