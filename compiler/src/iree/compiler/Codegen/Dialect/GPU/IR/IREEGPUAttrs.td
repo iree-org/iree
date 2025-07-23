@@ -390,8 +390,8 @@ def IREEGPU_ScaledMMAAttr :
     /// ```
     ///   C += A * B
     /// ```
-    /// Where, up to some transpositions, `A` has shape `<M, K>`, `B` has shape
-    /// `<K, N>`, and `C` has shape `<M, N>`.
+    /// Where, up to some transpositions, `A` has shape `<M, K, KB>`, `B`
+    /// has shape `<K, KB, N>`, and `C` has shape `<M, N>`.
     ::std::tuple<int64_t, int64_t, int64_t, int64_t>
     getScaledMNKShape() const {
       ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;

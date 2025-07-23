@@ -228,7 +228,7 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
                                         bool canUpcastAcc, bool mustBeAligned) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() <= 2 &&
-         "expected intrinsic to have a single M, N, and K dimension.");
+         "expected intrinsic to have a single M, N, and K <= 2 dimensions.");
   if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
     return failure(); // Cannot use this intrinsic for mismatched types
   }
@@ -285,7 +285,7 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   // 16x16x16 intrinsic, then:
   //  - kTotalTileCounts would be 3 * (128/16) = 24
   SmallVector<int64_t, 2> kTotalTileCounts = problem.kSizes;
-  for (auto [kTotalTileCount, intrinsicKSize] : llvm::zip(
+  for (auto [kTotalTileCount, intrinsicKSize] : llvm::zip_equal(
            MutableArrayRef{kTotalTileCounts}.take_back(intrinsic.kSizes.size()),
            intrinsic.kSizes)) {
     kTotalTileCount = llvm::divideCeil(kTotalTileCount, intrinsicKSize);
@@ -321,7 +321,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                                             const GPUMMAHeuristicSeeds &seeds) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() <= 2 &&
-         "expected intrinsic to have a single M, N, and K dimension.");
+         "expected intrinsic to have a single M, N, and K <= 2 dimensions.");
   // mTotalTileCounts and nTotalTileCounts represent the total number of
   // intrinsics along the M or N dimensions needed to fill the problem size.
   // For example, if the problem is {M:[4, 16], N:[2, 32], K[3, 128]} for a

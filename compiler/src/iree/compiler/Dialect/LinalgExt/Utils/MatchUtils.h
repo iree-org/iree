@@ -56,6 +56,8 @@ inferScaledContractionDims(ArrayRef<AffineMap> indexingMaps);
 // Checks whether `linalgOp` conforms to ScaledContractionOp.
 bool isaScaledContractionOpInterface(linalg::LinalgOp linalgOp);
 
+// Checks whether a given block corresponds to the body of a linalg op
+// describing a scaled mma.
 bool isScaledContractionBody(
     Block &block, function_ref<bool(Operation *, Operation *)> isaPair,
     llvm::raw_ostream &errs = mlir::thread_safe_nulls());

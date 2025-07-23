@@ -1026,34 +1026,6 @@ AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
                         context);
 }
 
-FailureOr<std::tuple<unsigned, unsigned, unsigned, unsigned>>
-getInnerDims(linalg::LinalgOp linalgOp) {
-  auto extractDims = [](SmallVector<SmallVector<unsigned, 2>> dims)
-      -> FailureOr<std::tuple<unsigned, unsigned, unsigned, unsigned>> {
-    for (auto dim : dims) {
-      if (dim.empty()) {
-        return failure();
-      }
-    }
-    std::tuple<unsigned, unsigned, unsigned, unsigned> res{
-        dims[0].back(), dims[1].back(), dims[2].back(), dims[3].back()};
-    return res;
-  };
-  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> maybeScaledContrDims =
-      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
-  if (succeeded(maybeScaledContrDims)) {
-    return extractDims({maybeScaledContrDims->m, maybeScaledContrDims->n,
-                        maybeScaledContrDims->k, maybeScaledContrDims->kB});
-  }
-  FailureOr<linalg::ContractionDimensions> maybeContractionDims =
-      linalg::inferContractionDims(linalgOp);
-  if (failed(maybeContractionDims)) {
-    return failure();
-  }
-  return extractDims({maybeContractionDims->m, maybeContractionDims->n,
-                      maybeContractionDims->k});
-}
-
 FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     IREE::Codegen::InnerTileDescAttrInterface kind) {

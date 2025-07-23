@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -26,8 +26,8 @@
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 namespace {
-auto par = utils::IteratorType::parallel;
-auto red = utils::IteratorType::reduction;
+constexpr auto par = utils::IteratorType::parallel;
+constexpr auto red = utils::IteratorType::reduction;
 } // namespace
 
 namespace detail {
@@ -45,7 +45,7 @@ enum class MatchContractionResult {
 // ScaledContractionOpInterface implementation
 //===----------------------------------------------------------------------===//
 
-/// If the value is defined by a chain of unary side effect-free, go up the
+/// If the value is defined by a chain of unary side-effect free, go up the
 /// use-def chain until the first value that isn't defined by such an op.
 // TODO: relax to multi-operands with constants, which are technically unary ops
 // as needed (e.g. add5).
@@ -62,21 +62,18 @@ static Value getSourceSkipUnary(Value value) {
   return value;
 }
 
-/// Returns true if the two operations are of the kinds specified by a pair of
-/// consecutive template arguments.
-template <typename AddOpTy, typename MulOpTy, typename... Args>
-static bool isPairTemplateImpl(Operation *add, Operation *mul) {
-  static_assert(sizeof...(Args) % 2 == 0,
-                "expected an even number of template arguments");
-  if (isa<AddOpTy>(add) && isa<MulOpTy>(mul)) {
-    return true;
-  }
-
-  if constexpr (sizeof...(Args) > 0) {
-    return isPairTemplateImpl<Args...>(add, mul);
-  } else {
-    return false;
-  }
+/// Returns true if the two operations are ones supported by scaled mfmas.
+static bool isValidScaledMmaPair(Operation *add, Operation *mul) {
+  SmallVector<std::pair<std::string, std::string>> validPairs = {
+      {"arith.addf", "arith.mulf"},
+      {"arith.addi", "arith.muli"},
+      {"complex.add", "complex.mul"},
+      {"arith.ori", "arith.andi"}};
+  return llvm::any_of(validPairs,
+                      [&add, mul](std::pair<std::string, std::string> p) {
+                        return p.first == add->getName().getStringRef() &&
+                               p.second == mul->getName().getStringRef();
+                      });
 }
 
 /// Given an `indexingMap` and its corresponding `iterators`, returns
@@ -122,21 +119,19 @@ inferIteratorsFromOutMap(AffineMap map) {
   return iterators;
 }
 
-bool isScaledContractionBody(
-    Block &block, function_ref<bool(Operation *, Operation *)> isaPair,
-    llvm::raw_ostream &errs) {
+bool isScaledContractionBody(Block &block) {
   if (block.empty() || !block.back().mightHaveTrait<OpTrait::IsTerminator>()) {
-    errs << "no terminator in the block";
+    llvm::errs() << "no terminator in the block";
     return false;
   }
   if (block.getNumArguments() != 5) {
-    errs << "expected block with 3 arguments";
+    llvm::errs() << "expected block with 3 arguments";
     return false;
   }
 
   Operation *terminator = block.getTerminator();
   if (terminator->getNumOperands() != 1) {
-    errs << "expected terminator with 1 operand";
+    llvm::errs() << "expected terminator with 1 operand";
     return false;
   }
 
@@ -161,7 +156,7 @@ bool isScaledContractionBody(
   Value yielded = getSourceSkipUnary(terminator->getOperand(0));
   Operation *reductionOp = yielded.getDefiningOp();
   if (reductionOp->getNumResults() != 1 || reductionOp->getNumOperands() != 2) {
-    errs << "expected reduction op to be binary";
+    llvm::errs() << "expected reduction op to be binary";
     return false;
   }
 
@@ -170,8 +165,9 @@ bool isScaledContractionBody(
 
   if (reductionLHS != block.getArgument(4) &&
       reductionRHS != block.getArgument(4)) {
-    errs << "expected reduction to take block argument #4 as one of the "
-            "operands (modulo unary casts)";
+    llvm::errs()
+        << "expected reduction to take block argument #4 as one of the "
+           "operands (modulo unary casts)";
     return false;
   }
 
@@ -180,12 +176,11 @@ bool isScaledContractionBody(
   Operation *elementwiseOp = contributed.getDefiningOp();
   if (!elementwiseOp || elementwiseOp->getNumResults() != 1 ||
       elementwiseOp->getNumOperands() != 2) {
-    errs << "expected elementwise op to be binary";
+    llvm::errs() << "expected elementwise op to be binary";
     return false;
   }
-
-  if (!isaPair(elementwiseOp, reductionOp)) {
-    errs << "expected reduction/elementwise op kind not satisfied";
+  if (!isValidScaledMmaPair(reductionOp, elementwiseOp)) {
+    llvm::errs() << "expected reduction/elementwise op kind not satisfied";
     return false;
   }
 
@@ -198,32 +193,12 @@ bool isScaledContractionBody(
     return true;
   }
 
-  errs << "expected elementwise op to apply to block arguments (modulo unary "
-          "casts)";
+  llvm::errs()
+      << "expected elementwise op to apply to block arguments (modulo unary "
+         "casts)";
   return false;
 }
 
-/// Returns true if the block is a body of a contraction with the kinds of
-/// operations given pairwise by template arguments.
-template <typename... Args>
-static bool isScaledContractionBody(Block &block) {
-  return isScaledContractionBody(block, &isPairTemplateImpl<Args...>,
-                                 llvm::errs());
-}
-
-/// Find 2 parallel (m and n) and 2 reduction (k and k_B) dimension candidates
-/// that form a scaled matmul subcomputation within `linalgOp`.
-/// These dimensions are such that:
-///   1. The m dimension is involved in an outer-product along LHS
-///      (i.e. it is a permutation on RES and LHS and does not appear in RHS).
-///   2. The n dimension is involved in an outer-product along RHS
-///      (i.e. it is a permutation on RES and RHS and does not appear in LHS).
-///   3. The k dimension appears as a permutation on LHS, RHS and their scales.
-///   4. The k_B dimension appears as a permutation on LHS and RHS.
-///   4. m, n, k, k_B appear only once in any given indexing.
-///   5. Optional batch dimensions that appear in all operands are captured.
-/// This allows e.g. detecting that some contraction is embedded within
-/// `linalgOp` with some orthogonal heuristic.
 static FailureOr<ScaledContractionDimensions>
 inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
                                ArrayRef<utils::IteratorType> iterators) {
@@ -317,12 +292,7 @@ isScaledContractionImpl(Operation *op,
   }
   // TODO: more fields than add/mul.
   // clang-format off
-  if (!isScaledContractionBody<
-        arith::MulFOp, arith::AddFOp,
-        arith::MulIOp, arith::AddIOp,
-        complex::MulOp, complex::AddOp,
-        arith::AndIOp, arith::OrIOp>(
-      *linalgOp.getBlock())) {
+  if (!isScaledContractionBody(*linalgOp.getBlock())) {
     return detail::MatchContractionResult::NotAddMul;
   }
   // clang-format on
