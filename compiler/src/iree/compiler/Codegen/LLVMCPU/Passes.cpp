@@ -123,6 +123,7 @@ static llvm::cl::opt<bool> clPatchFuncOps(
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   if (clTileDispatchUsingForall) {
+    funcPassManager.addPass(createConvertToDestinationPassingStylePass());
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
   } else {

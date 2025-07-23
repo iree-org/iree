@@ -3,60 +3,6 @@
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @matmul() {
-  %m = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-  %n = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-  %k = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
-  %lhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k}
-  %rhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n}
-  %init = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %n}
-  %result = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%m, %n}
-  %wg_id_y = hal.interface.workgroup.id[1] : index
-  %wg_count_y = hal.interface.workgroup.count[1] : index
-  %wg_size_y = hal.interface.workgroup.size[1] : index
-  %wg_id_x = hal.interface.workgroup.id[0] : index
-  %wg_count_x = hal.interface.workgroup.count[0] : index
-  %wg_size_x = hal.interface.workgroup.size[0] : index
-  %offset_y = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_id_y, %wg_size_y]
-  %step_y = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_count_y, %wg_size_y]
-  %offset_x = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_id_x, %wg_size_x]
-  %step_x = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_count_x, %wg_size_x]
-  scf.for %iv0 = %offset_y to %m step %step_y {
-    %tilesize_y = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%iv0)[%wg_size_y, %m]
-    scf.for %iv1 = %offset_x to %n step %step_x {
-      %tilesize_x = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%iv1)[%wg_size_x, %n]
-      %lhs_tile = iree_tensor_ext.dispatch.tensor.load %lhs, offsets = [%iv0, 0], sizes = [%tilesize_y, %k], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k} -> tensor<?x?xf32>
-      %rhs_tile = iree_tensor_ext.dispatch.tensor.load %rhs, offsets = [0, %iv1], sizes = [%k, %tilesize_x], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n} -> tensor<?x?xf32>
-      %init_tile = iree_tensor_ext.dispatch.tensor.load %init, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %n} -> tensor<?x?xf32>
-      %matmul_tile = linalg.matmul ins(%lhs_tile, %rhs_tile : tensor<?x?xf32>, tensor<?x?xf32>) outs(%init_tile : tensor<?x?xf32>) -> tensor<?x?xf32>
-      iree_tensor_ext.dispatch.tensor.store %matmul_tile, %result, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%m, %n}
-    }
-  }
-  return
-}
-//      CHECK: func.func @matmul()
-//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(3)
-//      CHECK:   scf.for %[[IV0:.+]] =
-//      CHECK:     scf.for %[[IV1:.+]] =
-//  CHECK-DAG:       %[[LHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS]]
-//  CHECK-DAG:       %[[RHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS]]
-//  CHECK-DAG:       %[[INIT_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INIT]]
-//      CHECK:       %[[MATMUL_TILE:.+]] = linalg.matmul
-// CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]] : tensor<?x?xf32>, tensor<?x?xf32>)
-// CHECK-SAME:           outs(%[[INIT_TILE]] : tensor<?x?xf32>)
-//      CHECK:       iree_tensor_ext.dispatch.tensor.store %[[MATMUL_TILE]], %[[RESULT]]
-
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @matmul_fill() {
@@ -1098,3 +1044,51 @@ func.func @early_bufferization_ops() {
 // CHECK-DAG:     %[[IN:.+]] = iree_codegen.load_from_buffer %[[IN_BINDING]]
 // CHECK-DAG:     %[[OUT:.+]] = iree_codegen.load_from_buffer %[[OUT_BINDING]]
 // CHECK:         linalg.copy ins(%[[IN]]{{.*}} outs(%[[OUT]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, Indirect>]>
+func.func @matmul_accumulate_from_readonly(%M: index, %N: index, %K: index) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%M, %N}
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%M, %N}
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%M, %K} -> tensor<?x?xf32>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%K, %N} -> tensor<?x?xf32>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%M, %N} -> tensor<?x?xf32>
+  %7 = linalg.matmul ins(%4, %5 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%6 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  iree_tensor_ext.dispatch.tensor.store %7, %3, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%M, %N}
+  return
+}
+// CHECK:       #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: func.func @matmul_accumulate_from_readonly(
+// CHECK-SAME:    %[[M:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[N:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[K:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[LHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+// CHECK-DAG:     %[[RHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+// CHECK-DAG:     %[[ACC_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(3)
+// CHECK-DAG:     %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
+// CHECK-DAG:     %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
+// CHECK-DAG:     %[[ACC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ACC_BINDING]]
+// CHECK:         %[[INIT:.+]] = tensor.empty(%[[M]], %[[N]]) : tensor<?x?xf32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[INIT]]
+// CHECK:         %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:     outs(%[[FILL]]
+// CHECK:         %[[RES:.+]] = linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]]
+// CHECK-SAME:      iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:      ins(%[[MATMUL]], %[[ACC]]
+// CHECK-SAME:     outs(%[[INIT]]
+// CHECK:           ^bb0(%[[IN0:.+]]: f32, %[[IN1:.+]]: f32, %{{.+}}: f32):
+// CHECK:              %[[ADD:.+]] = arith.addf %[[IN0]], %[[IN1]]
+// CHECK:              linalg.yield %[[ADD]]
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[RES]], %[[OUT_BINDING]]
