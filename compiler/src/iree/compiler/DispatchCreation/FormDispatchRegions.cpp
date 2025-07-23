@@ -1065,15 +1065,10 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
         }
       }
 
-      if (failed(moveOperandDefs(rewriter, consumer, regionOp, dominanceInfo,
-                                 {}))) {
-        continue;
-      }
-
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        return consumer->emitOpError("failed to move consumer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }

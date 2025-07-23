@@ -11,11 +11,8 @@
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -121,62 +118,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     }
   }
   return true;
-}
-
-LogicalResult moveOperandDefs(RewriterBase &rewriter,
-                              ArrayRef<Operation *> operations,
-                              Operation *insertionPoint,
-                              DominanceInfo &dominanceInfo,
-                              ArrayRef<Operation *> ignoreOperations) {
-  BackwardSliceOptions options;
-  llvm::DenseSet<Operation *> ignoreOperationsSet;
-  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
-           !ignoreOperationsSet.contains(op);
-  };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.omitUsesFromAbove = false;
-  options.inclusive = true;
-
-  llvm::SetVector<Operation *> slice;
-  for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      // If operand is the insertion point, there is nothing to move.
-      if (operand.getDefiningOp() == insertionPoint) {
-        continue;
-      }
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(operand, &slice, options);
-      assert(result.succeeded());
-    }
-    auto regions = op->getRegions();
-    if (regions.empty()) {
-      continue;
-    }
-    llvm::SetVector<Value> capturedVals;
-    mlir::getUsedValuesDefinedAbove(regions, capturedVals);
-    for (auto value : capturedVals) {
-      // If operand is the insertion point, there is nothing to move.
-      if (value.getDefiningOp() == insertionPoint) {
-        continue;
-      }
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(value, &slice, options);
-      assert(result.succeeded());
-    }
-  }
-
-  if (slice.contains(insertionPoint)) {
-    return failure();
-  }
-
-  mlir::topologicalSort(slice);
-  for (auto op : slice) {
-    rewriter.moveOpBefore(op, insertionPoint);
-  }
-  return success();
 }
 
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
