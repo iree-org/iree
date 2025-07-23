@@ -236,7 +236,13 @@ func.func @skip_skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x4xf16>)
 func.func @skip_skinny_n_mmtb(%arg0 : tensor<10x20xf16>, %arg1 : tensor<4x20xf16>, %arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
     attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
-    %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<10x20xf16>, tensor<4x20xf16>)
+    %0 = linalg.matmul
+        indexing_maps = [
+          affine_map<(d0, d1, d2) -> (d0, d2)>,
+          affine_map<(d0, d1, d2) -> (d1, d2)>,
+          affine_map<(d0, d1, d2) -> (d0, d1)>
+        ]
+        ins(%arg0, %arg1 : tensor<10x20xf16>, tensor<4x20xf16>)
         outs(%arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
     return %0 : tensor<10x4xf16>
 }
