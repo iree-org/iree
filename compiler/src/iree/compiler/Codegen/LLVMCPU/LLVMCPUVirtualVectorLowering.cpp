@@ -59,7 +59,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   {
     if (enableArmI8mm) {
       RewritePatternSet patterns(ctx);
-      arm_neon::populateLowerContractionToNeonI8MMPatternPatterns(patterns);
+      arm_neon::populateLowerContractionToNeonI8MMPatterns(patterns);
       (void)applyPatternsGreedily(funcOp, std::move(patterns));
     }
   }
