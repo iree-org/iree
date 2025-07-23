@@ -472,7 +472,6 @@ getVectorDistributeReductionConfig(
   }
 
   int64_t lastReductionDimSize = bounds[reductionDims.back()];
-
   if (ShapedType::isDynamic(lastReductionDimSize)) {
     lastReductionDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
@@ -773,7 +772,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
-
   if (ShapedType::isDynamic(reductionSize)) {
     reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
@@ -2795,6 +2793,7 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
   // moving dimension so each thread can execute a vectorized copy of 4
   // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+  
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, linalgOp, tileSizes,
       CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
