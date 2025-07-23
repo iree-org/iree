@@ -4,9 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -15,6 +17,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
 
@@ -143,65 +146,75 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
                                  IREE::Codegen::SwizzleHintOp hintOp) {
   auto subgroupLoadAttr =
       dyn_cast<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle());
+  [[maybe_unused]]
   int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
 
-  // get the memref size and element type
+  // Get the memref size and element type
   auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
   int64_t elementSizeInBits = memrefType.getElementTypeBitWidth();
+
+  [[maybe_unused]]
   int64_t elementSizeInBytes = elementSizeInBits / 8;
 
-  SmallVector<memref::CopyOp> validCopyOps;
+  // find the use chain:
+  // hintOp -> vector.load -> vector.store
+  SmallVector<std::pair<vector::LoadOp, vector::StoreOp>> loadStorePairs;
   for (Operation *user : hintOp->getUsers()) {
-    if (auto copy = dyn_cast<memref::CopyOp>(user)) {
-      // Check if copying from global memory to LDS (shared memory).
-      auto sourceType = cast<MemRefType>(copy.getSource().getType());
-      auto targetType = cast<MemRefType>(copy.getTarget().getType());
-      if (!hasGlobalMemoryAddressSpace(sourceType) ||
-          !hasSharedMemoryAddressSpace(targetType)) {
-        continue;
-      }
-
-      // Check if target memref is static shape and contiguous row-major
-      if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
-        continue;
-      }
-
-      // Calculate total copy size in bytes
-      int64_t totalElements = targetType.getNumElements();
-      int64_t totalSizeInBytes = totalElements * elementSizeInBytes;
-
-      // Check if copy size can be divided by (subgroupSize * elementSize)
-      int64_t subgroupLoadSize = subgroupSize * elementSizeInBytes;
-      if (totalSizeInBytes % subgroupLoadSize != 0) {
-        continue;
-      }
-
-      validCopyOps.push_back(copy);
+    auto load = dyn_cast<vector::LoadOp>(user);
+    if (!load) {
+      continue;
     }
+    if (load->getNumResults() != 1 || !load->hasOneUse()) {
+      continue;
+    }
+    auto store = dyn_cast<vector::StoreOp>(*load->getUsers().begin());
+    if (!store) {
+      continue;
+    }
+    loadStorePairs.emplace_back(load, store);
   }
 
-  // Expand the CopyOp into subgroup loads.
-  for (auto &copy : validCopyOps) {
-    Location loc = copy.getLoc();
-    [[maybe_unused]]
-    auto sourceType = cast<MemRefType>(copy.getSource().getType());
-    auto targetType = cast<MemRefType>(copy.getTarget().getType());
+  for (auto [load, store] : loadStorePairs) {
+    auto sourceType = cast<MemRefType>(load.getBase().getType());
+    auto targetType = cast<MemRefType>(store.getBase().getType());
 
-    // Calculate the number of subgroups and the size of each subgroup load.
-    int64_t totalElements = targetType.getNumElements();
-    [[maybe_unused]]
-    int64_t subgroupLoadSize = subgroupSize * elementSizeInBytes;
-    int64_t numSubgroups = totalElements / subgroupSize;
-
-    for (int64_t i = 0; i < numSubgroups; ++i) {
-      [[maybe_unused]]
-      Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
-
-      // TODO: implement this.
+    if (!hasGlobalMemoryAddressSpace(sourceType) ||
+        !hasSharedMemoryAddressSpace(targetType)) {
+      load.emitOpError("Skip because source and target address spaces are "
+                       "incompatible.");
+      continue;
     }
 
-    // Remove the original CopyOp
-    rewriter.eraseOp(copy);
+    if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
+      load.emitOpError("Skip because target memref is not "
+                       "static shape and contiguous row-major.");
+      continue;
+    }
+
+    // Expand the load/store chain into a single subgroup load.
+    // TODO: expand it to multiple subgroup loads if the size is larger than
+    // the subgroup size.
+    const int64_t kNumBitsPerCopy = 16;
+    Location loc = load.getLoc();
+    int64_t totalCopySize = targetType.getNumElements() * elementSizeInBytes;
+    if (totalCopySize != subgroupSize * kNumBitsPerCopy) {
+      load.emitOpError("Skip because total copy size is not equal to "
+                       "subgroup size times element size in bytes.");
+      continue;
+    }
+
+    SmallVector<Value> dstIndices;
+    for (int i = 0; i < targetType.getRank(); ++i) {
+      dstIndices.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    }
+    // Transfer type is a vector of the base element type
+    VectorType transferType = VectorType::get(
+        {kNumBitsPerCopy / elementSizeInBytes}, sourceType.getElementType());
+
+    rewriter.replaceOpWithNewOp<amdgpu::GatherToLDSOp>(
+        store, load.getBase(), load.getIndices(), store.getBase(), dstIndices,
+        transferType);
+    rewriter.eraseOp(load);
   }
 }
 
