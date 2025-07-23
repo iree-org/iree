@@ -2,8 +2,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul-pass{input=rhs}))" %s | FileCheck %s --check-prefixes=CHECK,RHS
 
 // CHECK-LABEL: @matmul
-// LHS: linalg.matmul_transpose_a
-// RHS: linalg.matmul_transpose_b
+// LHS: linalg.matmul
+// RHS: linalg.matmul
 func.func @matmul(%A: tensor<16x8xf32>, %B: tensor<8x16xf32>) -> (tensor<16x16xf32>) {
   %cst = arith.constant 0.0 : f32
   %init = tensor.empty() : tensor<16x16xf32>
