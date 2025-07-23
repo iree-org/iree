@@ -418,8 +418,12 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
 ///   1) k-alignment. We prefer intrinsics that can evenly divide the K
 ///   dimension of the problem.
 ///   2) M/N-alignment. We prefer intrinsics that can evenly divide the M
-///   and N dimensions of the problem. 3) Intrinsic with larger gemm size.
+///   and N dimensions of the problem.
+///   3) Intrinsic with larger gemm size.
 ///   4) Intrinsic with larger K size.
+///
+/// This function acts as a comparison function object for std::sort, which
+/// returns true if the lhs is ordered before rhs.
 bool compareIntrinsics(const GPUMatmulShapeType &problem,
                        const GPUMatmulShapeType &lhs,
                        const GPUMatmulShapeType &rhs) {
@@ -745,7 +749,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
                               pvSchedule->kTileSizes[0],
                               qkMatmul.kSizes[0] / intrinsicAK};
 
-    return std::make_pair(qkSchedule, pvSchedule.value());
+    return std::pair(qkSchedule, pvSchedule.value());
   }
 
   return failure();
