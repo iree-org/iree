@@ -192,3 +192,21 @@ func.func @swizzle_adjust_add_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %
 //       CHECK:   %[[STORE_SWOFF:.+]] = arith.addi %[[STORE_BASE]], %[[OFFSET_DIFF]] : index
 //       CHECK:   vector.store %[[VEC]], %[[SRC]][%[[STORE_SWOFF]]]
 //       CHECK:   return %[[VECTOR]]
+
+// -----
+
+// CHECK: @subgroup_load
+// CHECK-SAME: (%[[SRC:.*]]: memref<1024xi8>, %[[OFFSET:.*]]: index)
+func.func @subgroup_load(%src: memref<1024xi8>, %offset: index) {
+  // CHECK-NOT: iree_codegen.swizzle_hint
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.subgroup_load<64>] : memref<1024xi8>
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK: %[[LDS:.*]] = memref.alloc() : memref<1024xi8, #gpu.address_space<workgroup>>
+  // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[OFFSET]]], %[[LDS]][%[[C0]]]
+  // CHECK-NOT: vector.load
+  // CHECK-NOT: vector.store
+  %lds = memref.alloc() : memref<1024xi8, #gpu.address_space<workgroup>>
+  %1 = vector.load %0[%offset] : memref<1024xi8>, vector<16xi8>
+  vector.store %1, %lds[%offset] : memref<1024xi8, #gpu.address_space<workgroup>>, vector<16xi8>
+  return
+}

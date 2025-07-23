@@ -146,15 +146,13 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
                                  IREE::Codegen::SwizzleHintOp hintOp) {
   auto subgroupLoadAttr =
       dyn_cast<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle());
-  [[maybe_unused]]
   int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
 
   // Get the memref size and element type
   auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
   int64_t elementSizeInBits = memrefType.getElementTypeBitWidth();
 
-  [[maybe_unused]]
-  int64_t elementSizeInBytes = elementSizeInBits / 8;
+  [[maybe_unused]] int64_t elementSizeInBytes = elementSizeInBits / 8;
 
   // find the use chain:
   // hintOp -> vector.load -> vector.store
@@ -180,10 +178,10 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
 
     assert((hasGlobalMemoryAddressSpace(sourceType) &&
             hasSharedMemoryAddressSpace(targetType)) &&
-           "Skip because source and target address spaces are "
+           "Source and target address spaces are "
            "incompatible.");
     assert(memref::isStaticShapeAndContiguousRowMajor(targetType) &&
-           "Skip because target memref is not static shape and contiguous "
+           "Target memref is not static shape and contiguous "
            "row-major.");
 
     // Expand the load/store chain into a single subgroup load.
@@ -192,22 +190,20 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
     const int64_t kNumBitsPerCopy = 16;
     int64_t totalCopySize = targetType.getNumElements() * elementSizeInBytes;
     assert(totalCopySize == subgroupSize * kNumBitsPerCopy &&
-           "Skip because total copy size is not equal to "
+           "Total copy size is not equal to "
            "subgroup size times element size in bytes.");
 
-    SmallVector<Value> dstIndices;
-    for (int i = 0; i < targetType.getRank(); ++i) {
-      dstIndices.push_back(
-          rewriter.create<arith::ConstantIndexOp>(load.getLoc(), 0));
-    }
     // Transfer type is a vector of the base element type
     VectorType transferType = VectorType::get(
         {kNumBitsPerCopy / elementSizeInBytes}, sourceType.getElementType());
 
+    // TODO: support emitting multiple subgroup loads if the size is larger.
+    rewriter.setInsertionPointAfter(store);
     rewriter.replaceOpWithNewOp<amdgpu::GatherToLDSOp>(
-        store, load.getBase(), load.getIndices(), store.getBase(), dstIndices,
+        store, hintOp.getOperand(), load.getIndices(), store.getBase(),
+        ValueRange{rewriter.create<arith::ConstantIndexOp>(store.getLoc(), 0)},
         transferType);
-    rewriter.eraseOp(load);
+    // TODO: should we add a barrier here? Or the user controls it.
   }
 }
 

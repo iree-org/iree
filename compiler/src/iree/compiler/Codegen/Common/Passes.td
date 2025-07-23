@@ -729,6 +729,7 @@ def ResolveSwizzleHintsPass :
   let dependentDialects = [
     "affine::AffineDialect",
     "arith::ArithDialect",
+    "amdgpu::AMDGPUDialect",
   ];
 }
 
