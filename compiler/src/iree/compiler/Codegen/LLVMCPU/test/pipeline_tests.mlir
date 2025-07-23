@@ -574,7 +574,7 @@ func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.exec
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0, 0, 0], sizes = [1, 64, 1, 1, 8, 1], strides = [1, 1, 1, 1, 1, 1] : tensor<1x64x1x1x8x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x64x1x1x8x1xf32>>
   return
 }
-// CHECK-LABEL: func.func @pooling_nchw_max_pack_without_padding_issue_20723(
+// CHECK-LABEL: func.func @pooling_nchw_max_pack_with_padding_issue_20723(
 // CHECK:         scf.forall
 // CHECK:           iree_linalg_ext.map_scatter
 // CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
