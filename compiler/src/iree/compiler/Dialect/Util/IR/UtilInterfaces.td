@@ -853,7 +853,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return IREE::Util::TiedOpInterface::findTiedBaseValue($_op.getResult(resultIndex));
+        return IREE::Util::TiedOpInterface::findTiedBaseValue($_op->getResult(resultIndex));
       }]
     >,
     InterfaceMethod<

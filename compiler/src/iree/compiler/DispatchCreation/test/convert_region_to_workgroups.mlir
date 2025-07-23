@@ -84,3 +84,31 @@ util.func public @multi_mma(
 //       CHECK:     flow.return
 //       CHECK:   }
 //       CHECK:   util.return %[[r0]]
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+util.func public @matmul_unset_encoding(%arg0: tensor<123x456xf32>, %arg1: tensor<456x789xf32>, %arg2: tensor<123x789xf32>) -> tensor<123x789xf32> {
+  %3 = flow.tensor.encode %arg0 : tensor<123x456xf32> -> tensor<123x456xf32, #encoding>
+  %4 = flow.tensor.encode %arg1 : tensor<456x789xf32> -> tensor<456x789xf32, #encoding>
+  %5 = flow.tensor.encode %arg2 : tensor<123x789xf32> -> tensor<123x789xf32, #encoding>
+  %6 = flow.dispatch.region -> (tensor<123x789xf32>) {
+    %8 = linalg.matmul ins(%3, %4 : tensor<123x456xf32, #encoding>, tensor<456x789xf32, #encoding>) outs(%5 : tensor<123x789xf32, #encoding>) -> tensor<123x789xf32, #encoding>
+    %9 = iree_encoding.unset_encoding %8 : tensor<123x789xf32, #encoding> -> tensor<123x789xf32>
+    flow.return %9 : tensor<123x789xf32>
+  }
+  util.return %6 : tensor<123x789xf32>
+}
+// CHECK-LABEL: util.func public @matmul_unset_encoding(
+//       CHECK:  flow.dispatch.workgroups
+//  CHECK-NEXT:    %[[LHS_ARG:[a-zA-Z0-9]+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor
+//  CHECK-SAME:    %[[RHS_ARG:[a-zA-Z0-9]+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor
+//  CHECK-SAME:    %[[OUT_ARG:[a-zA-Z0-9]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor
+//       CHECK:    %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_ARG]]
+//       CHECK:    %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_ARG]]
+//       CHECK:    %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUT_ARG]]
+//       CHECK:    %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+//  CHECK-SAME:      outs(%[[OUT]]
+//       CHECK:    %[[RES:.+]] = iree_encoding.unset_encoding %[[MATMUL]]
+//       CHECK:    iree_tensor_ext.dispatch.tensor.store %[[RES]], %[[OUT_ARG]]

@@ -245,6 +245,19 @@ struct GenericNumericCastExternalModel {
 // TiedOpInterface
 //===----------------------------------------------------------------------===//
 
+struct UnsetEncodingOpTiedOpInterface
+    : public IREE::Util::TiedOpInterface::ExternalModel<
+          UnsetEncodingOpTiedOpInterface, IREE::Encoding::UnsetEncodingOp> {
+  ::std::optional<unsigned>
+  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
+    return {0}; // source
+  }
+
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
+    return {0}; // source
+  }
+};
+
 struct InsertSliceOpTiedOpInterface
     : public IREE::Util::TiedOpInterface::ExternalModel<
           InsertSliceOpTiedOpInterface, tensor::InsertSliceOp> {
@@ -469,6 +482,12 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     IREE::Codegen::InnerTiledOp::attachInterface<InnerTiledOpTiedOpInterface>(
         *context);
   });
+
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Encoding::IREEEncodingDialect *dialect) {
+        IREE::Encoding::UnsetEncodingOp::attachInterface<
+            UnsetEncodingOpTiedOpInterface>(*context);
+      });
 
   registry.addExtension(
       +[](MLIRContext *context, linalg::LinalgDialect *dialect) {
