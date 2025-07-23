@@ -178,34 +178,27 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
     auto sourceType = cast<MemRefType>(load.getBase().getType());
     auto targetType = cast<MemRefType>(store.getBase().getType());
 
-    if (!hasGlobalMemoryAddressSpace(sourceType) ||
-        !hasSharedMemoryAddressSpace(targetType)) {
-      load.emitOpError("Skip because source and target address spaces are "
-                       "incompatible.");
-      continue;
-    }
-
-    if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
-      load.emitOpError("Skip because target memref is not "
-                       "static shape and contiguous row-major.");
-      continue;
-    }
+    assert((hasGlobalMemoryAddressSpace(sourceType) &&
+            hasSharedMemoryAddressSpace(targetType)) &&
+           "Skip because source and target address spaces are "
+           "incompatible.");
+    assert(memref::isStaticShapeAndContiguousRowMajor(targetType) &&
+           "Skip because target memref is not static shape and contiguous "
+           "row-major.");
 
     // Expand the load/store chain into a single subgroup load.
     // TODO: expand it to multiple subgroup loads if the size is larger than
     // the subgroup size.
     const int64_t kNumBitsPerCopy = 16;
-    Location loc = load.getLoc();
     int64_t totalCopySize = targetType.getNumElements() * elementSizeInBytes;
-    if (totalCopySize != subgroupSize * kNumBitsPerCopy) {
-      load.emitOpError("Skip because total copy size is not equal to "
-                       "subgroup size times element size in bytes.");
-      continue;
-    }
+    assert(totalCopySize == subgroupSize * kNumBitsPerCopy &&
+           "Skip because total copy size is not equal to "
+           "subgroup size times element size in bytes.");
 
     SmallVector<Value> dstIndices;
     for (int i = 0; i < targetType.getRank(); ++i) {
-      dstIndices.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
+      dstIndices.push_back(
+          rewriter.create<arith::ConstantIndexOp>(load.getLoc(), 0));
     }
     // Transfer type is a vector of the base element type
     VectorType transferType = VectorType::get(
