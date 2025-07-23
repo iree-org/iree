@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -26,13 +25,6 @@ struct ElementwiseOpsFusabilityOptions {
 };
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
                                 ElementwiseOpsFusabilityOptions options);
-
-/// Move the definition of operands of `operations` before `insertionPoint`.
-LogicalResult moveOperandDefs(RewriterBase &rewriter,
-                              ArrayRef<Operation *> operations,
-                              Operation *insertionPoint,
-                              DominanceInfo &dominanceInfo,
-                              ArrayRef<Operation *> ignoreOperations = {});
 
 /// Returns the closest producer dispatch region op result and the chain of
 /// operations being looked past during the traversal to find the producer

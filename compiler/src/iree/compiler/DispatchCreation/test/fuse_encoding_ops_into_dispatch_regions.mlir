@@ -214,3 +214,46 @@ util.func public @reshape_fusion(%arg0: tensor<32x32xf32>) -> tensor<16x64xf32, 
 // CHECK:         flow.return %[[SET_ENCODING]] :
 // CHECK:       }
 // CHECK:       util.return %[[DISPATCH0]] : tensor<16x64xf32, #[[$ENCODING]]>
+
+// -----
+
+// Tests that dependencies of the chain of ops before set_encoding are moved before the
+// the dispatch region. In this case this would be the `arith.divsi` and `arith.constant`
+// that the `tensor.expand_shape` depends on.
+
+#map = affine_map<(d0) -> (d0)>
+#encoding = #iree_encoding.testing<>
+util.func public @move_dependencies_before_dispatch(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?x1024xf32, #encoding> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty(%arg1) : tensor<?xf32>
+  %1 = flow.dispatch.region -> (tensor<?xf32>{%arg1}) {
+    %3 = linalg.generic {
+        indexing_maps = [#map, #map, #map],
+        iterator_types = ["parallel"]}
+        ins(%arg0, %arg0 : tensor<?xf32>, tensor<?xf32>)
+        outs(%0 : tensor<?xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      linalg.yield %4 : f32
+    } -> tensor<?xf32>
+    flow.return %3 : tensor<?xf32>
+  }
+  %c1024 = arith.constant 1024 : index
+  %2 = arith.divsi %arg1, %c1024 : index
+  %3 = tensor.expand_shape %1 [[0, 1]] output_shape [%2, 1024] : tensor<?xf32> into tensor<?x1024xf32>
+  %4 = iree_encoding.set_encoding %3 : tensor<?x1024xf32> -> tensor<?x1024xf32, #encoding>
+  util.return %4 : tensor<?x1024xf32, #encoding>
+}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: @move_dependencies_before_dispatch
+// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9_]+]]: index
+// CHECK:         %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK:         %[[DIV:.+]] = arith.divsi %[[ARG1]], %[[C1024]] : index
+// CHECK:         %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<?x1024xf32, #[[$ENCODING]]>{%[[DIV]]})
+// CHECK:           %[[ADD:.+]] = linalg.generic
+// CHECK:           %[[EXPAND:.+]] = tensor.expand_shape %[[ADD]]
+// CHECK-SAME:        output_shape [%[[DIV]], 1024]
+// CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[EXPAND]]
+// CHECK:           flow.return %[[SET_ENCODING]] : tensor<?x1024xf32, #[[$ENCODING]]>
+// CHECK:         }
+// CHECK:         util.return %[[DISPATCH0]] : tensor<?x1024xf32, #[[$ENCODING]]>
