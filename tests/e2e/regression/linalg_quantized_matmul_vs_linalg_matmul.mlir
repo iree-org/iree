@@ -216,8 +216,15 @@ func.func @test_quantized_matmul_as_matmul() {
   call @check_one_quantized_matmul_as_matmul_3x4x5(%lhs_3x4_2, %rhs_4x5_2, %c_plus41, %c_minus57) : (tensor<3x4xi8>, tensor<4x5xi8>, i32, i32) -> ()
   call @check_one_quantized_matmul_as_matmul_3x4x5(%lhs_3x4_2, %rhs_4x5_2, %c_minus128, %c_plus127) : (tensor<3x4xi8>, tensor<4x5xi8>, i32, i32) -> ()
 
-  %lhs_3x4_dynamic = tensor.cast %lhs_3x4_1 : tensor<3x4xi8> to tensor<?x?xi8>
-  %rhs_4x5_dynamic = tensor.cast %rhs_4x5_1 : tensor<4x5xi8> to tensor<?x?xi8>
+  %lhs_3x4_dynamic = flow.tensor.dynamic_constant dense<[
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9, 10, 11, 12]]> : tensor<3x4xi8> -> tensor<?x?xi8>
+  %rhs_4x5_dynamic = flow.tensor.dynamic_constant dense<[
+      [5, 4, 3, 2, 9],
+      [1, 0, -1, -2, 8],
+      [-3, -4, -5, -6, 7],
+      [2, 3, 5, 7, 11]]> : tensor<4x5xi8> -> tensor<?x?xi8>
   call @check_one_quantized_matmul_as_matmul_dynamic(%lhs_3x4_dynamic, %rhs_4x5_dynamic, %c_minus128, %c_plus127) : (tensor<?x?xi8>, tensor<?x?xi8>, i32, i32) -> ()
 
   return
