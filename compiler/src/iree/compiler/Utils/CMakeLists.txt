@@ -27,6 +27,7 @@ iree_cc_library(
     "PassUtils.h"
     "PatternUtils.h"
     "Permutation.h"
+    "RegionOpUtils.h"
     "ShapeUtils.h"
     "StringUtils.h"
     "ToolUtils.h"
@@ -39,6 +40,7 @@ iree_cc_library(
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
+    "RegionOpUtils.cpp"
     "ShapeUtils.cpp"
     "StringUtils.cpp"
     "ToolUtils.cpp"
@@ -47,6 +49,7 @@ iree_cc_library(
     LLVMPasses
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
