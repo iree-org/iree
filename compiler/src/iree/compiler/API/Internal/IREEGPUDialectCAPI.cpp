@@ -353,9 +353,9 @@ MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
 
 ireeGPUMMASingleSubgroupLayout
 ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
-  assert(ireeAttributeIsAGPUMMAIntrinsicAttr(attr) ||
-         ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr) &&
-             "Expected MMA or VirtualMMA Intrinsic");
+  assert((ireeAttributeIsAGPUMMAIntrinsicAttr(attr) ||
+          ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr)) &&
+         "Expected MMA or VirtualMMA Intrinsic");
 
   mlir::Attribute baseAttr = unwrap(attr);
   mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout layout;
