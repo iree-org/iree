@@ -483,9 +483,9 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         }
 
         AffineMap map = applyOp.getAffineMap();
-        if (map.getNumInputs() != 1 || map.getNumResults() != 1) {
+        if (map.getNumResults() != 1) {
           return rewriter.notifyMatchFailure(
-              sliceOp, "affine.apply must have one input and one result");
+              sliceOp, "affine.apply must have only one result");
         }
 
         auto maybeStaticSize = getConstantIntValue(collapsedSize);
