@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 #include <cstdint>
 
@@ -22,6 +23,8 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 namespace mlir::iree_compiler {
 
+using IREE::GPU::getSingleSubgroupLayout;
+
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
 
@@ -33,6 +36,7 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule) {
+  os << "mmaKind " << schedule.mmaKind << ", ";
   os << "mSizes: " << schedule.mSize << ", ";
   os << "nSizes: " << schedule.nSize << ", ";
   os << "kSizes: " << schedule.kSize << ", ";
@@ -168,7 +172,7 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
 /// found. The schedule sizes are reduced in the order of mTileSizes,
 /// nTileSizes, kTileSizes, mSubgroupCounts, nSubgroupCounts.
 static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
-    GPUMatmulShapeType intrinsic, GPUMMASchedule schedule,
+    GPUMMASchedule schedule,
     llvm::function_ref<bool(const GPUMMASchedule &schedule)> isScheduleValid) {
 
   while (!isScheduleValid(schedule)) {
@@ -410,54 +414,63 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       mTileSizes,          nTileSizes,          kTileSizes};
 }
 
-/// Sort the MMA intrinsics by following precedence rules:
+/// Compare the MMA intrinsics by following precedence rules:
 ///   1) k-alignment. We prefer intrinsics that can evenly divide the K
 ///   dimension of the problem.
-///   2) M/N-alignment. We prefer intrinsics that can evenly divide the M and N
-///   dimensions of the problem.
+///   2) M/N-alignment. We prefer intrinsics that can evenly divide the M
+///   and N dimensions of the problem.
 ///   3) Intrinsic with larger gemm size.
 ///   4) Intrinsic with larger K size.
+///
+/// This function acts as a comparison function object for std::sort, which
+/// returns true if the lhs is ordered before rhs.
+bool compareIntrinsics(const GPUMatmulShapeType &problem,
+                       const GPUMatmulShapeType &lhs,
+                       const GPUMatmulShapeType &rhs) {
+  // Prefer K-aligned intrinsics.
+  int lhsKAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
+  int rhsKAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
+  if (lhsKAligned != rhsKAligned) {
+    return lhsKAligned > rhsKAligned;
+  }
+
+  // If K alignment is the same, prefer the intrinsic that aligns M and N.
+  int lhsMNAligned = (problem.mSizes.back() % lhs.mSizes.back() == 0 &&
+                      problem.nSizes.back() % lhs.nSizes.back() == 0)
+                         ? 1
+                         : 0;
+  int rhsMNAligned = (problem.mSizes.back() % rhs.mSizes.back() == 0 &&
+                      problem.nSizes.back() % rhs.nSizes.back() == 0)
+                         ? 1
+                         : 0;
+  if (lhsMNAligned != rhsMNAligned) {
+    return lhsMNAligned > rhsMNAligned;
+  }
+
+  auto intrinsicArea = [&](const GPUMatmulShapeType &intrinsic) {
+    return (ShapedType::getNumElements(intrinsic.mSizes) +
+            ShapedType::getNumElements(intrinsic.nSizes)) *
+           ShapedType::getNumElements(intrinsic.kSizes);
+  };
+  int64_t lhsArea = intrinsicArea(lhs);
+  int64_t rhsArea = intrinsicArea(rhs);
+  if (lhsArea != rhsArea) {
+    return lhsArea > rhsArea;
+  }
+
+  // Finally if everything else is the same, prefer large K size.
+  return ShapedType::getNumElements(lhs.kSizes) >
+         ShapedType::getNumElements(rhs.kSizes);
+}
+
 static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
                   ArrayRef<GPUIntrinsicType> intrinsics) {
   SmallVector<GPUIntrinsicType> sortedIntrinsics;
-  llvm::sort(sortedIntrinsics, [&](const GPUMatmulShapeType &lhs,
-                                   const GPUMatmulShapeType &rhs) {
-    // Prefer K-aligned intrinsics.
-    int lhsKAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
-    int rhsKAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
-    if (lhsKAligned != rhsKAligned) {
-      return lhsKAligned > rhsKAligned;
-    }
-
-    // If K alignment is the same, prefer the intrinsic that aligns M and N.
-    int lhsMNAligned = (problem.mSizes.back() % lhs.mSizes.back() == 0 &&
-                        problem.nSizes.back() % lhs.nSizes.back() == 0)
-                           ? 1
-                           : 0;
-    int rhsMNAligned = (problem.mSizes.back() % rhs.mSizes.back() == 0 &&
-                        problem.nSizes.back() % rhs.nSizes.back() == 0)
-                           ? 1
-                           : 0;
-    if (lhsMNAligned != rhsMNAligned) {
-      return lhsMNAligned > rhsMNAligned;
-    }
-
-    auto intrinsicArea = [&](const GPUMatmulShapeType &intrinsic) {
-      return (ShapedType::getNumElements(intrinsic.mSizes) +
-              ShapedType::getNumElements(intrinsic.nSizes)) *
-             ShapedType::getNumElements(intrinsic.kSizes);
-    };
-    int64_t lhsArea = intrinsicArea(lhs);
-    int64_t rhsArea = intrinsicArea(rhs);
-    if (lhsArea != rhsArea) {
-      return lhsArea > rhsArea;
-    }
-
-    // Finally if everything else is the same, prefer large K size.
-    return ShapedType::getNumElements(lhs.kSizes) >
-           ShapedType::getNumElements(rhs.kSizes);
-  });
+  llvm::sort(sortedIntrinsics,
+             [&](const GPUMatmulShapeType &lhs, const GPUMatmulShapeType &rhs) {
+               return compareIntrinsics(problem, lhs, rhs);
+             });
   return sortedIntrinsics;
 }
 
@@ -505,7 +518,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
 
       return isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
     };
-    return fitScheduleInSharedMemory(intrinsic, schedule, isValidSchedule);
+    return fitScheduleInSharedMemory(schedule, isValidSchedule);
   }
   return failure();
 }
@@ -585,7 +598,13 @@ getOptimalAttentionPVSchedule(const GPUMatmulShapeType &problem,
       mTileSizes,          nTileSizes,          kTileSizes};
 }
 
-FailureOr<GPUMMASchedule> deduceAttentionSchedule(
+struct ChainedMMAIntrinsics {
+  GPUIntrinsicType intrinsicA;
+  GPUIntrinsicType intrinsicB;
+  bool canReuseAOutputForB;
+};
+
+FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
     ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &pvMatmulSeeds, int64_t sharedMemLimitInBytes,
@@ -595,40 +614,87 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
          pvMatmul.kSizes.size() == 1 && qkMatmul.mSizes.size() == 1 &&
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
-  for (const GPUIntrinsicType &intrinsic : intrinsics) {
-    if (failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
-                                  canUpcastAcc, mustBeAligned))) {
-      continue;
+
+  std::vector<ChainedMMAIntrinsics> intrinsicPairs;
+
+  for (const GPUIntrinsicType &intrinsicA : intrinsics) {
+    for (const GPUIntrinsicType &intrinsicB : intrinsics) {
+      if (failed(canTargetIntrinsic(qkMatmul, intrinsicA, subgroupSize,
+                                    canUpcastAcc, mustBeAligned))) {
+        continue;
+      }
+
+      if (failed(canTargetIntrinsic(pvMatmul, intrinsicB, subgroupSize,
+                                    canUpcastAcc, mustBeAligned))) {
+        continue;
+      }
+      // Check if we can reuse the output of intrinsicA for lhs/rhs of
+      // intrinsicB.
+      auto matchLayout =
+          [](IREE::GPU::MMASingleSubgroupLayout layoutA,
+             IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
+        return (layoutA.element == layoutB.element) &&
+               (layoutA.thread == layoutB.thread) &&
+               (layoutA.tstrides == layoutB.tstrides);
+      };
+      bool canReuseAOutForBLhs =
+          matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
+                                              IREE::GPU::MMAFragment::Acc),
+                      getSingleSubgroupLayout(intrinsicB.mmaKind,
+                                              IREE::GPU::MMAFragment::Lhs));
+      bool canReuseAOutForBRhs =
+          matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
+                                              IREE::GPU::MMAFragment::Acc),
+                      getSingleSubgroupLayout(intrinsicB.mmaKind,
+                                              IREE::GPU::MMAFragment::Rhs));
+      intrinsicPairs.push_back(
+          {intrinsicA, intrinsicB, canReuseAOutForBLhs || canReuseAOutForBRhs});
+    }
+  }
+
+  llvm::sort(intrinsicPairs, [&](const ChainedMMAIntrinsics &lhs,
+                                 const ChainedMMAIntrinsics &rhs) {
+    if (lhs.canReuseAOutputForB && !rhs.canReuseAOutputForB) {
+      return true;
+    }
+    if (!lhs.canReuseAOutputForB && rhs.canReuseAOutputForB) {
+      return false;
     }
 
-    if (failed(canTargetIntrinsic(pvMatmul, intrinsic, subgroupSize,
-                                  canUpcastAcc, mustBeAligned))) {
-      continue;
+    if (lhs.intrinsicA.mmaKind != rhs.intrinsicA.mmaKind) {
+      return compareIntrinsics(qkMatmul, lhs.intrinsicA, rhs.intrinsicA);
     }
+    return compareIntrinsics(pvMatmul, lhs.intrinsicB, rhs.intrinsicB);
+  });
+
+  for (ChainedMMAIntrinsics intrinsics : intrinsicPairs) {
+    // Structured bindings cannot be captured in C++ < 20.
+    GPUIntrinsicType intrinsicA = intrinsics.intrinsicA;
+    GPUIntrinsicType intrinsicB = intrinsics.intrinsicB;
+    bool canReuseAOutput = intrinsics.canReuseAOutputForB;
 
     GPUMMASchedule schedule =
-        getOptimalAttentionPVSchedule(pvMatmul, intrinsic, pvMatmulSeeds);
+        getOptimalAttentionPVSchedule(pvMatmul, intrinsicB, pvMatmulSeeds);
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
       llvm::dbgs() << "  " << schedule << "\n";
     });
-
-    int64_t intrinsicK = intrinsic.kSizes[0];
+    int64_t intrinsicAK = intrinsicA.kSizes[0];
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       // Create a mma schedule for qkMatmul in attention.
       // qkMatmul.M = pvMatmul.M
       // qkMatmul.N = pvMatmul.K
       // qkMatmul.K = problem.K
-      GPUMMASchedule qkSchedule{schedule.mmaKind,
+      GPUMMASchedule qkSchedule{intrinsicA.mmaKind,
                                 schedule.mSize,
                                 schedule.kSize,
-                                intrinsicK,
+                                intrinsicAK,
                                 /*mSubgroupCount=*/schedule.mSubgroupCounts[0],
                                 /*nSubgroupCount=*/1,
                                 schedule.mTileSizes[0],
                                 schedule.kTileSizes[0],
-                                qkMatmul.kSizes[0] / intrinsicK};
+                                qkMatmul.kSizes[0] / intrinsicAK};
 
       bool isQKAligned =
           isValidMMASchedule(qkMatmul, qkSchedule, mustBeAligned, subgroupSize,
@@ -639,12 +705,18 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
       bool isPVAligned = isValidMMASchedule(pvMatmul, schedule, mustBeAligned,
                                             subgroupSize, false, transposedV);
 
-      int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth = intrinsic.bType.getIntOrFloatBitWidth();
+      int64_t lhsABitwidth = intrinsicA.aType.getIntOrFloatBitWidth();
+      int64_t rhsABitwidth = intrinsicA.bType.getIntOrFloatBitWidth();
+      int64_t rhsBBitwidth = intrinsicB.bType.getIntOrFloatBitWidth();
+      // We don't need to use shared memory for lhsB if we can reuse A intrinsic
+      // output.
+      int64_t lhsBBitwidth =
+          canReuseAOutput ? 0 : intrinsicB.aType.getIntOrFloatBitWidth();
+
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
-                                     qkSchedule, lhsBitwidth, rhsBitwidth) +
+                                     qkSchedule, lhsABitwidth, rhsABitwidth) +
                                  calculateOperandsSharedMemoryUsedInBytes(
-                                     schedule, lhsBitwidth, rhsBitwidth);
+                                     schedule, lhsBBitwidth, rhsBBitwidth);
 
       LLVM_DEBUG({
         llvm::dbgs() << "Available Shared Memory: ";
@@ -657,7 +729,27 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
              sharedMemoryUsed <= sharedMemLimitInBytes;
     };
 
-    return fitScheduleInSharedMemory(intrinsic, schedule, isValidSchedule);
+    FailureOr<GPUMMASchedule> pvSchedule =
+        fitScheduleInSharedMemory(schedule, isValidSchedule);
+    if (failed(pvSchedule)) {
+      return failure();
+    }
+
+    // Create a mma schedule for qkMatmul in attention.
+    // qkMatmul.M = pvMatmul.M
+    // qkMatmul.N = pvMatmul.K
+    // qkMatmul.K = problem.K
+    GPUMMASchedule qkSchedule{intrinsicA.mmaKind,
+                              pvSchedule->mSize,
+                              pvSchedule->kSize,
+                              intrinsicAK,
+                              /*mSubgroupCount=*/schedule.mSubgroupCounts[0],
+                              /*nSubgroupCount=*/1,
+                              pvSchedule->mTileSizes[0],
+                              pvSchedule->kTileSizes[0],
+                              qkMatmul.kSizes[0] / intrinsicAK};
+
+    return std::pair(qkSchedule, pvSchedule.value());
   }
 
   return failure();
