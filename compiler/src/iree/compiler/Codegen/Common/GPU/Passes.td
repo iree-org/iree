@@ -326,7 +326,9 @@ def GPUApplyTilingLevelPass :
            )}]>,
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
            /*default=*/"true",
-           "Allow pad fusion to generate zero size slices">
+           "Allow pad fusion to generate zero size slices">,
+    Option<"normalizeLoops", "normalize-loops", "bool", "false",
+           "Enable normalization for scf loops">
   ];
 }
 

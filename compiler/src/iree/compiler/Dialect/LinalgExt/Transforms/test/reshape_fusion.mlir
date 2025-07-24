@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-linalg-ext-test-reshape-fusion, canonicalize, cse, canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-linalg-ext-test-reshape-fusion, cse))" %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
@@ -481,6 +481,32 @@ util.func public @sink_through_k2(%0 : tensor<128x16x2x2x128xf16>, %1 : tensor<1
 //       CHECK:   util.return %[[ATTENTION]]
 
 // -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+
+util.func public @no_fuse_attention_mixed_static_dynamic(%arg0: tensor<?x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> tensor<2x10x4096x64xf16> {
+  %0 = tensor.empty() : tensor<20x4096x64xf16>
+  %1 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%arg0, %arg1, %arg2, %arg3 : tensor<?x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
+    ^bb0(%score: f16):
+      iree_linalg_ext.yield %score: f16
+  } -> tensor<20x4096x64xf16>
+  %expanded = tensor.expand_shape %1 [[0, 1], [2], [3]] output_shape [2, 10, 4096, 64] : tensor<20x4096x64xf16> into tensor<2x10x4096x64xf16>
+  util.return %expanded : tensor<2x10x4096x64xf16>
+}
+
+//CHECK-LABEL: func public @no_fuse_attention_mixed_static_dynamic(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x4096x16xf16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x1024x16xf16>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x1024x64xf16>
+// CHECK-SAME:     %[[ARG3:.+]]: f16)
+//      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+//      CHECK:   tensor.expand_shape %[[ATTENTION]]
+
 
 util.func @scatter_collapse_updates(%arg0: tensor<4x?x2x16x4x128xf16>, %arg1: tensor<?x1xi32>, %arg2: tensor<?x2x16x4x128xf16>) -> tensor<?x2x16x4x128xf16> {
   %collapsed = tensor.collapse_shape %arg0[[0, 1], [2], [3], [4], [5]] : tensor<4x?x2x16x4x128xf16> into tensor<?x2x16x4x128xf16>
