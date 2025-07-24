@@ -64,13 +64,13 @@ static Value getSourceSkipUnary(Value value) {
 
 /// Returns true if the two operations are ones supported by scaled mfmas.
 static bool isValidScaledMmaPair(Operation *add, Operation *mul) {
-  SmallVector<std::pair<std::string, std::string>> validPairs = {
-      {"arith.addf", "arith.mulf"},
-      {"arith.addi", "arith.muli"},
-      {"complex.add", "complex.mul"},
-      {"arith.ori", "arith.andi"}};
+  constexpr std::pair<StringRef, StringRef> validPairs[4] = {
+      {arith::AddFOp::getOperationName(), arith::MulFOp::getOperationName()},
+      {arith::AddIOp::getOperationName(), arith::MulIOp::getOperationName()},
+      {complex::AddOp::getOperationName(), complex::MulOp::getOperationName()},
+      {arith::OrIOp::getOperationName(), arith::AndIOp::getOperationName()}};
   return llvm::any_of(validPairs,
-                      [&add, mul](std::pair<std::string, std::string> p) {
+                      [add, mul](std::pair<StringRef, StringRef> p) {
                         return p.first == add->getName().getStringRef() &&
                                p.second == mul->getName().getStringRef();
                       });

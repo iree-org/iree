@@ -381,8 +381,10 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   for (int64_t k : llvm::drop_end(contractionK)) {
     reductionTileSizes[k] = 1;
   }
-  for (int64_t kB : llvm::drop_end(contractionKB)) {
-    reductionTileSizes[kB] = 1;
+  if (scaled) {
+    for (int64_t kB : llvm::drop_end(contractionKB)) {
+      reductionTileSizes[kB] = 1;
+    }
   }
 
   // Compute the M/N dimension tile sizes by multiplying subgroup information.
