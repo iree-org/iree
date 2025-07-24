@@ -1595,8 +1595,10 @@ getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
                                SmallVectorImpl<int64_t> &sizes,
                                SmallVectorImpl<bool> &scalableSizeFlags) {
   // Double-check the operation is one that is supported for lowering to ArmSME.
-  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp>(
-          op.getOperation()))
+  if (!((isa<linalg::MatmulOp>(op.getOperation()) &&
+         !isa<linalg::MatmulTransposeAOp>(op.getOperation()) &&
+         !isa<linalg::MatmulTransposeBOp>(op.getOperation())) ||
+        isa<linalg::MatmulTransposeAOp>(op.getOperation())))
     return;
 
   auto elementType = nonWideningLinalgElementType(op);
@@ -1656,7 +1658,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
       hasAnyVFeature(targetAttr.getConfiguration())) {
     // Use default tile size for matmul_transpose_b &
     // batch_matmul_transpose_b to avoid performance drop.
-    if (isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(
+    if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(
             op.getOperation())) {
       // Try to maximize the vector register utilization rate for matmul.
       getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,

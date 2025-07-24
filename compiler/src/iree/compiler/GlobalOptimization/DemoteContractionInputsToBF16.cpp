@@ -91,13 +91,17 @@ struct DemoteContractionInputsToBF16Pattern
     bool demoteConv = (demoteOption == DemotionOption::All) ||
                       (demoteOption == DemotionOption::Conv);
 
-    if (demoteMatmul && isa<linalg::MatmulOp>(linalgOp)) {
+    if (demoteMatmul && isa<linalg::MatmulOp>(linalgOp) &&
+        !isa<linalg::MatmulTransposeAOp>(linalgOp.getOperation()) &&
+        !isa<linalg::MatmulTransposeBOp>(linalgOp.getOperation())) {
       replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::MatvecOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::VecmatOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::VecmatOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulOp>(linalgOp)) {
+    } else if (demoteMatmul && isa<linalg::BatchMatmulOp>(linalgOp) &&
+               !isa<linalg::BatchMatmulTransposeAOp>(linalgOp.getOperation()) &&
+               !isa<linalg::BatchMatmulTransposeBOp>(linalgOp.getOperation())) {
       replaceOpInputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::BatchMatvecOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
