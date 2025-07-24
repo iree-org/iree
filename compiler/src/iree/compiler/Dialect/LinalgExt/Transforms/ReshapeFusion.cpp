@@ -200,6 +200,18 @@ LogicalResult ExpansionInfo::compute(
   if (operandReassoc.empty())
     return failure();
 
+  // Check that the operand dim size matches the iteration space dim size. This
+  // can fail when one is static and the other is dynamic.
+  for (const ReshapeOperandInfo &info : infos) {
+    for (auto [operandDim, iterDim] :
+         llvm::enumerate(info.operandToIterationSpace)) {
+      if (iterDim != ReshapeOperandInfo::kNoMapping &&
+          loopRanges[iterDim] != info.originalShape[operandDim]) {
+        return failure();
+      }
+    }
+  }
+
   int64_t operandNum = fusableOpOperand->getOperandNumber();
   ReshapeOperandInfo &fusionOperandInfo = infos[operandNum];
   this->loopShapeMap.clear();
@@ -413,8 +425,10 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
 
   IRMapping mapping;
   for (OpOperand &operand : op->getOpOperands()) {
-    mapping.map(operand.get(),
-                info.getOrCreateExpanded(loc, &operand, rewriter).value());
+    std::optional<Value> maybeNewOperand =
+        info.getOrCreateExpanded(loc, &operand, rewriter);
+    assert(maybeNewOperand.has_value());
+    mapping.map(operand.get(), maybeNewOperand.value());
   }
 
   assert(op.getNumDpsInits() == 1);
