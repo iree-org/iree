@@ -74,7 +74,7 @@ function(iree_amdgpu_binary)
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})
     get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
-    string(REGEX REPLACE "[.]c$" ".bc" _BITCODE_FILE ${_SRC})
+    string(REGEX REPLACE "[.]c$" "--${_RULE_ARCH}.bc" _BITCODE_FILE ${_SRC})
     list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
       OUTPUT
