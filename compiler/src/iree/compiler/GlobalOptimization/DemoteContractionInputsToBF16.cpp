@@ -91,45 +91,42 @@ struct DemoteContractionInputsToBF16Pattern
     bool demoteConv = (demoteOption == DemotionOption::All) ||
                       (demoteOption == DemotionOption::Conv);
 
-    if (demoteMatmul && isa<linalg::MatmulOp>(linalgOp) &&
-        !isa<linalg::MatmulTransposeAOp>(linalgOp.getOperation()) &&
-        !isa<linalg::MatmulTransposeBOp>(linalgOp.getOperation())) {
+    Operation *op = linalgOp.getOperation();
+    if (demoteMatmul && isa<linalg::MatmulOp>(op) &&
+        !isa<linalg::MatmulTransposeAOp>(op) &&
+        !isa<linalg::MatmulTransposeBOp>(op)) {
       replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::MatvecOp>(linalgOp)) {
+    } else if (demoteMatmul && isa<linalg::MatvecOp>(op)) {
       replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::VecmatOp>(linalgOp)) {
+    } else if (demoteMatmul && isa<linalg::VecmatOp>(op)) {
       replaceOpInputs(static_cast<linalg::VecmatOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulOp>(linalgOp) &&
-               !isa<linalg::BatchMatmulTransposeAOp>(linalgOp.getOperation()) &&
-               !isa<linalg::BatchMatmulTransposeBOp>(linalgOp.getOperation())) {
+    } else if (demoteMatmul && isa<linalg::BatchMatmulOp>(op) &&
+               !isa<linalg::BatchMatmulTransposeAOp>(op) &&
+               !isa<linalg::BatchMatmulTransposeBOp>(op)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatvecOp>(linalgOp)) {
+    } else if (demoteMatmul && isa<linalg::BatchMatvecOp>(op)) {
       replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchVecmatOp>(linalgOp)) {
+    } else if (demoteMatmul && isa<linalg::BatchVecmatOp>(op)) {
       replaceOpInputs(static_cast<linalg::BatchVecmatOp *>(nullptr));
-    } else if (demoteMatmul &&
-               isa<linalg::MatmulTransposeAOp>(linalgOp.getOperation())) {
+    } else if (demoteMatmul && isa<linalg::MatmulTransposeAOp>(op)) {
       replaceOpInputs(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
-    } else if (demoteMatmul &&
-               isa<linalg::MatmulTransposeBOp>(linalgOp.getOperation())) {
+    } else if (demoteMatmul && isa<linalg::MatmulTransposeBOp>(op)) {
       replaceOpInputs(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (demoteMatmul &&
-               isa<linalg::BatchMatmulTransposeAOp>(linalgOp.getOperation())) {
+    } else if (demoteMatmul && isa<linalg::BatchMatmulTransposeAOp>(op)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
-    } else if (demoteMatmul &&
-               isa<linalg::BatchMatmulTransposeBOp>(linalgOp.getOperation())) {
+    } else if (demoteMatmul && isa<linalg::BatchMatmulTransposeBOp>(op)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DOp>(linalgOp)) {
+    } else if (demoteConv && isa<linalg::Conv2DOp>(op)) {
       replaceOpInputs(static_cast<linalg::Conv2DOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNchwFchwOp>(linalgOp)) {
+    } else if (demoteConv && isa<linalg::Conv2DNchwFchwOp>(op)) {
       replaceOpInputs(static_cast<linalg::Conv2DNchwFchwOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+    } else if (demoteConv && isa<linalg::Conv2DNhwcHwcfOp>(op)) {
       replaceOpInputs(static_cast<linalg::Conv2DNhwcHwcfOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNhwcFhwcOp>(linalgOp)) {
+    } else if (demoteConv && isa<linalg::Conv2DNhwcFhwcOp>(op)) {
       replaceOpInputs(static_cast<linalg::Conv2DNhwcFhwcOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNgchwFgchwOp>(linalgOp)) {
+    } else if (demoteConv && isa<linalg::Conv2DNgchwFgchwOp>(op)) {
       replaceOpInputs(static_cast<linalg::Conv2DNgchwFgchwOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNgchwGfchwOp>(linalgOp)) {
+    } else if (demoteConv && isa<linalg::Conv2DNgchwGfchwOp>(op)) {
       replaceOpInputs(static_cast<linalg::Conv2DNgchwGfchwOp *>(nullptr));
     } else {
       return failure();
