@@ -45,6 +45,86 @@ using namespace IREE::Encoding;
 
 namespace {
 
+/// Converts contraction ops that have readonly init to the below form. It is a
+/// special case in data-tiling fusion concept that materializes encodings into
+/// identity layout. In the context, the matmul op could use readonly in init
+/// tensors and then gets stored into the writeonly buffer. With the rewrite,
+/// the iter_arg takes tensor.empty() instead, and avoids writing data outside
+/// forall op after distribution.
+///
+/// %0 = tensor.empty()
+/// %1 = linalg.fill %1(%cst_0) outs(%0)
+/// %2 = linalg.original_op ins(%lhs, %rhs) outs(%1)
+/// %3 = linalg.elementwise_add ins(%2, %acc) outs(%0)
+struct RemoveReadOnlyOutsDependencyForContractionOps
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!linalg::isaContractionOpInterface(op)) {
+      return failure();
+    }
+    rewriter.startOpModification(op);
+    bool modifiedOutput = false;
+    Location loc = op.getLoc();
+    for (OpOperand &opOperand : op.getDpsInitsMutable()) {
+      auto loadOp = opOperand.get()
+                        .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
+      if (!loadOp) {
+        continue;
+      }
+      auto access = llvm::cast<IREE::TensorExt::DispatchTensorType>(
+                        loadOp.getSource().getType())
+                        .getAccess();
+      if (access != IREE::TensorExt::TensorAccess::ReadOnly) {
+        continue;
+      }
+      modifiedOutput = true;
+
+      RankedTensorType type = loadOp.getResult().getType();
+      int64_t outputRank = type.getRank();
+      SmallVector<utils::IteratorType> iterators(outputRank,
+                                                 utils::IteratorType::parallel);
+      SmallVector<AffineMap> maps(3,
+                                  rewriter.getMultiDimIdentityMap(outputRank));
+      SmallVector<OpFoldResult> mixedSizes =
+          tensor::getMixedSizes(rewriter, loc, opOperand.get());
+      Type elementType = type.getElementType();
+      Value initOp =
+          rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
+      Value zero = rewriter.create<arith::ConstantOp>(
+          loc, rewriter.getZeroAttr(elementType));
+      Value fill = rewriter.create<linalg::FillOp>(loc, zero, initOp).result();
+
+      // Create a generic op to add back the original output tensor operand.
+      rewriter.setInsertionPointAfter(op);
+      auto genericOp = rewriter.create<linalg::GenericOp>(
+          loc, type, ValueRange{op->getResult(0), opOperand.get()}, initOp,
+          maps, iterators,
+          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+            Value result;
+            if (llvm::isa<FloatType>(elementType)) {
+              result = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
+            } else {
+              result = b.create<arith::AddIOp>(nestedLoc, args[0], args[1]);
+            }
+            b.create<linalg::YieldOp>(nestedLoc, result);
+          });
+
+      // Update the contraction op to use the new zero tensor as output operand.
+      rewriter.modifyOpInPlace(op, [&]() { op.setDpsInitOperand(0, fill); });
+      op->getResult(0).replaceAllUsesExcept(genericOp->getResult(0), genericOp);
+    }
+    if (!modifiedOutput) {
+      rewriter.cancelOpModification(op);
+      return failure();
+    }
+    rewriter.finalizeOpModification(op);
+    return success();
+  }
+};
+
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -121,6 +201,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // dims ops, and eliminate common sub-expressions.
   {
     RewritePatternSet patterns(ctx);
+    patterns.insert<RemoveReadOnlyOutsDependencyForContractionOps>(ctx);
     // NOTE: These patterns are currently load-bearing for sub-byte floats.
     populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
