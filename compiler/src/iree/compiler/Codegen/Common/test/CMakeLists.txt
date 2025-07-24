@@ -76,6 +76,7 @@ iree_lit_test_suite(
     "materialize_encoding_into_nop.mlir"
     "materialize_encoding_into_padding.mlir"
     "materialize_encoding_riscv.mlir"
+    "materialize_encoding_vmvx.mlir"
     "materialize_encoding_x86_64.mlir"
     "materialize_tuning_specs.mlir"
     "materialize_tuning_specs_default_missing.mlir"
@@ -123,7 +124,6 @@ iree_lit_test_suite(
     "vectorize_tensor_pad.mlir"
     "verify_tuning_specs.mlir"
     "verify_workgroup_distribution.mlir"
-    "vmvx_materialize_encoding.mlir"
   TOOLS
     FileCheck
     iree-opt
