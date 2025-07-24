@@ -189,14 +189,19 @@ static void resolveHintOp(RewriterBase &rewriter,
       continue;
     }
     if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
-      VectorType transferType =
-          dyn_cast<VectorType>(gatherToLDSOp.getTransferType());
-      if (!transferType || transferType.getRank() != 1) {
-        return;
+      Type transferType = gatherToLDSOp.getTransferType();
+      if (VectorType vectorTransferType = dyn_cast<VectorType>(transferType)) {
+        if (vectorTransferType.getRank() != 1 ||
+            vectorTransferType.getShape()[0] != accessWidth) {
+          return;
+        }
+      } else {
+        int64_t transferBitWidth = transferType.getIntOrFloatBitWidth();
+        if (transferBitWidth % 8 != 0 || transferBitWidth / 8 != accessWidth) {
+          return;
+        }
       }
-      if (transferType.getShape()[0] != accessWidth) {
-        return;
-      }
+
       gatherToLDSOps.push_back(gatherToLDSOp);
       continue;
     }
