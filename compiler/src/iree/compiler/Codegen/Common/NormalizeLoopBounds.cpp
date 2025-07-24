@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -86,8 +87,7 @@ emitNormalizedLoopBounds(RewriterBase &rewriter, Location loc, Block *body,
 /// into a 0-based loop with step 1
 ///   for %ii = 0 to ceildiv(%ub - %lb, %s) step 1
 /// Insert an `affine.apply` operation to compute the denormalized index value.
-static LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
-                                         scf::ForOp forOp) {
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter, scf::ForOp forOp) {
   OpBuilder::InsertionGuard g(rewriter);
   // Return if already normalized.
   std::optional<int64_t> lbInt = getConstantIntValue(forOp.getLowerBound());
@@ -135,8 +135,8 @@ static LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
 /// into a 0-based loop with step 1 (normalized)
 ///   forall (%i, %j) in (ceildiv(%ub0 - %lb0, %s0), ceildiv(%ub1 - %lb1, %s1))
 /// Insert `affine.apply` operations to compute the denormalized index values.
-static LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
-                                         scf::ForallOp forallOp) {
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
+                                  scf::ForallOp forallOp) {
   OpBuilder::InsertionGuard g(rewriter);
   if (forallOp.isNormalized())
     return success();
