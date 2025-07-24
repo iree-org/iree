@@ -30,10 +30,7 @@ struct GeneralizeLinalgMatMulPass
       if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
         return;
       }
-      if (isa_and_nonnull<linalg::MatmulOp, linalg::MatmulTransposeBOp,
-                          linalg::BatchMatmulOp,
-                          linalg::BatchMatmulTransposeBOp>(
-              linalgOp.getOperation())) {
+      if (isa_and_nonnull<linalg::MatmulOp, linalg::BatchMatmulOp>(linalgOp)) {
         namedOpCandidates.push_back(linalgOp);
       }
     });
