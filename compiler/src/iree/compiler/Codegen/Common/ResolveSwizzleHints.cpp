@@ -150,12 +150,10 @@ static void swizzleGatherToLDS(RewriterBase &rewriter,
       rewriter, hintLoc,
       hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(), memrefOffset,
                                         hintOp.getOperand()));
-
-  rewriter.setInsertionPointAfter(gatherOp);
-  rewriter.create<amdgpu::GatherToLDSOp>(
-      gatherOp.getLoc(), hintOp.getOperand(), ValueRange{newOffset},
-      gatherOp.getDst(), gatherOp.getDstIndices(), gatherOp.getTransferType());
-  rewriter.eraseOp(gatherOp);
+  rewriter.modifyOpInPlace(gatherOp, [&]() {
+    gatherOp.getSrcMutable().assign(hintOp.getOperand());
+    gatherOp.getSrcIndicesMutable().assign(newOffset);
+  });
 }
 
 /// Resolves all hints. Walks all direct users and splits them into loads and
