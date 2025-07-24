@@ -50,7 +50,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-#define DEBUG_TYPE "iree-cpu-encoding-external-models"
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 

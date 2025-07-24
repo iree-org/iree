@@ -49,7 +49,9 @@
 #include <cstdint>
 #include <numeric>
 
-#define DEBUG_TYPE "iree-gpu-encoding-external-models"
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -271,10 +273,10 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
   IREE::GPU::DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
       resultEncoding.getElementTypesArray(), targetAttr, resultEncoding);
   if (!mma) {
-    LLVM_DEBUG(llvm::dbgs() << "expect encodings on operand types\n");
+    LDBG("expect encodings on operand types");
     return nullptr;
   }
-  LLVM_DEBUG(llvm::dbgs() << "Target MMA: " << mma << "\n");
+  LDBG("Target MMA: " << mma);
 
   MLIRContext *ctx = builder.getContext();
   SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
