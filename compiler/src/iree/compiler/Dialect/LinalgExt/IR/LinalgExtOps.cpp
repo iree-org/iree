@@ -280,7 +280,7 @@ static void populateMap(OpTy op, MutableArrayRef<OpOperand> operands,
 template <typename OpTy>
 static void createNewOperandWithStaticSizes(
     Location loc, PatternRewriter &rewriter, OpOperand *opOperand,
-    llvm::DenseMap<AffineExpr, int64_t> &affineExprToSize, OpTy op,
+    const llvm::DenseMap<AffineExpr, int64_t> &affineExprToSize, OpTy op,
     SmallVector<Value> &newOperands, SmallVector<Type> &resultTypes,
     bool &changeNeeded) {
   Value src = opOperand->get();
@@ -307,7 +307,7 @@ static void createNewOperandWithStaticSizes(
     // Dimension has a dynamic shape and corresponding affine dim
     // expression is present in the map. So assign the size for the
     // given affine dim expression to the dimension.
-    newShape.push_back(affineExprToSize[dimExpr]);
+    newShape.push_back(affineExprToSize.at(dimExpr));
     newOperandNeeded = true;
   }
   resultType = RankedTensorType::get(newShape, sourceType.getElementType(),
