@@ -108,11 +108,6 @@ def LLVMGPUTensorCoreVectorizationPass :
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
 }
 
-def LLVMGPUTensorPadPass :
-    InterfacePass<"iree-llvmgpu-tensor-pad", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to pad out tensors up to static dimensions.";
-}
-
 def LLVMGPUTileAndDistributePass :
     InterfacePass<"iree-llvmgpu-tile-and-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";

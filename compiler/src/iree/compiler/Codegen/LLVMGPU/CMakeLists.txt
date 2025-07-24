@@ -85,7 +85,6 @@ iree_cc_library(
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
-    "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUVectorDistribute.cpp"
     "LLVMGPUVectorLowering.cpp"

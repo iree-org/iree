@@ -54,7 +54,6 @@ iree_lit_test_suite(
     "reuse_shared_memory_allocs.mlir"
     "rocdl_pipeline_test.mlir"
     "sort_pipeline_test.mlir"
-    "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "test_query_mma.mlir"
     "transform_dialect_bufferize.mlir"
