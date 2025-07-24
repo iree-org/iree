@@ -51,7 +51,7 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
     }
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (!loweringConfig)
+    if (!loweringConfig || !loweringConfig.hasWorkgroupTilingLevel())
       return WalkResult::advance();
     std::unique_ptr<TilingConfig> tilingConfig =
         TilingConfig::create(loweringConfig);
