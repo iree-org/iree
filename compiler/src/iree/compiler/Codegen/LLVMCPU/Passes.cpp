@@ -128,7 +128,6 @@ addTileAndDistributePasses(OpPassManager &funcPassManager,
     return;
   }
   if (clTileDispatchUsingForall) {
-    funcPassManager.addPass(createConvertToDestinationPassingStylePass());
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
     funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
