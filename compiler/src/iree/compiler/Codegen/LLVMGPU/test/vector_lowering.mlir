@@ -109,7 +109,6 @@ func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> 
 }
 
 // CHECK-LABEL: func.func @multi_reduction_f32
-// CHECK-DAG:  %[[PSN:.+]] = ub.poison : vector<2x1xf32>
 // CHECK-DAG:  %[[C0:.+]]  = arith.constant 0.000000e+00 : f32
 // CHECK-DAG:  %[[V0:.+]]  = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
 // CHECK:      %[[MUL:.+]] = arith.mulf %{{.*}}, %{{.*}} : vector<2x1x8xf32>
