@@ -145,3 +145,71 @@ func.func @gather_to_extract_slice_partial_collapse(%source : tensor<2x2x100x100
 //  CHECK-SAME:     tensor<2x2x100x100xi32> to tensor<1x1x100x100xi32>
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]]
 //  CHECK-SAME:     tensor<1x1x100x100xi32> into tensor<100x100xi32>
+
+// -----
+
+func.func public @staticize_attention_from_operand(%arg0: tensor<?x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> tensor<20x4096x64xf16> {
+  %0 = tensor.empty() : tensor<20x4096x64xf16>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> ()>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]} ins(%arg0, %arg1, %arg2, %arg3 : tensor<?x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
+  ^bb0(%arg4: f16):
+    iree_linalg_ext.yield %arg4 : f16
+  } -> tensor<20x4096x64xf16>
+  return %1 : tensor<20x4096x64xf16>
+}
+//CHECK-LABEL: func public @staticize_attention_from_operand(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x4096x16xf16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x1024x16xf16>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x1024x64xf16>
+// CHECK-SAME:     %[[ARG3:.+]]: f16)
+//      CHECK:   %[[CAST:.+]] = tensor.cast %[[ARG0]]
+// CHECK-SAME:     : tensor<?x4096x16xf16> to tensor<20x4096x16xf16>
+//      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+// CHECK-SAME:       ins(%[[CAST]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+//      CHECK:   return %[[ATTENTION]]
+
+// -----
+
+func.func public @staticize_attention_from_cast(%arg0: tensor<?x4096x16xf16>, %arg1: tensor<20x?x16xf16>, %arg2: tensor<20x?x64xf16>, %arg3: f16) -> tensor<20x4096x64xf16> {
+  %0 = tensor.empty() : tensor<20x4096x64xf16>
+  %cast0 = tensor.cast %arg1 : tensor<20x?x16xf16> to tensor<?x?x16xf16>
+  %cast1 = tensor.cast %arg2 : tensor<20x?x64xf16> to tensor<?x?x64xf16>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> ()>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]} ins(%arg0, %cast0, %cast1, %arg3 : tensor<?x4096x16xf16>, tensor<?x?x16xf16>, tensor<?x?x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
+  ^bb0(%arg4: f16):
+    iree_linalg_ext.yield %arg4 : f16
+  } -> tensor<20x4096x64xf16>
+  return %1 : tensor<20x4096x64xf16>
+}
+//CHECK-LABEL: func public @staticize_attention_from_cast(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x4096x16xf16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x?x16xf16>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x?x64xf16>
+// CHECK-SAME:     %[[ARG3:.+]]: f16)
+//      CHECK:   %[[CAST:.+]] = tensor.cast %[[ARG0]]
+// CHECK-SAME:     : tensor<?x4096x16xf16> to tensor<20x4096x16xf16>
+//      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+// CHECK-SAME:       ins(%[[CAST]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+//      CHECK:   return %[[ATTENTION]]
+
+// -----
+
+func.func public @staticize_online_attention_from_cast(%arg0: tensor<?x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> tensor<20x4096x64xf16> {
+  %0 = tensor.empty() : tensor<20x4096x64xf16>
+  %1 = tensor.empty() : tensor<20x4096xf16>
+  %cast0 = tensor.cast %arg1 : tensor<20x1024x16xf16> to tensor<?x1024x16xf16>
+  %cast1 = tensor.cast %arg2 : tensor<20x1024x64xf16> to tensor<?x1024x64xf16>
+  %2:3 = iree_linalg_ext.online_attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> ()>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]} ins(%arg0, %cast0, %cast1, %arg3 : tensor<?x4096x16xf16>, tensor<?x1024x16xf16>, tensor<?x1024x64xf16>, f16) outs(%0, %1, %1 : tensor<20x4096x64xf16>, tensor<20x4096xf16>, tensor<20x4096xf16>) {
+  ^bb0(%arg4: f16):
+    iree_linalg_ext.yield %arg4 : f16
+  } -> tensor<20x4096x64xf16>, tensor<20x4096xf16>, tensor<20x4096xf16>
+  return %2#0 : tensor<20x4096x64xf16>
+}
+//CHECK-LABEL: func public @staticize_online_attention_from_cast(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x4096x16xf16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x1024x16xf16>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x1024x64xf16>
+// CHECK-SAME:     %[[ARG3:.+]]: f16)
+//      CHECK:   %[[CAST:.+]] = tensor.cast %[[ARG0]]
+// CHECK-SAME:     : tensor<?x4096x16xf16> to tensor<20x4096x16xf16>
+//      CHECK:   %[[ATTENTION:.+]]:3 = iree_linalg_ext.online_attention
+// CHECK-SAME:       ins(%[[CAST]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+//      CHECK:   return %[[ATTENTION]]#0

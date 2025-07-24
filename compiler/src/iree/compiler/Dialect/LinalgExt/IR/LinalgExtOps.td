@@ -899,6 +899,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1034,6 +1036,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
+
+  let hasCanonicalizer = 1;
 }
 //===----------------------------------------------------------------------===//
 // Im2col
