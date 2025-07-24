@@ -226,7 +226,7 @@ func.func @subgroup_load_multiple(%src: memref<2048xi8>, %offset: index) {
   // CHECK-NOT: vector.load
   // CHECK-NOT: vector.store
   %lds = memref.alloc() : memref<2048xi8, #gpu.address_space<workgroup>>
-  %1 = vector.load %0[%offset] : memref<2048xi8>, vector<16xi8>
-  vector.store %1, %lds[%offset] : memref<2048xi8, #gpu.address_space<workgroup>>, vector<16xi8>
+  %1 = vector.load %0[%offset] : memref<2048xi8>, vector<32xi8>
+  vector.store %1, %lds[%offset] : memref<2048xi8, #gpu.address_space<workgroup>>, vector<32xi8>
   return
 }

@@ -171,25 +171,35 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
 
   for (auto [load, store] : loadStorePairs) {
     auto sourceType = cast<MemRefType>(load.getBase().getType());
-    auto targetType = cast<MemRefType>(store.getBase().getType());
+    auto targetMemRefType = cast<MemRefType>(store.getBase().getType());
 
     if (!hasGlobalMemoryAddressSpace(sourceType) ||
-        !hasSharedMemoryAddressSpace(targetType)) {
+        !hasSharedMemoryAddressSpace(targetMemRefType)) {
       return hintOp->emitError("Source and target address spaces are "
                                "incompatible.");
     }
 
-    if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
+    if (!memref::isStaticShapeAndContiguousRowMajor(targetMemRefType)) {
       return hintOp->emitError(
           "Target memref is not static shape and contiguous "
           "row-major.");
+    }
+
+    int64_t totalCopySize =
+        targetMemRefType.getNumElements() * elementSizeInBytes;
+    VectorType loadVectorType = load.getVectorType();
+    int64_t loadVectorByteSize =
+        loadVectorType.getNumElements() * elementSizeInBytes;
+    if (loadVectorByteSize * subgroupSize != totalCopySize) {
+      return hintOp->emitError(
+          "Total copy size is not equal to the load size times the subgroup "
+          "size, this means it cannot form a subgroup load.");
     }
 
     // Expand the load/store chain into a single subgroup load.
 
     // TODO: support smaller subgroup copy sizes.
     const int64_t kNumBytesPerCopy = 16;
-    int64_t totalCopySize = targetType.getNumElements() * elementSizeInBytes;
     int64_t sizePerCopy = subgroupSize * kNumBytesPerCopy;
     if (totalCopySize % sizePerCopy != 0) {
       return hintOp->emitError(
@@ -200,8 +210,9 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
           "kNumBytesPerCopy is not dividable by the element size.");
     }
 
-    VectorType copyType = VectorType::get(
-        {kNumBytesPerCopy / elementSizeInBytes}, targetType.getElementType());
+    VectorType copyType =
+        VectorType::get({kNumBytesPerCopy / elementSizeInBytes},
+                        targetMemRefType.getElementType());
 
     rewriter.setInsertionPointAfter(store);
     for (int i = 0; i < totalCopySize; i += sizePerCopy) {
