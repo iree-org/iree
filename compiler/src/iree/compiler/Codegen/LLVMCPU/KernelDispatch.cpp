@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -1427,10 +1428,9 @@ getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
                                SmallVectorImpl<int64_t> &sizes,
                                SmallVectorImpl<bool> &scalableSizeFlags) {
   // Double-check the operation is one that is supported for lowering to ArmSME.
-  if (!((isa<linalg::MatmulOp>(op.getOperation()) &&
-         !isa<linalg::MatmulTransposeAOp>(op.getOperation()) &&
-         !isa<linalg::MatmulTransposeBOp>(op.getOperation())) ||
-        isa<linalg::MatmulTransposeAOp>(op.getOperation())))
+  Operation *rawOp = op.getOperation();
+  if (!(IREE::LinalgExt::isPureMatmul(rawOp) ||
+        isa<linalg::MatmulTransposeAOp>(rawOp)))
     return;
 
   auto elementType = nonWideningLinalgElementType(op);
