@@ -189,17 +189,19 @@ static void resolveHintOp(RewriterBase &rewriter,
       continue;
     }
     if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
-      Type transferType = gatherToLDSOp.getTransferType();
-      if (VectorType vectorTransferType = dyn_cast<VectorType>(transferType)) {
-        if (vectorTransferType.getRank() != 1 ||
-            vectorTransferType.getShape()[0] != accessWidth) {
-          return;
+      int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
+                                   .getElementTypeBitWidth() *
+                               accessWidth;
+      auto transferBitWidth = [&]() -> int64_t {
+        if (auto vectorType =
+                dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
+          return vectorType.getElementTypeBitWidth() *
+                 vectorType.getNumElements();
         }
-      } else {
-        int64_t transferBitWidth = transferType.getIntOrFloatBitWidth();
-        if (transferBitWidth % 8 != 0 || transferBitWidth / 8 != accessWidth) {
-          return;
-        }
+        return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
+      }();
+      if (accessBitWidth != transferBitWidth) {
+        return;
       }
 
       gatherToLDSOps.push_back(gatherToLDSOp);

@@ -222,9 +222,8 @@ func.func @swizzle_gather_to_lds(%src: memref<?xf32>, %offset: index) {
 //       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
 
 // -----
-
 func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 1>] : memref<?xf32>
   %lds = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   amdgpu.gather_to_lds %0[%offset], %lds[%c0] : f32, memref<?xf32>, memref<256xf32, #gpu.address_space<workgroup>>
@@ -235,16 +234,12 @@ func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
 //  CHECK-SAME:   %[[OFFSET:[A-Za-z0-9]+]]: index
 //   CHECK-DAG:   %[[ROW_WIDTH:.+]] = arith.constant 64 : index
-//   CHECK-DAG:   %[[GROUP_COUNT:.+]] = arith.constant 16 : index
-//   CHECK-DAG:   %[[GROUP_WIDTH:.+]] = arith.constant 4 : index
 //   CHECK-DAG:   %[[DSTOFFSET:.+]] = arith.constant 0 : index
 //       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
 //       CHECK:   %[[I:.+]] = arith.divui %[[OFFSET]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[JELEM:.+]] = arith.remui %[[OFFSET]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[J:.+]] = arith.divui %[[JELEM]], %[[GROUP_WIDTH]] : index
-//       CHECK:   %[[ADD:.+]] = arith.addi %[[I]], %[[J]] : index
-//       CHECK:   %[[ROTATEJ:.+]] = arith.remui %[[ADD]], %[[GROUP_COUNT]] : index
-//       CHECK:  %[[ROTATEJELEM:.+]] = arith.muli %[[ROTATEJ]], %[[GROUP_WIDTH]] : index
+//       CHECK:   %[[J:.+]] = arith.addi %[[I]], %[[JELEM]] : index
+//       CHECK:   %[[ROTATEJ:.+]] = arith.remui %[[J]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJELEM]], %[[IELEM]] : index
+//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJ]], %[[IELEM]] : index
 //       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
