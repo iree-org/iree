@@ -1411,8 +1411,6 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
                               /*rhsType=*/vElementType,
                               /*accType=*/f32Type};
 
-  // TODO: Currently, we are forcing number of subgroups to be 1. This can be
-  // fixed by teaching vector distribution chained matmul.
   GPUMMAHeuristicSeeds pvMatmulSeeds = {/*bestSubgroupCountPerWorkgroup=*/4,
                                         /*bestMNTileCountPerSubgroup=*/4,
                                         /*bestKTileCountPerSubgroup=*/4};
@@ -1433,37 +1431,41 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule = deduceAttentionSchedule(
-      qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
-      targetSubgroupSize, transposedQ, transposedK, transposedV);
-  if (!schedule) {
+  std::optional<std::pair<GPUMMASchedule, GPUMMASchedule>> attSchedule =
+      deduceAttentionSchedule(qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds,
+                              maxSharedMemoryBytes, targetSubgroupSize,
+                              transposedQ, transposedK, transposedV);
+  if (!attSchedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceAttentionSchedule(
+    attSchedule = deduceAttentionSchedule(
         qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
         targetSubgroupSize, transposedQ, transposedK, transposedV,
         /*canUpcastAcc=*/true);
   }
 
-  if (!schedule) {
+  if (!attSchedule) {
     LDBG("Failed to deduce Attention schedule");
     return failure();
   }
 
+  auto [qkSchedule, pvSchedule] = attSchedule.value();
+
   // TODO: Due to a bug in layout configuration, we cannot set warp count on
   // the N dimension. This is however ok, because we generally do not want to
   // distribute subgroups on N dimension anyway.
-  if (schedule->nSubgroupCounts[0] != 1) {
-    schedule->nTileSizes[0] *= schedule->nSubgroupCounts[0];
-    schedule->nSubgroupCounts[0] = 1;
+  if (pvSchedule.nSubgroupCounts[0] != 1) {
+    pvSchedule.nTileSizes[0] *= pvSchedule.nSubgroupCounts[0];
+    pvSchedule.nSubgroupCounts[0] = 1;
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("Schedule: " << schedule);
+  LDBG("QK Schedule: " << qkSchedule);
+  LDBG("PV Schedule: " << pvSchedule);
 
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
-      ShapedType::getNumElements(schedule->nSubgroupCounts) *
-      ShapedType::getNumElements(schedule->mSubgroupCounts);
+      ShapedType::getNumElements(pvSchedule.nSubgroupCounts) *
+      ShapedType::getNumElements(pvSchedule.mSubgroupCounts);
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
@@ -1487,12 +1489,12 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = pvSchedule.mSubgroupCounts[0] *
+                             pvSchedule.mTileSizes[0] * pvSchedule.mSize;
+  workgroupTileSizes[nDim] = pvSchedule.nSubgroupCounts[0] *
+                             pvSchedule.nTileSizes[0] * pvSchedule.nSize;
 
-  reductionTileSizes[k2Dim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[0] * pvSchedule.kSize;
 
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
@@ -1502,26 +1504,21 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
 
-  // On attention subgroup distribution:
-  // The subgroup distribution in attention is controlled by the second matmul
-  // (Parallel dimension distribution is usually (almost always) controlled by
-  // the last reduction operation in a dispatch). Since VectorDistribution
-  // doesn't have logic to set subgroup and thread layouts separately, we
-  // explicitly set the subgroup count for the first matmul as well,
-  // corresponding to what the second matmul dictates.
-
   // Configuring for qk matmul.
-  // subgroup_n count for qk matmul is always 1, since we do not tile K1.
   IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
-  IREE::GPU::setMmaKind(context, qkConfig, schedule->mmaKind);
-  IREE::GPU::setSubgroupMCount(context, qkConfig, schedule->mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, qkConfig, 1);
+  IREE::GPU::setMmaKind(context, qkConfig, qkSchedule.mmaKind);
+  IREE::GPU::setSubgroupMCount(context, qkConfig,
+                               qkSchedule.mSubgroupCounts[0]);
+  IREE::GPU::setSubgroupNCount(context, qkConfig,
+                               qkSchedule.nSubgroupCounts[0]);
 
   // Configuring for pv matmul.
   IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
-  IREE::GPU::setMmaKind(context, pvConfig, schedule->mmaKind);
-  IREE::GPU::setSubgroupMCount(context, pvConfig, schedule->mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, pvConfig, schedule->nSubgroupCounts[0]);
+  IREE::GPU::setMmaKind(context, pvConfig, pvSchedule.mmaKind);
+  IREE::GPU::setSubgroupMCount(context, pvConfig,
+                               pvSchedule.mSubgroupCounts[0]);
+  IREE::GPU::setSubgroupNCount(context, pvConfig,
+                               pvSchedule.nSubgroupCounts[0]);
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
