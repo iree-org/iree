@@ -141,14 +141,13 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   rewriter.eraseOp(store);
 }
 
-static void
+static LogicalResult
 resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
                                  IREE::Codegen::SwizzleHintOp hintOp) {
   auto subgroupLoadAttr =
       dyn_cast<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle());
-  [[maybe_unused]] int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
+  int64_t subgroupSize = subgroupLoadAttr.getSubgroupSize();
 
-  // Get the memref size and element type
   auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
   int64_t elementSizeInBytes = memrefType.getElementTypeBitWidth() / 8;
 
@@ -174,35 +173,49 @@ resolveSubgroupLoadSwizzleHintOp(RewriterBase &rewriter,
     auto sourceType = cast<MemRefType>(load.getBase().getType());
     auto targetType = cast<MemRefType>(store.getBase().getType());
 
-    assert((hasGlobalMemoryAddressSpace(sourceType) &&
-            hasSharedMemoryAddressSpace(targetType)) &&
-           "Source and target address spaces are "
-           "incompatible.");
-    assert(memref::isStaticShapeAndContiguousRowMajor(targetType) &&
-           "Target memref is not static shape and contiguous "
-           "row-major.");
+    if (!hasGlobalMemoryAddressSpace(sourceType) ||
+        !hasSharedMemoryAddressSpace(targetType)) {
+      return hintOp->emitError("Source and target address spaces are "
+                               "incompatible.");
+    }
+
+    if (!memref::isStaticShapeAndContiguousRowMajor(targetType)) {
+      return hintOp->emitError(
+          "Target memref is not static shape and contiguous "
+          "row-major.");
+    }
 
     // Expand the load/store chain into a single subgroup load.
-    // TODO: expand it to multiple subgroup loads if the size is larger than
-    // the subgroup size.
-    const int64_t kNumBitsPerCopy = 16;
-    assert(targetType.getNumElements() * elementSizeInBytes ==
-               subgroupSize * kNumBitsPerCopy &&
-           "Total copy size is not equal to "
-           "subgroup size times element size in bytes.");
 
-    // Transfer type is a vector of the base element type
-    VectorType transferType = VectorType::get(
-        {kNumBitsPerCopy / elementSizeInBytes}, sourceType.getElementType());
+    // TODO: support smaller subgroup copy sizes.
+    const int64_t kNumBytesPerCopy = 16;
+    int64_t totalCopySize = targetType.getNumElements() * elementSizeInBytes;
+    int64_t sizePerCopy = subgroupSize * kNumBytesPerCopy;
+    if (totalCopySize % sizePerCopy != 0) {
+      return hintOp->emitError(
+          "Total copy size is not dividable by the subgroup copy size.");
+    }
+    if (kNumBytesPerCopy % elementSizeInBytes != 0) {
+      return hintOp->emitError(
+          "kNumBytesPerCopy is not dividable by the element size.");
+    }
 
-    // TODO: support emitting multiple subgroup loads if the size is larger.
+    VectorType copyType = VectorType::get(
+        {kNumBytesPerCopy / elementSizeInBytes}, targetType.getElementType());
+
     rewriter.setInsertionPointAfter(store);
-    rewriter.replaceOpWithNewOp<amdgpu::GatherToLDSOp>(
-        store, hintOp.getOperand(), load.getIndices(), store.getBase(),
-        ValueRange{rewriter.create<arith::ConstantIndexOp>(store.getLoc(), 0)},
-        transferType);
+    for (int i = 0; i < totalCopySize; i += sizePerCopy) {
+      Value offset =
+          rewriter.create<arith::ConstantIndexOp>(hintOp.getLoc(), i);
+      rewriter.create<amdgpu::GatherToLDSOp>(
+          store.getLoc(), hintOp.getOperand(), load.getIndices(),
+          store.getBase(), ValueRange{offset}, copyType);
+    }
+    rewriter.eraseOp(store);
     // TODO: should we add a barrier here? Or the user controls it.
   }
+
+  return success();
 }
 
 /// Resolves all hints. Walks all direct users and splits them into loads and
@@ -262,7 +275,10 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   IRRewriter rewriter(funcOp->getContext());
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
     if (isa<IREE::Codegen::SubgroupLoadAttr>(hintOp.getSwizzle())) {
-      resolveSubgroupLoadSwizzleHintOp(rewriter, hintOp);
+      auto result = resolveSubgroupLoadSwizzleHintOp(rewriter, hintOp);
+      if (failed(result)) {
+        return signalPassFailure();
+      }
     } else {
       resolveHintOp(rewriter, hintOp);
     }
