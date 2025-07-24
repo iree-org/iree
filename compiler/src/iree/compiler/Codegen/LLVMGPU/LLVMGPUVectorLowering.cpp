@@ -175,7 +175,7 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMultiReductionLoweringPatterns(
           contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerParallel);
+          vector::VectorMultiReductionLowering::InnerReduction);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(contractLoweringPatterns)))) {
         return signalPassFailure();
