@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -135,6 +136,26 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   rewriter.eraseOp(store);
 }
 
+/// Swizzles:
+///  amdgpu.gather_to_lds
+///    (iree_codegen.swizzle_hint, srcIndices, dst, dstIndices, transferType)
+///
+/// For now, only support gather_to_lds width == accessWidth.
+static void swizzleGatherToLDS(RewriterBase &rewriter,
+                               amdgpu::GatherToLDSOp gatherOp,
+                               IREE::Codegen::SwizzleHintOp hintOp) {
+  Location hintLoc = hintOp.getLoc();
+  Value memrefOffset = gatherOp.getSrcIndices()[0];
+  Value newOffset = getValueOrCreateConstantIndexOp(
+      rewriter, hintLoc,
+      hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(), memrefOffset,
+                                        hintOp.getOperand()));
+  rewriter.modifyOpInPlace(gatherOp, [&]() {
+    gatherOp.getSrcMutable().assign(hintOp.getOperand());
+    gatherOp.getSrcIndicesMutable().assign(newOffset);
+  });
+}
+
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
@@ -142,6 +163,7 @@ static void resolveHintOp(RewriterBase &rewriter,
                           IREE::Codegen::SwizzleHintOp hintOp) {
   SmallVector<vector::LoadOp> loads;
   SmallVector<vector::StoreOp> stores;
+  SmallVector<amdgpu::GatherToLDSOp> gatherToLDSOps;
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
@@ -164,6 +186,25 @@ static void resolveHintOp(RewriterBase &rewriter,
       stores.push_back(store);
       continue;
     }
+    if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
+      int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
+                                   .getElementTypeBitWidth() *
+                               accessWidth;
+      auto transferBitWidth = [&]() -> int64_t {
+        if (auto vectorType =
+                dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
+          return vectorType.getElementTypeBitWidth() *
+                 vectorType.getNumElements();
+        }
+        return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
+      }();
+      if (accessBitWidth != transferBitWidth) {
+        return;
+      }
+
+      gatherToLDSOps.push_back(gatherToLDSOp);
+      continue;
+    }
     // Bail out if we can't rewrite all users.
     return;
   }
@@ -175,6 +216,10 @@ static void resolveHintOp(RewriterBase &rewriter,
   for (vector::StoreOp store : stores) {
     rewriter.setInsertionPoint(store);
     swizzleStore(rewriter, store, hintOp);
+  }
+  for (amdgpu::GatherToLDSOp gatherToLDSOp : gatherToLDSOps) {
+    rewriter.setInsertionPoint(gatherToLDSOp);
+    swizzleGatherToLDS(rewriter, gatherToLDSOp, hintOp);
   }
 }
 
