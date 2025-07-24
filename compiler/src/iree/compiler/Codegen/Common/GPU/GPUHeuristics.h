@@ -110,7 +110,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
 /// |intrinsics| to target the given attention matmul problems, |qkMatmul|
 /// and |pvMatmul|. Returns std::nullopt if we cannot find such a schedule.
-FailureOr<GPUMMASchedule> deduceAttentionSchedule(
+FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
     ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &pvMatmulSeeds, int64_t sharedMemLimitInBytes,
