@@ -921,39 +921,36 @@ public:
     SmallVector<Value> newInputs = namedOp.getInputs();
     newInputs[inputIdx] = transpose.getInput();
 
+    auto replaceOp = [&](auto *typePtr) {
+      rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    };
+
     Operation *op = namedOp.getOperation();
     if (isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) {
-      rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
-      rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (isa<linalg::MatmulOp>(op) &&
                !isa<linalg::MatmulTransposeAOp>(op) &&
                !isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 0) {
-      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeAOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
     } else if (isa<linalg::MatmulOp>(op) &&
                !isa<linalg::MatmulTransposeAOp>(op) &&
                !isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
-      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
     } else if (isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) {
-      rewriter.replaceOpWithNewOp<linalg::BatchMatmulOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
-      rewriter.replaceOpWithNewOp<linalg::BatchMatmulOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (isa<linalg::BatchMatmulOp>(op) &&
                !isa<linalg::BatchMatmulTransposeAOp>(op) &&
                !isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 0) {
-      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeAOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
     } else if (isa<linalg::BatchMatmulOp>(op) &&
                !isa<linalg::BatchMatmulTransposeAOp>(op) &&
                !isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
-      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      replaceOp(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
     } else {
       return failure();
     }
