@@ -178,7 +178,7 @@ static inline iree_amd_cached_queue_t iree_amd_make_cached_queue(
       /*.base_address=*/queue->base_address,
       /*.size=*/queue->size,
       /*.reserved=*/0u,
-      /*.doorbell_signal=*/{(uint64_t)&queue->doorbell_signal},
+      /*.doorbell_signal=*/{queue->doorbell_signal.handle},
       /*.write_dispatch_id=*/
       (iree_amdgpu_scoped_atomic_uint64_t*)&((iree_amd_queue_t*)queue)
           ->write_dispatch_id,
