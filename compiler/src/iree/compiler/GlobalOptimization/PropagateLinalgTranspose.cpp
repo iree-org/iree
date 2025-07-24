@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -931,25 +932,17 @@ public:
       replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
       replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (isa<linalg::MatmulOp>(op) &&
-               !isa<linalg::MatmulTransposeAOp>(op) &&
-               !isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 0) {
+    } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
-    } else if (isa<linalg::MatmulOp>(op) &&
-               !isa<linalg::MatmulTransposeAOp>(op) &&
-               !isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
+    } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 1) {
       replaceOp(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
     } else if (isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
       replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulOp>(op) &&
-               !isa<linalg::BatchMatmulTransposeAOp>(op) &&
-               !isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 0) {
+    } else if (IREE::LinalgExt::isPureBatchMatmul(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulOp>(op) &&
-               !isa<linalg::BatchMatmulTransposeAOp>(op) &&
-               !isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
+    } else if (IREE::LinalgExt::isPureBatchMatmul(op) && inputIdx == 1) {
       replaceOp(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
     } else {
       return failure();

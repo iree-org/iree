@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -92,17 +93,13 @@ struct DemoteContractionInputsToBF16Pattern
                       (demoteOption == DemotionOption::Conv);
 
     Operation *op = linalgOp.getOperation();
-    if (demoteMatmul && isa<linalg::MatmulOp>(op) &&
-        !isa<linalg::MatmulTransposeAOp>(op) &&
-        !isa<linalg::MatmulTransposeBOp>(op)) {
+    if (demoteMatmul && IREE::LinalgExt::isPureMatmul(op)) {
       replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::MatvecOp>(op)) {
       replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::VecmatOp>(op)) {
       replaceOpInputs(static_cast<linalg::VecmatOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulOp>(op) &&
-               !isa<linalg::BatchMatmulTransposeAOp>(op) &&
-               !isa<linalg::BatchMatmulTransposeBOp>(op)) {
+    } else if (demoteMatmul && IREE::LinalgExt::isPureBatchMatmul(op)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::BatchMatvecOp>(op)) {
       replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
