@@ -289,6 +289,23 @@ void GPUApplyTilingLevelPass::runOnOperation() {
 
   MLIRContext *context = &getContext();
 
+  // Swap `collapse_shape` with `extract_slice` to enable more loop fusion
+  // opportunity. Currently this is only needed for convolution IGEMM path.
+  // TODO(vivian): Move the pattern to `GPUFuseAndHoistParallelLoopsPass`.
+  if (normalizeLoops) {
+    funcOp->walk(
+        [&](scf::ForOp forOp) { (void)normalizeLoopBounds(rewriter, forOp); });
+    funcOp->walk([&](scf::ForallOp forallOp) {
+      (void)normalizeLoopBounds(rewriter, forallOp);
+    });
+
+    RewritePatternSet patterns(context);
+    populateSwapExtractWithCollapsePattern(patterns);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
   // Apply cleanup patterns.
   {
     RewritePatternSet patterns(context);

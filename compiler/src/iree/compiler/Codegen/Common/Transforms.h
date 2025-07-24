@@ -93,6 +93,21 @@ FailureOr<IREETilingResult>
 tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
+/// Transform a `scf.for` loop with a strictly positive step
+///   for %i = %lb to %ub step %s
+/// into a 0-based loop with step 1
+///   for %ii = 0 to ceildiv(%ub - %lb, %s) step 1
+/// Insert an `affine.apply` operation to compute the denormalized index value.
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter, scf::ForOp forOp);
+
+/// Transform a `scf.forall` loop with a strictly positive steps
+///   forall (%i, %j) = (%lb0, %lb1) to (%ub0, %ub1) step (%s0, %s1)
+/// into a 0-based loop with step 1 (normalized)
+///   forall (%i, %j) in (ceildiv(%ub0 - %lb0, %s0), ceildiv(%ub1 - %lb1, %s1))
+/// Insert `affine.apply` operations to compute the denormalized index values.
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
+                                  scf::ForallOp forallOp);
+
 /// Populate patterns that fold tensor.expand/collapse_shape into the memref
 /// of iree_codegen.load_from_buffer or iree_codegen.store_to_buffer ops.
 void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
@@ -116,7 +131,13 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 /// for maximumf/minimumf ops, e.g. LLVM NVIDIA-PTX.
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
+/// Populate pattern to convert `tensor.extract_slice(tensor.expand_shape)` to
+/// `tensor.expand_shape(tensor.extract_slice)`.
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
+
+/// Populate pattern to convert `tensor.extract_slice(tensor.collapse_shape)` to
+/// `tensor.collapse_shape(tensor.extract_slice)`.
+void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
 
 /// Populate patterns to fold relayout operations into map_scatter ops.
 void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns);
