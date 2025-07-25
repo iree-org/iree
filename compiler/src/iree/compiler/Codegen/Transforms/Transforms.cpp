@@ -549,7 +549,8 @@ static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
            IREE::Codegen::WorkgroupMappingAttr>
       splitToWorkgroupMap;
 
-  for (auto mapping : castedSplitReductionMapping) {
+  for (IREE::LinalgExt::SplitReductionMappingAttr mapping :
+       castedSplitReductionMapping) {
     IREE::Codegen::WorkgroupMappingAttr nextHighestMapping =
         getNextWorkgroupMapping(currHighestMapping);
     splitToWorkgroupMap[mapping] = nextHighestMapping;

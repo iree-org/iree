@@ -531,7 +531,7 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
             rewriter, loc, numItersExpr, {lb, ub, step});
       });
   AffineExpr linearizeExpr = s0;
-  for (unsigned i = 1; i < lbs.size(); ++i) {
+  for (unsigned i = 1, e = lbs.size(); i < e; ++i) {
     AffineExpr s = rewriter.getAffineSymbolExpr(i);
     linearizeExpr = linearizeExpr * s;
   }
@@ -549,7 +549,7 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   auto nTotalProcsOp = rewriter.create<IREE::HAL::InterfaceWorkgroupCountOp>(
       loc, static_cast<unsigned>(delinearizeFrom));
   OpFoldResult nTotalProcs = nTotalProcsOp.getResult();
-  auto origNProcs = affine::makeComposedFoldedAffineApply(
+  OpFoldResult origNProcs = affine::makeComposedFoldedAffineApply(
       rewriter, loc, s0.floorDiv(s1), {nTotalProcs, nSplitProcs});
   SmallVector<OpFoldResult> basis = numIters;
   basis.push_back(origNProcs);
