@@ -19,6 +19,8 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "tile-and-distribute-to-workgroups-using-forall-op"
@@ -162,10 +164,6 @@ static SmallVector<Attribute> getMapping(MLIRContext *context,
   return llvm::to_vector(llvm::reverse(mapping));
 }
 
-//===---------------------------------------------------------------------===//
-// Post tiling cleanup patterns
-//===---------------------------------------------------------------------===//
-
 /// Checks whether we have static dimension for all the loop bounds and steps.
 /// This is a requirement if the reordering strategy is set to `transpose`.
 static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
@@ -183,6 +181,29 @@ static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
     }
   }
   return true;
+}
+
+/// Returns true if it is allowed to leave the `op` outside distribution loops,
+/// i.e., scf.forall loops. The consumer fusion could fail even the `op`
+/// implements TilingInterface. E.g., linalg.pack op can only be fused as a
+/// consumer in perfect tiling scenario.
+static bool isAllowedToFailOnCunsumerFusion(Operation *op) {
+  return isa<linalg::PackOp>(op);
+}
+
+/// Returns true if all the compute ops are within scf.forall distribution
+/// loops, except the ops that are allowed to stay outside.
+static bool verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp) {
+  WalkResult res = funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
+    if (isa<scf::ForallOp>(op) || !isComputeOp(op)) {
+      return WalkResult::skip();
+    }
+    if (!isAllowedToFailOnCunsumerFusion(op)) {
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return !res.wasInterrupted();
 }
 
 //===---------------------------------------------------------------------===//
@@ -303,16 +324,19 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
                                   return tiledAndFusedOps.contains(op);
                                 });
     if (failed(newFusionOpportunities)) {
-      rootTiledOp->emitOpError("failed to fuse consumers");
-      return signalPassFailure();
+      // Continue the work if the failure is allowed.
+      if (!verifyComputeOpsAfterDistribution(funcOp)) {
+        rootTiledOp->emitOpError("failed to fuse consumers");
+        return signalPassFailure();
+      }
+    } else {
+      // Because we restrict to at most a single tilable consumer for yielding
+      // a replacement, no new fusion opportunities will yield a replacement,
+      // meaning there is no need to run consumer fusion again afterwards.
+      // TODO: run producer and consumer fusion in one worklist.
+      fuseProducersOfSlices(rewriter, *newFusionOpportunities,
+                            tileAndFuseOptions, tilingLoops);
     }
-
-    // Because we restrict to at most a single tilable consumer for yielding
-    // a replacement, no new fusion opportunities will yield a replacement,
-    // meaning there is no need to run consumer fusion again afterwards.
-    // TODO: run producer and consumer fusion in one worklist.
-    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
-                          tilingLoops);
   }
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {

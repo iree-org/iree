@@ -523,3 +523,59 @@ func.func @mmt4d_unpack_elementwise() attributes {hal.executable.target = #execu
 // Checks that the stack allocation is in bounds, which implies that the fusion
 // happens. Otherwise, it requires a large buffer for intermediate data.
 // CHECK-LABEL: func.func @mmt4d_unpack_elementwise
+
+// -----
+
+// This tests that the pack op is not fusible in distribution, and it falls back
+// to the iree_linalg_ext.map_scatter solution. The check ensures that the
+// iree_linalg_ext.map_scatter op is fused within scf.forall op.
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %cst = arith.constant 0xFF800000 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x64x1x256xf32>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x64x1x1x8x1xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [8, 64, 1, 256], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x64x1x256xf32>> -> tensor<8x64x1x256xf32>
+  %3 = tensor.empty() : tensor<1x64x1x1x8x1xf32>
+  %4 = tensor.empty() : tensor<8x64x1x1xf32>
+  %5 = tensor.empty() : tensor<1x256xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%4 : tensor<8x64x1x1xf32>) -> tensor<8x64x1x1xf32>
+  %7 = linalg.pooling_nchw_max {dilations = dense<1> : vector<2xi64>, strides = dense<[1, 256]> : vector<2xi64>} ins(%2, %5 : tensor<8x64x1x256xf32>, tensor<1x256xf32>) outs(%6 : tensor<8x64x1x1xf32>) -> tensor<8x64x1x1xf32>
+  %pack = linalg.pack %7 outer_dims_perm = [0, 1, 2, 3] inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<8x64x1x1xf32> -> tensor<1x64x1x1x8x1xf32>
+  iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0, 0, 0], sizes = [1, 64, 1, 1, 8, 1], strides = [1, 1, 1, 1, 1, 1] : tensor<1x64x1x1x8x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x64x1x1x8x1xf32>>
+  return
+}
+// CHECK-LABEL: func.func @pooling_nchw_max_pack_without_padding_issue_20723(
+// CHECK:         scf.forall
+// CHECK:           iree_linalg_ext.map_scatter
+// CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+// Similar to the above test, but the pack has padding semantics. After folding
+// the padding into iree_linalg_ext.map_scatter op, it creates an additional
+// scf.forall to fill the padding values.
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %cst = arith.constant 0xFF800000 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<7x64x1x256xf32>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x64x1x1x8x1xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [8, 64, 1, 256], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<7x64x1x256xf32>> -> tensor<7x64x1x256xf32>
+  %3 = tensor.empty() : tensor<1x64x1x1x8x1xf32>
+  %4 = tensor.empty() : tensor<7x64x1x1xf32>
+  %5 = tensor.empty() : tensor<1x256xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%4 : tensor<7x64x1x1xf32>) -> tensor<7x64x1x1xf32>
+  %7 = linalg.pooling_nchw_max {dilations = dense<1> : vector<2xi64>, strides = dense<[1, 256]> : vector<2xi64>} ins(%2, %5 : tensor<7x64x1x256xf32>, tensor<1x256xf32>) outs(%6 : tensor<7x64x1x1xf32>) -> tensor<7x64x1x1xf32>
+  %cst_0 = arith.constant 0.0 : f32
+  %pack = linalg.pack %7 padding_value(%cst_0 : f32) outer_dims_perm = [0, 1, 2, 3] inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<7x64x1x1xf32> -> tensor<1x64x1x1x8x1xf32>
+  iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0, 0, 0], sizes = [1, 64, 1, 1, 8, 1], strides = [1, 1, 1, 1, 1, 1] : tensor<1x64x1x1x8x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x64x1x1x8x1xf32>>
+  return
+}
+// CHECK-LABEL: func.func @pooling_nchw_max_pack_with_padding_issue_20723(
+// CHECK:         scf.forall
+// CHECK:           iree_linalg_ext.map_scatter
+// CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+// CHECK:         scf.forall
