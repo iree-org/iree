@@ -2168,6 +2168,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#scaledmmaopsarrayattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScaledMMAOpsArrayAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#storagebitwidthsattr" class="md-nav__link">
     <span class="md-ellipsis">
       StorageBitwidthsAttr
@@ -5337,6 +5346,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#scaledmmaopsarrayattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScaledMMAOpsArrayAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#storagebitwidthsattr" class="md-nav__link">
     <span class="md-ellipsis">
       StorageBitwidthsAttr
@@ -5760,6 +5778,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#promotewithcacheswizzleattr">PromoteWithCacheSwizzleAttr</a></li>
 <li><a href="#reorderworkgroupsstrategyattr">ReorderWorkgroupsStrategyAttr</a></li>
 <li><a href="#scaledmmaattr">ScaledMMAAttr</a></li>
+<li><a href="#scaledmmaopsarrayattr">ScaledMMAOpsArrayAttr</a></li>
 <li><a href="#storagebitwidthsattr">StorageBitwidthsAttr</a></li>
 <li><a href="#subgroupopsattr">SubgroupOpsAttr</a></li>
 <li><a href="#targetattr">TargetAttr</a></li>
@@ -6456,7 +6475,7 @@ column major. This is equivalent to instead computing:</p>
 <h3 id="mmascheduleattr">MMAScheduleAttr<a class="headerlink" href="#mmascheduleattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.mma_schedule&lt;
-  ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr,   # intrinsic
+  ::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface,   # intrinsic
   int64_t,   # subgroup_m_count
   int64_t   # subgroup_n_count
 &gt;
@@ -6475,7 +6494,7 @@ to solve a specific contraction problem.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr</code></td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface</code></td>
 <td></td>
 </tr>
 <tr>
@@ -6605,6 +6624,29 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="scaledmmaopsarrayattr">ScaledMMAOpsArrayAttr<a class="headerlink" href="#scaledmmaopsarrayattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.scaled_mma_ops&lt;
+  ::llvm::ArrayRef&lt;ScaledMMAAttr&gt;   # value
+&gt;
+</code></pre></div>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;ScaledMMAAttr&gt;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="storagebitwidthsattr">StorageBitwidthsAttr<a class="headerlink" href="#storagebitwidthsattr" title="Permanent link">link</a></h3>
 <p><em>Supported bitwidths for storage</em></p>
 <p>Syntax:</p>
@@ -6612,7 +6654,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   ::mlir::iree_compiler::IREE::GPU::StorageBitwidths   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6636,7 +6678,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   ::mlir::iree_compiler::IREE::GPU::SubgroupOps   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
+<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6671,7 +6713,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6716,7 +6758,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6752,6 +6794,7 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
   SubgroupOpsAttr,   # subgroup
   DotProductOpsAttr,   # dot
   MMAOpsArrayAttr,   # mma
+  ScaledMMAOpsArrayAttr,   # scaled_mma
   DenseI32ArrayAttr,   # subgroup_size_choices
   DenseI32ArrayAttr,   # max_workgroup_sizes
   int32_t,   # max_thread_count_per_workgroup
@@ -6768,7 +6811,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
+<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6801,6 +6844,11 @@ NVIDIA GPUs.</p>
 <tr>
 <td style="text-align: center;">mma</td>
 <td style="text-align: center;"><code>MMAOpsArrayAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">scaled_mma</td>
+<td style="text-align: center;"><code>ScaledMMAOpsArrayAttr</code></td>
 <td></td>
 </tr>
 <tr>
@@ -6861,7 +6909,7 @@ NVIDIA GPUs.</p>
 </code></pre></div>
 <p>An attribute that can be applied to any operation to specify that it has
 been matched with a ukernel that is a legal lowering for it.</p>
-<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
+<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6906,7 +6954,7 @@ field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
 in a chained-matmul operation.</p>
-<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
+<h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6930,7 +6978,7 @@ in a chained-matmul operation.</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
+<h5 id="parameters_23">Parameters:<a class="headerlink" href="#parameters_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
