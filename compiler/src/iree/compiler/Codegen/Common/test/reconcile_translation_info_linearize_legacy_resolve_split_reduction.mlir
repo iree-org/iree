@@ -194,7 +194,7 @@ hal.executable private @split_reduction_executable {
           scf.forall (%arg1, %arg2, %arg3) in (%3, %4, %5) {
             "use2"(%arg1, %arg2, %arg3) : (index, index, index) -> ()
           } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-        } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+        } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
         return
       }
     }
