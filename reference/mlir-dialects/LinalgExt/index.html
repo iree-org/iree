@@ -6671,11 +6671,32 @@ only the non-padded part of the output.</p>
 </tbody>
 </table>
 <h3 id="splitreductionmappingattr">SplitReductionMappingAttr<a class="headerlink" href="#splitreductionmappingattr" title="Permanent link">link</a></h3>
-<p>Syntax: <code>#iree_linalg_ext.split_reduction_mapping</code></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_linalg_ext.split_reduction_mapping&lt;
+  int64_t   # dimension
+&gt;
+</code></pre></div>
 <p>Mapping attribute to indicate distribution for split-reduction.</p>
 <p>This attribute indicates that the <code>scf.forall</code> represent parallel partial
 reductions generated through the use of
 <code>ReductionTilingStrategy::PartialReductionOuterParallel</code>.</p>
+<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">dimension</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
 <h3 id="iteratortype">IteratorType<a class="headerlink" href="#iteratortype" title="Permanent link">link</a></h3>
 <p><em>Iterator type</em></p>
