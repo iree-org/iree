@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/OpDefinition.h"
@@ -31,37 +32,67 @@ struct GPUPackToIntrinsicsPass final
 };
 } // namespace
 
+FailureOr<SmallVector<OpFoldResult>>
+getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
+               IREE::Codegen::InnerTileDescAttrInterface kind) {
+  auto createPackedSizes =
+      [&rewriter, &linalgOp](SmallVector<int64_t> dims,
+                             SmallVector<SmallVector<unsigned, 2>> indices)
+      -> FailureOr<SmallVector<OpFoldResult>> {
+    auto zero = rewriter.getIndexAttr(0);
+    SmallVector<OpFoldResult> packedSizes(linalgOp.getNumLoops(), zero);
+    for (auto [dim, index] : llvm::zip_equal(dims, indices)) {
+      if (index.empty()) {
+        linalgOp.emitError()
+            << "contraction like operation missing critical dimension\n";
+        return failure();
+      }
+      packedSizes[index.back()] = rewriter.getIndexAttr(dim);
+    }
+    return packedSizes;
+  };
+
+  SmallVector<int64_t> dims;
+  SmallVector<SmallVector<unsigned, 2>> indices;
+  if (auto smma_kind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind)) {
+    FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledContrDims =
+        IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+    if (succeeded(scaledContrDims)) {
+      auto [m, n, k, kB] = smma_kind.getScaledMNKShape();
+      indices = {scaledContrDims->m, scaledContrDims->n, scaledContrDims->k,
+                 scaledContrDims->kB};
+      dims = {m, n, k, kB};
+    }
+  }
+
+  if (auto mma_kind = dyn_cast<IREE::GPU::MMAAttr>(kind)) {
+    FailureOr<linalg::ContractionDimensions> contractionDims =
+        linalg::inferContractionDims(linalgOp);
+    if (succeeded(contractionDims)) {
+      auto [m, n, k] = mma_kind.getMNKShape();
+      indices = {contractionDims->m, contractionDims->n, contractionDims->k};
+      dims = {m, n, k};
+    }
+  }
+
+  if (dims.empty() || indices.empty()) {
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "failed to infer contraction dims");
+  }
+  return createPackedSizes(dims, indices);
+}
+
 LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
                               RewriterBase &rewriter) {
   auto loweringConfig =
       getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
   assert(loweringConfig && "Packing unconfigured op");
-
-  IREE::GPU::MmaInterfaceAttr kind = getMmaKind(loweringConfig);
+  IREE::Codegen::InnerTileDescAttrInterface kind = getMmaKind(loweringConfig);
   assert(kind && "Packing op without mma kind");
-
-  FailureOr<linalg::ContractionDimensions> contractionDims =
-      linalg::inferContractionDims(linalgOp);
-  if (failed(contractionDims)) {
-    return rewriter.notifyMatchFailure(linalgOp,
-                                       "failed to infer contraction dims");
-  }
-
-  if (contractionDims->m.empty() || contractionDims->n.empty() ||
-      contractionDims->k.empty()) {
-    return rewriter.notifyMatchFailure(
-        linalgOp, "contraction like operation missing critical dimension");
-  }
-
-  auto zero = rewriter.getIndexAttr(0);
-  SmallVector<OpFoldResult> packedSizes(linalgOp.getNumLoops(), zero);
-
-  auto [m, n, k] = kind.getMNKShape();
-  packedSizes[contractionDims->m.back()] = rewriter.getIndexAttr(m);
-  packedSizes[contractionDims->n.back()] = rewriter.getIndexAttr(n);
-  packedSizes[contractionDims->k.back()] = rewriter.getIndexAttr(k);
+  FailureOr<SmallVector<OpFoldResult>> packedSizes =
+      getPackedSizes(linalgOp, rewriter, kind);
   FailureOr<linalg::PackResult> maybeResult =
-      linalg::pack(rewriter, linalgOp, packedSizes);
+      linalg::pack(rewriter, linalgOp, packedSizes.value());
   if (failed(maybeResult)) {
     return rewriter.notifyMatchFailure(linalgOp, "packing failed");
   }
@@ -78,11 +109,12 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!loweringConfig) {
       return failure();
     }
-    IREE::GPU::MmaInterfaceAttr kind = getMmaKind(loweringConfig);
+    IREE::Codegen::InnerTileDescAttrInterface kind = getMmaKind(loweringConfig);
     if (!kind) {
       return failure();
     }
-    if (failed(convertContractionToInnerTiledMma(rewriter, linalgOp, kind))) {
+    if (failed(IREE::GPU::convertContractionToInnerTiledMma(rewriter, linalgOp,
+                                                            kind))) {
       return failure();
     }
     return success();

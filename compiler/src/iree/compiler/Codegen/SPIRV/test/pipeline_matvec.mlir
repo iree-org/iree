@@ -12,7 +12,7 @@
 hal.executable @i4_dequant_unit_matmul_f16 {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-      compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
+      compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [], scaled_mma = [],
       subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [65535, 65535, 65535]>>
@@ -119,7 +119,7 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 hal.executable @i4_dequant_matvec_f16_subgroup_64 {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-      compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
+      compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [], scaled_mma = [],
       subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [65535, 65535, 65535]>>

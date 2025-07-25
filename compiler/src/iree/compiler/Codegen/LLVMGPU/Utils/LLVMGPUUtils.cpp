@@ -513,7 +513,11 @@ getContractionLayoutImpl(IREE::GPU::MMAScheduleAttr schedule,
 
   int64_t rank = contractOp.getIteratorTypesArray().size();
   auto mmaAttr =
-      llvm::cast<IREE::GPU::MmaInterfaceAttr>(schedule.getIntrinsic());
+      llvm::dyn_cast<IREE::GPU::MmaInterfaceAttr>(schedule.getIntrinsic());
+  if (!mmaAttr) {
+    return failure();
+  }
+
   MLIRContext *context = schedule.getContext();
 
   SmallVector<int64_t> bounds = contractOp.getStaticLoopRanges();

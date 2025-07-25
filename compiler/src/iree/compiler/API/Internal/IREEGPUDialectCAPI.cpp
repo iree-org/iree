@@ -345,7 +345,7 @@ MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
           unwrap(attr));
 
-  mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr mma_attr =
+  mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface mma_attr =
       mlir::iree_compiler::IREE::GPU::getMmaKind(loweringConfigAttr);
 
   return wrap(mma_attr);

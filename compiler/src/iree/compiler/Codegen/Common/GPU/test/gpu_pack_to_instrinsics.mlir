@@ -58,3 +58,79 @@ module {
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}>
 //  CHECK-SAME:     : tensor<?x?x?x16x16xf16>, tensor<?x?x?x?x16x16xf16> into tensor<?x?x?x16x16xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+module {
+  func.func @scaled_mfma_16x16x128(%a: tensor<?x?x?xf4E2M1FN>, %b: tensor<?x?x?xf4E2M1FN>, %a_scales: tensor<?x?xf8E8M0FNU>, %b_scales: tensor<?x?xf8E8M0FNU>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
+    %mm = linalg.generic {
+      indexing_maps = [#map, #map1, #map2, #map3, #map4],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+    } ins(%a, %b, %a_scales, %b_scales : tensor<?x?x?xf4E2M1FN>, tensor<?x?x?xf4E2M1FN>, tensor<?x?xf8E8M0FNU>, tensor<?x?xf8E8M0FNU>)
+    outs(%c : tensor<?x?xf32>) attrs =  {
+      lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>}>
+    } {
+    ^bb0(%in: f4E2M1FN, %in_4: f4E2M1FN, %in_5: f8E8M0FNU, %in_6: f8E8M0FNU, %out: f32):
+      %17 = arith.scaling_extf %in, %in_5 : f4E2M1FN, f8E8M0FNU to f32
+      %18 = arith.scaling_extf %in_4, %in_6 : f4E2M1FN, f8E8M0FNU to f32
+      %19 = arith.mulf %17, %18 : f32
+      %20 = arith.addf %out, %19 : f32
+      linalg.yield %20 : f32
+    } -> tensor<?x?xf32>
+    return %mm : tensor<?x?xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @scaled_mfma_16x16x128
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>}>
+//  CHECK-SAME:     : tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU>, tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU> into tensor<?x?x16x16xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+module {
+  func.func @scaled_mfma_32x32x64(%a: tensor<?x?x?xf8E8M0FNU>, %b: tensor<?x?x?xf8E8M0FNU>, %a_scales: tensor<?x?xf32>, %b_scales: tensor<?x?xf32>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
+    %mm = linalg.generic {
+      indexing_maps = [#map, #map1, #map2, #map3, #map4],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+    } ins(%a, %b, %a_scales, %b_scales : tensor<?x?x?xf8E8M0FNU>, tensor<?x?x?xf8E8M0FNU>, tensor<?x?xf32>, tensor<?x?xf32>)
+    outs(%c : tensor<?x?xf32>) attrs =  {
+      lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>}>
+    } {
+    ^bb0(%in: f8E8M0FNU, %in_4: f8E8M0FNU, %in_5: f32, %in_6: f32, %out: f32):
+      %17 = arith.scaling_extf %in, %in_5 : f8E8M0FNU, f32 to f32
+      %18 = arith.scaling_extf %in_4, %in_6 : f8E8M0FNU, f32 to f32
+      %19 = arith.mulf %17, %18 : f32
+      %20 = arith.addf %out, %19 : f32
+      linalg.yield %20 : f32
+    } -> tensor<?x?xf32>
+    return %mm : tensor<?x?xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @scaled_mfma_32x32x64
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:     indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>}>
+//  CHECK-SAME:     : tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf32>, tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf32> into tensor<?x?x32x32xf32>
