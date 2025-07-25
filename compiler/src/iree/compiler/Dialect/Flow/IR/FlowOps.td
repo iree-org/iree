@@ -408,7 +408,7 @@ def FLOW_ReturnOp : FLOW_Op<"return", [
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, std::nullopt);
+      build($_builder, $_state, {});
     }]>,
   ];
 }
