@@ -33,7 +33,7 @@ iree_cc_library(
     "Canonicalize.cpp"
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
-    "ConvertMeshToFlow.cpp"
+    "ConvertShardToFlow.cpp"
     "ConvertRegionToWorkgroups.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
@@ -72,7 +72,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRMeshDialect
+    MLIRShardDialect
     MLIRParser
     MLIRPass
     MLIRSCFDialect
@@ -87,7 +87,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Flow::Conversion::MeshToFlow
+    iree::compiler::Dialect::Flow::Conversion::ShardToFlow
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
