@@ -1905,7 +1905,7 @@ def HAL_ReturnOp : HAL_Op<"return", [
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, std::nullopt);
+      build($_builder, $_state, {});
     }]>,
   ];
 
@@ -3338,7 +3338,7 @@ class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
   let results = (outs HAL_Dim:$result);
 
   let builders = [
-    OpBuilder<(ins "unsigned":$dim, CArg<"std::optional<::llvm::APInt>", "std::nullopt">:$upper_bound),
+    OpBuilder<(ins "unsigned":$dim, CArg<"std::optional<::llvm::APInt>", "{}">:$upper_bound),
     [{
       build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim),
         upper_bound.has_value() ? $_builder.getIndexAttr(upper_bound->getSExtValue()) : ::mlir::IntegerAttr{});
