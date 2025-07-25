@@ -152,6 +152,10 @@ struct LoopTilingAndDistributionInfo {
   unsigned processorDistributionDim;
 };
 
+/// Returns true if the `op` describes computation in CodeGen concept. E.g.,
+/// TilingInterface op and UKernelOpInterface are compute ops.
+bool isComputeOp(Operation *op);
+
 /// Returns the list of TilingInterface ops in the operation obtained by a
 /// post order walk of the operation. This implies that in case of
 /// nested compute ops, the outermost compute ops are towards the end of the

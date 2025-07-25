@@ -125,6 +125,8 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   if (clTileDispatchUsingForall) {
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
+    funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
+    funcPassManager.addPass(createCombineLayoutTransformationPass());
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
     funcPassManager.addPass(createCSEPass());

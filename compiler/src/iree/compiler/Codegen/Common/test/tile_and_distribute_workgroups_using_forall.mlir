@@ -1050,3 +1050,36 @@ func.func @single_trip_forall(%0 : tensor<64x64xf32>, %1 : tensor<64x64xf32>) ->
 }
 //   CHECK-LABEL: func @single_trip_forall
 //         CHECK:   scf.forall
+
+// -----
+
+// Verify that the scf.forall is generated and the pack op is outside the op
+// without a crash. The consumer fusion is not available because it is not a
+// perfect tiling case.
+
+#config = #iree_cpu.lowering_config<distribution = [1, 16]>
+#map = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map2 = affine_map<(d0, d1) -> (d0, d1)>
+func.func @infusible_pack(%arg0 : tensor<30xf32>) -> tensor<5x6xf32> {
+  %empty = tensor.empty() : tensor<30xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<30xf32>) outs(%empty : tensor<30xf32>)
+      attrs = {lowering_config = #config} {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+  } -> tensor<30xf32>
+  %empty1 = tensor.empty() : tensor<5x6xf32>
+  %pack = linalg.pack %0 outer_dims_perm = [0]
+      inner_dims_pos = [0] inner_tiles = [6] into %empty1
+      : tensor<30xf32> -> tensor<5x6xf32>
+  return %pack : tensor<5x6xf32>
+}
+// CHECK-LABEL: func @infusible_pack
+//       CHECK:   scf.forall
+//       CHECK:     linalg.generic
+//       CHECK:   scf.forall.in_parallel {
+//       CHECK:   linalg.pack
