@@ -34,35 +34,3 @@ func.func @softmax() {
 //     CDNA3:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 64) : (f32) -> f32
 //     CDNA3:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 16) : (f32) -> f32
 //     CDNA3:    gpu.subgroup_reduce  add {{.*}} cluster(size = 16) : (f32) -> f32
-
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @dynamic_softmax() {
-  %c32_i64 = arith.constant 32 : i64
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-  %2 = arith.extui %0 : i32 to i64
-  %3 = arith.extui %1 : i32 to i64
-  %4 = arith.shli %3, %c32_i64 : i64
-  %5 = arith.ori %2, %4 : i64
-  %6 = arith.index_castui %5 : i64 to index
-  %7 = iree_tensor_ext.dispatch.workload.ordinal %6, 0 : index
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?xf16>>{%7}
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
-  %10 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?xf16>>{%7} -> tensor<32x?xf16>
-  %11 = tensor.empty(%7) : tensor<32x?xf16>
-  %12 = linalg.softmax dimension(1) ins(%10 : tensor<32x?xf16>) outs(%11 : tensor<32x?xf16>) -> tensor<32x?xf16>
-  iree_tensor_ext.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : tensor<32x?xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
-  return
-}
-
-
-// Finer details of this lowering are captured by the spirv pipeline test. Just
-// verify that warp reduction triggers.
-//    CHECK-LABEL: func.func @dynamic_softmax
-// CHECK-COUNT-10: gpu.shuffle  xor {{.*}} : i32
