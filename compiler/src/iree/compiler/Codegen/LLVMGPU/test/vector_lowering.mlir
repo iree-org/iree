@@ -93,3 +93,27 @@ func.func @partial_masked_transfer_read(%mem : memref<16x?x32xf16>) -> vector<1x
 // CHECK-DAG: %[[MASK1:.+]] = vector.broadcast %[[COND1]] : i1 to vector<16xi1>
 // CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C0]], %[[C0]]], %[[MASK]]
 // CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C1]], %[[C0]]], %[[MASK1]]
+
+// -----
+
+// Test multi_reduction lowering.
+// TODO(#21483): Detect reduction(fma(a, b, 0.0)) and fold it into a series of FMAs.
+
+func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
+  %cst_4 = arith.constant dense<0.000000e+00> : vector<2x1xf32>
+  %cst_5 = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
+  %22 = arith.mulf %a, %b : vector<2x1x8xf32>
+  %23 = arith.addf %22, %cst_5 : vector<2x1x8xf32>
+  %24 = vector.multi_reduction <add>, %23, %cst_4 [2] : vector<2x1x8xf32> to vector<2x1xf32>
+  return %24 : vector<2x1xf32>
+}
+
+// CHECK-LABEL: func.func @multi_reduction_f32
+// CHECK-DAG:  %[[C0:.+]]  = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:  %[[V0:.+]]  = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
+// CHECK:      %[[MUL:.+]] = arith.mulf %{{.*}}, %{{.*}} : vector<2x1x8xf32>
+// CHECK:      %[[ADD:.+]] = arith.addf %[[MUL]], %[[V0]] : vector<2x1x8xf32>
+// CHECK:      %[[E0:.+]]  = vector.extract %[[ADD]][0, 0] : vector<8xf32> from vector<2x1x8xf32>
+// CHECK:                    vector.reduction <add>, %[[E0]], %[[C0]] : vector<8xf32> into f32
+// CHECK:      %[[E1:.+]]  = vector.extract %[[ADD]][1, 0] : vector<8xf32> from vector<2x1x8xf32>
+// CHECK:                    vector.reduction <add>, %[[E1]], %[[C0]] : vector<8xf32> into f32
