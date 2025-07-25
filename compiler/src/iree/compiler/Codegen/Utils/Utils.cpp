@@ -918,6 +918,10 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
   return loopInfo;
 }
 
+bool isComputeOp(Operation *op) {
+  return isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op);
+}
+
 SmallVector<Operation *> getComputeOps(Operation *containingOp) {
   if (containingOp->getNumRegions() == 0) {
     return {};
@@ -926,7 +930,7 @@ SmallVector<Operation *> getComputeOps(Operation *containingOp) {
          "expected op with a single region");
   SmallVector<Operation *> computeOps;
   containingOp->getRegion(0).walk([&](Operation *op) {
-    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
+    if (isComputeOp(op)) {
       computeOps.push_back(op);
     }
   });
