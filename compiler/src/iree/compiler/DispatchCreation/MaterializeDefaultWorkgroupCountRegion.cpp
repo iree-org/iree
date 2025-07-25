@@ -83,13 +83,16 @@ static LogicalResult createDefaultWorkgroupCountRegion(
       return workgroupsOp->emitOpError(
           "unhandled multiple scf.forall ops in a dispatch");
     }
-    std::optional<ArrayAttr> mapping = (*forallOps.begin()).getMapping();
-    if (!mapping || mapping->size() != 1 ||
-        !isa<IREE::LinalgExt::SplitReductionMappingAttr>(
-            mapping->getValue().front())) {
+    auto forallOp = *forallOps.begin();
+    std::optional<ArrayAttr> mapping = forallOp.getMapping();
+    if (!mapping) {
       return workgroupsOp->emitOpError(
           "unhandled scf.forall op that doesnt have a mapping of "
           "`[#iree_linalg_ext.split_reduction_mapping]`");
+    }
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            rewriter.getContext(), forallOp.getLoc(), mapping->getValue()))) {
+      return failure();
     }
     defaultCountOp = rewriter.create<
         IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>(

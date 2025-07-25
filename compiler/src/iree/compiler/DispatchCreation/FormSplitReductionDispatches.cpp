@@ -73,12 +73,14 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   }
   options.setTileSizes(tileSizes);
   SmallVector<unsigned> reductionDims = getReductionDims(op);
-  if (reductionDims.size() != 1) {
-    return op.emitError("op must only have one reduction dim");
-  }
+  auto mapping = llvm::map_to_vector(
+      llvm::seq<int64_t>(0, reductionDims.size()),
+      [&](int64_t index) -> Attribute {
+        return IREE::LinalgExt::SplitReductionMappingAttr::get(
+            rewriter.getContext(), reductionDims.size() - 1 - index);
+      });
   options.setReductionDims(reductionDims);
-  options.setMapping(
-      {IREE::LinalgExt::SplitReductionMappingAttr::get(rewriter.getContext())});
+  options.setMapping(mapping);
 
   // Tile the operation and fuse with producers.
   scf::SCFTileAndFuseOptions tileAndFuseOptions;

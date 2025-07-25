@@ -67,11 +67,17 @@ verifyWorkgroupMappingAttrArray(scf::ForallOp forallOp) {
 
 /// Get the permutation that represents the mapping of loop dimensions to
 /// process dimensions.
-SmallVector<int64_t>
-getMappingPermutation(ArrayRef<IREE::Codegen::WorkgroupMappingAttr> mapping) {
-  return invertPermutationVector(llvm::map_to_vector(mapping, [&](auto a) {
+template <typename MappingAttrType>
+SmallVector<int64_t> getMappingPermutation(ArrayRef<MappingAttrType> mapping) {
+  return llvm::map_to_vector(mapping, [&](auto a) {
     return static_cast<int64_t>(mapping.size() - 1) - a.getMappingId();
-  }));
+  });
+}
+template <typename MappingAttrType>
+SmallVector<int64_t>
+getInvertedMappingPermutation(ArrayRef<MappingAttrType> mapping) {
+  return invertPermutationVector(
+      getMappingPermutation<MappingAttrType>(mapping));
 }
 
 /// Return the procId and nprocs to use for each of the distributed loops,
@@ -86,7 +92,9 @@ getProcIdsAndNprocs(
   assert(workgroupMappings.size() == lowerBounds.size() &&
          "expected as many workgroup mapping attributes as number of loops");
 
-  auto permutation = getMappingPermutation(workgroupMappings);
+  auto permutation =
+      getInvertedMappingPermutation<IREE::Codegen::WorkgroupMappingAttr>(
+          workgroupMappings);
   applyPermutationToVector(workgroupMappings, permutation);
   applyPermutationToVector(lowerBounds, permutation);
   applyPermutationToVector(upperBounds, permutation);
@@ -289,7 +297,9 @@ resolveWorkgroupCounts(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
           llvm::map_to_vector(forAllOp.getMapping().value(), [](auto a) {
             return cast<IREE::Codegen::WorkgroupMappingAttr>(a);
           });
-      auto permutation = getMappingPermutation(mappingAttr);
+      auto permutation =
+          getInvertedMappingPermutation<IREE::Codegen::WorkgroupMappingAttr>(
+              mappingAttr);
       workgroupCounts = applyPermutation(workgroupCounts, permutation);
       return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCounts,
                                             static_cast<int>(deLinearizeFrom) +
@@ -469,14 +479,14 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   }
 
   SmallVector<scf::ForallOp> splitReductionForAllOps;
-  funcOp.walk([&splitReductionForAllOps](scf::ForallOp forAllOp) {
+  funcOp.walk([&](scf::ForallOp forAllOp) {
     auto mapping = forAllOp.getMapping();
     if (!mapping) {
       return;
     }
-    if (llvm::none_of(
-            mapping->getValue(),
-            llvm::IsaPred<IREE::LinalgExt::SplitReductionMappingAttr>)) {
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            rewriter.getContext(), forAllOp.getLoc(), mapping->getValue(),
+            /*emitDiagnosticsErrs =*/false))) {
       return;
     }
     splitReductionForAllOps.push_back(forAllOp);
@@ -499,26 +509,34 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
         "cannot resolve for all ops with return values");
   }
 
-  assert(forallOp.getMapping() && forallOp.getMapping()->size() == 1 &&
-         "expected forall op to have mapping of "
-         "`[#iree_codegen.split_reduction_mapping]`");
-  // Currently only support single induction variable.
-  if (forallOp.getRank() != 1) {
-    return forallOp->emitOpError("unsupported split-reduction resolution of "
-                                 "`scf.forall` op of rank greater than 1");
-  }
-
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(forallOp);
   Location loc = forallOp.getLoc();
 
-  OpFoldResult lb = forallOp.getMixedLowerBound().front();
-  OpFoldResult ub = forallOp.getMixedUpperBound().front();
-  OpFoldResult step = forallOp.getMixedStep().front();
+  // Compute the number of iterations of the split-reduction loop.
+  // Since the split-reduction loop will be mapped with one iteration
+  // per workgroup, the product of number of iterations for all the ranks
+  // is also the number of processors used for split-reduction mapping.
+  SmallVector<OpFoldResult> lbs = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> ubs = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> steps = forallOp.getMixedStep();
   AffineExpr s0, s1, s2;
   bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr numItersExpr = (s1 - s0).ceilDiv(s2);
+  auto numIters =
+      llvm::map_to_vector(llvm::zip_equal(lbs, ubs, steps), [&](auto it) {
+        OpFoldResult lb = std::get<0>(it), ub = std::get<1>(it),
+                     step = std::get<2>(it);
+        return affine::makeComposedFoldedAffineApply(
+            rewriter, loc, numItersExpr, {lb, ub, step});
+      });
+  AffineExpr linearizeExpr = s0;
+  for (unsigned i = 1; i < lbs.size(); ++i) {
+    AffineExpr s = rewriter.getAffineSymbolExpr(i);
+    linearizeExpr = linearizeExpr * s;
+  }
   OpFoldResult nSplitProcs = affine::makeComposedFoldedAffineApply(
-      rewriter, loc, (s1 - s0).ceilDiv(s2), {lb, ub, step});
+      rewriter, loc, linearizeExpr, numIters);
 
   // Lower the splitk-modifier op in the entry point.
   if (failed(lowerSplitReductionModifierOp(rewriter, funcOp, delinearizeFrom,
@@ -533,11 +551,12 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   OpFoldResult nTotalProcs = nTotalProcsOp.getResult();
   auto origNProcs = affine::makeComposedFoldedAffineApply(
       rewriter, loc, s0.floorDiv(s1), {nTotalProcs, nSplitProcs});
+  SmallVector<OpFoldResult> basis = numIters;
+  basis.push_back(origNProcs);
   auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, procIdOp.getResult(),
-      ArrayRef<OpFoldResult>{nSplitProcs, origNProcs});
+      loc, procIdOp.getResult(), basis);
 
-  Value workgroupIdReplacement = delinearizeOp.getResult(1);
+  Value workgroupIdReplacement = delinearizeOp.getResults().back();
 
   // Check that all uses of `hal.interface.workgroup.id[delinearizeFrom]` are
   // within the `scf.forall` operation.
@@ -564,8 +583,20 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     return failure();
   }
 
-  return resolveForAll(rewriter, forallOp,
-                       OpFoldResult(delinearizeOp.getResult(0)), nSplitProcs,
+  auto splitReduceOpProcIds =
+      llvm::map_to_vector(delinearizeOp.getResults().drop_back(),
+                          [](Value v) -> OpFoldResult { return v; });
+  auto splitReduceMapping = llvm::map_to_vector(
+      forallOp.getMapping()->getValue(), [](Attribute attr) {
+        return cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr);
+      });
+
+  SmallVector<int64_t> mappingPermutation =
+      getMappingPermutation<IREE::LinalgExt::SplitReductionMappingAttr>(
+          splitReduceMapping);
+  applyPermutationToVector(splitReduceOpProcIds, mappingPermutation);
+  applyPermutationToVector(numIters, mappingPermutation);
+  return resolveForAll(rewriter, forallOp, splitReduceOpProcIds, numIters,
                        /*generateLoopNest = */ false);
 }
 
