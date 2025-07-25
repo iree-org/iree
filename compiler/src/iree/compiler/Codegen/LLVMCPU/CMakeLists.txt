@@ -135,6 +135,7 @@ iree_cc_library(
     MLIRSCFUtils
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTilingInterface
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
