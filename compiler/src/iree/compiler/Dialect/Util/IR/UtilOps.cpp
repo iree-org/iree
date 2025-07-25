@@ -1433,6 +1433,20 @@ LogicalResult OptimizationBarrierOp::verify() {
   return success();
 }
 
+void OptimizationBarrierOp::inferResultRangesFromOptional(
+    ArrayRef<IntegerValueRange> argRanges, SetIntLatticeFn setResultRange) {
+  for (Value result : getResults()) {
+    Type elemType = getElementTypeOrSelf(result);
+    if (!elemType.isIntOrIndex()) {
+      continue;
+    }
+    unsigned bitWidth = ConstantIntRanges::getStorageBitwidth(elemType);
+    setResultRange(result, IntegerValueRange(ConstantIntRanges::fromUnsigned(
+                               APInt::getZero(bitWidth),
+                               APInt::getSignedMaxValue(bitWidth))));
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // util.unfoldable_constant
 //===----------------------------------------------------------------------===//
