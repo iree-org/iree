@@ -573,6 +573,30 @@ def LowerUKernelOpsToCallsPass :
   let summary = "Lower micro-kernel wrapper ops into function calls";
 }
 
+def LowerBitcodeUKernelsPass :
+    Pass<"iree-codegen-lower-bitcode-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors to ukernel_generic";
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect"
+  ];
+}
+
+def LowerMemrefUKernelsPass :
+    Pass<"iree-codegen-lower-memref-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors and memref operands";
+  let dependentDialects = [
+    "memref::MemRefDialect"
+  ];
+}
+
+def LowerTensorUKernelsPass :
+    Pass<"iree-codegen-lower-tensor-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors and tensor operands";
+  let dependentDialects = [
+    "tensor::TensorDialect"
+  ];
+}
+
 def MaterializeHostEncodingPass :
     Pass<"iree-codegen-materialize-host-encoding", "mlir::ModuleOp"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";

@@ -457,4 +457,63 @@ def IREECodegen_AnySwizzleAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+def IREECodegen_UKernelProviderInterface :
+  AttrInterface<"UKernelProviderInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that provides ukernel implementations. Supports accessing
+    bitcode or parsed MLIR depending on the usage.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the bitcode referenced by |name| backed by this attribute.
+        Takes |target_configuration| in case the provider wants to make any
+        feature specific decisions for which implementation to provide.
+        The optional |annotation_site| refers to the operation where this
+        provider was found in the event site specific implementation information
+        is needed.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::StringRef>",
+      /*methodName=*/"getSerializedUKernel",
+      /*args=*/(ins "::mlir::StringRef":$name,
+                    "::mlir::DictionaryAttr":$target_configuration,
+                    "::mlir::Operation *":$annotation_site),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the ukernel referenced by |name| backed by this attribute.
+        Takes |target_configuration| in case the provider wants to make any
+        feature specific decisions for which implementation to provide.
+        The optional |annotation_site| refers to the operation where this
+        provider was found in the event site specific implementation information
+        is needed.
+
+        This method is doubly nullable; returning `failure()` indicates a hard
+        error in all cases, where returning `nullptr` it is up to the caller to
+        handle it gracefully if it makes sense to do so. In most cases, hard
+        errors should be preferred.
+
+        This is a separate method from `getSerializedUKernel` because MLIR ukernels
+        imply the need for parsing. Giving the attribute control over parsing
+        enables caching opportunities.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::Operation *>",
+      /*methodName=*/"getMLIRUKernel",
+      /*args=*/(ins "::mlir::StringRef":$name,
+                    "::mlir::DictionaryAttr":$target_configuration,
+                    "::mlir::Operation *":$annotation_site),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+  ];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES
