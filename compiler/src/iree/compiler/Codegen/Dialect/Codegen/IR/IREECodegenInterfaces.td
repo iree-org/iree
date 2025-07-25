@@ -445,7 +445,21 @@ def IREECodegen_SwizzleAttrInterface :
       /*retTy=*/"int64_t",
       /*methodName=*/"getAccessElementCount",
       /*args=*/(ins)
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Verifies the validity of any nested symbols.
+      }],
+      /*retTy=*/"::llvm::LogicalResult",
+      /*methodName=*/"verifySymbolUses",
+      /*args=*/(ins
+        "::mlir::SymbolTableCollection &":$symbolTable,
+        "::mlir::Operation*":$owner),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return success();
+      }]
+    >,
   ];
 }
 

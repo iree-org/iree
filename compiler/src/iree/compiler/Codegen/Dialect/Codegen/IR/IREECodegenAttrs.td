@@ -467,6 +467,35 @@ def IREECodegen_RotateRowsAttr  :
 }
 
 //===---------------------------------------------------------------------===//
+// iree_codegen.swizzle_impl
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_SwizzleImplAttr  :
+    AttrDef<IREECodegen_Dialect, "SwizzleImpl", [
+    DeclareAttrInterfaceMethods<IREECodegen_SwizzleAttrInterface, [
+        "swizzleOffset",
+        "getAccessElementCount",
+        "verifySymbolUses"
+      ]>
+    ]> {
+  let mnemonic = "swizzle_impl";
+  let summary = [{An attribute that describes a swizzling pattern for rotating rows.}];
+  let description = [{
+    Wrapper around a symbolic reference to a function with signature
+    (index) -> (index) that implements offset swizzling. When the swizzle hint is
+    resolved, this generates a function call per |access_width| contiguous
+    elements.
+  }];
+  let parameters = (ins
+    AttrParameter<"SymbolRefAttr", "The function to call when swizzling">:$symbol,
+    AttrParameter<"int64_t", "">:$access_width
+  );
+  let assemblyFormat = [{
+    `<` $symbol `,` $access_width `>`
+  }];
+}
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.symbolic_ukernel_provider
 //===---------------------------------------------------------------------===//
 

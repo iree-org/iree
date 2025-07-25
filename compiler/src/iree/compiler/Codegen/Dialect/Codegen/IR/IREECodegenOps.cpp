@@ -127,6 +127,15 @@ void StoreToBufferOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// SwizzleHintOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+SwizzleHintOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  return getSwizzle().verifySymbolUses(symbolTable, *this);
+}
+
+//===----------------------------------------------------------------------===//
 // InnerTiledOp
 //===----------------------------------------------------------------------===//
 

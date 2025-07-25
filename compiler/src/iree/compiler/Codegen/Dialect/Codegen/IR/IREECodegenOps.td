@@ -14,6 +14,7 @@ include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.td"
 include "mlir/Dialect/Linalg/IR/LinalgBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
@@ -115,7 +116,9 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
 //===----------------------------------------------------------------------===//
 
 def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
-    SameOperandsAndResultType, Pure]> {
+    SameOperandsAndResultType, Pure,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface, ["verifySymbolUses"]>,
+    ]> {
   let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
     Optimization hint to swizzle all accesses to the memref this takes a view
