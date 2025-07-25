@@ -491,17 +491,19 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
   return o;
 }
 
-MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
-                                                MMAFragment fragment) {
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
+                        MMAFragment fragment) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
     // |colMajor| indicates that the accumulator layout should be returned
     // column major.
-    return getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
-                                   fragment == MMAFragment::Acc &&
-                                       mmaAttr.getColMajor());
+    return IREE::GPU::getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
+                                              fragment == MMAFragment::Acc &&
+                                                  mmaAttr.getColMajor());
   }
   if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return getSingleSubgroupLayout(vmmaAttr.getIntrinsic(), fragment);
+    return IREE::GPU::getSingleSubgroupLayout(vmmaAttr.getIntrinsic(),
+                                              fragment);
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
@@ -1407,7 +1409,7 @@ int64_t ScaledMMAAttr::getBlockSize() const {
     return 32;
   }
   assert(false &&
-         "all cases should'vee been handled in ScaledMMA::getBlockSize()");
+         "all cases should've been handled in ScaledMMA::getBlockSize()");
   return 0;
 }
 
@@ -1434,6 +1436,16 @@ int64_t ScaledMMAAttr::getSubgroupSize() const {
   assert(false &&
          "all cases should'vee been handled in ScaledMMA::getBlockSize()");
   return 0;
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
+  return {Float8E8M0FNUType::get(ctx),  Float8E5M2Type::get(ctx),
+          Float8E5M2FNUZType::get(ctx), Float8E4M3FNType::get(ctx),
+          Float8E4M3FNUZType::get(ctx), Float4E2M1FNType::get(ctx)};
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedOutputTypes(MLIRContext *ctx) {
+  return {Float32Type::get(ctx)};
 }
 
 LogicalResult

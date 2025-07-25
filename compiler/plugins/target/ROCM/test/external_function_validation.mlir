@@ -7,7 +7,7 @@
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "",
                                       wgp = <compute = fp16, storage =  b16,
-                                      subgroup =  none, dot =  none, mma = [],
+                                      subgroup =  none, dot =  none, mma = [], scaled_mma = [],
                                       subgroup_size_choices = [64],
                                       max_workgroup_sizes = [1024, 1024, 1024],
                                       max_thread_count_per_workgroup = 1024,
