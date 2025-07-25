@@ -886,7 +886,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                /*reorderStrategy=*/reorderStrategy);
 
   // Some of the elementwise fusion can benefit from this pass.
-  funcPassManager.addPass(createRematerializeParallelOpsPass());
+  // funcPassManager.addPass(createRematerializeParallelOpsPass());
 
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
@@ -1009,7 +1009,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
                                      bool forROCDL) {
   tileAndDistributeToWorkgroup(
       funcPassManager, /*useForall=*/clDistributeToWorkgroupsUsingForall);
-  funcPassManager.addPass(createRematerializeParallelOpsPass());
+  // funcPassManager.addPass(createRematerializeParallelOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createGPUTileReductionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());

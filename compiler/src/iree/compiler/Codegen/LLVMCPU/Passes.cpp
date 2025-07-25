@@ -372,7 +372,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
   }
 
   // Run IREE specific passes before vector lowering expert.
-  funcPassManager.addPass(createRemoveSingleIterationLoopPass());
+  // funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   {
     LLVMCPUVectorLoweringPassOptions options;
@@ -813,7 +813,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   FunctionLikeNest(modulePassManager)
-      .addPass(createRematerializeParallelOpsPass)
+      // .addPass(createRematerializeParallelOpsPass)
       // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added
       // way to late and should insted be be done during lowering to LLVM.
       .addPass(createExpandF16OpToF32Pass)

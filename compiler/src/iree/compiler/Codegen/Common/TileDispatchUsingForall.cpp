@@ -214,7 +214,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // If tiledAndFused ops doesn't contain the user; add an replacement
     // for that.
     if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-          return dominanceInfo.properlyDominates(tilableOp, user) &&
+          return dominanceInfo.properlyDominates(tilableOp, user) ||
                  !tiledAndFusedOps.contains(user);
         })) {
       yieldReplacementsFor.insert(op);
@@ -296,23 +296,25 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       });
     }
     std::swap(tileAndFuseResult->loops, tilingLoops);
-    Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
-    FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoForall(rewriter, rootTiledOp, tilingLoops,
-                                [&tiledAndFusedOps](Operation *op) {
-                                  return tiledAndFusedOps.contains(op);
-                                });
-    if (failed(newFusionOpportunities)) {
-      rootTiledOp->emitOpError("failed to fuse consumers");
-      return signalPassFailure();
-    }
 
-    // Because we restrict to at most a single tilable consumer for yielding
-    // a replacement, no new fusion opportunities will yield a replacement,
-    // meaning there is no need to run consumer fusion again afterwards.
-    // TODO: run producer and consumer fusion in one worklist.
-    fuseProducersOfSlices(rewriter, *newFusionOpportunities, tileAndFuseOptions,
-                          tilingLoops);
+    for (Operation *rootTiledOp : tileAndFuseResult->tiledAndFusedOps) {
+      FailureOr<std::queue<Operation *>> newFusionOpportunities =
+          fuseConsumersIntoForall(rewriter, rootTiledOp, tilingLoops,
+                                  [&tiledAndFusedOps](Operation *op) {
+                                    return tiledAndFusedOps.contains(op);
+                                  });
+      if (failed(newFusionOpportunities)) {
+        rootTiledOp->emitOpError("failed to fuse consumers");
+        return signalPassFailure();
+      }
+
+      // Because we restrict to at most a single tilable consumer for yielding
+      // a replacement, no new fusion opportunities will yield a replacement,
+      // meaning there is no need to run consumer fusion again afterwards.
+      // TODO: run producer and consumer fusion in one worklist.
+      fuseProducersOfSlices(rewriter, *newFusionOpportunities,
+                            tileAndFuseOptions, tilingLoops);
+    }
   }
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {
