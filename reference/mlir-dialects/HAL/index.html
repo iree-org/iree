@@ -13075,7 +13075,7 @@ forced with the <code>--iree-hal-memoization=false</code> flag.</p>
 <h4 id="haldispatchextern-haldispatchexternop"><code>hal.dispatch.extern</code> (HAL::DispatchExternOp)<a class="headerlink" href="#haldispatchextern-haldispatchexternop" title="Permanent link">link</a></h4>
 <p><em>A dispatch of workgroups across a 3-dimensional grid.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.dispatch.extern` $export
+<div class="highlight"><pre><span></span><code>operation ::= `hal.dispatch.extern` $export_name
               (`[` $workload^ `]`)? ``
               `(` $arguments `)` `:`
               custom&lt;ShapedFunctionType&gt;(ref($arguments),
@@ -13158,7 +13158,7 @@ used for execution.</p>
 <h5 id="attributes_54">Attributes:<a class="headerlink" href="#attributes_54" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>export</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>export_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>Executable entry point layout specification.</td></tr>
 <tr><td><code>targets</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
 <tr><td><code>target_ordinals</code></td><td>::mlir::ArrayAttr</td><td>Array of index ordinal attributes</td></tr>
