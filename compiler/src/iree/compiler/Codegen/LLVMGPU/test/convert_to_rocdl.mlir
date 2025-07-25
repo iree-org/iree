@@ -328,3 +328,38 @@ builtin.module {
 //   CHECK-DAG: llvm.getelementptr %[[A0]][0, 0, 0, 0]
 //   CHECK-DAG: %[[A:.+]] = llvm.mlir.addressof @__shared_memory__
 //   CHECK-DAG: llvm.getelementptr %[[A]][0, 0, 0, 0]
+
+
+// -----
+// Test gpu.printf lowering for HIP runtime
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<MFMA_F32_16x16x16_BF16>, <MFMA_F32_32x32x8_BF16>, <MFMA_F32_16x16x32_F8E5M2FNUZ>, <MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>, <MFMA_F64_16x16x4_F64>, <MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>], subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>, iree_codegen.default_tuning_spec = #rocm.builtin.tuning_module<"iree_default_tuning_spec_gfx942.mlir">, ukernels = "none"}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#translation = #iree_codegen.translation_info<pipeline = None workgroup_size = [128, 1, 1] subgroup_size = 64>
+#device_target_hip = #hal.device.target<"hip", [#executable_target_rocm_hsaco_fb]> : !hal.device
+module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>, transform.with_named_sequence} {
+  util.global private @__device_0 = #device_target_hip
+  hal.executable private @test {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      builtin.module {
+        func.func @test() attributes {translation_info = #translation} {
+          %block_id_y = gpu.block_id  y upper_bound 256
+          %thread_id_x = gpu.thread_id  x upper_bound 128
+          gpu.printf "Hello, World from block %d - thread %d", %block_id_y, %thread_id_x : index, index
+          return
+        }
+      }
+    }
+  }
+}
+
+// CHECK-DAG: llvm.mlir.global internal constant @[[$STR:.+]]("Hello, World from block %d - thread %d\00") {addr_space = 0 : i32}
+// CHECK-DAG: llvm.func @__ockl_printf_append_string_n(i64, !llvm.ptr, i64, i32) -> i64
+// CHECK-DAG: llvm.func @__ockl_printf_append_args(i64, i32, i64, i64, i64, i64, i64, i64, i64, i32) -> i64
+// CHECK-DAG: llvm.func @__ockl_printf_begin(i64) -> i64
+// CHECK-LABEL: llvm.func @test()
+//   CHECK: %[[BEGIN:.+]] = llvm.call @__ockl_printf_begin
+//   CHECK: %[[ADR:.+]] = llvm.mlir.addressof @[[$STR]]
+//   CHECK: %[[GEP:.+]] = llvm.getelementptr %[[ADR]]
+//   CHECK: %[[APPEND_STR:.+]] = llvm.call @__ockl_printf_append_string_n(%[[BEGIN]], %[[GEP]]
+//   CHECK: llvm.call @__ockl_printf_append_args(%[[APPEND_STR]]
