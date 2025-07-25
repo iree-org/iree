@@ -127,7 +127,7 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
           linalg::dropUnitDims(rewriter, swappedOp, options);
       assert(succeeded(dropUnitDims) &&
              "failed to drop unit dims of produced operation");
-      swappedOp = dropUnitDims->resultOp;
+      swappedOp = cast<linalg::GenericOp>(dropUnitDims->resultOp);
       replacement = swappedOp->getResult(0);
     }
     rewriter.replaceOp(sliceOp, replacement);
