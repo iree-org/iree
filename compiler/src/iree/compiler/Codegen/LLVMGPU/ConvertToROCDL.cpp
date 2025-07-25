@@ -251,7 +251,6 @@ struct ConvertToROCDLPass final
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
-      populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateBubbleVectorBitCastOpPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);

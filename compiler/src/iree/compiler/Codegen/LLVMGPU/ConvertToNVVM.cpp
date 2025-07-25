@@ -99,7 +99,6 @@ struct ConvertToNVVMPass final
       populateVectorToSCFConversionPatterns(
           patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
-      populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
