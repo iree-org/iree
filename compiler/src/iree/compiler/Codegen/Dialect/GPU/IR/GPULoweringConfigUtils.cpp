@@ -19,13 +19,14 @@ static std::optional<SmallVector<int64_t>> getIntegerVector(ArrayAttr array) {
 
 constexpr StringLiteral kMmaKindName = "mma_kind";
 
-IREE::GPU::MmaInterfaceAttr getMmaKind(LoweringConfigAttr config) {
-  return config.getAttributes().getAs<IREE::GPU::MmaInterfaceAttr>(
-      kMmaKindName);
+IREE::Codegen::InnerTileDescAttrInterface
+getMmaKind(LoweringConfigAttr config) {
+  return config.getAttributes()
+      .getAs<IREE::Codegen::InnerTileDescAttrInterface>(kMmaKindName);
 }
 
 void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-                IREE::GPU::MmaInterfaceAttr kind) {
+                IREE::Codegen::InnerTileDescAttrInterface kind) {
   attrs.emplace_back(kMmaKindName, kind);
 }
 

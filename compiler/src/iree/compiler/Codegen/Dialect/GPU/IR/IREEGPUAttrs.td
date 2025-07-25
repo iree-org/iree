@@ -329,6 +329,11 @@ def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
 
+def IREEGPU_ScaledMMAOpsArrayAttr : ArrayOfAttr<
+  IREEGPU_Dialect, "ScaledMMAOpsArray", "scaled_mma_ops", "ScaledMMAAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
 def IREEGPU_ScaledMMAAttr :
     AttrDef<IREEGPU_Dialect, "ScaledMMA", [
   DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
@@ -371,11 +376,30 @@ def IREEGPU_ScaledMMAAttr :
   );
 
   let extraClassDeclaration = [{
+    // Return all supported element types for inputs
+    static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
+    static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
+
     // Return the number of elements per shared scale.
     int64_t getBlockSize() const;
 
-    // Return the required subgroup size for this intrinsic.
+    // Return preferred subgroup size
     int64_t getSubgroupSize() const;
+
+    /// Returns the shape of the scaled MMA operation:
+    /// ```
+    ///   C += A * B
+    /// ```
+    /// Where, up to some transpositions, `A` has shape `<M, K, KB>`, `B`
+    /// has shape `<K, KB, N>`, and `C` has shape `<M, N>`.
+    ::std::tuple<int64_t, int64_t, int64_t, int64_t>
+    getScaledMNKShape() const {
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
+      getUndistributedTileTypes(preThreadTypes);
+      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
+      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
+      return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
+    }
   }];
 }
 
@@ -393,7 +417,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   }];
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,
+    "::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface":$intrinsic,
     "int64_t":$subgroup_m_count,
     "int64_t":$subgroup_n_count
   );
@@ -477,6 +501,7 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "DotProductOpsAttr":$dot,
     // MMAs available on this target. Heuristic MMA selection runs is order.
     "MMAOpsArrayAttr":$mma,
+    "ScaledMMAOpsArrayAttr":$scaled_mma,
 
     // Limits
     // Supported subgroup size choices.
