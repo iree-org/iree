@@ -276,3 +276,186 @@ util.func public @dont_hoist_encoding_on_scalar_tensor(%arg0: tensor<f32>) -> te
 //       CHECK:     %[[CALL:.+]] = util.call @get_tensor(%[[SET_ENCODING]])
 //       CHECK:     flow.return %[[CALL]]
 //       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+// Tests the propagation of the unset encoding op through a parallel generic op.
+// Note the permuted target operand indexing map that needs to be added to the
+// encoding attribute to map the encoding to the domain of the generic op.
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d1, d0)>
+#map4 = affine_map<(d0, d1) -> ()>
+#map5 = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
+util.func public @propagate_unset_encoding_through_generic(%arg0: tensor<?x4096xf32, #encoding>, %arg1: tensor<f32>, %arg2: index) -> tensor<4096x?xbf16> {
+  %0 = flow.dispatch.region -> (tensor<4096x?xbf16>{%arg2}) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg2}
+    %2 = tensor.empty(%arg2) : tensor<4096x?xbf16>
+    %3 = linalg.generic {indexing_maps = [#map3, #map4, #map5], iterator_types = ["parallel", "parallel"]} ins(%1, %arg1 : tensor<?x4096xf32>, tensor<f32>) outs(%2 : tensor<4096x?xbf16>) {
+    ^bb0(%in: f32, %in_0: f32, %out: bf16):
+      %4 = arith.mulf %in, %in_0 : f32
+      %5 = arith.truncf %4 : f32 to bf16
+      linalg.yield %5 : bf16
+    } -> tensor<4096x?xbf16>
+    flow.return %3 : tensor<4096x?xbf16>
+  }
+  util.return %0 : tensor<4096x?xbf16>
+}
+// CHECK-DAG:   #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1) -> ()>
+// CHECK-DAG:   #[[MAP5:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], [#[[MAP2]], #[[MAP3]], #[[MAP4]]]]>
+// CHECK-DAG:   #[[$ENCODING2:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], [#[[MAP2]], #[[MAP3]]]]>
+// CHECK-LABEL: @propagate_unset_encoding_through_generic
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<?x4096xf32, #[[$ENCODING]]>, %[[ARG1:.+]]: tensor<f32>, %[[ARG2:.+]]: index
+// CHECK:         flow.dispatch.region -> (tensor<4096x?xbf16>{%[[ARG2]]}) {
+// CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ARG1]] : tensor<f32> -> tensor<f32, #[[$ENCODING1]]>
+// CHECK:           %[[EMPTY:.+]] = tensor.empty(%[[ARG2]]) : tensor<4096x?xbf16, #[[$ENCODING2]]>
+// CHECK:           %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[ARG0]], %[[SET_ENCODING]] :  tensor<?x4096xf32, #[[$ENCODING]]>, tensor<f32, #[[$ENCODING1]]>)
+// CHECK-SAME:        outs(%[[EMPTY]] :  tensor<4096x?xbf16, #[[$ENCODING2]]>)
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xbf16, #[[$ENCODING2]]> -> tensor<4096x?xbf16>{%[[ARG2]]}
+// CHECK:           flow.return %[[UNSET_ENCODING:.+]] : tensor<4096x?xbf16>
+// CHECK:         }
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> ()>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
+util.func public @dont_propagate_unset_encoding_outside_region(%arg0: tensor<?x4096xf32, #encoding>, %arg1: tensor<f32>, %arg2: index) -> tensor<?x4096xbf16> {
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg2}
+  %1 = tensor.empty(%arg2) : tensor<?x4096xbf16>
+  %2 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%0, %arg1 : tensor<?x4096xf32>, tensor<f32>) outs(%1 : tensor<?x4096xbf16>) {
+  ^bb0(%in: f32, %in_0: f32, %out: bf16):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.truncf %3 : f32 to bf16
+    linalg.yield %4 : bf16
+  } -> tensor<?x4096xbf16>
+  util.return %2 : tensor<?x4096xbf16>
+}
+// CHECK-LABEL: @dont_propagate_unset_encoding_outside_region
+// CHECK:         iree_encoding.unset_encoding
+// CHECK:         tensor.empty
+// CHECK:         linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> ()>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
+util.func public @dont_propagate_unset_encoding_with_multiple_uses(%arg0: tensor<?x4096xf32, #encoding>, %arg1: tensor<f32>, %arg2: index) -> (tensor<?x4096xbf16>, tensor<?x4096xbf16>) {
+  %0:2 = flow.dispatch.region -> (tensor<?x4096xbf16>{%arg2}, tensor<?x4096xbf16>{%arg2}) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg2}
+    %2 = tensor.empty(%arg2) : tensor<?x4096xbf16>
+    %3 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%1, %arg1 : tensor<?x4096xf32>, tensor<f32>) outs(%2 : tensor<?x4096xbf16>) {
+    ^bb0(%in: f32, %in_0: f32, %out: bf16):
+      %5 = arith.mulf %in, %in_0 : f32
+      %6 = arith.truncf %5 : f32 to bf16
+      linalg.yield %6 : bf16
+    } -> tensor<?x4096xbf16>
+    %4 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%1, %arg1 : tensor<?x4096xf32>, tensor<f32>) outs(%2 : tensor<?x4096xbf16>) {
+    ^bb0(%in: f32, %in_0: f32, %out: bf16):
+      %5 = arith.addf %in, %in_0 : f32
+      %6 = arith.truncf %5 : f32 to bf16
+      linalg.yield %6 : bf16
+    } -> tensor<?x4096xbf16>
+    flow.return %3, %4 : tensor<?x4096xbf16>, tensor<?x4096xbf16>
+  }
+  util.return %0#0, %0#1 : tensor<?x4096xbf16>, tensor<?x4096xbf16>
+}
+// CHECK-LABEL: @dont_propagate_unset_encoding_with_multiple_uses
+// CHECK:         iree_encoding.unset_encoding
+// CHECK:         tensor.empty
+// CHECK:         linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d0)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
+util.func public @dont_propagate_unset_encoding_through_generic_with_reduction(%arg0: tensor<?x4096xf32, #encoding>, %arg1: index) -> tensor<?xf32> {
+  %0 = flow.dispatch.region -> (tensor<?xf32>{%arg1}) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg1}
+    %2 = tensor.empty(%arg1) : tensor<?xf32>
+    %3 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]} ins(%1 : tensor<?x4096xf32>) outs(%2 : tensor<?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %out : f32
+      linalg.yield %4 : f32
+    } -> tensor<?xf32>
+    flow.return %3 : tensor<?xf32>
+  }
+  util.return %0 : tensor<?xf32>
+}
+// CHECK-LABEL: @dont_propagate_unset_encoding_through_generic_with_reduction
+// CHECK:         iree_encoding.unset_encoding
+// CHECK:         tensor.empty
+// CHECK:         linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
+util.func public @dont_propagate_unset_encoding_on_init(%arg0: tensor<?x4096xf32>, %arg1: index) -> tensor<?x4096xf32> {
+  %0 = flow.dispatch.region -> (tensor<?x4096xf32>{%arg1}) {
+    %1 = tensor.empty(%arg1) : tensor<?x4096xf32, #encoding>
+    %2 = iree_encoding.unset_encoding %1 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg1}
+    %3 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<?x4096xf32>) outs(%2 : tensor<?x4096xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %out : f32
+      linalg.yield %4 : f32
+    } -> tensor<?x4096xf32>
+    flow.return %3 : tensor<?x4096xf32>
+  }
+  util.return %0 : tensor<?x4096xf32>
+}
+// CHECK-LABEL: @dont_propagate_unset_encoding_on_init
+// CHECK:         tensor.empty
+// CHECK:         iree_encoding.unset_encoding
+// CHECK:         linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d0, d1, d0)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2]>
+util.func public @dont_propagate_non_projected_permutation(%arg0: tensor<?x4096xf32, #encoding>, %arg1: tensor<?x4x4096xf32>, %arg2: index) -> tensor<?x4096xf32> {
+  %0 = flow.dispatch.region -> (tensor<?x4096xf32>{%arg2}) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg2}
+    %2 = tensor.empty(%arg2) : tensor<?x4096xf32>
+    %3 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%1, %arg1 : tensor<?x4096xf32>, tensor<?x4x4096xf32>) outs(%2 : tensor<?x4096xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      %5 = arith.addf %4, %out : f32
+      linalg.yield %5 : f32
+    } -> tensor<?x4096xf32>
+    flow.return %3 : tensor<?x4096xf32>
+  }
+  util.return %0 : tensor<?x4096xf32>
+}
+// CHECK-LABEL: @dont_propagate_non_projected_permutation
+// CHECK:         iree_encoding.unset_encoding
+// CHECK:         tensor.empty
+// CHECK:         linalg.generic
