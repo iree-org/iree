@@ -379,6 +379,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // --- CDNA --- //
 
+  // "AMD CDNA 4 COMPUTE" in Page 5 of
+  // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-4-architecture-whitepaper.pdf
+  static const ChipDetails mi350xChip = {256, "mi350x"};
+
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
   static const ChipDetails mi300xChip = {304, "mi300x"};
@@ -426,6 +430,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // cdnaN/rdnaN mapping.
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       .Cases("cdna4", "gfx950", TargetDetails{cdna4Wgp, nullptr})
+      .Case("mi350x", TargetDetails{cdna4Wgp, &mi350xChip})
       .Case("mi325x", TargetDetails{cdna3Wgp, &mi325xChip})
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
@@ -481,6 +486,7 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
     return target;
 
   return llvm::StringSwitch<StringRef>(target.lower())
+      .Case("mi350x", "gfx950")
       .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
