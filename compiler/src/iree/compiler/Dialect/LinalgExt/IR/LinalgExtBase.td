@@ -68,14 +68,26 @@ def SplitReductionMappingAttr :
     AttrDef<IREELinalgExt_Dialect, "SplitReductionMapping", [
       DeclareAttrInterfaceMethods<DeviceMappingAttrInterface, []>]> {
   let mnemonic = "split_reduction_mapping";
-  let parameters = (ins);
-  let assemblyFormat = "";
+  let parameters = (ins
+    "int64_t":$dimension
+  );
+  let assemblyFormat = "`<` $dimension `>`";
   let description = [{
     Mapping attribute to indicate distribution for split-reduction.
 
     This attribute indicates that the `scf.forall` represent parallel partial
     reductions generated through the use of
     `ReductionTilingStrategy::PartialReductionOuterParallel`.
+  }];
+  let extraClassDeclaration = [{
+    // Checks that a list of attributes is well-defined.
+    static LogicalResult verifyAttrList(::mlir::MLIRContext *context,
+        Location loc, ArrayRef<Attribute> attrs, bool emitDiagnosticErrors = true);
+
+    // Less than operator for easy comparison.
+    bool operator<(
+        const ::mlir::iree_compiler::IREE::LinalgExt::SplitReductionMappingAttr &rhs)
+        const;
   }];
 }
 

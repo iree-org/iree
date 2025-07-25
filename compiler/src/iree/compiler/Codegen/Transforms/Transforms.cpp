@@ -511,26 +511,58 @@ namespace {
 // Given a list of workgroup mappings, finds the highest workgroup mapping
 // in the list and returns the workgroup mapping "one more" than the highest.
 static IREE::Codegen::WorkgroupMappingAttr
-getNextWorkgroupMapping(ArrayRef<Attribute> currentMappings) {
-  auto currentMappingVec =
-      llvm::map_to_vector(currentMappings, [](Attribute attr) {
-        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
-      });
-  llvm::sort(currentMappingVec);
-  auto lastAttr = currentMappingVec.back();
-  switch (lastAttr.getId()) {
+getNextWorkgroupMapping(IREE::Codegen::WorkgroupMappingAttr mapping) {
+  MLIRContext *context = mapping.getContext();
+  switch (mapping.getId()) {
   case IREE::Codegen::WorkgroupId::IdX:
     return IREE::Codegen::WorkgroupMappingAttr::get(
-        lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdY);
+        context, IREE::Codegen::WorkgroupId::IdY);
   case IREE::Codegen::WorkgroupId::IdY:
     return IREE::Codegen::WorkgroupMappingAttr::get(
-        lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdZ);
+        context, IREE::Codegen::WorkgroupId::IdZ);
   case IREE::Codegen::WorkgroupId::IdZ:
     return IREE::Codegen::WorkgroupMappingAttr::get(
-        lastAttr.getContext(), IREE::Codegen::WorkgroupId::IdZ,
-        lastAttr.getDelinearizedDim() + 1);
+        context, IREE::Codegen::WorkgroupId::IdZ,
+        mapping.getDelinearizedDim() + 1);
   }
   llvm_unreachable("Unhandled WorkgroupId case");
+}
+
+static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
+    ArrayRef<Attribute> currWorkgroupMapping,
+    ArrayRef<Attribute> splitReductionMapping) {
+  auto castedCurrWorkgroupMapping =
+      llvm::map_to_vector(currWorkgroupMapping, [](Attribute attr) {
+        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
+      });
+  llvm::sort(castedCurrWorkgroupMapping);
+
+  auto castedSplitReductionMapping =
+      llvm::map_to_vector(splitReductionMapping, [](Attribute attr) {
+        return cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr);
+      });
+  llvm::sort(castedSplitReductionMapping);
+
+  IREE::Codegen::WorkgroupMappingAttr currHighestMapping =
+      castedCurrWorkgroupMapping.back();
+  DenseMap<IREE::LinalgExt::SplitReductionMappingAttr,
+           IREE::Codegen::WorkgroupMappingAttr>
+      splitToWorkgroupMap;
+
+  for (auto mapping : castedSplitReductionMapping) {
+    IREE::Codegen::WorkgroupMappingAttr nextHighestMapping =
+        getNextWorkgroupMapping(currHighestMapping);
+    splitToWorkgroupMap[mapping] = nextHighestMapping;
+    currHighestMapping = nextHighestMapping;
+  }
+
+  auto combinedMapping = llvm::map_to_vector(
+      splitReductionMapping, [&](Attribute attr) -> Attribute {
+        return splitToWorkgroupMap.lookup(
+            cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr));
+      });
+  llvm::append_range(combinedMapping, currWorkgroupMapping);
+  return combinedMapping;
 }
 
 // Pattern to fold the `scf.forall` produced by split reduction
@@ -550,25 +582,16 @@ struct FoldSplitReductionForallWithWorkgroupForall
           forallOp, "unhandled operation with return values");
     }
 
-    // For now only support a single mapping of `split_reduction_mapping`.
-    // TODO(MaheshRavishankar): There is no real reason for this restriction.
-    // This is just something that is the state at the time of implementation.
-    // This restriction can be dropped after generalizing the
-    // `iree_codegen.split_reduction_mapping` to allow for specify multiple
-    // dimensions to partition along.
-    std::optional<ArrayAttr> mapping = forallOp.getMapping();
-    if (!mapping) {
+    std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
+    if (!mappingAttr) {
       return rewriter.notifyMatchFailure(forallOp,
                                          "not split reduction scf.forall");
     }
-    if (mapping->size() != 1 || forallOp.getRank() != 1) {
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            rewriter.getContext(), forallOp.getLoc(), mappingAttr->getValue(),
+            /*emitDiagnosticsErrors =*/false))) {
       return rewriter.notifyMatchFailure(
-          forallOp,
-          "unsupported multi-dimensional mapping for split-reductions");
-    }
-    if (!isa<IREE::LinalgExt::SplitReductionMappingAttr>(
-            mapping->getValue().front())) {
-      return rewriter.notifyMatchFailure(forallOp, "not split reduction loop");
+          forallOp, "invalid split reduction mapping attribute list");
     }
 
     // Get all workgroup mapping loops. It is assumed that the workgroup mapping
@@ -604,9 +627,9 @@ struct FoldSplitReductionForallWithWorkgroupForall
     llvm::append_range(newUbs, workgroupLoop.getMixedUpperBound());
     llvm::append_range(newSteps, workgroupLoop.getMixedStep());
 
-    SmallVector<Attribute> newMapping = {
-        getNextWorkgroupMapping(workgroupMapping->getValue())};
-    llvm::append_range(newMapping, workgroupMapping->getValue());
+    SmallVector<Attribute> newMapping =
+        appendSplitReductionMappingToWorkgroupMapping(
+            workgroupMapping->getValue(), mappingAttr->getValue());
 
     auto newMappingAttr = rewriter.getArrayAttr(newMapping);
     auto newForallOp = rewriter.create<scf::ForallOp>(

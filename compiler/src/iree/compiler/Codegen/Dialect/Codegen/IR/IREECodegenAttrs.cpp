@@ -416,7 +416,7 @@ LogicalResult WorkgroupMappingAttr::verifyAttrList(MLIRContext *context,
   for (auto attr : attrs) {
     auto typedAttr =
         ::mlir::dyn_cast_or_null<IREE::Codegen::WorkgroupMappingAttr>(attr);
-    if (!attr) {
+    if (!typedAttr) {
       return emitError() << "expected all the mapping attribute to be of "
                             "`WorkgroupMappingAttr` type";
     }

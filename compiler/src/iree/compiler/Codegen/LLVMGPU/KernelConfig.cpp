@@ -642,9 +642,12 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
   }
   if (forallOp) {
     std::optional<ArrayAttr> mapping = forallOp->getMapping();
-    if (!mapping || mapping->size() != 1 ||
-        !isa<IREE::LinalgExt::SplitReductionMappingAttr>(
-            mapping->getValue().front())) {
+    if (!mapping) {
+      return failure();
+    }
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            forallOp->getContext(), forallOp->getLoc(), mapping->getValue(),
+            /*emitDiagnosticErrors =*/false))) {
       return failure();
     }
     if (foundLinalgOp) {

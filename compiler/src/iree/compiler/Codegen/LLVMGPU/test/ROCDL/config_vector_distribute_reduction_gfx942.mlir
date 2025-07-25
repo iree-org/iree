@@ -325,7 +325,7 @@ func.func @split_reduction_config(%arg0 : tensor<?x131072xf32>,
     scf.forall.in_parallel {
       tensor.parallel_insert_slice %7 into %arg2[0, %5] [%1, 1] [1, 1] : tensor<?xf32> into tensor<?x1024xf32>
     }
-  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   iree_tensor_ext.dispatch.tensor.store %3, %result,
       offsets = [0, 0], sizes = [%1, 1024], strides = [1, 1]
       : tensor<?x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>{%1}

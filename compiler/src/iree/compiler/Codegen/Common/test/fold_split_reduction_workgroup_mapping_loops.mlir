@@ -7,7 +7,7 @@ func.func @simple_example_1dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
     scf.forall (%arg1) = (%3) to (%4) step (%5) {
       "use2"(%arg0, %arg1) : (index, index) -> ()
     } {mapping = [#iree_codegen.workgroup_mapping<x>]}
-  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   return
 }
 //      CHECK: func @simple_example_1dmapping
@@ -36,7 +36,7 @@ func.func @simple_example_2dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
     scf.forall (%arg1, %arg2)  in (%3, %4) {
       "use2"(%arg0, %arg1, %arg2) : (index, index, index) -> ()
     } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   return
 }
 //      CHECK: func @simple_example_2dmapping
@@ -65,7 +65,7 @@ func.func @simple_example_3dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
     scf.forall (%arg1, %arg2, %arg3) in (%3, %4, %5) {
       "use2"(%arg1, %arg2, %arg3) : (index, index, index) -> ()
     } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-  } {mapping = [#iree_linalg_ext.split_reduction_mapping]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   return
 }
 //      CHECK: func @simple_example_3dmapping
@@ -86,3 +86,78 @@ func.func @simple_example_3dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
 //      CHECK:     "use1"(%[[IV0]])
 //      CHECK:     "use2"(%[[IV1]], %[[IV2]], %[[IV3]])
 //      CHECK:     mapping = [#iree_codegen.workgroup_mapping<z:1>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Resolution when the split reduction `forall` and workgroup mapping
+// `forall` are multi-dimensional.
+
+func.func @split_2d_3dmapping(%0 : index, %1 : index, %2 : index, %3 : index,
+    %4 : index) {
+  scf.forall (%arg0, %arg1) in (%0, %1) {
+    "use1"(%arg0, %arg1) : (index, index) -> ()
+    scf.forall (%arg2, %arg3, %arg4) in (%2, %3, %4) {
+      "use2"(%arg2, %arg3, %arg4) : (index, index, index) -> ()
+    } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<1>, #iree_linalg_ext.split_reduction_mapping<0>]}
+  return
+}
+// CHECK-LABEL: @split_2d_3dmapping(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index)
+//       CHECK:   scf.forall (
+//  CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV2:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV3:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV4:[a-zA-Z0-9]+]])
+//  CHECK-SAME:       in (%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]])
+//   CHECK-DAG:     "use1"(%[[IV0]], %[[IV1]])
+//   CHECK-DAG:     "use2"(%[[IV2]], %[[IV3]], %[[IV4]])
+//       CHECK:     mapping = [
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<z:2>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<z:1>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<z>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<y>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+
+// Resolution when the split reduction `forall` and workgroup mapping
+// `forall` are multi-dimensional and the mappings are permuted
+
+func.func @split_2d_3dmapping_permuted(%0 : index, %1 : index, %2 : index, %3 : index,
+    %4 : index) {
+  scf.forall (%arg0, %arg1) in (%0, %1) {
+    "use1"(%arg0, %arg1) : (index, index) -> ()
+    scf.forall (%arg2, %arg3, %arg4) in (%2, %3, %4) {
+      "use2"(%arg2, %arg3, %arg4) : (index, index, index) -> ()
+    } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<z>]}
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>, #iree_linalg_ext.split_reduction_mapping<1>]}
+  return
+}
+// CHECK-LABEL: @split_2d_3dmapping_permuted(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index)
+//       CHECK:   scf.forall (
+//  CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV2:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV3:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV4:[a-zA-Z0-9]+]])
+//  CHECK-SAME:       in (%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]])
+//   CHECK-DAG:     "use1"(%[[IV0]], %[[IV1]])
+//   CHECK-DAG:     "use2"(%[[IV2]], %[[IV3]], %[[IV4]])
+//       CHECK:     mapping = [
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<z:1>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<z:2>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<y>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<x>
+//  CHECK-SAME:         #iree_codegen.workgroup_mapping<z>]
