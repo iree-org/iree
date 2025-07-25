@@ -428,7 +428,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   }];
 
   let arguments = (ins
-    StrAttr:$export,
+    StrAttr:$export_name,
     Variadic<Index>:$workload,
     Variadic<AnyType>:$arguments,
     HAL_ShapeDynamicDims:$argument_dims,
@@ -452,7 +452,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   );
 
   let assemblyFormat = [{
-    $export
+    $export_name
     (`[` $workload^ `]`)? ``
     `(` $arguments `)` `:`
     custom<ShapedFunctionType>(ref($arguments),
