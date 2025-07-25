@@ -20,11 +20,11 @@ func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<16x26x19x287xf16>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<287x3x3x287xf16>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: tensor<16x24x17x287xf32>
-//       CHECK:   %[[PADDED_LHS:.+]] = tensor.pad %[[A]] low[0, 0, 0, 0] high[0, 1, 16, 1]
+//       CHECK:   %[[PADDED_LHS:.+]] = tensor.pad %[[A]] low[0, 0, 0, 0] high[0, 0, 15, 1]
 //       CHECK:   %[[PADDED_RHS:.+]] = tensor.pad %[[B]] low[0, 0, 0, 0] high[1, 0, 0, 1]
 //       CHECK:   %[[PADDED_INIT:.+]] = tensor.pad %[[C]] low[0, 0, 0, 0] high[0, 0, 15, 1]
 //       CHECK:   %[[PADDED_RESULT:.+]] = linalg.generic
-//  CHECK-SAME:     ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<16x27x35x288xf16>, tensor<288x3x3x288xf16>)
+//  CHECK-SAME:     ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<16x26x34x288xf16>, tensor<288x3x3x288xf16>)
 //  CHECK-SAME:     outs(%[[PADDED_INIT]] : tensor<16x24x32x288xf32>)
 //       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[PADDED_RESULT]][0, 0, 0, 0] [16, 24, 17, 287] [1, 1, 1, 1]
 //  CHECK-SAME:     : tensor<16x24x32x288xf32> to tensor<16x24x17x287xf32>
@@ -52,11 +52,11 @@ func.func @conv_2d_chwn_chwf(%arg0: tensor<16x194x130x40xbf16>, %arg1: tensor<16
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<16x194x130x40xbf16>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<16x96x64x40xbf16>
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: tensor<40x3x3x40xf32>
-//       CHECK:   %[[PADDED_LHS:.+]] = tensor.pad %[[A]] low[0, 0, 0, 0] high[0, 1, 1, 8]
+//       CHECK:   %[[PADDED_LHS:.+]] = tensor.pad %[[A]] low[0, 0, 0, 0] high[0, -1, -1, 8]
 //       CHECK:   %[[PADDED_RHS:.+]] = tensor.pad %[[B]] low[0, 0, 0, 0] high[0, 0, 0, 8]
 //       CHECK:   %[[PADDED_INIT:.+]] = tensor.pad %[[C]] low[0, 0, 0, 0] high[8, 0, 0, 8]
 //       CHECK:   %[[PADDED_RESULT:.+]] = linalg.generic
-//  CHECK-SAME:     ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<16x195x131x48xbf16>, tensor<16x96x64x48xbf16>)
+//  CHECK-SAME:     ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<16x193x129x48xbf16>, tensor<16x96x64x48xbf16>)
 //  CHECK-SAME:     outs(%[[PADDED_INIT]] : tensor<48x3x3x48xf32>)
 //       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[PADDED_RESULT]][0, 0, 0, 0] [40, 3, 3, 40] [1, 1, 1, 1]
 //  CHECK-SAME:     : tensor<48x3x3x48xf32> to tensor<40x3x3x40xf32>
