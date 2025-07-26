@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
+#include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -202,6 +203,10 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr);
 /// Returns the GPU target attribute from the executable target wrapping |op|
 /// if found. Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
+
+/// Returns the number of compute units from target attribute `attr` if found. 
+/// Returns std::nullpot if none found.
+std::optional<int> getGPUNumComputeUnits(IREE::GPU::TargetAttr);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.
