@@ -1343,21 +1343,26 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  int64_t mDim = opInfo.getMDims().back();
+  std::optional<int64_t> mDim;
+  int64_t mDimSize = 1;
+  if (!opInfo.getMDims().empty()) {
+    mDim = opInfo.getMDims().back();
+    mDimSize = bounds[mDim.value()];
+  }
+
   int64_t k1Dim = opInfo.getK1Dims().back();
   int64_t k2Dim = opInfo.getK2Dims().back();
   int64_t nDim = opInfo.getNDims().back();
 
   // Dynamic dims are expected to be taken care of earlier in the pipeline.
-  if (ShapedType::isDynamic(bounds[mDim]) ||
-      ShapedType::isDynamic(bounds[k1Dim]) ||
+  if (ShapedType::isDynamic(mDimSize) || ShapedType::isDynamic(bounds[k1Dim]) ||
       ShapedType::isDynamic(bounds[k2Dim]) ||
       ShapedType::isDynamic(bounds[nDim])) {
     return failure();
   }
 
   // Bail out on skinny attention.
-  if (bounds[mDim] <= kVerySkinnyDimThreshold) {
+  if (mDimSize <= kVerySkinnyDimThreshold) {
     return failure();
   }
 
@@ -1400,14 +1405,14 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type vElementType = getElementTypeOrSelf(vMatrix);
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
-      /*m=*/bounds[mDim],
+      /*m=*/mDimSize,
       /*n=*/bounds[k2Dim],
       /*k=*/bounds[k1Dim],
       /*lhsType=*/qElementType,
       /*rhsType=*/kElementType,
       /*accType=*/f32Type,
   };
-  GPUMatmulShapeType pvMatmul{/*m=*/bounds[mDim],
+  GPUMatmulShapeType pvMatmul{/*m=*/mDimSize,
                               /*n=*/bounds[nDim],
                               /*k=*/bounds[k2Dim],
                               /*lhsType=*/vElementType,
@@ -1492,11 +1497,13 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] = pvSchedule.mSubgroupCounts[0] *
-                             pvSchedule.mTileSizes[0] * pvSchedule.mSize;
+  if (mDim.has_value()) {
+    workgroupTileSizes[mDim.value()] = pvSchedule.mSubgroupCounts[0] *
+                                       pvSchedule.mTileSizes[0] *
+                                       pvSchedule.mSize;
+  }
   workgroupTileSizes[nDim] = pvSchedule.nSubgroupCounts[0] *
                              pvSchedule.nTileSizes[0] * pvSchedule.nSize;
-
   reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[0] * pvSchedule.kSize;
 
   SmallVector<NamedAttribute, 2> attrs = {

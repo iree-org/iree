@@ -445,7 +445,7 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
+SmallVector<int64_t> ScatterOp::getStaticLoopRanges() {
   // Scatter loop ranges are loop ranges for update.
   return SmallVector<int64_t>(getUpdateType().getShape());
 }
@@ -477,7 +477,7 @@ GatherOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+SmallVector<int64_t> GatherOp::getStaticLoopRanges() {
   return SmallVector<int64_t>(getOutputType().getShape());
 }
 
@@ -1871,6 +1871,17 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         indexingMaps, DictionaryAttr());
 }
 
+void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                        TypeRange results, ValueRange inputOperands,
+                        ValueRange initOperands, ArrayAttr indexingMaps) {
+  assert(inputOperands.size() < 6);
+  assert(initOperands.size() == 1);
+  Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
+        inputOperands[2], inputOperands[3], mask, initOperands[0], indexingMaps,
+        DictionaryAttr());
+}
+
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
@@ -1995,7 +2006,7 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+SmallVector<int64_t> AttentionOp::getStaticLoopRanges() {
   SmallVector<int64_t> bounds(getIterationDomainRank());
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
@@ -2035,6 +2046,11 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
 void AttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                               MLIRContext *ctx) {
   patterns.insert<StaticizeLinalgExtOp<AttentionOp>>(ctx);
+}
+
+AffineMap AttentionOp::getMatchingIndexingMap(OpOperand *operand) {
+  return *(getIndexingMaps().getAsValueRange<AffineMapAttr>().begin() +
+           operand->getOperandNumber());
 }
 
 //===----------------------------------------------------------------------===//
