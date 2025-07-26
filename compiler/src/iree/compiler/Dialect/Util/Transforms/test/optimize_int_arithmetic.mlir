@@ -496,6 +496,38 @@ util.func @util_align_zero(%arg0 : i64) -> i64 {
 
 // -----
 
+// CHECK-LABEL: @optimization_barrier_index_min_max
+util.func @optimization_barrier_index_min_max(%arg0: index) -> (i1, i1, i1) {
+  %zero = arith.constant 0 : index
+  %max = arith.constant 9223372036854775807 : index
+  %0 = util.optimization_barrier %arg0 : index
+  %1 = arith.cmpi slt, %0, %zero : index
+  %2 = arith.cmpi uge, %0, %zero : index
+  %3 = arith.cmpi ugt, %0, %max : index
+  // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
+  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
+  // CHECK: util.return %[[FALSE]], %[[TRUE]], %[[FALSE]]
+  util.return %1, %2, %3 : i1, i1, i1
+}
+
+// -----
+
+// CHECK-LABEL: @optimization_barrier_i32_min_max
+util.func @optimization_barrier_i32_min_max(%arg0: i32) -> (i1, i1, i1) {
+  %zero = arith.constant 0 : i32
+  %max = arith.constant 2147483647 : i32
+  %0 = util.optimization_barrier %arg0 : i32
+  %1 = arith.cmpi slt, %0, %zero : i32
+  %2 = arith.cmpi uge, %0, %zero : i32
+  %3 = arith.cmpi ugt, %0, %max : i32
+  // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
+  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
+  // CHECK: util.return %[[FALSE]], %[[TRUE]], %[[FALSE]]
+  util.return %1, %2, %3 : i1, i1, i1
+}
+
+// -----
+
 // CHECK-LABEL: @hal_buffer_view_dim_min_max
 util.func @hal_buffer_view_dim_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) {
   %zero = arith.constant 0 : index

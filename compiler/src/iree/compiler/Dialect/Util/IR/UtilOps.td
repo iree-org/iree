@@ -19,6 +19,7 @@ include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferIntRangeInterface.td"
+include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
@@ -525,6 +526,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
 }
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
+  DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRangesFromOptional"]>,
   SameOperandsAndResultType,
 ]> {
   let summary = [{Prevents compiler optimizations across a value.}];
