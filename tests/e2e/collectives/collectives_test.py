@@ -151,16 +151,16 @@ class SingleRank(unittest.TestCase):
             mlir_input_type=iree.compiler.InputType.STABLEHLO,
         )
 
-    def test_mesh_all_reduce(self):
+    def test_shard_all_reduce(self):
         """
         Test trivial case of all_reduce with one rank.
         all_reduce([1, 2, 3, 4]) == [1, 2, 3, 4].
         """
         mlir = """
-            mesh.mesh @mesh(shape = 1)
+            shard.grid @grid(shape = 1)
 
             func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
-            %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<4xf32> -> tensor<4xf32>
+            %out = shard.all_reduce %input on @grid grid_axes = [0] : tensor<4xf32> -> tensor<4xf32>
             return %out : tensor<4xf32>
             }
         """
@@ -168,9 +168,9 @@ class SingleRank(unittest.TestCase):
         expected_outputs = [[np.array([1, 2, 3, 4], dtype=np.float32)]]
         run_test(mlir=mlir, inputs=inputs, expected_outputs=expected_outputs)
 
-    def test_mesh_all_to_all(self):
+    def test_shard_all_to_all(self):
         """
-        Test on a 1D device mesh, grouping along mesh dimension 0.
+        Test on a 1D device shard, grouping along shard dimension 0.
 
         Device contents before operation:
         [[1, 2], [3, 4]]
@@ -179,10 +179,10 @@ class SingleRank(unittest.TestCase):
         [[1, 2], [3, 4]]
         """
         mlir = """
-            mesh.mesh @mesh(shape = 1)
+            shard.grid @grid(shape = 1)
 
             func.func @main(%input : tensor<2x2xf32>) -> tensor<2x2xf32> {
-            %out = mesh.all_to_all %input on @mesh mesh_axes = [0]
+            %out = shard.all_to_all %input on @grid grid_axes = [0]
               split_axis = 0 concat_axis = 1 : tensor<2x2xf32> -> tensor<2x2xf32>
             return %out : tensor<2x2xf32>
             }
@@ -229,15 +229,15 @@ class TwoRanks(unittest.TestCase):
             mlir_input_type=iree.compiler.InputType.STABLEHLO,
         )
 
-    def test_mesh_all_reduce_1d_mesh(self):
+    def test_shard_all_reduce_1d_shard(self):
         """
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
         """
         mlir = """
-            mesh.mesh @mesh(shape = 2)
+            shard.grid @grid(shape = 2)
 
             func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
-            %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<4xf32> -> tensor<4xf32>
+            %out = shard.all_reduce %input on @grid grid_axes = [0] : tensor<4xf32> -> tensor<4xf32>
             return %out : tensor<4xf32>
             }
         """
@@ -252,15 +252,15 @@ class TwoRanks(unittest.TestCase):
             expected_outputs=expected_outputs,
         )
 
-    def test_mesh_all_reduce_3d_mesh(self):
+    def test_shard_all_reduce_3d_shard(self):
         """
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
         """
         mlir = """
-            mesh.mesh @mesh(shape = 1x2x1)
+            shard.grid @grid(shape = 1x2x1)
 
             func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
-            %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<4xf32> -> tensor<4xf32>
+            %out = shard.all_reduce %input on @grid grid_axes = [1] : tensor<4xf32> -> tensor<4xf32>
             return %out : tensor<4xf32>
             }
         """
@@ -277,10 +277,10 @@ class TwoRanks(unittest.TestCase):
 
 
 class FourRanks(unittest.TestCase):
-    def test_mesh_all_reduce_on_2d_mesh_along_axis_1(self):
+    def test_shard_all_reduce_on_2d_shard_along_axis_1(self):
         """
-        Test on a 2x2 device mesh reduction along dimension 1.
-        Mesh devices:
+        Test on a 2x2 device shard reduction along dimension 1.
+        Shard devices:
         axis 1
         ------>
         0 1
@@ -295,10 +295,10 @@ class FourRanks(unittest.TestCase):
         [12, 14] [12, 14]
         """
         mlir = """
-            mesh.mesh @mesh(shape = 2x2)
+            shard.grid @grid(shape = 2x2)
 
             func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
-            %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<2xf32> -> tensor<2xf32>
+            %out = shard.all_reduce %input on @grid grid_axes = [1] : tensor<2xf32> -> tensor<2xf32>
             return %out : tensor<2xf32>
             }
         """
@@ -320,10 +320,10 @@ class FourRanks(unittest.TestCase):
             expected_outputs=expected_outputs,
         )
 
-    def test_mesh_all_reduce_on_2d_mesh_along_axis_0(self):
+    def test_shard_all_reduce_on_2d_shard_along_axis_0(self):
         """
-        Test on a 2x2 device mesh reduction along dimension 0.
-        Mesh devices:
+        Test on a 2x2 device shard reduction along dimension 0.
+        Shard devices:
         axis 1
         ------>
         0 1
@@ -338,10 +338,10 @@ class FourRanks(unittest.TestCase):
         [6, 8] [10, 12]
         """
         mlir = """
-            mesh.mesh @mesh(shape = 2x2)
+            shard.grid @grid(shape = 2x2)
 
             func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
-            %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<2xf32> -> tensor<2xf32>
+            %out = shard.all_reduce %input on @grid grid_axes = [0] : tensor<2xf32> -> tensor<2xf32>
             return %out : tensor<2xf32>
             }
         """
@@ -363,10 +363,10 @@ class FourRanks(unittest.TestCase):
             expected_outputs=expected_outputs,
         )
 
-    def test_mesh_all_reduce_on_4d_mesh_along_1_axis(self):
+    def test_shard_all_reduce_on_4d_shard_along_1_axis(self):
         """
-        Test on a 1x2x1x2 device mesh reduction along mesh dimension 1.
-        Mesh devices:
+        Test on a 1x2x1x2 device shard reduction along shard dimension 1.
+        Shard devices:
         axis 3
         ------>
         0 1     | axis 1
@@ -381,10 +381,10 @@ class FourRanks(unittest.TestCase):
         [6, 8] [10, 12]
         """
         mlir = """
-            mesh.mesh @mesh(shape = 1x2x1x2)
+            shard.grid @grid(shape = 1x2x1x2)
 
             func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
-            %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<2xf32> -> tensor<2xf32>
+            %out = shard.all_reduce %input on @grid grid_axes = [1] : tensor<2xf32> -> tensor<2xf32>
             return %out : tensor<2xf32>
             }
         """
@@ -406,10 +406,10 @@ class FourRanks(unittest.TestCase):
             expected_outputs=expected_outputs,
         )
 
-    def test_mesh_all_to_all_on_4d_mesh_along_1_axis(self):
+    def test_shard_all_to_all_on_4d_shard_along_1_axis(self):
         """
-        Test on a 1x2x1x2 device mesh, grouping along mesh dimension 1.
-        Mesh devices:
+        Test on a 1x2x1x2 device shard, grouping along shard dimension 1.
+        Shard devices:
         axis 3
         ------>
         0 1     | axis 1
@@ -424,10 +424,10 @@ class FourRanks(unittest.TestCase):
         [[2, 6]]  [[4, 8]]
         """
         mlir = """
-            mesh.mesh @mesh(shape = 1x2x1x2)
+            shard.grid @grid(shape = 1x2x1x2)
 
             func.func @main(%input : tensor<2x1xf32>) -> tensor<1x2xf32> {
-            %out = mesh.all_to_all %input on @mesh mesh_axes = [1]
+            %out = shard.all_to_all %input on @grid grid_axes = [1]
               split_axis = 0 concat_axis = 1 : tensor<2x1xf32> -> tensor<1x2xf32>
             return %out : tensor<1x2xf32>
             }

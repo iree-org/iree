@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Conversion/MeshToFlow/Patterns.h"
+#include "iree/compiler/Dialect/Flow/Conversion/ShardToFlow/Patterns.h"
 
 #include <algorithm>
 #include <numeric>
@@ -19,9 +19,9 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Mesh/IR/MeshOps.h"
-#include "mlir/Dialect/Mesh/Transforms/Simplifications.h"
-#include "mlir/Dialect/Mesh/Transforms/Transforms.h"
+#include "mlir/Dialect/Shard/IR/ShardOps.h"
+#include "mlir/Dialect/Shard/Transforms/Simplifications.h"
+#include "mlir/Dialect/Shard/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -37,13 +37,13 @@
 namespace mlir::iree_compiler::IREE::Flow {
 
 static CollectiveReductionOp
-convertReductionKind(mesh::ReductionKind reduction) {
+convertReductionKind(shard::ReductionKind reduction) {
   switch (reduction) {
-  case mesh::ReductionKind::Max:
+  case shard::ReductionKind::Max:
     return CollectiveReductionOp::ReductionMaximum;
-  case mesh::ReductionKind::Min:
+  case shard::ReductionKind::Min:
     return CollectiveReductionOp::ReductionMinimum;
-  case mesh::ReductionKind::Sum:
+  case shard::ReductionKind::Sum:
     return CollectiveReductionOp::ReductionSum;
   default:
     assert(false);
@@ -52,7 +52,7 @@ convertReductionKind(mesh::ReductionKind reduction) {
 }
 
 static CollectiveReductionOpAttr
-convertReductionKind(mesh::ReductionKindAttr reduction) {
+convertReductionKind(shard::ReductionKindAttr reduction) {
   return CollectiveReductionOpAttr::get(
       reduction.getContext(), convertReductionKind(reduction.getValue()));
 }
@@ -189,11 +189,11 @@ splitMoveCollapse(TypedValue<RankedTensorType> tensor, int64_t splitAxis,
 namespace {
 
 template <typename Op>
-struct MeshToFlowCollectiveRewritePatternBase : OpRewritePattern<Op> {
+struct ShardToFlowCollectiveRewritePatternBase : OpRewritePattern<Op> {
   template <typename... OpRewritePatternArgs>
-  MeshToFlowCollectiveRewritePatternBase(
+  ShardToFlowCollectiveRewritePatternBase(
       SymbolTableCollection &symbolTableCollection,
-      LookupMeshChannelFn lookupChannel,
+      LookupShardChannelFn lookupChannel,
       OpRewritePatternArgs &&...opRewritePatternArgs)
       : OpRewritePattern<Op>(
             std::forward<OpRewritePatternArgs...>(opRewritePatternArgs)...),
@@ -201,29 +201,29 @@ struct MeshToFlowCollectiveRewritePatternBase : OpRewritePattern<Op> {
         lookupChannel(lookupChannel) {}
 
 protected:
-  // The !flow.channel corresponding to the mesh and mesh axes used in the op.
-  template <typename MeshCollectiveOp>
-  Value buildCachedChannelLoading(MeshCollectiveOp op,
+  // The !flow.channel corresponding to the shard and shard axes used in the op.
+  template <typename ShardCollectiveOp>
+  Value buildCachedChannelLoading(ShardCollectiveOp op,
                                   ImplicitLocOpBuilder &builder) const {
-    mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
-    return lookupChannel(builder.getLoc(), mesh, op.getMeshAxes(), builder);
+    shard::GridOp shard = shard::getGrid(op, symbolTableCollection);
+    return lookupChannel(builder.getLoc(), shard, op.getGridAxes(), builder);
   }
 
-  Value buildCachedChannelLoading(mesh::ProcessLinearIndexOp op,
+  Value buildCachedChannelLoading(shard::ProcessLinearIndexOp op,
                                   ImplicitLocOpBuilder &builder) const {
-    mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
-    return lookupChannel(builder.getLoc(), mesh, std::nullopt, builder);
+    shard::GridOp shard = shard::getGrid(op, symbolTableCollection);
+    return lookupChannel(builder.getLoc(), shard, std::nullopt, builder);
   }
 
   SymbolTableCollection &symbolTableCollection;
-  LookupMeshChannelFn lookupChannel;
+  LookupShardChannelFn lookupChannel;
 };
 
-struct MeshAllReduceToFlow
-    : MeshToFlowCollectiveRewritePatternBase<mesh::AllReduceOp> {
-  using MeshToFlowCollectiveRewritePatternBase::
-      MeshToFlowCollectiveRewritePatternBase;
-  LogicalResult matchAndRewrite(mesh::AllReduceOp op,
+struct ShardAllReduceToFlow
+    : ShardToFlowCollectiveRewritePatternBase<shard::AllReduceOp> {
+  using ShardToFlowCollectiveRewritePatternBase::
+      ShardToFlowCollectiveRewritePatternBase;
+  LogicalResult matchAndRewrite(shard::AllReduceOp op,
                                 PatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder builder(op->getLoc(), rewriter);
     builder.setInsertionPointAfter(op.getOperation());
@@ -242,11 +242,11 @@ struct MeshAllReduceToFlow
   }
 };
 
-struct MeshAllGatherToFlow
-    : MeshToFlowCollectiveRewritePatternBase<mesh::AllGatherOp> {
-  using MeshToFlowCollectiveRewritePatternBase::
-      MeshToFlowCollectiveRewritePatternBase;
-  LogicalResult matchAndRewrite(mesh::AllGatherOp op,
+struct ShardAllGatherToFlow
+    : ShardToFlowCollectiveRewritePatternBase<shard::AllGatherOp> {
+  using ShardToFlowCollectiveRewritePatternBase::
+      ShardToFlowCollectiveRewritePatternBase;
+  LogicalResult matchAndRewrite(shard::AllGatherOp op,
                                 PatternRewriter &rewriter) const override {
     if (!cast<RankedTensorType>(op.getOperand().getType()).hasStaticShape() ||
         !op.getResult().getType().hasStaticShape()) {
@@ -283,11 +283,11 @@ struct MeshAllGatherToFlow
   }
 };
 
-struct MeshAllToAllToFlow
-    : MeshToFlowCollectiveRewritePatternBase<mesh::AllToAllOp> {
-  using MeshToFlowCollectiveRewritePatternBase::
-      MeshToFlowCollectiveRewritePatternBase;
-  LogicalResult matchAndRewrite(mesh::AllToAllOp op,
+struct ShardAllToAllToFlow
+    : ShardToFlowCollectiveRewritePatternBase<shard::AllToAllOp> {
+  using ShardToFlowCollectiveRewritePatternBase::
+      ShardToFlowCollectiveRewritePatternBase;
+  LogicalResult matchAndRewrite(shard::AllToAllOp op,
                                 PatternRewriter &rewriter) const override {
     if (!cast<RankedTensorType>(op.getOperand().getType()).hasStaticShape() ||
         !op.getResult().getType().hasStaticShape()) {
@@ -296,16 +296,16 @@ struct MeshAllToAllToFlow
                                          "Dynamic tensor case is unsupported.");
     }
 
-    mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
-    assert(ShapedType::isStaticShape(mesh.getShape()));
+    shard::GridOp shard = shard::getGrid(op, symbolTableCollection);
+    assert(ShapedType::isStaticShape(shard.getShape()));
     int64_t splitCount =
-        mesh::collectiveProcessGroupSize(op.getMeshAxes(), mesh.getShape());
+        shard::collectiveProcessGroupSize(op.getGridAxes(), shard.getShape());
     // TODO: handle dynamic case.
     if (ShapedType::isDynamic(splitCount)) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(
           op->getLoc(),
-          "Dynamic split count induced by a dynamic mesh is unsupported.");
+          "Dynamic split count induced by a dynamic shard is unsupported.");
     }
 
     ImplicitLocOpBuilder builder(op->getLoc(), rewriter);
@@ -338,11 +338,11 @@ struct MeshAllToAllToFlow
   }
 };
 
-struct MeshProcessLinearIndexToFlow
-    : MeshToFlowCollectiveRewritePatternBase<mesh::ProcessLinearIndexOp> {
-  using MeshToFlowCollectiveRewritePatternBase::
-      MeshToFlowCollectiveRewritePatternBase;
-  LogicalResult matchAndRewrite(mesh::ProcessLinearIndexOp op,
+struct ShardProcessLinearIndexToFlow
+    : ShardToFlowCollectiveRewritePatternBase<shard::ProcessLinearIndexOp> {
+  using ShardToFlowCollectiveRewritePatternBase::
+      ShardToFlowCollectiveRewritePatternBase;
+  LogicalResult matchAndRewrite(shard::ProcessLinearIndexOp op,
                                 PatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder builder(op->getLoc(), rewriter);
     builder.setInsertionPointAfter(op.getOperation());
@@ -354,11 +354,11 @@ struct MeshProcessLinearIndexToFlow
   }
 };
 
-struct MeshReduceScatterToFlow
-    : MeshToFlowCollectiveRewritePatternBase<mesh::ReduceScatterOp> {
-  using MeshToFlowCollectiveRewritePatternBase::
-      MeshToFlowCollectiveRewritePatternBase;
-  LogicalResult matchAndRewrite(mesh::ReduceScatterOp op,
+struct ShardReduceScatterToFlow
+    : ShardToFlowCollectiveRewritePatternBase<shard::ReduceScatterOp> {
+  using ShardToFlowCollectiveRewritePatternBase::
+      ShardToFlowCollectiveRewritePatternBase;
+  LogicalResult matchAndRewrite(shard::ReduceScatterOp op,
                                 PatternRewriter &rewriter) const override {
     if (!cast<RankedTensorType>(op.getOperand().getType()).hasStaticShape() ||
         !op.getResult().getType().hasStaticShape()) {
@@ -399,15 +399,15 @@ struct MeshReduceScatterToFlow
 
 } // namespace
 
-void populateMeshToFlowCollectivesPatterns(
+void populateShardToFlowCollectivesPatterns(
     RewritePatternSet &patterns, SymbolTableCollection &symbolTableCollection,
-    LookupMeshChannelFn lookupChannel) {
-  patterns.add<MeshAllGatherToFlow, MeshAllReduceToFlow, MeshAllToAllToFlow,
-               MeshReduceScatterToFlow, MeshProcessLinearIndexToFlow>(
+    LookupShardChannelFn lookupChannel) {
+  patterns.add<ShardAllGatherToFlow, ShardAllReduceToFlow, ShardAllToAllToFlow,
+               ShardReduceScatterToFlow, ShardProcessLinearIndexToFlow>(
       symbolTableCollection, lookupChannel, patterns.getContext());
-  mesh::populateFoldingPatterns(patterns, symbolTableCollection);
-  mesh::populateProcessMultiIndexOpLoweringPatterns(patterns,
-                                                    symbolTableCollection);
+  shard::populateFoldingPatterns(patterns, symbolTableCollection);
+  shard::populateProcessMultiIndexOpLoweringPatterns(patterns,
+                                                     symbolTableCollection);
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow
