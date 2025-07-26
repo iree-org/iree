@@ -418,6 +418,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
             createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
         funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
             static_cast<IREE::CPU::TilingLevel>(i)));
+        // Tile all the reduction ops for target vector sizes. It is a nop for
+        // rootOp because it is already tiled with the same tile sizes. It
+        // ensures that all the dimensions are tiled in all the reduction ops.
+        funcPassManager.addPass(
+            createLLVMCPUTilePass(static_cast<IREE::CPU::TilingLevel>(i)));
         continue;
       }
       funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
