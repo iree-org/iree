@@ -203,9 +203,9 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr);
 /// if found. Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 
-/// Returns the number of compute units from target attribute `attr` if found. 
+/// Returns the number of compute units from target attribute `gpuAttr` if found. 
 /// Returns std::nullpot if none found.
-std::optional<int> getGPUNumComputeUnits(IREE::GPU::TargetAttr);
+std::optional<int> getGPUNumComputeUnits(IREE::GPU::TargetAttr gpuAttr);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.
