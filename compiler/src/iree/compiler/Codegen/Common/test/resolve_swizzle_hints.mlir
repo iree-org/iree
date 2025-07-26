@@ -243,3 +243,35 @@ func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
 //       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJ]], %[[IELEM]] : index
 //       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
+
+// -----
+
+func.func private @swizzle(%offset: index) -> index
+func.func @symbolic_swizzle(%src: memref<?xf32>, %offset: index) -> vector<2xf32> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.swizzle_impl<@swizzle, 1>] : memref<?xf32>
+  %1 = vector.load %0[%offset] : memref<?xf32>, vector<2xf32>
+  return %1 : vector<2xf32>
+}
+// CHECK-LABEL: func.func @symbolic_swizzle(
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
+//  CHECK-SAME:   %[[OFFSET:[A-Za-z0-9]+]]: index
+//       CHECK:   %[[SW0:.+]] = call @swizzle(%[[OFFSET]])
+//       CHECK:   vector.load %[[SRC]][%[[SW0]]]
+//       CHECK:   %[[ADD1:.+]] = arith.addi %[[OFFSET]], %c1 : index
+//       CHECK:   %[[SW1:.+]] = call @swizzle(%[[ADD1]])
+//       CHECK:   vector.load %[[SRC]][%[[SW1]]]
+
+// -----
+
+util.func private @swizzle(%offset: index) -> index
+func.func @util_func_symbolic_swizzle(%src: memref<?xf32>, %offset: index) -> vector<1xf32> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.swizzle_impl<@swizzle, 1>] : memref<?xf32>
+  %1 = vector.load %0[%offset] : memref<?xf32>, vector<1xf32>
+  return %1 : vector<1xf32>
+}
+// CHECK-LABEL: func.func @util_func_symbolic_swizzle(
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
+//  CHECK-SAME:   %[[OFFSET:[A-Za-z0-9]+]]: index
+//       CHECK:   %[[SWIZZLED_OFFSET:.+]] = util.call @swizzle(%[[OFFSET]])
+//       CHECK:   %[[LD:.+]] = vector.load %[[SRC]][%[[SWIZZLED_OFFSET]]]
+//       CHECK:   return %[[LD]]
