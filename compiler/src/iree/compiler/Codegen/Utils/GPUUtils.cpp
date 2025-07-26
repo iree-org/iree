@@ -1024,9 +1024,9 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
 }
 
 std::optional<int> getGPUNumComputeUnits(IREE::GPU::TargetAttr gpuAttr) {
-    if (IREE::GPU::TargetChipAttr chip = gpuAttr.getChip())
-      return chip.getWgpCount();
-    return std::nullopt;
+  if (IREE::GPU::TargetChipAttr chip = gpuAttr.getChip())
+    return chip.getWgpCount();
+  return std::nullopt;
 }
 
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
