@@ -69,7 +69,10 @@ struct ElideCompatibleTransferPattern
                                          "missing affinity information");
     }
     // Check if we need to keep the transfer based on topology.
-    if (topologyAttr.requiresTransfer(sourceAffinityAttr, resultAffinityAttr)) {
+    if (!topologyAttr.hasUnifiedMemory(sourceAffinityAttr,
+                                       resultAffinityAttr) &&
+        !topologyAttr.hasTransparentAccess(sourceAffinityAttr,
+                                           resultAffinityAttr)) {
       return rewriter.notifyMatchFailure(
           transferOp, "not eliding, transfer required by topology");
     }
