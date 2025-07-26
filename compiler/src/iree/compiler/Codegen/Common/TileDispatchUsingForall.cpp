@@ -363,6 +363,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   // Cleanup patterns for tile and distribute
   {
     RewritePatternSet patterns(context);
+    populateSwapExtractWithCollapsePattern(patterns);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     context->getOrLoadDialect<tensor::TensorDialect>()

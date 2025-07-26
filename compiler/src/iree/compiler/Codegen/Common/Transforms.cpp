@@ -494,9 +494,14 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
                                              "collapsed size must be static");
         }
 
+        // Compose all nested affine.apply chains and check if the offset is
+        // multiple of collapsed size.
+        SmallVector<Value> operands(applyOp.getOperands());
+        affine::fullyComposeAffineMapAndOperands(&map, &operands);
+        map = simplifyAffineMap(map);
         if (!map.getResult(0).isMultipleOf(maybeStaticSize.value())) {
           return rewriter.notifyMatchFailure(
-              sliceOp, "collapsed size is not divisible by offset multiplier");
+              sliceOp, "offset multiplier must be multiple of collapsed size");
         }
 
         unsigned lastReassocSize = srcShape[reassocIndices.back()];
