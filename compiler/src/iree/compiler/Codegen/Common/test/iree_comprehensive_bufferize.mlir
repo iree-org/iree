@@ -3123,3 +3123,15 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 // CHECK: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.+]] = bufferization.to_buffer %[[SOURCE]]
 // CHECK: iree_vector_ext.transfer_gather %[[BUFFER]][%[[C0]], %[[C0]]][%[[INDICES]]: vector<8xindex>, None]
+
+// -----
+
+func.func @convert_to_buffer() -> memref<6xf32> {
+  %alloc = bufferization.alloc_tensor() : tensor<6xf32>
+  %memref = bufferization.to_buffer %alloc : tensor<6xf32> to memref<6xf32>
+  return %memref : memref<6xf32>
+}
+
+// CHECK-LABEL: func.func @convert_to_buffer
+// CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
+// CHECK:         return %[[ALLOC]]
