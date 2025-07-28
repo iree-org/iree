@@ -86,8 +86,19 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
-  if (!translationInfo)
+  if (!translationInfo) {
     return;
+  }
+
+  auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
+  auto pipeline = translationInfo.getDispatchLoweringPassPipeline();
+  if (!maybeTilingConfig &&
+      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault &&
+      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::None) {
+    funcOp.emitOpError("Tiling Config is necessary for ")
+        << stringifyEnum(pipeline) << " pipeline.";
+    return signalPassFailure();
+  }
 
   LLVMCPUPipelineOptions pipelineOpts;
   if (isX86(target) || isRISCV(target)) {
@@ -103,82 +114,50 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
   pipelineOpts.enableAArch64I8mm = isAArch64(target) && hasI8mmFeature(target);
   pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
+  if (maybeTilingConfig &&
+      llvm::all_of(maybeTilingConfig->getDistributionTileSizes(),
+                   [](int64_t tileSize) { return tileSize == 0; })) {
+    pipelineOpts.disableDistribution = true;
+  }
 
-  OpPassManager pipeline(func::FuncOp::getOperationName());
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
+  OpPassManager passManager(func::FuncOp::getOperationName());
+  switch (pipeline) {
   // No pipleline specified, nothing to do.
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
     return;
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    addCPUDefaultPassPipeline(pipeline, maybeTilingConfig);
+    addCPUDefaultPassPipeline(passManager, maybeTilingConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUBufferOpsTileAndVectorize: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (!maybeTilingConfig) {
-      funcOp.emitOpError("Tiling Config is necessary for "
-                         "CPUBufferOpsTileAndVectorize pipeline.");
-      return signalPassFailure();
-    }
-    addCPUBufferOpsTileAndVectorizePipeline(pipeline, *maybeTilingConfig,
+    addCPUBufferOpsTileAndVectorizePipeline(passManager, *maybeTilingConfig,
                                             pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (!maybeTilingConfig) {
-      funcOp.emitOpError(
-          "Tiling Config is necessary for CPUDoubleTilingExpert pipeline.");
-      return signalPassFailure();
-    }
-    addMultiTilingExpertPassPipeline(pipeline, *maybeTilingConfig,
+    addMultiTilingExpertPassPipeline(passManager, *maybeTilingConfig,
                                      pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (!maybeTilingConfig) {
-      funcOp.emitOpError("Tiling Config is necessary for "
-                         "CPUConvTileAndDecomposeExpert pipeline.");
-      return signalPassFailure();
-    }
-    addConvTileAndDecomposeExpertPassPipeline(pipeline, *maybeTilingConfig,
+    addConvTileAndDecomposeExpertPassPipeline(passManager, *maybeTilingConfig,
                                               pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (!maybeTilingConfig) {
-      funcOp.emitOpError(
-          "Tiling Config is necessary for Mmt4dTilingExpert pipeline.");
-      return signalPassFailure();
-    }
-    addMmt4dTilingExpertPassPipeline(pipeline, *maybeTilingConfig,
+    addMmt4dTilingExpertPassPipeline(passManager, *maybeTilingConfig,
                                      pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (!maybeTilingConfig) {
-      funcOp.emitOpError(
-          "Tiling Config is necessary for CPUDataTiling pipeline.");
-      return signalPassFailure();
-    }
-    addCPUDataTilingPipeline(pipeline, *maybeTilingConfig, pipelineOpts);
+    addCPUDataTilingPipeline(passManager, *maybeTilingConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPULinalgExtTileAndVectorize: {
-    auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
-    if (!maybeTilingConfig) {
-      funcOp.emitOpError("Tiling Config is necessary for "
-                         "CPULinalgExtTileAndVectorize pipeline.");
-      return signalPassFailure();
-    }
-    addCPULinalgExtTileAndVectorizePipeline(pipeline, *maybeTilingConfig,
+    addCPULinalgExtTileAndVectorizePipeline(passManager, *maybeTilingConfig,
                                             pipelineOpts);
     break;
   }
@@ -187,7 +166,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  if (failed(runPipeline(pipeline, funcOp))) {
+  if (failed(runPipeline(passManager, funcOp))) {
     return signalPassFailure();
   }
 }
