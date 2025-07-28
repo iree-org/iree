@@ -1517,3 +1517,74 @@ util.func public @place_truncf_in_consumer_dispatch(%arg0: tensor<75600xf32>, %a
 //  CHECK-SAME:       ins(%[[TRUNCF]]
 //       CHECK:     flow.return %[[SCATTER]]
 //       CHECK:   util.return %[[DISPATCH0]]
+
+// -----
+
+// Check that the fp4 dynamic quantization kernel fuses to a single kernel.
+
+util.func public @dynamic_quantization_fp4(%arg0 : tensor<?x32xf16>, %arg1 : index) -> (tensor<?x16xi8>, tensor<?xi8>) {
+  %cst_0 = arith.constant 0.0 : f32
+  %cst = arith.constant 4.000000e+00 : f32
+  %2 = tensor.empty(%arg1) : tensor<?x32xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<?x32xf16>) outs(%2 : tensor<?x32xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %14 = arith.extf %in : f16 to f32
+    linalg.yield %14 : f32
+  } -> tensor<?x32xf32>
+  %4 = tensor.empty(%arg1) : tensor<?xf32>
+  %5 = linalg.fill ins(%cst_0 : f32) outs(%4 : tensor<?xf32>) -> tensor<?xf32>
+  %6 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%3 : tensor<?x32xf32>) outs(%5 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %14 = math.absf %in : f32
+    %15 = arith.maximumf %14, %out : f32
+    linalg.yield %15 : f32
+  } -> tensor<?xf32>
+  %7 = tensor.empty(%arg1) : tensor<?xi8>
+  %8 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xi8>) {
+  ^bb0(%in: f32, %out: i8):
+    %14 = arith.divf %in, %cst : f32
+    %15 = arith.truncf %14 : f32 to f8E8M0FNU
+    %16 = arith.bitcast %15 : f8E8M0FNU to i8
+    linalg.yield %16 : i8
+  } -> tensor<?xi8>
+  %9 = tensor.empty(%arg1) : tensor<?x32xf4E2M1FN>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%3, %6 : tensor<?x32xf32>, tensor<?xf32>) outs(%9 : tensor<?x32xf4E2M1FN>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f4E2M1FN):
+    %14 = arith.divf %in_1, %cst : f32
+    %15 = arith.scaling_truncf %in, %14 : f32, f32 to f4E2M1FN
+    linalg.yield %15 : f4E2M1FN
+  } -> tensor<?x32xf4E2M1FN>
+  %11 = iree_tensor_ext.bitcast %10 : tensor<?x32xf4E2M1FN>{%arg1} -> tensor<?x16xi8>{%arg1}
+  util.return %11, %8 : tensor<?x16xi8>, tensor<?xi8>
+}
+// CHECK-LABEL: @dynamic_quantization_fp4
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x32xf16>
+//       CHECK:   %[[EXTEND:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]] :
+//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:     %[[MAX:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[EXTEND]] :
+//       CHECK:     %[[SCALE:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[MAX]] :
+//       CHECK:     %[[QUANTIZED:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[EXTEND]], %[[MAX]] :
+//       CHECK:     flow.return %[[SCALE]], %[[QUANTIZED]]
+//       CHECK:   %[[BITCAST:.+]] = iree_tensor_ext.bitcast %[[DISPATCH]]#1
+//       CHECK:   return %[[BITCAST]], %[[DISPATCH]]#0
