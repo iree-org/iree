@@ -169,14 +169,14 @@ dropBatchTileSize(IREE::Codegen::LoweringConfigAttrInterface config) {
     return IREE::Codegen::LoweringConfigAttr::get(
         config.getContext(), tileSizesList, scalableTileFlagsList);
   }
-  std::unique_ptr<TilingConfig> tilingConfig =
-      TilingConfig::create(cast<IREE::CPU::LoweringConfigAttr>(config));
+  std::unique_ptr<TilingConfig> tilingConfig = TilingConfig::create(config);
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
       tilingConfig->getTilingLevelInfo();
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableTileFlags] : tilingInfo) {
     tileSizes.erase(tileSizes.begin());
-    scalableTileFlags.erase(scalableTileFlags.begin());
+    if (!scalableTileFlags.empty())
+      scalableTileFlags.erase(scalableTileFlags.begin());
     newItems.emplace_back(
         IREE::CPU::getTilingLevelName(level),
         IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
