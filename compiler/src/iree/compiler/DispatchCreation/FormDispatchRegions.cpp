@@ -721,16 +721,14 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
 
       // For now prune the fusable uses due to codegen failures. Ideally we
       // should just be taking the whole set of fusable uses.
-      SmallVector<OpOperand *> prunedFusableUses;
-      prunedFusableUses.push_back(fusableUses.front());
-
-      // Collect all consumers that are truncates.
-      for (OpOperand *fusableUse : fusableUses) {
-        if (IREE::LinalgExt::isBitTruncateOp(fusableUse->getOwner())) {
-          prunedFusableUses.push_back(fusableUse);
-        }
+      if (IREE::LinalgExt::isBitTruncateOp(fusableUses.front()->getOwner())) {
+        fusableUses =
+            llvm::filter_to_vector(fusableUses, [](OpOperand *operand) {
+              return IREE::LinalgExt::isBitTruncateOp(operand->getOwner());
+            });
+      } else {
+        fusableUses.resize(1);
       }
-      std::swap(prunedFusableUses, fusableUses);
 
       // Analyse the use to see if it is fusable.
       for (OpOperand *fusableUse : fusableUses) {
