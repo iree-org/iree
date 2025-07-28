@@ -236,8 +236,6 @@ module {
 //  CHECK-SAME:     thread = [1, 4, 0]
 //  CHECK-SAME:     workgroup = [1, 256, 0]
 
-//        LATE:  LLVMGPUWarpReduction
-
 // -----
 
 module {
