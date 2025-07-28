@@ -393,23 +393,6 @@ static OpOperand *getWarpResult(gpu::WarpExecuteOnLane0Op warpOp,
 }
 
 namespace {
-/// Pattern to convert InsertElement to broadcast, this is a workaround
-/// until MultiDimReduction distribution is supported.
-class InsertElementToBroadcast final
-    : public OpRewritePattern<vector::InsertElementOp> {
-public:
-  using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
-                                PatternRewriter &rewriter) const override {
-    if (insertOp.getDestVectorType().getNumElements() != 1)
-      return failure();
-    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        insertOp, insertOp.getDestVectorType(), insertOp.getSource());
-    return success();
-  }
-};
-
 /// Sink out load op feeding into a warp op yield.
 /// ```
 /// %0 = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
@@ -500,7 +483,6 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 
   vector::populateVectorMultiReductionLoweringPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
-  patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
 static AffineMap simpleDistributionFunction(Value val) {

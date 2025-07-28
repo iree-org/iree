@@ -97,27 +97,23 @@ func.func @extf_scalar_noop(%arg0 : vector<bf16>) -> vector<bf16> {
 
 func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, %arg2 : memref<bf16>) {
   %cst = arith.constant dense<1.000000e+00> : vector<bf16>
-  %5 = vector.extractelement %cst[] : vector<bf16>
+  %5 = vector.extract %cst[] : bf16 from vector<bf16>
   %6 = arith.mulf %arg0, %arg1 : vector<3xbf16>
   %7 = vector.reduction <add>, %6, %5 : vector<3xbf16> into bf16
   %8 = vector.broadcast %7 : bf16 to vector<bf16>
-  %9 = vector.extractelement %8[] : vector<bf16>
+  %9 = vector.extract %8[] : bf16 from vector<bf16>
   memref.store %9, %arg2[] : memref<bf16>
   return
 }
 
 // CHECK-LABEL: @store_reduction_bf16
-// CHECK:      %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
+// CHECK-DAG:  %[[CST:.+]] = arith.constant 1.000000e+00 : f32
 // CHECK-DAG:  %[[VAL0:.+]] = arith.extf %arg0 : vector<3xbf16> to vector<3xf32>
 // CHECK-DAG:  %[[VAL1:.+]] = arith.extf %arg1 : vector<3xbf16> to vector<3xf32>
-// CHECK:      %[[VAL2:.+]] = vector.extractelement %[[CST]][] : vector<bf16>
-// CHECK:      %[[VAL3:.+]] = arith.extf %[[VAL2]] : bf16 to f32
 // CHECK:      %[[VAL4:.+]] = arith.mulf %[[VAL0]], %[[VAL1]] : vector<3xf32>
-// CHECK:      %[[VAL5:.+]] = vector.reduction <add>, %[[VAL4]], %[[VAL3]] : vector<3xf32> into f32
+// CHECK:      %[[VAL5:.+]] = vector.reduction <add>, %[[VAL4]], %[[CST]] : vector<3xf32> into f32
 // CHECK:      %[[VAL6:.+]] = arith.truncf %[[VAL5]] : f32 to bf16
-// CHECK:      %[[VAL7:.+]] = vector.broadcast %[[VAL6]] : bf16 to vector<bf16>
-// CHECK:      %[[VAL8:.+]] = vector.extractelement %[[VAL7]][] : vector<bf16>
-// CHECK:      memref.store %[[VAL8]], %arg2[] : memref<bf16>
+// CHECK:      memref.store %[[VAL6]], %arg2[] : memref<bf16>
 
 // -----
 

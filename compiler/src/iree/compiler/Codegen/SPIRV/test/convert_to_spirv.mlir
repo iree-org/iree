@@ -121,7 +121,7 @@ hal.executable private @resource_bindings_in_same_func {
         %10 = arith.addf %5, %6 : f32
         %11 = arith.addf %7, %9 : f32
         %12 = arith.addf %10, %11 : f32
-        %13 = vector.extractelement %8[%c0 : index] : vector<4xf32>
+        %13 = vector.extract %8[%c0] : f32 from vector<4xf32>
         %14 = arith.addf %12, %13 : f32
 
         return %14 : f32
@@ -162,7 +162,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %3 = memref.load %1[%c0] : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
 
-        %4 = vector.extractelement %3[%c0 : index] : vector<4xf32>
+        %4 = vector.extract %3[%c0] : f32 from vector<4xf32>
         %5 = arith.addf %2, %4 : f32
 
         return %5 : f32
