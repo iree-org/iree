@@ -1520,7 +1520,7 @@ util.func public @place_truncf_in_consumer_dispatch(%arg0: tensor<75600xf32>, %a
 
 // -----
 
-// Check that the fp4 dynamic quantization kernel fuses to a single kernel
+// Check that the fp4 dynamic quantization kernel fuses to a single kernel.
 
 util.func public @dynamic_quantization_fp4(%arg0 : tensor<?x32xf16>, %arg1 : index) -> (tensor<?x16xi8>, tensor<?xi8>) {
   %cst_0 = arith.constant 0.0 : f32
