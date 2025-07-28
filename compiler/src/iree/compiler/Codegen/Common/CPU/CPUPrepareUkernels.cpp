@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -18,8 +20,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
 
 namespace {
-
-using IREE::Codegen::LoweringConfigAttr;
 
 static void tileBatchDimsForBatchMmt4dOp(RewriterBase &rewriter,
                                          FunctionOpInterface funcOp) {
@@ -151,21 +151,39 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
 
 /// Drops the first element from all the tile sizes list. The first element is
 /// for the batch dimension.
-static LoweringConfigAttr
-dropBatchTileSize(IREE::Codegen::LoweringConfigAttr config) {
-  TileSizesListType tileSizesList = config.getTileSizeVals();
-  ScalableTileFlagsListType scalableTileFlagsList =
-      config.getScalableTileFlagVals();
-  for (auto &tileSizes : tileSizesList) {
-    tileSizes.erase(tileSizes.begin());
-  }
-  for (auto &scalableTileFlags : scalableTileFlagsList) {
-    if (!scalableTileFlags.empty()) {
-      scalableTileFlags.erase(scalableTileFlags.begin());
+static IREE::Codegen::LoweringConfigAttrInterface
+dropBatchTileSize(IREE::Codegen::LoweringConfigAttrInterface config) {
+  if (auto loweringConfig =
+          dyn_cast<IREE::Codegen::LoweringConfigAttr>(config)) {
+    TileSizesListType tileSizesList = loweringConfig.getTileSizeVals();
+    ScalableTileFlagsListType scalableTileFlagsList =
+        loweringConfig.getScalableTileFlagVals();
+    for (auto &tileSizes : tileSizesList) {
+      tileSizes.erase(tileSizes.begin());
     }
+    for (auto &scalableTileFlags : scalableTileFlagsList) {
+      if (!scalableTileFlags.empty()) {
+        scalableTileFlags.erase(scalableTileFlags.begin());
+      }
+    }
+    return IREE::Codegen::LoweringConfigAttr::get(
+        config.getContext(), tileSizesList, scalableTileFlagsList);
   }
-  return IREE::Codegen::LoweringConfigAttr::get(
-      config.getContext(), tileSizesList, scalableTileFlagsList);
+  std::unique_ptr<TilingConfig> tilingConfig = TilingConfig::create(config);
+  SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
+      tilingConfig->getTilingLevelInfo();
+  SmallVector<NamedAttribute> newItems;
+  for (auto [level, tileSizes, scalableTileFlags] : tilingInfo) {
+    tileSizes.erase(tileSizes.begin());
+    if (!scalableTileFlags.empty())
+      scalableTileFlags.erase(scalableTileFlags.begin());
+    newItems.emplace_back(
+        IREE::CPU::getTilingLevelName(level),
+        IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+            config.getContext(), tileSizes, scalableTileFlags));
+  }
+  return IREE::CPU::LoweringConfigAttr::get(
+      config.getContext(), DictionaryAttr::get(config.getContext(), newItems));
 }
 
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
@@ -202,7 +220,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
               .result();
 
       auto loweringConfig =
-          getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(oldFillOp);
+          getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(
+              oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -238,7 +257,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         ValueRange{reducedOut});
 
     auto loweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);
