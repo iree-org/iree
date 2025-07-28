@@ -93,7 +93,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
   auto pipeline = translationInfo.getDispatchLoweringPassPipeline();
   if (!maybeTilingConfig &&
-      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault) {
+      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault &&
+      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::None) {
     funcOp.emitOpError("Tiling Config is necessary for ")
         << stringifyEnum(pipeline) << " pipeline.";
     return signalPassFailure();
