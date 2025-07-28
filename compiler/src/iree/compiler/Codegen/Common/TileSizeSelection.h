@@ -10,11 +10,9 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 
 namespace mlir::iree_compiler {
-
-using SizesAndScalableFlags =
-    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
 /// Provides unified API to get access to all the tile size needed during the
 /// CPU lowering process, while abstracting the representation and verification

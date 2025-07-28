@@ -297,6 +297,9 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;
@@ -308,8 +311,17 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
-/// Returns the result sizes and vector input sizes of the linalg.unpack op. The
-/// inferred bounding size is returned if it is dynamic shape. Returns
+/// Returns the inferred input-vector-sizes for the `op`, given the inferred
+/// vector sizes for the write operation. Returns std::nullopt, if it fails to
+/// compute the sizes.
+/// For now, it only supports non-scalable vectors.
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> vectorSizes,
+                                 ArrayRef<bool> scalableFlags);
+
+/// Returns the result sizes and vector input sizes of the linalg.unpack op.
+/// The inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op);
 
