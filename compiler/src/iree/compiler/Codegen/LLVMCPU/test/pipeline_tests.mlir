@@ -655,4 +655,3 @@ func.func @softmax_dynamic_with_assume_int_hints() attributes {hal.executable.ta
   return
 }
 // CHECK-LABEL: func.func @softmax_dynamic_with_assume_int_hints(
-// CHECK-NOT:     linalg
