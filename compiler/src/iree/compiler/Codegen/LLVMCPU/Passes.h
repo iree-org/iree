@@ -75,6 +75,7 @@ void populateVectorContractCustomKernelsPatterns(
 //----------------------------------------------------------------------------//
 
 struct LLVMCPUPipelineOptions {
+  bool disableDistribution = false;
   bool decomposePackUnPackOps = true;
   bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
@@ -104,7 +105,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
 /// that is not specialized by any pipeline). Adds an additional level of tiling
 /// and converts to memrefs.
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               std::unique_ptr<TilingConfig> &tilingConfig);
+                               std::unique_ptr<TilingConfig> &tilingConfig,
+                               LLVMCPUPipelineOptions &pipelineOpt);
 
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
