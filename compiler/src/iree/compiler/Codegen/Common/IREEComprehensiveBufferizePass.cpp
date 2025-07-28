@@ -249,6 +249,18 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     return signalPassFailure();
   }
 
+  // All to_buffer ops on single use constants will have already had any
+  // write conflicts resolved by the analysis, so we can safely mark them as
+  // read only.
+  funcOp->walk([](bufferization::ToBufferOp toBuffer) {
+    if (auto constant =
+            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      if (constant->hasOneUse()) {
+        toBuffer.setReadOnly(true);
+      }
+    }
+  });
+
   // Remove redundant args and unused results.
   {
     RewritePatternSet patterns(&getContext());
