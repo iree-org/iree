@@ -1,7 +1,10 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target, iree-llvmcpu-check-ir-before-llvm-conversion))' --iree-llvmcpu-disable-distribution --split-input-file %s | FileCheck %s
 
 // Test that iree_linalg_ext.map_scatter op is not generated when distribution
-// is disabled.
+// is disabled. The op is used in the fallback solution when the pack op is not
+// fusible in consumer fusion. We do not expect the op if the distribution is
+// disabled. For more details, see
+// https://github.com/iree-org/iree/issues/20723#issuecomment-3006445505
 
 #executable_target_embedded_elf_arm_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+reserve-x18", max_stack_allocation_size = 32768 : i64, native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf"}>
 func.func @pack_without_distribution() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64} {
