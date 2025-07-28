@@ -49,6 +49,10 @@ testcases = [
     deps = [
         "gen_math_ops_%s.mlir" % backend,
     ],
+    tags = [
+        # TODO(#21512): Reenable tests for RISCV targets.
+        "noriscv",
+    ] if (backend == "llvm-cpu") else []
 ) for backend, driver in [
     ("llvm-cpu", "local-task"),
     ("rocm", "hip"),
