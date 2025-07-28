@@ -312,20 +312,20 @@ struct ConvertBf16ToUInt16BuffersPass final
       // changes. Also handle amdgpu buffer casts:
       target.addDynamicallyLegalOp<
           amdgpu::FatRawBufferCastOp, vector::BroadcastOp, vector::ShuffleOp,
-          vector::ExtractElementOp, vector::ExtractOp, vector::InsertElementOp,
-          vector::InsertOp, vector::ScalableInsertOp, vector::ScalableExtractOp,
-          vector::InsertStridedSliceOp, vector::ExtractStridedSliceOp,
-          vector::TransferReadOp, vector::TransferWriteOp, vector::LoadOp,
-          vector::StoreOp, vector::MaskedLoadOp, vector::MaskedStoreOp,
-          vector::GatherOp, vector::ScatterOp, vector::ExpandLoadOp,
-          vector::CompressStoreOp, vector::ShapeCastOp, vector::ConstantMaskOp,
-          vector::CreateMaskOp, vector::MaskOp, vector::TransposeOp,
-          vector::YieldOp>([&typeConverter](Operation *op) {
-        bool legal = typeConverter.isLegal(op);
-        LLVM_DEBUG(if (!legal) llvm::dbgs()
-                   << "Bf16Emulation: illegal op: " << *op << "\n");
-        return legal;
-      });
+          vector::ExtractOp, vector::InsertOp, vector::ScalableInsertOp,
+          vector::ScalableExtractOp, vector::InsertStridedSliceOp,
+          vector::ExtractStridedSliceOp, vector::TransferReadOp,
+          vector::TransferWriteOp, vector::LoadOp, vector::StoreOp,
+          vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
+          vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
+          vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
+          vector::MaskOp, vector::TransposeOp, vector::YieldOp>(
+          [&typeConverter](Operation *op) {
+            bool legal = typeConverter.isLegal(op);
+            LLVM_DEBUG(if (!legal) llvm::dbgs()
+                       << "Bf16Emulation: illegal op: " << *op << "\n");
+            return legal;
+          });
 
       RewritePatternSet patterns(ctx);
       populateIreeBf16EmulationPatterns(patterns, typeConverter);

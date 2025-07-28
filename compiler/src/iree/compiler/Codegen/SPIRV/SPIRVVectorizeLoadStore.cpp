@@ -943,8 +943,7 @@ struct ScalarizeVectorTransferWrite final
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        Value scalar =
-            b.create<vector::ExtractElementOp>(loc, writeOp.getVector());
+        Value scalar = b.create<vector::ExtractOp>(loc, writeOp.getVector());
         b.create<memref::StoreOp>(loc, scalar, writeOp.getBase(),
                                   writeOp.getIndices());
         return Value();
