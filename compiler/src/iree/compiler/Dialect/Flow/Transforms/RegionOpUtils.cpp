@@ -524,7 +524,8 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   OpBuilder::InsertionGuard g(rewriter);
   mlir::DominanceInfo dominanceInfo(regionOp);
   if (failed(moveOperandDefs(rewriter, target, regionOp, dominanceInfo, {}))) {
-    return target->emitOpError("target operands can't be moved before region");
+    return rewriter.notifyMatchFailure(
+        target, "target operands can't be moved before region");
   }
 
   // Values replaced by moving the `target` into the dispatch region.
