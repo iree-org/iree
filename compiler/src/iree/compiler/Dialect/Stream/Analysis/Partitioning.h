@@ -13,6 +13,9 @@
 
 namespace mlir::iree_compiler::IREE::Stream {
 
+// Forward declarations
+class AffinityAnalysis;
+
 //===----------------------------------------------------------------------===//
 // Data structures
 //===----------------------------------------------------------------------===//
@@ -104,20 +107,20 @@ struct PartitionSet {
 // non-streamable ops if it is safe to do so (such as std arithmetic). Not all
 // ops in the block will be covered by a partition.
 PartitionSet partitionStreamableOps(IREE::Stream::PartitioningConfigAttr config,
-                                    Block *block);
+                                    Block *block, AffinityAnalysis &affinityAnalysis);
 PartitionSet
 partitionRegionConcurrency(IREE::Stream::PartitioningConfigAttr config,
                            Block *block);
 
 //===----------------------------------------------------------------------===//
-// Reference partitioning
+// Poorly named algorithms
 //===----------------------------------------------------------------------===//
 
 // Naive clustering based solely on correctness with no cost model or weighting.
 // Produces the largest possible streams for any given block. Unsatisfactory.
 PartitionSet
 partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
-                                Block *block);
+                                Block *block, AffinityAnalysis &affinityAnalysis);
 
 // Similarly poor algorithm to partitionStreamableOpsReference but for use
 // within partitioned streams to produce waves of concurrently executable work.

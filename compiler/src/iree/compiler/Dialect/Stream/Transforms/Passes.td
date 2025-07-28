@@ -257,7 +257,7 @@ def RefineUsagePass :
 //===----------------------------------------------------------------------===//
 
 def ScheduleExecutionPass :
-    InterfacePass<"iree-stream-schedule-execution", "mlir::CallableOpInterface"> {
+    Pass<"iree-stream-schedule-execution", "mlir::ModuleOp"> {
   let summary = "Identifies and groups asynchronous operations into executable regions within function-like regions.";
   let description = [{
     Partitions `stream.async.*` operations into execution regions that are

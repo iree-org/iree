@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -167,9 +168,9 @@ void PartitionSet::topologicalSort() {
 }
 
 PartitionSet partitionStreamableOps(IREE::Stream::PartitioningConfigAttr config,
-                                    Block *block) {
+                                    Block *block, AffinityAnalysis &affinityAnalysis) {
   // Only one algorithm today.
-  return partitionStreamableOpsReference(config, block);
+  return partitionStreamableOpsReference(config, block, affinityAnalysis);
 }
 
 PartitionSet

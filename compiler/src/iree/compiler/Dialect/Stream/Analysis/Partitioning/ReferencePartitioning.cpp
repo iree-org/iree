@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/Analysis/ResourceHazards.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -43,7 +44,8 @@ static std::unique_ptr<AsmState> getRootAsmState(Block *block) {
 // spanning partitions (like splats), etc.
 PartitionSet
 partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
-                                Block *block) {
+                                Block *block,
+                                AffinityAnalysis &affinityAnalysis) {
   PartitionSet partitionSet;
 
   struct OpInfo {
@@ -110,7 +112,6 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
             affinityAttr, builders[partitionOrdinal]->affinity)) {
       return false;
     }
-
     bool preferCloneToConsumers = streamableOp.preferCloneToConsumers();
     llvm::BitVector *opHazards = nullptr;
     llvm::BitVector opHazardsInCandidatePartition;
@@ -176,6 +177,75 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
         usableBuilders.reset();
       }
       // Even though not a streamable op we still want to track it below.
+    }
+
+    // Helper function to detect if a transfer should be moved to consumer's
+    // affinity
+    auto shouldMoveTransferToConsumer =
+        [&](IREE::Stream::AsyncTransferOp transferOp)
+        -> std::optional<IREE::Stream::AffinityAttr> {
+      Value transferResult = transferOp.getResult();
+
+      // Check if the transfer result has pinned affinities
+      SmallVector<IREE::Stream::AffinityAttr> pinnedAffinities;
+      if (!affinityAnalysis.tryLookupPinnedAffinities(transferResult,
+                                                      pinnedAffinities)) {
+        return std::nullopt;
+      }
+
+      if (pinnedAffinities.empty()) {
+        return std::nullopt;
+      }
+
+      // pinned affinity does not match the affinity where it would execute on
+      if (transferOp.getSourceAffinityAttr() == pinnedAffinities[0]) {
+        return std::nullopt;
+      }
+      return pinnedAffinities[0];
+    };
+
+    // Special handling for AsyncTransferOp with pinned consumers
+    if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
+      auto consumerAffinity = shouldMoveTransferToConsumer(transferOp);
+
+      if (consumerAffinity) {
+        // Force this transfer into its own partition on the consumer device
+        auto &opInfo = opInfos[&op];
+        opInfo.hazards.reserve(builders.size() + 1);
+        opInfo.hazards.resize(
+            builders.size(), /*t=*/true); // Hazard with all existing partitions
+
+        LLVM_DEBUG({
+          llvm::dbgs() << "====\nPartitioning op:\n";
+          op.print(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "\nConsumer affinity: " << *consumerAffinity << "\n";
+        });
+
+        // Create a new partition on the consumer device
+        size_t newOrdinal = builders.size();
+        opInfo.membership.resize(newOrdinal + 1, /*t=*/false);
+        opInfo.membership.set(newOrdinal);
+
+        auto newBuilder = std::make_unique<PartitionBuilder>();
+        newBuilder->ordinal = newOrdinal;
+        newBuilder->affinity =
+            *consumerAffinity; // Set affinity to consumer device
+
+        LLVM_DEBUG(llvm::dbgs() << "Created partition " << newOrdinal
+                                << " for transfer on consumer device "
+                                << *consumerAffinity << "\n");
+
+        transferOp.setSourceAffinityAttr(nullptr);
+
+        // Insert the transfer into the new partition
+        newBuilder->insert(&op, opInfo);
+        builders.push_back(std::move(newBuilder));
+        usableBuilders.resize(builders.size(), /*t=*/true);
+
+        continue;
+      }
+      // If no special consumer affinity, fall through to check if it should
+      // join its producer
     }
 
     // Synchronizing operations should join with their producers if the producer
