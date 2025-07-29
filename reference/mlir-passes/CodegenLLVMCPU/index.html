@@ -5389,7 +5389,8 @@ subsequently ingested by LLVMCPULowerExecutableTargetPass.</p>
 <p>Walk through all the TilingInterface operations and apply the tiling, if the
 given level is found in the operation's lowering config.</p>
 <h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-tiling-level : Tiling level used to retrieve the configuration from lowering_config
+<div class="highlight"><pre><span></span><code>-tiling-level : Tiling level used to retrieve the configuration from lowering_config.
+-skip-root-op : Do not tile the root op if the option is true.
 </code></pre></div>
 <h3 id="-iree-llvmcpu-tile-and-fuse"><code>-iree-llvmcpu-tile-and-fuse</code><a class="headerlink" href="#-iree-llvmcpu-tile-and-fuse" title="Permanent link">link</a></h3>
 <p><em>Pass to tile and fuse TilingInterface operations.</em></p>
