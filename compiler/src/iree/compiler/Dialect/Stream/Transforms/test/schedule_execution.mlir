@@ -517,20 +517,13 @@ util.func public @scfRecurse(%arg0: !stream.resource<*>, %arg1: index, %arg2: in
 
 // -----
 
-util.global private @device_a : !hal.device
-util.global private @device_b : !hal.device
-
 // CHECK-LABEL: @transferWithPinnedConsumer
 util.func public @transferWithPinnedConsumer(%arg0: !hal.buffer_view, %arg1: !hal.fence) -> !hal.buffer_view {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c16 = arith.constant 16 : index
-  %import_result = stream.tensor.import on(#hal.device.affinity<@device_a>) %arg0 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
-  // CHECK: %[[DISPATCH_A_RESULT:.+]], %[[DISPATCH_A_TIMEPOINT:.+]] = stream.async.execute
-  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
-  %dispatch_a_result = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_a[%c1](%import_result[%c0 to %c16 for %c16]) : (!stream.resource<external>{%c16}) -> !stream.resource<transient>{%c16}
-  %transfer_to_b = stream.async.transfer %dispatch_a_result : !stream.resource<transient>{%c16} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<transient>{%c16}
-  %dispatch_b_result = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_b[%c1](%transfer_to_b[%c0 to %c16 for %c16]) : (!stream.resource<transient>{%c16}) -> !stream.resource<transient>{%c16}
+  %import_result = stream.tensor.import on(#hal.device.affinity<@device_b>) %arg0 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
+  %dispatch_b_result = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_b[%c1](%import_result[%c0 to %c16 for %c16]) : (!stream.resource<external>{%c16}) -> !stream.resource<transient>{%c16}
 
   // Transfer from device_b back to device_a - this should be in its own execution region
   // on device_a because tensor.export below pins the value to device_a

@@ -10,11 +10,9 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
-
-// Forward declarations
-class AffinityAnalysis;
 
 //===----------------------------------------------------------------------===//
 // Data structures
@@ -113,7 +111,7 @@ partitionRegionConcurrency(IREE::Stream::PartitioningConfigAttr config,
                            Block *block);
 
 //===----------------------------------------------------------------------===//
-// Poorly named algorithms
+// Reference partitioning
 //===----------------------------------------------------------------------===//
 
 // Naive clustering based solely on correctness with no cost model or weighting.

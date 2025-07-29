@@ -206,7 +206,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Stream formation and scheduling
   //----------------------------------------------------------------------------
 
-  // Combine async work into execution regions (module-level pass)
+  // Combine async work into execution regions.
   passManager.addPass(IREE::Stream::createScheduleExecutionPass());
 
   FunctionLikeNest(passManager)

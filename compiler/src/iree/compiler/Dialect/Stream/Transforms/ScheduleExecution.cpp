@@ -340,7 +340,6 @@ struct ScheduleExecutionPass
     auto *context = &getContext();
     auto moduleOp = getOperation();
 
-    // Create affinity analysis once for the entire module
     AffinityAnalysis affinityAnalysis(moduleOp);
     if (failed(affinityAnalysis.run())) {
       return signalPassFailure();

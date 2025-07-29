@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/Analysis/ResourceHazards.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -179,41 +178,41 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       // Even though not a streamable op we still want to track it below.
     }
 
-    // Helper function to detect if a transfer should be moved to consumer's
-    // affinity
-    auto shouldMoveTransferToConsumer =
+    // Helper function to check if a the consumer of the transfer is
+    // pinned to a different affinity than the source.
+    auto getPinnedTransferConsumerAffinity =
         [&](IREE::Stream::AsyncTransferOp transferOp)
         -> std::optional<IREE::Stream::AffinityAttr> {
       Value transferResult = transferOp.getResult();
 
-      // Check if the transfer result has pinned affinities
+      // Check if the transfer result has pinned affinities.
       SmallVector<IREE::Stream::AffinityAttr> pinnedAffinities;
       if (!affinityAnalysis.tryLookupPinnedAffinities(transferResult,
-                                                      pinnedAffinities)) {
+                                                      pinnedAffinities) ||
+          pinnedAffinities.empty()) {
         return std::nullopt;
       }
 
-      if (pinnedAffinities.empty()) {
-        return std::nullopt;
-      }
-
-      // pinned affinity does not match the affinity where it would execute on
+      // Pinned affinity does not match the affinity where it would execute on.
       if (transferOp.getSourceAffinityAttr() == pinnedAffinities[0]) {
         return std::nullopt;
       }
       return pinnedAffinities[0];
     };
 
-    // Special handling for AsyncTransferOp with pinned consumers
+    // Special handling for stream.async.transfer with pinned consumers.
+    // This is done to avoid problems where a partition uses a buffer
+    // that should be allocated on hal.device.optimal<...>, but is
+    // pinned to a specific affinity by some consumer.
     if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
-      auto consumerAffinity = shouldMoveTransferToConsumer(transferOp);
+      auto consumerAffinity = getPinnedTransferConsumerAffinity(transferOp);
 
       if (consumerAffinity) {
-        // Force this transfer into its own partition on the consumer device
+        // Force this transfer into its own partition on the consumer device.
         auto &opInfo = opInfos[&op];
         opInfo.hazards.reserve(builders.size() + 1);
         opInfo.hazards.resize(
-            builders.size(), /*t=*/true); // Hazard with all existing partitions
+            builders.size(), true);
 
         LLVM_DEBUG({
           llvm::dbgs() << "====\nPartitioning op:\n";
@@ -221,31 +220,29 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
           llvm::dbgs() << "\nConsumer affinity: " << *consumerAffinity << "\n";
         });
 
-        // Create a new partition on the consumer device
+        // Create a new partition on the consumer device.
         size_t newOrdinal = builders.size();
-        opInfo.membership.resize(newOrdinal + 1, /*t=*/false);
+        opInfo.membership.resize(newOrdinal + 1, false);
         opInfo.membership.set(newOrdinal);
 
         auto newBuilder = std::make_unique<PartitionBuilder>();
         newBuilder->ordinal = newOrdinal;
         newBuilder->affinity =
-            *consumerAffinity; // Set affinity to consumer device
+            *consumerAffinity;
 
         LLVM_DEBUG(llvm::dbgs() << "Created partition " << newOrdinal
                                 << " for transfer on consumer device "
                                 << *consumerAffinity << "\n");
 
+        // Remove the source affinity from the transfer, otherwise it will
+        // conflict with the affinity of the partition.
         transferOp.setSourceAffinityAttr(nullptr);
 
-        // Insert the transfer into the new partition
         newBuilder->insert(&op, opInfo);
         builders.push_back(std::move(newBuilder));
         usableBuilders.resize(builders.size(), /*t=*/true);
-
         continue;
       }
-      // If no special consumer affinity, fall through to check if it should
-      // join its producer
     }
 
     // Synchronizing operations should join with their producers if the producer
