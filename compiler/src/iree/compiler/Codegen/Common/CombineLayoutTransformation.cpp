@@ -364,19 +364,19 @@ combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
   MapScatterOp combinedRelayoutOp = mapScatterOp;
   while (relayoutOp) {
     LDBG() << "Attempting to fold " << relayoutOp->getName()
-                               << " into map_scatter op:\n"
-                               << *relayoutOp;
+           << " into map_scatter op:\n"
+           << *relayoutOp;
     FailureOr<MapScatterOp> maybeCombinedRelayoutOp = foldIntoMapScatter(
         rewriter, relayoutOp, combinedRelayoutOp, padDistributionConfigFn);
     if (failed(maybeCombinedRelayoutOp)) {
       LDBG() << "Failed to fold " << relayoutOp->getName()
-                             << " into map_scatter op";
+             << " into map_scatter op";
       break;
     }
     combinedRelayoutOp = maybeCombinedRelayoutOp.value();
     LDBG() << "Successfully folded " << relayoutOp->getName()
-                                << " into map_scatter. New map_scatter op:\n"
-                                << combinedRelayoutOp;
+           << " into map_scatter. New map_scatter op:\n"
+           << combinedRelayoutOp;
     relayoutOp = combinedRelayoutOp.getInput().getDefiningOp();
   }
   if (combinedRelayoutOp.isIdentity()) {

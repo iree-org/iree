@@ -1943,11 +1943,13 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp) ||
         IREE::LinalgExt::isaHorizontallyFusedContraction(linalgOp)) {
-      LDBG() << "VectorDistribution: trying to find a suitable contraction config";
+      LDBG()
+          << "VectorDistribution: trying to find a suitable contraction config";
       return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      LDBG() << "VectorDistribution: trying to find a suitable convolution config";
+      LDBG()
+          << "VectorDistribution: trying to find a suitable convolution config";
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
     }

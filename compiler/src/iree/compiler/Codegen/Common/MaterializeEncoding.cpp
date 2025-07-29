@@ -61,8 +61,9 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // pass, and remove the ad-hoc materialization pass for padding.
     if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
                             IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG() << "Found GPUPaddingResolverAttr encoding resolver. Materialization "
-           "will be handled later.";
+      LDBG()
+          << "Found GPUPaddingResolverAttr encoding resolver. Materialization "
+             "will be handled later.";
       return success();
     }
 
@@ -70,7 +71,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
         LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
-             "attribute. (testCLGPUTarget)";
+                  "attribute. (testCLGPUTarget)";
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingResolverAttr::get(
                 ctx,
@@ -78,7 +79,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                                                         getCLGPUTarget(ctx)))));
       }
       LDBG() << "Select EncodingNopLayoutAttr attribute as the layout "
-           "attribute (Encoding resolver unknown or unsupported).";
+                "attribute (Encoding resolver unknown or unsupported).";
       return cast<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
@@ -104,8 +105,9 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
             : getTestTargetOrNopLayout();
 
-    LDBG() << "Selected Encoding::LayoutMaterializerAttr with target configuration: "
-         << layoutAttrWithTargetInfo;
+    LDBG() << "Selected Encoding::LayoutMaterializerAttr with target "
+              "configuration: "
+           << layoutAttrWithTargetInfo;
 
     MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);

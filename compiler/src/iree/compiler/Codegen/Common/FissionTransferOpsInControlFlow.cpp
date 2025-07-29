@@ -150,7 +150,7 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
 static void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
                                             const FissionTarget &target) {
   LDBG() << "Splitting transfer ops from control flow: \n"
-       << "For Op: " << target.parent << "\n";
+         << "For Op: " << target.parent << "\n";
 
   rewriter.setInsertionPoint(target.parent);
   SmallVector<memref::AllocaOp> allocaOps;

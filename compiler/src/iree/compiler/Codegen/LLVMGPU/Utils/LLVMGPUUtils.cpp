@@ -96,12 +96,13 @@ static MaskResult getMask(Operation *op) {
     if (maybeExtractOp.getStaticPosition().size() + 1 !=
         llvm::cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
       LDBG() << "----mask through extract unexpected position size -> Skip: "
-           << maybeExtractOp;
+             << maybeExtractOp;
       return MaskResult{};
     }
     if (maybeExtractOp.getStaticPosition().size() != 1) {
-      LDBG() << "----only mask through 2-D -> 1-D extract supported atm -> Skip: "
-           << maybeExtractOp;
+      LDBG()
+          << "----only mask through 2-D -> 1-D extract supported atm -> Skip: "
+          << maybeExtractOp;
       return MaskResult{};
     }
     LDBG() << "----mask through extract: " << maybeExtractOp;
@@ -176,10 +177,10 @@ static bool resultsInSupportedAsyncCopy(MemRefType memrefType,
     }
   }
   if (!supportedCopySize) {
-    LDBG() << "----> cp.async alignment failed, "
-         << numElements << " elts * " << elementType.getIntOrFloatBitWidth()
-         << "b/elem = " << numElements * elementType.getIntOrFloatBitWidth()
-         << "b is not supported by cp.async";
+    LDBG() << "----> cp.async alignment failed, " << numElements << " elts * "
+           << elementType.getIntOrFloatBitWidth()
+           << "b/elem = " << numElements * elementType.getIntOrFloatBitWidth()
+           << "b is not supported by cp.async";
     return false;
   }
 
@@ -228,7 +229,7 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
         auto maskResult = getMask(transferRead);
         if (!maskResult.maskOp) {
           LDBG() << "----read mask is not a vector.create_mask op -> Skip: "
-               << transferRead.getMask();
+                 << transferRead.getMask();
           return WalkResult::advance();
         }
       }

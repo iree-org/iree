@@ -73,7 +73,8 @@ LogicalResult splitReductionPrecondition(Operation *op,
   // The `linalg::splitReduction` method does not work for ops with indexing
   // semantics. See https://github.com/iree-org/iree/pull/14979
   if (linalgOp.hasIndexSemantics()) {
-    LDBG() << "the split method used currently doesnt support indexing semantics";
+    LDBG()
+        << "the split method used currently doesnt support indexing semantics";
     return failure();
   }
 
@@ -199,11 +200,12 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
         tilingConfig->getVectorReductionSizes();
     if (scalableDims.back()) {
       LDBG() << "scalable reduction dimensions not yet supported, skip "
-           "SplitReduction";
+                "SplitReduction";
       continue;
     }
     if (reductionSizes.empty()) {
-      LDBG() << "the list of reduction tiling sizes is empty, skip SplitReduction";
+      LDBG()
+          << "the list of reduction tiling sizes is empty, skip SplitReduction";
       continue;
     }
     int64_t size = reductionSizes.back();

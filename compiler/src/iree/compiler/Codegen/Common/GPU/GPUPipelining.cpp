@@ -519,8 +519,8 @@ static void getNvidiaAmpereTensorCorePipeline(
   // empty schedule.
   int numKgroups = mainloop.getNumberOfKgroups();
   if (numKgroups < 2 || numStages < 3) {
-    LDBG() << "--numKgroups=" << numKgroups << "(< 2) or numStages=" << numStages
-                         << "(< 3) -> BAIL";
+    LDBG() << "--numKgroups=" << numKgroups
+           << "(< 2) or numStages=" << numStages << "(< 3) -> BAIL";
     return;
   }
 
@@ -532,7 +532,8 @@ static void getNvidiaAmpereTensorCorePipeline(
   if (!(mainloop.asyncCreateGroupOp.size() == 1) ||
       !(mainloop.asyncWaitOps.size() == 1) ||
       !(mainloop.barrierOps.size() == 2)) {
-    LDBG() << "--failed prereqs: 1 async_create, 1 async_wait, 2 barriers -> BAIL";
+    LDBG()
+        << "--failed prereqs: 1 async_create, 1 async_wait, 2 barriers -> BAIL";
     return;
   }
 

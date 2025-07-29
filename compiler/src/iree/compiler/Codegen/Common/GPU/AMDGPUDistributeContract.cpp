@@ -216,9 +216,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                 lhsBatchOffsets, rhsBatchOffsets, lhsMap,
                                 rhsMap);
         LDBG() << "current lhs batch offsets: "
-             << llvm::interleaved_array(lhsBatchOffsets);
+               << llvm::interleaved_array(lhsBatchOffsets);
         LDBG() << "current rhs batch offsets: "
-             << llvm::interleaved_array(rhsBatchOffsets);
+               << llvm::interleaved_array(rhsBatchOffsets);
 
         Value lhsSlice =
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);

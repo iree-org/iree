@@ -872,14 +872,16 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
-        LDBG() << "shape for vector.xfer_read: " << llvm::interleaved(readShape);
+        LDBG() << "shape for vector.xfer_read: "
+               << llvm::interleaved(readShape);
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
-        LDBG() << "shape for vector.xfer_read: " << llvm::interleaved(readShape);
+        LDBG() << "shape for vector.xfer_read: "
+               << llvm::interleaved(readShape);
         return readShape;
       }
       // For matrixB.
@@ -899,7 +901,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
           sliceType = vecType;
         }
         LDBG() << "shape for vector.xfer_read: "
-             << llvm::interleaved(sliceType.getShape());
+               << llvm::interleaved(sliceType.getShape());
         return llvm::to_vector(sliceType.getShape());
       }
     }

@@ -421,7 +421,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   }
 
   LDBG() << "after folding tensor.extract_slice and vector.transfer_read Ops \n"
-       << funcOp;
+         << funcOp;
 }
 
 } // namespace

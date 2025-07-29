@@ -133,7 +133,8 @@ struct ROCDLConfigureBufferInstructionsPass final
     func.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
       Value offset = binding.getByteOffset();
       if (offset && !isDefinitelyWorkgroupUniform(offset)) {
-        LDBG() << "Binding offset " << offset << " not known workgroup-uniform\n";
+        LDBG() << "Binding offset " << offset
+               << " not known workgroup-uniform\n";
         return;
       }
       std::optional<int64_t> maxBytes = getSpannedBytes(binding);
@@ -143,7 +144,8 @@ struct ROCDLConfigureBufferInstructionsPass final
       }
       if (*maxBytes >=
           static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
-        LDBG() << "Size of " << binding << " too large (" << *maxBytes << " bytes)";
+        LDBG() << "Size of " << binding << " too large (" << *maxBytes
+               << " bytes)";
         return;
       }
       annotationHelper.setAttr(binding, unitAttr);

@@ -841,8 +841,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       for (unsigned i = maxCandidate; i >= 1; i >>= 1) {
         candidates.push_back(i * workgroupTileMultiple);
       }
-      LDBG() << 
-          "Base candidate tile sizes: " << llvm::interleaved_array(candidates);
+      LDBG() << "Base candidate tile sizes: "
+             << llvm::interleaved_array(candidates);
 
       int64_t candidateWorkgroupSize = 1;
       for (int64_t candidate : candidates) {
@@ -992,7 +992,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  LDBG() << "Selected tile and fuse lowering config: " << loweringConfig << "\n";
+  LDBG() << "Selected tile and fuse lowering config: " << loweringConfig
+         << "\n";
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
@@ -1100,7 +1101,8 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  LDBG() << "Selected tile and fuse lowering config: " << loweringConfig << "\n";
+  LDBG() << "Selected tile and fuse lowering config: " << loweringConfig
+         << "\n";
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(

@@ -410,7 +410,7 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
       int64_t factor = seen ? 1LL : maxUnrollFactor;
       seen = true;
       LDBG() << "Adjusted min tile sizes: " << minTileSizes[unrollDim]
-                                       << " with factor=" << factor << "\n";
+             << " with factor=" << factor << "\n";
       minTileSizes[unrollDim] =
           std::min<int64_t>(minTileSizes[unrollDim], factor);
     }
@@ -1163,7 +1163,7 @@ static LogicalResult setMatmulPeelingRootConfig(
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
   LDBG() << "Final tile sizes and scalable flags for contraction: "
-       << loweringConfig;
+         << loweringConfig;
 
   DictionaryAttr pipelineConfig =
       getPipelineConfWithPeelingAttr(op.getContext());
@@ -1213,7 +1213,7 @@ static LogicalResult setMatmulRootConfig(
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
   LDBG() << "Final tile sizes and scalable flags for contraction: "
-       << loweringConfig;
+         << loweringConfig;
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, loweringConfig,
@@ -2787,7 +2787,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
     return success();
 
   LDBG() << "The tile sizes for each dimension should be aligned to "
-       << alignedSizes;
+         << alignedSizes;
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
@@ -2807,7 +2807,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LDBG() << "unpack fusion does not work with peeling, falling back to "
-         "non-peeling path";
+              "non-peeling path";
     pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 
     // Remove the "enable_loop_peeling" attr from pipelineConfig

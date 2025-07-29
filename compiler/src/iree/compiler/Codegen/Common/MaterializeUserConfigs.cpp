@@ -115,7 +115,7 @@ getTransformLibraryFromPath(ModuleOp compiledModule, StringRef path) {
            << "Failed to load transform library module: " << libraryFileName;
   }
   LDBG() << "--found transform library " << libraryFileName << "@"
-                                    << entrySequenceName;
+         << entrySequenceName;
   return TransformLibraryWithEntrypoint{*maybeTransformLibrary,
                                         entrySequenceName.str()};
 }

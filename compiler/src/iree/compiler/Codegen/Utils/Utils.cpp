@@ -1701,8 +1701,8 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     if (ShapedType::isStatic(dimSize)) {
       result.vectorSizes.push_back(dimSize);
       result.vectorScalableFlags.push_back(dimScalable);
-      LDBG() << "Inferred iteration size '" << dimSize << "' for dimension '" << dim
-                                       << "'";
+      LDBG() << "Inferred iteration size '" << dimSize << "' for dimension '"
+             << dim << "'";
       continue;
     }
 
@@ -1726,9 +1726,9 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     dimScalable = maybeDimBound->scalable;
     result.vectorSizes.push_back(dimSize);
     result.vectorScalableFlags.push_back(dimScalable);
-    LDBG() << "Inferred iteration size '"
-         << dimSize << (dimScalable ? " x vscale" : "") << "' for dimension '"
-         << dim << "'";
+    LDBG() << "Inferred iteration size '" << dimSize
+           << (dimScalable ? " x vscale" : "") << "' for dimension '" << dim
+           << "'";
   }
 
   if (opResult) {

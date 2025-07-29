@@ -1052,7 +1052,8 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
         return dim.kind == TileSwizzle::Dim::Kind::Internal;
       });
 
-  LDBG() << "accCrossIntrinsicShape: " << llvm::interleaved(accCrossIntrinsicShape);
+  LDBG() << "accCrossIntrinsicShape: "
+         << llvm::interleaved(accCrossIntrinsicShape);
   LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
   int dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);

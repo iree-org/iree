@@ -262,8 +262,9 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
-    LDBG() << "candidate: " << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
-                       << " penalty:" << ratedTile.paddingPenalty;
+    LDBG() << "candidate: "
+           << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
+           << " penalty:" << ratedTile.paddingPenalty;
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -278,10 +279,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // Sanity check. This assert can only fail if there's a programming mistake
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
-  LDBG() << "bestRatedTile: " << llvm::interleaved(ArrayRef{bestRatedTile.M,
-                                                       bestRatedTile.N,
-                                                       bestRatedTile.K})
-                         << " penalty:" << bestRatedTile.paddingPenalty;
+  LDBG() << "bestRatedTile: "
+         << llvm::interleaved(
+                ArrayRef{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
+         << " penalty:" << bestRatedTile.paddingPenalty;
   return bestRatedTile;
 }
 

@@ -281,8 +281,8 @@ private:
       if (!hasStage && !isa<gpu::BarrierOp>(op)) {
         if (!isPure(&op)) {
           LDBG() << "Found a non-pure loop body op not assigned to any stage "
-               "(unsupported loop): "
-               << op;
+                    "(unsupported loop): "
+                 << op;
           return failure();
         }
       }
