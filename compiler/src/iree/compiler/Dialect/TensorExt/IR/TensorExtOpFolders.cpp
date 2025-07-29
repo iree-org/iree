@@ -15,7 +15,8 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 // iree_tensor_ext.bitcast
 //===----------------------------------------------------------------------===//
 
-struct ReplaceBitCastIfTensorOperandEmpty : public OpRewritePattern<BitCastOp> {
+namespace {
+struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
   using OpRewritePattern<BitCastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -28,6 +29,74 @@ struct ReplaceBitCastIfTensorOperandEmpty : public OpRewritePattern<BitCastOp> {
     return success();
   }
 };
+
+struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
+  using OpRewritePattern<BitCastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BitCastOp bitcastOp,
+                                PatternRewriter &rewriter) const final {
+    auto tensorCastOp = bitcastOp.getSource().getDefiningOp<tensor::CastOp>();
+    if (!tensorCastOp)
+      return failure();
+    auto tensorCastSrcType =
+        dyn_cast<RankedTensorType>(tensorCastOp.getOperand().getType());
+    if (!tensorCastSrcType) {
+      return failure();
+    }
+
+    // Ranked tensor casting can only change the amount of static information.
+    // Only fold if the amount of static information is increasing.
+    if (!tensor::canFoldIntoConsumerOp(tensorCastOp)) {
+      return failure();
+    }
+
+    // TODO: Support partial static info incorporation.
+    if (bitcastOp.getSourceDims() != bitcastOp.getResultDims()) {
+      return failure();
+    }
+
+    RankedTensorType intermediateTensorType = bitcastOp.getSource().getType();
+    RankedTensorType resTensorType = bitcastOp.getResult().getType();
+    ArrayRef<int64_t> resShape = resTensorType.getShape();
+
+    SmallVector<Value> newDynamicDims;
+    int64_t intermediateDynamicDim = 0;
+    int64_t resDynamicDim = 0;
+    SmallVector<int64_t> newResultSizes(resShape);
+    // Drop the dynamic dims that become static after incorporating the cast.
+    for (auto [castSize, sourceSize] : llvm::zip_equal(
+             tensorCastSrcType.getShape(), intermediateTensorType.getShape())) {
+      if (!ShapedType::isDynamic(sourceSize))
+        continue;
+
+      while (!ShapedType::isDynamic(resShape[resDynamicDim])) {
+        ++resDynamicDim;
+      }
+
+      if (ShapedType::isDynamic(castSize)) {
+        newDynamicDims.push_back(
+            bitcastOp.getSourceDims()[intermediateDynamicDim]);
+      } else {
+        newResultSizes[resDynamicDim] = castSize;
+      }
+      ++intermediateDynamicDim;
+    }
+
+    auto newType =
+        RankedTensorType::get(newResultSizes, resTensorType.getElementType(),
+                              resTensorType.getEncoding());
+    Value newBitcast = rewriter.create<BitCastOp>(
+        bitcastOp.getLoc(), newType, tensorCastOp.getOperand(), newDynamicDims,
+        newDynamicDims);
+    // We create a new cast to continue propagating static information.
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(bitcastOp, resTensorType,
+                                                newBitcast);
+
+    return success();
+  }
+};
+
+}; // namespace
 
 OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
   auto sourceType = llvm::cast<ShapedType>(getSource().getType());
@@ -46,7 +115,8 @@ OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
 
 void BitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
-  results.insert<ReplaceBitCastIfTensorOperandEmpty>(context);
+  results.insert<ReplaceBitCastIfTensorOperandEmpty,
+                 BitCastOfTensorCastStaticInfo>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -321,7 +391,7 @@ struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
                                 PatternRewriter &rewriter) const override {
-    auto blockArg = llvm::dyn_cast<BlockArgument>(ordinalOp.getOperand());
+    auto blockArg = dyn_cast<BlockArgument>(ordinalOp.getOperand());
     if (!blockArg) {
       return failure();
     }
