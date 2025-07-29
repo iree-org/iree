@@ -2130,7 +2130,9 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) {
     return setOpConfigAndEntryPointFnTranslation(
-        entryPointFn, genericOp, TileSizesListType{{}},
+        entryPointFn, genericOp,
+        IREE::CPU::LoweringConfigAttr::get(genericOp.getContext(),
+                                           SmallVector<NamedAttribute>()),
         DispatchLoweringPassPipeline::CPUDefault);
   }
 
@@ -2674,17 +2676,23 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
-  TileSizesListType tileSizes = {distTileSizes};
-  SmallVector<int64_t> vecTileSizes = distTileSizes;
 
   // Add an extra level of tiling.
   // TODO: Limit vector tile sizes for other TilingInterface ops.
+  SmallVector<int64_t> vecTileSizes = distTileSizes;
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
     limitVectorTileSizes(linalgOp, vecTileSizes);
   }
-  tileSizes.push_back(vecTileSizes);
+
+  LoweringConfigGenerator generator(op);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG("Set lowering_config for tensor.pad op: " << loweringConfig);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
+      entryPointFn, op, loweringConfig,
+      DispatchLoweringPassPipeline::CPUDefault);
 }
 
 /// Redirects to methods that set the configuration based on operation type.
