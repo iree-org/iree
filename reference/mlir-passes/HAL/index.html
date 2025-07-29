@@ -2926,6 +2926,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-hal-resolve-topology-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-hal-resolve-topology-queries
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-hal-serialize-all-executables" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-hal-serialize-all-executables
@@ -5693,6 +5702,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-hal-resolve-topology-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-hal-resolve-topology-queries
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-hal-serialize-all-executables" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-hal-serialize-all-executables
@@ -6130,6 +6148,13 @@ were promised. Verifies that all promises are resolved.</p>
 <p>Severs symbolic references to hal.executable.export ops from dispatch sites
 by replacing them with the ordinal assigned to the exports. This allows for
 subsequent passes to collapse the executables into opaque blobs.</p>
+<h3 id="-iree-hal-resolve-topology-queries"><code>-iree-hal-resolve-topology-queries</code><a class="headerlink" href="#-iree-hal-resolve-topology-queries" title="Permanent link">link</a></h3>
+<p><em>Try to statically resolve ops using topology information.</em></p>
+<p>Attempts to statically resolve <code>hal.allocator.resolve_memory_properties</code> ops
+that have the <code>hal.device.optimal</code> attribute. This is either done by checking the
+topology information for transparent access between devices or by using the
+DeviceAnalysis to check if two affinities refer to the same device. Otherwise,
+the operation is left unmodified to be resolved at runtime.</p>
 <h3 id="-iree-hal-serialize-all-executables"><code>-iree-hal-serialize-all-executables</code><a class="headerlink" href="#-iree-hal-serialize-all-executables" title="Permanent link">link</a></h3>
 <p><em>Converts hal.executable.variants to one or more hal.executable.binary ops.</em></p>
 <p>Runs a nested pipeline on each executable to serialize its variants from
