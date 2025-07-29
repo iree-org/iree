@@ -1180,7 +1180,7 @@ static LogicalResult setMatmulRootConfig(
     ArrayRef<int64_t> inputVecTileSizes, int vectorSize,
     VectorPreProcStrategy vecPreProcStrategy) {
   assert(vecPreProcStrategy != VectorPreProcStrategy::Peeling &&
-         "peeling should go setMatmulPeelingRootConfig method");
+         "peeling should go to the setMatmulPeelingRootConfig method");
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
