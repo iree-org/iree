@@ -132,6 +132,11 @@ static llvm::cl::opt<bool>
                     llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDirectConvolution(
+    "iree-codegen-use-direct-convolution",
+    llvm::cl::desc("Use direct convolution in tile and fuse pipeline"),
+    llvm::cl::init(false));
+
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -1079,6 +1084,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         context, /*prefetchSharedMemory=*/true,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*use_igemm_convolution=*/false,
+        /*use_direct_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
     pipelineAttrs.emplace_back(
         IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
@@ -1341,6 +1347,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
         context, /*prefetchSharedMemory=*/true,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*use_igemm_convolution=*/false,
+        /*use_direct_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
     pipelineAttrs.emplace_back(
         StringAttr::get(context,
@@ -2141,6 +2148,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
           context, /*prefetchSharedMemory=*/false,
           /*no_reduce_shared_memory_bank_conflicts=*/true,
           /*use_igemm_convolution=*/false,
+          /*use_direct_convolution=*/false,
           /*reorder_workgroups_strategy=*/std::nullopt);
       pipelineAttrs.emplace_back(
           b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
@@ -2859,6 +2867,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG() << "Tile and fuse matmul config";
+      return success();
+    }
+  }
+  if (clDirectConvolution) {
+    if (succeeded(IREE::GPU::setDirectConvolutionLoweringConfig(
+            target, entryPointFn, computeOp))) {
+      LDBG() << "Direct Convolution Config";
       return success();
     }
   }
