@@ -109,6 +109,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       context, /*prefetchSharedMemory=*/false,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
       /*use_igemm_convolution=*/false,
+      /*use_direct_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
@@ -505,6 +506,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/true,
+      /*use_direct_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       StringAttr::get(linalgOp->getContext(),
@@ -562,6 +564,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/false,
+      /*use_direct_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       StringAttr::get(linalgOp->getContext(),
@@ -1124,6 +1127,196 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
       {flatWorkgroupSize, 1, 1}, flatWorkgroupSize, DictionaryAttr());
 }
 
+LogicalResult
+setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *computeOp) {
+  auto op = dyn_cast<linalg::LinalgOp>(computeOp);
+  if (target.getWgp().getMma().empty())
+    return failure();
+
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
+      mlir::linalg::inferConvolutionDims(op);
+  if (failed(convolutionDims)) {
+    return failure();
+  }
+
+  // This strategy turns non-strided/dilated convolution problems into matmul
+  // problems by tiling certain dimensions to 1:
+  //  - Batch dimensions (parallel shared by the image and output)
+  //  - Filter dimensions (reduction on the filter, and convolved on the image)
+  //  - All output image dimensions except the outermost one
+  //
+  // After this, the remaining non-unit dimensions are:
+  //  - One output image dimension corresponding to the M dimension of a matmul.
+  //  - The output channel dimension, corresponding to the N dimension.
+  //  - The input channel dimension, corresponding to the K dimension.
+
+  // TODO: Relax this condition to strictly alignment requirements.
+  if (convolutionDims->outputChannel.size() < 1 ||
+      convolutionDims->inputChannel.size() < 1 ||
+      convolutionDims->filterLoop.size() < 1 ||
+      convolutionDims->outputImage.size() < 1 ||
+      convolutionDims->depth.size() != 0) {
+    return failure();
+  }
+
+  auto isAllOnesList = [](ArrayRef<int64_t> list) {
+    return llvm::all_of(list, [](int64_t i) { return i == 1; });
+  };
+
+  // TODO: Support non-unit strides/dilations.
+  if (!isAllOnesList(convolutionDims->strides) ||
+      !isAllOnesList(convolutionDims->dilations)) {
+    return failure();
+  }
+
+  int64_t mDim = convolutionDims->outputImage.back();
+  int64_t nDim = convolutionDims->outputChannel.back();
+  // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
+  // the distribution patterns currently do not support that variant.
+  if (mDim > nDim) {
+    return failure();
+  }
+  int64_t kDim = convolutionDims->inputChannel.back();
+
+  Value lhs = op.getDpsInputOperand(0)->get();
+  Value rhs = op.getDpsInputOperand(1)->get();
+  Value init = op.getDpsInitOperand(0)->get();
+
+  Type lhsElemType = getElementTypeOrSelf(lhs);
+  Type rhsElemType = getElementTypeOrSelf(rhs);
+  Type initElemType = getElementTypeOrSelf(init);
+
+  // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
+  // once the pipeline is able to support it. After adding multiple dimensions,
+  // all instances of schedule->m/nSubgroupCounts[0] and
+  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
+  // just the first element.
+  GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
+                             lhsElemType,  rhsElemType,  initElemType};
+
+  // Helper fn to store mma information.
+  auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
+                         SmallVector<GPUIntrinsicType> &intrinsics) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+  };
+
+  SmallVector<GPUIntrinsicType> intrinsics;
+  intrinsics.reserve(target.getWgp().getMma().size());
+  MLIRContext *context = op.getContext();
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
+    storeMmaInfo(mma, intrinsics);
+    // Store info on virtual intrinsics based on current mma if any
+    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
+         mma.getVirtualIntrinsics()) {
+      auto virtualMma =
+          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
+      storeMmaInfo(virtualMma, intrinsics);
+    }
+  }
+
+  if (intrinsics.empty())
+    return failure();
+
+  // Note that the following heuristic seeds are just placeholder values.
+  // We need to clean it up and make it adjusting to different targets.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
+  GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
+                             /*bestMNTileCountPerSubgroup=*/8,
+                             /*bestKTileCountPerSubgroup=*/2};
+
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  // First try to find a schedule with an exactly matching intrinsic.
+  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
+  if (failed(schedule)) {
+    // Then try again by allowing upcasting accumulator.
+    schedule = deduceMMASchedule(
+        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
+        /*transposedLhs*/ false, /*transposedRhs*/ false,
+        /*canUpcastAcc=*/true);
+  }
+  if (failed(schedule)) {
+    return failure();
+  }
+
+  int64_t flatWorkgroupSize =
+      targetSubgroupSize *
+      ShapedType::getNumElements(schedule->nSubgroupCounts) *
+      ShapedType::getNumElements(schedule->mSubgroupCounts);
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
+
+  SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> subgroupTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> convTileSizes(op.getNumLoops(), 0);
+  // Tile all batch dimensions with unit size.
+  for (int64_t batch : convolutionDims->batch) {
+    workgroupTileSizes[batch] = 1;
+  }
+  // Tile all output image dimensions with unit size except the last one.
+  for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
+    workgroupTileSizes[oi] = 1;
+  }
+  for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
+    workgroupTileSizes[oc] = 1;
+  }
+  for (int64_t ic : llvm::drop_end(convolutionDims->inputChannel)) {
+    reductionTileSizes[ic] = 1;
+  }
+  // Compute the M/N dimension tile size by multiply subgroup information.
+  workgroupTileSizes[mDim] =
+      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
+  subgroupTileSizes[mDim] = schedule->mTileSizes[0];
+  workgroupTileSizes[nDim] =
+      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  subgroupTileSizes[nDim] = schedule->nTileSizes[0];
+
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+
+  Builder b(context);
+  SmallVector<NamedAttribute, 4> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
+      NamedAttribute("conv_reduction", b.getI64ArrayAttr(convTileSizes)),
+      NamedAttribute("subgroup", b.getI64ArrayAttr(subgroupTileSizes))};
+  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
+  IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
+  // IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
+  // IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
+
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+
+  // Prefetch shared memory is kept off.
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*use_igemm_convolution=*/false,
+      /*use_direct_convolution=*/true,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  pipelineAttrs.emplace_back(
+      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
+
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse, workgroupSize,
+      targetSubgroupSize, pipelineConfig);
+}
+
 //====---------------------------------------------------------------------===//
 // Sort Pipeline Configuration
 //====---------------------------------------------------------------------===//
@@ -1237,6 +1430,11 @@ getPipelineOptions(FunctionOpInterface funcOp,
     if (useIgemmConvolution) {
       pipelineOptions.useIgemmConvolution = useIgemmConvolution.getValue();
     }
+    BoolAttr useDirectConvolution =
+        pipelineOptionsAttr.getUseDirectConvolution();
+    if (useDirectConvolution) {
+      pipelineOptions.useDirectConvolution = useDirectConvolution.getValue();
+    }
     ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
         pipelineOptionsAttr.getReorderWorkgroupsStrategy();
     if (reorderWorkgroupsStrategy) {
@@ -1271,6 +1469,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
             << options.enableReduceSharedMemoryBankConflicts << ", "
             << ", prefetchSharedMemory = " << options.prefetchSharedMemory
             << ", useIgemmConvolution = " << options.useIgemmConvolution
+            << ", useDirectConvolution = " << options.useDirectConvolution
             << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
