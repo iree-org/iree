@@ -311,13 +311,13 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
-/// Returns the inferred input-vector-sizes for the `op`, given the inferred
-/// vector sizes for the write operation. Returns std::nullopt, if it fails to
-/// compute the sizes.
+/// Returns the inferred input-vector-sizes for the `op` (for read + write
+/// operations), given the provided vector sizes for the write operation.
+/// Returns std::nullopt, if it fails to compute the sizes.
 /// For now, it only supports non-scalable vectors.
 std::optional<SizesAndScalableFlags>
 getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
-                                 ArrayRef<int64_t> vectorSizes,
+                                 ArrayRef<int64_t> writeVectorSizes,
                                  ArrayRef<bool> scalableFlags);
 
 /// Returns the result sizes and vector input sizes of the linalg.unpack op.

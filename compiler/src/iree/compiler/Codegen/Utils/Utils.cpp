@@ -1793,7 +1793,7 @@ getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
                                  ArrayRef<int64_t> vectorSizes,
                                  ArrayRef<bool> scalableFlags) {
   assert(vectorSizes.size() == op.getDestRank());
-  if (llvm::any_of(scalableFlags, [](bool val) { return val == false; })) {
+  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
     return std::nullopt;
   }
 
@@ -1834,9 +1834,9 @@ getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
   // The input-vector-sizes, that used in vectorization, specify both the read
   // and the write vector sizes and are passed as one array covering both
   // operations, i.e.:
-  //   input-vector-sizes = [1, 1, 8, [8],  8, [8]]
-  //                         \         /    \    /
-  //                         read-sizes   write-sizes
+  //   input-vector-sizes = [8, 16, 32, 16, 512, 128]
+  //                         \          /   \      /
+  //                          read-sizes   write-sizes
   SizesAndScalableFlags result;
   result.first.assign(readVectorSizes.begin(), readVectorSizes.end());
   result.first.append(vectorSizes.begin(), vectorSizes.end());
