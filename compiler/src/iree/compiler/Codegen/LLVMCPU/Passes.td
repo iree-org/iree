@@ -138,7 +138,9 @@ def LLVMCPUTilePass :
   }];
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Tiling level used to retrieve the configuration from lowering_config">
+      "Tiling level used to retrieve the configuration from lowering_config.">,
+    Option<"skipRootOp", "skip-root-op", "bool", /*default=*/"false",
+      "Do not tile the root op if the option is true.">
   ];
 }
 

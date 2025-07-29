@@ -36,9 +36,7 @@ namespace {
 /// lowering_config.
 struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
   using impl::LLVMCPUTilePassBase<LLVMCPUTilePass>::LLVMCPUTilePassBase;
-  explicit LLVMCPUTilePass(int64_t tilingLevel) {
-    this->tilingLevel = tilingLevel;
-  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -75,8 +73,17 @@ void LLVMCPUTilePass::runOnOperation() {
       LDBG("can't find lowering_config, skip tiling");
       continue;
     }
+    if (!maybeLoweringConfig.hasTilingLevel(tilingLevel)) {
+      LDBG("target tiling level does not exist");
+      continue;
+    }
 
     LDBG("candidate: " << op);
+    if (skipRootOp && maybeLoweringConfig.hasWorkgroupTilingLevel()) {
+      LDBG("skip tiling on the root op");
+      continue;
+    }
+
     auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
         getLoweringConfig(op).getTilingLevelAttr(tilingLevel));
     SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
@@ -115,8 +122,11 @@ void LLVMCPUTilePass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel) {
-  return std::make_unique<LLVMCPUTilePass>(tilingLevel);
+createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp) {
+  LLVMCPUTilePassOptions options;
+  options.tilingLevel = tilingLevel;
+  options.skipRootOp = skipRootOp;
+  return std::make_unique<LLVMCPUTilePass>(options);
 }
 
 } // namespace mlir::iree_compiler

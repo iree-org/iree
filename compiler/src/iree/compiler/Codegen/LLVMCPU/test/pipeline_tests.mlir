@@ -579,3 +579,79 @@ func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.exec
 // CHECK:           iree_linalg_ext.map_scatter
 // CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 // CHECK:         scf.forall
+
+// -----
+
+// Verify that the dispatch can be compiled without creating large vectors.
+
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "", max_stack_allocation_size = 32768 : i64, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @softmax_dynamic_with_assume_int_hints() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 0xFFC00000 : f32
+  %c1 = arith.constant 1 : index
+  %c32_i64 = arith.constant 32 : i64
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
+  %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
+  %5 = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : i32
+  %6 = arith.extui %0 : i32 to i64
+  %7 = arith.extui %1 : i32 to i64
+  %8 = arith.shli %7, %c32_i64 : i64
+  %9 = arith.ori %6, %8 : i64
+  %10 = arith.index_castui %9 : i64 to index
+  %11 = arith.extui %2 : i32 to i64
+  %12 = arith.extui %3 : i32 to i64
+  %13 = arith.shli %12, %c32_i64 : i64
+  %14 = arith.ori %11, %13 : i64
+  %15 = arith.index_castui %14 : i64 to index
+  %16 = arith.extui %4 : i32 to i64
+  %17 = arith.extui %5 : i32 to i64
+  %18 = arith.shli %17, %c32_i64 : i64
+  %19 = arith.ori %16, %18 : i64
+  %20 = arith.index_castui %19 : i64 to index
+  %21:3 = util.assume.int
+      %10<umin = 0, umax = 9007199254740991>,
+      %15<umin = 0, umax = 9007199254740991>,
+      %20<umin = 0, umax = 9007199254740991>
+    : index, index, index
+  %22 = iree_tensor_ext.dispatch.workload.ordinal %21#0, 0 : index
+  %23 = iree_tensor_ext.dispatch.workload.ordinal %21#1, 1 : index
+  %24 = iree_tensor_ext.dispatch.workload.ordinal %21#2, 2 : index
+  %25 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%22, %23, %24}
+  %26 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%22, %23, %24}
+  %27 = iree_tensor_ext.dispatch.tensor.load %25, offsets = [0, 0, 0], sizes = [%22, %23, %24], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%22, %23, %24} -> tensor<?x?x?xf32>
+  %28 = tensor.empty(%22, %23, %24) : tensor<?x?x?xf32>
+  %dim = tensor.dim %27, %c0 : tensor<?x?x?xf32>
+  %dim_1 = tensor.dim %27, %c1 : tensor<?x?x?xf32>
+  %29 = tensor.empty(%dim, %dim_1) : tensor<?x?xf32>
+  %30 = linalg.fill ins(%cst_0 : f32) outs(%29 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %31 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%27 : tensor<?x?x?xf32>) outs(%30 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %35 = arith.maxnumf %in, %out : f32
+    linalg.yield %35 : f32
+  } -> tensor<?x?xf32>
+  %32 = linalg.fill ins(%cst : f32) outs(%29 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %33 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%27, %31 : tensor<?x?x?xf32>, tensor<?x?xf32>) outs(%32 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %out: f32):
+    %35 = arith.subf %in, %in_2 : f32
+    %36 = math.exp %35 : f32
+    %37 = arith.addf %36, %out : f32
+    linalg.yield %37 : f32
+  } -> tensor<?x?xf32>
+  %34 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%27, %31, %33 : tensor<?x?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>) outs(%28 : tensor<?x?x?xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %35 = arith.subf %in, %in_2 : f32
+    %36 = math.exp %35 : f32
+    %37 = arith.divf %36, %in_3 : f32
+    linalg.yield %37 : f32
+  } -> tensor<?x?x?xf32>
+  iree_tensor_ext.dispatch.tensor.store %34, %26, offsets = [0, 0, 0], sizes = [%22, %23, %24], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%22, %23, %24}
+  return
+}
+// CHECK-LABEL: func.func @softmax_dynamic_with_assume_int_hints(
