@@ -1403,7 +1403,7 @@ func.func @bufferize_cst_output_tensor() {
 
 //       CHECK-DAG: %[[CST1:.+]] = arith.constant -2147483648 : i32
 //       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-//       CHECK: %[[CAST5:.+]] = bufferization.to_buffer %[[CST5]] : tensor<5xi32> to memref<5xi32>
+//       CHECK: %[[CAST5:.+]] = bufferization.to_buffer %[[CST5]] read_only : tensor<5xi32> to memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<5xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<i32, #hal.descriptor_type<storage_buffer>>
 //       CHECK: linalg.fill ins(%[[CST1]] : i32) outs(%[[OUTPUT]] : memref<i32{{.+}}>)
@@ -3123,3 +3123,53 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 // CHECK: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.+]] = bufferization.to_buffer %[[SOURCE]]
 // CHECK: iree_vector_ext.transfer_gather %[[BUFFER]][%[[C0]], %[[C0]]][%[[INDICES]]: vector<8xindex>, None]
+
+// -----
+
+func.func @convert_to_buffer() -> memref<6xf32> {
+  %alloc = bufferization.alloc_tensor() : tensor<6xf32>
+  %memref = bufferization.to_buffer %alloc : tensor<6xf32> to memref<6xf32>
+  return %memref : memref<6xf32>
+}
+
+// CHECK-LABEL: func.func @convert_to_buffer
+// CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
+// CHECK:         return %[[ALLOC]]
+
+// -----
+
+func.func @readonly_constant_bufferize() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant dense<0> : tensor<6xi32>
+  %0 = hal.interface.binding.subspan
+    layout(<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+    binding(0) alignment(64) offset(%c0) flags(Indirect)
+    : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<6xi32>>
+  iree_tensor_ext.dispatch.tensor.store %cst, %0, offsets = [0], sizes = [6], strides = [1]
+    : tensor<6xi32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<6xi32>>
+  return
+}
+
+// CHECK-LABEL: func.func @readonly_constant_bufferize
+// CHECK:         %[[CST:.+]] = arith.constant dense<0> : tensor<6xi32>
+// CHECK:         %[[MEMREF:.+]] = bufferization.to_buffer %[[CST]] read_only
+// CHECK:         linalg.generic {{.*}} ins(%[[MEMREF]]
+
+// -----
+
+func.func @retry_constant_bufferize() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant dense<0> : tensor<6xi32>
+  %0 = bufferization.to_buffer %cst read_only : tensor<6xi32> to memref<6xi32>
+  %1 = hal.interface.binding.subspan
+    layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>)
+    binding(0) alignment(64) offset(%c0) flags(Indirect)
+    : memref<6xi32, #hal.descriptor_type<storage_buffer>>
+  memref.copy %0, %1 : memref<6xi32> to memref<6xi32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @retry_constant_bufferize
+// CHECK:         %[[CST:.+]] = arith.constant dense<0> : tensor<6xi32>
+// CHECK:         %[[MEMREF:.+]] = bufferization.to_buffer %[[CST]] read_only
+// CHECK:         memref.copy %[[MEMREF]]

@@ -92,7 +92,7 @@ func.func @concatenate_cst() {
 
 // CHECK-LABEL: func.func @concatenate_cst()
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
-//   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_buffer %[[CST]] : tensor<2x3xi32> to memref<2x3xi32
+//   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_buffer %[[CST]] read_only : tensor<2x3xi32> to memref<2x3xi32
 //   CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan
 //   CHECK-DAG:   %[[DEST:.+]] = memref.assume_alignment %[[DEST_BINDING]], 64
 //   CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[DEST]][0, 2] [2, 3]
