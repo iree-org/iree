@@ -18,8 +18,7 @@ func.func @transpose_f32() attributes {hal.executable.target = #executable_targe
   iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : tensor<32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
   return
 }
-
-//   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], {{\[}}[4], [4]], [0, 0], [0, 0]]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 16], vector_common_parallel = {{\[}}[4], [4]], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_f32()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -46,8 +45,7 @@ func.func @transpose_output_indexing_map_f32() attributes {hal.executable.target
   iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : tensor<32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
   return
 }
-
-//   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], {{\[}}[4], [4]], [0, 0], [0, 0]]>
+//   CHECK: #[[CONFIG:.+]] =  #iree_cpu.lowering_config<distribution = [4, 16], vector_common_parallel = {{\[}}[4], [4]], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_output_indexing_map_f32()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -74,8 +72,7 @@ func.func @transpose_f64() attributes {hal.executable.target = #executable_targe
   iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : tensor<32x32xf64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf64>>
   return
 }
-
-//   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], {{\[}}[2], [2]], [0, 0], [0, 0]]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 16], vector_common_parallel = {{\[}}[2], [2]], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_f64()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -102,8 +99,7 @@ func.func @transpose_unsupported_not_rank_2() attributes {hal.executable.target 
   iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [2, 8, 4], strides = [1, 1, 1] : tensor<2x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x8x4xf32>>
   return
 }
-
-//   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 8, 4], [1, 4, 4], [0, 0, 0], [0, 0, 0]]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [2, 8, 4], vector_common_parallel = [1, 4, 4], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 0]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_unsupported_not_rank_2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -130,8 +126,7 @@ func.func @transpose_unsupported_not_simple_transpose() attributes {hal.executab
   iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : tensor<32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
   return
 }
-
-//   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32], {{\[}}4, 4], [0, 0], [0, 0]]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [32, 32], vector_common_parallel = [4, 4], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //       CHECK: func.func @transpose_unsupported_not_simple_transpose()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]

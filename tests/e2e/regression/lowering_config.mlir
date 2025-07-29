@@ -1,11 +1,11 @@
 #compilation0 = #iree_codegen.compilation_info<
-    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [1, 8, 0], [0, 0, 8], [0, 0, 0]]>,
+    lowering_config = #iree_cpu.lowering_config<distribution = [32, 32], vector_common_parallel = [1, 8, 0], vector_reduction = [0, 0, 8], vector_inner_parallel = [0, 0, 0]>,
     translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
 #compilation1 = #iree_codegen.compilation_info<
-    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [1, 4, 0], [0, 0, 4], [0, 0, 0]]>,
+    lowering_config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [1, 8, 0], vector_reduction = [0, 0, 4], vector_inner_parallel = [0, 0, 0]>,
     translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
 #compilation2 = #iree_codegen.compilation_info<
-    lowering_config = #iree_codegen.lowering_config<tile_sizes = [{sizes=[32, 64], interchange=[1, 0]}, [1, 1, 0], [0, 0, 8], [0, 0, 0]]>,
+    lowering_config = #iree_cpu.lowering_config<distribution = {sizes=[64, 64], interchange=[1, 0]}, vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 8], vector_inner_parallel = [0, 0, 0]>,
     translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
 
 func.func @lowering_config_test() {

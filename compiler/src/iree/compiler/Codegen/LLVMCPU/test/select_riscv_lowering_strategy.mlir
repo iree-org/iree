@@ -11,8 +11,8 @@ func.func @matmul_riscv(%lhs: tensor<384x512xf32>, %rhs: tensor<512x128xf32>) ->
   %2 = linalg.matmul ins(%lhs, %rhs : tensor<384x512xf32>, tensor<512x128xf32>) outs(%1 : tensor<384x128xf32>) -> tensor<384x128xf32>
   return %2 : tensor<384x128xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[48, 64], [48, 64], [0, 0], [8, 32], [0, 0], [0, 0]]>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[48, 64, 0], [48, 64, 0], [0, 0, 0], [8, 32, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [48, 64], cache_reduction = [0, 0], vector_common_parallel = [8, 32], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<cache_parallel = [48, 64, 0], cache_reduction = [0, 0, 0], distribution = [48, 64, 0], vector_common_parallel = [8, 32, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_riscv(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -31,8 +31,8 @@ func.func @matmul_gemm_riscv_vl512(%lhs: tensor<384x512xf32>, %rhs: tensor<512x1
   %res = linalg.matmul ins(%lhs, %rhs : tensor<384x512xf32>, tensor<512x128xf32>) outs(%fill : tensor<384x128xf32>) -> tensor<384x128xf32>
   return %res : tensor<384x128xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [64, 64], [0, 0], [7, 64], [0, 0], [0, 0]]>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [7, 64, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64], cache_reduction = [0, 0], vector_common_parallel = [7, 64], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], cache_reduction = [0, 0, 0], distribution = [64, 64, 0], vector_common_parallel = [7, 64, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_gemm_riscv_vl512(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -51,16 +51,16 @@ func.func @matmul_gemm_riscv_vl1024(%lhs: tensor<384x512xf32>, %rhs: tensor<512x
   %res = linalg.matmul ins(%lhs, %rhs : tensor<384x512xf32>, tensor<512x256xf32>) outs(%fill : tensor<384x256xf32>) -> tensor<384x256xf32>
   return %res : tensor<384x256xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128], [64, 128], [0, 0], [7, 128], [0, 0], [0, 0]]>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128, 0], [64, 128, 0], [0, 0, 0], [7, 128, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 128], cache_reduction = [0, 0], vector_common_parallel = [7, 128], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 128, 0], cache_reduction = [0, 0, 0], distribution = [64, 128, 0], vector_common_parallel = [7, 128, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_gemm_riscv_vl1024(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG2]]
 
-//  CHECK-AGGRESSIVE-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 256], [32, 256], [0, 0], [7, 128], [0, 0], [0, 0]]>
-//  CHECK-AGGRESSIVE-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 256, 0], [32, 256, 0], [0, 0, 0], [7, 128, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-AGGRESSIVE-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [32, 256], cache_reduction = [0, 0], vector_common_parallel = [7, 128], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
+//  CHECK-AGGRESSIVE-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<cache_parallel = [32, 256, 0], cache_reduction = [0, 0, 0], distribution = [32, 256, 0], vector_common_parallel = [7, 128, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
 //  CHECK-AGGRESSIVE-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK-AGGRESSIVE: func.func @matmul_gemm_riscv_vl1024(
 // CHECK-AGGRESSIVE-SAME:     translation_info = #[[TRANSLATION]]
@@ -79,8 +79,8 @@ func.func @matmul_gemv_riscv_vl512(%lhs: tensor<1x512xf32>, %rhs: tensor<512x128
   %res = linalg.matmul ins(%lhs, %rhs : tensor<1x512xf32>, tensor<512x128xf32>) outs(%fill : tensor<1x128xf32>) -> tensor<1x128xf32>
   return %res : tensor<1x128xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 128], [0, 128], [0, 0], [1, 128], [0, 0], [0, 0]]>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 128, 0], [0, 128, 0], [0, 0, 0], [1, 128, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [0, 128], cache_reduction = [0, 0], vector_common_parallel = [1, 128], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<cache_parallel = [0, 128, 0], cache_reduction = [0, 0, 0], distribution = [0, 128, 0], vector_common_parallel = [1, 128, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_gemv_riscv_vl512(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

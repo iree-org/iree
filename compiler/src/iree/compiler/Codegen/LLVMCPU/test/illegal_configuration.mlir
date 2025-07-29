@@ -1,11 +1,11 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --verify-diagnostics --split-input-file %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0]]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
-func.func @illegal_empty_tiling(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
+func.func @illegal_distribution_only(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
-  // expected-error @+1 {{expected four tiling levels, got 0}}
+  // expected-error @+1 {{expected four tiling levels, got 1}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
 }
