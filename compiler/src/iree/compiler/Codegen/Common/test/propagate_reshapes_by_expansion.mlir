@@ -399,3 +399,29 @@ func.func @swap_inner_bitcast_dynamic_result(%arg0: tensor<3x6xi8>, %arg1: index
 // CHECK-NEXT: %[[BITCAST:.+]] = iree_tensor_ext.bitcast %[[ARG0]] : tensor<3x6xi8> -> tensor<3x3xi16>
 // CHECK-NEXT: %[[SLICE:.+]] = tensor.extract_slice %[[BITCAST]]{{.*}} : tensor<3x3xi16> to tensor<?x3xi16>
 // CHECK-NEXT: return %[[SLICE]]
+
+// -----
+
+func.func @no_swap_encoded_bitcast(%arg0: tensor<3x6xi8, 1>) -> tensor<2x3xi16, 1> {
+  %0 = tensor.extract_slice %arg0 [0, 0] [2, 6] [1, 1] : tensor<3x6xi8, 1> to tensor<2x6xi8, 1>
+  %1 = iree_tensor_ext.bitcast %0 : tensor<2x6xi8, 1> -> tensor<2x3xi16, 1>
+  return %1 : tensor<2x3xi16, 1>
+}
+
+// CHECK-LABEL: @no_swap_encoded_bitcast
+// CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<3x6xi8, 1 : i64>
+// CHECK-NEXT: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
+// CHECK-NEXT: iree_tensor_ext.bitcast %[[SLICE]]
+
+// -----
+
+func.func @no_swap_rank_reducing_slice(%arg0: tensor<3x6xi8>) -> tensor<3xi16> {
+  %0 = tensor.extract_slice %arg0 [0, 0] [1, 6] [1, 1] : tensor<3x6xi8> to tensor<6xi8>
+  %1 = iree_tensor_ext.bitcast %0 : tensor<6xi8> -> tensor<3xi16>
+  return %1 : tensor<3xi16>
+}
+
+// CHECK-LABEL: @no_swap_rank_reducing_slice
+// CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<3x6xi8>
+// CHECK-NEXT: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
+// CHECK-NEXT: iree_tensor_ext.bitcast %[[SLICE]]

@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -308,8 +309,9 @@ struct SwapInnerBitcastWithExtractSlice
                                 PatternRewriter &rewriter) const override {
     Value bitcastSrc = bitcastOp.getSource();
     auto sliceOp = bitcastSrc.getDefiningOp<tensor::ExtractSliceOp>();
-    if (!sliceOp)
-      return failure();
+    if (!sliceOp) {
+      return rewriter.notifyMatchFailure(bitcastOp, "non-slice producer");
+    }
 
     auto bitcastSrcType = cast<RankedTensorType>(bitcastSrc.getType());
     auto bitcastResType = cast<RankedTensorType>(bitcastOp.getType());
@@ -320,14 +322,18 @@ struct SwapInnerBitcastWithExtractSlice
         bitcastSrcType.getShape().drop_back() !=
             bitcastResType.getShape().drop_back() ||
         ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          bitcastOp, "bitcast affects more than inner most dim");
     }
 
     // Fail if the inner most dim is sliced or if this is an encoded tensor.
     RankedTensorType sliceInputType = sliceOp.getSource().getType();
     if (sliceInputType.getEncoding() ||
+        sliceInputType.getRank() != bitcastSrcType.getRank() ||
         sliceInputType.getShape().back() != bitcastSrcType.getShape().back()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          bitcastOp,
+          "inner dimension is sliced or rank reducing or tensor is encoded");
     }
 
     int64_t newInnerSize = bitcastResType.getShape().back();
