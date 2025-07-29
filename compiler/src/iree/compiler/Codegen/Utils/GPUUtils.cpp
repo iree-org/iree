@@ -1023,12 +1023,6 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
   return getCLGPUTarget(op->getContext());
 }
 
-std::optional<int> getGPUNumComputeUnits(IREE::GPU::TargetAttr gpuAttr) {
-  if (IREE::GPU::TargetChipAttr chip = gpuAttr.getChip())
-    return chip.getWgpCount();
-  return std::nullopt;
-}
-
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   // First try to see if there is a subgroup size chosen in the CodeGen pipeline
   // configuration.
