@@ -678,6 +678,43 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
   }];
 }
 
+def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memory_properties", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Resolves memory properties from resource lifetime and affinity.}];
+  let description = [{
+    Resolves the required memory types and buffer usage for a resource with
+    the given lifetime and affinity. This operation encapsulates the logic
+    for deriving buffer properties based on stream resource semantics.
+
+    This operation can be resolved later in compilation either by canonicalization
+    for single device affinties or using the topology attribute for multiple devices.
+
+    Example:
+    ```mlir
+    %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
+        for(#hal.device.affinity<@device_a>)
+        lifetime(transient) : i32, i32
+    ```
+  }];
+
+  let arguments = (ins
+    OptionalAttr<AnyAttr>:$affinity,
+    HAL_LifetimeAttr:$lifetime
+  );
+  let results = (outs
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
+  );
+
+  let assemblyFormat = [{
+    (`for` `(` $affinity^ `)`)?
+    `lifetime` `(` $lifetime `)`
+    `:` type($memory_types) `,` type($buffer_usage)
+    attr-dict-with-keyword
+  }];
+}
+
 } // OpGroupAllocatorOps
 
 //===----------------------------------------------------------------------===//
