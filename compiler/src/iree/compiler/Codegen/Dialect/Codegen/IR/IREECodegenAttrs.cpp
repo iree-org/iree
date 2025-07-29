@@ -26,6 +26,8 @@
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
 static const char kRootOpInfoAttrName[] = "root_op";
+static const char kUKernelProviderName[] = "iree_codegen.ukernel_provider";
+static const char kUKernelDescriptorName[] = "iree_codegen.ukernel";
 
 namespace mlir::iree_compiler {
 
@@ -573,6 +575,18 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.symbolic_ukernel_provider
+//===---------------------------------------------------------------------===//
+
+FailureOr<Operation *>
+SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
+                                            Operation *annotationSite) const {
+  auto *symbolTableOp = SymbolTable::getNearestSymbolTable(annotationSite);
+  SymbolTable symbolTable(symbolTableOp);
+  return symbolTable.lookup(name);
+}
+
 //===----------------------------------------------------------------------===//
 // Initialize attributes
 //===----------------------------------------------------------------------===//
@@ -691,6 +705,28 @@ void setRootOpInfo(Operation *op) {
 
 bool hasRootOpInfo(Operation *op) {
   return op->hasAttrOfType<UnitAttr>(kRootOpInfoAttrName);
+}
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting attributes related to ukernels.
+//===----------------------------------------------------------------------===//
+
+IREE::Codegen::UKernelProviderInterface
+getUKernelProviderFromTarget(DictionaryAttr dict) {
+  if (!dict)
+    return {};
+  return dict.getAs<IREE::Codegen::UKernelProviderInterface>(
+      kUKernelProviderName);
+}
+
+IREE::Codegen::UKernelDescriptorAttr getUKernelDescriptor(Operation *op) {
+  return op->getAttrOfType<IREE::Codegen::UKernelDescriptorAttr>(
+      kUKernelDescriptorName);
+}
+
+void setUKernelDescriptor(Operation *op,
+                          IREE::Codegen::UKernelDescriptorAttr descriptor) {
+  op->setAttr(kUKernelDescriptorName, descriptor);
 }
 
 } // namespace mlir::iree_compiler

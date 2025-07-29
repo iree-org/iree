@@ -133,6 +133,7 @@ iree_cc_library(
     "InstrumentMemoryAccesses.cpp"
     "LinkTuningSpecsPass.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
+    "LowerUKernelDescriptors.cpp"
     "LowerUKernelsToCalls.cpp"
     "LoweringConfigInterpreter.cpp"
     "MaterializeEncoding.cpp"
