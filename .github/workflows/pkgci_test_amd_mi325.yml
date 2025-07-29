@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Test AMD MI300
+name: PkgCI Test AMD MI325
 on:
   workflow_call:
     inputs:
@@ -18,8 +18,8 @@ on:
         default: ""
 
 jobs:
-  test_mi300:
-    runs-on: linux-mi300-1gpu-ossci-iree-org
+  test_mi325:
+    runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
