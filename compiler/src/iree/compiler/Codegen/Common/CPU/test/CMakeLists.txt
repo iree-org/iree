@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "lower_to_ukernel_ops.mlir"
     "prepare_ukernels.mlir"
+    "propagate_data_layout.mlir"
   TOOLS
     FileCheck
     iree-opt
