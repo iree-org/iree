@@ -55,7 +55,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
     return failure();
   }
 
-  LDBG("MultiMMA TileAndFuse Config");
+  LDBG() << "MultiMMA TileAndFuse Config";
 
   // Compute workgroup size, which is given by the subgroup size times the
   // number of subgroups. The number of subgroups is found by the product of
@@ -344,7 +344,7 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   // buffer currently gets materialized as private memory. We need to add
   // missing patterns to fix that.
   if (!schedule && canSupportUnaligned) {
-    LDBG("Attempting to deduce unaligned TileAndFuse MMA schedulee");
+    LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedulee";
     mustBeAligned = false;
     doCPromotion = true;
     schedule = getMmaScheduleFromProblemAndTarget(
@@ -353,13 +353,13 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   }
 
   if (!schedule) {
-    LDBG("Failed to deduce TileAndFuse MMA schedule");
+    LDBG() << "Failed to deduce TileAndFuse MMA schedule";
     return failure();
   }
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("Schedule: " << schedule);
+  LDBG() << "Target Subgroup size: " << targetSubgroupSize;
+  LDBG() << "Schedule: " << schedule;
 
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
@@ -477,11 +477,11 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   if (target.getWgp().getMma().empty())
     return failure();
 
-  LDBG("IGEMM TileAndFuse Config");
+  LDBG() << "IGEMM TileAndFuse Config";
   FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
       LinalgExt::getIGEMMGenericConvDetails(linalgOp);
   if (failed(igemmGenericConvDetails)) {
-    LDBG("Unsupported convolution type");
+    LDBG() << "Unsupported convolution type";
     return failure();
   }
   SmallVector<AffineMap> igemmContractionMaps =
@@ -536,7 +536,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
   SmallVector<Value> operands(linalgOp->getOperands());
 
-  LDBG("Matmul TileAndFuse Config");
+  LDBG() << "Matmul TileAndFuse Config";
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
@@ -787,7 +787,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) {
-    LDBG("Loss factor: " << lossFactor);
+    LDBG() << "Loss factor: " << lossFactor;
     // Initialize the configuration.
     flatWorkgroupSize = 1;
     // Initialize thread tiling along all partitioned loops with size 1, and
@@ -841,8 +841,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       for (unsigned i = maxCandidate; i >= 1; i >>= 1) {
         candidates.push_back(i * workgroupTileMultiple);
       }
-      LDBG(
-          "Base candidate tile sizes: " << llvm::interleaved_array(candidates));
+      LDBG() << 
+          "Base candidate tile sizes: " << llvm::interleaved_array(candidates);
 
       int64_t candidateWorkgroupSize = 1;
       for (int64_t candidate : candidates) {
@@ -873,7 +873,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           bool hasIdleThreads = distInfo.partitionableLoops.size() == 1 &&
                                 candidate <= subgroupSize;
           int vectorSize = hasIdleThreads ? 1 : numVectorElements;
-          LDBG("Use vector size: " << vectorSize);
+          LDBG() << "Use vector size: " << vectorSize;
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
           candidateWorkgroupSize = candidate / vectorSize;
           assert(numThreads % (candidate / vectorSize) == 0);
@@ -900,7 +900,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           numThreads /= candidateWorkgroupSize;
         }
         workgroupTileSizes[shapeDim] = scaledTileSize;
-        LDBG("Chosen workgroup tile size: " << scaledTileSize);
+        LDBG() << "Chosen workgroup tile size: " << scaledTileSize;
         assert(numThreads >= 1);
         break;
       }
@@ -992,7 +992,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  LDBG("Selected tile and fuse lowering config: " << loweringConfig << "\n");
+  LDBG() << "Selected tile and fuse lowering config: " << loweringConfig << "\n";
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
@@ -1100,7 +1100,7 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  LDBG("Selected tile and fuse lowering config: " << loweringConfig << "\n");
+  LDBG() << "Selected tile and fuse lowering config: " << loweringConfig << "\n";
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(

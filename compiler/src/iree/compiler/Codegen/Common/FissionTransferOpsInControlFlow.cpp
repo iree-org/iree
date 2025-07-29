@@ -97,7 +97,7 @@ static void setupReadLoop(IRRewriter &rewriter, const FissionTarget &target,
                                              indices);
   }
 
-  LDBG("Read loop: \n" << readLoop << "\n");
+  LDBG() << "Read loop: \n" << readLoop << "\n";
   rewriter.setInsertionPointAfter(readLoop);
 }
 
@@ -125,7 +125,7 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
         readOp, readOp.getVectorType(), allocaOp, indices, readOp.getPadding());
   }
 
-  LDBG("Write loop: \n" << writeLoop << "\n");
+  LDBG() << "Write loop: \n" << writeLoop << "\n";
 }
 
 /// Splits transfer read and write operations from a control flow Operation
@@ -149,8 +149,8 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
 ///   }
 static void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
                                             const FissionTarget &target) {
-  LDBG("Splitting transfer ops from control flow: \n"
-       << "For Op: " << target.parent << "\n");
+  LDBG() << "Splitting transfer ops from control flow: \n"
+       << "For Op: " << target.parent << "\n";
 
   rewriter.setInsertionPoint(target.parent);
   SmallVector<memref::AllocaOp> allocaOps;

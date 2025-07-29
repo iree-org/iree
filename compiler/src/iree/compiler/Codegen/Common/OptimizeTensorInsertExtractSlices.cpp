@@ -387,21 +387,21 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   });
 
   funcOp.walk([&](scf::ForOp forOp) { moveLoopInvariantCode(forOp); });
-  LDBG("after hoisting loop invariant code\n" << funcOp);
+  LDBG() << "after hoisting loop invariant code\n" << funcOp;
 
   moveLoopInvariantCodeFromGenericOps(funcOp);
-  LDBG("after hoisting loop invariant code out of generic ops\n" << funcOp);
+  LDBG() << "after hoisting loop invariant code out of generic ops\n" << funcOp;
 
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
   funcOp.walk(
       [&](scf::ForOp forOp) { hoistLoopInvariantSubsets(rewriter, forOp); });
-  LDBG("after hoisting loop invariant subsets\n" << funcOp);
+  LDBG() << "after hoisting loop invariant subsets\n" << funcOp;
 
   funcOp.walk([&](scf::ForOp forOp) {
     hoistSubsetWithLoopInvariantTensor(rewriter, forOp);
   });
-  LDBG("after hoisting subset loop invariant tensors" << funcOp);
+  LDBG() << "after hoisting subset loop invariant tensors" << funcOp;
 
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
@@ -420,8 +420,8 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  LDBG("after folding tensor.extract_slice and vector.transfer_read Ops \n"
-       << funcOp);
+  LDBG() << "after folding tensor.extract_slice and vector.transfer_read Ops \n"
+       << funcOp;
 }
 
 } // namespace

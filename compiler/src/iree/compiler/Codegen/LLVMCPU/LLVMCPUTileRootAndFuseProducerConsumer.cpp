@@ -150,7 +150,7 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
                                 });
 
     if (failed(newFusionOpportunities)) {
-      LDBG("failed to fuse consumers, skip");
+      LDBG() << "failed to fuse consumers, skip";
       return tiledResults->tiledAndFusedOps.front();
     }
 
@@ -213,19 +213,19 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
     rootOp = llvm::filter_to_vector(computeOps, hasRootConfig)[0];
   }
   if (failed(rootOp) || !rootOp.value()) {
-    LDBG("unable to find the root operation");
+    LDBG() << "unable to find the root operation";
     return;
   }
 
   IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
       getLoweringConfig(rootOp.value());
   if (!loweringConfig) {
-    LDBG("unable to find the attached lowering config");
+    LDBG() << "unable to find the attached lowering config";
     return;
   }
 
   if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    LDBG("unable to find the lowering config with the tiling level");
+    LDBG() << "unable to find the lowering config with the tiling level";
     return;
   }
 
@@ -248,7 +248,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LDBG("----- cleanup failed -----");
+    LDBG() << "----- cleanup failed -----";
     return signalPassFailure();
   }
 }

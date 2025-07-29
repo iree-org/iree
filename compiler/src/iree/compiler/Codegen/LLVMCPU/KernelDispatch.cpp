@@ -409,8 +409,8 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
       }
       int64_t factor = seen ? 1LL : maxUnrollFactor;
       seen = true;
-      LDBG("Adjusted min tile sizes: " << minTileSizes[unrollDim]
-                                       << " with factor=" << factor << "\n");
+      LDBG() << "Adjusted min tile sizes: " << minTileSizes[unrollDim]
+                                       << " with factor=" << factor << "\n";
       minTileSizes[unrollDim] =
           std::min<int64_t>(minTileSizes[unrollDim], factor);
     }
@@ -897,15 +897,15 @@ getDefaultDistributedLevelTileSizes(Operation *op,
         config.vectorSizeHints.empty() ? 1 : config.vectorSizeHints[i];
   }
 
-  LDBG("Adjusted min tile sizes: " << adjustedMinTileSizes);
-  LDBG("Adjusted max tile sizes: " << adjustedMaxTileSizes);
-  LDBG("Adjusted vector size hints: " << adjustedVectorSizeHints);
+  LDBG() << "Adjusted min tile sizes: " << adjustedMinTileSizes;
+  LDBG() << "Adjusted max tile sizes: " << adjustedMaxTileSizes;
+  LDBG() << "Adjusted vector size hints: " << adjustedVectorSizeHints;
 
   SmallVector<int64_t> distributedTileSizes = getDefaultDistributionTileSizes(
       lbs, ubs, adjustedMinTileSizes, adjustedMaxTileSizes,
       adjustedVectorSizeHints);
 
-  LDBG("Distributed tile sizes before fixups: " << distributedTileSizes);
+  LDBG() << "Distributed tile sizes before fixups: " << distributedTileSizes;
 
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
@@ -916,7 +916,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
         lbs[i], ubs[i], distributedTileSizes[i], adjustedMinTileSizes[i],
         config.allowIncompleteTile);
   }
-  LDBG("Distributed tile sizes after fixups: " << distributedTileSizes);
+  LDBG() << "Distributed tile sizes after fixups: " << distributedTileSizes;
   return distributedTileSizes;
 }
 
@@ -957,7 +957,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
       continue;
     vecTileSizes[index] = 1;
   }
-  LDBG("Set always-vectorize sizes: " << vecTileSizes);
+  LDBG() << "Set always-vectorize sizes: " << vecTileSizes;
 }
 
 /// A helper class to record different level tiling sizes and generate
@@ -1162,8 +1162,8 @@ static LogicalResult setMatmulPeelingRootConfig(
   generator.setVectorTileSizes(vecTileSizes, vectorScalableFlags);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Final tile sizes and scalable flags for contraction: "
-       << loweringConfig);
+  LDBG() << "Final tile sizes and scalable flags for contraction: "
+       << loweringConfig;
 
   DictionaryAttr pipelineConfig =
       getPipelineConfWithPeelingAttr(op.getContext());
@@ -1212,8 +1212,8 @@ static LogicalResult setMatmulRootConfig(
   generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Final tile sizes and scalable flags for contraction: "
-       << loweringConfig);
+  LDBG() << "Final tile sizes and scalable flags for contraction: "
+       << loweringConfig;
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, loweringConfig,
@@ -1312,7 +1312,7 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
       minSize = std::min<int64_t>(minSize, mmType.getIntOrFloatBitWidth());
   }
 
-  LDBG("Smallest type found: " << minSize << " bits");
+  LDBG() << "Smallest type found: " << minSize << " bits";
   assert(minSize > 0 && minSize < std::numeric_limits<int64_t>::max() &&
          "Min size couldn't be computed");
 
@@ -1503,8 +1503,8 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  LDBG("Matmul vector sizes: " << tileSizes);
-  LDBG("Matmul vector scalable flags: " << scalableTileFlags);
+  LDBG() << "Matmul vector sizes: " << tileSizes;
+  LDBG() << "Matmul vector scalable flags: " << scalableTileFlags;
   return std::make_pair(tileSizes, scalableTileFlags);
 }
 
@@ -1566,7 +1566,7 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   bool usePeelingPipeline =
       vecPreProcStrategy == VectorPreProcStrategy::Peeling;
 
-  LDBG("Vector pre-processing strategy: " << vecPreProcStrategy);
+  LDBG() << "Vector pre-processing strategy: " << vecPreProcStrategy;
 
   DistributionHeuristicConfig distConfig;
   distConfig.maxTileSizes.resize(numLoops, clDefaultDistTileSize);
@@ -1596,7 +1596,7 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // FIXME: Apply maxTileSize modification for all targets.
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
-    LDBG("RISC-V Aggressive Distribution: " << clEnableRiscvAggressiveDist);
+    LDBG() << "RISC-V Aggressive Distribution: " << clEnableRiscvAggressiveDist;
     for (auto loopNum :
          llvm::seq<unsigned>(static_cast<unsigned>(isBM), numLoops)) {
       if (clEnableRiscvAggressiveDist) {
@@ -1623,11 +1623,11 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // smaller than `minTileSizes`, so we have to adjust the cache sizes again.
   cacheTileSizes = distTileSizes;
 
-  LDBG("Distribution tile sizes: " << distTileSizes);
-  LDBG("Cache tile sizes: " << cacheTileSizes);
-  LDBG("Vector tile sizes: " << vecTileSizes);
-  LDBG("Vector scalable tile flags: " << vecScalableFlags);
-  LDBG("Vector size: " << vectorSize);
+  LDBG() << "Distribution tile sizes: " << distTileSizes;
+  LDBG() << "Cache tile sizes: " << cacheTileSizes;
+  LDBG() << "Vector tile sizes: " << vecTileSizes;
+  LDBG() << "Vector scalable tile flags: " << vecScalableFlags;
+  LDBG() << "Vector size: " << vectorSize;
 
   if (usePeelingPipeline) {
     return setMatmulPeelingRootConfig(
@@ -1870,12 +1870,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> lbs, ubs;
   getRangeBounds(attnOp, lbs, ubs);
 
-  LDBG("Attention Detail:");
-  LDBG("Batch: " << llvm::interleaved_array(opInfo.getBatchDims()));
-  LDBG("M: " << llvm::interleaved_array(opInfo.getMDims()));
-  LDBG("K1: " << llvm::interleaved_array(opInfo.getK1Dims()));
-  LDBG("K2: " << llvm::interleaved_array(opInfo.getK2Dims()));
-  LDBG("N: " << llvm::interleaved_array(opInfo.getNDims()));
+  LDBG() << "Attention Detail:";
+  LDBG() << "Batch: " << llvm::interleaved_array(opInfo.getBatchDims());
+  LDBG() << "M: " << llvm::interleaved_array(opInfo.getMDims());
+  LDBG() << "K1: " << llvm::interleaved_array(opInfo.getK1Dims());
+  LDBG() << "K2: " << llvm::interleaved_array(opInfo.getK2Dims());
+  LDBG() << "N: " << llvm::interleaved_array(opInfo.getNDims());
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
@@ -1975,7 +1975,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Set lowering_config for attnOp: " << loweringConfig);
+  LDBG() << "Set lowering_config for attnOp: " << loweringConfig;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, loweringConfig,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
@@ -2081,7 +2081,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                               const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
-  LDBG("Setting default generic op root configuration");
+  LDBG() << "Setting default generic op root configuration";
 
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
@@ -2100,10 +2100,10 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
-  LDBG("Final tile sizes for distribution: " << distTileSizes);
+  LDBG() << "Final tile sizes for distribution: " << distTileSizes;
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-  LDBG("Vectorization pre-processing strategy " << vecPreProcStrategy);
+  LDBG() << "Vectorization pre-processing strategy " << vecPreProcStrategy;
 
   // Set the next level tile sizes.
   SmallVector<int64_t> vecTileSizes;
@@ -2119,7 +2119,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Set lowering_config: " << loweringConfig);
+  LDBG() << "Set lowering_config: " << loweringConfig;
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
@@ -2231,8 +2231,8 @@ getTransposeVectorSizes(mlir::FunctionOpInterface entryPointFn,
   if (scalableFlags.empty())
     scalableFlags = SmallVector<bool>(tileSizes.size(), false);
 
-  LDBG("Transpose vector sizes: " << tileSizes);
-  LDBG("Transpose vector scalable flags: " << scalableFlags);
+  LDBG() << "Transpose vector sizes: " << tileSizes;
+  LDBG() << "Transpose vector scalable flags: " << scalableFlags;
   return std::make_pair(tileSizes, scalableFlags);
 }
 
@@ -2249,7 +2249,7 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   if (!linalgOpInfo.isTranspose())
     return failure();
 
-  LDBG("Setting transpose-like op root configuration");
+  LDBG() << "Setting transpose-like op root configuration";
 
   std::optional<SizesAndScalableFlags> vecDims = getTransposeVectorSizes(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
@@ -2261,7 +2261,7 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   DistributionHeuristicConfig distConfig;
   distConfig.minTileSizes = vecSizes;
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-  LDBG("Vectorization pre-processing strategy " << vecPreProcStrategy);
+  LDBG() << "Vectorization pre-processing strategy " << vecPreProcStrategy;
   if (vecPreProcStrategy != VectorPreProcStrategy::None) {
     distConfig.allowIncompleteTile = true;
   }
@@ -2273,7 +2273,7 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecSizes, vecScalableDims);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Set lowering_config: " << loweringConfig);
+  LDBG() << "Set lowering_config: " << loweringConfig;
 
   auto passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
@@ -2289,7 +2289,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
-  LDBG("Setting elementwise generic op root configuration");
+  LDBG() << "Setting elementwise generic op root configuration";
 
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0)
@@ -2336,7 +2336,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   }
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-  LDBG("Vector pre-processing strategy: " << vecPreProcStrategy);
+  LDBG() << "Vector pre-processing strategy: " << vecPreProcStrategy;
 
   // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
   // the cases are f32 and i32, so we divide it by 4.
@@ -2352,7 +2352,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Set lowering_config for element-wise op: " << loweringConfig);
+  LDBG() << "Set lowering_config for element-wise op: " << loweringConfig;
 
   DispatchLoweringPassPipeline passPipeline;
   DictionaryAttr pipelineConfig;
@@ -2609,7 +2609,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(distConfig.vectorSizeHints);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Set lowering_config for tensor.pad op: " << loweringConfig);
+  LDBG() << "Set lowering_config for tensor.pad op: " << loweringConfig;
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, padOp, loweringConfig,
@@ -2636,7 +2636,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG("Set lowering_config for tensor.pad op: " << loweringConfig);
+  LDBG() << "Set lowering_config for tensor.pad op: " << loweringConfig;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
       DispatchLoweringPassPipeline::CPUDefault);
@@ -2767,8 +2767,8 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
 
     foundUnPackOp = true;
     auto idxMap = linalgOp.getMatchingIndexingMap(opOperand);
-    LDBG("Find unpack op candidate: " << unpackOp);
-    LDBG("The corresponding indexing map is: " << idxMap);
+    LDBG() << "Find unpack op candidate: " << unpackOp;
+    LDBG() << "The corresponding indexing map is: " << idxMap;
 
     SmallVector<int64_t> innerTiles = unpackOp.getStaticTiles();
     ArrayRef<int64_t> dimPos = unpackOp.getInnerDimsPos();
@@ -2786,8 +2786,8 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   if (!foundUnPackOp)
     return success();
 
-  LDBG("The tile sizes for each dimension should be aligned to "
-       << alignedSizes);
+  LDBG() << "The tile sizes for each dimension should be aligned to "
+       << alignedSizes;
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
@@ -2806,8 +2806,8 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   auto pipelineConfig = tInfo.getConfiguration();
   if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
-    LDBG("unpack fusion does not work with peeling, falling back to "
-         "non-peeling path");
+    LDBG() << "unpack fusion does not work with peeling, falling back to "
+         "non-peeling path";
     pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 
     // Remove the "enable_loop_peeling" attr from pipelineConfig
@@ -3037,7 +3037,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  LDBG("Parallel vector tile sizes: " << parallelVecTileSizes);
+  LDBG() << "Parallel vector tile sizes: " << parallelVecTileSizes;
 
   // Split parallel vector tile sizes into common parts and op-specific parts.
   SmallVector<int64_t> commonVecTileSizes = parallelVecTileSizes;
@@ -3238,7 +3238,7 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
     return lowerUsingDefaultPipeline(entryPointFn);
   }
 
-  LDBG("Root op: " << *rootOperation);
+  LDBG() << "Root op: " << *rootOperation;
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto targetMLTransInfo =

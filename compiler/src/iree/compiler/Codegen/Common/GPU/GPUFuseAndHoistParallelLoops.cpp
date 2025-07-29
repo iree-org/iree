@@ -365,7 +365,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing and hoisting loops\n" << funcOp);
+  LDBG() << "After fusing and hoisting loops\n" << funcOp;
 
   // After hoisting parallel loops, try to fuse in any newly revealed consumers
   // and destinations.
@@ -386,7 +386,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing new consumers\n" << funcOp);
+  LDBG() << "After fusing new consumers\n" << funcOp;
 
   // Finally try to do any new producer fusions.
   {
@@ -400,7 +400,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing new producers\n" << funcOp);
+  LDBG() << "After fusing new producers\n" << funcOp;
 }
 
 } // namespace mlir::iree_compiler

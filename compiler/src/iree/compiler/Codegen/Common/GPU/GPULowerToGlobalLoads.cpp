@@ -42,8 +42,8 @@ static LogicalResult
 distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
                               ArrayRef<int64_t> workgroupSize,
                               int64_t subgroupSize) {
-  LDBG("==== distributing op: ");
-  LDBG(*copy);
+  LDBG() << "==== distributing op: ";
+  LDBG() << *copy;
   Location loc = copy.getLoc();
 
   // The linalg.copy we are dealing with represents a region we need to copy to
@@ -82,13 +82,13 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   int64_t residualElements =
       totalCopySizePerSubgroup % (subgroupSize * elementsPerCopy);
 
-  LDBG("-- elementsPerCopy: " << elementsPerCopy);
-  LDBG("-- workgroupSize: " << workgroupSize[0]);
-  LDBG("-- numSubgroups: " << numSubgroups);
-  LDBG("-- totalCopySize: " << totalCopySize);
-  LDBG("-- totalCopySizePerSubgroup: " << totalCopySizePerSubgroup);
-  LDBG("-- numCopiesPerThread: " << numCopiesPerThread);
-  LDBG("-- residualElements: " << residualElements);
+  LDBG() << "-- elementsPerCopy: " << elementsPerCopy;
+  LDBG() << "-- workgroupSize: " << workgroupSize[0];
+  LDBG() << "-- numSubgroups: " << numSubgroups;
+  LDBG() << "-- totalCopySize: " << totalCopySize;
+  LDBG() << "-- totalCopySizePerSubgroup: " << totalCopySizePerSubgroup;
+  LDBG() << "-- numCopiesPerThread: " << numCopiesPerThread;
+  LDBG() << "-- residualElements: " << residualElements;
 
   if (residualElements != 0) {
     return rewriter.notifyMatchFailure(
@@ -158,15 +158,15 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
   auto targetType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copy)) {
-    LDBG("-- Op: " << *copy);
-    LDBG("-- does not have `use_global_load_dma` attribute, skipping.");
+    LDBG() << "-- Op: " << *copy;
+    LDBG() << "-- does not have `use_global_load_dma` attribute, skipping.";
     return failure();
   }
 
   if (!hasGlobalMemoryAddressSpace(sourceType) ||
       !hasSharedMemoryAddressSpace(targetType)) {
-    LDBG("-- Op: " << *copy);
-    LDBG("-- incompatible source or target memory address space.");
+    LDBG() << "-- Op: " << *copy;
+    LDBG() << "-- incompatible source or target memory address space.";
     return failure();
   }
 

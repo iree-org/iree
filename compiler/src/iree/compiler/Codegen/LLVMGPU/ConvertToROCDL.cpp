@@ -281,12 +281,12 @@ struct ConvertToROCDLPass final
       arith::populateExpandF8E8M0Patterns(fallbackSmallFloatPatterns);
       if (failed(applyPatternsGreedily(
               m, std::move(fallbackSmallFloatPatterns)))) {
-        LDBG("Small float patterns failed\n" << m);
+        LDBG() << "Small float patterns failed\n" << m;
         return signalPassFailure();
       }
     }
 
-    LDBG("After applying in-dialect conversions\n" << m);
+    LDBG() << "After applying in-dialect conversions\n" << m;
 
     {
       RewritePatternSet patterns(&getContext());
@@ -298,7 +298,7 @@ struct ConvertToROCDLPass final
       }
     }
 
-    LDBG("After applying GPU rewrite patterns\n" << m);
+    LDBG() << "After applying GPU rewrite patterns\n" << m;
 
     {
       // Convert arith::maximumf/minimumf ops on AMD gpus since the lowering
@@ -312,7 +312,7 @@ struct ConvertToROCDLPass final
       }
     }
 
-    LDBG("After converting maximumf/minimumf ops\n" << m);
+    LDBG() << "After converting maximumf/minimumf ops\n" << m;
 
     {
       RewritePatternSet llvmPatterns(&getContext());
@@ -350,7 +350,7 @@ struct ConvertToROCDLPass final
       }
     }
 
-    LDBG("After converting to rocdl\n" << m);
+    LDBG() << "After converting to rocdl\n" << m;
 
     // 16 is the maximum relevant alignment for all AMD GPUs. Unceremoniously
     // set it to 16 as all of our allocations almost always have much greater
@@ -358,7 +358,7 @@ struct ConvertToROCDLPass final
     // TODO(qedawkins): Set this much earlier when we introduce the allocations.
     setSharedMemoryAlignment(m, 16);
 
-    LDBG("After updating shared memory alignments\n" << m);
+    LDBG() << "After updating shared memory alignments\n" << m;
   }
 };
 } // namespace mlir::iree_compiler

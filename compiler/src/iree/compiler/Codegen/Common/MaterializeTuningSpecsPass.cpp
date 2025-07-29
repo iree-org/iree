@@ -82,7 +82,7 @@ static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
     return tuningSpec->emitError()
            << "Failed to create a unique file in " << dir << "\n";
   }
-  LDBG("Linked tuning spec file path: " << dumpPath);
+  LDBG() << "Linked tuning spec file path: " << dumpPath;
 
   std::string error;
   auto file = mlir::openOutputFile(dumpPath, &error);

@@ -363,20 +363,20 @@ combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
   }
   MapScatterOp combinedRelayoutOp = mapScatterOp;
   while (relayoutOp) {
-    LDBG("Attempting to fold " << relayoutOp->getName()
+    LDBG() << "Attempting to fold " << relayoutOp->getName()
                                << " into map_scatter op:\n"
-                               << *relayoutOp);
+                               << *relayoutOp;
     FailureOr<MapScatterOp> maybeCombinedRelayoutOp = foldIntoMapScatter(
         rewriter, relayoutOp, combinedRelayoutOp, padDistributionConfigFn);
     if (failed(maybeCombinedRelayoutOp)) {
-      LDBG("Failed to fold " << relayoutOp->getName()
-                             << " into map_scatter op");
+      LDBG() << "Failed to fold " << relayoutOp->getName()
+                             << " into map_scatter op";
       break;
     }
     combinedRelayoutOp = maybeCombinedRelayoutOp.value();
-    LDBG("Successfully folded " << relayoutOp->getName()
+    LDBG() << "Successfully folded " << relayoutOp->getName()
                                 << " into map_scatter. New map_scatter op:\n"
-                                << combinedRelayoutOp);
+                                << combinedRelayoutOp;
     relayoutOp = combinedRelayoutOp.getInput().getDefiningOp();
   }
   if (combinedRelayoutOp.isIdentity()) {
@@ -404,7 +404,7 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
       rewriter, loc, op->getOperand(0), mapScatterDest);
   rewriter.modifyOpInPlace(
       op, [&]() { op->setOperand(0, mapScatterOp.getResult(0)); });
-  LDBG("Created identity map_scatter:\n" << mapScatterOp);
+  LDBG() << "Created identity map_scatter:\n" << mapScatterOp;
   return mapScatterOp;
 }
 

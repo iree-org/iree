@@ -364,7 +364,7 @@ struct MainLoopInfo {
         // Pipeline and schedule the most inner for op ,i.e., the mainloop that
         // should be a flat region.
         isSchedulable = false;
-        LDBG("-- found op with regions -> not schedulable: " << op);
+        LDBG() << "-- found op with regions -> not schedulable: " << op;
         return;
       }
       if (isa<nvgpu::DeviceAsyncCopyOp>(op)) {
@@ -412,19 +412,19 @@ struct MainLoopInfo {
     // `cp.wait_group`, `bar.sync`, `mma.sync`, `ldmatrix` or `ld.shared`) for
     // scheduling is missing, the mainloop cannot be scheduled.
     if (copyGlobalToSharedOps.empty()) {
-      LDBG("-- missing copyGlobalToSharedOps -> not schedulable");
+      LDBG() << "-- missing copyGlobalToSharedOps -> not schedulable";
       isSchedulable = false;
     } else if (asyncCreateGroupOp.empty()) {
-      LDBG("-- missing asyncCreateGroupOp -> not schedulable");
+      LDBG() << "-- missing asyncCreateGroupOp -> not schedulable";
       isSchedulable = false;
     } else if (asyncWaitOps.empty()) {
-      LDBG("-- missing asyncWaitOps -> not schedulable");
+      LDBG() << "-- missing asyncWaitOps -> not schedulable";
       isSchedulable = false;
     } else if (barrierOps.empty()) {
-      LDBG("-- missing barrierOps -> not schedulable");
+      LDBG() << "-- missing barrierOps -> not schedulable";
       isSchedulable = false;
     } else if (warpOperations.empty()) {
-      LDBG("-- missing warpOperations -> not schedulable");
+      LDBG() << "-- missing warpOperations -> not schedulable";
       isSchedulable = false;
     }
     if (!isSchedulable)
@@ -505,12 +505,12 @@ static void getNvidiaAmpereTensorCorePipeline(
     unsigned numStages) {
   // Analyze the main loop and obtain information for coarse-grained pipelining
   // and fine-grained instruction scheduling.
-  LDBG("Start getNvidiaAmpereTensorCorePipeline");
+  LDBG() << "Start getNvidiaAmpereTensorCorePipeline";
   MainLoopInfo mainloop(forOp);
 
   // If the mainloop is not schedulable, return an empty schedule.
   if (!mainloop.isSchedulable) {
-    LDBG("--main loop is not schedulable -> " << forOp);
+    LDBG() << "--main loop is not schedulable -> " << forOp;
     return;
   }
 
@@ -519,8 +519,8 @@ static void getNvidiaAmpereTensorCorePipeline(
   // empty schedule.
   int numKgroups = mainloop.getNumberOfKgroups();
   if (numKgroups < 2 || numStages < 3) {
-    LDBG("--numKgroups=" << numKgroups << "(< 2) or numStages=" << numStages
-                         << "(< 3) -> BAIL");
+    LDBG() << "--numKgroups=" << numKgroups << "(< 2) or numStages=" << numStages
+                         << "(< 3) -> BAIL";
     return;
   }
 
@@ -532,7 +532,7 @@ static void getNvidiaAmpereTensorCorePipeline(
   if (!(mainloop.asyncCreateGroupOp.size() == 1) ||
       !(mainloop.asyncWaitOps.size() == 1) ||
       !(mainloop.barrierOps.size() == 2)) {
-    LDBG("--failed prereqs: 1 async_create, 1 async_wait, 2 barriers -> BAIL");
+    LDBG() << "--failed prereqs: 1 async_create, 1 async_wait, 2 barriers -> BAIL";
     return;
   }
 

@@ -41,7 +41,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   std::unique_ptr<TilingConfig> tilingConfig =
       TilingConfig::create(getLoweringConfig(op));
   if (useConfiguredVectorSizes && tilingConfig) {
-    LDBG("Use configured vector sizes from lowering config");
+    LDBG() << "Use configured vector sizes from lowering config";
     auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
     // Replace zeros in canonical vector shape to turn it into a valid shape.
     std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);

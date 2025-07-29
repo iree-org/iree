@@ -143,7 +143,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     }
 
     SmallVector<int64_t> distShape = resultLayout.getDistributedShape();
-    LDBG("distributed shape: " << llvm::interleaved_array(distShape));
+    LDBG() << "distributed shape: " << llvm::interleaved_array(distShape);
 
     // Create a zero vector with the full distributed vector shape for
     // accumulating unrolled contraction results.
@@ -215,10 +215,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         fillOperandBatchOffsets(opDetail, k, resultBatchOffsets,
                                 lhsBatchOffsets, rhsBatchOffsets, lhsMap,
                                 rhsMap);
-        LDBG("current lhs batch offsets: "
-             << llvm::interleaved_array(lhsBatchOffsets));
-        LDBG("current rhs batch offsets: "
-             << llvm::interleaved_array(rhsBatchOffsets));
+        LDBG() << "current lhs batch offsets: "
+             << llvm::interleaved_array(lhsBatchOffsets);
+        LDBG() << "current rhs batch offsets: "
+             << llvm::interleaved_array(rhsBatchOffsets);
 
         Value lhsSlice =
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);

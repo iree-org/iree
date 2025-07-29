@@ -114,8 +114,8 @@ getTransformLibraryFromPath(ModuleOp compiledModule, StringRef path) {
     return compiledModule.emitError()
            << "Failed to load transform library module: " << libraryFileName;
   }
-  LDBG("--found transform library " << libraryFileName << "@"
-                                    << entrySequenceName);
+  LDBG() << "--found transform library " << libraryFileName << "@"
+                                    << entrySequenceName;
   return TransformLibraryWithEntrypoint{*maybeTransformLibrary,
                                         entrySequenceName.str()};
 }
@@ -150,7 +150,7 @@ static LogicalResult getModuleTuningSpec(ModuleOp compiledModule,
     return compiledModule.emitError() << "Failed to parse tuning spec in "
                                       << kSerializedTuningSpecAttrName;
   }
-  LDBG("--loaded tuning spec");
+  LDBG() << "--loaded tuning spec";
   return success();
 }
 
@@ -183,7 +183,7 @@ struct MaterializeUserConfigsPass final
     // removed.
     if (moduleOp->hasAttr(kSerializedTuningSpecAttrName)) {
       moduleOp->removeAttr(kSerializedTuningSpecAttrName);
-      LDBG("--dropped the serialized tuning spec from the module");
+      LDBG() << "--dropped the serialized tuning spec from the module";
     }
 
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
@@ -200,7 +200,7 @@ struct MaterializeUserConfigsPass final
       //      "translation_info" =
       //        #iree_codegen.translation_info<pipeline = None>
       //      ```
-      LDBG("MaterializeUserConfigsPass on function: " << funcOp);
+      LDBG() << "MaterializeUserConfigsPass on function: " << funcOp;
       if (succeeded(userTransformLibrary)) {
         StringRef libraryModuleName =
             userTransformLibrary->transformLibrary.getSymName().value_or(
@@ -249,7 +249,7 @@ struct MaterializeUserConfigsPass final
       }
 
       translationInfo = getTranslationInfo(funcOp);
-      LDBG("--guaranteed unique translationInfo: " << translationInfo);
+      LDBG() << "--guaranteed unique translationInfo: " << translationInfo;
       /// We only need to resolve symbols for transform dialect based
       /// strategies.
       if (!translationInfo ||

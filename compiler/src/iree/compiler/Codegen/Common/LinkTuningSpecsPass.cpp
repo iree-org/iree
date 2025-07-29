@@ -504,14 +504,14 @@ FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
 
   size_t numConsumedSpecs = llvm::count_if(tuningSpecs, consumesInputOp);
   if (numConsumedSpecs > 0 && numConsumedSpecs != tuningSpecs.size()) {
-    LDBG("Only " << numConsumedSpecs << " tuning specs out of "
-                 << tuningSpecs.size() << " total consume the input op");
+    LDBG() << "Only " << numConsumedSpecs << " tuning specs out of "
+                 << tuningSpecs.size() << " total consume the input op";
     return module.emitWarning() << "Expected the argument in all tuning specs "
                                    "to be consistently readonly or consumed";
   }
 
   if (tuningSpecs.empty()) {
-    LDBG("No tuning specs found, exiting without linking");
+    LDBG() << "No tuning specs found, exiting without linking";
     return NamedSequenceOp{};
   }
 
