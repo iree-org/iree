@@ -137,6 +137,8 @@ def FuseMultiUseElementwiseProducerPass :
                    "mlir::FunctionOpInterface"> {
   let summary = "Fuse elementwise linalg operations on tensors when producers have multiple uses.";
   let options = [
+    Option<"intraDispatch", "intra-dispatch", "bool",
+           /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"numIterations", "num-iterations", "unsigned",
            /*default=*/"2", "Number of iterations to fuse multiuse ops">
   ];
