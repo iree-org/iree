@@ -3316,9 +3316,36 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-lower-bitcode-ukernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-lower-bitcode-ukernels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-lower-executable-using-transform-dialect" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-lower-executable-using-transform-dialect
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-lower-memref-ukernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-lower-memref-ukernels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-lower-tensor-ukernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-lower-tensor-ukernels
     </span>
   </a>
   
@@ -6230,9 +6257,36 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-lower-bitcode-ukernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-lower-bitcode-ukernels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-lower-executable-using-transform-dialect" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-lower-executable-using-transform-dialect
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-lower-memref-ukernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-lower-memref-ukernels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-lower-tensor-ukernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-lower-tensor-ukernels
     </span>
   </a>
   
@@ -7034,8 +7088,14 @@ as the order in which these nested tuning specs appear in the IR.</p>
 <p>A tuning spec entry point is a <code>transform.named_sequence</code> op annotated with the
 <code>iree_codegen.tuning_spec</code> unit attribute. We require it to perform in-place op
 modification and not consume the handle.</p>
+<h3 id="-iree-codegen-lower-bitcode-ukernels"><code>-iree-codegen-lower-bitcode-ukernels</code><a class="headerlink" href="#-iree-codegen-lower-bitcode-ukernels" title="Permanent link">link</a></h3>
+<p><em>Lowers ops with ukernel descriptors to ukernel_generic</em></p>
 <h3 id="-iree-codegen-lower-executable-using-transform-dialect"><code>-iree-codegen-lower-executable-using-transform-dialect</code><a class="headerlink" href="#-iree-codegen-lower-executable-using-transform-dialect" title="Permanent link">link</a></h3>
 <p><em>Lower executables using the transform dialect recipe provided in the module.</em></p>
+<h3 id="-iree-codegen-lower-memref-ukernels"><code>-iree-codegen-lower-memref-ukernels</code><a class="headerlink" href="#-iree-codegen-lower-memref-ukernels" title="Permanent link">link</a></h3>
+<p><em>Lowers ops with ukernel descriptors and memref operands</em></p>
+<h3 id="-iree-codegen-lower-tensor-ukernels"><code>-iree-codegen-lower-tensor-ukernels</code><a class="headerlink" href="#-iree-codegen-lower-tensor-ukernels" title="Permanent link">link</a></h3>
+<p><em>Lowers ops with ukernel descriptors and tensor operands</em></p>
 <h3 id="-iree-codegen-lower-ukernel-ops-to-calls"><code>-iree-codegen-lower-ukernel-ops-to-calls</code><a class="headerlink" href="#-iree-codegen-lower-ukernel-ops-to-calls" title="Permanent link">link</a></h3>
 <p><em>Lower micro-kernel wrapper ops into function calls</em></p>
 <h3 id="-iree-codegen-lowering-config-interpreter"><code>-iree-codegen-lowering-config-interpreter</code><a class="headerlink" href="#-iree-codegen-lowering-config-interpreter" title="Permanent link">link</a></h3>
