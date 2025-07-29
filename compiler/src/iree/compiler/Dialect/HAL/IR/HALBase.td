@@ -214,6 +214,31 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 def HAL_BufferUsage : TypeAlias<I32>;
 def HAL_MemoryType : TypeAlias<I32>;
 
+// Note: This is a copy from the Stream dialect.
+// Indicates a value whose lifetime is not yet analyzed.
+def HAL_Lifetime_Unknown : I32EnumAttrCase<"Unknown", 0, "*">;
+// An externally managed value.
+def HAL_Lifetime_External : I32EnumAttrCase<"External", 1, "external">;
+// A staging buffer for uploads/downloads.
+def HAL_Lifetime_Staging : I32EnumAttrCase<"Staging", 2, "staging">;
+// A short-lived value that is used across streams.
+def HAL_Lifetime_Transient : I32EnumAttrCase<"Transient", 3, "transient">;
+// A long-lived value that persists across streams.
+def HAL_Lifetime_Variable : I32EnumAttrCase<"Variable", 4, "variable">;
+// An immutable value that persist for the duration of the program.
+def HAL_Lifetime_Constant : I32EnumAttrCase<"Constant", 5, "constant">;
+def HAL_LifetimeAttr :
+    I32EnumAttr<"Lifetime", "IREE HAL value lifetime", [
+      HAL_Lifetime_Unknown,
+      HAL_Lifetime_External,
+      HAL_Lifetime_Staging,
+      HAL_Lifetime_Transient,
+      HAL_Lifetime_Variable,
+      HAL_Lifetime_Constant,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 //===----------------------------------------------------------------------===//
 // Base HAL op classes
 //===----------------------------------------------------------------------===//
