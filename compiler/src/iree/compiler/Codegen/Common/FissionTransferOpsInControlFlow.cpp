@@ -20,7 +20,6 @@
 
 #define DEBUG_TYPE "iree-codegen-fission-transfer-ops-in-control-flow"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 

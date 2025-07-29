@@ -30,7 +30,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile-root-and-fuse-producers-consumers"
-#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 

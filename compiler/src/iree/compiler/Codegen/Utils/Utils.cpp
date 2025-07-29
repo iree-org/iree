@@ -42,7 +42,6 @@
 
 #define DEBUG_TYPE "iree-codegen-utils"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(KD_DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 

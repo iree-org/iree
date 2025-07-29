@@ -33,7 +33,6 @@
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
 

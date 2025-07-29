@@ -16,7 +16,6 @@
 
 #define DEBUG_TYPE "tiling-config"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(KD_DBGS() << X << "\n")
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 

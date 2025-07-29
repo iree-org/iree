@@ -15,7 +15,6 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 #define DEBUG_TYPE "iree-codegen-amdgpu-distribute-contract"
-#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 namespace {

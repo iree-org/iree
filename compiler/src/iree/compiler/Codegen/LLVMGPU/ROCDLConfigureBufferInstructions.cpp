@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 

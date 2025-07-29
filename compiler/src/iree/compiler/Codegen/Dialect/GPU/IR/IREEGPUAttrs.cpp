@@ -38,7 +38,6 @@
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
