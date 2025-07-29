@@ -365,8 +365,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(
 
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
+  funcPassManager.addPass(createLLVMCPUTilePass(
+      tilingConfig.getVectorCommonParallelLevel(), /*skipRootOp=*/false));
   funcPassManager.addPass(createLLVMCPUPeelPass());
   {
     GenericVectorizationPassOptions options;
@@ -422,6 +422,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
           createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
       funcPassManager.addPass(
           createLLVMCPUTileRootAndFuseInputOperandsPass(level));
+      // Tile all the reduction ops for target vector sizes, which ensures
+      // that all the dimensions are tiled in all the reduction ops. The root
+      // op is already tiled, so it is skipped in the pass.
+      funcPassManager.addPass(createLLVMCPUTilePass(
+          static_cast<IREE::CPU::TilingLevel>(i), /*skipRootOp=*/true));
       break;
     case IREE::CPU::TilingLevel::VectorInnerParallelTiles:
       funcPassManager.addPass(createLLVMCPUTileAndFusePass(
@@ -603,8 +608,8 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
 
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
+  funcPassManager.addPass(createLLVMCPUTilePass(
+      tilingConfig.getVectorCommonParallelLevel(), /*skipRootOp=*/false));
   if (pipelineOpt.decomposePackUnPackOps) {
     funcPassManager.addPass(createDecomposePackUnPackOpsPass());
   }
