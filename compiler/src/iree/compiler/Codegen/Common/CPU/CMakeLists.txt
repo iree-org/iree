@@ -43,6 +43,7 @@ iree_cc_library(
   SRCS
     "CPULowerToUKernels.cpp"
     "CPUPrepareUkernels.cpp"
+    "CPUPropagateDataLayout.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
