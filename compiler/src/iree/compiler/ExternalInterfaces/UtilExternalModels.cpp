@@ -6,7 +6,6 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -300,33 +299,6 @@ struct LinalgOpTiedOpInterfaceHelper {
   }
 };
 
-// TODO(Max191): Remove this interface once GPU data tiling stops using early
-// materialization. This only exists for handling inner_tiled ops before
-// dispatch workgroups are created, which only happens with early
-// materialization.
-struct InnerTiledOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          InnerTiledOpTiedOpInterface, IREE::Codegen::InnerTiledOp> {
-  Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(
-        tiledOp.getOutputs()[resultIndex]);
-  }
-
-  ::std::optional<unsigned>
-  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return {tiledOp.getOutputs().getBeginOperandIndex() + resultIndex};
-  }
-
-  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return llvm::to_vector(llvm::seq(
-        static_cast<int64_t>(tiledOp.getOutputs().getBeginOperandIndex()),
-        static_cast<int64_t>(tiledOp.getNumOperands())));
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // HoistableOpInterface
 //===----------------------------------------------------------------------===//
@@ -463,12 +435,6 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         tensor::InsertSliceOp::attachInterface<InsertSliceOpTiedOpInterface>(
             *context);
       });
-
-  registry.addExtension(+[](MLIRContext *context,
-                            IREE::Codegen::IREECodegenDialect *dialect) {
-    IREE::Codegen::InnerTiledOp::attachInterface<InnerTiledOpTiedOpInterface>(
-        *context);
-  });
 
   registry.addExtension(
       +[](MLIRContext *context, linalg::LinalgDialect *dialect) {
