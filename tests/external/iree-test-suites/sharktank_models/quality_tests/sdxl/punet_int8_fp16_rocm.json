@@ -32,7 +32,7 @@
         }
     ],
     "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_weights.irpa",
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp16.mlir",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/07292025/mlir/stable_diffusion_xl_base_1_0_punet_bs1_64_1024x1024_i8.mlir",
     "device": "hip",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
