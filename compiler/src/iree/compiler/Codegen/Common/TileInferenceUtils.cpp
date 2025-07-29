@@ -14,7 +14,6 @@
 #include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-codegen-tile-inference-utils"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
 
@@ -49,8 +48,8 @@ inferWorkgroupTileMultiplesFromPackUnPack(
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   // If the tiles are dynamic, then no inference can be made.
   if (ShapedType::isDynamicShape(innerTiles)) {
-    LLVM_DEBUG(DBGS() << "Cannot infer multiple for dynamic inner tiles."
-                         "Defaulting to all 1.");
+    LDBG() << "Cannot infer multiple for dynamic inner tiles. Defaulting to "
+              "all 1.";
     return {getDefaultValueMultiples(op.getSource()),
             getDefaultValueMultiples(op.getDest())};
   }
@@ -86,8 +85,8 @@ inferWorkgroupTileMultiplesFromPackUnPack(
       lcmInnerTileMultiple = std::lcm(
           initialPackedMultiples.value()[innerTileIdx], lcmInnerTileMultiple);
       if (lcmInnerTileMultiple != tile) {
-        LLVM_DEBUG(DBGS() << "Cannot find a compatible tile size multiple. "
-                          << "Defaulting to all 1.");
+        LDBG() << "Cannot find a compatible tile size multiple. Defaulting to "
+                  "all 1.";
         return {getDefaultValueMultiples(op.getSource()),
                 getDefaultValueMultiples(op.getDest())};
       }
@@ -130,7 +129,7 @@ static void inferWorkgroupTileMultiplesFromLinalgOp(
   auto dbgsPrintMultiples = [](SmallVector<SmallVector<int64_t>> multiples) {
     LLVM_DEBUG({
       for (auto [i, m] : llvm::enumerate(multiples)) {
-        DBGS() << "operand " << i << ": " << llvm::interleaved_array(m) << "\n";
+        LDBG() << "operand " << i << ": " << llvm::interleaved_array(m);
       }
     });
   };
@@ -195,14 +194,14 @@ expandMultiples(ArrayRef<int64_t> collapsedMultiples,
     for (int i = group.size() - 1; i >= 0; --i) {
       int64_t expandedSize = expandedShape[group[i]];
       if (ShapedType::isDynamic(expandedSize)) {
-        LLVM_DEBUG(DBGS() << "Cannot infer multiple with dynamic size. "
-                             "defaulting to all 1");
+        LDBG()
+            << "Cannot infer multiple with dynamic size. defaulting to all 1";
         expandedMultiples = SmallVector<int64_t>(expandedShape.size(), 1);
         return expandedMultiples;
       }
       if (residualMultiple % expandedSize != 0) {
-        LLVM_DEBUG(DBGS() << "Expanded size does not divide producer "
-                             "multiple. Defaulting to all 1");
+        LDBG() << "Expanded size does not divide producer multiple. Defaulting "
+                  "to all 1";
         expandedMultiples = SmallVector<int64_t>(expandedShape.size(), 1);
         return expandedMultiples;
       }

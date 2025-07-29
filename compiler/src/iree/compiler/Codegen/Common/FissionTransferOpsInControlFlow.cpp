@@ -19,7 +19,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-fission-transfer-ops-in-control-flow"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 namespace mlir::iree_compiler {
 

@@ -12,7 +12,6 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-combine-layout-transformation"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
 

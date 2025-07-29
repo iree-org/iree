@@ -15,7 +15,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "tiling-config"
-#define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 

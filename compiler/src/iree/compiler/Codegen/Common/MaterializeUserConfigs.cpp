@@ -19,7 +19,6 @@
 #include "mlir/Parser/Parser.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-user-configs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
 

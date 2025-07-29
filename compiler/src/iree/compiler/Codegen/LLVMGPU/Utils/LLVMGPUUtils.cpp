@@ -22,7 +22,6 @@
 using namespace mlir;
 
 #define DEBUG_TYPE "llvm-gpu-utils"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
 

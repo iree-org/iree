@@ -45,7 +45,6 @@
 #include <numeric>
 
 #define DEBUG_TYPE "kernel-dispatch"
-#define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir::iree_compiler {
 

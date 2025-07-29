@@ -32,7 +32,6 @@
 #include "mlir/Support/LogicalResult.h"
 
 #define DEBUG_TYPE "iree-gpu-config-utils"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler::IREE::GPU {
 

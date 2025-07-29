@@ -19,7 +19,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-pipelining"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
