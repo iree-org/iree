@@ -202,14 +202,14 @@ static FailureOr<unsigned> fuseMultiUseProducers(
           //    by cloning the producer instead of multi-use fusion.
           if (!options.intraDispatch &&
               IREE::LinalgExt::isBitExtendOp(producer)) {
-            return;
+            continue;
           }
 
           // 8. Skip bit-truncate-like `producer` ops as we would rather fuse
           //    these operations with their producers.
           if (!options.intraDispatch &&
               IREE::LinalgExt::isBitTruncateOp(producer)) {
-            return;
+            continue;
           }
 
           // 9. All uses from `producer` -> `consumer` need to be fusable.
@@ -225,8 +225,9 @@ static FailureOr<unsigned> fuseMultiUseProducers(
           fusableProducer = producer;
           break;
         }
-        if (!fusableProducer)
+        if (!fusableProducer) {
           return;
+        }
 
         // If the `genericOp` is already part of a fusion group, just add the
         // the `fusableProducer` to the same group.
