@@ -58,50 +58,15 @@ struct GPUPadConvsPass final : impl::GPUPadConvsPassBase<GPUPadConvsPass> {
         return;
       }
 
-      // Get padding sizes from lowering_config for GEMM dimensions.
+      // Get padding sizes from lowering_config.
       std::optional<SmallVector<int64_t>> paddingSizes =
-          getPaddingList(loweringConfig);
+          getPaddingList(loweringConfig, /*padConv*/ true);
       if (!paddingSizes) {
         return;
       }
 
-      // Generate padding sizes for convolution dimensions.
-      auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
-      if (failed(convDimsOrFailure)) {
-        return;
-      }
-      // No padding for filter dimensions.
-      const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
-      auto filterDims = convDims.filterLoop;
-      llvm::sort(filterDims);
-      int64_t totalReduction = 1;
-      SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
-      SmallVector<int64_t> paddingConvSizes = paddingSizes.value();
-      for (unsigned dim : filterDims) {
-        assert(dim <= paddingConvSizes.size() && dim < bounds.size() &&
-               "filter dimension out of bounds");
-        paddingConvSizes.insert(paddingConvSizes.begin() + dim, 0);
-        totalReduction *= bounds[dim];
-      }
-
-      // No padding for channel dimensions if the `totalReudction` is already
-      // multiples of padding size.
-      auto channelDims = convDims.inputChannel;
-      int64_t paddingReduction = 1;
-      for (unsigned dim : channelDims) {
-        assert(dim < paddingConvSizes.size() && dim < bounds.size() &&
-               "input channel dimension out of bounds");
-        paddingReduction *= paddingConvSizes[dim];
-        totalReduction *= bounds[dim];
-      }
-      if (totalReduction % paddingReduction == 0) {
-        for (unsigned dim : channelDims) {
-          paddingConvSizes[dim] = 0;
-        }
-      }
-
       SmallVector<OpFoldResult> padSizes =
-          getAsIndexOpFoldResult(rewriter.getContext(), paddingConvSizes);
+          getAsIndexOpFoldResult(rewriter.getContext(), paddingSizes.value());
       rewriter.setInsertionPoint(op);
       if (failed(padToStaticSizes(rewriter, op, padSizes))) {
         return signalPassFailure();

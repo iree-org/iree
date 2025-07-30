@@ -199,16 +199,16 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   return schedule;
 }
 
-/// Create a matmul lowering config based on iteration bounds and indexing
+/// Create a lowering config based on iteration bounds and indexing
 /// maps for a given target. This function computes contraction dimensions
 /// and deduces an MMA intrinsic schedule to choose tile sizes and the
 /// workgroup size.
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
-getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
-                                        ArrayRef<AffineMap> maps,
-                                        ArrayRef<Value> operands,
-                                        IREE::GPU::TargetAttr target,
-                                        bool useDirectLoad, bool scaled) {
+getLoweringConfigAndWorkgroupSize(
+    SmallVector<int64_t> bounds, ArrayRef<AffineMap> maps,
+    ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
+    bool scaled,
+    std::optional<mlir::linalg::ConvolutionDimensions> padConvDims = {}) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -451,8 +451,33 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
       kPackFactor = std::get<2>(mmaKind.getMNKShape());
     }
     paddingTileSizes[innerKDim] *= kPackFactor;
-    attrs.emplace_back(StringAttr::get(context, "padding"),
-                       b.getI64ArrayAttr(paddingTileSizes));
+
+    // In the case of padding convs, starting from workgroup tile sizes, only
+    // the reduction dimensions require appropriate padding.
+    if (padConvDims.has_value()) {
+      SmallVector<int64_t> paddingConvSizes = workgroupTileSizes;
+      auto filterDims = padConvDims.value().filterLoop;
+      auto channelDims = padConvDims.value().inputChannel;
+      unsigned appendSize =
+          filterDims.size() + channelDims.size() - kDims.size();
+      paddingConvSizes.append(appendSize, 0);
+
+      // To avoid over-padding, no padding for channel dimensions is needed if
+      // the product of reduction sizes is already multiples of k padding size.
+      // Otherwise, pad the innermost channel dimension.
+      // TODO (vivian): Padding the innermost channel dimension to a multiple of
+      // vector size may still be needed even if the K-dim is aligned, and this
+      // should be validated based on performance.
+      if (bounds[innerKDim] % paddingTileSizes[innerKDim] != 0) {
+        int64_t innerChannelDim = channelDims.back();
+        paddingConvSizes[innerChannelDim] = paddingTileSizes[innerKDim];
+      }
+      attrs.emplace_back(StringAttr::get(context, "padding_conv"),
+                         b.getI64ArrayAttr(paddingConvSizes));
+    } else {
+      attrs.emplace_back(StringAttr::get(context, "padding"),
+                         b.getI64ArrayAttr(paddingTileSizes));
+    }
   }
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -464,10 +489,9 @@ getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
   return std::make_pair(loweringConfig, flatWorkgroupSize);
 }
 
-LogicalResult
-setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  Operation *op, bool useDirectLoad) {
+LogicalResult setIGEMMConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, bool useDirectLoad, bool padConv) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -489,11 +513,15 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
 
+  std::optional<mlir::linalg::ConvolutionDimensions> padConvDims;
+  if (padConv)
+    padConvDims = igemmGenericConvDetails->convDims;
+
   SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
-                                              igemmOperands, target,
-                                              useDirectLoad, /*scaled*/ false);
+      getLoweringConfigAndWorkgroupSize(bounds, igemmContractionMaps,
+                                        igemmOperands, target, useDirectLoad,
+                                        /*scaled*/ false, padConvDims);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -538,8 +566,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG() << "Matmul TileAndFuse Config";
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
-                                              useDirectLoad, /*scaled*/ false);
+      getLoweringConfigAndWorkgroupSize(bounds, maps, operands, target,
+                                        useDirectLoad, /*scaled*/ false);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -547,7 +575,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     // TODO (muzasyed) : Perform padding appropriately for minimizing bank
     // conflicts when dealing with scaled matmuls. For now it is disabled.
     useDirectLoad = true;
-    configAndWgSize = getMatmulLoweringConfigAndWorkgroupSize(
+    configAndWgSize = getLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*scaled*/ true);
   }
 
