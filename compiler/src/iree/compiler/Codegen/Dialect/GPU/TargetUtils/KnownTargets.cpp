@@ -921,11 +921,6 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // duplicated product or microarchitecture names among vendors, which should
   // be the case.
 
-  // For mobile GPUs we target Vulkan 1.1, which accepts SPIR-V 1.3 as the
-  // maximum. But the VK_KHR_spirv_1_4 extension is commonly available so we use
-  // SPIR-V 1.4. For non-mobile GPUs we target Vulkan 1.3, which accepts
-  // SPIR-V 1.6 as the maximum.
-
   // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
@@ -934,7 +929,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   }
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),
-                            /*features=*/"spirv:v1.4,cap:Shader", context);
+                            /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details =
           getNVIDIAGPUTargetDetails(target)) {
@@ -944,7 +939,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   if (std::optional<TargetDetails> details =
           getQualcommGPUTargetDetails(target)) {
     return createTargetAttr(*details, target,
-                            /*features=*/"spirv:v1.4,cap:Shader", context);
+                            /*features=*/"spirv:v1.6,cap:Shader", context);
   }
 
   // Go through common profiles if not hit in the above.
