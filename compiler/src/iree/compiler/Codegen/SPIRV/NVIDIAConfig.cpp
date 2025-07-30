@@ -28,11 +28,12 @@ namespace mlir::iree_compiler::detail {
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            IREE::GPU::TargetAttr target) {
   // First try to see if we can use tensor cores.
+  /*
   if (succeeded(setCooperativeMatrixConfig(target, op,
                                            NVIDIANumSubgroupsPerWorkgroup,
                                            NVIDIANumMNTilesPerSubgroup)))
     return success();
-
+                                            */
   const int subgroupSize = target.getPreferredSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
@@ -44,7 +45,7 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
     threadMNK = {4, 4, 32};
   }
   return setMatmulOpConfig(target, op, workgroupXY, threadMNK,
-                           /*enablePromotion=*/true);
+                           /*enablePromotion=*/false);
 }
 
 // Volta architecture:
