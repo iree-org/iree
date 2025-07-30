@@ -235,6 +235,15 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
                                            /*fuseMultiReduction=*/false,
                                            /*fuseTruncateOps=*/true});
       })
+      // 5. After all the reshape propagations, fuse elementwise operations
+      //    even if the producer has multiple uses.
+      .addPass([] {
+        FuseMultiUseElementwiseProducerPassOptions options;
+        options.intraDispatch = true;
+        return DispatchCreation::createFuseMultiUseElementwiseProducerPass(
+            options);
+      })
+
       // Clone all producers into the dispatch region to perpare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to

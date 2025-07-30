@@ -140,15 +140,16 @@ static LogicalResult doMultiUseFusion(Operation *rootOp,
   return success();
 }
 
-static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
-                                                 MLIRContext *context,
-                                                 DominanceInfo &dominanceInfo) {
+static FailureOr<unsigned> fuseMultiUseProducers(
+    Operation *funcOp, MLIRContext *context, DominanceInfo &dominanceInfo,
+    const FuseMultiUseElementwiseProducerPassOptions &options) {
   OpBuilder builder(context);
   llvm::MapVector<Operation *, llvm::SetVector<Operation *>> fusedOps;
   DenseMap<Operation *, Operation *> opToRootMap;
   funcOp->walk<WalkOrder::PostOrder, ReverseIterator>(
       [&](linalg::GenericOp genericOp) {
-        if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+        if (options.intraDispatch ==
+            IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
           return;
         }
 
@@ -199,13 +200,15 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
           // 7. Skip bit-extend-like `producer` ops as we would rather fuse
           //    by cloning the producer instead of multi-use fusion.
-          if (IREE::LinalgExt::isBitExtendOp(producer)) {
+          if (!options.intraDispatch &&
+              IREE::LinalgExt::isBitExtendOp(producer)) {
             return;
           }
 
           // 8. Skip bit-truncate-like `producer` ops as we would rather fuse
           //    these operations with their producers.
-          if (IREE::LinalgExt::isBitTruncateOp(producer)) {
+          if (!options.intraDispatch &&
+              IREE::LinalgExt::isBitTruncateOp(producer)) {
             return;
           }
 
@@ -268,15 +271,17 @@ struct FuseMultiUseElementwiseProducerPass final
 void FuseMultiUseElementwiseProducerPass::runOnOperation() {
   Operation *funcOp = getOperation();
   MLIRContext *context = funcOp->getContext();
+  FuseMultiUseElementwiseProducerPassOptions options{intraDispatch,
+                                                     numIterations};
 
   // Run fusion of producer with consumer when producer has multiple uses.
   // For now run this sequence a fixed times (2 by default). Ideally we
   // would run it till no candidates exist.
-  for (auto i : llvm::seq<unsigned>(0, numIterations)) {
+  for (auto i : llvm::seq<unsigned>(0, options.numIterations)) {
     (void)i;
     auto &dominanceInfo = getAnalysis<DominanceInfo>();
     FailureOr<unsigned> numOfFusableCandidates =
-        fuseMultiUseProducers(funcOp, context, dominanceInfo);
+        fuseMultiUseProducers(funcOp, context, dominanceInfo, options);
     if (failed(numOfFusableCandidates)) {
       funcOp->emitError("failed to fuse multi-use producers");
       return signalPassFailure();
