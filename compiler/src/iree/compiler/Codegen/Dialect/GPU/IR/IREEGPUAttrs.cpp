@@ -1683,6 +1683,13 @@ bool TargetAttr::supportsSyncMMAOps() const {
   return false;
 }
 
+std::optional<int64_t> getCUCount(IREE::GPU::TargetAttr target) {
+  if (auto chip = target.getChip()) {
+    return chip.getWgpCount();
+  }
+  return std::nullopt;
+}
+
 //===----------------------------------------------------------------------===//
 // Lowering Config Attributes
 //===----------------------------------------------------------------------===//

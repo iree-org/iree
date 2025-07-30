@@ -106,4 +106,8 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
 #undef GET_ATTRDEF_CLASSES
 // clang-format on
 
+namespace mlir::iree_compiler::IREE::GPU {
+std::optional<int64_t> getCUCount(TargetAttr target);
+} // namespace mlir::iree_compiler::IREE::GPU
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS_H_
