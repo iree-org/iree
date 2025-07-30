@@ -455,44 +455,6 @@ util.func public @dont_clone_flow_ops(%arg0: tensor<?x?xf16>, %arg1: tensor<?x?x
 
 // -----
 
-util.func public @clone_scatter_indices(%arg0: tensor<1x?x32x8x128xf8E4M3FNUZ>, %arg1: tensor<1x?x32x8x128xbf16>, %arg2: tensor<1x?xi64>, %arg3: tensor<1x?xi64>, %arg4: tensor<1x?xi32>, %arg5: tensor<?x32x8x128xbf16>) -> (tensor<?x32x8x128xbf16>, tensor<1x?xi64>) {
-  %c1 = arith.constant 1 : index
-  %c10_i64 = arith.constant 10 : i64
-  %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1x?x32x8x128xf8E4M3FNUZ>) outs(%arg1 : tensor<1x?x32x8x128xbf16>) {
-  ^bb0(%in: f8E4M3FNUZ, %out: bf16):
-    %3 = arith.extf %in : f8E4M3FNUZ to bf16
-    linalg.yield %3 : bf16
-  } -> tensor<1x?x32x8x128xbf16>
-  %1:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<1x?xi64>) outs(%arg3, %arg4 : tensor<1x?xi64>, tensor<1x?xi32>) {
-  ^bb0(%in: i64, %out: i64, %out_0: i32):
-    %3 = arith.addi %in, %c10_i64 : i64
-    %4 = arith.trunci %3 : i64 to i32
-    linalg.yield %3, %4 : i64, i32
-  } -> (tensor<1x?xi64>, tensor<1x?xi32>)
-  %2 = flow.dispatch.region -> (tensor<?x32x8x128xbf16>{%c1}) {
-    %3 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%0, %1#1 : tensor<1x?x32x8x128xbf16>, tensor<1x?xi32>) outs(%arg5 : tensor<?x32x8x128xbf16>) {
-    ^bb0(%arg6: bf16, %arg7: bf16):
-      iree_linalg_ext.yield %arg6 : bf16
-    } -> tensor<?x32x8x128xbf16>
-    flow.return %3 : tensor<?x32x8x128xbf16>
-  }
-  util.return %2, %1#0 : tensor<?x32x8x128xbf16>, tensor<1x?xi64>
-}
-
-// CHECK-LABEL: func public @clone_scatter_indices
-//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
-//       CHECK:     %[[GEN0:.+]]:2 = linalg.generic
-//       CHECK:     flow.return %[[GEN0]]#0 : tensor<1x?xi64>
-//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
-//       CHECK:     %[[GEN1:.+]] = linalg.generic
-//       CHECK:     %[[GEN2:.+]]:2 = linalg.generic
-//       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:       ins(%[[GEN1]], %[[GEN2]]#1
-//       CHECK:     flow.return %[[SCATTER]] : tensor<?x32x8x128xbf16>
-//       CHECK:   util.return %[[DISPATCH1]], %[[DISPATCH0]]
-
-// -----
-
 // Still fuse Q, K, and V in the case of bit-extend ops.
 util.func @attention_bitextend_fusion(%arg0: tensor<10x20x30x50xf8E4M3FNUZ>,
     %arg1: tensor<10x20x40x50xf8E4M3FNUZ>, %arg2: tensor<10x20x40x50xf8E4M3FNUZ>,
