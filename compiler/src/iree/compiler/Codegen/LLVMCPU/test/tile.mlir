@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile{tiling-level=0}))" --split-input-file %s | FileCheck %s
-
 // `tiling-level=0`, which is the testing value of the pass option, indicates
-// distribution level tiling.
+// distribution level tiling. See IREECPUTypes.h for more details.
+
 #config0 = #iree_cpu.lowering_config<distribution = [10, 20]>
 #config1 = #iree_cpu.lowering_config<distribution = [10, 20, 30]>
 #config2 = #iree_cpu.lowering_config<distribution = [1, 16]>
