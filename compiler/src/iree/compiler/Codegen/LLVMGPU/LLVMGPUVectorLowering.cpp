@@ -142,6 +142,30 @@ struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
   }
 };
 
+struct FoldMulAddToFMA final : OpRewritePattern<arith::AddFOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::AddFOp addOp,
+                                PatternRewriter &rewriter) const override {
+    auto mulfOp = addOp.getLhs().getDefiningOp<arith::MulFOp>();
+    Value addend = addOp.getRhs();
+
+    if (!mulfOp) {
+      mulfOp = addOp.getRhs().getDefiningOp<arith::MulFOp>();
+      addend = addOp.getLhs();
+    }
+
+    if (!mulfOp) {
+      return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<math::FmaOp>(addOp, mulfOp.getLhs(),
+                                             mulfOp.getRhs(), addend);
+
+    return success();
+  }
+};
+
 struct LLVMGPUVectorLoweringPass final
     : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -149,6 +173,7 @@ struct LLVMGPUVectorLoweringPass final
     registry.insert<memref::MemRefDialect>();
     registry.insert<vector::VectorDialect>();
     registry.insert<scf::SCFDialect>();
+    registry.insert<math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -205,6 +230,7 @@ struct LLVMGPUVectorLoweringPass final
       vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
       arith::SelectOp::getCanonicalizationPatterns(patterns, ctx);
       patterns.add<FoldI1SelectToBroadcast>(ctx);
+      patterns.add<FoldMulAddToFMA>(ctx);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
