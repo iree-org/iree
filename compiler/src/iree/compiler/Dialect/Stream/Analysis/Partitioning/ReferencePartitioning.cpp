@@ -194,10 +194,12 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       }
 
       // Pinned affinity does not match the affinity where it would execute on.
-      if (transferOp.getSourceAffinityAttr() == pinnedAffinities[0]) {
-        return std::nullopt;
+      for (auto affinity : pinnedAffinities) {
+        if (transferOp.getSourceAffinityAttr() != affinity) {
+          return affinity;
+        }
       }
-      return pinnedAffinities[0];
+      return std::nullopt;
     };
 
     // Special handling for stream.async.transfer with pinned consumers.
