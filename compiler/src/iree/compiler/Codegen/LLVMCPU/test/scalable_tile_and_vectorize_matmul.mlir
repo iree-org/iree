@@ -1,13 +1,13 @@
 // RUN: iree-opt --split-input-file \
-// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse{tiling-level=1},iree-llvmcpu-tile{tiling-level=2},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
-
-// -----
+// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse{tiling-level=3},iree-llvmcpu-tile{tiling-level=4},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
+// `tiling-level=3` indicates VectorCommonParallelTiles, and `tiling-level=4`
+// indicates VectorReductionTiles. See IREECPUTypes.h for more details.
 
 /// This test checks we successfully tile the matmul and invoke the linalg vectorizer,
 /// and produce scalable vector ops.
 
 /// Simple scalable lowering config, derived from the default for SVE on AArch64.
-#scalable_lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128, 128, 0], [1, [32], 0], [0, 0, 1], [0, 0, 0]]>
+#scalable_lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [1, [32], 0], vector_reduction = [0, 0, 1]>
 
 func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32>{
   %1 = linalg.matmul {lowering_config = #scalable_lowering_config} ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)

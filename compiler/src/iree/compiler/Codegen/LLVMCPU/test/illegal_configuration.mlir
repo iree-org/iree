@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --verify-diagnostics --split-input-file %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0]]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal_distribution_only(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
@@ -12,7 +12,7 @@ func.func @illegal_distribution_only(%0: memref<4x8xf32>, %1: memref<8x16xf32>, 
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
+#config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, 32, 16], vector_reduction = [0, 0, 16], vector_inner_parallel = [0, 0, 0]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
@@ -24,7 +24,7 @@ func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 0, 0], [0, 16, 16], [0, 0, 0]]>
+#config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, 0, 0], vector_reduction = [0, 16, 16], vector_inner_parallel = [0, 0, 0]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal_reduction_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
@@ -36,7 +36,7 @@ func.func @illegal_reduction_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [{sizes = [4, 8], interchange = [1]}, [8, 8, 0], [0, 0, 8], [0, 0, 0]]>
+#config = #iree_cpu.lowering_config<distribution = {sizes = [4, 8], interchange = [1]}, vector_common_parallel = [8, 8, 0], vector_reduction = [0, 0, 8], vector_inner_parallel = [0, 0, 0]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal_interchange(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation

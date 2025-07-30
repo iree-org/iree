@@ -1,8 +1,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction{enable-fp-reduction-reordering=true},cse,canonicalize))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction,cse,canonicalize))" --split-input-file %s | FileCheck %s --check-prefix=DISABLEREASSOC
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 8]]>
-#config1 = #iree_codegen.lowering_config<tile_sizes = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 16]]>
+#config = #iree_cpu.lowering_config<vector_reduction = [0, 0, 0, 8]>
+#config1 = #iree_cpu.lowering_config<vector_reduction = [0, 0, 0, 16]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 func.func @softmax_codegen_config(%arg0: tensor<2x5x4096x4096xf32>) -> tensor<2x5x4096x4096xf32> {
@@ -107,7 +107,7 @@ func.func @softmax_cpu_config(%arg0: tensor<2x5x4096x4096xf32>) -> tensor<2x5x40
 
 // Do not split operations with indexing semantics
 // See : https://github.com/iree-org/iree/issues/14934
-#config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
+#config = #iree_cpu.lowering_config<vector_reduction = [4]>
 func.func @dont_split_with_indexing_semantics(%arg0 : tensor<4096xf32>, %arg1 : tensor<f32>) -> tensor<f32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
@@ -131,7 +131,7 @@ func.func @dont_split_with_indexing_semantics(%arg0 : tensor<4096xf32>, %arg1 : 
 
 // check usage of result data type for respecting disable-reassociation flag.
 // See https://github.com/iree-org/iree/issues/14934#issuecomment-1716552762
-#config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
+#config = #iree_cpu.lowering_config<vector_reduction = [4]>
 func.func @dont_reassociate(%arg0 : tensor<4096xi32>, %arg1 : tensor<f32>) -> tensor<f32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],

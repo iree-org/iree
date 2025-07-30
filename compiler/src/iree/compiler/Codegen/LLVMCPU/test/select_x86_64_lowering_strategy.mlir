@@ -232,7 +232,7 @@ func.func @add_static() attributes {hal.executable.target = #executable_target_e
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [64, 64, 0], [0, 0, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
+#config = #iree_cpu.lowering_config<distribution = [64, 64, 0], cache_parallel = [64, 64, 0], cache_reduction = [0, 0, 0], vector_common_parallel = [32, 32, 0], vector_reduction = [0, 0, 32], vector_inner_parallel = [0, 0, 0]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
 func.func @preset_config_matmul_tensors() attributes {
@@ -251,7 +251,7 @@ func.func @preset_config_matmul_tensors() attributes {
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>>
   return
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], cache_reduction = [0, 0, 0], distribution = [64, 64, 0], vector_common_parallel = [32, 32, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 32]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @preset_config_matmul_tensors()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

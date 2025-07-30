@@ -33,6 +33,7 @@
 // CHECK-NEXT:  %[[OUT_WRITE:.*]] = vector.transfer_write %[[INNER_LOOP]], %[[OUT_SLICE_1]]{{.*}} {{.*}} : vector<8x[16]xf32>, tensor<8x?xf32>
 // CHECK-NEXT:  %[[INSERT_SLICE:.*]] = tensor.insert_slice %[[OUT_WRITE]] into %[[OUT_SLICE]]{{.*}} : tensor<8x?xf32> into tensor<8x?xf32>
 // CHECK-NEXT:  tensor.insert_slice %[[INSERT_SLICE]] into %[[OUT_TENSOR_1]]{{.*}} : tensor<8x?xf32> into tensor<1024x1024xf32>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], cache_parallel = [0, 0, 0], cache_reduction = [0, 0, 0], vector_common_parallel = [8, [16], 0], vector_reduction = [0, 0, 1], vector_inner_parallel = [0, 0, 0]>
 func.func @pipeline(%3: tensor<1024x1024xf32>, %4: tensor<1024x1024xf32>, %5: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
   %c1 = arith.constant 1 : index
   %c1024 = arith.constant 1024 : index
@@ -53,7 +54,7 @@ func.func @pipeline(%3: tensor<1024x1024xf32>, %4: tensor<1024x1024xf32>, %5: te
         %extracted_slice_2 = tensor.extract_slice %extracted_slice[0, %arg4] [8, 1] [1, 1] : tensor<8x1024xf32> to tensor<8x1xf32>
         %extracted_slice_3 = tensor.extract_slice %extracted_slice_0[%arg4, 0] [1, %7] [1, 1] : tensor<1024x?xf32> to tensor<1x?xf32>
         %extracted_slice_4 = tensor.extract_slice %arg5[0, 0] [8, %7] [1, 1] : tensor<8x?xf32> to tensor<8x?xf32>
-        %13 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>} ins(%extracted_slice_2, %extracted_slice_3 : tensor<8x1xf32>, tensor<1x?xf32>) outs(%extracted_slice_4 : tensor<8x?xf32>) -> tensor<8x?xf32>
+        %13 = linalg.matmul {lowering_config = #config} ins(%extracted_slice_2, %extracted_slice_3 : tensor<8x1xf32>, tensor<1x?xf32>) outs(%extracted_slice_4 : tensor<8x?xf32>) -> tensor<8x?xf32>
         %inserted_slice_5 = tensor.insert_slice %13 into %arg5[0, 0] [8, %7] [1, 1] : tensor<8x?xf32> into tensor<8x?xf32>
         scf.yield %inserted_slice_5 : tensor<8x?xf32>
       }
