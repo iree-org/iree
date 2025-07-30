@@ -1342,21 +1342,29 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  int64_t mDim = opInfo.getMDims().back();
-  int64_t k1Dim = opInfo.getK1Dims().back();
-  int64_t k2Dim = opInfo.getK2Dims().back();
-  int64_t nDim = opInfo.getNDims().back();
+  auto getDimAndSize = [&bounds](ArrayRef<int64_t> dims)
+      -> std::pair<std::optional<int64_t>, int64_t> {
+    std::optional<int64_t> dim;
+    int64_t size = 1;
+    if (!dims.empty()) {
+      dim = dims.back();
+      size = bounds[dim.value()];
+    }
+    return {dim, size};
+  };
+  auto [mDim, mDimSize] = getDimAndSize(opInfo.getMDims());
+  auto [k1Dim, k1DimSize] = getDimAndSize(opInfo.getK1Dims());
+  auto [k2Dim, k2DimSize] = getDimAndSize(opInfo.getK2Dims());
+  auto [nDim, nDimSize] = getDimAndSize(opInfo.getNDims());
 
   // Dynamic dims are expected to be taken care of earlier in the pipeline.
-  if (ShapedType::isDynamic(bounds[mDim]) ||
-      ShapedType::isDynamic(bounds[k1Dim]) ||
-      ShapedType::isDynamic(bounds[k2Dim]) ||
-      ShapedType::isDynamic(bounds[nDim])) {
+  if (ShapedType::isDynamic(mDimSize) || ShapedType::isDynamic(k1DimSize) ||
+      ShapedType::isDynamic(k2DimSize) || ShapedType::isDynamic(nDimSize)) {
     return failure();
   }
 
   // Bail out on skinny attention.
-  if (bounds[mDim] <= kVerySkinnyDimThreshold) {
+  if (mDimSize <= kVerySkinnyDimThreshold) {
     return failure();
   }
 
@@ -1399,16 +1407,16 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type vElementType = getElementTypeOrSelf(vMatrix);
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
-      /*m=*/bounds[mDim],
-      /*n=*/bounds[k2Dim],
-      /*k=*/bounds[k1Dim],
+      /*m=*/mDimSize,
+      /*n=*/k2DimSize,
+      /*k=*/k1DimSize,
       /*lhsType=*/qElementType,
       /*rhsType=*/kElementType,
       /*accType=*/f32Type,
   };
-  GPUMatmulShapeType pvMatmul{/*m=*/bounds[mDim],
-                              /*n=*/bounds[nDim],
-                              /*k=*/bounds[k2Dim],
+  GPUMatmulShapeType pvMatmul{/*m=*/mDimSize,
+                              /*n=*/nDimSize,
+                              /*k=*/k2DimSize,
                               /*lhsType=*/vElementType,
                               /*rhsType=*/vElementType,
                               /*accType=*/f32Type};
@@ -1491,12 +1499,20 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] = pvSchedule.mSubgroupCounts[0] *
-                             pvSchedule.mTileSizes[0] * pvSchedule.mSize;
-  workgroupTileSizes[nDim] = pvSchedule.nSubgroupCounts[0] *
-                             pvSchedule.nTileSizes[0] * pvSchedule.nSize;
-
-  reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[0] * pvSchedule.kSize;
+  if (mDim.has_value()) {
+    workgroupTileSizes[mDim.value()] = pvSchedule.mSubgroupCounts[0] *
+                                       pvSchedule.mTileSizes[0] *
+                                       pvSchedule.mSize;
+  }
+  if (nDim.has_value()) {
+    workgroupTileSizes[nDim.value()] = pvSchedule.nSubgroupCounts[0] *
+                                       pvSchedule.nTileSizes[0] *
+                                       pvSchedule.nSize;
+  }
+  if (k2Dim.has_value()) {
+    reductionTileSizes[k2Dim.value()] =
+        pvSchedule.kTileSizes[0] * pvSchedule.kSize;
+  }
 
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),

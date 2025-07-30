@@ -1017,8 +1017,7 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   // Various problem parameters.
   int64_t loopDepth = scatter.getLoopIteratorTypes().size();
   int64_t elemBits = scatter.getOriginalType().getElementTypeBitWidth();
-  SmallVector<int64_t> loopBounds = scatter.getStaticLoopRanges().value_or(
-      SmallVector<int64_t>(loopDepth, ShapedType::kDynamic));
+  SmallVector<int64_t> loopBounds = scatter.getStaticLoopRanges();
 
   // Configurations we need to decide.
   int64_t flatWorkgroupSize = target.getPreferredSubgroupSize();
