@@ -40,7 +40,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 
@@ -50,8 +50,6 @@
 #include <numeric>
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -273,10 +271,10 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
   IREE::GPU::DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
       resultEncoding.getElementTypesArray(), targetAttr, resultEncoding);
   if (!mma) {
-    LDBG("expect encodings on operand types");
+    LDBG() << "expect encodings on operand types";
     return nullptr;
   }
-  LDBG("Target MMA: " << mma);
+  LDBG() << "Target MMA: " << mma;
 
   MLIRContext *ctx = builder.getContext();
   SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;

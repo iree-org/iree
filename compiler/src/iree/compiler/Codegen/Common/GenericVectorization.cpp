@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -24,8 +25,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-generic-vectorization"
-#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -41,7 +40,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   std::unique_ptr<TilingConfig> tilingConfig =
       TilingConfig::create(getLoweringConfig(op));
   if (useConfiguredVectorSizes && tilingConfig) {
-    LDBG("Use configured vector sizes from lowering config");
+    LDBG() << "Use configured vector sizes from lowering config";
     auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
     // Replace zeros in canonical vector shape to turn it into a valid shape.
     std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);

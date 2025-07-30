@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -26,7 +27,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile-and-fuse"
-#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -246,12 +246,12 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return WalkResult::interrupt();
   });
   if (!consumerOp) {
-    LDBG("----- skip, no consumer op -----");
+    LDBG() << "----- skip, no consumer op -----";
     return;
   }
 
-  LDBG("consumerOp: " << consumerOp);
-  LDBG("tilingLevel: " << tilingLevel);
+  LDBG() << "consumerOp: " << consumerOp;
+  LDBG() << "tilingLevel: " << tilingLevel;
 
   // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
   // fallback to find a lowering_config from the root operation.
@@ -260,13 +260,13 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   if (!loweringConfig) {
     FailureOr<Operation *> rootOp = getRootOperation(getComputeOps(funcOp));
     if (failed(rootOp)) {
-      LDBG("failed to find rootOp, skip TileAndFuse");
+      LDBG() << "failed to find rootOp, skip TileAndFuse";
       return;
     }
     loweringConfig = getLoweringConfig(rootOp.value());
   }
   if (!loweringConfig) {
-    LDBG("can't find lowering_config, skip TileAndFuse");
+    LDBG() << "can't find lowering_config, skip TileAndFuse";
     return;
   }
 
@@ -278,7 +278,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   tileScalableFlags.assign(attr.getScalableFlags().begin(),
                            attr.getScalableFlags().end());
   if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
-    LDBG("----- skip, all zeros -----");
+    LDBG() << "----- skip, all zeros -----";
     return;
   }
 
@@ -289,7 +289,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   IRRewriter rewriter(context);
   DominanceInfo dominanceInfo(funcOp);
   if (failed(applyTileAndFuse(rewriter, consumerOp, dominanceInfo, options))) {
-    LDBG("----- tile and fuse failed -----");
+    LDBG() << "----- tile and fuse failed -----";
     return signalPassFailure();
   }
 
@@ -303,7 +303,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LDBG("----- cleanup failed -----");
+    LDBG() << "----- cleanup failed -----";
     return signalPassFailure();
   }
 }
