@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -22,7 +23,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile"
-#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -48,7 +48,7 @@ struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
 
 void LLVMCPUTilePass::runOnOperation() {
   if (tilingLevel == -1) {
-    LDBG("tilingLevel not set, skip tiling");
+    LDBG() << "tilingLevel not set, skip tiling";
     return;
   }
   MLIRContext *context = &getContext();
@@ -70,17 +70,17 @@ void LLVMCPUTilePass::runOnOperation() {
     IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
         getLoweringConfig(op);
     if (!maybeLoweringConfig) {
-      LDBG("can't find lowering_config, skip tiling");
+      LDBG() << "can't find lowering_config, skip tiling";
       continue;
     }
     if (!maybeLoweringConfig.hasTilingLevel(tilingLevel)) {
-      LDBG("target tiling level does not exist");
+      LDBG() << "target tiling level does not exist";
       continue;
     }
 
-    LDBG("candidate: " << op);
+    LDBG() << "candidate: " << op;
     if (skipRootOp && maybeLoweringConfig.hasWorkgroupTilingLevel()) {
-      LDBG("skip tiling on the root op");
+      LDBG() << "skip tiling on the root op";
       continue;
     }
 
@@ -92,7 +92,7 @@ void LLVMCPUTilePass::runOnOperation() {
     setSCFTileSizes(tilingOptions, op, std::move(tileSizes),
                     std::move(tileScalableFlags));
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
-      LDBG("tiling sizes are all zeros, skip tiling");
+      LDBG() << "tiling sizes are all zeros, skip tiling";
       continue;
     }
 
@@ -115,7 +115,7 @@ void LLVMCPUTilePass::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LDBG("----- cleanup failed -----");
+    LDBG() << "----- cleanup failed -----";
     return signalPassFailure();
   }
 }
