@@ -806,6 +806,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
+     DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -852,13 +853,17 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 
   let builders = [
     OpBuilder<(ins "TypeRange":$results,
-    "Value":$query,
-    "Value":$key,
-    "Value":$value,
-    "Value":$scale,
-    "Value":$output,
-    "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+      "Value":$query,
+      "Value":$key,
+      "Value":$value,
+      "Value":$scale,
+      "Value":$output,
+      "ArrayAttr":$indexing_maps,
+      CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+    OpBuilder<(ins "TypeRange":$results,
+      "ValueRange":$inputOperands,
+      "ValueRange":$initOperands,
+      "ArrayAttr":$indexing_maps)>
   ];
 
   let extraClassDeclaration = [{
