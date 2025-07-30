@@ -135,12 +135,12 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
       /*desc=*/[{
         Return the static loop ranges.
       }],
-      /*retTy=*/"FailureOr<SmallVector<int64_t>>",
+      /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getStaticLoopRanges",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return failure();
+        llvm_unreachable("not implemented");
       }]
     >,
     InterfaceMethod<
