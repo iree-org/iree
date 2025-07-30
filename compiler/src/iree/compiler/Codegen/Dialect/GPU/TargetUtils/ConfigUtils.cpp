@@ -785,7 +785,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
-                                     std::nullopt) {
+                                     std::nullopt) -> int64_t {
     LDBG() << "Loss factor: " << lossFactor;
     // Initialize the configuration.
     flatWorkgroupSize = 1;
@@ -798,6 +798,21 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       threadTileSizes[loopIndex] = 1;
     }
 
+    // Special case: if all the parallel dimensions are dynamic (and, just to be
+    // defensive, there aren't workgroup tile size constraints requested), we'll
+    // let the later tiling logic mask off excess lanes in the last workgroup
+    // since that's cheaper than using insufficient parallelism.
+    if (!distInfo.partitionableLoops.empty() && !lossFactor &&
+        llvm::all_of(distInfo.partitionableLoops, [&](int64_t shapeDim) {
+          return ShapedType::isDynamic(distInfo.loopBounds[shapeDim]) &&
+                 workgroupTileSizeMultiples[shapeDim] == 1;
+        })) {
+      LDBG() << "Fully dynamic parallel dimension";
+      int64_t innerShapeDim = distInfo.partitionableLoops.back();
+      workgroupTileSizes[innerShapeDim] *= numThreads;
+      flatWorkgroupSize *= numThreads;
+      return 1;
+    }
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;
