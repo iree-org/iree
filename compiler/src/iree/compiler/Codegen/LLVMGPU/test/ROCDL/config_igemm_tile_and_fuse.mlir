@@ -1,5 +1,7 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN: --iree-codegen-llvmgpu-use-igemm=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
+// RUN: --iree-codegen-llvmgpu-use-igemm=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefixes=CHECK,GFX942
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi300x@hip \
+// RUN: --iree-codegen-llvmgpu-use-igemm=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefixes=CHECK,MI300X
 
 func.func @nhwc_conv_mfma() {
   %cst = arith.constant 0.000000e+00 : f32
@@ -24,9 +26,14 @@ func.func @nhwc_conv_mfma() {
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 2, 32, 64, 0]
+
+//  GFX942-SAME:    reduction = [0, 0, 0, 0, 8]
+//  GFX942-SAME:    subgroup = [1, 2, 2, 1, 0]
+//  GFX942-SAME:    workgroup = [1, 2, 32, 64, 0]
+
+//  MI300X-SAME:    reduction = [0, 0, 0, 0, 8]
+//  MI300X-SAME:    subgroup = [1, 1, 1, 1, 0]
+//  MI300X-SAME:    workgroup = [1, 1, 16, 64, 0]}>
 
 // -----
 
@@ -53,9 +60,14 @@ func.func @nchw_conv_mfma() {
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+//  GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+//  GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
+//  GFX942-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+//  MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+//  MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+//  MI300X-SAME:     workgroup = [1, 32, 1, 32, 0]
 
 // -----
 
@@ -81,11 +93,18 @@ func.func @nhwc_conv_unaligned_mfma() {
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     padding = [2, 1, 32, 64, 32]
-//  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [2, 1, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [2, 1, 32, 64, 0]
+
+//  GFX942-SAME:     padding = [2, 1, 32, 64, 32]
+//  GFX942-SAME:     promote_operands = [0, 1, 2]
+//  GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+//  GFX942-SAME:     subgroup = [2, 1, 2, 1, 0]
+//  GFX942-SAME:     workgroup = [2, 1, 32, 64, 0]
+
+//  MI300X-SAME:     padding = [1, 1, 16, 64, 32]
+//  MI300X-SAME:     promote_operands = [0, 1, 2]
+//  MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+//  MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+//  MI300X-SAME:     workgroup = [1, 1, 16, 64, 0]
 
 // -----
 
@@ -111,8 +130,15 @@ func.func @nchw_conv_unaligned_mfma() {
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     padding = [1, 64, 2, 32, 32]
-//  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+//  GFX942-SAME:     padding = [1, 64, 2, 32, 32]
+//  GFX942-SAME:     promote_operands = [0, 1, 2]
+//  GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+//  GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
+//  GFX942-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+//  MI300X-SAME:     padding = [1, 32, 1, 32, 32]
+//  MI300X-SAME:     promote_operands = [0, 1, 2]
+//  MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+//  MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+//  MI300X-SAME:     workgroup = [1, 32, 1, 32, 0]
