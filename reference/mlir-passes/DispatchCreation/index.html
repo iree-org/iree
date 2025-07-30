@@ -5513,7 +5513,8 @@ num-size-3-groups : Number of fusion groups of size 3
 <h3 id="-iree-dispatch-creation-fuse-multi-use-elementwise-producer"><code>-iree-dispatch-creation-fuse-multi-use-elementwise-producer</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-multi-use-elementwise-producer" title="Permanent link">link</a></h3>
 <p><em>Fuse elementwise linalg operations on tensors when producers have multiple uses.</em></p>
 <h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-num-iterations : Number of iterations to fuse multiuse ops
+<div class="highlight"><pre><span></span><code>-intra-dispatch : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
+-num-iterations : Number of iterations to fuse multiuse ops
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-fusion-preprocessing"><code>-iree-dispatch-creation-fusion-preprocessing</code><a class="headerlink" href="#-iree-dispatch-creation-fusion-preprocessing" title="Permanent link">link</a></h3>
 <p><em>Run useful preprocessing patterns that help with fusion.</em></p>
