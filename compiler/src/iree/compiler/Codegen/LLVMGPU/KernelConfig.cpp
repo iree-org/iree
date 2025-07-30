@@ -73,6 +73,12 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUEnableReductionVectorDistribution(
+    "iree-codegen-llvmgpu-use-reduction-vector-distribution",
+    llvm::cl::desc(
+        "enable the usage of the reduction vector distribution pipeline"),
+    llvm::cl::init(true));
+
 // TODO (nirvedhmeshram): Drop this whole path after we have support with
 // TileAndFuse pipeline from completion of
 // https://github.com/iree-org/iree/issues/18858
@@ -746,6 +752,10 @@ static LogicalResult
 setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      mlir::FunctionOpInterface entryPoint,
                                      linalg::LinalgOp op) {
+  if (!clGPUEnableReductionVectorDistribution) {
+    LDBG() << "Reduction Vector Distribution not enabled, skipping...";
+    return failure();
+  }
   MLIRContext *context = op.getContext();
   OpBuilder b(context);
 
