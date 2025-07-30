@@ -267,7 +267,7 @@ func.func @attention_20x4096x64x4096x64() {
 // CHECK-SAME:                           subgroup_m_count = 4
 // CHECK-SAME:                           subgroup_n_count = 1
 // CHECK-SAME:                           reduction =  [0, 0, 0, 64, 0]
-// CHECK-SAME:                           workgroup =  [1, 64, 0, 0, 64]
+// CHECK-SAME:                           workgroup =  [1, 128, 0, 0, 64]
 
 // -----
 
@@ -311,7 +311,7 @@ func.func @attention_20x4096x64x4096x64_f8() {
 // CHECK-SAME: subgroup_m_count = 4
 // CHECK-SAME: subgroup_n_count = 1
 // CHECK-SAME: reduction =  [0, 0, 0, 128, 0]
-// CHECK-SAME: workgroup =  [1, 64, 0, 0, 64]
+// CHECK-SAME: workgroup =  [1, 128, 0, 0, 64]
 
 // -----
 

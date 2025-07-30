@@ -1432,7 +1432,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
                               /*accType=*/f32Type};
 
   GPUMMAHeuristicSeeds pvMatmulSeeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-                                        /*bestMNTileCountPerSubgroup=*/4,
+                                        /*bestMNTileCountPerSubgroup=*/8,
                                         /*bestKTileCountPerSubgroup=*/4};
 
   LDBG() << "Attention Vector Distribution Config";
@@ -1580,6 +1580,14 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
+  {
+    NamedAttrList llvmFuncAttrs;
+    llvmFuncAttrs.append("amdgpu-waves-per-eu", b.getStringAttr("1"));
+    llvmFuncAttrs.append("denormal-fp-math-f32",
+                         b.getStringAttr("preserve-sign"));
+    pipelineAttrs.emplace_back("llvm_func_attrs",
+                               llvmFuncAttrs.getDictionary(b.getContext()));
+  }
 
   // TODO: We do not turn prefetching on even when requested by the prefetching
   // flag because there is a shared memory allocation the two matmuls, which
