@@ -5046,14 +5046,14 @@ for common configurations.</p>
 </ul>
 <p>The default build does <em>not</em> include:</p>
 <ul>
-<li>CUDA and ROCM/HIP targets</li>
+<li>CUDA and ROCm/HIP targets</li>
 <li>Python and other language bindings for the compiler or runtime</li>
 <li>Advanced features like AddressSanitizer or tracing instrumentation</li>
 <li>Experimental components</li>
 </ul>
 <div class="admonition example">
 <p class="admonition-title">Configuration examples</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Disable all backends except CPU</label><label for="__tabbed_3_2">Enable CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Disable all backends except CPU</label><label for="__tabbed_3_2">Enable CUDA</label><label for="__tabbed_3_3">Enable ROCm/HIP</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>This configure command will</p>
@@ -5079,6 +5079,17 @@ for common configurations.</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_TARGET_BACKEND_CUDA<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_HAL_DRIVER_CUDA<span class="o">=</span>ON
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>This configure command will</p>
+<ul>
+<li>Enable the ROCm compiler target backend</li>
+<li>Enable the HIP runtime HAL driver</li>
+</ul>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_TARGET_BACKEND_ROCM<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_HAL_DRIVER_HIP<span class="o">=</span>ON
 </code></pre></div>
 </div>
 </div>
