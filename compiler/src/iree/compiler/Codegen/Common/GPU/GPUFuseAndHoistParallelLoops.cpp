@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -25,8 +26,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-fuse-and-hoist-parallel-loops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -365,7 +364,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing and hoisting loops\n" << funcOp);
+  LDBG() << "After fusing and hoisting loops\n" << funcOp;
 
   // After hoisting parallel loops, try to fuse in any newly revealed consumers
   // and destinations.
@@ -386,7 +385,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing new consumers\n" << funcOp);
+  LDBG() << "After fusing new consumers\n" << funcOp;
 
   // Finally try to do any new producer fusions.
   {
@@ -400,7 +399,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing new producers\n" << funcOp);
+  LDBG() << "After fusing new producers\n" << funcOp;
 }
 
 } // namespace mlir::iree_compiler

@@ -50,7 +50,6 @@ using llvm::dbgs;
 #define DEBUG_VECTOR_TO_MMA "transform-llvmgpu-extensions-vector-to-mma"
 
 #define DBGS() (dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(dbgs() << '[' << DEBUG_TYPE << "] " << X)
 #define DBGS_ALIAS() (dbgs() << '[' << DEBUG_TYPE_ALIAS << "] ")
 #define DBGS_VECTOR_TO_MMA() (dbgs() << '[' << DEBUG_VECTOR_TO_MMA << "] ")
 

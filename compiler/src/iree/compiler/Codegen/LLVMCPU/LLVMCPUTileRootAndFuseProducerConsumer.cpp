@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -29,7 +30,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-tile-root-and-fuse-producers-consumers"
-#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -150,7 +150,7 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
                                 });
 
     if (failed(newFusionOpportunities)) {
-      LDBG("failed to fuse consumers, skip");
+      LDBG() << "failed to fuse consumers, skip";
       return tiledResults->tiledAndFusedOps.front();
     }
 
@@ -213,19 +213,19 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
     rootOp = llvm::filter_to_vector(computeOps, hasRootConfig)[0];
   }
   if (failed(rootOp) || !rootOp.value()) {
-    LDBG("unable to find the root operation");
+    LDBG() << "unable to find the root operation";
     return;
   }
 
   IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
       getLoweringConfig(rootOp.value());
   if (!loweringConfig) {
-    LDBG("unable to find the attached lowering config");
+    LDBG() << "unable to find the attached lowering config";
     return;
   }
 
   if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    LDBG("unable to find the lowering config with the tiling level");
+    LDBG() << "unable to find the lowering config with the tiling level";
     return;
   }
 
@@ -248,7 +248,7 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LDBG("----- cleanup failed -----");
+    LDBG() << "----- cleanup failed -----";
     return signalPassFailure();
   }
 }

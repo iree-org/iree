@@ -80,11 +80,10 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
   // contraction op.
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(rewriter, loc, outputOperand);
-  auto initOp = rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
+  Value initOp = rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
   Value zero = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getZeroAttr(elementType));
-  Value fill =
-      rewriter.create<linalg::FillOp>(loc, zero, initOp.getResult()).result();
+  Value fill = rewriter.create<linalg::FillOp>(loc, zero, initOp).result();
 
   // Update the contraction op to use the new zero tensor as output operand.
   rewriter.modifyOpInPlace(dpsOp, [&]() { dpsOp.setDpsInitOperand(0, fill); });
@@ -92,8 +91,9 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
   // Create a generic op to add back the original output tensor operand.
   rewriter.setInsertionPointAfter(dpsOp);
   auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, outputType, ValueRange{dpsOp->getResult(0), outputOperand}, fill,
-      maps, iterators, [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+      loc, outputType, ValueRange{dpsOp->getResult(0), outputOperand},
+      ValueRange{initOp}, maps, iterators,
+      [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
         Value result;
         if (llvm::isa<FloatType>(elementType)) {
           result = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);

@@ -31,6 +31,7 @@ func.func @accumulate_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
 //       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<512x512xi32>) -> tensor<512x512xi32>
 //       CHECK: %[[GEMM:.+]] = linalg.generic {{.*}} outs(%[[FILL]] : tensor<512x512xi32>) {
 //       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[GEMM]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
 //       CHECK: iree_tensor_ext.dispatch.tensor.store %[[ADD]]
 
 // -----
@@ -82,6 +83,7 @@ func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>
 //       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : f32) outs(%[[EMPTY]] : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 //       CHECK: %[[CONV:.+]] = linalg.conv_2d_nchw_fchw {{.*}} outs(%[[FILL]] : tensor<1x64x56x56xf32>)
 //       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[CONV]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
 //       CHECK: iree_tensor_ext.dispatch.tensor.store %[[ADD]]
 
 // -----
