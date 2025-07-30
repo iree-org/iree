@@ -827,10 +827,10 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   assert(numLoops == 5);
 
   // NOTE: only valid for NHWC!
-  const int64_t B = bounds[0];       // N
-  const int64_t Ho = bounds[1];      // N
-  const int64_t Wo = bounds[2];      // N
-  const int64_t Co = bounds[3];      // M
+  const int64_t B = bounds[0];       // M
+  const int64_t Ho = bounds[1];      // M
+  const int64_t Wo = bounds[2];      // M
+  const int64_t Co = bounds[3];      // N
   const int64_t K = bounds[4];       // K
   const int64_t Hf = filterShape[0]; // K
   const int64_t Wf = filterShape[1]; // K
@@ -859,10 +859,10 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   const int64_t elemsInTransactionPerThread = elemsInTransaction / subgroupSize;
 
   int64_t Tk = std::min(bit_ceil(Ci * Hf * Wf), bestThreadK);
-  int64_t Tw = std::min(bestThreadN, bit_ceil(Wo));
-  int64_t Th = std::min(bestThreadN / Tw, bit_ceil(Ho));
-  int64_t Tb = std::min(bestThreadN / (Tw * Th), bit_ceil(B));
-  int64_t TCo = std::min(bestThreadM, bit_ceil(Co));
+  int64_t Tw = std::min(bestThreadM, bit_ceil(Wo));
+  int64_t Th = std::min(bestThreadM / Tw, bit_ceil(Ho));
+  int64_t Tb = std::min(bestThreadM / (Tw * Th), bit_ceil(B));
+  int64_t TCo = std::min(bestThreadN, bit_ceil(Co));
 
   auto stealableTilesForK = [&]() { return Tb * Th * TCo * Tw; };
   auto stealableTilesForW = [&]() { return Tb * Th * TCo; };
@@ -895,18 +895,18 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   if (contiguousSize < elemsInTransactionPerThread) {
     if (Tk < Ci * Wf) {
       int64_t Tk_factor =
-          std::min(bit_ceil(Ci * Wf) / Tk, stealableTilesForK());
+          std::min((Ci * Wf + Tk - 1) / Tk, stealableTilesForK());
       stealToK(Tk_factor);
     }
   }
   // Try fix Tw if contiguous sector too small
   contiguousSize = (Tk < Ci * Wf) ? (Tk) : (Ci * Wf + (Tw - 1) * Ci);
   if (contiguousSize < elemsInTransactionPerThread) {
-    if (Tk > Ci * Wf && stealableTilesForW() > 0) {
+    if (Tk >= Ci * Wf && stealableTilesForW() > 0) {
       int64_t Tw_delta =
-          (elemsInTransactionPerThread - contiguousSize) * Ci * Wf;
+          (elemsInTransactionPerThread - contiguousSize + Ci - 1) / Ci;
       int64_t Tw_factor =
-          std::min(bit_ceil((Tw + Tw_delta) / Tw), stealableTilesForW());
+          std::min((Tw + Tw_delta + Tw - 1) / Tw, stealableTilesForW());
       stealToW(Tw_factor);
     }
   }
