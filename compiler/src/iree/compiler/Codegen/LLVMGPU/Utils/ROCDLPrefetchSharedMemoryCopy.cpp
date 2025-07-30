@@ -12,7 +12,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -29,8 +29,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -42,7 +40,7 @@ public:
   /// prefetching. Returns failure if unable to support the given |op|.
   static FailureOr<LoopPrefetcher> get(scf::ForOp op) {
     if (!op.getOps<scf::ForOp>().empty()) {
-      LDBG("Loop prefetcher does not support nested loops yet");
+      LDBG() << "Loop prefetcher does not support nested loops yet";
       return failure();
     }
 
@@ -52,12 +50,12 @@ public:
     prefetcher.lb = prefetcher.ub = prefetcher.step = 0;
 
     if (failed(prefetcher.initializeLoopInfo())) {
-      LDBG("Failed to initialize loop info (unsupported loop)");
+      LDBG() << "Failed to initialize loop info (unsupported loop)";
       return failure();
     }
 
     if (failed(prefetcher.initializeStages())) {
-      LDBG("Failed to initialize stage info (unsupported loop)");
+      LDBG() << "Failed to initialize stage info (unsupported loop)";
       return failure();
     }
 
@@ -255,7 +253,7 @@ private:
     // If `scf.yeild` is the only compute op then there is no value in doing
     // prefetching.
     if (computeDependencies.size() == 1) {
-      LDBG("Loop does not have compute so not doing prefetching." << forOp);
+      LDBG() << "Loop does not have compute so not doing prefetching." << forOp;
       return failure();
     }
 
@@ -281,9 +279,9 @@ private:
       // will be re-written.
       if (!hasStage && !isa<gpu::BarrierOp>(op)) {
         if (!isPure(&op)) {
-          LDBG("Found a non-pure loop body op not assigned to any stage "
-               "(unsupported loop): "
-               << op);
+          LDBG() << "Found a non-pure loop body op not assigned to any stage "
+                    "(unsupported loop): "
+                 << op;
           return failure();
         }
       }

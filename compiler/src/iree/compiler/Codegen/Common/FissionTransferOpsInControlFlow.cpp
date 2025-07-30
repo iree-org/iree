@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -18,8 +19,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-fission-transfer-ops-in-control-flow"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -97,7 +96,7 @@ static void setupReadLoop(IRRewriter &rewriter, const FissionTarget &target,
                                              indices);
   }
 
-  LDBG("Read loop: \n" << readLoop << "\n");
+  LDBG() << "Read loop: \n" << readLoop << "\n";
   rewriter.setInsertionPointAfter(readLoop);
 }
 
@@ -125,7 +124,7 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
         readOp, readOp.getVectorType(), allocaOp, indices, readOp.getPadding());
   }
 
-  LDBG("Write loop: \n" << writeLoop << "\n");
+  LDBG() << "Write loop: \n" << writeLoop << "\n";
 }
 
 /// Splits transfer read and write operations from a control flow Operation
@@ -149,8 +148,8 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
 ///   }
 static void splitTransferOpsFromControlFlow(IRRewriter &rewriter,
                                             const FissionTarget &target) {
-  LDBG("Splitting transfer ops from control flow: \n"
-       << "For Op: " << target.parent << "\n");
+  LDBG() << "Splitting transfer ops from control flow: \n"
+         << "For Op: " << target.parent << "\n";
 
   rewriter.setInsertionPoint(target.parent);
   SmallVector<memref::AllocaOp> allocaOps;

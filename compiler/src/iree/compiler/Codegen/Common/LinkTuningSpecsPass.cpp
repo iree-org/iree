@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Transform/IR/TransformAttrs.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -22,8 +23,6 @@
 #include "mlir/IR/Verifier.h"
 
 #define DEBUG_TYPE "iree-codegen-link-tuning-specs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -504,14 +503,14 @@ FailureOr<NamedSequenceOp> linkTuningSpecs(ModuleOp module) {
 
   size_t numConsumedSpecs = llvm::count_if(tuningSpecs, consumesInputOp);
   if (numConsumedSpecs > 0 && numConsumedSpecs != tuningSpecs.size()) {
-    LDBG("Only " << numConsumedSpecs << " tuning specs out of "
-                 << tuningSpecs.size() << " total consume the input op");
+    LDBG() << "Only " << numConsumedSpecs << " tuning specs out of "
+           << tuningSpecs.size() << " total consume the input op";
     return module.emitWarning() << "Expected the argument in all tuning specs "
                                    "to be consistently readonly or consumed";
   }
 
   if (tuningSpecs.empty()) {
-    LDBG("No tuning specs found, exiting without linking");
+    LDBG() << "No tuning specs found, exiting without linking";
     return NamedSequenceOp{};
   }
 

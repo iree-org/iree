@@ -32,7 +32,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -50,7 +50,6 @@
 
 #define DEBUG_TYPE "iree-llvmgpu-kernel-config"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clGPUEarlyTileAndFuseMatmul(
@@ -1213,7 +1212,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
-  LDBG("Matmul Vector Distribution Config");
+  LDBG() << "Matmul Vector Distribution Config";
 
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
 
@@ -1238,12 +1237,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   if (!schedule) {
-    LDBG("Failed to deduce MMA schedule");
+    LDBG() << "Failed to deduce MMA schedule";
     return failure();
   }
 
-  LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("Schedule: " << schedule);
+  LDBG() << "Target Subgroup size: " << targetSubgroupSize;
+  LDBG() << "Schedule: " << schedule;
 
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
@@ -1418,7 +1417,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
                                         /*bestMNTileCountPerSubgroup=*/4,
                                         /*bestKTileCountPerSubgroup=*/4};
 
-  LDBG("Attention Vector Distribution Config");
+  LDBG() << "Attention Vector Distribution Config";
 
   // Infer if Q, K and V are transposed to help generate better schedule.
   bool transposedQ =
@@ -1447,7 +1446,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   }
 
   if (!attSchedule) {
-    LDBG("Failed to deduce Attention schedule");
+    LDBG() << "Failed to deduce Attention schedule";
     return failure();
   }
 
@@ -1461,9 +1460,9 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     pvSchedule.nSubgroupCounts[0] = 1;
   }
 
-  LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("QK Schedule: " << qkSchedule);
-  LDBG("PV Schedule: " << pvSchedule);
+  LDBG() << "Target Subgroup size: " << targetSubgroupSize;
+  LDBG() << "QK Schedule: " << qkSchedule;
+  LDBG() << "PV Schedule: " << pvSchedule;
 
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
@@ -1751,20 +1750,20 @@ static LogicalResult setAttentionReductionConfig(
                                         currDim);
   }
 
-  LDBG("QK Basis");
-  LDBG("Thread Basis");
-  LDBG(llvm::interleaved(qkThreadBasis.counts));
-  LDBG(llvm::interleaved(qkThreadBasis.mapping));
-  LDBG("Subgroup Basis");
-  LDBG(llvm::interleaved(subgroupBasis.counts));
-  LDBG(llvm::interleaved(subgroupBasis.mapping));
-  LDBG("PV Basis");
-  LDBG("Thread Basis");
-  LDBG(llvm::interleaved(pvThreadBasis.counts));
-  LDBG(llvm::interleaved(pvThreadBasis.mapping));
-  LDBG("Subgroup Basis");
-  LDBG(llvm::interleaved(subgroupBasis.counts));
-  LDBG(llvm::interleaved(subgroupBasis.mapping));
+  LDBG() << "QK Basis";
+  LDBG() << "Thread Basis";
+  LDBG() << llvm::interleaved(qkThreadBasis.counts);
+  LDBG() << llvm::interleaved(qkThreadBasis.mapping);
+  LDBG() << "Subgroup Basis";
+  LDBG() << llvm::interleaved(subgroupBasis.counts);
+  LDBG() << llvm::interleaved(subgroupBasis.mapping);
+  LDBG() << "PV Basis";
+  LDBG() << "Thread Basis";
+  LDBG() << llvm::interleaved(pvThreadBasis.counts);
+  LDBG() << llvm::interleaved(pvThreadBasis.mapping);
+  LDBG() << "Subgroup Basis";
+  LDBG() << llvm::interleaved(subgroupBasis.counts);
+  LDBG() << llvm::interleaved(subgroupBasis.mapping);
 
   // Tile N parallel dimensions to value tile size fetched in a single
   // iteration.
@@ -1935,27 +1934,29 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   if (!clGPUEnableVectorDistribution) {
-    LDBG("Vector Distribution not enabled, skipping...");
+    LDBG() << "Vector Distribution not enabled, skipping...";
     return failure();
   }
 
-  LDBG("VectorDistribution: finding a suitable config...");
+  LDBG() << "VectorDistribution: finding a suitable config...";
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp) ||
         IREE::LinalgExt::isaHorizontallyFusedContraction(linalgOp)) {
-      LDBG("VectorDistribution: trying to find a suitable contraction config");
+      LDBG()
+          << "VectorDistribution: trying to find a suitable contraction config";
       return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      LDBG("VectorDistribution: trying to find a suitable convolution config");
+      LDBG()
+          << "VectorDistribution: trying to find a suitable convolution config";
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
     }
   }
 
   if (auto attnOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
-    LDBG("VectorDistribution: trying to find a suitable attention config");
+    LDBG() << "VectorDistribution: trying to find a suitable attention config";
     if (succeeded(setAttentionIntrinsicBasedVectorDistributionConfig(
             target, entryPoint, attnOp))) {
       return success();
@@ -1963,7 +1964,7 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return setAttentionVectorDistributionConfig(target, entryPoint, attnOp);
   }
 
-  LDBG("VectorDistribution: failed to find a suitable config");
+  LDBG() << "VectorDistribution: failed to find a suitable config";
   return failure();
 }
 
@@ -2947,7 +2948,7 @@ static LogicalResult setConvolutionConfig(
   if (clGPUUseTileAndFuseConvolution) {
     if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
                                                           linalgOp))) {
-      LDBG("Tile and fuse convolution config");
+      LDBG() << "Tile and fuse convolution config";
       return success();
     }
   }
@@ -3052,27 +3053,27 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   });
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
                                                    computeOp, ukernelConfig))) {
-    LDBG("Tile and fuse data tiled MMA inner_tiled config");
+    LDBG() << "Tile and fuse data tiled MMA inner_tiled config";
     return success();
   }
   if (clGPUEarlyTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad))) {
-      LDBG("Tile and fuse matmul config");
+      LDBG() << "Tile and fuse matmul config";
       return success();
     }
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad))) {
-      LDBG("Tile and fuse IGEMM config");
+      LDBG() << "Tile and fuse IGEMM config";
       return success();
     }
   }
   if (clGPUTestTileAndFuseVectorize) {
     if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
                                                           computeOp))) {
-      LDBG("Tile and fuse default config");
+      LDBG() << "Tile and fuse default config";
       return success();
     }
   }
@@ -3083,67 +3084,67 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   // config becomes the default for matmul.
   if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                    computeOp))) {
-    LDBG("Tile and fuse matmul config after no vector distribute config");
+    LDBG() << "Tile and fuse matmul config after no vector distribute config";
     return success();
   }
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (succeeded(setContractConfig(target, entryPointFn, linalgOp))) {
-      LDBG("Contract Config");
+      LDBG() << "Contract Config";
       return success();
     }
     if (succeeded(setReductionVectorDistributionConfig(target, entryPointFn,
                                                        linalgOp))) {
-      LDBG("Vector Distribution Subgroup Reduction Config");
+      LDBG() << "Vector Distribution Subgroup Reduction Config";
       return success();
     }
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
-      LDBG("Warp Reduction Config");
+      LDBG() << "Warp Reduction Config";
       return success();
     }
     if (succeeded(setConvolutionConfig(target, entryPointFn, linalgOp, 16))) {
-      LDBG("Convolution Config");
+      LDBG() << "Convolution Config";
       return success();
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp) {
       if (succeeded(setTransposeConfig(entryPointFn, genericOp))) {
-        LDBG("Transpose Config");
+        LDBG() << "Transpose Config";
         return success();
       } else if (ukernelConfig &&
                  succeeded(setArgmaxUkernelConfig(target, entryPointFn,
                                                   genericOp, ukernelConfig))) {
-        LDBG("Argmax Ukernel Config");
+        LDBG() << "Argmax Ukernel Config";
         return success();
       } else if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
                      target, entryPointFn, linalgOp))) {
-        LDBG("Tile and Fuse Config");
+        LDBG() << "Tile and Fuse Config";
         return success();
       }
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)
       .Case<IREE::LinalgExt::FftOp>([&](auto fftOp) {
-        LDBG("FFT Config");
+        LDBG() << "FFT Config";
         return setFftConfig(target, entryPointFn, fftOp);
       })
       .Case<IREE::LinalgExt::SortOp>([&](auto sortOp) {
-        LDBG("Sort Config");
+        LDBG() << "Sort Config";
         return IREE::GPU::setSortConfig(target, entryPointFn, sortOp);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp,
             IREE::LinalgExt::WinogradFilterTransformOp>([&](auto winogradOp) {
-        LDBG("Winograd Config");
+        LDBG() << "Winograd Config";
         return setWinogradOpConfig(target, entryPointFn, winogradOp);
       })
       .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
-        LDBG("CustomOp Config");
+        LDBG() << "CustomOp Config";
         return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
                                                 initGPULaunchConfig);
       })
       .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
-        LDBG("ScatterOp Config");
+        LDBG() << "ScatterOp Config";
         if (failed(IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
                                                        scatterOp))) {
           return setRootDefaultConfig(target, entryPointFn, computeOp);
@@ -3151,13 +3152,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         return success();
       })
       .Default([&](auto op) {
-        LDBG("Default Config");
+        LDBG() << "Default Config";
         if (clLLVMGPUVectorizePipeline) {
           return setRootDefaultConfig(target, entryPointFn, computeOp);
         }
         if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
                 target, entryPointFn, computeOp))) {
-          LDBG("Tile and fuse default config");
+          LDBG() << "Tile and fuse default config";
           return success();
         }
         return setRootDefaultConfig(target, entryPointFn, computeOp);

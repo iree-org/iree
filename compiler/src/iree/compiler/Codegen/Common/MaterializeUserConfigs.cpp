@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -18,8 +19,6 @@
 #include "mlir/Parser/Parser.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-user-configs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -114,8 +113,8 @@ getTransformLibraryFromPath(ModuleOp compiledModule, StringRef path) {
     return compiledModule.emitError()
            << "Failed to load transform library module: " << libraryFileName;
   }
-  LDBG("--found transform library " << libraryFileName << "@"
-                                    << entrySequenceName);
+  LDBG() << "--found transform library " << libraryFileName << "@"
+         << entrySequenceName;
   return TransformLibraryWithEntrypoint{*maybeTransformLibrary,
                                         entrySequenceName.str()};
 }
@@ -150,7 +149,7 @@ static LogicalResult getModuleTuningSpec(ModuleOp compiledModule,
     return compiledModule.emitError() << "Failed to parse tuning spec in "
                                       << kSerializedTuningSpecAttrName;
   }
-  LDBG("--loaded tuning spec");
+  LDBG() << "--loaded tuning spec";
   return success();
 }
 
@@ -183,7 +182,7 @@ struct MaterializeUserConfigsPass final
     // removed.
     if (moduleOp->hasAttr(kSerializedTuningSpecAttrName)) {
       moduleOp->removeAttr(kSerializedTuningSpecAttrName);
-      LDBG("--dropped the serialized tuning spec from the module");
+      LDBG() << "--dropped the serialized tuning spec from the module";
     }
 
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
@@ -200,7 +199,7 @@ struct MaterializeUserConfigsPass final
       //      "translation_info" =
       //        #iree_codegen.translation_info<pipeline = None>
       //      ```
-      LDBG("MaterializeUserConfigsPass on function: " << funcOp);
+      LDBG() << "MaterializeUserConfigsPass on function: " << funcOp;
       if (succeeded(userTransformLibrary)) {
         StringRef libraryModuleName =
             userTransformLibrary->transformLibrary.getSymName().value_or(
@@ -249,7 +248,7 @@ struct MaterializeUserConfigsPass final
       }
 
       translationInfo = getTranslationInfo(funcOp);
-      LDBG("--guaranteed unique translationInfo: " << translationInfo);
+      LDBG() << "--guaranteed unique translationInfo: " << translationInfo;
       /// We only need to resolve symbols for transform dialect based
       /// strategies.
       if (!translationInfo ||

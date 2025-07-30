@@ -18,6 +18,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -40,8 +41,6 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-utils"
-#define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(KD_DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -1375,7 +1374,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(user);
 
-  LDBG("\tReplacing in user by creating new user : " << *user);
+  LDBG() << "\tReplacing in user by creating new user : " << *user;
   if (auto castOp = dyn_cast<memref::CastOp>(user)) {
     auto replacementType = llvm::cast<MemRefType>(replacement.getType());
     auto currentResultType =
@@ -1389,7 +1388,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
         replacementType.getLayout(), replacementType.getMemorySpace());
     auto newCastOp =
         rewriter.create<memref::CastOp>(loc, newResultType, replacement);
-    LDBG("\t\tNew user : " << *newCastOp);
+    LDBG() << "\t\tNew user : " << *newCastOp;
     return SmallVector<Value>(newCastOp->result_begin(),
                               newCastOp->result_end());
   }
@@ -1410,7 +1409,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     auto newSubviewOp = rewriter.create<memref::SubViewOp>(
         loc, newResultType, replacement, offsets, sizes, strides);
 
-    LDBG("\t\tNew user : " << *newSubviewOp);
+    LDBG() << "\t\tNew user : " << *newSubviewOp;
     return llvm::to_vector_of<Value>(newSubviewOp->getResults());
   }
   if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
@@ -1429,7 +1428,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     auto newExpandOp = rewriter.create<memref::ExpandShapeOp>(
         loc, *newResultType, replacement, expandOp.getReassociation(),
         expandOp.getOutputShape(), expandOp.getStaticOutputShape());
-    LDBG("\t\tNew user : " << *newExpandOp);
+    LDBG() << "\t\tNew user : " << *newExpandOp;
     return llvm::to_vector_of<Value>(newExpandOp->getResults());
   }
   if (auto collapseOp = dyn_cast<memref::CollapseShapeOp>(user)) {
@@ -1443,7 +1442,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
 
     auto newCollapseOp = rewriter.create<memref::CollapseShapeOp>(
         loc, *newResultType, replacement, collapseOp.getReassociation());
-    LDBG("\t\tNew user : " << *newCollapseOp);
+    LDBG() << "\t\tNew user : " << *newCollapseOp;
     return llvm::to_vector_of<Value>(newCollapseOp->getResults());
   }
   return std::nullopt;
@@ -1458,8 +1457,8 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
 
   while (!worklist.empty()) {
     auto [original, replacement] = worklist.pop_back_val();
-    LDBG("//===------------------------------------------===//");
-    LDBG("Replacing : " << original);
+    LDBG() << "//===------------------------------------------===//";
+    LDBG() << "Replacing : " << original;
 
     llvm::SmallDenseSet<OpOperand *> preservedUses;
     if (original.getType() != replacement.getType()) {
@@ -1467,7 +1466,7 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
         Operation *user = use.getOwner();
         // Some uses cannot be replaced.
         if (user->hasTrait<OpTrait::ReturnLike>()) {
-          LDBG("\tUnhandled user : " << *user);
+          LDBG() << "\tUnhandled user : " << *user;
           preservedUses.insert(&use);
           continue;
         }
@@ -1493,7 +1492,7 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
     // Replace all non-preserved uses.
     rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
       if (!preservedUses.count(&use)) {
-        LDBG("\t\tReplacing use in :" << *use.getOwner());
+        LDBG() << "\t\tReplacing use in :" << *use.getOwner();
         return true;
       }
       return false;
@@ -1667,9 +1666,9 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
-  LDBG("Inferring sizes for: " << linalgOp);
+  LDBG() << "Inferring sizes for: " << linalgOp;
   if (opResult) {
-    LDBG(" where OpResult.resultNumber = " << opResult->getResultNumber());
+    LDBG() << " where OpResult.resultNumber = " << opResult->getResultNumber();
   }
 
   std::optional<vector::VscaleRange> vscaleRange;
@@ -1701,8 +1700,8 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     if (ShapedType::isStatic(dimSize)) {
       result.vectorSizes.push_back(dimSize);
       result.vectorScalableFlags.push_back(dimScalable);
-      LDBG("Inferred iteration size '" << dimSize << "' for dimension '" << dim
-                                       << "'");
+      LDBG() << "Inferred iteration size '" << dimSize << "' for dimension '"
+             << dim << "'";
       continue;
     }
 
@@ -1726,9 +1725,9 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     dimScalable = maybeDimBound->scalable;
     result.vectorSizes.push_back(dimSize);
     result.vectorScalableFlags.push_back(dimScalable);
-    LDBG("Inferred iteration size '"
-         << dimSize << (dimScalable ? " x vscale" : "") << "' for dimension '"
-         << dim << "'");
+    LDBG() << "Inferred iteration size '" << dimSize
+           << (dimScalable ? " x vscale" : "") << "' for dimension '" << dim
+           << "'";
   }
 
   if (opResult) {
@@ -1742,11 +1741,11 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
-  LDBG("Inferring dest sizes for: " << op);
+  LDBG() << "Inferring dest sizes for: " << op;
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
         return !getConstantIntValue(v).has_value();
       })) {
-    LDBG("skip, because inner_tiles are not all constant");
+    LDBG() << "skip, because inner_tiles are not all constant";
     return std::nullopt;
   }
 
@@ -1771,9 +1770,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   }
 
   LLVM_DEBUG({
-    LDBG("After adjustment with inner tiles and outer_dims_perm:");
+    LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
-      LDBG("Dim #" << idx << ": " << val);
+      LDBG() << "Dim #" << idx << ": " << val;
     }
   });
   result.destShape = result.vectorSizes;
@@ -1782,12 +1781,12 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
-  LDBG("Inferring dest sizes for: " << op);
+  LDBG() << "Inferring dest sizes for: " << op;
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
         return !getConstantIntValue(v).has_value();
       })) {
-    LDBG("failed on inference because inner_tiles are not all constant");
+    LDBG() << "failed on inference because inner_tiles are not all constant";
     return std::nullopt;
   }
 
@@ -1811,9 +1810,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   }
 
   LLVM_DEBUG({
-    LDBG("After adjustment with inner tiles and outer_dims_perm:");
+    LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
-      LDBG("Dim #" << idx << ": " << val);
+      LDBG() << "Dim #" << idx << ": " << val;
     }
   });
   result.destShape = result.vectorSizes;
@@ -1830,10 +1829,10 @@ std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
             presburger::BoundType::UB, dim,
             /*stopCondition=*/nullptr, /*closedUB=*/true);
     if (failed(maybeDimBound)) {
-      LDBG("failed to infer bounds for dim #" << dim);
+      LDBG() << "failed to infer bounds for dim #" << dim;
       return std::nullopt;
     }
-    LDBG("Dim #" << dim << ": " << maybeDimBound.value());
+    LDBG() << "Dim #" << dim << ": " << maybeDimBound.value();
     result.vectorSizes.push_back(maybeDimBound.value());
     result.destShape.push_back(maybeDimBound.value());
   }
@@ -1845,7 +1844,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
     return std::nullopt;
 
   std::optional<VectorizationTileSizes> result;
-  LDBG("Inferring sizes for: " << val);
+  LDBG() << "Inferring sizes for: " << val;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })

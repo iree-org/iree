@@ -10,7 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -20,8 +20,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-combine-layout-transformation"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -364,20 +362,20 @@ combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
   }
   MapScatterOp combinedRelayoutOp = mapScatterOp;
   while (relayoutOp) {
-    LDBG("Attempting to fold " << relayoutOp->getName()
-                               << " into map_scatter op:\n"
-                               << *relayoutOp);
+    LDBG() << "Attempting to fold " << relayoutOp->getName()
+           << " into map_scatter op:\n"
+           << *relayoutOp;
     FailureOr<MapScatterOp> maybeCombinedRelayoutOp = foldIntoMapScatter(
         rewriter, relayoutOp, combinedRelayoutOp, padDistributionConfigFn);
     if (failed(maybeCombinedRelayoutOp)) {
-      LDBG("Failed to fold " << relayoutOp->getName()
-                             << " into map_scatter op");
+      LDBG() << "Failed to fold " << relayoutOp->getName()
+             << " into map_scatter op";
       break;
     }
     combinedRelayoutOp = maybeCombinedRelayoutOp.value();
-    LDBG("Successfully folded " << relayoutOp->getName()
-                                << " into map_scatter. New map_scatter op:\n"
-                                << combinedRelayoutOp);
+    LDBG() << "Successfully folded " << relayoutOp->getName()
+           << " into map_scatter. New map_scatter op:\n"
+           << combinedRelayoutOp;
     relayoutOp = combinedRelayoutOp.getInput().getDefiningOp();
   }
   if (combinedRelayoutOp.isIdentity()) {
@@ -405,7 +403,7 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
       rewriter, loc, op->getOperand(0), mapScatterDest);
   rewriter.modifyOpInPlace(
       op, [&]() { op->setOperand(0, mapScatterOp.getResult(0)); });
-  LDBG("Created identity map_scatter:\n" << mapScatterOp);
+  LDBG() << "Created identity map_scatter:\n" << mapScatterOp;
   return mapScatterOp;
 }
 

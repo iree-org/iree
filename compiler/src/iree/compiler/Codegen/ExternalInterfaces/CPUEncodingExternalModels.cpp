@@ -46,13 +46,11 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::CPU {
 
@@ -72,7 +70,7 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
   // TODO(egebeysel): I think this isScalable*Enabled flag should be temporary
   // and the temporary SME flag should probably come next to it.
   if (!isAArch64(config) || !isScalableVectorizationEnabled()) {
-    LDBG("Pre-conditions to enable scalable tiling are not met!");
+    LDBG() << "Pre-conditions to enable scalable tiling are not met!";
     return failure();
   }
 
@@ -87,7 +85,7 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
   // TODO(egebeysel): Add logic for SME.
   if (mDim.has_value()) {
     if (hasFeature(config, "+sme")) {
-      LDBG("SME with data-tiling is not supported yet!");
+      LDBG() << "SME with data-tiling is not supported yet!";
       return failure();
     }
     scalableTiles.push_back(false);
@@ -263,8 +261,9 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
-    LDBG("candidate: " << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
-                       << " penalty:" << ratedTile.paddingPenalty);
+    LDBG() << "candidate: "
+           << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
+           << " penalty:" << ratedTile.paddingPenalty;
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -279,10 +278,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // Sanity check. This assert can only fail if there's a programming mistake
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
-  LDBG("bestRatedTile: " << llvm::interleaved(ArrayRef{bestRatedTile.M,
-                                                       bestRatedTile.N,
-                                                       bestRatedTile.K})
-                         << " penalty:" << bestRatedTile.paddingPenalty);
+  LDBG() << "bestRatedTile: "
+         << llvm::interleaved(
+                ArrayRef{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
+         << " penalty:" << bestRatedTile.paddingPenalty;
   return bestRatedTile;
 }
 

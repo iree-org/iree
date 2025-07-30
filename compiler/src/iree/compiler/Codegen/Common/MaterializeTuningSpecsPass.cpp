@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -33,8 +34,6 @@
 #include "mlir/Support/FileUtilities.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-tuning-specs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -82,7 +81,7 @@ static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
     return tuningSpec->emitError()
            << "Failed to create a unique file in " << dir << "\n";
   }
-  LDBG("Linked tuning spec file path: " << dumpPath);
+  LDBG() << "Linked tuning spec file path: " << dumpPath;
 
   std::string error;
   auto file = mlir::openOutputFile(dumpPath, &error);
