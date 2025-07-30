@@ -16,6 +16,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -29,6 +30,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -304,6 +306,11 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &funcPassManager) {
 }
 
 void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
+
+  // TODO: if (pipelineOptions.useIgemmConvolution) {
+  funcPassManager.addPass(createConvolutionToIGEMMPass());
+  //}
+
   addTileAndDistributeToWorkgroupsPasses(
       funcPassManager, /*useFuseTensorPadWithConsumerPass=*/true);
 
@@ -316,6 +323,9 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
   // Tile to GPU invocations and vectorize.
   funcPassManager.addPass(createGPUCreateFastSlowPathPass());
   funcPassManager.addPass(createGPUTilePass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   {
