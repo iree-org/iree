@@ -11,13 +11,12 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
-#include "llvm/Support/Debug.h"
 #define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -134,17 +133,19 @@ struct ROCDLConfigureBufferInstructionsPass final
     func.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
       Value offset = binding.getByteOffset();
       if (offset && !isDefinitelyWorkgroupUniform(offset)) {
-        LDBG("Binding offset " << offset << " not known workgroup-uniform\n");
+        LDBG() << "Binding offset " << offset
+               << " not known workgroup-uniform\n";
         return;
       }
       std::optional<int64_t> maxBytes = getSpannedBytes(binding);
       if (!maxBytes) {
-        LDBG("Couldn't bound binding size for " << binding);
+        LDBG() << "Couldn't bound binding size for " << binding;
         return;
       }
       if (*maxBytes >=
           static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
-        LDBG("Size of " << binding << " too large (" << *maxBytes << " bytes)");
+        LDBG() << "Size of " << binding << " too large (" << *maxBytes
+               << " bytes)";
         return;
       }
       annotationHelper.setAttr(binding, unitAttr);

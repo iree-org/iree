@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -19,8 +20,6 @@
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-optimize-vector-transfer"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -68,7 +67,7 @@ struct OptimizeVectorTransferPass final
 
   void runOnOperation() override {
     auto funcOp = getOperation();
-    LDBG("before optimize vector transfer\n" << funcOp);
+    LDBG() << "before optimize vector transfer\n" << funcOp;
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
@@ -83,7 +82,7 @@ struct OptimizeVectorTransferPass final
       }
     }
 
-    LDBG("after dropping leading unit dims\n" << funcOp);
+    LDBG() << "after dropping leading unit dims\n" << funcOp;
 
     if (redundantHoisting) {
       // Workaround, run loop invariant code motion before hoist redundant
@@ -95,7 +94,7 @@ struct OptimizeVectorTransferPass final
     IRRewriter rewriter(funcOp->getContext());
     vector::transferOpflowOpt(rewriter, funcOp);
 
-    LDBG("after folding redundant vector transfers\n" << funcOp);
+    LDBG() << "after folding redundant vector transfers\n" << funcOp;
 
     // Move bitcast inwards from loop region boundaries to increase chances to
     // cancel them.
@@ -107,7 +106,7 @@ struct OptimizeVectorTransferPass final
       }
     }
 
-    LDBG("after bubbling vector bitcasts\n" << funcOp);
+    LDBG() << "after bubbling vector bitcasts\n" << funcOp;
 
     // Second stage of patterns to flatten transfer ops.
     if (flatten) {
@@ -117,11 +116,11 @@ struct OptimizeVectorTransferPass final
         return signalPassFailure();
       }
     }
-    LDBG("after flattening vector transfers\n" << funcOp);
+    LDBG() << "after flattening vector transfers\n" << funcOp;
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
     memref::eraseDeadAllocAndStores(rewriter, funcOp);
-    LDBG("after erasing unused allocs and stores\n" << funcOp);
+    LDBG() << "after erasing unused allocs and stores\n" << funcOp;
   }
 };
 
