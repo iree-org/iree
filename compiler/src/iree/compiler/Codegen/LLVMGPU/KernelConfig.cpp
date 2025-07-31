@@ -832,9 +832,9 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const int numSIMDs = wgp.getSimdsPerWgp().value_or(4);
 
   // If there is more than enough work to saturate all CUs, use single subgroup
-  // per workgroup
+  // per workgroup.
   // TODO: Similarly decide on the local split k factor based on total number of
-  // SIMDs
+  // SIMDs.
   if (parallelSize && *parallelSize > numComputeUnits * numSIMDs) {
     maxWorkgroupSize = target.getPreferredSubgroupSize();
   }
