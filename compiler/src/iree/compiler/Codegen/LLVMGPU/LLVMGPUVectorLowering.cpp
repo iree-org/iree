@@ -199,7 +199,7 @@ struct LLVMGPUVectorLoweringPass final
     // Uplift arith ops to math.fma before lowering high level vector ops.
     {
       RewritePatternSet fmaPatterns(ctx);
-      fmaPatterns.add<SetMulAddFMF>(ctx, /*benefit*/ 2);
+      fmaPatterns.add<SetMulAddFMF>(ctx, PatternBenefit(2));
       populateUpliftToFMAPatterns(fmaPatterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(fmaPatterns)))) {
         return signalPassFailure();
