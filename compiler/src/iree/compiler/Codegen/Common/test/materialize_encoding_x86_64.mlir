@@ -2220,3 +2220,43 @@ func.func @set_encoding_transpose_multi_result() attributes {
 //       CHECK:   %[[PACK:.+]] = linalg.pack %[[TRANSPOSE]]
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[TRANSPOSE]], %[[RESULT_BINDING]]
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING1]]
+
+// -----
+
+#executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> ()>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, 4, 3]>
+#encoding1 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, [#map2, #map3]], iteration_sizes = [2, 4, 3]>
+func.func @generic_with_0d_tensor() attributes {hal.executable.target = #executable_target_xyz} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4xf32, #encoding>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x4xf32, #encoding>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4xf32, #encoding>> -> tensor<2x4xf32, #encoding>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
+  %5 = iree_encoding.set_encoding %4 : tensor<f32> -> tensor<f32, #encoding1>
+  %6 = tensor.empty() : tensor<2x4xf32, #encoding>
+  %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<2x4xf32, #encoding>) -> tensor<2x4xf32, #encoding>
+  %8 = linalg.generic {indexing_maps = [#map4, #map3, #map4], iterator_types = ["parallel", "parallel"]} ins(%3, %5 : tensor<2x4xf32, #encoding>, tensor<f32, #encoding1>) outs(%7 : tensor<2x4xf32, #encoding>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %9 = arith.addf %in, %in_0 : f32
+    linalg.yield %9 : f32
+  } -> tensor<2x4xf32, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %8, %2, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : tensor<2x4xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x4xf32, #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @generic_with_0d_tensor
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0)
+//   CHECK-DAG:   %[[INPUT_0D_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1)
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(2)
+//   CHECK-DAG:   %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_BINDING]]
+//   CHECK-DAG:   %[[INPUT_0D:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_0D_BINDING]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[INPUT]], %[[INPUT_0D]] : tensor<1x1x2x4xf32>, tensor<f32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[RESULT_BINDING]]
