@@ -270,7 +270,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return;
   }
   if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    LDBG() << "invalid tilingLevel, skip TileAndFuse";
+    LDBG() << "no tile sizes for the tiling level, skip TileAndFuse";
     return;
   }
 
