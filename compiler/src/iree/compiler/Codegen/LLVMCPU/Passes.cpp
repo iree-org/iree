@@ -462,6 +462,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
   }
 
   {
+    funcPassManager.addPass(createTileLargeTensorsPass());
     funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     if (pipelineOpt.decomposePackUnPackOps) {
       funcPassManager.addPass(createDecomposePackUnPackOpsPass());
