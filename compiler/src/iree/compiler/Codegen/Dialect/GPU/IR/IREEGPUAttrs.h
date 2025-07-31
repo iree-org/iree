@@ -76,6 +76,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment,
                                                 bool colMajor);
 
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(VirtualMMAIntrinsic virtualIntrinsic,
+                        MMAFragment fragment, bool colMajor);
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
