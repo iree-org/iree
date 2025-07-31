@@ -269,6 +269,16 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
 
   SmallVector<AffineMap> packedIndexingMaps;
   for (OpOperand *inputOperand : genericOp.getDpsInputOperands()) {
+    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
+    // Special case for 0D inputs. They will resolve to identity layout, so
+    // skip the logic to compute the packed indexing map.
+    if (inputMap.getNumResults() == 0) {
+      auto packedInputMap = AffineMap::get(
+          /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, {},
+          rewriter.getContext());
+      packedIndexingMaps.push_back(packedInputMap);
+      continue;
+    }
     // Step 2: Retrieve the encoding for every input operand and perform the
     // outer dimension permutation, inner dimension expansion and permutation,
     // swizzle expansion and swizzle permutation.
@@ -310,7 +320,6 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     }
     ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo.innerDimsPos;
     ArrayRef<int64_t> outerDimsPerm = materializeEncodingInfo.outerDimsPerm;
-    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
     // Permute result dims to the input packed domain, and map dims to the
     // output packed domain.
     SmallVector<int64_t> packedResultDims = llvm::map_to_vector(
