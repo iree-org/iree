@@ -434,17 +434,19 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
           static_cast<IREE::CPU::TilingLevel>(i), /*skipRootOp=*/true));
       break;
     case IREE::CPU::TilingLevel::VectorInnerParallelTiles:
-      funcPassManager.addPass(createLLVMCPUTileAndFusePass(
-          tilingConfig.getVectorInnerParallelLevel()));
-      break;
     case IREE::CPU::TilingLevel::DistributionTiles:
     case IREE::CPU::TilingLevel::MaxNumTileLevels:
     case IREE::CPU::TilingLevel::InvalidLevel:
-      break;
+      continue;
     };
     funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
     funcPassManager.addPass(createConcretizePadResultShapePass());
   }
+
+  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+      IREE::CPU::TilingLevel::VectorInnerParallelTiles));
+  funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
+  funcPassManager.addPass(createConcretizePadResultShapePass());
 
   funcPassManager.addPass(createForallToForPass());
   if (pipelineOpt.enablePeeling) {

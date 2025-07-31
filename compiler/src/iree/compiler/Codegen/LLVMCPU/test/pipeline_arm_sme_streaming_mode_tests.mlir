@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [0], vector_common_parallel = [1], vector_reduction = [0], vector_inner_parallel = [0]>
+#config = #iree_cpu.lowering_config<distribution = [0], vector_common_parallel = [1]>
 module {
 module {
   func.func @fixed_size_dispatch() attributes {hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>,
@@ -43,7 +43,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [0], vector_common_parallel = [[1]], vector_reduction = [0], vector_inner_parallel = [0]>
+#config = #iree_cpu.lowering_config<distribution = [0], vector_common_parallel = [[1]]>
 module {
 module {
   func.func @scalable_dispatch() attributes {hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>,
@@ -81,7 +81,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel = [[4], [4]], vector_reduction = [0, 0], vector_inner_parallel = [0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel = [[4], [4]]>
 module {
 module {
   func.func @scalable_dispatch_using_za() attributes {hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>,

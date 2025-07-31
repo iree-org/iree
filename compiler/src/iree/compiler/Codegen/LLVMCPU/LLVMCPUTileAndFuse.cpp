@@ -269,6 +269,10 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     LDBG() << "can't find lowering_config, skip TileAndFuse";
     return;
   }
+  if (!loweringConfig.hasTilingLevel(tilingLevel)) {
+    LDBG() << "invalid tilingLevel, skip TileAndFuse";
+    return;
+  }
 
   SmallVector<int64_t> tileSizes;
   SmallVector<bool> tileScalableFlags;
