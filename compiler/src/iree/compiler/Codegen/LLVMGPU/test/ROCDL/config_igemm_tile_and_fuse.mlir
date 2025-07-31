@@ -136,12 +136,18 @@ func.func @nchw_conv_unaligned_mfma() {
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-<<<<<<< HEAD
-//  CHECK-SAME:     padding = [1, 64, 2, 32, 32]
-//  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+//  GFX942-SAME:     padding = [1, 64, 2, 32, 32]
+//  GFX942-SAME:     promote_operands = [0, 1, 2]
+//  GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+//  GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
+//  GFX942-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+//  MI300X-SAME:     padding = [1, 32, 1, 32, 32]
+//  MI300X-SAME:     promote_operands = [0, 1, 2]
+//  MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+//  MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+//  MI300X-SAME:     workgroup = [1, 32, 1, 32, 0]
 
 //    PAD-CONV:     padding_conv = [1, 64, 2, 32, 0, 0, 0]
 
@@ -233,17 +239,8 @@ func.func @group_conv_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<1
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-
-//  GFX942-SAME:     padding = [1, 64, 2, 32, 32]
-//  GFX942-SAME:     promote_operands = [0, 1, 2]
-//  GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
-//  GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  GFX942-SAME:     workgroup = [1, 64, 2, 32, 0]
-
-//  MI300X-SAME:     padding = [1, 32, 1, 32, 32]
-//  MI300X-SAME:     promote_operands = [0, 1, 2]
-//  MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
-//  MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-//  MI300X-SAME:     workgroup = [1, 32, 1, 32, 0]
-
-//    PAD-CONV:     padding_conv = [1, 32, 1, 64, 0, 0, 32]
+//  CHECK-SAME:     padding = [1, 32, 1, 64, 32]
+//  CHECK-SAME:     promote_operands = [0, 1, 2]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 2]
+//  CHECK-SAME:     subgroup = [1, 2, 0, 1, 0]
+//  CHECK-SAME:     workgroup = [1, 32, 1, 64, 0]
