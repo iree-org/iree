@@ -1,23 +1,11 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --verify-diagnostics --split-input-file %s
 
-#config = #iree_cpu.lowering_config<distribution = [0, 0]>
-#translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
-func.func @illegal_distribution_only(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
-  translation_info = #translation
-} {
-  // expected-error @+1 {{expected four tiling levels, got 1}}
-  linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
-  return
-}
-
-// -----
-
 #config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, 32, 16], vector_reduction = [0, 0, 16], vector_inner_parallel = [0, 0, 0]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
-  // expected-error @+1 {{expected only parallel dims to be set in the second tiling level, got 2-th tile size set}}
+  // expected-error @+1 {{expected only parallel dims to be set in the vector_common_parallel tiling level, got 2-th tile size set}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
 }
@@ -29,7 +17,7 @@ func.func @illegal_parallel_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x
 func.func @illegal_reduction_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
-  // expected-error @+1 {{only reduction dims to be set in the third tiling level, got 1-th tile size set}}
+  // expected-error @+1 {{only reduction dims to be set in the vector_reduction tiling level, got 1-th tile size set}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
 }
@@ -41,7 +29,7 @@ func.func @illegal_reduction_tile_sizes_config(%0: memref<4x8xf32>, %1: memref<8
 func.func @illegal_interchange(%0: memref<4x8xf32>, %1: memref<8x16xf32>, %2: memref<4x16xf32>) attributes {
   translation_info = #translation
 } {
-  // expected-error @+1 {{expected [0, 2) to be set exactly once in interchange #0}}
+  // expected-error @+1 {{expected [0, 2) to be set exactly once in interchange for distribution tiling level}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
 }

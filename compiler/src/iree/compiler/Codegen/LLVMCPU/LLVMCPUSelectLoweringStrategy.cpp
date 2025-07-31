@@ -41,24 +41,16 @@ public:
 
 /// Verify that valid configuration is set for all ops within the funcOp.
 template <typename F>
-static LogicalResult
-verifyLoweringConfiguration(FunctionOpInterface funcOp,
-                            IREE::Codegen::TranslationInfoAttr translationInfo,
-                            F verificationFn) {
+static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
+                                                 F verificationFn) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     if (isa<IREE::LinalgExt::CustomOp>(op)) {
       return WalkResult::advance();
     }
-    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-        getLoweringConfig(op);
-    if (!loweringConfig || !loweringConfig.hasWorkgroupTilingLevel())
+    auto loweringConfig = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
+    if (!loweringConfig)
       return WalkResult::advance();
-    std::unique_ptr<TilingConfig> tilingConfig =
-        TilingConfig::create(loweringConfig);
-    if (!tilingConfig)
-      return WalkResult::interrupt();
-    return verificationFn(op, *tilingConfig, translationInfo,
-                          ArrayRef<int64_t>{});
+    return verificationFn(op, loweringConfig);
   });
   return failure(walkResult.wasInterrupted());
 }
@@ -82,12 +74,12 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
     switch (translationInfo.getDispatchLoweringPassPipeline()) {
     case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
       verificationStatus = verifyLoweringConfiguration(
-          funcOp, translationInfo, verifyDoubleTilingExpertPassPipelineConfig);
+          funcOp, verifyMultiTilingExpertPassPipelineConfig);
       break;
     case IREE::Codegen::DispatchLoweringPassPipeline::
         CPUConvTileAndDecomposeExpert:
       verificationStatus = verifyLoweringConfiguration(
-          funcOp, translationInfo, verifyConvTileAndDecomposeExpertConfig);
+          funcOp, verifyConvTileAndDecomposeExpertConfig);
       break;
     default:
       break;
