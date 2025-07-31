@@ -306,14 +306,25 @@ def IREEGPU_VirtualMMAAttr :
     These interleaving and/or unrolling changes in the layout is especially
     useful to coalesce reads from shared memory to register or align layouts
     in a chained-matmul operation.
+
+    If set to true (similar to MMAAttr), |col_major| indicates the computation
+    is perfomed as below:
+
+    ```
+      C^T += B^T x A^T
+    ```
   }];
 
-  let assemblyFormat = "`<` struct(params) `>`";
+  let assemblyFormat = "`<` $intrinsic (`,` `col_major` `=` $col_major^)? `>`";
 
   let parameters = (ins
-    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic
+    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"bool", "false">:$col_major
   );
 
+  let builders = [
+    AttrBuilder<(ins "VirtualMMAIntrinsic":$intrinsic)>
+  ];
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
