@@ -12,8 +12,10 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -144,11 +146,23 @@ struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
   }
 };
 
-struct SetMulAddFMF final : OpRewritePattern<arith::AddFOp> {
+// Set FMF to fold arith.mulf + arith.addf -> math.fma and thus enable
+// optimizations w.r.t vector.multi_reduction(fma).
+struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(arith::AddFOp addOp,
+  LogicalResult matchAndRewrite(vector::MultiDimReductionOp redOp,
                                 PatternRewriter &rewriter) const override {
+    if (redOp.getKind() != vector::CombiningKind::ADD) {
+      return failure();
+    }
+
+    Value src = redOp.getSource();
+    auto addOp = src.getDefiningOp<arith::AddFOp>();
+    if (!addOp) {
+      return failure();
+    }
+
     auto mulOp = addOp.getLhs().getDefiningOp<arith::MulFOp>();
     if (!mulOp) {
       mulOp = addOp.getRhs().getDefiningOp<arith::MulFOp>();
@@ -158,16 +172,14 @@ struct SetMulAddFMF final : OpRewritePattern<arith::AddFOp> {
       return failure();
     }
 
-    constexpr auto contract = arith::FastMathFlags::contract;
-    if (mulOp.getFastmath() != arith::FastMathFlags::none &&
-        addOp.getFastmath() != arith::FastMathFlags::none) {
+    constexpr auto none = arith::FastMathFlags::none;
+    if (mulOp.getFastmath() != none || addOp.getFastmath() != none) {
       return failure();
     }
 
-    rewriter.replaceOpWithNewOp<arith::MulFOp>(
-        mulOp, mulOp.getType(), mulOp.getLhs(), mulOp.getRhs(), contract);
-    rewriter.replaceOpWithNewOp<arith::AddFOp>(
-        addOp, addOp.getType(), addOp.getLhs(), addOp.getRhs(), contract);
+    constexpr auto contract = arith::FastMathFlags::contract;
+    rewriter.modifyOpInPlace(mulOp, [&] { mulOp.setFastmath(contract); });
+    rewriter.modifyOpInPlace(addOp, [&] { addOp.setFastmath(contract); });
 
     return success();
   }
@@ -186,10 +198,10 @@ struct LLVMGPUVectorLoweringPass final
     auto funcOp = getOperation();
     MLIRContext *ctx = &getContext();
 
-    // Uplift arith ops to math.fma before lowering high level vector operation.
+    // Uplift arith ops to math.fma before lowering high level vector ops.
     {
       RewritePatternSet fmaPatterns(ctx);
-      fmaPatterns.add<SetMulAddFMF>(ctx);
+      fmaPatterns.add<SetMulAddFMF>(ctx, /*benefit*/ 2);
       populateUpliftToFMAPatterns(fmaPatterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(fmaPatterns)))) {
         return signalPassFailure();
