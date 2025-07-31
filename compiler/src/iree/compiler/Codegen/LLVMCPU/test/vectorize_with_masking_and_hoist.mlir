@@ -33,7 +33,7 @@
 // CHECK-NEXT:  %[[OUT_WRITE:.*]] = vector.transfer_write %[[INNER_LOOP]], %[[OUT_SLICE_1]]{{.*}} {{.*}} : vector<8x[16]xf32>, tensor<8x?xf32>
 // CHECK-NEXT:  %[[INSERT_SLICE:.*]] = tensor.insert_slice %[[OUT_WRITE]] into %[[OUT_SLICE]]{{.*}} : tensor<8x?xf32> into tensor<8x?xf32>
 // CHECK-NEXT:  tensor.insert_slice %[[INSERT_SLICE]] into %[[OUT_TENSOR_1]]{{.*}} : tensor<8x?xf32> into tensor<1024x1024xf32>
-#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], cache_parallel = [0, 0, 0], cache_reduction = [0, 0, 0], vector_common_parallel = [8, [16], 0], vector_reduction = [0, 0, 1], vector_inner_parallel = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [8, [16], 0], vector_reduction = [0, 0, 1]>
 func.func @pipeline(%3: tensor<1024x1024xf32>, %4: tensor<1024x1024xf32>, %5: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
   %c1 = arith.constant 1 : index
   %c1024 = arith.constant 1024 : index

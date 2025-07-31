@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-2d-scalable-to-1d-scalable{assume-arm-sme=true},cse))" --split-input-file %s | FileCheck %s
 
-#compute_config = #iree_cpu.lowering_config<vector_common_parallel = [[4], [4]], vector_reduction = [0, 0], vector_inner_parallel = [0, 0]>
-#matmul_config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel =  [[4], [4], 0], vector_reduction = [0, 0, 1], vector_inner_parallel = [0, 0, 0]>
+#compute_config = #iree_cpu.lowering_config<vector_common_parallel = [[4], [4]]>
+#matmul_config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel =  [[4], [4], 0], vector_reduction = [0, 0, 1]>
 #dim_0_map = affine_map<(d0)[s0] -> (-d0 + 32400, s0)>
 #dim_1_map = affine_map<(d0)[s0] -> (-d0 + 16, s0)>
 
@@ -60,9 +60,9 @@ func.func @scalable_2d_matmul_and_generic(%arg0: tensor<32400x32xf32>, %arg1: te
   }
   return %2 : tensor<32400x16xf32>
 }
-// CHECK: #[[FILL_CONFIG:.*]] = #iree_cpu.lowering_config<vector_common_parallel = {{\[}}[4], [4]], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
-// CHECK: #[[MATMUL_CONFIG:.*]] = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = {{\[}}[4], [4], 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
-// CHECK: #[[GENERIC_CONFIG:.*]] = #iree_cpu.lowering_config<vector_common_parallel = [4, [4]], vector_inner_parallel = [0, 0], vector_reduction = [0, 0]>
+// CHECK: #[[FILL_CONFIG:.*]] = #iree_cpu.lowering_config<vector_common_parallel = {{\[}}[4], [4]]>
+// CHECK: #[[MATMUL_CONFIG:.*]] = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = {{\[}}[4], [4], 0], vector_reduction = [0, 0, 1]>
+// CHECK: #[[GENERIC_CONFIG:.*]] = #iree_cpu.lowering_config<vector_common_parallel = [4, [4]]>
 //
 //      CHECK: func.func @scalable_2d_matmul_and_generi
 //      CHECK:   %[[C4:.*]] = arith.constant 4 : index

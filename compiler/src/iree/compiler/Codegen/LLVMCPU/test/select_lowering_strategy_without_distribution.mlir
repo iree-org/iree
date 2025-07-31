@@ -19,7 +19,7 @@ func.func @matmul_static() attributes {hal.executable.target = #executable_targe
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [384, 128], strides = [1, 1] : tensor<384x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x128xf32>>
   return
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [0, 0, 0], cache_reduction = [0, 0, 0], distribution = [0, 0, 0], vector_common_parallel = [1, 1, 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

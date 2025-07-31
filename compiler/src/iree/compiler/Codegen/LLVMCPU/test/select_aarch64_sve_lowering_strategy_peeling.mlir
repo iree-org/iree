@@ -26,7 +26,7 @@ func.func @matmul_tensors() attributes {hal.executable.target = #executable_targ
   iree_tensor_ext.dispatch.tensor.store %10, %6, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], cache_reduction = [0, 0, 0], distribution = [64, 64, 0], vector_common_parallel = [8, [16], 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [8, [16], 0], vector_reduction = [0, 0, 1]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matmul_tensors()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -53,7 +53,7 @@ func.func @static_tensors_non_pow_two_sizes() attributes {hal.executable.target 
   iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [15, 7], strides = [1, 1] : tensor<15x7xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<15x7xf32>>
   return
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [5, 7, 0], cache_reduction = [0, 0, 0], distribution = [5, 7, 0], vector_common_parallel = [8, [16], 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [5, 7, 0], distribution = [5, 7, 0], vector_common_parallel = [8, [16], 0], vector_reduction = [0, 0, 1]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @static_tensors_non_pow_two_sizes()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -81,7 +81,7 @@ func.func @static_tensors_1x1() attributes {hal.executable.target = #executable_
   return
 }
 // TODO: FIXME - scalable "16" ([16]) for just 1 element
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [0, 0, 0], cache_reduction = [0, 0, 0], distribution = [0, 0, 0], vector_common_parallel = [1, [16], 0], vector_inner_parallel = [0, 0, 0], vector_reduction = [0, 0, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [1, [16], 0], vector_reduction = [0, 0, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @static_tensors_1x1()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
