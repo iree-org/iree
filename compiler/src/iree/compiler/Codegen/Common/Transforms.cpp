@@ -81,6 +81,8 @@ struct FuseTilableForallConsumers final
       return domInfo.properlyDominates(sliceOwner, op);
     };
     options.inclusive = true;
+    options.omitUsesFromAbove = false;
+    options.omitBlockArguments = true;
     if (succeeded(getBackwardSlice(tilableOp, &slice, options))) {
       for (Operation *op : llvm::reverse(slice)) {
         rewriter.moveOpAfter(op, sliceOwner);
