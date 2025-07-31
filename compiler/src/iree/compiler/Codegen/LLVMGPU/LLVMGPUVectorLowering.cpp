@@ -8,6 +8,8 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -142,6 +144,45 @@ struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
   }
 };
 
+// Set FMF to fold arith.mulf + arith.addf -> math.fma and thus enable
+// optimizations w.r.t vector.multi_reduction(fma).
+struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::MultiDimReductionOp redOp,
+                                PatternRewriter &rewriter) const override {
+    if (redOp.getKind() != vector::CombiningKind::ADD) {
+      return failure();
+    }
+
+    Value src = redOp.getSource();
+    auto addOp = src.getDefiningOp<arith::AddFOp>();
+    if (!addOp) {
+      return failure();
+    }
+
+    auto mulOp = addOp.getLhs().getDefiningOp<arith::MulFOp>();
+    if (!mulOp) {
+      mulOp = addOp.getRhs().getDefiningOp<arith::MulFOp>();
+    }
+
+    if (!mulOp) {
+      return failure();
+    }
+
+    constexpr auto none = arith::FastMathFlags::none;
+    if (mulOp.getFastmath() != none || addOp.getFastmath() != none) {
+      return failure();
+    }
+
+    constexpr auto contract = arith::FastMathFlags::contract;
+    rewriter.modifyOpInPlace(mulOp, [&] { mulOp.setFastmath(contract); });
+    rewriter.modifyOpInPlace(addOp, [&] { addOp.setFastmath(contract); });
+
+    return success();
+  }
+};
+
 struct LLVMGPUVectorLoweringPass final
     : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -149,10 +190,21 @@ struct LLVMGPUVectorLoweringPass final
     registry.insert<memref::MemRefDialect>();
     registry.insert<vector::VectorDialect>();
     registry.insert<scf::SCFDialect>();
+    registry.insert<math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *ctx = &getContext();
+
+    // Uplift arith ops to math.fma before lowering high level vector ops.
+    {
+      RewritePatternSet fmaPatterns(ctx);
+      fmaPatterns.add<SetMulAddFMF>(ctx, PatternBenefit(2));
+      populateUpliftToFMAPatterns(fmaPatterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(fmaPatterns)))) {
+        return signalPassFailure();
+      }
+    }
 
     {
       // Lower high level vector operations like contract or multidim reduce ops
