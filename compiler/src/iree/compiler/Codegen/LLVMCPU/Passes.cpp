@@ -32,6 +32,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -193,7 +194,8 @@ LogicalResult verifyMultiTilingExpertPassPipelineConfig(
           return op->emitOpError(
                      "expected only parallel dims to be set in the ")
                  << IREE::CPU::getTilingLevelName(level)
-                 << " tiling level, got " << index << "-th tile size set";
+                 << " tiling level, but tile size at index (" << index
+                 << ") was also set";
         }
       }
       break;
@@ -206,7 +208,8 @@ LogicalResult verifyMultiTilingExpertPassPipelineConfig(
           return op->emitOpError(
                      "expected only reduction dims to be set in the ")
                  << IREE::CPU::getTilingLevelName(level)
-                 << " tiling level, got " << index << "-th tile size set";
+                 << " tiling level, but tile size at index (" << index
+                 << ") was also set";
         }
       }
       break;
@@ -234,6 +237,13 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     return success();
   }
 
+  auto getTileSizeAtIndex = [](ArrayRef<int64_t> sizes,
+                               ArrayRef<bool> scalableFlags,
+                               unsigned index) -> std::pair<int64_t, bool> {
+    return std::make_pair(sizes[index],
+                          index < scalableFlags.size() && scalableFlags[index]);
+  };
+
   SmallVector<IREE::CPU::TilingLevel> requiredLevels = {
       IREE::CPU::DistributionTiles, IREE::CPU::VectorCommonParallelTiles,
       IREE::CPU::VectorReductionTiles};
@@ -244,21 +254,27 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
       return op->emitOpError("expected ")
              << IREE::CPU::getTilingLevelName(level) << " is set";
     }
-    for (auto [idx, size] :
-         llvm::enumerate(loweringConfig.getStaticTilingLevelSizes(
-             static_cast<unsigned>(level), op))) {
-      if (size == 1) {
-        shapeAfterTiling[idx] = 1;
+    auto tilingLevelAttr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        loweringConfig.getTilingLevelAttr(level));
+    for (size_t i = 0, e = tilingLevelAttr.getSizes().size(); i < e; ++i) {
+      auto [size, scalableFlag] = getTileSizeAtIndex(
+          tilingLevelAttr.getSizes(), tilingLevelAttr.getScalableFlags(), i);
+      if (scalableFlag) {
+        shapeAfterTiling[i] = ShapedType::kDynamic;
         continue;
       }
-      if (ShapedType::isDynamicShape(shapeAfterTiling[idx]) ||
+      if (size == 1) {
+        shapeAfterTiling[i] = 1;
+        continue;
+      }
+      if (ShapedType::isDynamicShape(shapeAfterTiling[i]) ||
           ShapedType::isDynamic(size) || size == 0) {
         continue;
       }
-      if (shapeAfterTiling[idx] % size != 0) {
-        shapeAfterTiling[idx] = ShapedType::kDynamic;
+      if (shapeAfterTiling[i] % size != 0) {
+        shapeAfterTiling[i] = ShapedType::kDynamic;
       } else {
-        shapeAfterTiling[idx] = size;
+        shapeAfterTiling[i] = size;
       }
     }
   }

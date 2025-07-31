@@ -126,7 +126,8 @@ void addTensorToVectorsPassPipeline(OpPassManager &funcPassManager,
                                     bool lowerToVectors = true);
 
 /// Verifies that the given `loweringConfig` can decompose convolution ops to
-/// lower dim ops.
+/// lower dim ops. It requires {Distribution, VectorCommonParallel,
+/// VectorReduction} tiling levels.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
 
