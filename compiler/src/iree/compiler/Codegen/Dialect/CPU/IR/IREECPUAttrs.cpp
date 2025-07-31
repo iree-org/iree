@@ -178,7 +178,8 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
 }
 
 bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
-  return !getWorkgroupTileSizes().empty();
+  return getConfig().contains(
+      getTilingLevelName(TilingLevel::DistributionTiles));
 }
 
 std::optional<unsigned> LoweringConfigAttr::getNumTilingLevels() const {
