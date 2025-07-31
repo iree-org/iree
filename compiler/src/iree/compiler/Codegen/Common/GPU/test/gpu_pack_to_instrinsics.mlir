@@ -134,3 +134,146 @@ module {
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>}>
 //  CHECK-SAME:     : tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf32>, tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf32> into tensor<?x?x32x32xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @no_hoist_mismatched_pack_unpack(%arg0 : tensor<4x8x16x4xf32>, %arg1 : tensor<8x4x16x4xf32>, %arg2 : tensor<64x64xf32>) -> tensor<64x64xf32>{
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %1 = scf.for %arg3 = %c0 to %c512 step %c32 iter_args(%arg4 = %arg2) -> (tensor<64x64xf32>) {
+      %2 = tensor.empty() : tensor<4x4x16x16xf32>
+      %pack = linalg.pack %arg4 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %2 : tensor<64x64xf32> -> tensor<4x4x16x16xf32>
+      %3 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%pack) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x4x16x4xf32> into tensor<4x4x16x16xf32>
+      %unpack = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %arg4 : tensor<4x4x16x16xf32> -> tensor<64x64xf32>
+      %empty = tensor.empty() : tensor<32x16x2x4xf32>
+      %pack_2 = linalg.pack %unpack inner_dims_pos = [0, 1] inner_tiles = [2, 4] into %empty : tensor<64x64xf32> -> tensor<32x16x2x4xf32>
+      %empty_2 = tensor.empty() : tensor<16x32x4x2xf32>
+      %transpose = linalg.transpose ins(%pack_2 : tensor<32x16x2x4xf32>) outs(%empty_2 : tensor<16x32x4x2xf32>) permutation = [1, 0, 3, 2]
+      %empty_3 = tensor.empty() : tensor<64x64xf32>
+      %unpack_2 = linalg.unpack %transpose outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [4, 2] into %empty_3 : tensor<16x32x4x2xf32> -> tensor<64x64xf32>
+      scf.yield %unpack_2 : tensor<64x64xf32>
+    }
+  return %1 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func.func @no_hoist_mismatched_pack_unpack
+//       CHECK:   %[[FOR_RESULT:.+]] = scf.for %arg3 = %c0 to %c512 step %c32 iter_args(%[[ARG4:.+]] = %arg2) -> (tensor<64x64xf32>)
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[ARG4]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %1 : tensor<64x64xf32> -> tensor<4x4x16x16xf32>
+//       CHECK:     %[[INNER_TILED_RESULT:.+]] = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%[[PACK]])
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %transposed outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [4, 2] into %5 : tensor<16x32x4x2xf32> -> tensor<64x64xf32>
+//       CHECK:     scf.yield %[[UNPACK]] : tensor<64x64xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @no_hoist_pack_unpack_otherusers(%arg1 : tensor<8x4x16x4xf32>, %arg2 : tensor<64x64xf32>) -> tensor<64x64xf32>{
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %padding_value = arith.constant 0.000000e+00 : f32
+  %1 = scf.for %arg3 = %c0 to %c512 step %c32 iter_args(%arg4 = %arg2) -> (tensor<64x64xf32>) {
+    %empty = tensor.empty() : tensor<4x8x16x4xf32>
+    %slice = tensor.extract_slice %arg4[0, 0][64, 32][1, 1] : tensor<64x64xf32> to tensor<64x32xf32>
+    %pack_1 = linalg.pack %slice inner_dims_pos = [0, 1] inner_tiles = [16, 4] into %empty : tensor<64x32xf32> -> tensor<4x8x16x4xf32>
+    %2 = tensor.empty() : tensor<4x4x16x16xf32>
+    %pack = linalg.pack %arg4 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %2 : tensor<64x64xf32> -> tensor<4x4x16x16xf32>
+    %3 = iree_codegen.inner_tiled ins(%pack_1, %arg1) outs(%pack) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x4x16x4xf32> into tensor<4x4x16x16xf32>
+    %unpack = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %arg4 : tensor<4x4x16x16xf32> -> tensor<64x64xf32>
+    scf.yield %unpack : tensor<64x64xf32>
+    }
+  return %1 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func.func @no_hoist_pack_unpack_otherusers
+//       CHECK:   %[[FOR_RESULT:.+]] = scf.for %arg2 = %c0 to %c512 step %c32 iter_args(%[[ARG3:.+]] = %arg1) -> (tensor<64x64xf32>)
+//       CHECK:     %[[PACK:.+]] = linalg.pack %[[ARG3]] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %2 : tensor<64x64xf32> -> tensor<4x4x16x16xf32>
+//       CHECK:     %[[INNER_TILED_RESULT:.+]] = iree_codegen.inner_tiled ins(%pack, %arg0) outs(%[[PACK]])
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[ARG3]] : tensor<4x4x16x16xf32> -> tensor<64x64xf32>
+//       CHECK:     scf.yield %[[UNPACK]] : tensor<64x64xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @hoist_multiple_pack_unpack(%arg0 : tensor<4x8x16x4xf32>, %arg1 : tensor<8x8x16x4xf32>, %arg2 : tensor<64x127xf32>, %input : tensor<64x128xf32>) -> (tensor<64x127xf32>, tensor<64x128xf32>){
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %padding_value = arith.constant 0.000000e+00 : f32
+  %1, %result0 = scf.for %arg3 = %c0 to %c512 step %c32 iter_args(%arg4 = %arg2, %arg5 = %input) -> (tensor<64x127xf32>, tensor<64x128xf32>) {
+      %2 = tensor.empty() : tensor<4x8x16x16xf32>
+      %pack = linalg.pack %arg4 padding_value(%padding_value : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %2 : tensor<64x127xf32> -> tensor<4x8x16x16xf32>
+      %empty = tensor.empty() : tensor<4x8x16x16xf32>
+      %pack_1 = linalg.pack %arg5 padding_value(%padding_value : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %empty : tensor<64x128xf32> -> tensor<4x8x16x16xf32>
+      %3 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%pack) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x8x16x4xf32> into tensor<4x8x16x16xf32>
+      %4 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%pack_1) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x8x16x4xf32> into tensor<4x8x16x16xf32>
+      %unpack = linalg.unpack %3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %arg4 : tensor<4x8x16x16xf32> -> tensor<64x127xf32>
+      %unpack_1 = linalg.unpack %4 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %arg5 : tensor<4x8x16x16xf32> -> tensor<64x128xf32>
+      scf.yield %unpack, %unpack_1 : tensor<64x127xf32>, tensor<64x128xf32>
+    }
+  return %1, %result0 : tensor<64x127xf32>, tensor<64x128xf32>
+}
+
+// CHECK-LABEL: func.func @hoist_multiple_pack_unpack
+//       CHECK:   %[[A_PACK:.+]] = linalg.pack
+//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16]
+//       CHECK:   %[[B_PACK:.+]] = linalg.pack %arg3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %0 : tensor<64x128xf32> -> tensor<4x8x16x16xf32>
+//       CHECK:   %[[FOR_RESULT:.+]]:2 = scf.for %arg4 = %c0 to %c512 step %c32 iter_args(%[[ARG5:.+]] = %[[A_PACK]], %[[ARG6:.+]] = %[[B_PACK]]) -> (tensor<4x8x16x16xf32>, tensor<4x8x16x16xf32>)
+//       CHECK:     %[[INNER_TILED_RESULT:.+]] = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%[[ARG5]])
+//       CHECK:     %[[INNER_TILED_RESULT_1:.+]] = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%[[ARG6]])
+//       CHECK:     scf.yield %[[INNER_TILED_RESULT]], %[[INNER_TILED_RESULT_1]] : tensor<4x8x16x16xf32>,  tensor<4x8x16x16xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<64x128xf32>
+//       CHECK:   linalg.unpack %[[FOR_RESULT]]#1 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY]] : tensor<4x8x16x16xf32> -> tensor<64x128xf32>
+//       CHECK:   %[[EMPTY_1:.+]] = tensor.empty() : tensor<64x127xf32>
+//       CHECK:   linalg.unpack %[[FOR_RESULT]]#0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY_1]] : tensor<4x8x16x16xf32> -> tensor<64x127xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @hoist_selective_pack_unpack(%lhs_input : tensor<4x8x16x4xf32>, %rhs_input : tensor<8x8x16x4xf32>, %arg0 : tensor<64x128xf32>, %arg1 : tensor<4x8x16x16xf32>, %arg2 : tensor<64x127xf32>) -> (tensor<64x128xf32>, tensor<4x8x16x16xf32>, tensor<64x127xf32>){
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %padding_value = arith.constant 0.000000e+00 : f32
+  %result0, %result1, %result2 = scf.for %arg3 = %c0 to %c512 step %c32 iter_args(%arg4 = %arg0, %arg5 = %arg1, %arg6 = %arg2) -> (tensor<64x128xf32>, tensor<4x8x16x16xf32>, tensor<64x127xf32>) {
+      %empty = tensor.empty() : tensor<4x8x16x16xf32>
+      %pack_1 = linalg.pack %arg4 padding_value(%padding_value : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %empty : tensor<64x128xf32> -> tensor<4x8x16x16xf32>
+      %empty_1 = tensor.empty() : tensor<4x8x16x16xf32>
+      %pack = linalg.pack %arg6 padding_value(%padding_value : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %empty_1 : tensor<64x127xf32> -> tensor<4x8x16x16xf32>
+      %3 = iree_codegen.inner_tiled ins(%lhs_input, %rhs_input) outs(%pack) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x8x16x4xf32> into tensor<4x8x16x16xf32>
+      %4 = iree_codegen.inner_tiled ins(%lhs_input, %rhs_input) outs(%pack_1) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x8x16x4xf32> into tensor<4x8x16x16xf32>
+      %5 = iree_codegen.inner_tiled ins(%lhs_input, %rhs_input) outs(%arg5) {indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>} : tensor<4x8x16x4xf32>, tensor<8x8x16x4xf32> into tensor<4x8x16x16xf32>
+      %empty_2 = tensor.empty() : tensor<64x128xf32>
+      %unpack_1 = linalg.unpack %4 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %empty_2 : tensor<4x8x16x16xf32> -> tensor<64x128xf32>
+      %empty_3 = tensor.empty() : tensor<32x16x2x8xf32>
+      %pack_2 = linalg.pack %unpack_1 inner_dims_pos = [0, 1] inner_tiles = [2, 8] into %empty_3 : tensor<64x128xf32> -> tensor<32x16x2x8xf32>
+      %empty_4 = tensor.empty() : tensor<16x32x8x2xf32>
+      %transpose = linalg.transpose ins(%pack_2 : tensor<32x16x2x8xf32>) outs(%empty_4 : tensor<16x32x8x2xf32>) permutation = [1, 0, 3, 2]
+      %unpack_2 = linalg.unpack %transpose outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 2] into %arg4 : tensor<16x32x8x2xf32> -> tensor<64x128xf32>
+      %unpack = linalg.unpack %3 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %arg6 : tensor<4x8x16x16xf32> -> tensor<64x127xf32>
+      scf.yield %unpack_2, %5, %unpack : tensor<64x128xf32>, tensor<4x8x16x16xf32>, tensor<64x127xf32>
+    }
+  return %result0, %result1, %result2 : tensor<64x128xf32>, tensor<4x8x16x16xf32>, tensor<64x127xf32>
+}
+
+// CHECK-LABEL: func.func @hoist_selective_pack_unpack
+//       CHECK:   %[[A_PACK:.+]] = linalg.pack
+//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %0 : tensor<64x127xf32> -> tensor<4x8x16x16xf32>
+//       CHECK:   %[[FOR_RESULT:.+]]:3 = scf.for %arg5 = %c0 to %c512 step %c32 iter_args(%[[ARG6:.+]] = %arg2, %[[ARG7:.+]] = %arg3, %[[ARG8:.+]] = %[[A_PACK]]) -> (tensor<64x128xf32>, tensor<4x8x16x16xf32>, tensor<4x8x16x16xf32>)
+//       CHECK:     %[[B_PACK:.+]] = linalg.pack %[[ARG6]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %0 : tensor<64x128xf32> -> tensor<4x8x16x16xf32>
+//       CHECK:     %[[INNER_TILED_RESULT:.+]] = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%[[ARG8]])
+//       CHECK:     %[[INNER_TILED_RESULT_1:.+]] = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%[[B_PACK]])
+//       CHECK:     %[[INNER_TILED_RESULT_2:.+]] = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%[[ARG7]])
+//       CHECK:     %[[UNPACK_3:.+]] = linalg.unpack %transposed outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 2] into %[[ARG6]] : tensor<16x32x8x2xf32> -> tensor<64x128xf32>
+//       CHECK:     scf.yield %[[UNPACK_3]], %[[INNER_TILED_RESULT_2]], %[[INNER_TILED_RESULT]] : tensor<64x128xf32>, tensor<4x8x16x16xf32>, tensor<4x8x16x16xf32>
+//       CHECK:   %[[EMPTY_1:.+]] = tensor.empty() : tensor<64x127xf32>
+//       CHECK:   linalg.unpack %[[FOR_RESULT]]#2 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY_1]] : tensor<4x8x16x16xf32> -> tensor<64x127xf32>
