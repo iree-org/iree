@@ -125,18 +125,15 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addTensorToVectorsPassPipeline(OpPassManager &funcPassManager,
                                     bool lowerToVectors = true);
 
-// Populates the passes needed to do tiling, decomposing, and vectorizing the
-// convolution ops.
+/// Verifies that the given `loweringConfig` can decompose convolution ops to
+/// lower dim ops. It requires {Distribution, VectorCommonParallel,
+/// VectorReduction} tiling levels.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
-    Operation *op, TilingConfig &tilingConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {});
+    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
 
-/// Populates the passes needed to do two-level tile + vectorize of linalg ops.
-LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
-    Operation *op, TilingConfig &tilingConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {});
+/// Verifies if the tile sizes from `loweringConfig` are valid for each level.
+LogicalResult verifyMultiTilingExpertPassPipelineConfig(
+    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
