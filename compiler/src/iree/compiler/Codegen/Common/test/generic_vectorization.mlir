@@ -2,6 +2,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true vectorize-padding=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-GATHER
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true use-configured-vector-sizes=false}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-VAL-DEF-SCF-FOR
 
 func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
   %result = linalg.matmul ins(%lhs, %rhs: tensor<3x4xf16>, tensor<4x5xf16>) outs(%acc: tensor<3x5xf32>) -> tensor<3x5xf32>
@@ -389,6 +390,30 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK:           %[[GENERIC_SRC:.+]] = vector.transfer_read %[[UNPACK_WRITE]]{{.+}}, %[[GENERIC_MASK]]
 // CHECK-MASK:           %[[EXP:.+]] = math.exp %[[GENERIC_SRC]]
 // CHECK-MASK:           vector.transfer_write %[[EXP]]{{.+}}, %[[GENERIC_MASK]]
+
+// -----
+
+// CHECK-VAL-DEF-SCF-FOR-LABEL: @val_defined_by_scf_for
+func.func @val_defined_by_scf_for(%arg0: index, %arg1: index) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<1x1x16x16xf32>
+  %1 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
+  %c0_0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  %c2 = arith.constant 2 : index
+  %2 = scf.for %arg2 = %c0_0 to %c16 step %c2 iter_args(%arg3 = %0) -> (tensor<1x1x16x16xf32>) {
+    scf.yield %arg3 : tensor<1x1x16x16xf32>
+  }
+  %unpack = linalg.unpack %2 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %1 : tensor<1x1x16x16xf32> -> tensor<?x?xf32>
+  return %unpack : tensor<?x?xf32>
+}
+// CHECK-VAL-DEF-SCF-FOR: %[[EMPTY:.*]] = tensor.empty{{.*}}: tensor<?x?xf32>
+// CHECK-VAL-DEF-SCF-FOR: %[[FOR:.*]] = scf.for
+// CHECK-VAL-DEF-SCF-FOR: %[[READ:.*]] = vector.transfer_read %[[FOR]]{{.*}} vector<1x1x16x16xf32>
+// CHECK-VAL-DEF-SCF-FOR: %[[CAST:.*]] = vector.shape_cast %[[READ]]{{.*}} vector<16x16xf32>
+// CHECK-VAL-DEF-SCF-FOR: %[[MASK:.*]] = vector.create_mask
+// CHECK-VAL-DEF-SCF-FOR: %[[WRITE:.*]] = vector.transfer_write %[[CAST]], %[[EMPTY]]{{.*}}, %[[MASK]]
+// CHECK-VAL-DEF-SCF-FOR: return %[[WRITE]]
 
 // -----
 

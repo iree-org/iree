@@ -1664,6 +1664,14 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult) {
+  LDBG() << "Inferring sizes for: " << forOp;
+  unsigned resultNumber = opResult.getResultNumber();
+  LDBG() << " where OpResult.resultNumber = " << resultNumber;
+  return inferSizesFromIR(forOp.getInitsMutable()[resultNumber].get());
+}
+
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
   LDBG() << "Inferring sizes for: " << linalgOp;
@@ -1846,6 +1854,8 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   std::optional<VectorizationTileSizes> result;
   LDBG() << "Inferring sizes for: " << val;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
+      .Case<scf::ForOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
