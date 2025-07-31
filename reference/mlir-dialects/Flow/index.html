@@ -6830,7 +6830,7 @@ func.call can be used outside of the stream to do so. If shapes are
 unknowable until the operation is performed it should be made as a normal
 asynchronous host call with 'coarse-fences' instead.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
-<p>Interfaces: <code>CallOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6894,7 +6894,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <p>Declares a function that can be called as an asynchronous streaming
 operation via <code>flow.call</code>. Today only external functions are allowed.</p>
 <p>Traits: <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

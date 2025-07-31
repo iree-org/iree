@@ -15988,7 +15988,7 @@ sizes reflect the unpadded attribute storage sizes.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.call` $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
 </code></pre></div>
 <p>Calls an internal VM function with the given arguments.</p>
-<p>Interfaces: <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -16033,7 +16033,7 @@ sizes reflect the unpadded attribute storage sizes.</p>
 arguments may be variadic, encoded as segmented sized operand lists.</p>
 <p>Variadic arguments must be specified with a total count in the segment_sizes
 attribute.</p>
-<p>Interfaces: <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -23253,7 +23253,7 @@ exports can reference the same internal functions.</p>
 <p>Represents a function containing VM ops and those of compatible dialects.
 All flow control is performed by VM ops.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -23273,7 +23273,7 @@ contains the import. The maximum declared minimum version of all required
 imports from the module will become the required minimum version at runtime.</p>
 <p>Optional imports not present at runtime will be invalid to call and whether
 they were resolved can be queried with <code>vm.import.resolved</code>.</p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -23293,7 +23293,7 @@ they were resolved can be queried with <code>vm.import.resolved</code>.</p>
 Must not load any globals that are defined or initialized after it in the
 module.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

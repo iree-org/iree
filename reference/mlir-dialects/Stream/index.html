@@ -7587,7 +7587,7 @@ func.call can be used outside of the stream to do so. If sizes are
 unknownable until the operation is performed it should be made as a normal
 asynchronous host call with 'coarse-fences' instead.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
-<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>CallOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>AsyncAccessOpInterface</code>, <code>CallOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7830,7 +7830,7 @@ execution may begin immediately.</p>
 operation via <code>stream.async.call</code>. Today only external functions are
 allowed.</p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_AsyncPhaseOp</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9240,7 +9240,7 @@ explicitly.</p>
 <p>Calls a function operating on resource values with stream semantics.
 Asynchronous calls must have no side-effects.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
-<p>Interfaces: <code>CallOpInterface</code>, <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>SymbolUserOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>SymbolUserOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9720,7 +9720,7 @@ available to the target and can be made visible there using
 operation via <code>stream.cmd.call</code>. Today only external functions are
 allowed.</p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_CmdPhaseOp</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

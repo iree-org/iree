@@ -11933,7 +11933,7 @@ runtime <code>!hal.device</code>. If no variants within an executable are valid 
 loading will fail at runtime. If multiple variants are valid the first valid
 one found will be loaded and used for execution.</p>
 <p>Traits: <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -11978,7 +11978,7 @@ a way compatible with its execution model. Examples:
 - Metal: function constants
 - WebGPU: pipeline-overridable constants</p>
 <p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

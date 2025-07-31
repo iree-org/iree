@@ -7689,7 +7689,7 @@ a cast is performed within the callee.</p>
 ...
 %0 = util.call @fn(%0, %1) : (i32, tensor&lt;f32&gt;) -&gt; (f32, %1 as tensor&lt;i32&gt;)
 </code></pre></div></p>
-<p>Interfaces: <code>CallOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_TiedOpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_TiedOpInterface</code></p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7735,7 +7735,7 @@ a cast is performed within the callee.</p>
 <p>An external function declaration (used when referring to a function declared
 in some other module) has no body.</p>
 <p>Traits: <code>AffineScope</code>, <code>AutomaticAllocationScope</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>OpAsmOpInterface</code>, <code>Symbol</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>OpAsmOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7754,7 +7754,7 @@ in some other module) has no body.</p>
 Must not load any globals that are defined or initialized after it in the
 module.</p>
 <p>Traits: <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
 <h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
