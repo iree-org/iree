@@ -6945,7 +6945,8 @@ also have its own cofiguration.</p>
 <h3 id="virtualmmaattr">VirtualMMAAttr<a class="headerlink" href="#virtualmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # intrinsic
+  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic,   # intrinsic
+  bool   # col_major
 &gt;
 </code></pre></div>
 <p>This mma variant represents "virtual" MMA ops that has modification to
@@ -6954,6 +6955,10 @@ field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
 <p>These interleaving and/or unrolling changes in the layout is especially
 useful to coalesce reads from shared memory to register or align layouts
 in a chained-matmul operation.</p>
+<p>If set to true (similar to MMAAttr), |col_major| indicates the computation
+is perfomed as below:</p>
+<div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
+</code></pre></div>
 <h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6968,6 +6973,11 @@ in a chained-matmul operation.</p>
 <td style="text-align: center;">intrinsic</td>
 <td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic</code></td>
 <td>an enum of type VirtualMMAIntrinsic</td>
+</tr>
+<tr>
+<td style="text-align: center;">col_major</td>
+<td style="text-align: center;"><code>bool</code></td>
+<td></td>
 </tr>
 </tbody>
 </table>
