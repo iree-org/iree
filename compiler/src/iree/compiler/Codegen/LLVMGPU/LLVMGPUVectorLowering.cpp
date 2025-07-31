@@ -186,7 +186,7 @@ struct LLVMGPUVectorLoweringPass final
     auto funcOp = getOperation();
     MLIRContext *ctx = &getContext();
 
-    // Uplift arith ops to math.fma before lowering high level vector operation
+    // Uplift arith ops to math.fma before lowering high level vector operation.
     {
       RewritePatternSet fmaPatterns(ctx);
       fmaPatterns.add<SetMulAddFMF>(ctx);
