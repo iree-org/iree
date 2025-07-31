@@ -121,4 +121,12 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
+namespace IREE::GPU {
+class TargetAttr;
+}
+/// Sets target specific pipeline attributes for attention. Currently, this only
+/// affects AMD targets.
+void setAttentionPipelineAttributes(
+    IREE::GPU::TargetAttr target,
+    SmallVectorImpl<NamedAttribute> &pipelineAttrs);
 } // namespace mlir::iree_compiler

@@ -759,4 +759,18 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
   return failure();
 }
 
+void setAttentionPipelineAttributes(
+    IREE::GPU::TargetAttr target,
+    SmallVectorImpl<NamedAttribute> &pipelineAttrs) {
+  if (!target.isAMD()) {
+    return;
+  }
+  Builder b(target.getContext());
+  NamedAttrList llvmFuncAttrs;
+  llvmFuncAttrs.append("amdgpu-waves-per-eu", b.getStringAttr("1"));
+  llvmFuncAttrs.append("denormal-fp-math-f32",
+                       b.getStringAttr("preserve-sign"));
+  pipelineAttrs.emplace_back("llvm_func_attrs",
+                             llvmFuncAttrs.getDictionary(b.getContext()));
+}
 } // namespace mlir::iree_compiler

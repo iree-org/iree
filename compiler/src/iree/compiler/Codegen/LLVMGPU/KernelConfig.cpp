@@ -128,6 +128,11 @@ static llvm::cl::opt<bool>
                     llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clUseExperimentalAttentionHeuristics(
+    "iree-llvmgpu-use-experimental-attention-heuristics",
+    llvm::cl::desc("Use experimental attention heuristics."), llvm::cl::Hidden,
+    llvm::cl::init(false));
+
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -1431,9 +1436,15 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
                               /*rhsType=*/vElementType,
                               /*accType=*/f32Type};
 
-  GPUMMAHeuristicSeeds pvMatmulSeeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-                                        /*bestMNTileCountPerSubgroup=*/8,
-                                        /*bestKTileCountPerSubgroup=*/4};
+  int64_t bestMNTileCountPerSubgroup = 4;
+  if (clUseExperimentalAttentionHeuristics) {
+    bestMNTileCountPerSubgroup = 8;
+  }
+
+  GPUMMAHeuristicSeeds pvMatmulSeeds = {
+      /*bestSubgroupCountPerWorkgroup=*/4,
+      /*bestMNTileCountPerSubgroup=*/bestMNTileCountPerSubgroup,
+      /*bestKTileCountPerSubgroup=*/4};
 
   LDBG() << "Attention Vector Distribution Config";
 
@@ -1580,13 +1591,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  {
-    NamedAttrList llvmFuncAttrs;
-    llvmFuncAttrs.append("amdgpu-waves-per-eu", b.getStringAttr("1"));
-    llvmFuncAttrs.append("denormal-fp-math-f32",
-                         b.getStringAttr("preserve-sign"));
-    pipelineAttrs.emplace_back("llvm_func_attrs",
-                               llvmFuncAttrs.getDictionary(b.getContext()));
+  if (clUseExperimentalAttentionHeuristics) {
+    setAttentionPipelineAttributes(target, pipelineAttrs);
   }
 
   // TODO: We do not turn prefetching on even when requested by the prefetching
