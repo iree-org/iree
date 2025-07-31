@@ -2088,10 +2088,9 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) {
+    LoweringConfigGenerator generator(genericOp);
     return setOpConfigAndEntryPointFnTranslation(
-        entryPointFn, genericOp,
-        IREE::CPU::LoweringConfigAttr::get(genericOp.getContext(),
-                                           SmallVector<NamedAttribute>()),
+        entryPointFn, genericOp, generator.generateCPULoweringConfig(),
         DispatchLoweringPassPipeline::CPUDefault);
   }
 
