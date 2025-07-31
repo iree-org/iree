@@ -140,6 +140,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMathDialect
+    MLIRMathTransforms
     MLIRMathToLLVM
     MLIRMathToROCDL
     MLIRMemRefDialect
