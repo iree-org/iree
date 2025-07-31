@@ -8,6 +8,7 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -179,6 +180,7 @@ struct LLVMGPUVectorLoweringPass final
     registry.insert<memref::MemRefDialect>();
     registry.insert<vector::VectorDialect>();
     registry.insert<scf::SCFDialect>();
+    registry.insert<math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
