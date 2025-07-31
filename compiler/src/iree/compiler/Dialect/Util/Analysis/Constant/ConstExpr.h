@@ -20,6 +20,8 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
+class GlobalLoadOpInterface;
+
 // Analyzes an entire module to determine all operations/values that are
 // purely derived from constants or immutable data and builds a
 // dependency tree.
@@ -163,6 +165,13 @@ private:
   // as `definingOp`.
   void tryExpandToUseOrUseParent(Operation *definingOp, Operation *useOp);
 
+  // Check layout of leaves reachable from a root op. If the layout differs
+  // then drop leaves from the hoisting map, till the layout of the leaves
+  // agrees. The order in which the leaves are drop are arbitrary (but
+  // deterministic)
+  void dropLeavesWithLayoutConflicts(
+      ArrayRef<IREE::Util::GlobalLoadOpInterface> roots);
+
   // Add a new info record for a value to analyze for const-ness.
   ConstValueInfo *addInfo(Value constValue);
 
@@ -174,7 +183,7 @@ private:
   //   LoadGlobalOp.result -> GlobalOp
   //   ConstantOp.result -> ConstantOp
   // Entries can come from the whole program.
-  llvm::DenseMap<Value, Operation *> constantRoots;
+  llvm::MapVector<Value, Operation *> constantRoots;
 
   // Map of analyzed value to corresponding info struct.
   llvm::DenseMap<Value, ConstValueInfo *> constInfoMap;
