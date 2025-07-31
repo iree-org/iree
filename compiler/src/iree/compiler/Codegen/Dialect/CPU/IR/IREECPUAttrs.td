@@ -25,6 +25,8 @@ def IREECPU_LoweringConfigAttr :
         "getNumTilingLevels",
         "getStaticTilingLevelSizes",
         "getTilingLevelAttr",
+        "getVectorSizes",
+        "getVectorScalableFlags",
       ]>
     ]> {
   let mnemonic = "lowering_config";
