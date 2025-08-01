@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -96,9 +96,59 @@ static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
   return isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(op);
 }
 
-// Note: It would be easy to parameterize this rewrite to convert N-D scalable
-// operations to M-D scalable ones (where M < N). However this is currently not
-// needed.
+/// Returns a new `LoweringConfigAttr`, with the tile sizes of vector
+/// dimensions, set to `sizes`, and the corresponding scalability set to
+/// `scalableFlags`.
+static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
+    IREE::CPU::LoweringConfigAttr loweringConfig, ArrayRef<int64_t> sizes,
+    ArrayRef<bool> scalableFlags) {
+  using TilingLevel = IREE::CPU::TilingLevel;
+  MLIRContext *ctx = loweringConfig.getContext();
+  SmallVector<NamedAttribute> items;
+  for (unsigned i = 0, e = TilingLevel::MaxNumTileLevels; i < e; ++i) {
+    auto level = static_cast<TilingLevel>(i);
+    if (!loweringConfig.hasTilingLevel(level)) {
+      continue;
+    }
+    switch (level) {
+    case TilingLevel::DistributionTiles:
+    case TilingLevel::CacheParallelTiles:
+    case TilingLevel::CacheReductionTiles: {
+      items.emplace_back(IREE::CPU::getTilingLevelName(level),
+                         loweringConfig.getTilingLevelAttr(i));
+      break;
+    }
+    case TilingLevel::VectorCommonParallelTiles:
+    case TilingLevel::VectorReductionTiles:
+    case TilingLevel::VectorInnerParallelTiles: {
+      auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+          loweringConfig.getTilingLevelAttr(i));
+      SmallVector<int64_t> newSizes(attr.getSizes());
+      SmallVector<bool> newScalableFlags(attr.getScalableFlags());
+      newScalableFlags.resize(newSizes.size(), false);
+      for (auto [idx, size] : llvm::enumerate(newSizes)) {
+        if (size == 0) {
+          continue;
+        }
+        newSizes[idx] = sizes[idx];
+        newScalableFlags[idx] = scalableFlags[idx];
+      }
+      auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
+          ctx, newSizes, attr.getInterchange(), newScalableFlags);
+      items.emplace_back(IREE::CPU::getTilingLevelName(level), newLevel);
+      break;
+    }
+    case TilingLevel::MaxNumTileLevels:
+    case TilingLevel::InvalidLevel:
+      break;
+    };
+  }
+  return IREE::CPU::LoweringConfigAttr::get(ctx, items);
+}
+
+// Note: It would be easy to parameterize this rewrite to convert N-D
+// scalable operations to M-D scalable ones (where M < N). However this is
+// currently not needed.
 static LogicalResult
 dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
                                          bool assumeArmSME = false) {
@@ -107,33 +157,36 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   // there's no other targets that support > 1D scalability).
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   bool isArmSME = assumeArmSME || hasSMEFeature(targetAttr);
-
-  if (!isArmSME)
+  if (!isArmSME) {
     return success();
+  }
 
   SmallVector<TilingInterface> computeOps;
   funcOp.walk([&](TilingInterface op) {
-    if (!opKnownToSupport2DScalableVectorizationWithArmSME(op))
+    if (!opKnownToSupport2DScalableVectorizationWithArmSME(op)) {
       computeOps.push_back(op);
+    }
   });
 
   for (TilingInterface tilingOp : computeOps) {
-    IREE::Codegen::LoweringConfigAttrInterface loweringConfigAttr =
-        getLoweringConfig(tilingOp);
-    if (!loweringConfigAttr)
+    auto loweringConfigAttr =
+        getLoweringConfig<IREE::CPU::LoweringConfigAttr>(tilingOp);
+    if (!loweringConfigAttr) {
       continue;
+    }
 
-    std::unique_ptr<TilingConfig> tilingConfig =
-        TilingConfig::create(loweringConfigAttr);
-    auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
-    auto numScalableDims = llvm::count(scalableFlags, true);
-
-    if (numScalableDims <= 1)
+    std::optional<SmallVector<int64_t>> vectorSizes =
+        loweringConfigAttr.getVectorSizes();
+    std::optional<SmallVector<bool>> scalableFlags =
+        loweringConfigAttr.getVectorScalableFlags();
+    int64_t numScalableDims = llvm::count(*scalableFlags, true);
+    if (numScalableDims <= 1) {
       continue;
+    }
 
     SmallVector<int64_t> loopTileSizes;
     SmallVector<bool> newScalableFlags;
-    for (auto [flag, size] : llvm::zip_equal(scalableFlags, vectorSizes)) {
+    for (auto [flag, size] : llvm::zip_equal(*scalableFlags, *vectorSizes)) {
       if (flag && numScalableDims >= 2) {
         --numScalableDims;
         loopTileSizes.push_back(size);
@@ -147,7 +200,7 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
     IRRewriter rewriter(tilingOp->getContext());
     rewriter.setInsertionPoint(tilingOp);
 
-    // 2. Re-tile the operation with some scalability dropped. This introduces
+    // Re-tile the operation with some scalability dropped. This introduces
     // loops for previously scalable vector/tile sizes.
     scf::SCFTilingOptions options;
     setSCFTileSizes(options, tilingOp, loopTileSizes, /*tileScalableFlags=*/{});
@@ -155,9 +208,10 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
     if (failed(tilingResult))
       return failure();
 
-    // 3. Update the lowering config of the new tiled operations.
-    auto newLoweringConfig = tilingConfig->getLoweringConfigWithNewVectorSizes(
-        vectorSizes, newScalableFlags);
+    // Update the lowering config of the new tiled operations.
+    IREE::CPU::LoweringConfigAttr newLoweringConfig =
+        getLoweringConfigWithNewVectorSizes(loweringConfigAttr, *vectorSizes,
+                                            newScalableFlags);
     for (auto *newOp : tilingResult->tiledOps) {
       if (isa<TilingInterface>(newOp))
         setLoweringConfig(newOp, newLoweringConfig);
