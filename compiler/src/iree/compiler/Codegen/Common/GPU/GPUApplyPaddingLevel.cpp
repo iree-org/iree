@@ -69,7 +69,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   SmallVector<Attribute> paddingValues;
   for (Value operand : tilingInterfaceOp.getOperation()->getOperands()) {
     paddingValues.push_back(
-        rewriter.getZeroAttr(getElementTypeOrSelf(operand.getType())));
+        rewriter.getOneAttr(getElementTypeOrSelf(operand.getType())));
   }
 
   // 1.b. Special adjustment for OnlineAttention mask padding that needs to be
